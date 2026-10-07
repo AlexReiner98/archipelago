@@ -27,6 +27,7 @@ import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './
 import { loadConfig } from './config.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
+import { configureOutbox } from './outbox.ts';
 import { hookSessionEnd, hookSessionStart } from './sessions.ts';
 import { callTool, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
@@ -83,6 +84,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const hosts = [`127.0.0.1:${port}`, `localhost:${port}`];
   const origins = hosts.map((h) => `http://${h}`);
   const tokens = options.auth === 'tokens';
+  configureOutbox(async (id) => (workspaces.has(id) ? (await workspaces.get(id)).lattice : undefined));
 
   /** The workspace a request is for and who is making it. */
   async function resolve(req: IncomingMessage, surface: 'human' | 'agent'): Promise<{ ws: Workspace; lattice: Lattice; actor: (label?: string) => Actor }> {

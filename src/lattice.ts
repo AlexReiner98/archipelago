@@ -375,6 +375,11 @@ export class Lattice {
         const [from, to] = [await lookup(op.from), await lookup(op.to)];
         if (to.private && !from.private) problems.push(`${where}: ${name(op.from)} is shared, so it cannot depend on ${name(op.to)}, which is private. Share ${name(op.to)}, or make ${name(op.from)} private too.`);
       }
+      if (op.op === 'merge') {
+        // A merge moves relations from one to the other, so the two must be equally visible.
+        const [keep, drop] = [await lookup(op.keep), await lookup(op.drop)];
+        if (keep.private !== drop.private) problems.push(`${where}: ${name(op.keep)} and ${name(op.drop)} must have the same visibility to be merged. Share or un-share one of them first.`);
+      }
       if (op.op !== 'update' || !op.visibility) continue;
       const self = await lookup(op.id);
       if (self.private && !self.was) {

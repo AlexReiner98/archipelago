@@ -1163,6 +1163,160 @@ async function graph(focus) {
   );
 }
 
+// ---- Workspace -----------------------------------------------------------
+
+/** Show a new token's secret once, with a way to copy it. */
+function secretBox(label, token) {
+  return h(
+    'div',
+    { class: 'secret' },
+    h('div', {}, h('strong', {}, label)),
+    h('code', {}, token),
+    h('div', { class: 'toolbar' }, h('button', { onclick: (e) => navigator.clipboard.writeText(token).then(() => (e.target.textContent = 'Copied')) }, 'Copy'), h('span', { class: 'muted small' }, 'Shown once. It is not stored and cannot be shown again.')),
+  );
+}
+
+async function workspace() {
+  const me = await (await fetch('/whoami', { headers: authHeaders() })).json();
+  const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name));
+  if (me.auth !== 'tokens') {
+    return main.replaceChildren(
+      head,
+      h(
+        'section',
+        { class: 'card' },
+        h(
+          'div',
+          { class: 'empty' },
+          'This server is in single-user mode: one workspace, no sign-in, and everything you do here is done as its owner. To share it with other people or separate customers, set "auth": "tokens" in lattice.config.json and restart; the first start prints your token.',
+        ),
+      ),
+    );
+  }
+  const [info, tokens, people] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 })]);
+  const personName = (id) => people.find((p) => p.id === id)?.title;
+  const notice = h('div');
+  const fail = (err) => notice.replaceChildren(h('div', { class: 'error', style: 'padding: 10px 14px' }, err.message));
+  const live = tokens.filter((t) => !t.revoked_at);
+
+  const tokenRow = (t) =>
+    h(
+      'li',
+      {},
+      h(
+        'div',
+        { class: 'row-top' },
+        h('span', { class: 'chip' }, t.kind),
+        h('span', { class: 'grow' }, h('strong', {}, t.name), t.admin && [' ', h('span', { class: 'pill' }, 'admin')], t.id === me.actor.token && [' ', h('span', { class: 'pill ok' }, 'this session')]),
+        h(
+          'button',
+          {
+            class: 'danger',
+            disabled: t.id === me.actor.token,
+            title: t.id === me.actor.token ? 'This is the token you are signed in with' : '',
+            onclick: () => confirm(`Revoke the token "${t.name}"? Whoever uses it is signed out at once.`) && api('token_revoke', { id: t.id }).then(workspace, fail),
+          },
+          'Revoke',
+        ),
+      ),
+      h('div', { class: 'row-sub' }, t.entity_id ? `for ${personName(t.entity_id) ?? t.entity_id}` : 'not tied to a person', ` · ends in ${t.hint} · `, t.last_used ? `last used ${when(t.last_used)}` : 'never used', t.expires_at && ` · expires ${when(t.expires_at)}`),
+    );
+
+  const agentName = h('input', { type: 'text', placeholder: 'e.g. claude-code', style: 'flex: 1; min-width: 180px' });
+  const memberName = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: 160px' });
+  const memberEmail = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: 160px' });
+  const memberAdmin = h('input', { type: 'checkbox' });
+  const accepts = h('input', { type: 'text', value: info.accepts_from.join(', '), placeholder: 'workspace ids, separated by commas', style: 'flex: 1; min-width: 220px' });
+
+  main.replaceChildren(
+    head,
+    notice,
+    h(
+      'div',
+      { class: 'grid' },
+      h(
+        'section',
+        { class: 'card wide' },
+        h('header', {}, h('h2', {}, 'Agent tokens'), h('span', { class: 'n' }, 'An agent with one of these acts for you: it sees what you see and proposes to you.')),
+        h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'agent').map(tokenRow)),
+        h(
+          'div',
+          { class: 'toolbar', style: 'padding: 12px 14px' },
+          agentName,
+          h(
+            'button',
+            {
+              class: 'primary',
+              onclick: () =>
+                api('token_create', { kind: 'agent', name: agentName.value.trim() })
+                  .then((made) => workspace().then(() => document.getElementById('main').children[1].replaceChildren(secretBox(`Token for ${made.name}`, made.token))))
+                  .catch(fail),
+            },
+            'Create agent token',
+          ),
+        ),
+      ),
+      me.actor.admin &&
+        h(
+          'section',
+          { class: 'card wide' },
+          h('header', {}, h('h2', {}, 'Members'), h('span', { class: 'n' }, 'People who can sign in to this workspace.')),
+          h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'human').map(tokenRow)),
+          h(
+            'div',
+            { class: 'toolbar', style: 'padding: 12px 14px' },
+            memberName,
+            memberEmail,
+            h('label', {}, memberAdmin, ' Admin'),
+            h(
+              'button',
+              {
+                class: 'primary',
+                onclick: () =>
+                  api('member_add', { name: memberName.value.trim(), email: memberEmail.value.trim() || undefined, admin: memberAdmin.checked })
+                    .then((made) => workspace().then(() => document.getElementById('main').children[1].replaceChildren(secretBox(`Sign-in token for ${memberName.value.trim()}. Send it to them privately.`, made.token))))
+                    .catch(fail),
+              },
+              'Add member',
+            ),
+          ),
+        ),
+      me.actor.admin &&
+        h(
+          'section',
+          { class: 'card wide' },
+          h('header', {}, h('h2', {}, 'Settings')),
+          h(
+            'dl',
+            { class: 'fields' },
+            h('dt', {}, 'New things are'),
+            h(
+              'dd',
+              {},
+              h(
+                'select',
+                { onchange: (e) => api('workspace_set', { default_visibility: e.target.value }).then(workspace, fail) },
+                [['private', 'Private to their author unless shared'], ['shared', 'Shared with everyone unless made private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label)),
+              ),
+            ),
+            h('dt', {}, 'Accept notifications from'),
+            h(
+              'dd',
+              {},
+              h(
+                'div',
+                { class: 'toolbar' },
+                accepts,
+                h('button', { onclick: () => api('workspace_set', { accepts_from: accepts.value.split(',').map((s) => s.trim()).filter(Boolean) }).then(workspace, fail) }, 'Save'),
+              ),
+              h('div', { class: 'muted small' }, `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".`),
+            ),
+          ),
+        ),
+    ),
+  );
+}
+
 // ---- Activity ------------------------------------------------------------
 
 function describeEvent(ev) {
@@ -1278,7 +1432,7 @@ async function activity() {
 
 // ---- routing -------------------------------------------------------------
 
-const ROUTES = { today, review, map, activity, automations, graph };
+const ROUTES = { today, review, map, activity, automations, graph, workspace };
 
 async function route() {
   const [, name = 'today', arg] = location.hash.split('/');

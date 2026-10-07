@@ -6,6 +6,7 @@ import { actorId, type Actor, type Lattice } from './lattice.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
+import { acceptedSenders, notifyWorkspace } from './outbox.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
 import { VIEWS } from './views.ts';
@@ -300,15 +301,37 @@ export const TOOLS: Record<string, Tool> = {
     input: { id: z.string() },
     run: async (l, actor, input) => revokeToken(l.db, input.id, actor.admin ? undefined : (actor.person ?? '')),
   },
-  workspace_set: {
-    description: 'Change a workspace setting. default_visibility: whether new things are private to their author (the default) or shared with the workspace unless they say otherwise. Admins only.',
+  notify_workspace: {
+    description: 'Send a notification to another workspace on this server. It arrives only if that workspace\u2019s admin has chosen to accept notifications from this one.',
     humanOnly: true,
-    input: { default_visibility: z.enum(['private', 'shared']) },
+    input: {
+      workspace: z.string().describe('The other workspace\u2019s id.'),
+      title: z.string().min(1),
+      body: z.string().optional(),
+      level: z.enum(['info', 'warning', 'urgent']).optional(),
+    },
+    run: async (l, actor, input) => notifyWorkspace(l, actor, input),
+  },
+  workspace_info: {
+    description: 'This workspace\u2019s settings: its id, the default visibility of new things, and which workspaces it accepts notifications from.',
+    humanOnly: true,
+    input: {},
+    run: async (l) => ({ id: l.workspace, default_visibility: await l.defaultVisibility(), accepts_from: await acceptedSenders(l) }),
+  },
+  workspace_set: {
+    description: 'Change workspace settings. default_visibility: whether new things are private to their author (the default) or shared unless they say otherwise. accepts_from: which other workspaces may send this one notifications. Admins only.',
+    humanOnly: true,
+    input: {
+      default_visibility: z.enum(['private', 'shared']).optional(),
+      accepts_from: z.array(z.string()).optional().describe('Ids of the workspaces allowed to send this one notifications. Replaces the list.'),
+    },
     run: async (l, actor, input) => {
       needAdmin(actor, 'change workspace settings');
-      await l.db.query(`insert into setting (key, value) values ('default_visibility', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(input.default_visibility)]);
-      await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `default_visibility set to ${input.default_visibility}` });
-      return input;
+      for (const [key, value] of Object.entries(input)) {
+        await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
+        await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${key} set to ${JSON.stringify(value)}` });
+      }
+      return { id: l.workspace, default_visibility: await l.defaultVisibility(), accepts_from: await acceptedSenders(l) };
     },
   },
   decide: {

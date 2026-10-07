@@ -217,3 +217,6 @@ svg.graph .dim { opacity: 0.18; }
 
 #whoami { margin-top: auto; padding: 10px; border-top: 1px solid var(--line); display: grid; gap: 2px; }
 #whoami:empty { display: none; }
+
+.secret { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--warn); background: var(--warn-soft); border-radius: 10px; display: grid; gap: 8px; }
+.secret code { font: 13px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; user-select: all; }

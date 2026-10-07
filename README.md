@@ -28,7 +28,7 @@ have human authority; the MCP endpoint does not, and two tools (`decide`,
 The web UI has five screens: **Today** (notifications, sessions and the
 standing questions), **Review** (approve, exclude or correct proposed changes),
 **Map** (search, create, and each entity with its fields, relations and
-history), **Graph**, **Automations** and **Activity** (the event log, one line
+history), **Graph**, **Automations**, **Workspace** and **Activity** (the event log, one line
 per change set).
 
 The graph draws the map as nodes and arrows: what blocks what, what belongs to
@@ -159,12 +159,11 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 - Launching into the desktop app. Launched sessions are headless.
 - Adding relations in the web UI. They can be read on an entity page and in the graph, but only added through `change`.
 - Semantic search. Search is text matching.
-- Screens for managing members, tokens and workspace settings. They are
-  tools only (`member_add`, `token_create`, `token_list`, `token_revoke`,
-  `workspace_set`), called from the CLI.
+- A screen for the operator. Workspaces are created with a request to
+  `/operator/workspaces`.
 - Hosting: a Postgres server instead of the embedded database, TLS, and
   listening beyond this machine.
-- Notifications between workspaces, and single sign-on.
+- Single sign-on.
 
 ## Identity and workspaces
 
@@ -224,6 +223,13 @@ change that:
   - **A held resource is held for everyone.** If someone's private session
     holds the live lane, others are refused it and told it is held by
     "someone's private session".
+
+- **Notifications between workspaces.** A human can send another workspace a
+  notification with `notify_workspace`. It arrives only if that workspace's
+  admin has added the sender to the workspaces it accepts, and accepting is
+  one-way.
+- **The Workspace screen** manages all of this: your agent tokens, members,
+  the default visibility and which workspaces to accept notifications from.
 
 Limits, stated plainly: the server
 still listens on this machine only, with no

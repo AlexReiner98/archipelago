@@ -288,3 +288,30 @@ test('nothing can depend on a private item from outside it, and a held resource 
   assert.deepEqual(now.waiting_on_resource.map((t: any) => t.title), ['Other live work']);
   assert.equal((await api(sam, 'view', { name: 'available_now' })).held_resources[0].held_by_title, 'Sam debugging');
 });
+
+test('a workspace receives notifications only from workspaces its admin accepts', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const operator = workspaces.ensureOperator()!;
+  const mine = (await createToken((await workspaces.get('default')).lattice.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const send = (token: string, workspace: string) => call('/api/notify_workspace', token, { workspace, title: 'The shadow study is ready', level: 'warning' });
+
+  // Refused the same way whether the workspace is closed to us or does not exist.
+  assert.match((await send(mine, 'acme')).error, /does not accept notifications from "default"/);
+  assert.match((await send(mine, 'nowhere')).error, /does not accept notifications from "default"/);
+
+  const agent = (await call('/api/token_create', mine, { kind: 'agent', name: 'bot' })).result.token;
+  assert.match((await call('/api/notify_workspace', agent, { workspace: 'acme', title: 'x' })).error, /humans only/);
+
+  const set = await call('/api/workspace_set', theirs, { accepts_from: ['default'] });
+  assert.deepEqual(set.result, { id: 'acme', default_visibility: 'private', accepts_from: ['default'] });
+  assert.deepEqual((await send(mine, 'acme')).result, { delivered_to: 'acme' });
+
+  const inbox = (await call('/api/view', theirs, { name: 'notifications' })).result as any[];
+  assert.deepEqual([inbox[0].title, inbox[0].level, inbox[0].from], ['The shadow study is ready', 'warning', 'agent:workspace:default/alex']);
+  assert.equal(((await call('/api/view', mine, { name: 'notifications' })).result as any[]).length, 0, 'nothing lands in the sender\'s own inbox');
+  // Accepting is one-way: Acme cannot write back until the other side accepts it.
+  assert.match((await send(theirs, 'default')).error, /does not accept notifications from "acme"/);
+  const sent = (await call('/api/events', mine, { limit: 5 })).result as any[];
+  assert.ok(sent.some((e) => e.action === 'workspace.notify' && e.detail.to === 'acme'), 'the sender\'s log records it');
+});
