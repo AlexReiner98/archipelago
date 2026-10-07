@@ -33,7 +33,9 @@
       "statuses": { "open": ["running", "waiting"], "closed": ["finished", "failed", "cancelled"] },
       "fields": {
         "surface": { "type": "string", "description": "Where it runs, e.g. claude-code." },
-        "cwd": { "type": "string" }
+        "cwd": { "type": "string" },
+        "session_id": { "type": "string", "description": "The id the surface gave the session." },
+        "last_seen": { "type": "datetime", "description": "Last time the session reported in." }
       }
     }
   ],

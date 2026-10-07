@@ -1,6 +1,11 @@
 // One local process owns the database and serves both surfaces:
 //   POST /mcp        MCP (streamable HTTP) for agents
 //   POST /api/<tool> the same tools for the human CLI and web UI, with human authority
+//   POST /agent/<tool> the same tools with agent authority, as plain JSON, for
+//                    hooks and scripts that cannot speak MCP
+//   POST /hooks/session-start, /hooks/session-end
+//                    Claude Code HTTP hooks: a session registers itself and is
+//                    handed what the map knows about its repository
 //   GET  /           the web UI
 // It listens on 127.0.0.1 only.
 
@@ -12,8 +17,10 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
+import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { Lattice } from './lattice.ts';
 import { Registry } from './packs.ts';
+import { hookSessionEnd, hookSessionStart } from './sessions.ts';
 import { callTool, TOOLS } from './tools.ts';
 
 const actorField = {
@@ -88,20 +95,37 @@ export function createHttpServer(lattice: Lattice, port: number): Server {
         return await transport.handleRequest(req, res, await readJson(req));
       }
 
-      if (req.method === 'POST' && url.pathname.startsWith('/api/')) {
-        // This route carries human authority, so keep other web pages out of
-        // it: a browser always sends Origin on a cross-site POST, and cannot
-        // send a JSON content type without a preflight we never answer. Our
-        // own UI is the one origin allowed.
+      const surface = url.pathname.startsWith('/api/') ? 'api' : url.pathname.startsWith('/agent/') ? 'agent' : undefined;
+      if (req.method === 'POST' && surface) {
+        // /api carries human authority, so keep other web pages out: a browser
+        // always sends Origin on a cross-site POST, and cannot send a JSON
+        // content type without a preflight we never answer. Our own UI is the
+        // one origin allowed.
         const origin = req.headers.origin;
         if ((origin && !origins.includes(origin)) || !hosts.includes(req.headers.host ?? '') || !req.headers['content-type']?.startsWith('application/json')) {
-          return send(res, 403, { error: 'The API accepts only local JSON requests from the CLI or the lattice UI.' });
+          return send(res, 403, { error: 'The API accepts only local JSON requests from the CLI, hooks or the lattice UI.' });
         }
-        const name = url.pathname.slice('/api/'.length);
+        const name = url.pathname.slice(surface.length + 2);
         try {
-          return send(res, 200, { result: await callTool(lattice, { kind: 'human', name: 'local' }, name, await readJson(req)) });
+          const body = ((await readJson(req)) ?? {}) as Record<string, unknown>;
+          if (surface === 'api') return send(res, 200, { result: await callTool(lattice, { kind: 'human', name: 'local' }, name, body) });
+          const { actor, ...input } = body;
+          return send(res, 200, { result: await callTool(lattice, { kind: 'agent', name: (actor as string) || 'script' }, name, input) });
         } catch (err) {
           return send(res, 400, { error: (err as Error).message });
+        }
+      }
+
+      if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {
+        if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are local only.' });
+        const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; reason?: string };
+        if (url.pathname === '/hooks/session-start') {
+          const additionalContext = await hookSessionStart(lattice, body);
+          return send(res, 200, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext } });
+        }
+        if (url.pathname === '/hooks/session-end') {
+          await hookSessionEnd(lattice, body);
+          return send(res, 200, {});
         }
       }
 
@@ -116,6 +140,7 @@ export function createHttpServer(lattice: Lattice, port: number): Server {
 if (import.meta.main) {
   const config = loadConfig();
   const lattice = new Lattice(await openDb(config.dataDir), new Registry(config.packsDir, config.packs), config.policy);
+  configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'] });
   const server = createHttpServer(lattice, config.port);
   server.listen(config.port, '127.0.0.1', () => {
     console.log(`lattice listening on http://127.0.0.1:${config.port}  (MCP at /mcp)`);
@@ -123,6 +148,7 @@ if (import.meta.main) {
     console.log(`packs: ${lattice.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
   });
   const stop = async () => {
+    stopAllLaunched();
     server.close();
     await lattice.db.close();
     process.exit(0);

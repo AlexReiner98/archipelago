@@ -3,6 +3,8 @@
 
 import { z } from 'zod';
 import type { Actor, Lattice } from './lattice.ts';
+import { launch, stopLaunched } from './launcher.ts';
+import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
@@ -171,6 +173,41 @@ export const TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => l.release(actor, input),
   },
+  session_start: {
+    description:
+      'Register this agent session in the map so the human can see it. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it. Takes effect at once.',
+    input: {
+      title: z.string().optional().describe('A few words on what this session is for.'),
+      task: z.string().optional().describe('Id of the entity being worked on.'),
+      surface: z.string().optional().describe('Where you are running, e.g. claude-code, claude-desktop.'),
+      cwd: z.string().optional().describe('Your working directory. Used to find the repository.'),
+      session_id: z.string().optional().describe('The id your surface gave this session, if you know it. Makes this call safe to repeat.'),
+    },
+    run: async (l, actor, input) => sessionStart(l, actor, input),
+  },
+  session_update: {
+    description: 'Report in from a registered session: a note worth keeping, a change to waiting or running, or a task you have picked up. With only the run, it is a heartbeat.',
+    input: {
+      run: z.string().describe('The run id from session_start, or the session id.'),
+      status: z.enum(['running', 'waiting']).optional(),
+      note: z.string().optional().describe('What happened, what you found, or what you are blocked on.'),
+      task: z.string().optional(),
+    },
+    run: async (l, actor, input) => sessionUpdate(l, actor, input),
+  },
+  session_end: {
+    description: 'Close a registered session with its outcome and a summary. Everything it held is released.',
+    input: {
+      run: z.string().describe('The run id from session_start, or the session id.'),
+      outcome: z.enum(['finished', 'failed', 'cancelled']).optional(),
+      summary: z.string().optional().describe('What was done and what is left.'),
+    },
+    run: async (l, actor, input) => {
+      const result = await sessionEnd(l, actor, input);
+      // If this server started the session's process, stop that too.
+      return { ...result, process_stopped: stopLaunched(result.run) };
+    },
+  },
   check_connections: {
     description: 'Ping every connection (external tool) and record whether it is reachable. Work that needs an unreachable connection shows as blocked.',
     input: {},
@@ -180,6 +217,17 @@ export const TOOLS: Record<string, Tool> = {
     description: 'Copy new entries from a connection\'s tool-call log into the activity log, so actions taken in that tool are visible here.',
     input: { connection: z.string() },
     run: async (l, actor, input) => l.importAudit(actor, input),
+  },
+  launch: {
+    description:
+      'Start a headless Claude Code session on a task, in the task\u2019s repository, with its brief as the prompt. The session is registered first, so it holds any exclusive resource the task needs, or the launch is refused.',
+    humanOnly: true,
+    input: {
+      task: z.string(),
+      mode: z.enum(['plan', 'acceptEdits']).optional().describe('plan (default): read and investigate only. acceptEdits: may edit files in the repository.'),
+      instructions: z.string().optional().describe('Anything to add to the brief.'),
+    },
+    run: async (l, actor, input) => launch(l, actor, input),
   },
   decide: {
     description: 'Approve or reject a proposal.',

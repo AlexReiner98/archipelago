@@ -55,6 +55,39 @@ npm run lattice -- reject <id> "why"
 `claim` and `release` (taking an exclusive resource, such as the one live Rhino
 session) take effect at once for agents too.
 
+## Sessions and the live lane
+
+An agent session registers itself in the map as a run, says what it is working
+on, and is given any exclusive resource that work needs, or told who holds it.
+When the session ends, everything it held is released. These writes take effect
+at once; they are the session's own state, not facts about the world.
+
+- **From an agent:** the `session_start`, `session_update` and `session_end`
+  tools.
+- **Automatically, from Claude Code:** merge
+  [examples/claude-code-hooks.json](examples/claude-code-hooks.json) into a
+  project's `.claude/settings.json`. Each session opened there then registers
+  on start and closes on end, and starts with what the map knows about that
+  repository: the open work nothing blocks, the blocked work and what it waits
+  on, and whether each exclusive resource is free. The repository is matched
+  by the `path` on a `software.repo` entity.
+- **From a script:** `POST /agent/<tool>` takes the same tools as plain JSON
+  with agent authority.
+
+- **Launched from the map:** an entity page's **Launch session** button (or
+  the human-only `launch` tool) starts a headless Claude Code session in the
+  task's repository with its brief as the prompt. You choose what it may do:
+  *investigate only* (plan mode, the default) or *may edit files*. It is
+  registered before it starts, so it takes the lane or the launch is refused.
+  Its answer, turn count and cost are written to the run when it ends, and
+  the full transcript is kept under `runs/`. Ending the run from the UI stops
+  the process. This needs the `claude` CLI on the PATH.
+
+The Today screen lists open sessions, flags one that has not reported for 30
+minutes, and can end it, which releases what it holds. An entity page has
+**Copy session brief**: the task's context, blockers, needed resources and the
+rules that govern them, as text to start a session with.
+
 ## Views
 
 The questions the map exists to answer. `npm run lattice -- view` lists them.
@@ -68,6 +101,9 @@ The questions the map exists to answer. `npm run lattice -- view` lists them.
 | `at_risk` | What is about to go wrong? |
 | `blockers` | What is blocked, and what has to move first? |
 | `available_now` | What can run right now, and who holds each resource? |
+| `sessions` | Which agent sessions are open, on what, holding what? |
+| `brief` | What does a session need to know to start on this task? |
+| `repo_work` | What open work belongs to this repository? |
 
 Blockers are never stored. They are derived each time from `depends_on` and
 `needs` relations, so they cannot go stale.
@@ -90,6 +126,8 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 
 ## Not built yet
 
+- Launching into the desktop app. Launched sessions are headless.
+- Unattended automations: nothing launches a session on a schedule or trigger.
 - A graph view, and editing fields other than status in the web UI.
 - Undo. The event log records what changed, but nothing replays it backwards.
 - Semantic search. Search is text matching.

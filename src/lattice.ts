@@ -294,7 +294,11 @@ export class Lattice {
     return { warnings };
   }
 
-  private async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean } = {}) {
+  /**
+   * Apply a change without consulting policy. For human changes, approved
+   * proposals, and the system's own bookkeeping (sessions).
+   */
+  async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean } = {}) {
     const ops = dropExcepted(input.ops, opts.except ?? []);
     if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
     // Validate again: the map may have changed since this was proposed.

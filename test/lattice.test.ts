@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { openDb } from '../src/db.ts';
+import { configureLauncher, launch } from '../src/launcher.ts';
 import { Lattice, type Actor, type Op } from '../src/lattice.ts';
 import { Registry } from '../src/packs.ts';
+import { hookSessionEnd, hookSessionStart, sessionEnd, sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 
@@ -322,4 +324,170 @@ test('a reviewer can correct a proposal while approving it', async () => {
   const [event] = (await l.events({ target: feature.id })) as any[];
   assert.equal(event.actor, 'agent:test');
   assert.equal(event.detail.revised_by, 'human:test');
+});
+
+/** A project in a repo, with one task that needs the live lane and one that does not. */
+async function laneSetup(l: Lattice) {
+  return make(l, [
+    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Aperture repo', props: { path: 'C:\\code\\Aperture' } },
+    { op: 'create', ref: 'proj', type: 'project', title: 'Aperture' },
+    { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
+    { op: 'create', ref: 'rule', type: 'decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives Rhino.' } },
+    { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
+    { op: 'create', ref: 'offline', type: 'task', title: 'Write unit tests' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Which target?' },
+    { op: 'create', ref: 'gated', type: 'task', title: 'Tune the solver' },
+    { op: 'link', type: 'software.lives_in', from: 'proj', to: 'repo' },
+    { op: 'link', type: 'part_of', from: 'live', to: 'proj' },
+    { op: 'link', type: 'part_of', from: 'offline', to: 'proj' },
+    { op: 'link', type: 'part_of', from: 'gated', to: 'proj' },
+    { op: 'link', type: 'depends_on', from: 'gated', to: 'q' },
+    { op: 'link', type: 'needs', from: 'live', to: 'lane' },
+    { op: 'link', type: 'governed_by', from: 'lane', to: 'rule' },
+  ]);
+}
+
+test('a session registers, takes the lane its task needs, and gives it back when it ends', async () => {
+  const l = await fresh();
+  const made = await laneSetup(l);
+
+  const one = await sessionStart(l, agent, { task: made.live, cwd: 'c:/code/aperture/src', session_id: 's1' });
+  assert.equal(one.status, 'running');
+  assert.deepEqual(one.claimed, ['Live lane']);
+  assert.equal(one.repo?.title, 'Aperture repo', 'found by a subfolder, whatever the slashes or case');
+  assert.equal((await l.proposals()).length, 0, 'operational state needs no approval');
+  assert.equal((await sessionStart(l, agent, { session_id: 's1' })).resumed, true, 'announcing twice is safe');
+
+  // A second session wanting the same lane is told who has it, and waits.
+  const two = await sessionStart(l, agent, { task: made.live, session_id: 's2' });
+  assert.equal(two.status, 'waiting');
+  assert.match(two.blocked![0].why, /held by "Session: Capture probe"/);
+
+  await sessionUpdate(l, agent, { run: 's1', note: 'Probe captured; parity is off by 2 px' });
+  let view = (await VIEWS.sessions.run(l, {})) as any;
+  const first = view.open.find((r: any) => r.id === one.run);
+  assert.deepEqual(first.holds.map((h: any) => h.title), ['Live lane']);
+  assert.deepEqual(first.working_on.map((w: any) => w.title), ['Capture probe']);
+  assert.equal(first.stale, false);
+  assert.match((await l.entity(one.run))!.body, /parity is off by 2 px/);
+
+  const ended = await sessionEnd(l, agent, { run: 's1', summary: 'Done' });
+  assert.deepEqual([ended.status, ended.released], ['finished', 1]);
+  assert.equal((await sessionEnd(l, agent, { run: one.run })).already_ended, true);
+  view = (await VIEWS.sessions.run(l, {})) as any;
+  assert.deepEqual(view.open.map((r: any) => r.id), [two.run]);
+  assert.equal((await l.claim(agent, { resource: made.lane, holder: two.run, reason: 'My turn' })).status, 'claimed');
+  await assert.rejects(sessionUpdate(l, agent, { run: one.run, note: 'late' }), /already ended/);
+});
+
+test('a session that goes quiet is shown as stale', async () => {
+  const l = await fresh();
+  const { run } = await sessionStart(l, agent, { title: 'Quiet one' });
+  await l.db.query(`update entity set props = props || '{"last_seen":"2020-01-01T00:00:00Z"}' where id = $1`, [run]);
+  assert.equal(((await VIEWS.sessions.run(l, {})) as any).open[0].stale, true);
+  await sessionUpdate(l, agent, { run });
+  assert.equal(((await VIEWS.sessions.run(l, {})) as any).open[0].stale, false, 'a heartbeat clears it');
+  assert.equal(((await l.events({ target: run })) as any[]).length, 1, 'and leaves no event');
+});
+
+test('a brief gathers a task\'s context, blockers, needs and rules', async () => {
+  const l = await fresh();
+  const made = await laneSetup(l);
+  const holder = await sessionStart(l, agent, { title: 'Other session' });
+  await l.claim(agent, { resource: made.lane, holder: holder.run, reason: 'busy' });
+
+  const brief = (await VIEWS.brief.run(l, { task: made.live })) as any;
+  assert.equal(brief.repo.path, 'C:\\code\\Aperture');
+  assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
+  assert.deepEqual(brief.rules.map((r: any) => r.title), ['One live lane.']);
+  for (const part of ['# Capture probe', 'Part of: Aperture', 'held by Other session', 'Only one session drives Rhino.']) {
+    assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
+  }
+  const gated = (await VIEWS.brief.run(l, { task: made.gated })) as any;
+  assert.deepEqual(gated.root_blockers.map((b: any) => b.title), ['Which target?']);
+});
+
+test('the session-start hook registers the session and hands it the repo\'s work and the lane state', async () => {
+  const l = await fresh();
+  const made = await laneSetup(l);
+  const text = await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Aperture' });
+  assert.match(text, /registered in Lattice/);
+  assert.match(text, /Repository: Aperture repo/);
+  assert.match(text, new RegExp(`Write unit tests \\(${made.offline}\\)`));
+  assert.match(text, /Tune the solver .* waiting on: Which target\?/);
+  assert.match(text, /"Live lane" .* is free/);
+
+  const other = await sessionStart(l, agent, { title: 'Lane holder' });
+  await l.claim(agent, { resource: made.lane, holder: other.run, reason: 'busy' });
+  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), /does not know a repository[\s\S]*HELD by Lane holder: do not use it/);
+
+  await hookSessionEnd(l, { session_id: 'abc', reason: 'logout' });
+  const open = ((await VIEWS.sessions.run(l, {})) as any).open.map((r: any) => r.title);
+  assert.ok(!open.includes('Session in Aperture repo'));
+  await hookSessionEnd(l, { session_id: 'never-seen' });
+});
+
+test('launching runs a headless session on a task, holding the lane and recording the outcome', async () => {
+  const l = await fresh();
+  const dir = mkdtempSync(join(tmpdir(), 'lattice-launch-'));
+  // A stand-in for the Claude Code CLI: echoes what it was given, as stream-json.
+  const cli = join(dir, 'fake-claude.mjs');
+  writeFileSync(
+    cli,
+    `let prompt = '';
+     process.stdin.on('data', (d) => (prompt += d)).on('end', () => {
+       const say = (m) => console.log(JSON.stringify(m));
+       say({ type: 'system', subtype: 'init', session_id: process.argv[process.argv.indexOf('--session-id') + 1] });
+       if (prompt.includes('PLANONLY')) {
+         say({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'ExitPlanMode', input: { plan: 'The plan: do X then Y' } }] } });
+         return setTimeout(() => say({ type: 'result', is_error: false, result: '', num_turns: 2 }), 100);
+       }
+       setTimeout(() => say({ type: 'result', is_error: prompt.includes('FAIL'), num_turns: 3, total_cost_usd: 0.5,
+         result: 'mode=' + process.argv[process.argv.indexOf('--permission-mode') + 1] + ' cwd=' + process.cwd() + ' saw=' + prompt.includes('# Capture probe') + '/' + prompt.includes('cannot edit files') }), 300);
+     });`,
+  );
+  configureLauncher({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), command: [process.execPath, cli] });
+  const made = await make(l, [
+    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Repo', props: { path: dir } },
+    { op: 'create', ref: 'proj', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
+    { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
+    { op: 'create', ref: 'homeless', type: 'task', title: 'No repo' },
+    { op: 'link', type: 'software.lives_in', from: 'proj', to: 'repo' },
+    { op: 'link', type: 'part_of', from: 'live', to: 'proj' },
+    { op: 'link', type: 'needs', from: 'live', to: 'lane' },
+  ]);
+  const ended = async (run: string) => {
+    for (let i = 0; i < 100; i++) {
+      const e = (await l.entity(run))!;
+      if (!e.is_open) return e;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('the launched session never ended');
+  };
+
+  await assert.rejects(launch(l, agent, { task: made.live }), /Only a human/);
+  await assert.rejects(launch(l, human, { task: made.homeless }), /not linked to a repository/);
+
+  const first = await launch(l, human, { task: made.live });
+  assert.deepEqual([first.mode, first.claimed], ['plan', ['Live lane']]);
+  // While it runs it holds the lane, so a second launch on the same task is refused.
+  await assert.rejects(launch(l, human, { task: made.live }), /Not launched\. "Live lane" is held by "Headless \(plan\): Capture probe"/);
+
+  const done = await ended(first.run);
+  assert.equal(done.status, 'finished');
+  assert.match(done.body, /mode=plan/);
+  assert.match(done.body, /saw=true\/true/, 'the prompt carried the brief and the mode note');
+  assert.match(done.body, /3 turns, \$0\.50; transcript: /);
+  assert.ok(done.body.toLowerCase().includes(`cwd=${dir}`.toLowerCase()), 'it ran in the repository');
+  assert.match(readFileSync(first.transcript, 'utf8'), /"type":"result"/);
+  assert.equal(((await VIEWS.available_now.run(l, {})) as any).held_resources.length, 0, 'the lane came back');
+
+  const planned = await ended((await launch(l, human, { task: made.live, instructions: 'PLANONLY' })).run);
+  assert.match(planned.body, /finished: The plan: do X then Y/, 'a plan-mode answer is found even though the result is empty');
+
+  const failing = await launch(l, human, { task: made.live, mode: 'acceptEdits', instructions: 'please FAIL' });
+  const failed = await ended(failing.run);
+  assert.equal(failed.status, 'failed');
+  assert.match(failed.body, /mode=acceptEdits/);
 });

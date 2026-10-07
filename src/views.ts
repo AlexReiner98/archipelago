@@ -1,7 +1,7 @@
 // Views: the questions the map exists to answer. Nothing here is stored;
 // blockers are derived from relations every time, so they cannot go stale.
 
-import type { Lattice } from './lattice.ts';
+import type { Entity, Lattice } from './lattice.ts';
 
 interface Edge {
   x: string;
@@ -70,7 +70,7 @@ class BlockGraph {
   }
 }
 
-async function blockGraph(l: Lattice): Promise<BlockGraph> {
+export async function blockGraph(l: Lattice): Promise<BlockGraph> {
   const { rows } = await l.db.query<Edge>(EDGES);
   return new BlockGraph(rows);
 }
@@ -211,6 +211,143 @@ async function atRisk(l: Lattice, input: { days?: number }) {
   };
 }
 
+/** Minutes without a report before an open session is shown as stale. */
+const STALE_MINUTES = 30;
+
+async function sessions(l: Lattice) {
+  const runs = l.registry.family('sys.run');
+  const { rows: open } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null order by created_at desc`, [runs]);
+  const { rows: links } = await l.db.query<{ run: string; type: string; id: string; title: string; entity_type: string }>(
+    `select r.from_id as run, r.type, e.id, e.title, e.type as entity_type from relation r join entity e on e.id = r.to_id
+     where r.from_id = any($1::text[]) and r.valid_to is null and r.type in ('sys.works_on', 'holds', 'software.lives_in')`,
+    [open.map((r) => r.id)],
+  );
+  const { rows: ended } = await l.db.query(
+    `select id, title, status, updated_at from entity where type = any($1::text[]) and not is_open and archived_at is null order by updated_at desc limit 10`,
+    [runs],
+  );
+  const of = (run: string, type: string) => links.filter((x) => x.run === run && x.type === type).map(({ id, title, entity_type }) => ({ id, title, type: entity_type }));
+  return {
+    stale_after_minutes: STALE_MINUTES,
+    open: open.map((r) => {
+      const seen = (r.props.last_seen as string | undefined) ?? r.created_at.toISOString();
+      return {
+        id: r.id,
+        title: r.title,
+        status: r.status,
+        surface: r.props.surface,
+        cwd: r.props.cwd,
+        started: r.created_at,
+        last_seen: seen,
+        stale: Date.now() - Date.parse(seen) > STALE_MINUTES * 60_000,
+        working_on: of(r.id, 'sys.works_on'),
+        holds: of(r.id, 'holds'),
+        repo: of(r.id, 'software.lives_in')[0],
+      };
+    }),
+    recently_ended: ended,
+  };
+}
+
+/** Everything a session needs to start on a task, as data and as text to paste. */
+async function brief(l: Lattice, input: { task?: string }) {
+  if (!input.task) throw new Error('brief needs "task": the id of the entity to work on');
+  const task = await l.entity(input.task);
+  if (!task) throw new Error(`No entity "${input.task}"`);
+
+  // The task, then what it is part of, outwards.
+  const chain: Entity[] = [task];
+  for (let at = task.id, depth = 0; depth < 6; depth++) {
+    const { rows } = await l.db.query<Entity>(
+      `select e.* from relation r join entity e on e.id = r.to_id where r.type = 'part_of' and r.from_id = $1 and r.valid_to is null limit 1`,
+      [at],
+    );
+    if (!rows[0] || chain.some((c) => c.id === rows[0].id)) break;
+    chain.push(rows[0]);
+    at = rows[0].id;
+  }
+  const ids = chain.map((c) => c.id);
+  const related = async (type: string, from: string[]) =>
+    (
+      await l.db.query<Entity>(
+        `select distinct e.* from relation r join entity e on e.id = r.to_id where r.type = $1 and r.from_id = any($2::text[]) and r.valid_to is null and e.archived_at is null`,
+        [type, from],
+      )
+    ).rows;
+
+  const [repo] = l.registry.relations.has('software.lives_in') ? await related('software.lives_in', ids) : [];
+  const needs = await related('needs', [task.id]);
+  const rules = await related('governed_by', [...ids, ...needs.map((n) => n.id)]);
+  const issues = await related('addresses', [task.id]);
+  const assumptions = await related('assumes', ids);
+  const graph = await blockGraph(l);
+  const roots = graph.roots(task.id);
+  const names = await briefs(l, [...(graph.direct.get(task.id) ?? []).map((e) => e.y), ...roots]);
+  const blockedBy = (graph.direct.get(task.id) ?? []).map((e) => ({ why: e.why, entity: names.get(e.y) }));
+  const { rows: held } = await l.db.query<{ to_id: string; title: string }>(
+    `select h.to_id, e.title from relation h join entity e on e.id = h.from_id where h.type = 'holds' and h.valid_to is null and h.to_id = any($1::text[])`,
+    [needs.map((n) => n.id)],
+  );
+
+  const lines = [`# ${task.title}`, `${l.registry.type(task.type)?.title ?? task.type}, ${task.status}. Lattice id: ${task.id}`];
+  if (task.body) lines.push('', task.body);
+  if (chain.length > 1) lines.push('', `Part of: ${chain.slice(1).map((c) => c.title).join(' > ')}`);
+  if (repo) lines.push(`Repository: ${repo.title} (${repo.props.path ?? repo.props.remote ?? 'no path recorded'})`);
+  if (roots.length) {
+    lines.push('', '## Blocked', 'This cannot finish until:');
+    for (const id of roots) lines.push(`- ${names.get(id)?.title} (${names.get(id)?.type}, ${names.get(id)?.status})`);
+  }
+  if (needs.length) {
+    lines.push('', '## Needs');
+    for (const n of needs) {
+      const holder = held.find((h) => h.to_id === n.id);
+      lines.push(`- ${n.title}: ${n.status}${holder ? `, held by ${holder.title}` : ''}${n.props.exclusive === false ? '' : ' (exclusive: claim it before use, release it after)'}`);
+    }
+  }
+  if (rules.length) {
+    lines.push('', '## Rules that apply');
+    for (const r of rules) lines.push(`- ${r.title}${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && r.body ? ` ${r.body}` : ''}`);
+  }
+  if (issues.length) lines.push('', '## Addresses', ...issues.map((i) => `- ${i.title} (${i.status})${i.body ? `: ${i.body}` : ''}`));
+  if (assumptions.length) lines.push('', '## Assumes', ...assumptions.map((a) => `- ${a.title} (${a.status})`));
+  lines.push('', '## Reporting', `Register with lattice (session_start, task ${task.id}), note anything worth knowing with session_update, and call session_end with a summary when done.`);
+
+  const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
+  return {
+    task: slim(task),
+    part_of: chain.slice(1).map(slim),
+    repo: repo && { ...slim(repo), path: repo.props.path },
+    blocked_by: blockedBy,
+    root_blockers: roots.map((id) => names.get(id)),
+    needs: needs.map((n) => ({ ...slim(n), exclusive: n.props.exclusive !== false, held_by: held.find((h) => h.to_id === n.id)?.title })),
+    rules: rules.map(slim),
+    text: lines.join('\n'),
+  };
+}
+
+/** Open work that belongs to whatever lives in a repository, split by whether it can run now. */
+async function repoWork(l: Lattice, input: { repo?: string }) {
+  if (!input.repo) throw new Error('repo_work needs "repo": the id of a repository');
+  const graph = await blockGraph(l);
+  const { rows } = await l.db.query<Brief>(
+    `with recursive scope(id) as (
+       select from_id from relation where type = 'software.lives_in' and to_id = $1 and valid_to is null
+       union
+       select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null
+     )
+     select e.id, e.type, e.title, e.status, e.owner, e.props->>'due' as due
+     from entity e join scope s on s.id = e.id
+     where e.is_open and e.archived_at is null and e.type = any($2::text[])
+     order by e.props->>'due' nulls last, e.updated_at desc`,
+    [input.repo, [...l.registry.family('task'), ...l.registry.family('decision')]],
+  );
+  const names = await briefs(l, rows.flatMap((r) => graph.roots(r.id)));
+  return {
+    ready: rows.filter((r) => !graph.isBlocked(r.id)),
+    blocked: rows.filter((r) => graph.isBlocked(r.id)).map((r) => ({ ...r, waiting_on: graph.roots(r.id).map((id) => names.get(id)?.title) })),
+  };
+}
+
 export interface View {
   description: string;
   run(l: Lattice, input: Record<string, unknown>): Promise<unknown>;
@@ -240,6 +377,18 @@ export const VIEWS: Record<string, View> = {
   blockers: {
     description: 'Every blocked item, what directly blocks it, and the root blockers that have to move first. Params: owner.',
     run: blockers,
+  },
+  sessions: {
+    description: 'Agent sessions and automation runs: what each open one is working on and holding, whether it has gone quiet, and the last ten that ended.',
+    run: sessions,
+  },
+  brief: {
+    description: 'Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required).',
+    run: brief,
+  },
+  repo_work: {
+    description: 'Open tasks and decisions belonging to whatever lives in a repository, split into ready and blocked. Params: repo (required).',
+    run: repoWork,
   },
   available_now: {
     description: 'What can run right now: open tasks with nothing blocking them, tasks waiting only on a resource, and who holds each resource. Params: owner.',

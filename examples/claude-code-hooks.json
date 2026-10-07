@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [{ "type": "http", "url": "http://127.0.0.1:3100/hooks/session-start" }]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [{ "type": "http", "url": "http://127.0.0.1:3100/hooks/session-end" }]
+      }
+    ]
+  }
+}

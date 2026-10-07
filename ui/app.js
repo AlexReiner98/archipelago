@@ -103,9 +103,55 @@ function today() {
   const risk = card('At risk');
   const mine = card('You are holding up');
   const resources = card('Resources and connections');
+  const running = card('Sessions', { wide: true });
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, 'Today'), h('p', { class: 'muted' }, 'Derived from the map each time you open this page.')),
-    h('div', { class: 'grid' }, needs.el, blocked.el, mine.el, waiting.el, risk.el, resources.el),
+    h('div', { class: 'grid' }, running.el, needs.el, blocked.el, mine.el, waiting.el, risk.el, resources.el),
+  );
+
+  running.fill(
+    api('view', { name: 'sessions' }),
+    (v) => [
+      v.open.length,
+      h(
+        'ul',
+        { class: 'rows' },
+        v.open.map((r) =>
+          h(
+            'li',
+            {},
+            h(
+              'div',
+              { class: 'row-top' },
+              h('span', { class: 'chip' }, r.surface ?? 'session'),
+              h('span', { class: 'grow' }, link(r)),
+              r.stale && h('span', { class: 'pill bad', title: `No report for over ${v.stale_after_minutes} minutes` }, 'gone quiet'),
+              h('span', { class: `pill ${r.status === 'waiting' ? 'warn' : 'ok'}` }, r.status),
+              h(
+                'button',
+                {
+                  onclick: async () => {
+                    if (!confirm(`End "${r.title}"? Anything it holds is released.`)) return;
+                    await api('session_end', { run: r.id, outcome: 'cancelled', summary: 'Ended from the UI' });
+                    today();
+                  },
+                },
+                'End',
+              ),
+            ),
+            h(
+              'div',
+              { class: 'row-sub' },
+              r.working_on.length ? ['working on: ', r.working_on.map((e, i) => [i > 0 && ', ', link(e)])] : 'no task named',
+              r.holds.length > 0 && [' · holds: ', r.holds.map((e, i) => [i > 0 && ', ', link(e)])],
+              r.repo && [' · ', link(r.repo)],
+              ` · last heard ${when(r.last_seen)}`,
+            ),
+          ),
+        ),
+      ),
+    ],
+    'No sessions are running.',
   );
   const view = (name, params) => api('view', { name, params });
 
@@ -437,6 +483,45 @@ async function entity(id) {
         { onchange: (ev) => change([{ op: 'update', id, status: ev.target.value }], `Status set to ${ev.target.value} in the UI`) },
         statusesOf(e.type).map((s) => h('option', { value: s, selected: s === e.status }, s)),
       ),
+      !e.archived_at &&
+        ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t) &&
+        h(
+          'button',
+          {
+            onclick: async (ev) => {
+              const brief = await api('view', { name: 'brief', params: { task: id } });
+              await navigator.clipboard.writeText(brief.text);
+              ev.target.textContent = 'Brief copied';
+            },
+            title: 'Copy what a session needs to start on this: context, blockers, resources and rules',
+          },
+          'Copy session brief',
+        ),
+      !e.archived_at &&
+        ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t) &&
+        h(
+          'span',
+          { class: 'toolbar' },
+          h('select', { id: 'launch-mode', title: 'What the session may do with nobody there to approve it' }, h('option', { value: 'plan' }, 'Investigate only'), h('option', { value: 'acceptEdits' }, 'May edit files')),
+          h(
+            'button',
+            {
+              onclick: async () => {
+                const mode = document.getElementById('launch-mode').value;
+                const what = mode === 'plan' ? 'It can read and investigate but not change anything.' : 'It can EDIT FILES in the repository with nobody approving each change. It is told not to commit, push or delete.';
+                const instructions = prompt(`Launch a headless Claude Code session on "${e.title}"?\n\n${what}\n\nAnything to add to its brief? (optional)`);
+                if (instructions === null) return;
+                try {
+                  const started = await api('launch', { task: id, mode, instructions: instructions || undefined });
+                  location.hash = `#/e/${started.run}`;
+                } catch (err) {
+                  alert(err.message);
+                }
+              },
+            },
+            'Launch session',
+          ),
+        ),
       !e.archived_at &&
         h('button', { class: 'danger', onclick: () => confirm(`Archive "${e.title}"? It leaves every view but stays in the history.`) && change([{ op: 'archive', id }], 'Archived in the UI') }, 'Archive'),
     ),
