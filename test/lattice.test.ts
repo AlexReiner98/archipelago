@@ -120,6 +120,21 @@ test('an agent change becomes a proposal; a human approves it, minus exclusions'
   await assert.rejects(l.decide(human, { proposal: id, approve: true }), /already approved/);
 });
 
+test('the pulse moves when a change is proposed, decided or applied, and not otherwise', async () => {
+  const l = await fresh();
+  const stamp = async () => (await l.pulse()).stamp;
+  const seen = [await stamp()];
+  assert.equal(await stamp(), seen[0], 'reading does not move it');
+
+  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'A' }] });
+  seen.push(await stamp());
+  await l.decide(human, { proposal: (proposed as { proposal: string }).proposal, approve: false });
+  seen.push(await stamp());
+  await make(l, [{ op: 'create', type: 'task', title: 'B' }]);
+  seen.push(await stamp());
+  assert.equal(new Set(seen).size, seen.length, `each write gives a new stamp: ${seen.join(', ')}`);
+});
+
 test('policy can let agents apply some ops directly, or forbid them', async () => {
   const l = await fresh();
   const loose = new Lattice(l.db, l.registry, { create: 'auto', merge: 'forbidden' });

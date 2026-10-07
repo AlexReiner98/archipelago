@@ -150,6 +150,12 @@ export const TOOLS: Record<string, Tool> = {
     input: { status: z.enum(['pending', 'approved', 'rejected']).optional() },
     run: async (l, _actor, input) => l.proposals(input),
   },
+  pulse: {
+    description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
+    humanOnly: true,
+    input: {},
+    run: async (l) => l.pulse(),
+  },
   change: {
     description:
       'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type) with the reason. ' +

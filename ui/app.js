@@ -19,6 +19,38 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 
+// Questions are asked in the page rather than with confirm() and prompt(), so
+// they can be styled and browser automation can answer them. Resolves to null
+// when dismissed; otherwise true, or the text typed when `input` is given.
+function ask({ title, message, input, action = 'OK', cancel = 'Cancel', danger = false }) {
+  return new Promise((resolve) => {
+    const field = input && h('textarea', { rows: 3, placeholder: input.placeholder ?? '' });
+    const dialog = h(
+      'dialog',
+      { class: 'ask' },
+      h(
+        'form',
+        { method: 'dialog' },
+        h('h2', {}, title),
+        message && h('p', { class: 'ask-message' }, message),
+        field,
+        h('div', { class: 'toolbar' }, cancel && h('button', { value: 'cancel' }, cancel), h('button', { value: 'ok', class: danger ? 'danger' : 'primary' }, action)),
+      ),
+    );
+    // Answered on the button press itself: the browser holds the dialog's close
+    // event until it next paints, which a window nobody can see never does.
+    const answer = (ok) => {
+      dialog.remove();
+      resolve(ok ? (field ? field.value.trim() : true) : null);
+    };
+    dialog.firstChild.addEventListener('submit', (e) => answer(e.submitter?.value === 'ok'));
+    dialog.addEventListener('cancel', () => answer(false));
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+}
+const tell = (title, message) => ask({ title, message, cancel: null });
+
 // The token, when the server wants one. Kept for this browser only.
 const store = {
   get token() {
@@ -121,6 +153,14 @@ const statusesOf = (typeId) => {
   return s ? [...s.open, ...s.closed] : [];
 };
 const isClosed = (typeId, status) => types.get(typeId)?.statuses.closed.includes(status) ?? false;
+const isA = (typeId, ancestor) => {
+  for (let t = typeId; t; t = types.get(t)?.flavour_of) if (t === ancestor) return true;
+  return false;
+};
+/** Whether a type may sit at one end of a relation, given that end's allowed types. */
+const fits = (allowed, typeId) => allowed.some((a) => a === '*' || isA(typeId, a));
+// Relations the system keeps itself (what a session works on, who holds a resource) are not edited by hand.
+const kept = (relId) => relId.startsWith('sys.') || relId === 'holds';
 
 const when = (ts) => new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const chip = (typeId) => h('span', { class: 'chip', title: typeId }, typeTitle(typeId));
@@ -248,7 +288,7 @@ function today() {
                 'button',
                 {
                   onclick: async () => {
-                    if (!confirm(`End "${r.title}"? Anything it holds is released.`)) return;
+                    if (!(await ask({ title: `End "${r.title}"?`, message: 'Anything it holds is released.', action: 'End session', danger: true }))) return;
                     await api('session_end', { run: r.id, outcome: 'cancelled', summary: 'Ended from the UI' });
                     today();
                   },
@@ -373,6 +413,20 @@ function proposalCard(p, names) {
   };
   // An excluded create takes its links with it, as the server will.
   const dead = (op) => op.op === 'link' && [op.from, op.to].some((k) => refs.has(k) && !included[ops.indexOf(refs.get(k))]);
+  // The long text of a change stays folded to its first words until asked for.
+  // Which rows are unfolded is kept here, because every edit redraws the rows.
+  const unfolded = new Set();
+  const fold = (i, ...parts) => {
+    const text = parts.flat(Infinity).filter(Boolean);
+    if (!text.length) return null;
+    const first = text.join('\n').replace(/\s+/g, ' ').trim();
+    return h(
+      'details',
+      { class: 'more', open: unfolded.has(i), ontoggle: (e) => (e.target.open ? unfolded.add(i) : unfolded.delete(i)) },
+      h('summary', {}, h('span', { class: 'preview' }, first.length > 90 ? `${first.slice(0, 90)}…` : first)),
+      text.map((t) => h('div', { class: 'detail' }, t)),
+    );
+  };
 
   const approve = h('button', { class: 'primary' });
   const status = h('span', { class: 'muted small' });
@@ -455,9 +509,12 @@ function proposalCard(p, names) {
             draw();
           },
         }),
-        op.body && h('div', { class: 'detail' }, op.body),
-        op.props && Object.keys(op.props).length > 0 && h('div', { class: 'detail' }, Object.entries(op.props).map(([k, v]) => `${k}: ${v}`).join('\n')),
-        op.confidence !== undefined && op.confidence < 1 && h('div', { class: 'detail' }, `confidence ${op.confidence}`),
+        fold(
+          i,
+          op.body,
+          op.props && Object.keys(op.props).length > 0 && Object.entries(op.props).map(([k, v]) => `${k}: ${v}`).join('\n'),
+          op.confidence !== undefined && op.confidence < 1 && `confidence ${op.confidence}`,
+        ),
       ];
       st = statusSelect(op.type, op.status, `default (${statusesOf(op.type)[0]})`);
     } else if (op.op === 'update') {
@@ -467,7 +524,7 @@ function proposalCard(p, names) {
       what = [
         h('div', {}, nameOf(op.id), op.title && op.title !== target?.title && [' ', h('span', { class: 'arrow' }, '→'), ` ${op.title}`]),
         target && newStatus && h('div', { class: 'detail' }, `status: ${target.status} → ${newStatus}`),
-        Object.entries(changes).filter(([k]) => k !== 'title').map(([k, v]) => h('div', { class: 'detail' }, `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)),
+        fold(i, Object.entries(changes).filter(([k]) => k !== 'title').map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)),
       ];
       st = target ? statusSelect(target.type, newStatus, `unchanged (${target.status})`) : '';
     } else if (op.op === 'link') {
@@ -481,14 +538,14 @@ function proposalCard(p, names) {
           : op.op === 'archive' || op.op === 'restore'
             ? nameOf(op.id)
             : op.op === 'define_type'
-              ? [h('strong', {}, op.type.id), op.type.extends && ` (flavour of ${op.type.extends})`, h('div', { class: 'detail' }, op.type.description)]
+              ? [h('strong', {}, op.type.id), op.type.extends && ` (flavour of ${op.type.extends})`, fold(i, op.type.description)]
               : JSON.stringify(op);
     }
     return h('tr', { class: off ? 'off' : '' }, h('td', { class: 'check' }, check), mark(h('td', { class: 'kind' }, kind)), h('td', {}, what), h('td', { class: 'status' }, st ?? ''));
   }
 
   async function decide(yes) {
-    const note = yes ? undefined : prompt('Why reject it? (optional, recorded in the log)');
+    const note = yes ? undefined : await ask({ title: 'Reject this proposal?', message: p.reason, input: { placeholder: 'Why reject it? (optional, recorded in the log)' }, action: 'Reject', danger: true });
     if (!yes && note === null) return;
     approve.disabled = true;
     try {
@@ -576,14 +633,87 @@ async function entity(id) {
       await api('change', { ops, reason });
       entity(id);
     } catch (err) {
-      alert(err.message);
+      tell('That change was not made', err.message);
     }
   };
   const owner = e.owner ? await api('get', { id: e.owner }).then((r) => r.entity, () => null) : null;
   const relRows = (rows, direction) =>
-    rows.map((r) =>
-      h('tr', {}, h('td', { class: 'nowrap muted' }, relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type), h('td', {}, chip(r.entity_type), ' ', link(r)), h('td', {}, pill(r.entity_type, r.status))),
-    );
+    rows.map((r) => {
+      const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
+      return h(
+        'tr',
+        {},
+        h('td', { class: 'nowrap muted' }, phrase),
+        h('td', {}, chip(r.entity_type), ' ', link(r)),
+        h('td', {}, pill(r.entity_type, r.status)),
+        h(
+          'td',
+          { class: 'act' },
+          !e.archived_at &&
+            !kept(r.type) &&
+            h(
+              'button',
+              {
+                class: 'danger',
+                onclick: async () =>
+                  (await ask({ title: 'Remove this relation?', message: `${e.title} ${phrase} ${r.title}`, action: 'Remove', danger: true })) && change([{ op: 'unlink', relation: r.relation }], 'Relation removed in the UI'),
+              },
+              'Remove',
+            ),
+        ),
+      );
+    });
+
+  // Every way this entity can be linked, read from its side: "depends on" and
+  // "blocks" are one relation in its two directions.
+  const phrases = schema.relations
+    .filter((r) => !kept(r.id))
+    .flatMap((r) => [fits(r.from, e.type) && { rel: r.id, out: true, label: r.title, others: r.to }, fits(r.to, e.type) && r.inverse !== r.title && { rel: r.id, out: false, label: r.inverse, others: r.from }])
+    .filter(Boolean);
+  const adder = h('div', { class: 'add-relation', hidden: true });
+  const openAdder = () => {
+    dirty = true; // a live update must not close this
+    const pick = h('select', { onchange: () => find() }, phrases.map((p, i) => h('option', { value: i }, p.label)));
+    const q = h('input', { type: 'search', placeholder: 'Search for what to link to', oninput: () => find() });
+    const found = h('div');
+    let turn = 0;
+    const find = async () => {
+      const mine = ++turn;
+      const p = phrases[pick.value];
+      const text = q.value.trim();
+      if (!text) return found.replaceChildren();
+      const any = p.others.includes('*');
+      try {
+        const hits = (await Promise.all((any ? [undefined] : p.others).map((type) => api('search', { q: text, type, limit: 8 })))).flat();
+        if (mine !== turn) return;
+        // Sources, sessions and the like are offered only to relations that name them.
+        const rows = hits.filter((x) => x.id !== id && (!any || !x.type.startsWith('sys.')));
+        found.replaceChildren(
+          rows.length
+            ? h(
+                'ul',
+                { class: 'rows' },
+                rows.map((x) =>
+                  h(
+                    'li',
+                    { class: 'row-top' },
+                    chip(x.type),
+                    h('span', { class: 'grow' }, x.title),
+                    pill(x.type, x.status),
+                    h('button', { onclick: () => change([{ op: 'link', type: p.rel, from: p.out ? id : x.id, to: p.out ? x.id : id }], 'Relation added in the UI') }, 'Link'),
+                  ),
+                ),
+              )
+            : h('div', { class: 'empty' }, any ? 'Nothing matches.' : `Nothing matches among: ${p.others.map(typeTitle).join(', ')}.`),
+        );
+      } catch (err) {
+        if (mine === turn) found.replaceChildren(h('div', { class: 'error' }, err.message));
+      }
+    };
+    adder.replaceChildren(h('div', { class: 'toolbar' }, h('span', { class: 'muted' }, 'This'), pick, q, h('button', { onclick: () => entity(id) }, 'Cancel')), found);
+    adder.hidden = false;
+    q.focus();
+  };
 
   main.replaceChildren(
     h(
@@ -648,13 +778,19 @@ async function entity(id) {
               onclick: async () => {
                 const mode = document.getElementById('launch-mode').value;
                 const what = mode === 'plan' ? 'It can read and investigate but not change anything.' : 'It can EDIT FILES in the repository with nobody approving each change. It is told not to commit, push or delete.';
-                const instructions = prompt(`Launch a headless Claude Code session on "${e.title}"?\n\n${what}\n\nAnything to add to its brief? (optional)`);
+                const instructions = await ask({
+                  title: `Launch a headless Claude Code session on "${e.title}"?`,
+                  message: what,
+                  input: { placeholder: 'Anything to add to its brief? (optional)' },
+                  action: 'Launch',
+                  danger: mode !== 'plan',
+                });
                 if (instructions === null) return;
                 try {
                   const started = await api('launch', { task: id, mode, instructions: instructions || undefined });
                   location.hash = `#/e/${started.run}`;
                 } catch (err) {
-                  alert(err.message);
+                  tell('The session did not start', err.message);
                 }
               },
             },
@@ -662,7 +798,7 @@ async function entity(id) {
           ),
         ),
       !e.archived_at &&
-        h('button', { class: 'danger', onclick: () => confirm(`Archive "${e.title}"? It leaves every view but stays in the history.`) && change([{ op: 'archive', id }], 'Archived in the UI') }, 'Archive'),
+        h('button', { class: 'danger', onclick: async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI') }, 'Archive'),
     ),
     h(
       'div',
@@ -688,10 +824,16 @@ async function entity(id) {
       h(
         'section',
         { class: 'card wide' },
-        h('header', {}, h('h2', {}, 'Relations'), h('span', { class: 'n' }, data.outgoing.length + data.incoming.length)),
+        h(
+          'header',
+          {},
+          h('h2', {}, 'Relations'),
+          h('span', { class: 'toolbar' }, h('span', { class: 'n' }, data.outgoing.length + data.incoming.length), !e.archived_at && phrases.length > 0 && h('button', { onclick: openAdder }, 'Add')),
+        ),
         data.outgoing.length + data.incoming.length
           ? h('table', { class: 'list' }, h('tbody', {}, relRows(data.outgoing, 'out'), relRows(data.incoming, 'in')))
           : h('div', { class: 'empty' }, 'Not linked to anything.'),
+        adder,
       ),
       h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'History')), eventTable(data.recent_events, false)),
     ),
@@ -1214,7 +1356,7 @@ async function workspace() {
             class: 'danger',
             disabled: t.id === me.actor.token,
             title: t.id === me.actor.token ? 'This is the token you are signed in with' : '',
-            onclick: () => confirm(`Revoke the token "${t.name}"? Whoever uses it is signed out at once.`) && api('token_revoke', { id: t.id }).then(workspace, fail),
+            onclick: async () => (await ask({ title: `Revoke the token "${t.name}"?`, message: 'Whoever uses it is signed out at once.', action: 'Revoke', danger: true })) && api('token_revoke', { id: t.id }).then(workspace, fail),
           },
           'Revoke',
         ),
@@ -1390,13 +1532,13 @@ async function activity() {
                   {
                     onclick: async (click) => {
                       click.preventDefault();
-                      if (!confirm('Undo this change set? The opposite is applied as a new change; nothing is erased from the log.')) return;
+                      if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
                       try {
                         const r = await api('undo', { changeset: g.changeset });
-                        if (r.skipped.length) alert(`Undone, except:\n- ${r.skipped.join('\n- ')}`);
+                        if (r.skipped.length) await tell('Undone, except:', `- ${r.skipped.join('\n- ')}`);
                         run();
                       } catch (err) {
-                        alert(err.message);
+                        tell('That was not undone', err.message);
                       }
                     },
                   },
@@ -1430,12 +1572,52 @@ async function activity() {
   run().catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
+// ---- live updates --------------------------------------------------------
+
+// The server's pulse moves whenever the map or the review queue does. The page
+// is drawn again when it moves, unless that would throw away something half
+// done (typed text, ticked boxes, an open question, a graph being explored);
+// then a notice offers the refresh instead.
+let pulse;
+let dirty = false;
+const stale = h('div', { id: 'stale', hidden: true }, 'The map has changed.', h('button', { onclick: () => route() }, 'Refresh'));
+document.body.append(stale);
+main.addEventListener('input', (e) => {
+  if (e.target.tagName !== 'SELECT') dirty = true;
+});
+
+async function checkPulse() {
+  if (document.hidden) return;
+  let now;
+  try {
+    now = (await api('pulse')).stamp;
+  } catch {
+    return;
+  }
+  const moved = pulse !== undefined && now !== pulse;
+  pulse = now;
+  if (!moved) return;
+  if (dirty || document.querySelector('dialog[open]') || /^#\/(graph|new)/.test(location.hash)) {
+    refreshReviewCount();
+    stale.hidden = false;
+    return;
+  }
+  // Hold the page's height while it is redrawn, so the scroll position stays.
+  main.style.minHeight = `${main.offsetHeight}px`;
+  await route();
+  setTimeout(() => (main.style.minHeight = ''), 1000);
+}
+setInterval(checkPulse, 2000);
+document.addEventListener('visibilitychange', checkPulse);
+
 // ---- routing -------------------------------------------------------------
 
 const ROUTES = { today, review, map, activity, automations, graph, workspace };
 
 async function route() {
   const [, name = 'today', arg] = location.hash.split('/');
+  dirty = false;
+  stale.hidden = true;
   for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (name === 'e' || name === 'new' ? 'map' : name));
   try {
     if (!schema) await loadSchema();

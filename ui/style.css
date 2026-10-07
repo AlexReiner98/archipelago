@@ -101,6 +101,16 @@ button.danger { color: var(--bad); }
 button:disabled { opacity: 0.5; cursor: default; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
+dialog.ask { width: min(460px, calc(100vw - 32px)); padding: 0; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 30px rgb(0 0 0 / 0.25); }
+dialog.ask::backdrop { background: rgb(0 0 0 / 0.35); }
+dialog.ask form { display: grid; gap: 10px; padding: 16px; }
+dialog.ask .ask-message { color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+dialog.ask textarea { width: 100%; }
+dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
+
+#stale { position: fixed; right: 16px; bottom: 16px; z-index: 5; display: flex; gap: 10px; align-items: center; padding: 8px 8px 8px 14px; background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); }
+#stale[hidden] { display: none; }
+
 /* Review */
 .proposal { margin-bottom: 18px; }
 .proposal .meta { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
@@ -119,6 +129,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 .ops select { padding: 2px 4px; max-width: 160px; }
 .ops .edited { box-shadow: inset 2px 0 0 var(--warn); }
 .ops .detail { color: var(--muted); font-size: 12.5px; margin-top: 2px; white-space: pre-wrap; }
+.ops details.more { margin-top: 2px; }
+.ops details.more > summary { cursor: pointer; list-style: none; color: var(--muted); font-size: 12.5px; }
+.ops details.more > summary::-webkit-details-marker { display: none; }
+.ops details.more > summary::before { content: "▸ "; }
+.ops details.more[open] > summary::before { content: "▾ Hide"; }
+.ops details.more[open] .preview { display: none; }
 .group-head td { background: var(--bg); font-weight: 600; font-size: 12px; }
 .arrow { color: var(--muted); }
 
@@ -132,6 +148,12 @@ table.list { width: 100%; border-collapse: collapse; }
 table.list td, table.list th { padding: 7px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 table.list th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 table.list tr:last-child td { border-bottom: 0; }
+table.list td.act { width: 1%; white-space: nowrap; text-align: right; }
+.add-relation { border-top: 1px solid var(--line); }
+.add-relation > .toolbar { padding: 12px 14px; }
+.add-relation input[type="search"] { flex: 1; min-width: 180px; }
+.add-relation .rows { border-top: 1px solid var(--line); }
+.add-relation .rows > li { align-items: center; }
 .nowrap { white-space: nowrap; }
 /* Activity is many small tables; fixed columns keep them aligned. */
 table.events { table-layout: fixed; }

@@ -47,5 +47,5 @@ npm test
 npm run typecheck
 ```
 
-The UI's confirmation dialogs (`confirm`, `prompt`) cannot be answered by
-browser automation, so buttons behind them are tested through the API.
+The UI asks its questions in the page (`ask` and `tell` in `ui/app.js`), so
+browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.

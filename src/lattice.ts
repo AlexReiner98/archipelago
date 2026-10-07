@@ -807,6 +807,14 @@ export class Lattice {
     return rows;
   }
 
+  /** A stamp that moves whenever the map or the review queue does, as this viewer sees them. */
+  async pulse() {
+    const { rows } = await this.db.query<{ stamp: string }>(
+      `select concat_ws('.', (select coalesce(max(seq), 0) from event), (select count(*) from proposal), (select count(*) from proposal where status = 'pending')) as stamp`,
+    );
+    return rows[0];
+  }
+
   async proposals(input: { status?: string } = {}) {
     const { rows } = await this.db.query<Proposal>(`select * from proposal where status = $1 order by ts`, [input.status ?? 'pending']);
     return rows;
