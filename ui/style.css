@@ -296,6 +296,10 @@ svg.graph .dim { opacity: 0.18; }
 .legend .stroke { width: 18px; border-top: 1.5px solid var(--edge); display: inline-block; }
 .legend .stroke.blocking { border-top: 2px solid var(--edge-strong); }
 
+#listening { margin-top: auto; padding: 4px 10px 0; color: var(--ok); font-size: 12.5px; }
+#listening::before { content: "● "; }
+#listening[hidden] { display: none; }
+#listening:not([hidden]) + #follow { margin-top: 0; }
 #follow { margin-top: auto; padding: 8px 10px; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12.5px; cursor: pointer; }
 #follow + #whoami { margin-top: 0; }
 #followed { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 6; display: flex; gap: 10px; align-items: center; max-width: min(720px, calc(100vw - 32px)); padding: 8px 8px 8px 14px; background: var(--panel); border: 1px solid var(--warn); border-radius: 10px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); }

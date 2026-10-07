@@ -36,6 +36,12 @@ start of a session:
   already moves it). Say in the reason that it is a test, and undo what you
   made when you are done (`undo` with the change set). Drive a browser only
   when you need to click, and then a visible one on that same server.
+- **Listen for the owner.** What they do in the web UI (a decision made, an
+  edit, an approval) is addressed to you as much as a chat message is. The
+  `watch` tool answers the moment they change something: call it once for
+  `latest`, then run it in the background with `after` and `wait_seconds`, act
+  on what it returns, and start it again. The prompt hook also tells you, with
+  the owner's next message, what they did since you last heard.
 - **A throwaway server is for what the live one cannot take:** token identity,
   schema changes, launches, and anything that destroys or floods data. Always
   give it its own data folder:

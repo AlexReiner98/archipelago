@@ -79,6 +79,13 @@ opens what it touched (or Review, when the change waits there), and the `show`
 tool opens any entity or screen with a one-line note. Anything you are in the
 middle of is kept; the note offers the jump instead.
 
+**Agents hear you.** What you do in the UI reaches the agents working with
+you. An agent waiting in the `watch` tool is answered the moment you decide,
+edit, approve or reject something, and the menu shows "An agent is listening"
+while one waits. A Claude Code session in this repository is also told, with
+your next message, what you did since it last heard (the `UserPromptSubmit`
+hook in `.claude/settings.json`).
+
 The graph draws the map as nodes and arrows: what blocks what, what belongs to
 what, or every relation. Open it on one entity (the **Graph** button on its
 page) to see only its neighbourhood, one to four steps out. Colour shows the

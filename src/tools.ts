@@ -107,6 +107,63 @@ export const devMode = () => restartServer !== undefined;
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
 const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(join(UI_DIR, file)).mtimeMs));
 
+/** One thing the human did to the map, small enough to put in front of a model. */
+export interface HumanChange {
+  seq: number;
+  ts: string;
+  actor: string;
+  action: string;
+  target?: { id: string; type: string; title: string };
+  reason?: string;
+  /** For an edit, each field's value before and after. */
+  changes?: unknown;
+}
+
+export async function latestSeq(l: Lattice): Promise<number> {
+  const { rows } = await l.db.query<{ seq: number }>(`select coalesce(max(seq), 0)::int as seq from event`);
+  return rows[0].seq;
+}
+
+/** What humans have done since an event, oldest first: their edits, decisions, approvals and rejections. */
+export async function humanChanges(l: Lattice, after: number): Promise<HumanChange[]> {
+  const { rows } = await l.db.query<{ seq: number; ts: string; actor: string; action: string; target_id: string | null; type: string | null; title: string | null; reason: string | null; detail: Record<string, unknown> | null }>(
+    `select e.seq::int as seq, e.ts, e.actor, e.action, e.target_id, t.type, t.title, e.reason, e.detail
+     from event e left join entity t on t.id = e.target_id
+     where e.seq > $1 and e.actor like 'human:%' order by e.seq limit 50`,
+    [after],
+  );
+  return rows.map((r) => ({
+    seq: r.seq,
+    ts: r.ts,
+    actor: r.actor,
+    action: r.action,
+    target: r.target_id ? { id: r.target_id, type: r.type ?? '', title: r.title ?? '' } : undefined,
+    reason: r.reason || undefined,
+    changes: r.detail?.changes ?? r.detail ?? undefined,
+  }));
+}
+
+/** The same, as lines of text for a hook to hand to a session. */
+export function describeChanges(changes: HumanChange[]): string {
+  const short = (v: unknown) => (v == null ? 'nothing' : JSON.stringify(v));
+  return changes
+    .map((c) => {
+      const what = c.target ? `${c.target.type} "${c.target.title}" (${c.target.id})` : '';
+      const fields =
+        c.action === 'entity.update' && c.changes && typeof c.changes === 'object'
+          ? Object.entries(c.changes as Record<string, { from?: unknown; to?: unknown }>).map(([k, v]) => `${k}: ${short(v.from)} -> ${short(v.to)}`).join('; ')
+          : c.changes
+            ? JSON.stringify(c.changes)
+            : '';
+      return `- ${c.action} ${what}${fields ? `: ${fields}` : ''}${c.reason ? ` [${c.reason}]` : ''}`;
+    })
+    .join('\n');
+}
+
+// Agents waiting in `watch` to hear what the human does. Counted so the web UI
+// can say whether anyone will hear a decision the moment it is made.
+let listening = 0;
+
 /** Where an agent last pointed the human's screen: a place in the web UI. */
 interface Focus {
   /** When it was set; a new value is how the UI knows to move. */
@@ -189,7 +246,31 @@ export const TOOLS: Record<string, Tool> = {
     description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
     humanOnly: true,
     input: {},
-    run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)), ui: uiStamp() }),
+    run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)), ui: uiStamp(), listening }),
+  },
+  watch: {
+    description:
+      'Hear what the human does in the map, as it happens: a decision made, an edit, an approval or a rejection. ' +
+      'Call it once with no input to get `latest`. Then call it with `after` set to that and `wait_seconds` up to 600: it answers the moment the human changes something, ' +
+      'or with no changes when the time runs out. Call again with the new `latest` to keep listening. While a session waits here, the web UI shows that an agent is listening.',
+    input: {
+      after: z.number().int().nonnegative().optional().describe('The `latest` from the previous call.'),
+      wait_seconds: z.number().int().min(0).max(600).optional().describe('How long to wait for something to happen. Default 0: answer at once.'),
+    },
+    run: async (l, _actor, input) => {
+      if (input.after === undefined) return { latest: await latestSeq(l), changes: [] };
+      const until = Date.now() + (input.wait_seconds ?? 0) * 1000;
+      listening++;
+      try {
+        for (;;) {
+          const changes = await humanChanges(l, input.after);
+          if (changes.length || Date.now() >= until) return { latest: changes.at(-1)?.seq ?? input.after, changes };
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      } finally {
+        listening--;
+      }
+    },
   },
   show: {
     description:

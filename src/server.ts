@@ -3,7 +3,7 @@
 //   POST /api/<tool>   the same tools for the human CLI and web UI
 //   POST /agent/<tool> the same tools as plain JSON, for hooks and scripts
 //                      that cannot speak MCP
-//   POST /hooks/session-start, /hooks/session-end
+//   POST /hooks/session-start, /hooks/session-end, /hooks/prompt
 //                      Claude Code HTTP hooks: a session registers itself and
 //                      is handed what the map knows about its repository
 //   GET  /whoami       which workspace and identity a request resolves to
@@ -30,7 +30,7 @@ import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hookSessionEnd, hookSessionStart } from './sessions.ts';
-import { callTool, configureRestart, devMode, TOOLS } from './tools.ts';
+import { callTool, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 const actorField = {
@@ -86,6 +86,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const origins = hosts.map((h) => `http://${h}`);
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => (workspaces.has(id) ? (await workspaces.get(id)).lattice : undefined));
+
+  /** Per Claude Code session: the last event it has been told about by the prompt hook. */
+  const heardUpTo = new Map<string, number>();
 
   /** The workspace a request is for and who is making it. */
   async function resolve(req: IncomingMessage, surface: 'human' | 'agent'): Promise<{ ws: Workspace; lattice: Lattice; actor: (label?: string) => Actor }> {
@@ -171,7 +174,20 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are local only.' });
         const { lattice } = await resolve(req, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; reason?: string };
+        // Each time the owner sends a session a message, the session is told what
+        // the owner has done in the map since it last heard: a decision made
+        // in the UI reaches the session with the next thing they say.
+        if (url.pathname === '/hooks/prompt') {
+          const key = body.session_id ?? '';
+          const heard = heardUpTo.get(key);
+          const changes = heard === undefined ? [] : await humanChanges(lattice, heard);
+          heardUpTo.set(key, changes.at(-1)?.seq ?? heard ?? (await latestSeq(lattice)));
+          if (!changes.length) return send(res, 200, {});
+          const additionalContext = `Since you last heard from Lattice, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${describeChanges(changes)}`;
+          return send(res, 200, { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext } });
+        }
         if (url.pathname === '/hooks/session-start') {
+          heardUpTo.set(body.session_id ?? '', await latestSeq(lattice));
           const additionalContext = await hookSessionStart(lattice, body);
           return send(res, 200, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext } });
         }

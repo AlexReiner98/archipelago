@@ -2149,6 +2149,10 @@ async function checkPulse() {
       stale.hidden = false;
     }
     uiFiles ??= beat.ui;
+    // Whether an agent will hear what is done here the moment it is done.
+    const ear = document.getElementById('listening');
+    ear.hidden = !beat.listening;
+    ear.textContent = beat.listening > 1 ? `${beat.listening} agents are listening` : 'An agent is listening';
     follow(beat.focus);
   } catch {
     return;
