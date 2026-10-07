@@ -55,7 +55,9 @@ async function serve(auth: 'off' | 'tokens') {
 
 test('with auth off, one workspace and the surface decides who is calling', async () => {
   const { call } = await serve('off');
+  assert.equal((await call('/api/workspace_info')).result.owner, null, 'a new workspace has no owner');
   assert.equal((await call('/api/init', undefined, { name: 'Alex' })).status, 200, '/api is the human');
+  assert.equal((await call('/api/workspace_info')).result.owner.title, 'Alex');
   const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'note', title: 'N' }] });
   assert.equal(proposed.result.status, 'proposed', '/agent is an agent');
   assert.match((await call('/agent/decide', undefined, { proposal: proposed.result.proposal, approve: true })).error, /humans only/);

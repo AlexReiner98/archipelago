@@ -228,6 +228,14 @@ function today() {
     h('div', { class: 'page-head' }, h('h1', {}, 'Today'), h('p', { class: 'muted' }, 'Derived from the map each time you open this page.')),
     h('div', { class: 'grid' }, notices.el, running.el, needs.el, blocked.el, mine.el, waiting.el, risk.el, resources.el),
   );
+  // Most of this page is about the owner; say so when there is none yet.
+  api('workspace_info').then(
+    ({ owner }) => {
+      const stillHere = location.hash === '' || location.hash.startsWith('#/today');
+      if (!owner && stillHere) main.firstChild.append(h('p', { class: 'error' }, 'This workspace has no owner yet, so there is nobody for this page to be about. ', h('a', { href: '#/workspace' }, 'Set the owner'), '.'));
+    },
+    () => {},
+  );
 
   const markRead = async (ids) => {
     await api('change', { ops: ids.map((id) => ({ op: 'update', id, status: 'read' })), reason: 'Read in the UI' });
@@ -1376,12 +1384,35 @@ function operatorCard(current) {
   return h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Installation'), h('span', { class: 'n' }, 'Every workspace on this server. For whoever runs it.')), body);
 }
 
+// Whose workspace this is. "Needs you now" and the other standing questions
+// are asked about the owner, so a new workspace is not much use until one is set.
+function ownerCard(owner, redraw) {
+  const name = h('input', { type: 'text', placeholder: 'Your name', style: 'flex: 1; min-width: 180px' });
+  const email = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: 180px' });
+  const error = h('div');
+  const set = () =>
+    name.value.trim() &&
+    api('init', { name: name.value.trim(), email: email.value.trim() || undefined })
+      .then(redraw)
+      .catch((err) => error.replaceChildren(h('div', { class: 'error' }, err.message)));
+  return h(
+    'section',
+    { class: 'card wide' },
+    h('header', {}, h('h2', {}, 'Owner'), h('span', { class: 'n' }, 'Whose work the Today screen is about.')),
+    owner
+      ? h('ul', { class: 'rows' }, h('li', { class: 'row-top' }, chip('person'), h('span', { class: 'grow' }, link(owner))))
+      : [h('div', { class: 'empty' }, 'This workspace has no owner yet. Enter your name to become it; a person is created for you in the map.'), h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, name, email, h('button', { class: 'primary', onclick: set }, 'Set owner')), error],
+  );
+}
+
 async function workspace() {
   const me = await (await fetch('/whoami', { headers: authHeaders() })).json();
   const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name));
   if (me.auth !== 'tokens') {
+    const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
+      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, ownerCard(owner, workspace)),
       h(
         'section',
         { class: 'card' },
@@ -1434,6 +1465,7 @@ async function workspace() {
     h(
       'div',
       { class: 'grid' },
+      (me.actor.admin || !info.owner) && ownerCard(info.owner, workspace),
       h(
         'section',
         { class: 'card wide' },

@@ -476,10 +476,13 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => notifyWorkspace(l, actor, input),
   },
   workspace_info: {
-    description: 'This workspace\u2019s settings: its id, the default visibility of new things, and which workspaces it accepts notifications from.',
+    description: 'This workspace\u2019s settings: its id, its owner (null until one is set with init), the default visibility of new things, and which workspaces it accepts notifications from.',
     humanOnly: true,
     input: {},
-    run: async (l) => ({ id: l.workspace, default_visibility: await l.defaultVisibility(), accepts_from: await acceptedSenders(l) }),
+    run: async (l) => {
+      const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on to_jsonb(e.id) = s.value where s.key = 'me'`);
+      return { id: l.workspace, owner: rows[0] ?? null, default_visibility: await l.defaultVisibility(), accepts_from: await acceptedSenders(l) };
+    },
   },
   workspace_set: {
     description: 'Change workspace settings. default_visibility: whether new things are private to their author (the default) or shared unless they say otherwise. accepts_from: which other workspaces may send this one notifications. Admins only.',
