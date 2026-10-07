@@ -138,11 +138,14 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .switch button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
 .switch button:last-child { border-radius: 0 6px 6px 0; }
 .switch button.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); position: relative; font-weight: 600; }
-.roadmap-graph { overflow: auto; }
+.roadmap-graph { overflow: auto; scrollbar-color: var(--line) transparent; }
 .roadmap-graph svg { display: block; }
 .rm-link { fill: none; stroke: var(--edge); stroke-width: 1.5; }
-.rm-dep { fill: none; stroke: var(--g-blocked); stroke-width: 1.5; stroke-dasharray: 5 4; }
-.rm-arrowhead { fill: var(--g-blocked); }
+.rm-dep { fill: none; stroke: var(--edge-strong); stroke-width: 1.7; }
+.rm-dep.waiting { stroke: var(--g-blocked); }
+.rm-dep.lifted { stroke-dasharray: 5 4; }
+.rm-arrowhead { fill: var(--edge-strong); }
+.rm-arrowhead.wait { fill: var(--g-blocked); }
 .rm-node { cursor: pointer; }
 .rm-node text { fill: var(--text); font-size: 12.5px; }
 .rm-node text.small { fill: var(--muted); font-size: 11px; }
@@ -298,4 +301,5 @@ svg.graph .dim { opacity: 0.18; }
 .legend .swatch.rm-active { border: 2.5px solid var(--warn); border-radius: 3px; }
 .legend .swatch.rm-closed { background: var(--ok-soft); border: 1.5px solid var(--ok); border-radius: 3px; }
 .legend .swatch.rm-blocked { background: var(--g-blocked); }
-.legend .stroke.waits { border-top: 2px dashed var(--g-blocked); }
+.legend .stroke.waits { border-top: 2px solid var(--g-blocked); }
+.legend .stroke.lifted { border-top: 2px dashed var(--edge-strong); }

@@ -1641,77 +1641,130 @@ function progressBar({ done, total }) {
   return h('span', { class: 'progress', title: `${done} of ${total} tasks and issues closed` }, h('span', { class: 'bar' }, h('span', { style: `width: ${Math.round((done / total) * 100)}%` })), h('span', { class: 'muted small' }, `${done}/${total}`));
 }
 
-// The same tree drawn left to right: the project, its features top to bottom in
-// roadmap order, then what is part of each. It is laid out, not simulated, so
-// it looks the same every time. Dashed red arrows point at what is waited on.
+// The roadmap drawn so that position means order of work: the project on the
+// left, then each feature one column to the right of everything it waits on.
+// Arrows run from what is needed to what needs it. A feature also waits on
+// another when one of its tasks waits on one of the other's. It is laid out,
+// not simulated, so it looks the same every time.
 function roadmapGraph(data, withWork) {
-  const COL = 280;
+  const COL = 310;
   const BOX = { w: 232, h: 42 };
+  const ROW = 20;
   const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
-  const leaf = (w) => ({ ...w, kind: 'work', kids: [] });
-  const make = (b, i) => ({ ...b, kind: 'branch', place: i + 1, kids: [...b.branches.map(make), ...(withWork ? b.work.map(leaf) : [])] });
-  const root = { ...data.root, kind: 'root', open: true, progress: data.progress, kids: [...data.branches.map(make), ...(withWork ? data.unplaced.map(leaf) : [])] };
 
-  const all = [];
-  let y = 0;
-  let deepest = 0;
-  const lay = (n, depth) => {
-    all.push(n);
-    n.x = depth * COL;
-    deepest = Math.max(deepest, depth);
-    const from = y;
-    const room = n.kind === 'work' ? 24 : BOX.h + 10;
-    n.kids.forEach((k) => lay(k, depth + 1));
-    // A box needs its own height even when what hangs off it is shorter.
-    if (y - from < room) y = from + room;
-    n.y = n.kids.length ? Math.max((n.kids[0].y + n.kids.at(-1).y) / 2, from + room / 2) : from + room / 2;
+  const nodes = [];
+  const owner = new Map();
+  const titles = new Map();
+  const add = (b, parent, i) => {
+    const n = { ...b, kind: 'branch', place: i + 1, parent, work: withWork ? b.work : [], needs: new Map() };
+    nodes.push(n);
+    owner.set(b.id, n);
+    titles.set(b.id, b.title);
+    for (const w of b.work) {
+      owner.set(w.id, n);
+      titles.set(w.id, w.title);
+    }
+    b.branches.forEach((k, j) => add(k, n, j));
   };
-  lay(root, 0);
-  const byId = new Map(all.map((n) => [n.id, n]));
-  const pad = 16;
-  const width = deepest * COL + (withWork ? 340 : BOX.w) + pad * 2;
-  const height = y + pad * 2;
-
-  const inner = s('g', { transform: `translate(${pad},${pad})` });
-  const curve = (x1, y1, x2, y2) => `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
-  for (const n of all) for (const k of n.kids) inner.append(s('path', { class: 'rm-link', d: curve(n.x + BOX.w, n.y, k.x, k.y) }));
+  data.branches.forEach((b, i) => add(b, null, i));
   for (const d of data.depends) {
-    const [a, b] = [byId.get(d.from), byId.get(d.to)];
-    if (!a || !b) continue;
-    // Leave from the left edge and come back to it, bowing outwards, so the arrow stays clear of the tree's own lines.
-    const bow = Math.min(a.x, b.x) - 14 - Math.min(Math.abs(a.y - b.y) / 6, 40);
-    inner.append(s('path', { class: 'rm-dep', 'marker-end': 'url(#rm-arrow)', d: `M${a.x},${a.y} C${bow},${a.y} ${bow},${b.y} ${b.x - 2},${b.y}` }, s('title', {}, document.createTextNode(`${a.title} waits on ${b.title}`))));
+    const [a, b] = [owner.get(d.from), owner.get(d.to)];
+    if (!a || !b || a === b) continue;
+    const direct = a.id === d.from && b.id === d.to;
+    const known = a.needs.get(b) ?? { direct: false, why: [] };
+    a.needs.set(b, { direct: known.direct || direct, why: direct ? known.why : [...known.why, `${titles.get(d.from)} waits on ${titles.get(d.to)}`] });
   }
-  for (const n of all) {
-    const state = `${n.open ? '' : ' closed'}${n.active ? ' active' : ''}${n.blocked ? ' blocked' : ''}`;
-    const hint = s('title', {}, document.createTextNode(`${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}`));
-    let el;
-    if (n.kind === 'work') {
-      el = s('g', { class: `rm-node work${state}`, transform: `translate(${n.x},${n.y})` }, hint, s('circle', { cx: 8, r: 5 }), s('text', { x: 20, y: 4 }, document.createTextNode(cut(n.title, 44))));
-    } else {
-      const { done, total } = n.progress;
-      el = s(
-        'g',
-        { class: `rm-node ${n.kind}${state}`, transform: `translate(${n.x},${n.y - BOX.h / 2})` },
-        hint,
-        s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 7 }),
-        s('text', { x: 10, y: 17 }, document.createTextNode(cut(n.place ? `${n.place}. ${n.title}` : n.title, 34))),
-        total > 0 && s('rect', { class: 'track', x: 10, y: 27, width: 80, height: 5, rx: 2.5 }),
-        total > 0 && s('rect', { class: 'fill', x: 10, y: 27, width: (80 * done) / total, height: 5, rx: 2.5 }),
-        s('text', { class: 'small', x: total ? 96 : 10, y: 33 }, document.createTextNode(total ? `${done}/${total}` : 'no tasks')),
-        s('text', { class: 'small', x: BOX.w - 10, y: 33, 'text-anchor': 'end' }, document.createTextNode(n.kind === 'root' ? '' : n.status)),
-        n.blocked && s('circle', { class: 'flag', cx: BOX.w - 4, cy: 4, r: 5 }),
+
+  // A feature's column is one past the furthest thing it waits on (or is part of).
+  const level = (n, trail = new Set()) => {
+    if (n.level !== undefined) return n.level;
+    if (trail.has(n)) return 0; // a loop of dependencies: stop going round
+    trail.add(n);
+    let at = n.parent ? level(n.parent, trail) + 1 : 0;
+    for (const p of n.needs.keys()) at = Math.max(at, level(p, trail) + 1);
+    trail.delete(n);
+    return (n.level = at);
+  };
+  const cols = [];
+  for (const n of nodes) (cols[level(n)] ??= []).push(n);
+  const tall = (n) => BOX.h + (n.work.length ? n.work.length * ROW + 8 : 0);
+  // The first column keeps roadmap order. Each later one sits as near as it can
+  // to what it waits on, so arrows stay short.
+  let bottom = 0;
+  cols.forEach((col, i) => {
+    const near = (n) => {
+      const from = [...n.needs.keys(), ...(n.parent ? [n.parent] : [])].filter((p) => p.y !== undefined);
+      return from.length ? from.reduce((sum, p) => sum + p.y, 0) / from.length : undefined;
+    };
+    const wanted = new Map(col.map((n) => [n, i ? near(n) : undefined]));
+    const ordered = i ? [...col].sort((a, b) => (wanted.get(a) ?? Infinity) - (wanted.get(b) ?? Infinity) || col.indexOf(a) - col.indexOf(b)) : col;
+    let y = 0;
+    for (const n of ordered) {
+      n.x = (i + 1) * COL;
+      n.y = Math.max(y, wanted.get(n) ?? y);
+      y = n.y + tall(n) + 12;
+    }
+    bottom = Math.max(bottom, y);
+  });
+  const first = cols[0] ?? [];
+  const root = { ...data.root, kind: 'root', open: true, progress: data.progress, work: withWork ? data.unplaced : [], x: 0 };
+  root.y = first.length ? Math.max(0, (first.at(-1).y + BOX.h) / 2 - BOX.h / 2) : 0;
+  bottom = Math.max(bottom, root.y + tall(root) + 12);
+
+  const pad = 16;
+  const width = cols.length * COL + BOX.w + 40 + pad * 2;
+  const height = bottom + pad * 2;
+  const inner = s('g', { transform: `translate(${pad},${pad})` });
+  const mid = (n) => n.y + BOX.h / 2;
+  const curve = (x1, y1, x2, y2) => `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
+  let waiting = false;
+  let met = false;
+  let lifted = false;
+  for (const n of nodes) {
+    // Belonging: to the project when nothing else places it, or to the feature it is part of.
+    if (n.parent) inner.append(s('path', { class: 'rm-link', d: curve(n.parent.x + BOX.w, mid(n.parent), n.x, mid(n)) }));
+    else if (!n.needs.size) inner.append(s('path', { class: 'rm-link', d: curve(BOX.w, mid(root), n.x, mid(n)) }));
+    for (const [p, info] of n.needs) {
+      waiting ||= p.open;
+      met ||= !p.open;
+      lifted ||= !info.direct;
+      inner.append(
+        s(
+          'path',
+          { class: `rm-dep${p.open ? ' waiting' : ''}${info.direct ? '' : ' lifted'}`, 'marker-end': `url(#rm-arrow${p.open ? '-wait' : ''})`, d: curve(p.x + BOX.w, mid(p), n.x - 2, mid(n)) },
+          s('title', {}, document.createTextNode([`${n.title} waits on ${p.title}${p.open ? '' : ' (finished)'}`, ...info.why].join('\n'))),
+        ),
       );
     }
-    el.addEventListener('click', () => (location.hash = `#/e/${n.id}`));
-    inner.append(el);
   }
-  const svg = s(
-    'svg',
-    { width, height, viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'The roadmap as a tree' },
-    s('defs', {}, s('marker', { id: 'rm-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: 'rm-arrowhead' }))),
-    inner,
-  );
+  for (const n of [root, ...nodes]) {
+    const state = (x) => `${x.open ? '' : ' closed'}${x.active ? ' active' : ''}${x.blocked ? ' blocked' : ''}`;
+    const hint = (x) => s('title', {}, document.createTextNode(`${x.title}\n${typeTitle(x.type)}, ${x.status}${x.blocked ? ', blocked' : ''}${x.sessions?.length ? ', session open' : ''}`));
+    const open = (x) => () => (location.hash = `#/e/${x.id}`);
+    const { done, total } = n.progress;
+    const box = s(
+      'g',
+      { class: `rm-node ${n.kind}${state(n)}`, transform: `translate(${n.x},${n.y})` },
+      hint(n),
+      s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 7 }),
+      s('text', { x: 10, y: 17 }, document.createTextNode(cut(n.place ? `${n.place}. ${n.title}` : n.title, 34))),
+      total > 0 && s('rect', { class: 'track', x: 10, y: 27, width: 80, height: 5, rx: 2.5 }),
+      total > 0 && s('rect', { class: 'fill', x: 10, y: 27, width: (80 * done) / total, height: 5, rx: 2.5 }),
+      s('text', { class: 'small', x: total ? 96 : 10, y: 33 }, document.createTextNode(total ? `${done}/${total}` : 'no tasks')),
+      s('text', { class: 'small', x: BOX.w - 10, y: 33, 'text-anchor': 'end' }, document.createTextNode(n.kind === 'root' ? '' : n.status)),
+      n.blocked && s('circle', { class: 'flag', cx: BOX.w - 4, cy: 4, r: 5 }),
+    );
+    box.addEventListener('click', open(n));
+    inner.append(box);
+    n.work.forEach((w, j) => {
+      const el = s('g', { class: `rm-node work${state(w)}`, transform: `translate(${n.x + 12},${n.y + BOX.h + 8 + j * ROW + ROW / 2})` }, hint(w), s('circle', { cx: 6, r: 4.5 }), s('text', { x: 17, y: 4 }, document.createTextNode(cut(w.title, 36))));
+      el.addEventListener('click', open(w));
+      inner.append(el);
+    });
+  }
+  const marker = (id, cls) => s('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: cls }));
+  const svg = s('svg', { width, height, viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'The roadmap, laid out by what waits on what' }, s('defs', {}, marker('rm-arrow', 'rm-arrowhead'), marker('rm-arrow-wait', 'rm-arrowhead wait')), inner);
+  const everything = [root, ...nodes].flatMap((n) => [n, ...n.work]);
   return h(
     'div',
     {},
@@ -1719,10 +1772,13 @@ function roadmapGraph(data, withWork) {
     h(
       'div',
       { class: 'legend' },
-      h('span', { class: 'key' }, h('span', { class: 'swatch rm-active' }), 'Being worked on'),
-      h('span', { class: 'key' }, h('span', { class: 'swatch rm-closed' }), 'Finished'),
-      all.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch rm-blocked' }), 'Blocked'),
-      data.depends.length > 0 && h('span', { class: 'key' }, h('span', { class: 'stroke waits' }), 'Waits on (arrow points at what is needed)'),
+      h('span', { class: 'key' }, 'Left to right: what has to come first'),
+      waiting && h('span', { class: 'key' }, h('span', { class: 'stroke waits' }), 'Waits on something unfinished'),
+      met && h('span', { class: 'key' }, h('span', { class: 'stroke blocking' }), 'Waited on something now finished'),
+      lifted && h('span', { class: 'key' }, h('span', { class: 'stroke lifted' }), 'Through their tasks'),
+      everything.some((n) => n.active) && h('span', { class: 'key' }, h('span', { class: 'swatch rm-active' }), 'Being worked on'),
+      everything.some((n) => !n.open) && h('span', { class: 'key' }, h('span', { class: 'swatch rm-closed' }), 'Finished'),
+      everything.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch rm-blocked' }), 'Blocked'),
     ),
   );
 }
