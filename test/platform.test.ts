@@ -175,7 +175,6 @@ test('inside a workspace, private things are hidden from other members by the da
     { op: 'create', ref: 'x', type: 'task', title: 'Alex private', owner: me },
     { op: 'link', type: 'part_of', from: 's', to: 'p' },
     { op: 'link', type: 'part_of', from: 'x', to: 'p' },
-    { op: 'link', type: 'depends_on', from: 's', to: 'x' },
   ] });
   await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Sam private', owner: added.person }] });
   assert.deepEqual(await titles(alex), ['Alex private', 'Shared task']);
@@ -194,7 +193,7 @@ test('inside a workspace, private things are hidden from other members by the da
 
   // Each person's views are their own.
   assert.deepEqual((await api(sam, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title), ['Sam private']);
-  assert.deepEqual((await api(alex, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title), ['Alex private']);
+  assert.deepEqual((await api(alex, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title).sort(), ['Alex private', 'Shared task']);
 
   // Sharing is an explicit edit, and it works both ways.
   await api(alex, 'change', { reason: 'x', ops: [{ op: 'update', id: mine.created.x, visibility: 'shared' }] });
@@ -229,4 +228,63 @@ test('inside a workspace, private things are hidden from other members by the da
   await api(alex, 'workspace_set', { default_visibility: 'shared' });
   await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Open by default' }] });
   assert.ok((await titles(sam)).includes('Open by default'));
+});
+
+test('nothing can depend on a private item from outside it, and a held resource is held for everyone', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const db = (await workspaces.get('default')).lattice.db;
+  const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const api = async (token: string, tool: string, body: unknown = {}) => {
+    const r = await call(`/api/${tool}`, token, body);
+    if (r.status !== 200) throw new Error(r.error);
+    return r.result;
+  };
+  const refused = async (token: string, ops: unknown[]) => (await call('/api/change', token, { reason: 'x', ops })).error as string;
+  await api(alex, 'init', { name: 'Alex' });
+  const sam = (await api(alex, 'member_add', { name: 'Sam' })).token as string;
+
+  const made = (await api(alex, 'change', { reason: 'x', ops: [
+    { op: 'create', ref: 'pub', type: 'task', title: 'Public task', visibility: 'shared' },
+    { op: 'create', ref: 'priv', type: 'task', title: 'Private prep' },
+    { op: 'create', ref: 'priv2', type: 'task', title: 'Private follow-up' },
+    { op: 'create', ref: 'base', type: 'task', title: 'Shared base', visibility: 'shared' },
+    { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane', visibility: 'shared' },
+    { op: 'create', ref: 'live', type: 'task', title: 'Live work', visibility: 'shared' },
+    { op: 'link', type: 'depends_on', from: 'priv2', to: 'priv' },
+    { op: 'link', type: 'depends_on', from: 'priv', to: 'base' },
+    { op: 'create', ref: 'other', type: 'task', title: 'Other live work', visibility: 'shared' },
+    { op: 'link', type: 'needs', from: 'live', to: 'lane' },
+    { op: 'link', type: 'needs', from: 'other', to: 'lane' },
+  ] })).created;
+
+  // A shared item cannot wait on a private one: colleagues would see it as ready.
+  assert.match(await refused(alex, [{ op: 'link', type: 'depends_on', from: made.pub, to: made.priv }]), /"Public task" is shared, so it cannot depend on "Private prep", which is private/);
+  assert.match(await refused(alex, [{ op: 'create', ref: 'n', type: 'task', title: 'New shared', visibility: 'shared' }, { op: 'link', type: 'depends_on', from: 'n', to: made.priv }]), /cannot depend on "Private prep"/);
+  // Private on private (same person) and private on shared are both fine: they were created above.
+  // A looser relation is not a dependency, so it is allowed.
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'link', type: 'relates_to', from: made.pub, to: made.priv }] });
+
+  // Sharing something that waits on a private item needs that item shared too.
+  assert.match(await refused(alex, [{ op: 'update', id: made.priv2, visibility: 'shared' }]), /cannot be shared while it depends on private items: "Private prep"/);
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'update', id: made.priv2, visibility: 'shared' }, { op: 'update', id: made.priv, visibility: 'shared' }] });
+
+  // Something others depend on cannot be made private, even when the dependent is hidden from you.
+  assert.match(await refused(alex, [{ op: 'update', id: made.priv, visibility: 'private' }]), /cannot be made private while other work depends on it: "Private follow-up"/);
+  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'mine', type: 'task', title: 'Sam secret' }, { op: 'link', type: 'depends_on', from: 'mine', to: made.base }] });
+  const hidden = await refused(alex, [{ op: 'update', id: made.base, visibility: 'private' }]);
+  assert.match(hidden, /"Private prep", 1 item private to someone else/);
+  assert.ok(!hidden.includes('Sam secret'), 'the hidden dependent is counted, not named');
+
+  // Sam's session is private to Sam, but the lane it holds is held for everyone.
+  const session = await api(sam, 'session_start', { task: made.live, title: 'Sam debugging' });
+  assert.deepEqual(session.claimed, ['Live lane']);
+  assert.ok(!((await api(alex, 'search', { type: 'sys.run' })) as any[]).length, 'Alex cannot see the session itself');
+  const alexRun = await api(alex, 'session_start', { title: 'Alex wants the lane', task: made.live });
+  assert.equal(alexRun.status, 'waiting');
+  assert.match(alexRun.blocked[0].why, /"Live lane" is held by "someone's private session"/);
+  const now = await api(alex, 'view', { name: 'available_now' });
+  assert.equal(now.held_resources[0].held_by_title, "someone's private session");
+  assert.ok(!now.ready.some((t: any) => t.title === 'Other live work'), 'other work needing the lane is not shown as ready');
+  assert.deepEqual(now.waiting_on_resource.map((t: any) => t.title), ['Other live work']);
+  assert.equal((await api(sam, 'view', { name: 'available_now' })).held_resources[0].held_by_title, 'Sam debugging');
 });

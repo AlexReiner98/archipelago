@@ -135,6 +135,32 @@ create policy member_event on event for all to lattice_member
          and (target_id is null or target_id in (select id from entity)))
   with check (true);
 
+-- Two facts have to cross the privacy line, or coordination breaks. Each is
+-- answered by a function that sees everything and gives away as little as it
+-- can.
+--
+-- Who holds a resource: a shared resource held by someone's private session
+-- is still held. The holder's title is given only to those who may see it.
+create or replace function lattice_active_holds(is_member boolean, viewer text)
+returns table (id text, from_id text, to_id text, props jsonb, valid_from timestamptz, holder_title text)
+language sql stable security definer set search_path = public as $fn$
+  select h.id, h.from_id, h.to_id, h.props, h.valid_from,
+         case when not is_member or s.private_to is null or s.private_to = viewer then s.title else 'someone''s private session' end
+  from relation h join entity s on s.id = h.from_id
+  where h.type = 'holds' and h.valid_to is null
+$fn$;
+
+-- How many things that are not the viewer's own private items depend on this
+-- one. Only a count: it says a dependent exists, not what it is.
+create or replace function lattice_external_dependents(target text, viewer text) returns int
+language sql stable security definer set search_path = public as $fn$
+  select count(*)::int from relation r join entity s on s.id = r.from_id
+  where r.to_id = target and r.valid_to is null and r.type in ('depends_on', 'needs') and s.archived_at is null
+    and (s.private_to is null or s.private_to <> viewer)
+$fn$;
+
+grant execute on function lattice_active_holds(boolean, text), lattice_external_dependents(text, text) to lattice_member;
+
 drop policy if exists member_proposal on proposal;
 create policy member_proposal on proposal for all to lattice_member
   using (private_to is null or private_to = current_setting('lattice.viewer', true))

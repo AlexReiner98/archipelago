@@ -1,7 +1,7 @@
 // Views: the questions the map exists to answer. Nothing here is stored;
 // blockers are derived from relations every time, so they cannot go stale.
 
-import type { Entity, Lattice } from './lattice.ts';
+import { ACTIVE_HOLDS, type Entity, type Lattice } from './lattice.ts';
 
 interface Edge {
   x: string;
@@ -34,7 +34,7 @@ const EDGES = `
   union all
   select n.from_id, n.to_id, 'resource_held'
     from relation n join entity x on x.id = n.from_id join entity res on res.id = n.to_id
-    join relation h on h.to_id = n.to_id and h.type = 'holds' and h.valid_to is null
+    join ${ACTIVE_HOLDS} h on h.to_id = n.to_id
    where n.type = 'needs' and n.valid_to is null
      and x.is_open and x.archived_at is null and res.archived_at is null
      and coalesce((res.props->>'exclusive')::boolean, true)
@@ -114,9 +114,8 @@ async function availableNow(l: Lattice, input: { owner?: string }) {
     [l.registry.family('task'), input.owner ?? null],
   );
   const { rows: held } = await l.db.query(
-    `select res.id as resource, res.title, h.from_id as held_by, e.title as held_by_title, h.props->>'for' as held_for, h.valid_from as since
-     from relation h join entity res on res.id = h.to_id join entity e on e.id = h.from_id
-     where h.type = 'holds' and h.valid_to is null`,
+    `select res.id as resource, res.title, h.from_id as held_by, h.holder_title as held_by_title, h.props->>'for' as held_for, h.valid_from as since
+     from ${ACTIVE_HOLDS} h join entity res on res.id = h.to_id`,
   );
   const resourceOnly = (id: string) => graph.direct.get(id)!.every((e) => e.why !== 'depends_on');
   const names = await briefs(l, [...graph.direct.values()].flat().map((e) => e.y));
@@ -285,7 +284,7 @@ async function brief(l: Lattice, input: { task?: string }) {
   const names = await briefs(l, [...(graph.direct.get(task.id) ?? []).map((e) => e.y), ...roots]);
   const blockedBy = (graph.direct.get(task.id) ?? []).map((e) => ({ why: e.why, entity: names.get(e.y) }));
   const { rows: held } = await l.db.query<{ to_id: string; title: string }>(
-    `select h.to_id, e.title from relation h join entity e on e.id = h.from_id where h.type = 'holds' and h.valid_to is null and h.to_id = any($1::text[])`,
+    `select h.to_id, h.holder_title as title from ${ACTIVE_HOLDS} h where h.to_id = any($1::text[])`,
     [needs.map((n) => n.id)],
   );
 

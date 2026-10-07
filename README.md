@@ -215,8 +215,17 @@ change that:
     change workspace settings. The first token of a workspace is an admin's;
     running `init` with it ties it to a person.
 
-Limits, stated plainly: a blocker you cannot see does not show as a blocker,
-so a task can look ready when it waits on someone's private item. The server
+  - **Nothing can depend on a private item from outside it.** A shared item
+    cannot `depends_on` or `needs` a private one; a private item cannot be
+    shared while it waits on private items, unless they are shared in the same
+    change; and an item cannot be made private while other work depends on it
+    (a dependent hidden from you is counted, not named). So a blocker is
+    always visible to everyone it blocks.
+  - **A held resource is held for everyone.** If someone's private session
+    holds the live lane, others are refused it and told it is held by
+    "someone's private session".
+
+Limits, stated plainly: the server
 still listens on this machine only, with no
 TLS. And on a single machine an agent running as your OS user can read any
 token you keep in a file or environment variable, so tokens are a real
