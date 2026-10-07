@@ -154,3 +154,13 @@ details.group .inner { background: var(--bg); }
   #main { padding: 16px; }
   .ops td.kind { width: auto; }
 }
+
+/* Forms */
+.form .fields { grid-template-columns: 150px minmax(0, 1fr); align-items: start; }
+.form .fields dt { padding-top: 6px; }
+.form input[type="text"], .form input[type="number"], .form input[type="date"], .form textarea { width: 100%; }
+.form select { min-width: 180px; }
+textarea, input[type="number"], input[type="date"] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+textarea { resize: vertical; }
+.form .actions { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+.row-sub.error { color: var(--bad); }

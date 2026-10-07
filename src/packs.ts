@@ -12,6 +12,8 @@ export interface FieldDef {
   values?: string[];
   description?: string;
   default?: unknown;
+  /** Maintained by the system; shown but not offered for editing. */
+  system?: boolean;
 }
 
 export interface Statuses {

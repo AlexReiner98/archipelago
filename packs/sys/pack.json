@@ -82,15 +82,18 @@
         },
         "session_id": {
           "type": "string",
-          "description": "The id the surface gave the session."
+          "description": "The id the surface gave the session.",
+          "system": true
         },
         "last_seen": {
           "type": "datetime",
-          "description": "Last time the session reported in."
+          "description": "Last time the session reported in.",
+          "system": true
         },
         "stale_flagged": {
           "type": "boolean",
-          "description": "Set once the human has been told this session went quiet."
+          "description": "Set once the human has been told this session went quiet.",
+          "system": true
         }
       }
     },
@@ -118,7 +121,8 @@
         },
         "from": {
           "type": "string",
-          "description": "Who sent it."
+          "description": "Who sent it.",
+          "system": true
         }
       }
     },
@@ -187,14 +191,17 @@
           "description": "For action tool: the tool's input. For action launch: {task, mode, instructions}."
         },
         "last_fired": {
-          "type": "datetime"
+          "type": "datetime",
+          "system": true
         },
         "last_result": {
-          "type": "string"
+          "type": "string",
+          "system": true
         },
         "last_run": {
           "type": "string",
-          "description": "The run the last launch started."
+          "description": "The run the last launch started.",
+          "system": true
         }
       }
     }

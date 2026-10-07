@@ -84,14 +84,18 @@ function card(title, { wide } = {}) {
 const WHY = { depends_on: 'depends on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
 
 async function refreshReviewCount() {
-  const badge = document.getElementById('review-count');
-  try {
-    const pending = await api('proposals');
-    badge.textContent = pending.length;
-    badge.hidden = pending.length === 0;
-  } catch {
-    badge.hidden = true;
-  }
+  const set = async (id, count) => {
+    const badge = document.getElementById(id);
+    try {
+      const n = await count();
+      badge.textContent = n;
+      badge.hidden = n === 0;
+    } catch {
+      badge.hidden = true;
+    }
+  };
+  set('review-count', async () => (await api('proposals')).length);
+  set('notice-count', async () => (await api('view', { name: 'notifications' })).length);
 }
 
 // ---- Today ---------------------------------------------------------------
@@ -104,10 +108,48 @@ function today() {
   const mine = card('You are holding up');
   const resources = card('Resources and connections');
   const running = card('Sessions', { wide: true });
+  const notices = card('Notifications', { wide: true });
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, 'Today'), h('p', { class: 'muted' }, 'Derived from the map each time you open this page.')),
-    h('div', { class: 'grid' }, running.el, needs.el, blocked.el, mine.el, waiting.el, risk.el, resources.el),
+    h('div', { class: 'grid' }, notices.el, running.el, needs.el, blocked.el, mine.el, waiting.el, risk.el, resources.el),
   );
+
+  const markRead = async (ids) => {
+    await api('change', { ops: ids.map((id) => ({ op: 'update', id, status: 'read' })), reason: 'Read in the UI' });
+    today();
+    refreshReviewCount();
+  };
+  notices
+    .fill(
+      api('view', { name: 'notifications' }),
+      (rows) => [
+        rows.length,
+        h(
+          'ul',
+          { class: 'rows' },
+          rows.map((n) =>
+            h(
+              'li',
+              {},
+              h(
+                'div',
+                { class: 'row-top' },
+                h('span', { class: `pill ${n.level === 'urgent' ? 'bad' : n.level === 'warning' ? 'warn' : ''}` }, n.level ?? 'info'),
+                h('span', { class: 'grow' }, h('strong', {}, n.title)),
+                h('button', { onclick: () => markRead([n.id]) }, 'Mark read'),
+              ),
+              h('div', { class: 'row-sub' }, n.body && [n.body, ' · '], n.about_id && [h('a', { href: `#/e/${n.about_id}` }, n.about_title), ' · '], `${n.from ?? ''} · ${when(n.created_at)}`),
+            ),
+          ),
+          rows.length > 1 && h('li', {}, h('button', { onclick: () => markRead(rows.map((n) => n.id)) }, `Mark all ${rows.length} read`)),
+        ),
+      ],
+      '',
+    )
+    .then(() => {
+      // Nothing unread: the card would only be noise.
+      if (notices.el.querySelector('.n').textContent === '0') notices.el.remove();
+    });
 
   running.fill(
     api('view', { name: 'sessions' }),
@@ -411,7 +453,7 @@ function map() {
         limit: 200,
       });
       // Sources are provenance, not work: list them only when asked for.
-      if (!mapState.type) rows = rows.filter((e) => e.type !== 'sys.source');
+      if (!mapState.type) rows = rows.filter((e) => !e.type.startsWith('sys.') || e.type === 'sys.connection');
       results.replaceChildren(
         rows.length
           ? h(
@@ -431,12 +473,13 @@ function map() {
     run();
   };
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Map'), h('p', { class: 'muted' }, 'Everything in the map. A type includes its flavours.')),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Map'), h('p', { class: 'muted' }, 'Everything in the map. A type includes its flavours. Sources, sessions and other system records are listed only when you pick their type.')),
     h(
       'div',
       { class: 'toolbar', style: 'margin-bottom: 12px' },
       h('input', { type: 'search', placeholder: 'Search titles and text', value: mapState.q, oninput: set('q'), style: 'flex: 1; min-width: 200px' }),
       h('select', { onchange: set('type') }, h('option', { value: '' }, 'All types'), schema.types.map((t) => h('option', { value: t.id, selected: t.id === mapState.type }, `${t.title}${t.pack === 'core' ? '' : ` (${t.pack})`}`))),
+      h('button', { onclick: () => (location.hash = `#/new/${mapState.type || 'task'}`) }, 'New'),
       h('select', { onchange: set('open') }, ['open', 'closed', 'all'].map((v) => h('option', { value: v, selected: v === mapState.open }, v === 'open' ? 'Unfinished' : v === 'closed' ? 'Finished' : 'Both'))),
     ),
     h('section', { class: 'card' }, results),
@@ -483,6 +526,26 @@ async function entity(id) {
         { onchange: (ev) => change([{ op: 'update', id, status: ev.target.value }], `Status set to ${ev.target.value} in the UI`) },
         statusesOf(e.type).map((s) => h('option', { value: s, selected: s === e.status }, s)),
       ),
+      !e.archived_at &&
+        h(
+          'button',
+          {
+            onclick: () => {
+              const form = entityForm(e.type, e, {
+                submitLabel: 'Save',
+                onCancel: () => entity(id),
+                onSubmit: async (next) => {
+                  const props = { ...next.props };
+                  for (const key of Object.keys(e.props)) if (!(key in props) && !types.get(e.type)?.fields[key]?.system) props[key] = null;
+                  await api('change', { ops: [{ op: 'update', id, title: next.title, body: next.body, status: next.status, props }], reason: 'Edited in the UI' });
+                  entity(id);
+                },
+              });
+              main.querySelector('.grid').firstChild.replaceWith(form);
+            },
+          },
+          'Edit',
+        ),
       !e.archived_at &&
         ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t) &&
         h(
@@ -555,6 +618,165 @@ async function entity(id) {
           : h('div', { class: 'empty' }, 'Not linked to anything.'),
       ),
       h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'History')), eventTable(data.recent_events, false)),
+    ),
+  );
+}
+
+// ---- forms ---------------------------------------------------------------
+
+/** A form for any type, built from its schema. System-kept fields are left out. */
+function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
+  const type = types.get(typeId);
+  const state = { title: initial.title ?? '', status: initial.status ?? type.statuses.open[0], body: initial.body ?? '', props: { ...(initial.props ?? {}) } };
+  const bad = new Set();
+  const error = h('div', { class: 'error', style: 'white-space: pre-wrap; padding: 0 14px 14px' });
+
+  const control = (key, def) => {
+    const value = state.props[key];
+    const set = (v) => {
+      if (v === '' || v === undefined) delete state.props[key];
+      else state.props[key] = v;
+    };
+    switch (def.type) {
+      case 'enum':
+        return h('select', { onchange: (e) => set(e.target.value) }, h('option', { value: '' }, '(not set)'), def.values.map((v) => h('option', { value: v, selected: v === value }, v)));
+      case 'boolean':
+        return h(
+          'select',
+          { onchange: (e) => set(e.target.value === '' ? '' : e.target.value === 'true') },
+          [['', '(not set)'], ['true', 'yes'], ['false', 'no']].map(([v, label]) => h('option', { value: v, selected: String(value ?? '') === v }, label)),
+        );
+      case 'number':
+        return h('input', { type: 'number', value: value ?? '', oninput: (e) => set(e.target.value === '' ? '' : Number(e.target.value)) });
+      case 'date':
+        return h('input', { type: 'date', value: value ?? '', oninput: (e) => set(e.target.value) });
+      case 'json':
+        return h('textarea', {
+          rows: 4,
+          value: value === undefined ? '' : JSON.stringify(value, null, 2),
+          placeholder: '{ }',
+          oninput: (e) => {
+            bad.delete(key);
+            if (!e.target.value.trim()) return set('');
+            try {
+              set(JSON.parse(e.target.value));
+            } catch {
+              bad.add(key);
+            }
+          },
+        });
+      default:
+        return h('input', { type: 'text', value: value ?? '', placeholder: def.type === 'datetime' ? '2026-10-07T14:00:00Z' : '', oninput: (e) => set(e.target.value) });
+    }
+  };
+
+  const row = (label, input, hint) => [h('dt', {}, label), h('dd', {}, input, hint && h('div', { class: 'muted small' }, hint))];
+  const save = h('button', { class: 'primary' }, submitLabel);
+  save.addEventListener('click', async () => {
+    error.textContent = '';
+    if (!state.title.trim()) return (error.textContent = 'A title is required.');
+    if (bad.size) return (error.textContent = `Not valid JSON: ${[...bad].join(', ')}`);
+    save.disabled = true;
+    try {
+      await onSubmit(state);
+    } catch (err) {
+      error.textContent = err.message;
+      save.disabled = false;
+    }
+  });
+
+  return h(
+    'section',
+    { class: 'card wide form' },
+    h('header', {}, h('h2', {}, type.title), h('span', { class: 'n' }, type.description)),
+    h(
+      'dl',
+      { class: 'fields' },
+      row('Title', h('input', { type: 'text', value: state.title, oninput: (e) => (state.title = e.target.value) })),
+      row('Status', h('select', { onchange: (e) => (state.status = e.target.value) }, statusesOf(typeId).map((s) => h('option', { value: s, selected: s === state.status }, s)))),
+      Object.entries(type.fields)
+        .filter(([, def]) => !def.system)
+        .map(([key, def]) => row(key.replaceAll('_', ' '), control(key, def), def.description)),
+      row('Notes', h('textarea', { rows: 5, value: state.body, oninput: (e) => (state.body = e.target.value) })),
+    ),
+    error,
+    h('div', { class: 'actions' }, save, h('button', { onclick: onCancel }, 'Cancel')),
+  );
+}
+
+function newEntity(typeId) {
+  if (!types.has(typeId)) typeId = 'task';
+  const draw = () => {
+    const form = entityForm(typeId, {}, {
+      submitLabel: 'Create',
+      onCancel: () => history.back(),
+      onSubmit: async (next) => {
+        const result = await api('change', { ops: [{ op: 'create', ref: 'new', type: typeId, title: next.title, status: next.status, body: next.body || undefined, props: next.props }], reason: 'Created in the UI' });
+        location.hash = `#/e/${result.created.new}`;
+      },
+    });
+    main.replaceChildren(
+      h('div', { class: 'page-head' }, h('h1', {}, 'New'), h('p', { class: 'muted' }, 'You are creating this directly, so it is applied at once.')),
+      h(
+        'div',
+        { class: 'toolbar', style: 'margin-bottom: 12px' },
+        h('label', { class: 'muted' }, 'Type '),
+        h(
+          'select',
+          {
+            onchange: (e) => {
+              typeId = e.target.value;
+              draw();
+            },
+          },
+          schema.types.map((t) => h('option', { value: t.id, selected: t.id === typeId }, `${t.title}${t.pack === 'core' ? '' : ` (${t.pack})`}`)),
+        ),
+      ),
+      h('div', { class: 'grid' }, form),
+    );
+  };
+  draw();
+}
+
+// ---- Automations ---------------------------------------------------------
+
+async function automations() {
+  const rows = await api('search', { type: 'sys.automation', limit: 200 });
+  const describe = (p) => {
+    const when = p.trigger === 'every' ? `every ${p.every_minutes} min` : p.trigger === 'daily' ? `daily at ${p.at}` : `when ${p.on_action} is logged`;
+    const what = p.action === 'notify' ? `notify: ${p.message ?? '(its title)'}` : p.action === 'tool' ? `call ${p.tool}` : `launch a session (${p.input?.mode ?? 'plan'}) on ${p.input?.task}`;
+    return `${when} → ${what}`;
+  };
+  const toggle = async (a) => {
+    await api('change', { ops: [{ op: 'update', id: a.id, status: a.status === 'enabled' ? 'paused' : 'enabled' }], reason: `${a.status === 'enabled' ? 'Paused' : 'Enabled'} in the UI` });
+    automations();
+  };
+  main.replaceChildren(
+    h(
+      'div',
+      { class: 'page-head' },
+      h('h1', {}, 'Automations'),
+      h('p', { class: 'muted' }, 'A trigger that fires an action. One an agent proposes does nothing until you approve it in Review. Every firing is in Activity.'),
+    ),
+    h('div', { class: 'toolbar', style: 'margin-bottom: 12px' }, h('button', { class: 'primary', onclick: () => (location.hash = '#/new/sys.automation') }, 'New automation')),
+    h(
+      'section',
+      { class: 'card' },
+      rows.length
+        ? h(
+            'ul',
+            { class: 'rows' },
+            rows.map((a) =>
+              h(
+                'li',
+                {},
+                h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(a)), h('span', { class: `pill ${a.status === 'enabled' ? 'ok' : 'closed'}` }, a.status), h('button', { onclick: () => toggle(a) }, a.status === 'enabled' ? 'Pause' : 'Enable')),
+                h('div', { class: 'row-sub' }, describe(a.props)),
+                a.props.last_fired && h('div', { class: `row-sub${String(a.props.last_result).startsWith('failed') ? ' error' : ''}` }, `last fired ${when(a.props.last_fired)} · ${a.props.last_result}`),
+              ),
+            ),
+          )
+        : h('div', { class: 'empty' }, 'No automations yet.'),
     ),
   );
 }
@@ -650,14 +872,15 @@ async function activity() {
 
 // ---- routing -------------------------------------------------------------
 
-const ROUTES = { today, review, map, activity };
+const ROUTES = { today, review, map, activity, automations };
 
 async function route() {
   const [, name = 'today', arg] = location.hash.split('/');
-  for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (name === 'e' ? 'map' : name));
+  for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (name === 'e' || name === 'new' ? 'map' : name));
   try {
     if (!schema) await loadSchema();
     if (name === 'e' && arg) await entity(arg);
+    else if (name === 'new') newEntity(arg);
     else await (ROUTES[name] ?? today)();
   } catch (err) {
     main.replaceChildren(h('div', { class: 'error' }, err.message));

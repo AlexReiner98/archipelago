@@ -2,6 +2,7 @@
 
 import { PGlite } from '@electric-sql/pglite';
 import { randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
 
 /** Anything that can run a query: the database or a transaction on it. */
 export interface Q {
@@ -86,6 +87,7 @@ create table if not exists setting (
 
 /** Open the database at a folder, or in memory when no folder is given. */
 export async function openDb(dataDir?: string): Promise<PGlite> {
+  if (dataDir) mkdirSync(dataDir, { recursive: true });
   const db = new PGlite(dataDir);
   await db.exec(SCHEMA);
   return db;

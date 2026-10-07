@@ -25,10 +25,11 @@ All three call the tools in [src/tools.ts](src/tools.ts). The web UI and CLI
 have human authority; the MCP endpoint does not, and two tools (`decide`,
 `init`) are not offered to agents at all.
 
-The web UI has four screens: **Today** (the standing questions), **Review**
-(approve, exclude or correct proposed changes), **Map** (search, and each
-entity with its relations and history) and **Activity** (the event log, one
-line per change set). It is plain files in `ui/` with no build step.
+The web UI has five screens: **Today** (notifications, sessions and the
+standing questions), **Review** (approve, exclude or correct proposed changes),
+**Map** (search, create, and each entity with its fields, relations and
+history), **Automations** and **Activity** (the event log, one line per change
+set). It is plain files in `ui/` with no build step.
 
 ## How a change happens
 
@@ -88,6 +89,22 @@ minutes, and can end it, which releases what it holds. An entity page has
 **Copy session brief**: the task's context, blockers, needed resources and the
 rules that govern them, as text to start a session with.
 
+## Notifications and automations
+
+- **Notifications:** an agent (`notify`), an automation or the system can leave
+  you a message. Unread ones sit at the top of Today. A session that stops
+  reporting raises one, saying what it still holds.
+- **Automations:** a trigger and an action, stored as an entity.
+  - Triggers: `every` N minutes, `daily` at a local time, or an `event` in the
+    activity log (`proposal.create`, or a prefix such as `resource.*`).
+  - Actions: `notify`, call `check_connections` or `import_audit`, or `launch`
+    a headless session on a task.
+  - An automation an agent proposes does nothing until you approve it. Every
+    firing is logged with its result. Events caused by automations cannot
+    trigger automations, and a launching automation waits for its last session
+    to end before starting another.
+  - Create and pause them on the Automations screen.
+
 ## Views
 
 The questions the map exists to answer. `npm run lattice -- view` lists them.
@@ -127,8 +144,7 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 ## Not built yet
 
 - Launching into the desktop app. Launched sessions are headless.
-- Unattended automations: nothing launches a session on a schedule or trigger.
-- A graph view, and editing fields other than status in the web UI.
+- A graph view. Relations can be read on an entity page but only added through `change`.
 - Undo. The event log records what changed, but nothing replays it backwards.
 - Semantic search. Search is text matching.
 - Teams. The `workspace` and `visibility` columns exist but nothing enforces them.
