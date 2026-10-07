@@ -23,3 +23,9 @@ services:
         value: /var/lattice/data
       - key: LATTICE_PUBLIC_HOST # the name(s) customers reach it by, e.g. lattice.example.com
         sync: false
+      # Where a copy of every backup is sent, off the server. For Supabase Storage:
+      # https://<project>.supabase.co/storage/v1/object/<private bucket>, and a key that may write to it.
+      - key: LATTICE_BACKUP_UPLOAD_URL
+        sync: false
+      - key: LATTICE_BACKUP_UPLOAD_KEY
+        sync: false

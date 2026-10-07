@@ -404,7 +404,7 @@ test('beyond this machine the server needs tokens, and answers only to the names
   process.env.LATTICE_PUBLIC_HOST = 'Lattice.Example.com, other.example.com';
   process.env.PORT = '10000';
   const hosted = loadConfig();
-  assert.deepEqual([hosted.host, hosted.port, hosted.publicHosts], ['0.0.0.0', 10000, ['lattice.example.com', 'other.example.com']]);
+  assert.deepEqual([hosted.host, hosted.port, hosted.publicHosts, hosted.launch], ['0.0.0.0', 10000, ['lattice.example.com', 'other.example.com'], false], 'and it does not launch sessions');
 
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(mkdtempSync(join(tmpdir(), 'lattice-public-')), 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
   const server = createHttpServer(workspaces, 0, { auth: 'tokens', publicHosts: hosted.publicHosts });

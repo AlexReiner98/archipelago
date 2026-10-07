@@ -32,9 +32,12 @@ export interface Config {
    * Where and how often every workspace is written out as a backup, and how
    * many of each to keep. On by default, beside the data folder, every 6
    * hours, keeping 28 (a week). `"backup": false` turns it off;
-   * LATTICE_BACKUP_DIR moves it.
+   * LATTICE_BACKUP_DIR moves it. With LATTICE_BACKUP_UPLOAD_URL and
+   * LATTICE_BACKUP_UPLOAD_KEY set, a copy of each is sent off the server.
    */
-  backup: false | { dir: string; everyHours: number; keep: number };
+  backup: false | { dir: string; everyHours: number; keep: number; upload?: { url: string; key: string } };
+  /** Whether this server may start Claude Code sessions: only when it listens on this machine alone. */
+  launch: boolean;
   /**
    * For working on Lattice itself, one person on one machine: agent changes
    * apply without review unless `policy` says otherwise, and agents may restart
@@ -61,8 +64,10 @@ export function loadConfig(): Config {
   if (!local && dev) throw new Error('Dev mode does not listen beyond this machine.');
   const named = process.env.LATTICE_PUBLIC_HOST?.split(',') ?? fromFile.publicHosts ?? [];
   const dataDir = resolve(ROOT, process.env.LATTICE_DATA ?? fromFile.dataDir ?? 'data');
+  // The key is a secret, so it comes from the environment only, never the config file.
+  const sendTo = process.env.LATTICE_BACKUP_UPLOAD_URL && process.env.LATTICE_BACKUP_UPLOAD_KEY ? { url: process.env.LATTICE_BACKUP_UPLOAD_URL, key: process.env.LATTICE_BACKUP_UPLOAD_KEY } : undefined;
   const wanted = fromFile.backup === false ? false : { ...(fromFile.backup as object | undefined) } as { dir?: string; everyHours?: number; keep?: number };
-  const backup = wanted && { dir: resolve(ROOT, process.env.LATTICE_BACKUP_DIR ?? wanted.dir ?? join(dataDir, '..', 'backups')), everyHours: wanted.everyHours ?? 6, keep: wanted.keep ?? 28 };
+  const backup = wanted && { dir: resolve(ROOT, process.env.LATTICE_BACKUP_DIR ?? wanted.dir ?? join(dataDir, '..', 'backups')), everyHours: wanted.everyHours ?? 6, keep: wanted.keep ?? 28, upload: sendTo };
   const unreviewed = Object.fromEntries(Object.keys(DEFAULT_AGENT_POLICY).map((op) => [op, 'auto'])) as Policy;
   return {
     packs: fromFile.packs,
@@ -70,6 +75,8 @@ export function loadConfig(): Config {
     auth,
     dev,
     host,
+    // A hosted server has neither its customers' repositories nor their Claude CLI.
+    launch: local,
     publicHosts: named.map((name) => name.trim().toLowerCase()).filter(Boolean),
     // Hosting platforms say which port to use through PORT.
     port: Number(process.env.LATTICE_PORT ?? process.env.PORT ?? fromFile.port ?? 3100),

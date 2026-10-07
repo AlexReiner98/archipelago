@@ -233,7 +233,7 @@ if (import.meta.main) {
   const config = loadConfig();
   const rootDir = join(config.dataDir, '..', 'workspaces');
   const workspaces = new Workspaces({ dataDir: config.dataDir, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy, runAutomations: true });
-  configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
+  if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 
   // One server per data folder, whatever port each is on: two of them writing
   // the same database files destroy it. The lock names the process that has it.
@@ -274,14 +274,18 @@ If that process is not a lattice server, delete ${lock}.`);
     console.log(`auth: ${config.auth}`);
     if (config.dev) console.log('dev mode: agent changes are not reviewed, and agents can restart the server');
     if (config.backup) {
-      const { dir, everyHours, keep } = config.backup;
-      console.log(`backups: every ${everyHours} hours to ${dir}, keeping ${keep}`);
+      const { dir, everyHours, keep, upload } = config.backup;
+      console.log(`backups: every ${everyHours} hours to ${dir}, keeping ${keep}${upload ? ', each copied off the server' : ' (NOT copied off the server)'}`);
       // Asked every few minutes whether one is due, going by the newest file,
       // so restarting the server neither skips a backup nor piles them up.
       const check = async () => {
         const newest = newestBackup(dir);
         if (newest && Date.now() - newest.getTime() < everyHours * 3600_000) return;
-        for (const r of await backupAll(workspaces, dir, keep)) console.log(r.error ? `backup of ${r.workspace} FAILED: ${r.error}` : `backed up ${r.workspace}: ${r.rows} rows`);
+        for (const r of await backupAll(workspaces, dir, keep, upload)) {
+          if (r.error) console.error(`backup of ${r.workspace} FAILED: ${r.error}`);
+          else if (r.copied === false) console.error(`backed up ${r.workspace}: ${r.rows} rows, but the copy off the server FAILED: ${r.copy_error}`);
+          else console.log(`backed up ${r.workspace}: ${r.rows} rows${r.copied ? ', copied off the server' : ''}`);
+        }
       };
       const safely = () => void check().catch((err) => console.error('backup failed:', err));
       safely();

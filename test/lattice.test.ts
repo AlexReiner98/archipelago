@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -783,5 +785,27 @@ test('backups are written per workspace, read back, and only the newest are kept
   const read = readBackup(join(dir, 'acme', files.sort().at(-1)!));
   assert.deepEqual([read.workspace, read.tables.entity.map((e) => e.title)], [{ id: 'acme', name: 'Acme' }, ['Theirs']]);
   assert.ok(Date.now() - newestBackup(dir)!.getTime() < 60_000, 'the newest backup\'s time is read from its name');
+
+  // A copy of each new backup goes to a place that takes a file by POST with a key.
+  const received: { url?: string; auth?: string; bytes: number }[] = [];
+  let refuse = false;
+  const store = createServer((req, res) => {
+    let bytes = 0;
+    req.on('data', (chunk: Buffer) => (bytes += chunk.length));
+    req.on('end', () => {
+      received.push({ url: req.url, auth: req.headers.authorization, bytes });
+      res.writeHead(refuse ? 403 : 200).end(refuse ? 'no' : '{}');
+    });
+  });
+  await new Promise<void>((r) => store.listen(0, '127.0.0.1', r));
+  const target = { url: `http://127.0.0.1:${(store.address() as AddressInfo).port}/object/bucket/`, key: 'k' };
+  const sent = await backupAll(workspaces, dir, 2, target);
+  assert.deepEqual(sent.map((d) => d.copied), [true, true]);
+  assert.match(received[1].url!, /^\/object\/bucket\/acme\/.+\.json\.gz$/);
+  assert.deepEqual([received[1].auth, received[1].bytes > 100], ['Bearer k', true]);
+  refuse = true;
+  const failed = await backupAll(workspaces, dir, 2, target);
+  assert.deepEqual([failed[0].copied, failed[0].error, /403/.test(failed[0].copy_error!)], [false, undefined, true], 'the backup stands; the failed copy is reported');
+  store.close();
   await workspaces.closeAll();
 });

@@ -7,7 +7,7 @@
 //   node src/backup.ts restore <backup file> <new data folder>
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { openDb, type Db } from './db.ts';
 import { LOCAL_PACK } from './packs.ts';
@@ -55,6 +55,25 @@ export async function restore(db: Db, backup: Dump): Promise<Record<string, numb
   return counts;
 }
 
+/**
+ * Where a copy of each backup is sent, off the server: an address that takes
+ * a file by POST with a bearer key. Supabase Storage is one:
+ * https://<project>.supabase.co/storage/v1/object/<bucket>
+ */
+export interface UploadTarget {
+  url: string;
+  key: string;
+}
+
+async function upload(file: string, workspace: string, target: UploadTarget): Promise<void> {
+  const res = await fetch(`${target.url.replace(/\/$/, '')}/${workspace}/${basename(file)}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${target.key}`, 'content-type': 'application/gzip', 'x-upsert': 'true' },
+    body: readFileSync(file),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
+}
+
 const localPackOf = (ws: Workspace) => {
   const { registry } = ws.lattice;
   const file = registry.localDir ? join(registry.localDir, 'pack.json') : join(registry.dir, LOCAL_PACK, 'pack.json');
@@ -63,9 +82,16 @@ const localPackOf = (ws: Workspace) => {
 
 /**
  * Back up every workspace into `dir/<workspace>/<time>.json.gz`, keeping the
- * newest `keep` of each. One that fails is reported and the rest still run.
+ * newest `keep` of each, and send a copy of each new file to `target` when
+ * there is one. One that fails is reported and the rest still run. Copies
+ * sent away are not pruned from here.
  */
-export async function backupAll(workspaces: Workspaces, dir: string, keep: number): Promise<{ workspace: string; file?: string; rows?: number; error?: string }[]> {
+export async function backupAll(
+  workspaces: Workspaces,
+  dir: string,
+  keep: number,
+  target?: UploadTarget,
+): Promise<{ workspace: string; file?: string; rows?: number; error?: string; copied?: boolean; copy_error?: string }[]> {
   const done = [];
   for (const { id, name } of workspaces.list()) {
     try {
@@ -79,7 +105,9 @@ export async function backupAll(workspaces: Workspaces, dir: string, keep: numbe
       renameSync(`${file}.part`, file);
       const old = readdirSync(folder).filter((f) => f.endsWith('.json.gz')).sort().slice(0, -keep);
       for (const f of old) rmSync(join(folder, f));
-      done.push({ workspace: id, file, rows: Object.values(taken.tables).reduce((n, rows) => n + rows.length, 0) });
+      // The backup stands whether or not the copy gets through; a failed copy is reported beside it.
+      const copy = target ? await upload(file, id, target).then(() => ({ copied: true }), (err: Error) => ({ copied: false, copy_error: err.message })) : {};
+      done.push({ workspace: id, file, rows: Object.values(taken.tables).reduce((n, rows) => n + rows.length, 0), ...copy });
     } catch (err) {
       done.push({ workspace: id, error: (err as Error).message });
     }

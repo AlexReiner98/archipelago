@@ -232,7 +232,10 @@ at the platform.
 - `PORT` is honoured when `LATTICE_PORT` is not set.
 - Each workspace is its own database and costs about 200 MB of memory on top
   of about 350 MB for the server, so 2 GB holds roughly eight customers.
-- Not built yet: copying backups off the server (see Backups).
+- A hosted server does not launch sessions: launching starts Claude Code in a
+  repository on the server's own machine.
+- Not done yet: the first deployment, and a copy of the backups off the
+  server has not been tried against a real bucket (see Backups).
 
 ## Backups
 
@@ -252,8 +255,14 @@ To restore, with the server stopped, into a folder that does not exist yet:
 node src/backup.ts restore backups/default/<file>.json.gz data-restored
 ```
 
-Then put that folder in place of `data/`. The backups sit on the same disk as
-the data until they are copied somewhere else, which is not built yet.
+Then put that folder in place of `data/`.
+
+The backups sit on the same disk as the data. To send a copy of each one off
+the server, set `LATTICE_BACKUP_UPLOAD_URL` and `LATTICE_BACKUP_UPLOAD_KEY`:
+any address that takes a file by POST with a bearer key. For Supabase Storage
+that is `https://<project>.supabase.co/storage/v1/object/<private bucket>` and
+a key allowed to write to it. A copy that fails is reported in the server's
+output and the backup itself still stands. Copies sent away are not pruned.
 
 ## Identity and workspaces
 

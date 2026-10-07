@@ -46,7 +46,7 @@ export function configureLauncher(next: LauncherConfig): void {
 
 export async function launch(l: Lattice, actor: Actor, input: { task: string; mode?: LaunchMode; instructions?: string }) {
   if (actor.kind !== 'human') throw new Error('Only a human can launch a session.');
-  if (!config) throw new Error('Launching is not configured on this server.');
+  if (!config) throw new Error('Launching is off on this server. It starts Claude Code in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
   const mode = input.mode ?? 'plan';
   const brief = (await VIEWS.brief.run(l, { task: input.task })) as {
     task: { id: string; title: string };
