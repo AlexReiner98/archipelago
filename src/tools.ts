@@ -3,6 +3,7 @@
 
 import { z } from 'zod';
 import type { Actor, Lattice } from './lattice.ts';
+import { createToken, listTokens, revokeToken } from './auth.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
@@ -247,6 +248,29 @@ export const TOOLS: Record<string, Tool> = {
       instructions: z.string().optional().describe('Anything to add to the brief.'),
     },
     run: async (l, actor, input) => launch(l, actor, input),
+  },
+  token_create: {
+    description: 'Make a token for a person or an agent in this workspace. A human token can approve and launch; an agent token cannot. The secret is shown once.',
+    humanOnly: true,
+    input: {
+      kind: z.enum(['human', 'agent']),
+      name: z.string().min(1).describe('Who or what will use it, e.g. "alex" or "claude-code". Recorded against everything done with it.'),
+      entity: z.string().optional().describe('Id of the person or agent entity this token is for.'),
+      expires_days: z.number().int().positive().optional(),
+    },
+    run: async (l, _actor, input) => createToken(l.db, l.workspace, input),
+  },
+  token_list: {
+    description: 'List this workspace\u2019s tokens: who each is for, when it was last used, and whether it is revoked. Secrets are never shown.',
+    humanOnly: true,
+    input: {},
+    run: async (l) => listTokens(l.db),
+  },
+  token_revoke: {
+    description: 'Revoke a token at once.',
+    humanOnly: true,
+    input: { id: z.string() },
+    run: async (l, _actor, input) => revokeToken(l.db, input.id),
   },
   decide: {
     description: 'Approve or reject a proposal.',

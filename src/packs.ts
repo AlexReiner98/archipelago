@@ -68,20 +68,28 @@ export const LOCAL_PACK = 'local';
 export class Registry {
   readonly dir: string;
   readonly only: string[] | undefined;
+  /** Where this workspace's own types are kept, when not beside the shared packs. */
+  readonly localDir: string | undefined;
   packs: PackFile[] = [];
   types = new Map<string, ResolvedType>();
   relations = new Map<string, RelationDef & { pack: string }>();
 
-  constructor(dir: string, only?: string[]) {
+  constructor(dir: string, only?: string[], localDir?: string) {
     this.dir = dir;
     this.only = only;
+    this.localDir = localDir;
     this.reload();
   }
 
   reload(): void {
     const found = new Map<string, PackFile>();
-    for (const name of readdirSync(this.dir)) {
-      const file = join(this.dir, name, 'pack.json');
+    // With its own local folder, a workspace must not pick up the types
+    // another workspace defined in the shared one.
+    const folders = readdirSync(this.dir)
+      .filter((name) => !(this.localDir && name === LOCAL_PACK))
+      .map((name) => [name, join(this.dir, name, 'pack.json')]);
+    if (this.localDir) folders.push([LOCAL_PACK, join(this.localDir, 'pack.json')]);
+    for (const [name, file] of folders) {
       if (!existsSync(file)) continue;
       const pack = JSON.parse(readFileSync(file, 'utf8')) as PackFile;
       if (pack.id !== name) throw new Error(`Pack folder "${name}" contains pack id "${pack.id}"`);
@@ -233,7 +241,7 @@ export class Registry {
 
   /** Add a type to the local pack file and reload. */
   defineLocal(def: TypeDef): void {
-    const dir = join(this.dir, LOCAL_PACK);
+    const dir = this.localDir ?? join(this.dir, LOCAL_PACK);
     const file = join(dir, 'pack.json');
     const pack: PackFile = existsSync(file)
       ? JSON.parse(readFileSync(file, 'utf8'))

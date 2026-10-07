@@ -24,11 +24,14 @@ const base = `http://127.0.0.1:${loadConfig().port}`;
 async function call<T = unknown>(tool: string, input: unknown = {}): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${base}/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (process.env.LATTICE_TOKEN) headers.authorization = `Bearer ${process.env.LATTICE_TOKEN}`;
+    res = await fetch(`${base}/api/${tool}`, { method: 'POST', headers, body: JSON.stringify(input) });
   } catch {
     throw new Error(`Cannot reach lattice at ${base}. Start it with: npm start`);
   }
   const body = (await res.json()) as { result?: T; error?: string };
+  if (res.status === 401) throw new Error('This server requires a token. Set LATTICE_TOKEN to your token and try again.');
   if (!res.ok) throw new Error(body.error);
   return body.result as T;
 }

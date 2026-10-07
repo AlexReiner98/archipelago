@@ -138,11 +138,14 @@ export class Lattice {
   readonly db: PGlite;
   readonly registry: Registry;
   readonly policy: Policy;
+  /** The workspace this map belongs to. Each has its own database. */
+  readonly workspace: string;
 
-  constructor(db: PGlite, registry: Registry, policy: Partial<Policy> = {}) {
+  constructor(db: PGlite, registry: Registry, policy: Partial<Policy> = {}, workspace = 'default') {
     this.db = db;
     this.registry = registry;
     this.policy = { ...DEFAULT_AGENT_POLICY, ...policy };
+    this.workspace = workspace;
   }
 
   // ---- writes ----------------------------------------------------------

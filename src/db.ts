@@ -79,6 +79,20 @@ create table if not exists proposal (
   note       text
 );
 
+-- Stored as a hash only; the secret is shown once when the token is made.
+create table if not exists token (
+  id         text primary key,
+  hash       text not null unique,
+  hint       text not null,
+  kind       text not null,
+  name       text not null,
+  entity_id  text,
+  created_at timestamptz not null default now(),
+  last_used  timestamptz,
+  expires_at timestamptz,
+  revoked_at timestamptz
+);
+
 create table if not exists setting (
   key   text primary key,
   value jsonb not null

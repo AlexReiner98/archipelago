@@ -11,6 +11,11 @@ export interface Config {
   packs?: string[];
   /** What agents may do without asking. Humans are never restricted. */
   policy?: Partial<Policy>;
+  /**
+   * off (default): one workspace, and the surface decides who is calling.
+   * tokens: every request carries a token naming its workspace and identity.
+   */
+  auth: 'off' | 'tokens';
 }
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -22,6 +27,7 @@ export function loadConfig(): Config {
   return {
     packs: fromFile.packs,
     policy: fromFile.policy,
+    auth: (process.env.LATTICE_AUTH ?? fromFile.auth) === 'tokens' ? 'tokens' : 'off',
     port: Number(process.env.LATTICE_PORT ?? fromFile.port ?? 3100),
     dataDir: resolve(ROOT, process.env.LATTICE_DATA ?? fromFile.dataDir ?? 'data'),
     packsDir: resolve(ROOT, fromFile.packsDir ?? 'packs'),

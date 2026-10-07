@@ -159,10 +159,51 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 - Launching into the desktop app. Launched sessions are headless.
 - Adding relations in the web UI. They can be read on an entity page and in the graph, but only added through `change`.
 - Semantic search. Search is text matching.
-- Teams. The `workspace` and `visibility` columns exist but nothing enforces them.
-- Authentication. Agent and human are told apart by which endpoint is called,
-  on a server bound to this machine. An agent with shell access can run the
-  CLI, so policy is a guard rail, not a security boundary.
+- Several people in one workspace with private and shared visibility. Tokens
+  can already be issued to several people, but everyone in a workspace sees
+  all of it.
+- Hosting: a Postgres server instead of the embedded database, TLS, and
+  listening beyond this machine.
+- Notifications between workspaces, and single sign-on.
+
+## Identity and workspaces
+
+By default the server is for one person on one machine: there is one workspace,
+and which endpoint you call decides whether you are the human or an agent.
+
+Set `"auth": "tokens"` in `lattice.config.json` (or `LATTICE_AUTH=tokens`) to
+change that:
+
+- **Every request carries a token** (`Authorization: Bearer lat_...`). The
+  token says which workspace it belongs to and whether it is a human's or an
+  agent's. A human token can approve, launch and manage tokens; an agent token
+  cannot, on any endpoint.
+- **First start prints two secrets, once:** your human token for the default
+  workspace, and the operator secret.
+- **Tokens** are made with `token_create`, listed with `token_list` and
+  revoked with `token_revoke` (human only). Only a hash is stored. A launched
+  session gets its own agent token, valid for a day and revoked when it ends.
+- **Using a token:** paste it into the web UI's sign-in screen; set
+  `LATTICE_TOKEN` for the CLI; for Claude Code, add
+  `"headers": { "Authorization": "Bearer ${LATTICE_AGENT_TOKEN}" }` to the
+  `lattice` entry in `.mcp.json`, and the same header to each hook.
+- **Workspaces: one database per customer.** Each workspace has its own
+  database, its own locally defined types and its own automation runner.
+  Nothing is shared, so there is no filter to get wrong. The operator creates
+  one and receives its first human token:
+
+  ```bash
+  curl -X POST http://127.0.0.1:3100/operator/workspaces -H "content-type: application/json" -H "Authorization: Bearer <operator secret>" -d '{"id":"acme","name":"Acme Architects"}'
+  ```
+
+  The operator secret can create and list workspaces and nothing else: it
+  cannot read any workspace's map.
+
+Limits, stated plainly: the server still listens on this machine only, with no
+TLS. And on a single machine an agent running as your OS user can read any
+token you keep in a file or environment variable, so tokens are a real
+boundary between machines and between customers, not between you and an agent
+on your own laptop.
 
 ## Tests
 

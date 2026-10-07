@@ -5,9 +5,10 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { createWriteStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { createToken, revokeToken } from './auth.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { VIEWS } from './views.ts';
@@ -32,6 +33,8 @@ interface LauncherConfig {
   dir: string;
   /** argv prefix of the Claude Code CLI. */
   command: string[];
+  /** The server requires tokens, so each launched session is given one of its own. */
+  auth?: boolean;
 }
 
 let config: LauncherConfig | undefined;
@@ -66,8 +69,11 @@ export async function launch(l: Lattice, actor: Actor, input: { task: string; mo
   }
 
   mkdirSync(config.dir, { recursive: true });
-  const mcpFile = join(config.dir, 'mcp.json');
-  writeFileSync(mcpFile, JSON.stringify({ mcpServers: { lattice: { type: 'http', url: config.mcpUrl } } }));
+  // With tokens on, the session gets its own agent token, good for a day and
+  // revoked the moment it ends.
+  const key = config.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1 }) : undefined;
+  const mcpFile = join(config.dir, `${run}.mcp.json`);
+  writeFileSync(mcpFile, JSON.stringify({ mcpServers: { lattice: { type: 'http', url: config.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
   const transcript = join(config.dir, `${run}.jsonl`);
   const prompt = [
     brief.text,
@@ -123,6 +129,8 @@ export async function launch(l: Lattice, actor: Actor, input: { task: string; mo
   const finish = async (problem?: string) => {
     if (!running.delete(run)) return;
     log.end();
+    if (key) await revokeToken(l.db, key.id).catch(() => {});
+    rmSync(mcpFile, { force: true });
     const ok = !problem && result && !result.is_error;
     const detail = result ? `${result.num_turns ?? '?'} turns${result.total_cost_usd != null ? `, $${result.total_cost_usd.toFixed(2)}` : ''}` : '';
     const text = problem ?? (result?.result || plan || lastText || stderr.trim() || 'The session ended without a result.');

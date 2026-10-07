@@ -19,11 +19,86 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 
+// The token, when the server wants one. Kept for this browser only.
+const store = {
+  get token() {
+    try {
+      return localStorage.getItem('lattice-token') ?? '';
+    } catch {
+      return this.memory ?? '';
+    }
+  },
+  set token(value) {
+    this.memory = value;
+    try {
+      if (value) localStorage.setItem('lattice-token', value);
+      else localStorage.removeItem('lattice-token');
+    } catch {
+      // Storage can be blocked; the token then lasts until the page is closed.
+    }
+  },
+};
+const authHeaders = () => (store.token ? { authorization: `Bearer ${store.token}` } : {});
+
+class SignInNeeded extends Error {}
+
 async function api(tool, input = {}) {
-  const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+  const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() }, body: JSON.stringify(input) });
   const body = await res.json();
+  if (res.status === 401) throw new SignInNeeded(body.error);
   if (!res.ok) throw new Error(body.error);
   return body.result;
+}
+
+function signIn(message) {
+  const input = h('input', { type: 'text', placeholder: 'lat_…', style: 'flex: 1; min-width: 260px', autocomplete: 'off' });
+  const error = h('div', { class: 'error', style: 'padding: 0 14px 14px' }, message ?? '');
+  const submit = async () => {
+    store.token = input.value.trim();
+    const res = await fetch('/whoami', { headers: authHeaders() });
+    if (!res.ok) {
+      store.token = '';
+      return (error.textContent = 'That token was not accepted.');
+    }
+    schema = undefined;
+    route();
+  };
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  main.replaceChildren(
+    h('div', { class: 'page-head' }, h('h1', {}, 'Sign in'), h('p', { class: 'muted' }, 'This server asks for a token. It decides which workspace you see and what you may do.')),
+    h('section', { class: 'card', style: 'max-width: 620px' }, h('div', { class: 'toolbar', style: 'padding: 14px' }, input, h('button', { class: 'primary', onclick: submit }, 'Sign in')), error),
+  );
+  input.focus();
+}
+
+async function showIdentity() {
+  const slot = document.getElementById('whoami');
+  try {
+    const res = await fetch('/whoami', { headers: authHeaders() });
+    if (!res.ok) return slot.replaceChildren();
+    const me = await res.json();
+    if (me.auth !== 'tokens') return slot.replaceChildren();
+    slot.replaceChildren(
+      h('div', {}, h('strong', {}, me.workspace.name)),
+      h('div', { class: 'muted small' }, `${me.actor.name} (${me.actor.kind})`),
+      h(
+        'a',
+        {
+          href: '#',
+          class: 'small',
+          onclick: (e) => {
+            e.preventDefault();
+            store.token = '';
+            schema = undefined;
+            route();
+          },
+        },
+        'Sign out',
+      ),
+    );
+  } catch {
+    slot.replaceChildren();
+  }
 }
 
 // ---- shared lookups ------------------------------------------------------
@@ -1205,9 +1280,11 @@ async function route() {
     else if (name === 'new') newEntity(arg);
     else await (ROUTES[name] ?? today)();
   } catch (err) {
+    if (err instanceof SignInNeeded) return signIn(store.token ? 'Your token is no longer accepted.' : '');
     main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
   refreshReviewCount();
+  showIdentity();
 }
 
 window.addEventListener('hashchange', route);

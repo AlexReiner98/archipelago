@@ -214,3 +214,6 @@ svg.graph .dim { opacity: 0.18; }
 .legend .swatch.ringed { border: 2px dashed var(--g-blocked); }
 .legend .stroke { width: 18px; border-top: 1.5px solid var(--edge); display: inline-block; }
 .legend .stroke.blocking { border-top: 2px solid var(--edge-strong); }
+
+#whoami { margin-top: auto; padding: 10px; border-top: 1px solid var(--line); display: grid; gap: 2px; }
+#whoami:empty { display: none; }
