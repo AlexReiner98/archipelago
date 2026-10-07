@@ -743,28 +743,43 @@ export class Lattice {
   }
 
   async search(input: { q?: string; type?: string; status?: string; owner?: string; open?: boolean; include_archived?: boolean; limit?: number }) {
-    const where: string[] = [];
-    const params: unknown[] = [];
-    const add = (sql: string, value: unknown) => {
-      params.push(value);
-      where.push(sql.replaceAll('?', `$${params.length}`));
+    if (input.type && !this.registry.type(input.type)) throw new Error(`Unknown type "${input.type}"`);
+    // Text is matched as typed anywhere in the title, or as the same words in
+    // any form in the title or notes. Only when that finds nothing are titles
+    // with a word close to what was typed taken instead: a slip of the keys
+    // should find something, but "hosting" should not also bring up "posting".
+    const run = async (near: boolean) => {
+      const where: string[] = [];
+      const params: unknown[] = [];
+      const add = (sql: string, value: unknown) => {
+        params.push(value);
+        where.push(sql.replaceAll('?', `$${params.length}`));
+      };
+      let rank = '';
+      if (input.q) {
+        const TEXT = `to_tsvector('english', title || ' ' || body)`;
+        add(near ? `word_similarity(?, title) > 0.5` : `(title ilike '%' || ? || '%' or ${TEXT} @@ websearch_to_tsquery('english', ?))`, input.q);
+        const q = `$${params.length}`;
+        // Best first: the words in the title count for more than in the notes,
+        // and a title that is mostly the words asked for beats a long one that mentions them.
+        const WEIGHTED = `setweight(to_tsvector('english', title), 'A') || setweight(to_tsvector('english', body), 'D')`;
+        rank = `(case when title ilike '%' || ${q} || '%' then 1 else 0 end) + similarity(${q}, title) + ts_rank(${WEIGHTED}, websearch_to_tsquery('english', ${q}), 1) desc, `;
+      }
+      if (input.type) add(`type = any(?::text[])`, this.registry.family(input.type));
+      if (input.status) add(`status = ?`, input.status);
+      if (input.owner) add(`owner = ?`, input.owner);
+      if (input.open !== undefined) add(`is_open = ?`, input.open);
+      if (!input.include_archived) where.push(`archived_at is null`);
+      params.push(Math.min(input.limit ?? 25, 200));
+      const { rows } = await this.db.query<Entity>(
+        `select id, type, title, status, is_open, owner, confidence, props, updated_at from entity
+         ${where.length ? 'where ' + where.join(' and ') : ''} order by ${rank}updated_at desc limit $${params.length}`,
+        params,
+      );
+      return rows;
     };
-    if (input.q) add(`(title ilike '%' || ? || '%' or to_tsvector('english', title || ' ' || body) @@ websearch_to_tsquery('english', ?))`, input.q);
-    if (input.type) {
-      if (!this.registry.type(input.type)) throw new Error(`Unknown type "${input.type}"`);
-      add(`type = any(?::text[])`, this.registry.family(input.type));
-    }
-    if (input.status) add(`status = ?`, input.status);
-    if (input.owner) add(`owner = ?`, input.owner);
-    if (input.open !== undefined) add(`is_open = ?`, input.open);
-    if (!input.include_archived) where.push(`archived_at is null`);
-    params.push(Math.min(input.limit ?? 25, 200));
-    const { rows } = await this.db.query<Entity>(
-      `select id, type, title, status, is_open, owner, confidence, props, updated_at from entity
-       ${where.length ? 'where ' + where.join(' and ') : ''} order by updated_at desc limit $${params.length}`,
-      params,
-    );
-    return rows;
+    const rows = await run(false);
+    return rows.length || !input.q ? rows : run(true);
   }
 
   async get(id: string) {

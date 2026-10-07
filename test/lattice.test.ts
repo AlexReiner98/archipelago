@@ -809,3 +809,18 @@ test('backups are written per workspace, read back, and only the newest are kept
   store.close();
   await workspaces.closeAll();
 });
+
+test('search puts the best match first and forgives a slip of the keys', async () => {
+  const l = await fresh();
+  await make(l, [
+    { op: 'create', type: 'note', title: 'Roadmap for the garden app' },
+    { op: 'create', type: 'note', title: 'Hosting', body: 'Where the deployment runs.' },
+    { op: 'create', type: 'note', title: 'Unrelated', body: 'Mentions hosting once, in passing, among many other words about something else entirely.' },
+    { op: 'create', type: 'note', title: 'Nothing to do with it' },
+  ]);
+  const titles = async (q: string) => (await l.search({ q })).map((e) => e.title);
+  assert.deepEqual(await titles('hosting'), ['Hosting', 'Unrelated'], 'a title match outranks a newer mention in the notes');
+  assert.deepEqual(await titles('deployments'), ['Hosting'], 'another form of a word in the notes');
+  assert.deepEqual(await titles('roadmp'), ['Roadmap for the garden app'], 'a typo in a title word');
+  assert.deepEqual(await titles('zebra'), []);
+});

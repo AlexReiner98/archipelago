@@ -96,6 +96,12 @@ export interface Tool {
   run(l: Lattice, actor: Actor, input: any): Promise<unknown>;
 }
 
+let backUp: (() => Promise<unknown>) | undefined;
+/** The server hands the tools a way to back every workspace up now. */
+export function configureBackup(run: (() => Promise<unknown>) | undefined): void {
+  backUp = run;
+}
+
 let restartServer: (() => void) | undefined;
 /** Dev mode hands the tools a way to restart the process they run in. */
 export function configureRestart(restart: (() => void) | undefined): void {
@@ -124,12 +130,12 @@ export async function latestSeq(l: Lattice): Promise<number> {
   return rows[0].seq;
 }
 
-/** What humans have done since an event, oldest first: their edits, decisions, approvals and rejections. */
+/** What humans have done since an event, oldest first: their edits, decisions, approvals and rejections. Reading a notification is not news. */
 export async function humanChanges(l: Lattice, after: number): Promise<HumanChange[]> {
   const { rows } = await l.db.query<{ seq: number; ts: string; actor: string; action: string; target_id: string | null; type: string | null; title: string | null; reason: string | null; detail: Record<string, unknown> | null }>(
     `select e.seq::int as seq, e.ts, e.actor, e.action, e.target_id, t.type, t.title, e.reason, e.detail
      from event e left join entity t on t.id = e.target_id
-     where e.seq > $1 and e.actor like 'human:%' order by e.seq limit 50`,
+     where e.seq > $1 and e.actor like 'human:%' and t.type is distinct from 'sys.notification' order by e.seq limit 50`,
     [after],
   );
   return rows.map((r) => ({
@@ -192,7 +198,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l) => l.registry.describe(),
   },
   search: {
-    description: 'Find entities by text, type (flavours included), status or owner. Always search before creating, to avoid duplicates.',
+    description: 'Find entities by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. Always search before creating, to avoid duplicates.',
     input: {
       q: z.string().optional().describe('Matches title and body.'),
       type: z.string().optional(),
@@ -247,6 +253,14 @@ export const TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: {},
     run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)), ui: uiStamp(), listening }),
+  },
+  backup: {
+    description: 'Back every workspace up now, without waiting for the schedule. Do this before anything that changes the database schema. Answers with what was written.',
+    input: {},
+    run: async () => {
+      if (!backUp) throw new Error('Backups are turned off on this server.');
+      return backUp();
+    },
   },
   watch: {
     description:

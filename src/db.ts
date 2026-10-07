@@ -1,6 +1,7 @@
 // Embedded Postgres (PGlite). The same schema runs on a Postgres server.
 
 import { PGlite } from '@electric-sql/pglite';
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 
@@ -176,7 +177,9 @@ export interface Db extends Q {
 /** Open the database at a folder, or in memory when no folder is given. */
 export async function openDb(dataDir?: string): Promise<PGlite> {
   if (dataDir) mkdirSync(dataDir, { recursive: true });
-  const db = new PGlite(dataDir);
+  // pg_trgm matches near-misses and typos in search; a Postgres server has it too.
+  const db = dataDir ? new PGlite(dataDir, { extensions: { pg_trgm } }) : new PGlite({ extensions: { pg_trgm } });
+  await db.exec(`create extension if not exists pg_trgm`);
   await db.exec(SCHEMA);
   await db.exec(VISIBILITY);
   return db;

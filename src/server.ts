@@ -32,7 +32,7 @@ import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hookSessionEnd, hookSessionStart } from './sessions.ts';
-import { callTool, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
+import { callTool, configureBackup, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 const actorField = {
@@ -287,6 +287,7 @@ If that process is not a lattice server, delete ${lock}.`);
           else console.log(`backed up ${r.workspace}: ${r.rows} rows${r.copied ? ', copied off the server' : ''}`);
         }
       };
+      configureBackup(() => backupAll(workspaces, dir, keep, upload));
       const safely = () => void check().catch((err) => console.error('backup failed:', err));
       safely();
       backups = setInterval(safely, 5 * 60_000);

@@ -212,7 +212,9 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 ## Not built yet
 
 - Launching into the desktop app. Launched sessions are headless.
-- Semantic search. Search is text matching.
+- Semantic search. Search matches words in any form in titles and notes, puts
+  the best match first, and falls back to near-misses in titles when nothing
+  matches; it does not match by meaning.
 - Hosting is part built (see Hosting below): backups and the first deployment
   are not done, and a Postgres server instead of the embedded database is the
   later step.
