@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { createToken, workspaceOf } from '../src/auth.ts';
+import { loadConfig } from '../src/config.ts';
+import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
 import { createHttpServer } from '../src/server.ts';
+import { configureRestart } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
 
 const closers: (() => Promise<void>)[] = [];
@@ -314,4 +317,33 @@ test('a workspace receives notifications only from workspaces its admin accepts'
   assert.match((await send(theirs, 'default')).error, /does not accept notifications from "acme"/);
   const sent = (await call('/api/events', mine, { limit: 5 })).result as any[];
   assert.ok(sent.some((e) => e.action === 'workspace.notify' && e.detail.to === 'acme'), 'the sender\'s log records it');
+});
+
+test('dev mode turns review off and offers agents a restart; without it neither holds', async () => {
+  const { call } = await serve('off');
+  assert.match((await call('/agent/restart')).error, /only in dev mode/);
+
+  let restarts = 0;
+  configureRestart(() => restarts++);
+  after(() => configureRestart(undefined));
+  assert.deepEqual((await call('/agent/restart')).result.restarting, true, 'an agent may restart');
+  assert.equal(restarts, 1);
+  assert.equal((await call('/whoami', undefined, undefined, 'GET')).dev, true);
+
+  const before = [process.env.LATTICE_DEV, process.env.LATTICE_AUTH];
+  after(() => {
+    for (const [i, key] of ['LATTICE_DEV', 'LATTICE_AUTH'].entries()) {
+      if (before[i] === undefined) delete process.env[key];
+      else process.env[key] = before[i];
+    }
+  });
+  process.env.LATTICE_DEV = '1';
+  delete process.env.LATTICE_AUTH;
+  const dev = loadConfig();
+  assert.equal(dev.dev, true);
+  assert.ok(Object.values({ ...DEFAULT_AGENT_POLICY, ...dev.policy }).every((level) => level === 'auto'), 'every op applies without review');
+  process.env.LATTICE_AUTH = 'tokens';
+  assert.throws(() => loadConfig(), /does not run with auth "tokens"/);
+  process.env.LATTICE_DEV = '0';
+  assert.equal(loadConfig().dev, false);
 });

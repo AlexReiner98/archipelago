@@ -9,7 +9,8 @@ is how to work on it.
 The state of this build is kept in Lattice itself, not in this file. At the
 start of a session:
 
-1. Make sure the server is running (`npm start`, port 3100).
+1. Make sure the server is running (`npm run dev` while building Lattice,
+   otherwise `npm start`; port 3100).
 2. With the lattice MCP tools: `view` with name `repo_work` for this repo's
    open work, and `search` for type `software.handoff` to read the latest
    handoff note. If the session-start hook is working you were already given
@@ -19,9 +20,16 @@ start of a session:
 
 ## Rules
 
-- **You are an agent, not the owner.** Changes you make go through `change`
-  and wait as proposals. Never approve, reject, launch or manage tokens by
-  calling the CLI or `/api` yourself: those carry the human's authority.
+- **You are an agent, not the owner.** Changes you make go through `change`.
+  Under `npm start` they wait as proposals; under `npm run dev` they apply at
+  once, so check them before you send them. Either way, never approve, reject,
+  launch or manage tokens by calling the CLI or `/api` yourself: those carry
+  the human's authority.
+- **Restart the server yourself in dev mode.** After changing anything under
+  `src/` or `packs/`, run `npm test` and `npm run typecheck`, then call the
+  `restart` tool and wait for `GET /health`. If it does not come back, the
+  reason is in `runs/dev-server.log`; fix the code and it starts again on the
+  next file change. Without dev mode (no `restart` tool), ask the owner.
 - **Never test against the real map.** `data/` is the owner's live map. To
   exercise the server or the UI, start a throwaway one:
   `LATTICE_PORT=3199 LATTICE_DATA=<temp folder>/data node src/server.ts`

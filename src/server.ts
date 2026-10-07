@@ -24,12 +24,12 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { join } from 'node:path';
 import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
-import { loadConfig } from './config.ts';
+import { loadConfig, RESTART_EXIT } from './config.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hookSessionEnd, hookSessionStart } from './sessions.ts';
-import { callTool, TOOLS } from './tools.ts';
+import { callTool, configureRestart, devMode, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 const actorField = {
@@ -39,7 +39,7 @@ const actorField = {
 function buildMcp(lattice: Lattice, actorFor: (label?: string) => Actor): McpServer {
   const mcp = new McpServer({ name: 'lattice', version: '0.1.0' });
   for (const [name, tool] of Object.entries(TOOLS)) {
-    if (tool.humanOnly) continue;
+    if (tool.humanOnly || (tool.devOnly && !devMode())) continue;
     mcp.registerTool(name, { description: tool.description, inputSchema: { ...tool.input, ...actorField } }, async (args: Record<string, unknown>) => {
       const { actor, ...input } = args;
       try {
@@ -130,7 +130,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'GET' && url.pathname === '/whoami') {
         if (!local(req, false)) return send(res, 403, { error: 'Local requests only.' });
         const { ws, actor } = await resolve(req, 'human');
-        return send(res, 200, { auth: tokens ? 'tokens' : 'off', workspace: { id: ws.id, name: ws.name }, actor: actor() });
+        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: actor() });
       }
 
       if (url.pathname === '/mcp') {
@@ -220,6 +220,7 @@ if (import.meta.main) {
     console.log(`data: ${config.dataDir}`);
     console.log(`packs: ${main.lattice.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
     console.log(`auth: ${config.auth}`);
+    if (config.dev) console.log('dev mode: agent changes are not reviewed, and agents can restart the server');
     if (config.auth !== 'tokens') return;
     // First start with tokens on: there is nobody to ask for a token yet, so
     // make the two that everything else is created from, and show them once.
@@ -230,12 +231,14 @@ if (import.meta.main) {
       console.log(`\nYour token for the default workspace (shown once):\n  ${owner.token}\nPaste it into the web UI, and set LATTICE_TOKEN for the CLI.`);
     }
   });
-  const stop = async () => {
+  const stop = async (code = 0) => {
     stopAllLaunched();
     server.close();
     await workspaces.closeAll();
-    process.exit(0);
+    process.exit(code);
   };
-  process.on('SIGINT', stop);
-  process.on('SIGTERM', stop);
+  process.on('SIGINT', () => stop());
+  process.on('SIGTERM', () => stop());
+  // Leave time for the answer to the restart call to be sent, then hand over to src/dev.ts.
+  if (config.dev) configureRestart(() => void setTimeout(() => stop(RESTART_EXIT), 200));
 }

@@ -13,6 +13,26 @@ npm start
 The server listens on `http://127.0.0.1:3100` and keeps its data in `data/`
 (embedded Postgres, no install needed). Everything else talks to that server.
 
+### Dev mode
+
+```bash
+npm run dev
+```
+
+For working on Lattice itself, one person on one machine. It differs from
+`npm start` in two ways:
+
+- **Agent changes are not reviewed.** Every op applies at once unless
+  `policy` in `lattice.config.json` says otherwise. Undo in the Activity screen
+  still reverses a change set.
+- **Agents can restart the server** with the `restart` tool, to run code they
+  have just changed. The server is kept running by [src/dev.ts](src/dev.ts):
+  if new code fails to start, it tries again when a file under `src/` or
+  `packs/` changes. Its output is kept in `runs/dev-server.log`.
+
+Approving, launching and tokens stay with you. Dev mode refuses to start with
+`auth` set to `tokens`.
+
 ## Three surfaces, one set of tools
 
 | Surface | Who | How |

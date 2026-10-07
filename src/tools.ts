@@ -89,8 +89,17 @@ export interface Tool {
   input: z.ZodRawShape;
   /** Not offered to agents. */
   humanOnly?: boolean;
+  /** Exists only when the server runs in dev mode. */
+  devOnly?: boolean;
   run(l: Lattice, actor: Actor, input: any): Promise<unknown>;
 }
+
+let restartServer: (() => void) | undefined;
+/** Dev mode hands the tools a way to restart the process they run in. */
+export function configureRestart(restart: (() => void) | undefined): void {
+  restartServer = restart;
+}
+export const devMode = () => restartServer !== undefined;
 
 export const TOOLS: Record<string, Tool> = {
   schema: {
@@ -340,6 +349,18 @@ export const TOOLS: Record<string, Tool> = {
       return { id: l.workspace, default_visibility: await l.defaultVisibility(), accepts_from: await acceptedSenders(l) };
     },
   },
+  restart: {
+    description:
+      'Dev mode only. Restart the server so it runs the code now on disk; use it after changing anything under src/ or packs/. ' +
+      'Answers at once, then the server is away for a few seconds: wait for GET /health before the next call. Sessions it launched are stopped. ' +
+      'If the new code does not start, the server comes back when a file under src/ or packs/ next changes; the reason is in runs/dev-server.log.',
+    devOnly: true,
+    input: {},
+    run: async () => {
+      restartServer!();
+      return { restarting: true, log: 'runs/dev-server.log' };
+    },
+  },
   decide: {
     description: 'Approve or reject a proposal.',
     humanOnly: true,
@@ -369,6 +390,7 @@ export const TOOLS: Record<string, Tool> = {
 export async function callTool(l: Lattice, actor: Actor, name: string, input: unknown): Promise<unknown> {
   const tool = TOOLS[name];
   if (!tool) throw new Error(`No tool "${name}". Tools: ${Object.keys(TOOLS).join(', ')}`);
+  if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
   const parsed = z.strictObject(tool.input).safeParse(input ?? {});
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);
