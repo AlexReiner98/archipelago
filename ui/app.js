@@ -1788,7 +1788,9 @@ async function roadmap(rootId) {
 // then a notice offers the refresh instead.
 let pulse;
 let dirty = false;
-const stale = h('div', { id: 'stale', hidden: true }, 'The map has changed.', h('button', { onclick: () => route() }, 'Refresh'));
+let uiFiles;
+let outdated = false;
+const stale = h('div', { id: 'stale', hidden: true }, 'The map has changed.', h('button', { onclick: () => (outdated ? location.reload() : route()) }, 'Refresh'));
 document.body.append(stale);
 main.addEventListener('input', (e) => {
   if (e.target.tagName !== 'SELECT') dirty = true;
@@ -1849,6 +1851,15 @@ async function checkPulse() {
   try {
     const beat = await api('pulse');
     now = beat.stamp;
+    // The page's own files changed on the server: load them, unless that would
+    // throw away something half done.
+    if (uiFiles !== undefined && beat.ui !== uiFiles) {
+      if (!dirty && !document.querySelector('dialog[open]')) return location.reload();
+      outdated = true;
+      stale.firstChild.textContent = 'Lattice has been updated.';
+      stale.hidden = false;
+    }
+    uiFiles ??= beat.ui;
     follow(beat.focus);
   } catch {
     return;

@@ -1,6 +1,8 @@
 // One table of tools serves both surfaces: agents reach them over MCP, humans
 // over the CLI and local API. Same names, same inputs, same write path.
 
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { actorId, type Actor, type Lattice } from './lattice.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
@@ -101,6 +103,10 @@ export function configureRestart(restart: (() => void) | undefined): void {
 }
 export const devMode = () => restartServer !== undefined;
 
+/** Moves when any file of the web UI is saved, so an open page knows to load itself again. */
+const UI_DIR = join(import.meta.dirname, '..', 'ui');
+const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(join(UI_DIR, file)).mtimeMs));
+
 /** Where an agent last pointed the human's screen: a place in the web UI. */
 interface Focus {
   /** When it was set; a new value is how the UI knows to move. */
@@ -183,7 +189,7 @@ export const TOOLS: Record<string, Tool> = {
     description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
     humanOnly: true,
     input: {},
-    run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)) }),
+    run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)), ui: uiStamp() }),
   },
   show: {
     description:
