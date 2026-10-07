@@ -348,6 +348,70 @@ async function repoWork(l: Lattice, input: { repo?: string }) {
   };
 }
 
+/** Which relations each preset draws. */
+const GRAPH_PRESETS: Record<string, string[] | undefined> = {
+  blocking: ['depends_on', 'needs', 'holds'],
+  structure: ['part_of', 'serves', 'software.lives_in', 'works_at'],
+  all: undefined,
+};
+const GRAPH_LIMIT = 400;
+
+/** Nodes and edges for drawing: the whole map under a preset, or the neighbourhood of one entity. */
+async function graph(l: Lattice, input: { focus?: string; depth?: number; relations?: string; include_closed?: boolean; include_system?: boolean }) {
+  const preset = input.relations ?? (input.focus ? 'all' : 'blocking');
+  if (!(preset in GRAPH_PRESETS)) throw new Error(`relations must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
+  const only = GRAPH_PRESETS[preset];
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open from entity where archived_at is null`);
+  const system = (type: string) => type.startsWith('sys.') && !l.registry.isA(type, 'resource');
+  const eligible = new Map(
+    entities.filter((e) => e.id === input.focus || ((input.include_closed || e.is_open) && (input.include_system || !system(e.type)))).map((e) => [e.id, e]),
+  );
+  if (input.focus && !eligible.has(input.focus)) throw new Error(`No entity "${input.focus}"`);
+  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(
+    `select id, type, from_id, to_id from relation where valid_to is null and ($1::text[] is null or type = any($1::text[]))`,
+    [only ?? null],
+  );
+  let edges = relations.filter((r) => eligible.has(r.from_id) && eligible.has(r.to_id));
+
+  let keep: Set<string>;
+  if (input.focus) {
+    // Walk outwards from the focus, ignoring direction.
+    const depth = Math.min(Math.max(input.depth ?? 2, 1), 4);
+    keep = new Set([input.focus]);
+    let frontier = [input.focus];
+    for (let d = 0; d < depth && frontier.length; d++) {
+      const next: string[] = [];
+      for (const e of edges) {
+        for (const [a, b] of [[e.from_id, e.to_id], [e.to_id, e.from_id]]) {
+          if (frontier.includes(a) && !keep.has(b)) {
+            keep.add(b);
+            next.push(b);
+          }
+        }
+      }
+      frontier = next;
+    }
+  } else {
+    // Without a focus, an entity nothing connects to adds nothing to a graph.
+    keep = new Set(edges.flatMap((e) => [e.from_id, e.to_id]));
+  }
+  const total = keep.size;
+  if (keep.size > GRAPH_LIMIT) keep = new Set([...keep].slice(0, GRAPH_LIMIT));
+  edges = edges.filter((e) => keep.has(e.from_id) && keep.has(e.to_id));
+
+  const blocked = await blockGraph(l);
+  return {
+    preset,
+    focus: input.focus,
+    truncated: total > GRAPH_LIMIT ? { shown: GRAPH_LIMIT, of: total } : undefined,
+    nodes: [...keep].map((id) => {
+      const e = eligible.get(id)!;
+      return { id, type: e.type, root: l.registry.type(e.type)?.lineage.at(-1) ?? e.type, title: e.title, status: e.status, open: e.is_open, blocked: blocked.isBlocked(id) };
+    }),
+    edges: edges.map((e) => ({ id: e.id, type: e.type, from: e.from_id, to: e.to_id })),
+  };
+}
+
 async function notifications(l: Lattice) {
   const { rows } = await l.db.query(
     `select n.id, n.title, n.body, n.props->>'level' as level, n.props->>'from' as from, n.created_at,
@@ -391,6 +455,11 @@ export const VIEWS: Record<string, View> = {
   blockers: {
     description: 'Every blocked item, what directly blocks it, and the root blockers that have to move first. Params: owner.',
     run: blockers,
+  },
+  graph: {
+    description:
+      'Nodes and edges for drawing the map. Params: relations (blocking, structure or all), focus (an entity id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system.',
+    run: graph,
   },
   notifications: {
     description: 'Unread notifications for the human, newest first.',

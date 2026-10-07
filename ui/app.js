@@ -546,6 +546,7 @@ async function entity(id) {
           },
           'Edit',
         ),
+      h('button', { onclick: () => (location.hash = `#/graph/${id}`) }, 'Graph'),
       !e.archived_at &&
         ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t) &&
         h(
@@ -781,6 +782,302 @@ async function automations() {
   );
 }
 
+// ---- Graph ---------------------------------------------------------------
+
+// Colour says what kind of thing a node is. Seven groups, in a fixed order,
+// from a palette checked for colour-blind separation in both themes. Red is
+// kept for "blocked", which is also drawn as a ring and named in the tooltip.
+const GROUPS = [
+  { key: 'people', label: 'People and organisations', roots: ['person', 'company', 'agent'] },
+  { key: 'work', label: 'Work', roots: ['project', 'task', 'goal', 'area', 'idea', 'software.feature', 'software.pull_request'] },
+  { key: 'knowledge', label: 'Decisions and knowledge', roots: ['decision', 'hypothesis', 'result', 'note', 'file', 'procedure'] },
+  { key: 'problems', label: 'Issues', roots: ['issue'] },
+  { key: 'time', label: 'Events', roots: ['event'] },
+  { key: 'resources', label: 'Resources and tools', roots: ['resource', 'software.application', 'software.repo', 'software.environment'] },
+  { key: 'system', label: 'System records', roots: [] },
+];
+const groupOf = (root) => GROUPS.find((g) => g.roots.includes(root)) ?? GROUPS.at(-1);
+const BLOCKING = ['depends_on', 'needs', 'holds'];
+const SVG = 'http://www.w3.org/2000/svg';
+const s = (tag, attrs = {}, ...kids) => {
+  const el = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) el.setAttribute(k, v);
+  el.append(...kids.filter(Boolean));
+  return el;
+};
+
+const graphState = { relations: '', depth: 2, closed: false };
+
+/** Place nodes so linked ones sit together and nothing overlaps. Runs to rest before drawing. */
+function layout(nodes, edges, width, height) {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  nodes.forEach((n, i) => {
+    const angle = (i / nodes.length) * Math.PI * 2;
+    const spread = Math.min(width, height) * 0.35;
+    n.x = width / 2 + Math.cos(angle) * spread;
+    n.y = height / 2 + Math.sin(angle) * spread;
+    n.vx = n.vy = 0;
+  });
+  const ideal = Math.max(70, Math.min(150, Math.sqrt((width * height) / Math.max(nodes.length, 1)) * 0.8));
+  for (let step = 0; step < 320; step++) {
+    const heat = 1 - step / 320;
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j];
+        let dx = a.x - b.x || 0.01;
+        let dy = a.y - b.y || 0.01;
+        const d2 = dx * dx + dy * dy;
+        // Only near neighbours push apart, or separate clusters drive each other off the page.
+        if (d2 > ideal * ideal * 9) continue;
+        const push = (ideal * ideal) / d2;
+        a.vx += dx * push * 0.05;
+        a.vy += dy * push * 0.05;
+        b.vx -= dx * push * 0.05;
+        b.vy -= dy * push * 0.05;
+      }
+      a.vx += (width / 2 - a.x) * 0.02;
+      a.vy += (height / 2 - a.y) * 0.03;
+    }
+    for (const e of edges) {
+      const a = byId.get(e.from);
+      const b = byId.get(e.to);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const pull = ((d - ideal) / d) * 0.06;
+      a.vx += dx * pull;
+      a.vy += dy * pull;
+      b.vx -= dx * pull;
+      b.vy -= dy * pull;
+    }
+    for (const n of nodes) {
+      const speed = Math.hypot(n.vx, n.vy);
+      const cap = 40 * heat + 1;
+      if (speed > cap) {
+        n.vx *= cap / speed;
+        n.vy *= cap / speed;
+      }
+      n.x += n.vx;
+      n.y += n.vy;
+      n.vx *= 0.6;
+      n.vy *= 0.6;
+    }
+  }
+}
+
+async function graph(focus) {
+  const params = { focus: focus || undefined, depth: focus ? graphState.depth : undefined, relations: graphState.relations || undefined, include_closed: graphState.closed };
+  const data = await api('view', { name: 'graph', params });
+  const focused = focus ? data.nodes.find((n) => n.id === focus) : undefined;
+  const redraw = () => graph(focus);
+
+  const width = 1000;
+  const height = 640;
+  const { nodes, edges } = data;
+  layout(nodes, edges, width, height);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const degree = new Map();
+  for (const e of edges) for (const id of [e.from, e.to]) degree.set(id, (degree.get(id) ?? 0) + 1);
+  const radius = (n) => 6 + Math.min(degree.get(n.id) ?? 0, 8) * 0.6;
+  // Label everything when there is room; otherwise the hubs, and the rest on hover.
+  const labelled = (n) => nodes.length <= 45 || n.id === focus || (degree.get(n.id) ?? 0) >= 4;
+
+  const tip = h('div', { class: 'graph-tip', hidden: true });
+  const viewport = s('g');
+  const svg = s('svg', { viewBox: `0 0 ${width} ${height}`, class: 'graph', role: 'img', 'aria-label': 'Graph of the map' },
+    s('defs', {}, s('marker', { id: 'arrow', viewBox: '0 0 10 10', refX: 10, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: 'arrowhead' }))),
+    viewport,
+  );
+  const edgeEls = new Map();
+  const nodeEls = new Map();
+
+  const place = (e) => {
+    const a = byId.get(e.from);
+    const b = byId.get(e.to);
+    const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    // Stop the line at the edge of each circle so the arrowhead is not hidden.
+    const [ax, ay] = [a.x + ((b.x - a.x) / d) * radius(a), a.y + ((b.y - a.y) / d) * radius(a)];
+    const [bx, by] = [b.x - ((b.x - a.x) / d) * (radius(b) + 3), b.y - ((b.y - a.y) / d) * (radius(b) + 3)];
+    for (const line of edgeEls.get(e.id)) for (const [k, v] of Object.entries({ x1: ax, y1: ay, x2: bx, y2: by })) line.setAttribute(k, v);
+  };
+  const showTip = (event, ...content) => {
+    tip.replaceChildren(...content);
+    tip.hidden = false;
+    const box = svg.parentElement.getBoundingClientRect();
+    tip.style.left = `${Math.min(event.clientX - box.left + 14, box.width - 260)}px`;
+    tip.style.top = `${event.clientY - box.top + 14}px`;
+  };
+  const highlight = (ids) => {
+    for (const [id, el] of nodeEls) {
+      el.classList.toggle('dim', Boolean(ids) && !ids.has(id));
+      el.classList.toggle('near', Boolean(ids) && ids.has(id));
+    }
+    for (const e of edges) for (const line of edgeEls.get(e.id)) line.classList.toggle('dim', Boolean(ids) && !(ids.has(e.from) && ids.has(e.to)));
+  };
+
+  for (const e of edges) {
+    const line = s('line', { class: `edge${BLOCKING.includes(e.type) ? ' blocking' : ''}`, 'marker-end': 'url(#arrow)' });
+    const hit = s('line', { class: 'edge-hit' });
+    hit.addEventListener('mousemove', (ev) => showTip(ev, h('div', {}, byId.get(e.from).title), h('div', { class: 'muted' }, relations.get(e.type)?.title ?? e.type), h('div', {}, byId.get(e.to).title)));
+    hit.addEventListener('mouseleave', () => (tip.hidden = true));
+    edgeEls.set(e.id, [line, hit]);
+    viewport.append(line, hit);
+  }
+  for (const n of nodes) {
+    const group = groupOf(n.root);
+    const title = n.title.length > 30 ? n.title.slice(0, 29) + '…' : n.title;
+    const el = s(
+      'g',
+      { class: `node group-${group.key}${n.open ? '' : ' closed'}${n.id === focus ? ' focus' : ''}`, transform: `translate(${n.x},${n.y})` },
+      n.blocked && s('circle', { r: radius(n) + 4, class: 'blocked-ring' }),
+      s('circle', { r: radius(n), class: 'dot' }),
+      s('text', { x: radius(n) + 5, y: 4, class: `label${labelled(n) ? '' : ' quiet'}` }, document.createTextNode(title)),
+    );
+    const near = new Set([n.id, ...edges.filter((e) => e.from === n.id || e.to === n.id).flatMap((e) => [e.from, e.to])]);
+    el.addEventListener('mousemove', (ev) => {
+      highlight(near);
+      showTip(ev, h('div', {}, chip(n.type), ' ', pill(n.type, n.status), n.blocked && [' ', h('span', { class: 'pill bad' }, 'blocked')]), h('strong', {}, n.title), h('div', { class: 'muted small' }, 'Click to open · double-click to centre the graph here'));
+    });
+    el.addEventListener('mouseleave', () => {
+      highlight(null);
+      tip.hidden = true;
+    });
+    // Drag to move a node; a press without movement is a click.
+    el.addEventListener('pointerdown', (down) => {
+      down.stopPropagation();
+      el.setPointerCapture(down.pointerId);
+      let moved = false;
+      const scale = () => width / svg.getBoundingClientRect().width / zoom.k;
+      const move = (ev) => {
+        if (Math.abs(ev.clientX - down.clientX) + Math.abs(ev.clientY - down.clientY) > 3) moved = true;
+        n.x += ev.movementX * scale();
+        n.y += ev.movementY * scale();
+        el.setAttribute('transform', `translate(${n.x},${n.y})`);
+        for (const e of edges) if (e.from === n.id || e.to === n.id) place(e);
+      };
+      const up = () => {
+        el.removeEventListener('pointermove', move);
+        el.removeEventListener('pointerup', up);
+        if (!moved) location.hash = `#/e/${n.id}`;
+      };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', up);
+    });
+    el.addEventListener('dblclick', () => (location.hash = `#/graph/${n.id}`));
+    nodeEls.set(n.id, el);
+    viewport.append(el);
+  }
+  edges.forEach(place);
+
+  // Pan by dragging the background; zoom with the wheel, about the pointer.
+  const zoom = { k: 1, x: 0, y: 0 };
+  const apply = () => viewport.setAttribute('transform', `translate(${zoom.x},${zoom.y}) scale(${zoom.k})`);
+  // Start with everything in view, leaving room on the right for labels.
+  if (nodes.length) {
+    const xs = nodes.map((n) => n.x);
+    const ys = nodes.map((n) => n.y);
+    const [x0, x1, y0, y1] = [Math.min(...xs) - 30, Math.max(...xs) + 190, Math.min(...ys) - 30, Math.max(...ys) + 30];
+    zoom.k = Math.min(width / (x1 - x0), height / (y1 - y0), 1.6);
+    zoom.x = (width - (x1 - x0) * zoom.k) / 2 - x0 * zoom.k;
+    zoom.y = (height - (y1 - y0) * zoom.k) / 2 - y0 * zoom.k;
+    apply();
+  }
+  svg.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    const box = svg.getBoundingClientRect();
+    const px = ((ev.clientX - box.left) / box.width) * width;
+    const py = ((ev.clientY - box.top) / box.height) * height;
+    const k = Math.min(4, Math.max(0.3, zoom.k * (ev.deltaY < 0 ? 1.15 : 1 / 1.15)));
+    zoom.x = px - ((px - zoom.x) / zoom.k) * k;
+    zoom.y = py - ((py - zoom.y) / zoom.k) * k;
+    zoom.k = k;
+    apply();
+  }, { passive: false });
+  svg.addEventListener('pointerdown', (down) => {
+    svg.setPointerCapture(down.pointerId);
+    const ratio = width / svg.getBoundingClientRect().width;
+    const move = (ev) => {
+      zoom.x += ev.movementX * ratio;
+      zoom.y += ev.movementY * ratio;
+      apply();
+    };
+    const up = () => {
+      svg.removeEventListener('pointermove', move);
+      svg.removeEventListener('pointerup', up);
+    };
+    svg.addEventListener('pointermove', move);
+    svg.addEventListener('pointerup', up);
+  });
+
+  const present = new Set(nodes.map((n) => groupOf(n.root).key));
+  const preset = data.preset;
+  main.replaceChildren(
+    h(
+      'div',
+      { class: 'page-head' },
+      h('h1', {}, focused ? ['Around: ', focused.title] : 'Graph'),
+      h('p', { class: 'muted' }, focused ? 'What this is connected to. ' : 'What is connected to what. Entities with no drawn relation are left out. ', 'Drag to move, scroll to zoom. The Map screen lists the same things as a table.'),
+    ),
+    h(
+      'div',
+      { class: 'toolbar', style: 'margin-bottom: 12px' },
+      h(
+        'select',
+        {
+          title: 'Which relations to draw',
+          onchange: (e) => {
+            graphState.relations = e.target.value;
+            redraw();
+          },
+        },
+        [['blocking', 'What blocks what'], ['structure', 'What belongs to what'], ['all', 'Every relation']].map(([v, label]) => h('option', { value: v, selected: v === preset }, label)),
+      ),
+      focus &&
+        h(
+          'select',
+          {
+            title: 'How far out from the centre to go',
+            onchange: (e) => {
+              graphState.depth = Number(e.target.value);
+              redraw();
+            },
+          },
+          [1, 2, 3, 4].map((d) => h('option', { value: d, selected: d === graphState.depth }, `${d} step${d === 1 ? '' : 's'} out`)),
+        ),
+      h(
+        'label',
+        {},
+        h('input', {
+          type: 'checkbox',
+          checked: graphState.closed,
+          onchange: (e) => {
+            graphState.closed = e.target.checked;
+            redraw();
+          },
+        }),
+        ' Include finished',
+      ),
+      focus && h('button', { onclick: () => (location.hash = '#/graph') }, 'Show the whole map'),
+      h('span', { class: 'muted small' }, `${nodes.length} entities, ${edges.length} relations`, data.truncated && ` (showing ${data.truncated.shown} of ${data.truncated.of})`),
+    ),
+    h(
+      'section',
+      { class: 'card graph-card' },
+      nodes.length ? [svg, tip] : h('div', { class: 'empty' }, 'Nothing to draw with these settings.'),
+      h(
+        'div',
+        { class: 'legend' },
+        GROUPS.filter((g) => present.has(g.key)).map((g) => h('span', { class: 'key' }, h('span', { class: `swatch group-${g.key}` }), g.label)),
+        nodes.some((n) => !n.open) && h('span', { class: 'key' }, h('span', { class: 'swatch hollow' }), 'Finished'),
+        nodes.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch ringed' }), 'Blocked'),
+        edges.some((e) => BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke blocking' }), 'Blocking relation (arrow points at what is needed)'),
+        edges.some((e) => !BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke' }), 'Other relation'),
+      ),
+    ),
+  );
+}
+
 // ---- Activity ------------------------------------------------------------
 
 function describeEvent(ev) {
@@ -896,7 +1193,7 @@ async function activity() {
 
 // ---- routing -------------------------------------------------------------
 
-const ROUTES = { today, review, map, activity, automations };
+const ROUTES = { today, review, map, activity, automations, graph };
 
 async function route() {
   const [, name = 'today', arg] = location.hash.split('/');
@@ -904,6 +1201,7 @@ async function route() {
   try {
     if (!schema) await loadSchema();
     if (name === 'e' && arg) await entity(arg);
+    else if (name === 'graph') await graph(arg);
     else if (name === 'new') newEntity(arg);
     else await (ROUTES[name] ?? today)();
   } catch (err) {

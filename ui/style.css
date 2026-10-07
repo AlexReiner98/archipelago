@@ -164,3 +164,53 @@ textarea, input[type="number"], input[type="date"] { font: inherit; color: var(-
 textarea { resize: vertical; }
 .form .actions { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
 .row-sub.error { color: var(--bad); }
+
+/* Graph. Group colours are the dataviz reference palette, slots 1-7, validated
+   for colour-blind separation on these surfaces in each theme. */
+:root {
+  --g-people: #2a78d6; --g-work: #eb6834; --g-knowledge: #1baf7a; --g-problems: #eda100;
+  --g-time: #e87ba4; --g-resources: #008300; --g-system: #4a3aa7; --g-blocked: #d03b3b;
+  --edge: #b9b5aa; --edge-strong: #5f5c55;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --g-people: #3987e5; --g-work: #d95926; --g-knowledge: #199e70; --g-problems: #c98500;
+    --g-time: #d55181; --g-resources: #008300; --g-system: #9085e9; --g-blocked: #d03b3b;
+    --edge: #55534c; --edge-strong: #b5b2a8;
+  }
+}
+.graph-card { position: relative; }
+svg.graph { display: block; width: 100%; height: auto; max-height: 72vh; touch-action: none; cursor: grab; user-select: none; }
+svg.graph .edge { stroke: var(--edge); stroke-width: 1.25; }
+svg.graph .edge.blocking { stroke: var(--edge-strong); stroke-width: 1.75; }
+svg.graph .edge-hit { stroke: transparent; stroke-width: 12; }
+svg.graph .arrowhead { fill: context-stroke; }
+svg.graph .node { cursor: pointer; }
+svg.graph .dot { stroke: var(--panel); stroke-width: 2; }
+svg.graph .closed .dot { fill: var(--panel) !important; stroke-width: 2.5; }
+svg.graph .blocked-ring { fill: none; stroke: var(--g-blocked); stroke-width: 2; stroke-dasharray: 3 2; }
+svg.graph .focus .dot { stroke: var(--text); stroke-width: 2.5; }
+svg.graph .label { font-size: 12px; fill: var(--text); paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }
+svg.graph .label.quiet { display: none; }
+svg.graph .node.near .label.quiet { display: block; }
+svg.graph .dim { opacity: 0.18; }
+.group-people .dot, .swatch.group-people { fill: var(--g-people); background: var(--g-people); }
+.group-work .dot, .swatch.group-work { fill: var(--g-work); background: var(--g-work); }
+.group-knowledge .dot, .swatch.group-knowledge { fill: var(--g-knowledge); background: var(--g-knowledge); }
+.group-problems .dot, .swatch.group-problems { fill: var(--g-problems); background: var(--g-problems); }
+.group-time .dot, .swatch.group-time { fill: var(--g-time); background: var(--g-time); }
+.group-resources .dot, .swatch.group-resources { fill: var(--g-resources); background: var(--g-resources); }
+.group-system .dot, .swatch.group-system { fill: var(--g-system); background: var(--g-system); }
+.closed.group-people .dot { stroke: var(--g-people); } .closed.group-work .dot { stroke: var(--g-work); }
+.closed.group-knowledge .dot { stroke: var(--g-knowledge); } .closed.group-problems .dot { stroke: var(--g-problems); }
+.closed.group-time .dot { stroke: var(--g-time); } .closed.group-resources .dot { stroke: var(--g-resources); }
+.closed.group-system .dot { stroke: var(--g-system); }
+.graph-tip { position: absolute; max-width: 250px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); pointer-events: none; display: grid; gap: 4px; z-index: 2; }
+.graph-tip[hidden] { display: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.legend .key { display: inline-flex; align-items: center; gap: 6px; }
+.legend .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.legend .swatch.hollow { border: 2px solid var(--muted); }
+.legend .swatch.ringed { border: 2px dashed var(--g-blocked); }
+.legend .stroke { width: 18px; border-top: 1.5px solid var(--edge); display: inline-block; }
+.legend .stroke.blocking { border-top: 2px solid var(--edge-strong); }

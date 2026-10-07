@@ -28,8 +28,14 @@ have human authority; the MCP endpoint does not, and two tools (`decide`,
 The web UI has five screens: **Today** (notifications, sessions and the
 standing questions), **Review** (approve, exclude or correct proposed changes),
 **Map** (search, create, and each entity with its fields, relations and
-history), **Automations** and **Activity** (the event log, one line per change
-set). It is plain files in `ui/` with no build step.
+history), **Graph**, **Automations** and **Activity** (the event log, one line
+per change set).
+
+The graph draws the map as nodes and arrows: what blocks what, what belongs to
+what, or every relation. Open it on one entity (the **Graph** button on its
+page) to see only its neighbourhood, one to four steps out. Colour shows the
+kind of thing, a dashed red ring marks what is blocked, and finished work is
+hollow. Drag to move, scroll to zoom, click a node to open it. It is plain files in `ui/` with no build step.
 
 ## How a change happens
 
@@ -151,7 +157,7 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 ## Not built yet
 
 - Launching into the desktop app. Launched sessions are headless.
-- A graph view. Relations can be read on an entity page but only added through `change`.
+- Adding relations in the web UI. They can be read on an entity page and in the graph, but only added through `change`.
 - Semantic search. Search is text matching.
 - Teams. The `workspace` and `visibility` columns exist but nothing enforces them.
 - Authentication. Agent and human are told apart by which endpoint is called,

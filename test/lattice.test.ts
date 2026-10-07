@@ -600,3 +600,33 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   await undo(l, human, { changeset: (result as { changeset: string }).changeset });
   assert.equal((await l.entity(base.old))!.status, 'doing');
 });
+
+test('the graph view returns a preset of the whole map, or one entity\'s neighbourhood', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'software.bug', title: 'B' },
+    { op: 'create', ref: 'c', type: 'task', title: 'C', status: 'done' },
+    { op: 'create', ref: 'lonely', type: 'note', title: 'Lonely' },
+    { op: 'create', ref: 'far', type: 'task', title: 'Far' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'far', to: 'p' },
+    { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
+    { op: 'link', type: 'depends_on', from: 'b', to: 'c' },
+  ]);
+  const titles = (g: any) => g.nodes.map((n: any) => n.title).sort();
+
+  const blocking = (await VIEWS.graph.run(l, {})) as any;
+  assert.deepEqual(titles(blocking), ['A', 'B'], 'only what blocking relations connect; finished work left out');
+  assert.deepEqual(blocking.edges.map((e: any) => e.type), ['depends_on']);
+  const a = blocking.nodes.find((n: any) => n.title === 'A');
+  assert.deepEqual([a.blocked, a.root], [true, 'task']);
+  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'issue', 'a flavour reports its root type');
+
+  assert.deepEqual(titles(await VIEWS.graph.run(l, { relations: 'all', include_closed: true })), ['A', 'B', 'C', 'Far', 'Proj']);
+  assert.deepEqual(titles(await VIEWS.graph.run(l, { focus: made.far, depth: 1 })), ['Far', 'Proj']);
+  assert.deepEqual(titles(await VIEWS.graph.run(l, { focus: made.far, depth: 2 })), ['A', 'Far', 'Proj']);
+  assert.deepEqual(titles(await VIEWS.graph.run(l, { focus: made.lonely })), ['Lonely'], 'a focus is shown even with no relations');
+  await assert.rejects(VIEWS.graph.run(l, { relations: 'everything' }), /must be one of/);
+});
