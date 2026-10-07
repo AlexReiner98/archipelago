@@ -678,11 +678,17 @@ test('the roadmap tree orders a project\'s features, rolls up progress, and show
   assert.deepEqual([early.status, early.active, early.branches[0].title], ['building', true, 'Sub']);
   assert.deepEqual(tree.progress, { done: 1, total: 4 }, 'the project counts all of it, placed or not');
   assert.deepEqual(tree.unplaced.map((w: any) => w.title), ['Loose']);
+  assert.deepEqual(tree.depends, [], 'no dependencies yet');
   assert.deepEqual(tree.by_status, { building: 1, planned: 3 });
   assert.deepEqual(tree.now.map((n: any) => [n.title, n.path.join(' > ')]), [['Early', ''], ['T2', 'Early > Sub']], 'what is being built, and under what');
 
   const session = await sessionStart(l, agent, { task: made.t3, title: 'Fixing T3' });
+  await make(l, [
+    { op: 'link', type: 'depends_on', from: made.late, to: made.early },
+    { op: 'link', type: 'depends_on', from: made.t1, to: made.other },
+  ]);
   const withSession = (await VIEWS.tree.run(l, { root: made.p })) as any;
+  assert.deepEqual(withSession.depends, [{ from: made.late, to: made.early }], 'only dependencies between things in the tree');
   const late = withSession.branches[1];
   assert.deepEqual([late.active, late.work[0].sessions[0].id], [true, session.run], 'an open session marks its task and the feature above it');
 

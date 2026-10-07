@@ -57,7 +57,8 @@ The roadmap is one project's features in the order they are to be built. Each
 shows its own status and how much of the work that is part of it is closed, and
 whatever is being built or has a session open on it is marked. Reorder features
 with the arrows; tasks that belong to the project but to no feature are listed
-underneath, to be moved under one. It is the `tree` view, which agents can call
+underneath, to be moved under one. **Graph** at the top draws the same tree
+left to right, with dashed arrows for what waits on what. It is the `tree` view, which agents can call
 too. The tree itself is declared in the software pack (`trees` in
 [packs/software/pack.json](packs/software/pack.json)): which types are roots,
 branches and work, which field orders them, and which statuses mean "now". A

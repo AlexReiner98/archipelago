@@ -479,6 +479,7 @@ async function tree(l: Lattice, input: { tree?: string; root?: string }) {
     return { ...self, active: self.active || work.some((w) => w.active) || branches.some((b) => b.active), order: place(e), progress, branches, work };
   };
   const top = build(root, []);
+  const { rows: depends } = await l.db.query<{ from: string; to: string }>(`select from_id as "from", to_id as "to" from relation where type = 'depends_on' and valid_to is null`);
   const flat = (b: Branch): Branch[] => [b, ...b.branches.flatMap(flat)];
   const by_status: Record<string, number> = {};
   for (const b of top.branches.flatMap(flat)) by_status[b.status] = (by_status[b.status] ?? 0) + 1;
@@ -491,6 +492,8 @@ async function tree(l: Lattice, input: { tree?: string; root?: string }) {
     branches: top.branches,
     /** Work that belongs to the root but to no branch of it. */
     unplaced: top.work,
+    /** What waits on what, within this tree: "from" cannot finish until "to" has. */
+    depends: depends.filter((d) => seen.has(d.from) && seen.has(d.to)),
   };
 }
 

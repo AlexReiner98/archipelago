@@ -1641,6 +1641,110 @@ function progressBar({ done, total }) {
   return h('span', { class: 'progress', title: `${done} of ${total} tasks and issues closed` }, h('span', { class: 'bar' }, h('span', { style: `width: ${Math.round((done / total) * 100)}%` })), h('span', { class: 'muted small' }, `${done}/${total}`));
 }
 
+// The same tree drawn left to right: the project, its features top to bottom in
+// roadmap order, then what is part of each. It is laid out, not simulated, so
+// it looks the same every time. Dashed red arrows point at what is waited on.
+function roadmapGraph(data, withWork) {
+  const COL = 280;
+  const BOX = { w: 232, h: 42 };
+  const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
+  const leaf = (w) => ({ ...w, kind: 'work', kids: [] });
+  const make = (b, i) => ({ ...b, kind: 'branch', place: i + 1, kids: [...b.branches.map(make), ...(withWork ? b.work.map(leaf) : [])] });
+  const root = { ...data.root, kind: 'root', open: true, progress: data.progress, kids: [...data.branches.map(make), ...(withWork ? data.unplaced.map(leaf) : [])] };
+
+  const all = [];
+  let y = 0;
+  let deepest = 0;
+  const lay = (n, depth) => {
+    all.push(n);
+    n.x = depth * COL;
+    deepest = Math.max(deepest, depth);
+    const from = y;
+    const room = n.kind === 'work' ? 24 : BOX.h + 10;
+    n.kids.forEach((k) => lay(k, depth + 1));
+    // A box needs its own height even when what hangs off it is shorter.
+    if (y - from < room) y = from + room;
+    n.y = n.kids.length ? Math.max((n.kids[0].y + n.kids.at(-1).y) / 2, from + room / 2) : from + room / 2;
+  };
+  lay(root, 0);
+  const byId = new Map(all.map((n) => [n.id, n]));
+  const pad = 16;
+  const width = deepest * COL + (withWork ? 340 : BOX.w) + pad * 2;
+  const height = y + pad * 2;
+
+  const inner = s('g', { transform: `translate(${pad},${pad})` });
+  const curve = (x1, y1, x2, y2) => `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
+  for (const n of all) for (const k of n.kids) inner.append(s('path', { class: 'rm-link', d: curve(n.x + BOX.w, n.y, k.x, k.y) }));
+  for (const d of data.depends) {
+    const [a, b] = [byId.get(d.from), byId.get(d.to)];
+    if (!a || !b) continue;
+    // Leave from the left edge and come back to it, bowing outwards, so the arrow stays clear of the tree's own lines.
+    const bow = Math.min(a.x, b.x) - 14 - Math.min(Math.abs(a.y - b.y) / 6, 40);
+    inner.append(s('path', { class: 'rm-dep', 'marker-end': 'url(#rm-arrow)', d: `M${a.x},${a.y} C${bow},${a.y} ${bow},${b.y} ${b.x - 2},${b.y}` }, s('title', {}, document.createTextNode(`${a.title} waits on ${b.title}`))));
+  }
+  for (const n of all) {
+    const state = `${n.open ? '' : ' closed'}${n.active ? ' active' : ''}${n.blocked ? ' blocked' : ''}`;
+    const hint = s('title', {}, document.createTextNode(`${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}`));
+    let el;
+    if (n.kind === 'work') {
+      el = s('g', { class: `rm-node work${state}`, transform: `translate(${n.x},${n.y})` }, hint, s('circle', { cx: 8, r: 5 }), s('text', { x: 20, y: 4 }, document.createTextNode(cut(n.title, 44))));
+    } else {
+      const { done, total } = n.progress;
+      el = s(
+        'g',
+        { class: `rm-node ${n.kind}${state}`, transform: `translate(${n.x},${n.y - BOX.h / 2})` },
+        hint,
+        s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 7 }),
+        s('text', { x: 10, y: 17 }, document.createTextNode(cut(n.place ? `${n.place}. ${n.title}` : n.title, 34))),
+        total > 0 && s('rect', { class: 'track', x: 10, y: 27, width: 80, height: 5, rx: 2.5 }),
+        total > 0 && s('rect', { class: 'fill', x: 10, y: 27, width: (80 * done) / total, height: 5, rx: 2.5 }),
+        s('text', { class: 'small', x: total ? 96 : 10, y: 33 }, document.createTextNode(total ? `${done}/${total}` : 'no tasks')),
+        s('text', { class: 'small', x: BOX.w - 10, y: 33, 'text-anchor': 'end' }, document.createTextNode(n.kind === 'root' ? '' : n.status)),
+        n.blocked && s('circle', { class: 'flag', cx: BOX.w - 4, cy: 4, r: 5 }),
+      );
+    }
+    el.addEventListener('click', () => (location.hash = `#/e/${n.id}`));
+    inner.append(el);
+  }
+  const svg = s(
+    'svg',
+    { width, height, viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'The roadmap as a tree' },
+    s('defs', {}, s('marker', { id: 'rm-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: 'rm-arrowhead' }))),
+    inner,
+  );
+  return h(
+    'div',
+    {},
+    h('div', { class: 'roadmap-graph' }, svg),
+    h(
+      'div',
+      { class: 'legend' },
+      h('span', { class: 'key' }, h('span', { class: 'swatch rm-active' }), 'Being worked on'),
+      h('span', { class: 'key' }, h('span', { class: 'swatch rm-closed' }), 'Finished'),
+      all.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch rm-blocked' }), 'Blocked'),
+      data.depends.length > 0 && h('span', { class: 'key' }, h('span', { class: 'stroke waits' }), 'Waits on (arrow points at what is needed)'),
+    ),
+  );
+}
+
+const roadmapState = {
+  get graph() {
+    try {
+      return localStorage.getItem('lattice-roadmap-as') === 'graph';
+    } catch {
+      return false;
+    }
+  },
+  set graph(value) {
+    try {
+      localStorage.setItem('lattice-roadmap-as', value ? 'graph' : 'list');
+    } catch {
+      // Without storage the list is shown each time.
+    }
+  },
+  work: true,
+};
+
 async function roadmap(rootId) {
   const remembered = () => {
     try {
@@ -1714,6 +1818,7 @@ async function roadmap(rootId) {
       'Feature added to the roadmap in the UI',
     );
   const statuses = statusesOf('software.feature').filter((st) => data.by_status[st]);
+  const asGraph = roadmapState.graph;
 
   main.replaceChildren(
     h(
@@ -1727,6 +1832,12 @@ async function roadmap(rootId) {
       { class: 'toolbar', style: 'margin-bottom: 14px' },
       h('select', { onchange: (e) => (location.hash = `#/roadmap/${e.target.value}`) }, roots.map((r) => h('option', { value: r.id, selected: r.id === rootId }, `${r.title} (${r.branches})`))),
       h('a', { href: `#/e/${rootId}` }, 'Open project'),
+      h(
+        'span',
+        { class: 'switch' },
+        [['List', false], ['Graph', true]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label)),
+      ),
+      asGraph && h('label', {}, h('input', { type: 'checkbox', checked: roadmapState.work, onchange: (e) => ((roadmapState.work = e.target.checked), roadmap(rootId)) }), ' Tasks'),
       h('span', { class: 'grow' }),
       statuses.map((st) => h('span', { class: `pill${isClosed('software.feature', st) ? ' closed' : ''}` }, `${data.by_status[st]} ${st}`)),
       progressBar(data.progress),
@@ -1746,10 +1857,11 @@ async function roadmap(rootId) {
         'section',
         { class: 'card wide' },
         h('header', {}, h('h2', {}, 'Features'), h('span', { class: 'n' }, features.length)),
-        data.branches.length ? h('ul', { class: 'tree top' }, data.branches.map(branch)) : h('div', { class: 'empty' }, 'No features yet.'),
+        !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? roadmapGraph(data, roadmapState.work) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
         h('div', { class: 'toolbar', style: 'padding: 12px 14px; border-top: 1px solid var(--line)' }, title, h('button', { class: 'primary', onclick: add }, 'Add feature')),
       ),
       data.unplaced.length > 0 &&
+        !asGraph &&
         h(
           'section',
           { class: 'card wide' },

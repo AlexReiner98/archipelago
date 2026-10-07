@@ -133,6 +133,33 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .progress .bar { width: 90px; height: 6px; border-radius: 3px; background: var(--closed-soft); overflow: hidden; }
 .progress .bar > span { display: block; height: 100%; background: var(--ok); }
 
+.switch { display: inline-flex; }
+.switch button { border-radius: 0; margin-left: -1px; }
+.switch button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.switch button:last-child { border-radius: 0 6px 6px 0; }
+.switch button.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); position: relative; font-weight: 600; }
+.roadmap-graph { overflow: auto; }
+.roadmap-graph svg { display: block; }
+.rm-link { fill: none; stroke: var(--edge); stroke-width: 1.5; }
+.rm-dep { fill: none; stroke: var(--g-blocked); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.rm-arrowhead { fill: var(--g-blocked); }
+.rm-node { cursor: pointer; }
+.rm-node text { fill: var(--text); font-size: 12.5px; }
+.rm-node text.small { fill: var(--muted); font-size: 11px; }
+.rm-node .box { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
+.rm-node:hover .box { stroke: var(--muted); }
+.rm-node.root .box { fill: var(--accent-soft); stroke: var(--accent); }
+.rm-node.closed .box { fill: var(--ok-soft); stroke: var(--ok); }
+.rm-node.active .box { stroke: var(--warn); stroke-width: 2.5; }
+.rm-node .track { fill: var(--closed-soft); }
+.rm-node .fill { fill: var(--ok); }
+.rm-node .flag { fill: var(--g-blocked); }
+.rm-node.work circle { fill: var(--muted); }
+.rm-node.work.closed circle { fill: var(--ok); }
+.rm-node.work.closed text { fill: var(--muted); }
+.rm-node.work.active circle { fill: var(--warn); stroke: var(--warn); stroke-width: 3; stroke-opacity: 0.35; }
+.rm-node.work.blocked circle { fill: var(--g-blocked); }
+
 /* Review */
 .proposal { margin-bottom: 18px; }
 .proposal .meta { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
@@ -268,3 +295,7 @@ svg.graph .dim { opacity: 0.18; }
 
 .secret { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--warn); background: var(--warn-soft); border-radius: 10px; display: grid; gap: 8px; }
 .secret code { font: 13px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; user-select: all; }
+.legend .swatch.rm-active { border: 2.5px solid var(--warn); border-radius: 3px; }
+.legend .swatch.rm-closed { background: var(--ok-soft); border: 1.5px solid var(--ok); border-radius: 3px; }
+.legend .swatch.rm-blocked { background: var(--g-blocked); }
+.legend .stroke.waits { border-top: 2px dashed var(--g-blocked); }
