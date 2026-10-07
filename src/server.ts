@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
+import { Automations } from './automations.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { Lattice } from './lattice.ts';
 import { Registry } from './packs.ts';
@@ -141,6 +142,8 @@ if (import.meta.main) {
   const config = loadConfig();
   const lattice = new Lattice(await openDb(config.dataDir), new Registry(config.packsDir, config.packs), config.policy);
   configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'] });
+  const automations = new Automations(lattice);
+  automations.start();
   const server = createHttpServer(lattice, config.port);
   server.listen(config.port, '127.0.0.1', () => {
     console.log(`lattice listening on http://127.0.0.1:${config.port}  (MCP at /mcp)`);
@@ -148,6 +151,7 @@ if (import.meta.main) {
     console.log(`packs: ${lattice.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
   });
   const stop = async () => {
+    automations.stop();
     stopAllLaunched();
     server.close();
     await lattice.db.close();

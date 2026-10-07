@@ -348,6 +348,20 @@ async function repoWork(l: Lattice, input: { repo?: string }) {
   };
 }
 
+async function notifications(l: Lattice) {
+  const { rows } = await l.db.query(
+    `select n.id, n.title, n.body, n.props->>'level' as level, n.props->>'from' as from, n.created_at,
+            a.id as about_id, a.title as about_title
+     from entity n
+     left join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
+     left join entity a on a.id = r.to_id
+     where n.type = any($1::text[]) and n.is_open and n.archived_at is null
+     order by n.created_at desc limit 100`,
+    [l.registry.family('sys.notification')],
+  );
+  return rows;
+}
+
 export interface View {
   description: string;
   run(l: Lattice, input: Record<string, unknown>): Promise<unknown>;
@@ -377,6 +391,10 @@ export const VIEWS: Record<string, View> = {
   blockers: {
     description: 'Every blocked item, what directly blocks it, and the root blockers that have to move first. Params: owner.',
     run: blockers,
+  },
+  notifications: {
+    description: 'Unread notifications for the human, newest first.',
+    run: notifications,
   },
   sessions: {
     description: 'Agent sessions and automation runs: what each open one is working on and holding, whether it has gone quiet, and the last ten that ended.',

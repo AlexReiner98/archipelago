@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { Actor, Lattice } from './lattice.ts';
 import { launch, stopLaunched } from './launcher.ts';
+import { notify } from './notify.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { VIEWS } from './views.ts';
 
@@ -207,6 +208,16 @@ export const TOOLS: Record<string, Tool> = {
       // If this server started the session's process, stop that too.
       return { ...result, process_stopped: stopLaunched(result.run) };
     },
+  },
+  notify: {
+    description: 'Send the human a notification: something they should know or act on that is not itself a change to the map. Shown on their Today screen until read. Use sparingly.',
+    input: {
+      title: z.string().min(1).describe('The whole message in one line if possible.'),
+      body: z.string().optional(),
+      level: z.enum(['info', 'warning', 'urgent']).optional(),
+      about: z.string().optional().describe('Id of the entity it concerns.'),
+    },
+    run: async (l, actor, input) => notify(l, actor, input),
   },
   check_connections: {
     description: 'Ping every connection (external tool) and record whether it is reachable. Work that needs an unreachable connection shows as blocked.',

@@ -4,6 +4,7 @@
 
 import type { PGlite } from '@electric-sql/pglite';
 import { existsSync, readFileSync } from 'node:fs';
+import { checkAutomation } from './automation-rules.ts';
 import { newId, type Q } from './db.ts';
 import type { Registry, TypeDef } from './packs.ts';
 
@@ -237,6 +238,7 @@ export class Lattice {
           if (op.owner) await checkOwner(op.owner, where);
           const type = reg.type(op.type);
           if (!type) break;
+          if (reg.isA(op.type, 'sys.automation')) errors.push(...checkAutomation(op.props ?? {}).map((p) => `${where}: ${p}`));
           if (op.ref) {
             if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
             refs.set(op.ref, op.type);

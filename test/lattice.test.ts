@@ -3,6 +3,7 @@ import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { Automations } from '../src/automations.ts';
 import { openDb } from '../src/db.ts';
 import { configureLauncher, launch } from '../src/launcher.ts';
 import { Lattice, type Actor, type Op } from '../src/lattice.ts';
@@ -490,4 +491,70 @@ test('launching runs a headless session on a task, holding the lane and recordin
   const failed = await ended(failing.run);
   assert.equal(failed.status, 'failed');
   assert.match(failed.body, /mode=acceptEdits/);
+});
+
+test('an agent can notify the human; a stale session raises one notification', async () => {
+  const l = await fresh();
+  const made = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Ship it' }]);
+  await callTool(l, agent, 'notify', { title: 'Blocked on a certificate', level: 'warning', about: made.t });
+  assert.equal((await l.proposals()).length, 0);
+  let unread = (await VIEWS.notifications.run(l, {})) as any[];
+  assert.deepEqual([unread[0].title, unread[0].level, unread[0].from, unread[0].about_title], ['Blocked on a certificate', 'warning', 'agent:test', 'Ship it']);
+
+  const lane = (await make(l, [{ op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' }])).lane;
+  const { run } = await sessionStart(l, agent, { title: 'Quiet one' });
+  await l.claim(agent, { resource: lane, holder: run, reason: 'busy' });
+  await l.db.query(`update entity set props = props || '{"last_seen":"2020-01-01T00:00:00Z"}' where id = $1`, [run]);
+  const autos = new Automations(l);
+  await autos.tick();
+  await autos.tick();
+  unread = (await VIEWS.notifications.run(l, {})) as any[];
+  const stale = unread.filter((n) => n.title.includes('gone quiet'));
+  assert.equal(stale.length, 1, 'told once, not every pass');
+  assert.match(stale[0].body, /still holds: Live lane/);
+});
+
+test('automations fire on a schedule and on events, are logged, and cannot trigger each other', async () => {
+  const l = await fresh();
+  await assert.rejects(
+    make(l, [{ op: 'create', type: 'sys.automation', title: 'Half-made', status: 'enabled', props: { trigger: 'every', action: 'tool', tool: 'decide' } }]),
+    /needs every_minutes[\s\S]*tool to be one of: check_connections, import_audit/,
+  );
+  // An agent can only propose one.
+  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'sys.automation', title: 'Sneaky', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'notify' } }] });
+  assert.equal(proposed.status, 'proposed');
+
+  const made = await make(l, [
+    { op: 'create', ref: 'hourly', type: 'sys.automation', title: 'Check connections', status: 'enabled', props: { trigger: 'every', every_minutes: 60, action: 'tool', tool: 'check_connections' } },
+    { op: 'create', ref: 'morning', type: 'sys.automation', title: 'Morning nudge', status: 'enabled', props: { trigger: 'daily', at: '09:00', action: 'notify', message: 'Review the map' } },
+    { op: 'create', ref: 'review', type: 'sys.automation', title: 'New proposal', status: 'enabled', props: { trigger: 'event', on_action: 'proposal.create', action: 'notify', message: 'Proposal from {actor}: {reason}', level: 'warning' } },
+    { op: 'create', ref: 'any', type: 'sys.automation', title: 'Everything', status: 'paused', props: { trigger: 'event', on_action: 'entity.*', action: 'notify' } },
+  ]);
+  const autos = new Automations(l);
+  const at = (h: number, m = 0) => new Date(2026, 9, 7, h, m);
+  const fired = async (when: Date) => (await autos.tick(when)).map((f) => f.automation).sort();
+
+  assert.deepEqual(await fired(at(8)), [made.hourly], 'interval fires at once; daily waits for its time; events start from now');
+  assert.deepEqual(await fired(at(8, 30)), []);
+  assert.deepEqual(await fired(at(9, 1)), [made.hourly, made.morning].sort());
+  assert.deepEqual(await fired(at(9, 30)), [], 'daily fires once a day');
+  assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 0)), [made.hourly, made.morning].sort());
+
+  await l.change(agent, { reason: 'Found a bug', ops: [{ op: 'create', type: 'software.bug', title: 'Crash' }] });
+  assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 5)), [made.review]);
+  const unread = (await VIEWS.notifications.run(l, {})) as any[];
+  assert.ok(unread.some((n) => n.title === 'Proposal from agent:test: Found a bug' && n.level === 'warning'));
+
+  // Unpause the catch-all: the notifications automations create must not set it off.
+  await make(l, [{ op: 'update', id: made.any, status: 'enabled' }]);
+  await autos.tick(new Date(2026, 9, 8, 9, 6));
+  const before = ((await VIEWS.notifications.run(l, {})) as any[]).length;
+  assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 7)), []);
+  assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, before);
+
+  const hourly = (await l.entity(made.hourly))!;
+  assert.match(hourly.props.last_result as string, /^ok: \[\]/);
+  const log = (await l.events({ target: made.hourly })) as any[];
+  assert.equal(log.filter((e) => e.action === 'automation.fire').length, 3);
+  assert.equal(log[0].actor, `agent:automation:${made.hourly}`);
 });

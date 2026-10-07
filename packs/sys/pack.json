@@ -3,16 +3,38 @@
   "version": "0.1.0",
   "title": "System",
   "description": "The system's own primitives, stored in the same map so it describes itself.",
-  "requires": ["core"],
+  "requires": [
+    "core"
+  ],
   "types": [
     {
       "id": "sys.source",
       "title": "Source",
       "description": "The original input a fact came from: a file, an email, a commit, a conversation.",
-      "statuses": { "open": ["recorded"], "closed": ["removed"] },
+      "statuses": {
+        "open": [
+          "recorded"
+        ],
+        "closed": [
+          "removed"
+        ]
+      },
       "fields": {
-        "uri": { "type": "string", "description": "A stable address: a file path, URL or message id." },
-        "kind": { "type": "enum", "values": ["file", "email", "web", "conversation", "commit", "other"] }
+        "uri": {
+          "type": "string",
+          "description": "A stable address: a file path, URL or message id."
+        },
+        "kind": {
+          "type": "enum",
+          "values": [
+            "file",
+            "email",
+            "web",
+            "conversation",
+            "commit",
+            "other"
+          ]
+        }
       }
     },
     {
@@ -21,25 +43,176 @@
       "title": "Connection",
       "description": "An external tool, such as an MCP server. Status says whether it is reachable right now.",
       "fields": {
-        "exclusive": { "type": "boolean", "default": false },
-        "url": { "type": "url", "description": "Checked by check_connections." },
-        "audit_log": { "type": "string", "description": "Path to a JSON-lines log of tool calls, read by import_audit." }
+        "exclusive": {
+          "type": "boolean",
+          "default": false
+        },
+        "url": {
+          "type": "url",
+          "description": "Checked by check_connections."
+        },
+        "audit_log": {
+          "type": "string",
+          "description": "Path to a JSON-lines log of tool calls, read by import_audit."
+        }
       }
     },
     {
       "id": "sys.run",
       "title": "Run",
       "description": "One agent session or one execution of an automation.",
-      "statuses": { "open": ["running", "waiting"], "closed": ["finished", "failed", "cancelled"] },
+      "statuses": {
+        "open": [
+          "running",
+          "waiting"
+        ],
+        "closed": [
+          "finished",
+          "failed",
+          "cancelled"
+        ]
+      },
       "fields": {
-        "surface": { "type": "string", "description": "Where it runs, e.g. claude-code." },
-        "cwd": { "type": "string" },
-        "session_id": { "type": "string", "description": "The id the surface gave the session." },
-        "last_seen": { "type": "datetime", "description": "Last time the session reported in." }
+        "surface": {
+          "type": "string",
+          "description": "Where it runs, e.g. claude-code."
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string",
+          "description": "The id the surface gave the session."
+        },
+        "last_seen": {
+          "type": "datetime",
+          "description": "Last time the session reported in."
+        },
+        "stale_flagged": {
+          "type": "boolean",
+          "description": "Set once the human has been told this session went quiet."
+        }
+      }
+    },
+    {
+      "id": "sys.notification",
+      "title": "Notification",
+      "description": "A message for the human, from an agent, an automation or the system.",
+      "statuses": {
+        "open": [
+          "unread"
+        ],
+        "closed": [
+          "read"
+        ]
+      },
+      "fields": {
+        "level": {
+          "type": "enum",
+          "values": [
+            "info",
+            "warning",
+            "urgent"
+          ],
+          "default": "info"
+        },
+        "from": {
+          "type": "string",
+          "description": "Who sent it."
+        }
+      }
+    },
+    {
+      "id": "sys.automation",
+      "title": "Automation",
+      "description": "A trigger that fires an action. Only fires while its status is enabled.",
+      "statuses": {
+        "open": [
+          "enabled",
+          "paused"
+        ],
+        "closed": [
+          "retired"
+        ]
+      },
+      "fields": {
+        "trigger": {
+          "type": "enum",
+          "values": [
+            "every",
+            "daily",
+            "event"
+          ],
+          "description": "every: an interval. daily: a time of day. event: something logged in the activity feed."
+        },
+        "every_minutes": {
+          "type": "number",
+          "description": "For trigger every."
+        },
+        "at": {
+          "type": "string",
+          "description": "For trigger daily: local time as HH:MM."
+        },
+        "on_action": {
+          "type": "string",
+          "description": "For trigger event: an event action such as proposal.create, or a prefix such as resource.*"
+        },
+        "action": {
+          "type": "enum",
+          "values": [
+            "notify",
+            "tool",
+            "launch"
+          ],
+          "description": "notify: tell the human. tool: call check_connections or import_audit. launch: start a headless session on a task."
+        },
+        "message": {
+          "type": "string",
+          "description": "For action notify. May use {target}, {action}, {actor} and {reason} from the triggering event."
+        },
+        "level": {
+          "type": "enum",
+          "values": [
+            "info",
+            "warning",
+            "urgent"
+          ]
+        },
+        "tool": {
+          "type": "string",
+          "description": "For action tool."
+        },
+        "input": {
+          "type": "json",
+          "description": "For action tool: the tool's input. For action launch: {task, mode, instructions}."
+        },
+        "last_fired": {
+          "type": "datetime"
+        },
+        "last_result": {
+          "type": "string"
+        },
+        "last_run": {
+          "type": "string",
+          "description": "The run the last launch started."
+        }
       }
     }
   ],
   "relations": [
-    { "id": "sys.works_on", "title": "is working on", "inverse": "is being worked on by", "from": ["sys.run", "agent", "person"], "to": ["*"], "description": "What a run or actor is doing right now." }
+    {
+      "id": "sys.works_on",
+      "title": "is working on",
+      "inverse": "is being worked on by",
+      "from": [
+        "sys.run",
+        "agent",
+        "person"
+      ],
+      "to": [
+        "*"
+      ],
+      "description": "What a run or actor is doing right now."
+    }
   ]
 }
