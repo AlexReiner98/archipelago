@@ -39,6 +39,26 @@ export interface RelationDef {
   description: string;
 }
 
+/**
+ * A tree a pack declares over "is part of": a roadmap, for one. The `tree`
+ * view reads it; nothing here is code.
+ */
+export interface TreeDef {
+  id: string;
+  title: string;
+  description: string;
+  /** Types a tree can start from. */
+  roots: string[];
+  /** Types that make up the tree's levels. */
+  branches: string[];
+  /** Types counted as the work under a branch: progress is how much of it is closed. */
+  work: string[];
+  /** The number field that orders branches among their siblings. */
+  order: string;
+  /** Statuses that mean someone is on it now. */
+  active: string[];
+}
+
 export interface PackFile {
   id: string;
   version: string;
@@ -47,6 +67,7 @@ export interface PackFile {
   requires?: string[];
   types?: TypeDef[];
   relations?: RelationDef[];
+  trees?: TreeDef[];
   /** Extra fields a pack adds to types owned by another pack. */
   extend?: Record<string, { fields: Record<string, FieldDef> }>;
 }
@@ -73,6 +94,7 @@ export class Registry {
   packs: PackFile[] = [];
   types = new Map<string, ResolvedType>();
   relations = new Map<string, RelationDef & { pack: string }>();
+  trees = new Map<string, TreeDef & { pack: string }>();
 
   constructor(dir: string, only?: string[], localDir?: string) {
     this.dir = dir;
@@ -166,9 +188,21 @@ export class Registry {
       }
     }
 
+    const trees = new Map<string, TreeDef & { pack: string }>();
+    for (const pack of ordered) {
+      for (const tree of pack.trees ?? []) {
+        if (!owned(pack, tree.id)) throw new Error(`Tree "${tree.id}" in pack "${pack.id}" must be named "${pack.id}.<name>"`);
+        for (const kind of [...tree.roots, ...tree.branches, ...tree.work]) {
+          if (!types.has(kind)) throw new Error(`Tree "${tree.id}" refers to unknown type "${kind}"`);
+        }
+        trees.set(tree.id, { ...tree, pack: pack.id });
+      }
+    }
+
     this.packs = ordered;
     this.types = types;
     this.relations = relations;
+    this.trees = trees;
   }
 
   type(id: string): ResolvedType | undefined {
@@ -288,6 +322,7 @@ export class Registry {
         fields: t.fields,
       })),
       relations: [...this.relations.values()],
+      trees: [...this.trees.values()],
     };
   }
 }

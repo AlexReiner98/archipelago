@@ -411,6 +411,89 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
   };
 }
 
+/**
+ * A tree a pack declares over "is part of", from one root: its branches in
+ * order, the work under each, progress rolled up from that work, and where
+ * work is happening now. Without a root, the roots there are to choose from.
+ */
+async function tree(l: Lattice, input: { tree?: string; root?: string }) {
+  const defs = l.registry.trees;
+  const def = input.tree ? defs.get(input.tree) : defs.size === 1 ? [...defs.values()][0] : undefined;
+  if (!def) throw new Error(`tree must be one of: ${[...defs.keys()].join(', ')}`);
+  const isA = (type: string, kinds: string[]) => kinds.some((kind) => l.registry.isA(type, kind));
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, created_at from entity where archived_at is null`);
+  const byId = new Map(entities.map((e) => [e.id, e]));
+  const { rows: links } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null`);
+  const kids = new Map<string, Entity[]>();
+  for (const link of links) {
+    const child = byId.get(link.from_id);
+    if (child && byId.has(link.to_id)) kids.set(link.to_id, [...(kids.get(link.to_id) ?? []), child]);
+  }
+  const about = { id: def.id, title: def.title };
+  if (!input.root) {
+    const roots = entities
+      .filter((e) => isA(e.type, def.roots))
+      .map((e) => ({ id: e.id, type: e.type, title: e.title, status: e.status, branches: (kids.get(e.id) ?? []).filter((k) => isA(k.type, def.branches)).length }));
+    return { tree: about, roots: roots.sort((a, b) => b.branches - a.branches || a.title.localeCompare(b.title)) };
+  }
+  const root = byId.get(input.root);
+  if (!root) throw new Error(`No entity "${input.root}"`);
+
+  const { rows: sessions } = await l.db.query<{ target: string; id: string; title: string }>(
+    `select r.to_id as target, s.id, s.title from relation r join entity s on s.id = r.from_id
+     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null`,
+  );
+  const blocked = await blockGraph(l);
+  const item = (e: Entity) => {
+    const on = sessions.filter((s) => s.target === e.id).map(({ id, title }) => ({ id, title }));
+    return { id: e.id, type: e.type, title: e.title, status: e.status, open: e.is_open, blocked: blocked.isBlocked(e.id), sessions: on, active: on.length > 0 || def.active.includes(e.status) };
+  };
+  type Item = ReturnType<typeof item>;
+  interface Branch extends Item {
+    order: number | null;
+    progress: { done: number; total: number };
+    branches: Branch[];
+    work: Item[];
+  }
+  const now: (Item & { path: string[] })[] = [];
+  const place = (e: Entity) => (typeof e.props[def.order] === 'number' ? (e.props[def.order] as number) : null);
+  const seen = new Set([root.id]);
+  const build = (e: Entity, path: string[]): Branch => {
+    // Each thing appears once. Branches are walked before work is counted, so
+    // work that is part of both a branch and something above it sits under the branch.
+    const claim = (wanted: (k: Entity) => boolean) => {
+      const taken = (kids.get(e.id) ?? []).filter((k) => !seen.has(k.id) && wanted(k));
+      for (const k of taken) seen.add(k.id);
+      return taken;
+    };
+    const self = item(e);
+    if (self.active && e !== root) now.push({ ...self, path });
+    const here = e === root ? [] : [...path, e.title];
+    // Placed branches first, in order; the rest after them, oldest first.
+    const branches = claim((k) => isA(k.type, def.branches))
+      .sort((a, b) => (place(a) ?? Infinity) - (place(b) ?? Infinity) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .map((k) => build(k, here));
+    const work = claim((k) => isA(k.type, def.work)).map(item);
+    now.push(...work.filter((w) => w.active).map((w) => ({ ...w, path: here })));
+    const progress = branches.reduce((sum, b) => ({ done: sum.done + b.progress.done, total: sum.total + b.progress.total }), { done: work.filter((w) => !w.open).length, total: work.length });
+    return { ...self, active: self.active || work.some((w) => w.active) || branches.some((b) => b.active), order: place(e), progress, branches, work };
+  };
+  const top = build(root, []);
+  const flat = (b: Branch): Branch[] => [b, ...b.branches.flatMap(flat)];
+  const by_status: Record<string, number> = {};
+  for (const b of top.branches.flatMap(flat)) by_status[b.status] = (by_status[b.status] ?? 0) + 1;
+  return {
+    tree: about,
+    root: { id: top.id, type: top.type, title: top.title, status: top.status },
+    progress: top.progress,
+    by_status,
+    now,
+    branches: top.branches,
+    /** Work that belongs to the root but to no branch of it. */
+    unplaced: top.work,
+  };
+}
+
 async function notifications(l: Lattice) {
   const { rows } = await l.db.query(
     `select n.id, n.title, n.body, n.props->>'level' as level, n.props->>'from' as from, n.created_at,
@@ -459,6 +542,11 @@ export const VIEWS: Record<string, View> = {
     description:
       'Nodes and edges for drawing the map. Params: relations (blocking, structure or all), focus (an entity id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system.',
     run: graph,
+  },
+  tree: {
+    description:
+      'A tree a pack declares over "is part of", such as software.roadmap: one root and its branches in order, the work under each, progress rolled up, and what is being worked on now. Params: root (an entity id; without it, the roots to choose from), tree (needed only when packs declare more than one).',
+    run: tree,
   },
   notifications: {
     description: 'Unread notifications for the human, newest first.',

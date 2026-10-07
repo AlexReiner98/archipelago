@@ -27,7 +27,10 @@
       "id": "software.feature",
       "title": "Feature",
       "description": "A capability of a product. Built means merged but not yet in a release.",
-      "statuses": { "open": ["planned", "building", "built"], "closed": ["shipped", "dropped"] }
+      "statuses": { "open": ["planned", "building", "built"], "closed": ["shipped", "dropped"] },
+      "fields": {
+        "order": { "type": "number", "description": "Position on the roadmap among its siblings. Lower comes first." }
+      }
     },
     {
       "id": "software.bug",
@@ -80,5 +83,17 @@
     { "id": "software.lives_in", "title": "lives in", "inverse": "hosts", "from": ["*"], "to": ["software.repo"], "description": "The repository that holds the work." },
     { "id": "software.uses", "title": "uses", "inverse": "is used by", "from": ["*"], "to": ["software.application"], "description": "An application the work depends on or targets." },
     { "id": "software.ships", "title": "ships", "inverse": "ships in", "from": ["software.release"], "to": ["*"], "description": "What a release contains." }
+  ],
+  "trees": [
+    {
+      "id": "software.roadmap",
+      "title": "Roadmap",
+      "description": "A project's features in the order they are to be built, the work under each, and where work is happening now.",
+      "roots": ["project"],
+      "branches": ["software.feature"],
+      "work": ["task", "issue"],
+      "order": "order",
+      "active": ["building", "doing"]
+    }
   ]
 }

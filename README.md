@@ -47,11 +47,21 @@ All three call the tools in [src/tools.ts](src/tools.ts). The web UI and CLI
 have human authority; the MCP endpoint does not, and two tools (`decide`,
 `init`) are not offered to agents at all.
 
-The web UI has five screens: **Today** (notifications, sessions and the
+The web UI's screens: **Today** (notifications, sessions and the
 standing questions), **Review** (approve, exclude or correct proposed changes),
 **Map** (search, create, and each entity with its fields, relations and
-history), **Graph**, **Automations**, **Workspace** and **Activity** (the event log, one line
-per change set).
+history), **Graph**, **Roadmap**, **Automations**, **Workspace** and
+**Activity** (the event log, one line per change set).
+
+The roadmap is one project's features in the order they are to be built. Each
+shows its own status and how much of the work that is part of it is closed, and
+whatever is being built or has a session open on it is marked. Reorder features
+with the arrows; tasks that belong to the project but to no feature are listed
+underneath, to be moved under one. It is the `tree` view, which agents can call
+too. The tree itself is declared in the software pack (`trees` in
+[packs/software/pack.json](packs/software/pack.json)): which types are roots,
+branches and work, which field orders them, and which statuses mean "now". A
+pack can declare another tree the same way, with no code.
 
 The graph draws the map as nodes and arrows: what blocks what, what belongs to
 what, or every relation. Open it on one entity (the **Graph** button on its
