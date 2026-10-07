@@ -159,9 +159,9 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 - Launching into the desktop app. Launched sessions are headless.
 - Adding relations in the web UI. They can be read on an entity page and in the graph, but only added through `change`.
 - Semantic search. Search is text matching.
-- Several people in one workspace with private and shared visibility. Tokens
-  can already be issued to several people, but everyone in a workspace sees
-  all of it.
+- Screens for managing members, tokens and workspace settings. They are
+  tools only (`member_add`, `token_create`, `token_list`, `token_revoke`,
+  `workspace_set`), called from the CLI.
 - Hosting: a Postgres server instead of the embedded database, TLS, and
   listening beyond this machine.
 - Notifications between workspaces, and single sign-on.
@@ -199,7 +199,25 @@ change that:
   The operator secret can create and list workspaces and nothing else: it
   cannot read any workspace's map.
 
-Limits, stated plainly: the server still listens on this machine only, with no
+- **Several people in one workspace.** An admin adds people with
+  `member_add`, which creates their person entity and their token. From then
+  on:
+  - New things are **private to their author** unless created or edited as
+    shared. An admin can flip that default with `workspace_set`.
+  - Private means hidden from other members everywhere: search, by id,
+    relations, the graph, the activity log and every view. The database
+    enforces it (row level security), so no query has to remember to filter.
+  - Each person's views are their own: "needs me" is what needs *them*.
+  - Anyone can make an **agent token that acts for themselves**. That agent
+    sees what they see, its proposals go to them alone, and its notifications
+    reach only them.
+  - Only an admin can add members, make human tokens or tokens for others, and
+    change workspace settings. The first token of a workspace is an admin's;
+    running `init` with it ties it to a person.
+
+Limits, stated plainly: a blocker you cannot see does not show as a blocker,
+so a task can look ready when it waits on someone's private item. The server
+still listens on this machine only, with no
 TLS. And on a single machine an agent running as your OS user can read any
 token you keep in a file or environment variable, so tokens are a real
 boundary between machines and between customers, not between you and an agent

@@ -99,12 +99,86 @@ create table if not exists setting (
 );
 `;
 
+// Who may see what, enforced by the database itself. A request made on behalf
+// of a person runs as the role below with that person as "viewer", and row
+// level security hides everything private to someone else: entities, any
+// relation touching one, any event about one, and other people's proposals.
+// No query in the application has to remember to filter.
+const VISIBILITY = `
+alter table entity   add column if not exists private_to text;
+alter table proposal add column if not exists private_to text;
+alter table event    add column if not exists private_to text;
+alter table token    add column if not exists admin boolean not null default false;
+
+do $$ begin create role lattice_member nologin; exception when duplicate_object then null; end $$;
+grant select, insert, update on entity, relation, event, proposal, setting, token to lattice_member;
+grant usage, select on all sequences in schema public to lattice_member;
+
+alter table entity   enable row level security;
+alter table relation enable row level security;
+alter table event    enable row level security;
+alter table proposal enable row level security;
+
+drop policy if exists member_entity on entity;
+create policy member_entity on entity for all to lattice_member
+  using (private_to is null or private_to = current_setting('lattice.viewer', true))
+  with check (true);
+
+drop policy if exists member_relation on relation;
+create policy member_relation on relation for all to lattice_member
+  using (from_id in (select id from entity) and to_id in (select id from entity))
+  with check (from_id in (select id from entity) and to_id in (select id from entity));
+
+drop policy if exists member_event on event;
+create policy member_event on event for all to lattice_member
+  using ((private_to is null or private_to = current_setting('lattice.viewer', true))
+         and (target_id is null or target_id in (select id from entity)))
+  with check (true);
+
+drop policy if exists member_proposal on proposal;
+create policy member_proposal on proposal for all to lattice_member
+  using (private_to is null or private_to = current_setting('lattice.viewer', true))
+  with check (true);
+`;
+
+/** What the application needs of a database: the real one, or one scoped to a viewer. */
+export interface Db extends Q {
+  transaction<T>(fn: (tx: Q) => Promise<T>): Promise<T>;
+  close(): Promise<void>;
+}
+
 /** Open the database at a folder, or in memory when no folder is given. */
 export async function openDb(dataDir?: string): Promise<PGlite> {
   if (dataDir) mkdirSync(dataDir, { recursive: true });
   const db = new PGlite(dataDir);
   await db.exec(SCHEMA);
+  await db.exec(VISIBILITY);
   return db;
+}
+
+/**
+ * The same database as one person sees it. Every statement runs inside a
+ * transaction that first drops to the member role and names the viewer, so
+ * the setting cannot leak between requests sharing the connection.
+ */
+export function scoped(db: Db, viewer: string): Db {
+  const enter = async (tx: Q) => {
+    await tx.query(`select set_config('lattice.viewer', $1, true)`, [viewer]);
+    await tx.query(`set local role lattice_member`);
+  };
+  return {
+    query: <T>(sql: string, params?: unknown[]) =>
+      db.transaction(async (tx) => {
+        await enter(tx);
+        return tx.query<T>(sql, params);
+      }),
+    transaction: <T>(fn: (tx: Q) => Promise<T>) =>
+      db.transaction(async (tx) => {
+        await enter(tx);
+        return fn(tx);
+      }),
+    close: () => db.close(),
+  };
 }
 
 const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';

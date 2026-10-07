@@ -86,7 +86,7 @@ async function briefs(l: Lattice, ids: Iterable<string>): Promise<Map<string, Br
 }
 
 async function person(l: Lattice, given?: string): Promise<string> {
-  const id = given ?? (await l.setting<string>('me'));
+  const id = given ?? (l.viewer || (await l.setting<string>('me')));
   if (!id) throw new Error('No person given and no workspace owner set. Run: lattice init "Your Name"');
   return id;
 }

@@ -2,7 +2,7 @@
 // over the CLI and local API. Same names, same inputs, same write path.
 
 import { z } from 'zod';
-import type { Actor, Lattice } from './lattice.ts';
+import { actorId, type Actor, type Lattice } from './lattice.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
@@ -78,6 +78,10 @@ const op = z.discriminatedUnion('op', [
     }),
   }),
 ]);
+
+function needAdmin(actor: Actor, what: string): void {
+  if (!actor.admin) throw new Error(`Only a workspace admin can ${what}.`);
+}
 
 export interface Tool {
   description: string;
@@ -249,28 +253,63 @@ export const TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => launch(l, actor, input),
   },
+  member_add: {
+    description: 'Add a person to this workspace: creates their (shared) person entity and a human token for them. Admins only.',
+    humanOnly: true,
+    input: {
+      name: z.string().min(1),
+      email: z.string().optional(),
+      admin: z.boolean().optional().describe('May manage members, tokens and workspace settings.'),
+    },
+    run: async (l, actor, input) => {
+      needAdmin(actor, 'add members');
+      const { created } = await l.apply(actorId(actor), {
+        ops: [{ op: 'create', ref: 'p', type: 'person', title: input.name, visibility: 'shared', props: input.email ? { email: input.email } : {} }],
+        reason: 'Added to the workspace',
+      });
+      const token = await createToken(l.db, l.workspace, { kind: 'human', name: input.name, entity: created.p, admin: input.admin });
+      return { person: created.p, token: token.token, note: token.note };
+    },
+  },
   token_create: {
-    description: 'Make a token for a person or an agent in this workspace. A human token can approve and launch; an agent token cannot. The secret is shown once.',
+    description:
+      'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once.',
     humanOnly: true,
     input: {
       kind: z.enum(['human', 'agent']),
-      name: z.string().min(1).describe('Who or what will use it, e.g. "alex" or "claude-code". Recorded against everything done with it.'),
-      entity: z.string().optional().describe('Id of the person or agent entity this token is for.'),
+      name: z.string().min(1).describe('Who or what will use it, e.g. "claude-code". Recorded against everything done with it.'),
+      entity: z.string().optional().describe('Id of the person this token is, or acts for. Defaults to you.'),
+      admin: z.boolean().optional(),
       expires_days: z.number().int().positive().optional(),
     },
-    run: async (l, _actor, input) => createToken(l.db, l.workspace, input),
+    run: async (l, actor, input) => {
+      const entity = input.entity ?? actor.person;
+      if (input.kind === 'human' || input.admin || entity !== actor.person) needAdmin(actor, 'make a token for anyone but an agent acting for yourself');
+      return createToken(l.db, l.workspace, { ...input, entity });
+    },
   },
   token_list: {
-    description: 'List this workspace\u2019s tokens: who each is for, when it was last used, and whether it is revoked. Secrets are never shown.',
+    description: 'List tokens: an admin sees the whole workspace\u2019s, anyone else their own. Secrets are never shown.',
     humanOnly: true,
     input: {},
-    run: async (l) => listTokens(l.db),
+    run: async (l, actor) => listTokens(l.db, actor.admin ? undefined : (actor.person ?? '')),
   },
   token_revoke: {
-    description: 'Revoke a token at once.',
+    description: 'Revoke a token at once. An admin can revoke any; anyone else only their own.',
     humanOnly: true,
     input: { id: z.string() },
-    run: async (l, _actor, input) => revokeToken(l.db, input.id),
+    run: async (l, actor, input) => revokeToken(l.db, input.id, actor.admin ? undefined : (actor.person ?? '')),
+  },
+  workspace_set: {
+    description: 'Change a workspace setting. default_visibility: whether new things are private to their author (the default) or shared with the workspace unless they say otherwise. Admins only.',
+    humanOnly: true,
+    input: { default_visibility: z.enum(['private', 'shared']) },
+    run: async (l, actor, input) => {
+      needAdmin(actor, 'change workspace settings');
+      await l.db.query(`insert into setting (key, value) values ('default_visibility', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(input.default_visibility)]);
+      await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `default_visibility set to ${input.default_visibility}` });
+      return input;
+    },
   },
   decide: {
     description: 'Approve or reject a proposal.',
@@ -288,7 +327,12 @@ export const TOOLS: Record<string, Tool> = {
     description: 'Set the workspace owner, creating their person entity if needed.',
     humanOnly: true,
     input: { name: z.string().min(1), email: z.string().optional() },
-    run: async (l, actor, input) => l.init(actor, input),
+    run: async (l, actor, input) => {
+      const result = await l.init(actor, input);
+      // From now on this token is that person: their view, their private things.
+      if (actor.token) await l.db.query(`update token set entity_id = $2 where id = $1 and entity_id is null`, [actor.token, result.me]);
+      return result;
+    },
   },
 };
 

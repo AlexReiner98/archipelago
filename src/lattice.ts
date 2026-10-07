@@ -2,15 +2,20 @@
 // goes through change(): it is validated, checked against policy, then either
 // applied or stored as a proposal for a human, and always logged.
 
-import type { PGlite } from '@electric-sql/pglite';
 import { existsSync, readFileSync } from 'node:fs';
 import { checkAutomation } from './automation-rules.ts';
-import { newId, type Q } from './db.ts';
+import { newId, scoped, type Db, type Q } from './db.ts';
 import type { Registry, TypeDef } from './packs.ts';
 
 export interface Actor {
   kind: 'human' | 'agent';
   name: string;
+  /** The person this identity is, or acts for. */
+  person?: string;
+  /** May manage the workspace's members, tokens and settings. */
+  admin?: boolean;
+  /** Id of the token in use, when there is one. */
+  token?: string;
 }
 
 export type Level = 'auto' | 'propose' | 'forbidden';
@@ -135,17 +140,39 @@ export interface Proposal {
 export const actorId = (actor: Actor) => `${actor.kind}:${actor.name}`;
 
 export class Lattice {
-  readonly db: PGlite;
+  readonly db: Db;
   readonly registry: Registry;
   readonly policy: Policy;
   /** The workspace this map belongs to. Each has its own database. */
   readonly workspace: string;
+  /**
+   * The person whose view this is. Undefined means unscoped: the whole map,
+   * as one person on one machine or the system itself sees it.
+   */
+  readonly viewer: string | undefined;
 
-  constructor(db: PGlite, registry: Registry, policy: Partial<Policy> = {}, workspace = 'default') {
+  constructor(db: Db, registry: Registry, policy: Partial<Policy> = {}, workspace = 'default', viewer?: string) {
     this.db = db;
     this.registry = registry;
     this.policy = { ...DEFAULT_AGENT_POLICY, ...policy };
     this.workspace = workspace;
+    this.viewer = viewer;
+  }
+
+  /** This map as one person sees it. An empty viewer sees only what is shared. */
+  as(viewer: string): Lattice {
+    return new Lattice(scoped(this.db, viewer), this.registry, this.policy, this.workspace, viewer);
+  }
+
+  /** Whether new things are private to their author unless they say otherwise. */
+  async defaultVisibility(q: Q = this.db): Promise<'private' | 'shared'> {
+    const { rows } = await q.query<{ value: string }>(`select value from setting where key = 'default_visibility'`);
+    return rows[0]?.value === 'shared' ? 'shared' : 'private';
+  }
+
+  /** Who a new private thing is private to: the viewer, when there is one. */
+  private privateTo(visibility: 'private' | 'shared'): string | null {
+    return visibility === 'private' && this.viewer ? this.viewer : null;
   }
 
   // ---- writes ----------------------------------------------------------
@@ -160,8 +187,8 @@ export class Lattice {
     if (levels.includes('propose')) {
       const id = newId('p');
       await this.db.query(
-        `insert into proposal (id, actor, reason, source, ops, warnings) values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb)`,
-        [id, actorId(actor), input.reason, JSON.stringify(input.source ?? null), JSON.stringify(input.ops), JSON.stringify(warnings)],
+        `insert into proposal (id, actor, reason, source, ops, warnings, private_to) values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7)`,
+        [id, actorId(actor), input.reason, JSON.stringify(input.source ?? null), JSON.stringify(input.ops), JSON.stringify(warnings), this.viewer || null],
       );
       await this.log(this.db, { actor: actorId(actor), action: 'proposal.create', reason: input.reason, detail: { proposal: id, ops: input.ops.length } });
       return {
@@ -322,6 +349,7 @@ export class Lattice {
     const reg = this.registry;
 
     await this.db.transaction(async (tx) => {
+      const fallback = await this.defaultVisibility(tx);
       const defaultSource = input.source ? await this.ensureSource(tx, actor, input.source, changeset) : null;
       const sourceOf = async (op: { source?: SourceSpec }) => (op.source ? this.ensureSource(tx, actor, op.source, changeset) : defaultSource);
       const resolve = (key: string) => created[key] ?? key;
@@ -335,8 +363,8 @@ export class Lattice {
             const id = newId('e');
             const status = op.status ?? type.statuses.open[0];
             await tx.query(
-              `insert into entity (id, type, title, body, status, is_open, owner, visibility, confidence, props, source_id)
-               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)`,
+              `insert into entity (id, type, title, body, status, is_open, owner, visibility, confidence, props, source_id, private_to)
+               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)`,
               [
                 id,
                 op.type,
@@ -345,10 +373,11 @@ export class Lattice {
                 status,
                 reg.isOpen(op.type, status),
                 op.owner ? resolve(op.owner) : null,
-                op.visibility ?? 'private',
+                op.visibility ?? fallback,
                 op.confidence ?? 1,
                 JSON.stringify({ ...reg.defaults(op.type), ...op.props }),
                 await sourceOf(op),
+                this.privateTo(op.visibility ?? fallback),
               ],
             );
             created[op.ref ?? `#${i + 1}`] = id;
@@ -377,8 +406,14 @@ export class Lattice {
             }
             await tx.query(
               `update entity set title = $2, body = $3, status = $4, is_open = $5, owner = $6, visibility = $7,
-                 confidence = $8, props = $9::jsonb, updated_at = now() where id = $1`,
-              [op.id, next.title, next.body, next.status, reg.isOpen(before.type, next.status), next.owner, next.visibility, next.confidence, JSON.stringify(props)],
+                 confidence = $8, props = $9::jsonb, updated_at = now(),
+                 private_to = case when $10::boolean then $11 else private_to end where id = $1`,
+              [
+                op.id, next.title, next.body, next.status, reg.isOpen(before.type, next.status), next.owner, next.visibility, next.confidence, JSON.stringify(props),
+                // Only an explicit change of visibility moves who it is private to.
+                op.visibility !== undefined && op.visibility !== before.visibility,
+                this.privateTo(next.visibility as 'private' | 'shared'),
+              ],
             );
             await log('entity.update', op.id, { title: next.title, changes });
             break;
@@ -458,8 +493,8 @@ export class Lattice {
     const problems = this.registry.check('sys.source', undefined, props);
     if (problems.length) throw new Error(`Change rejected:\n- source: ${problems.join('\n- source: ')}`);
     await q.query(
-      `insert into entity (id, type, title, body, status, is_open, props) values ($1, 'sys.source', $2, $3, 'recorded', true, $4::jsonb)`,
-      [id, spec.title ?? spec.uri, spec.excerpt ?? '', JSON.stringify(props)],
+      `insert into entity (id, type, title, body, status, is_open, props, visibility, private_to) values ($1, 'sys.source', $2, $3, 'recorded', true, $4::jsonb, $5, $6)`,
+      [id, spec.title ?? spec.uri, spec.excerpt ?? '', JSON.stringify(props), await this.defaultVisibility(q), this.privateTo(await this.defaultVisibility(q))],
     );
     await this.log(q, { actor, action: 'entity.create', target: id, changeset, reason: 'Source of this change', detail: { type: 'sys.source', title: spec.title ?? spec.uri } });
     return id;
@@ -470,9 +505,11 @@ export class Lattice {
     e: { actor: string; action: string; target?: string; changeset?: string; reason?: string; detail?: Props; origin?: string; ts?: string },
   ): Promise<void> {
     await q.query(
-      `insert into event (actor, action, target_id, changeset, reason, detail, origin, ts)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7, coalesce($8::timestamptz, now()))`,
-      [e.actor, e.action, e.target ?? null, e.changeset ?? null, e.reason ?? '', JSON.stringify(e.detail ?? {}), e.origin ?? 'lattice', e.ts ?? null],
+      `insert into event (actor, action, target_id, changeset, reason, detail, origin, ts, private_to)
+       values ($1, $2, $3, $4, $5, $6::jsonb, $7, coalesce($8::timestamptz, now()), $9)`,
+      // An event about an entity is as visible as that entity. One with no
+      // target (a proposal, an undo) is private to whoever caused it.
+      [e.actor, e.action, e.target ?? null, e.changeset ?? null, e.reason ?? '', JSON.stringify(e.detail ?? {}), e.origin ?? 'lattice', e.ts ?? null, e.target ? null : this.viewer || null],
     );
   }
 

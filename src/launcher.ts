@@ -71,7 +71,7 @@ export async function launch(l: Lattice, actor: Actor, input: { task: string; mo
   mkdirSync(config.dir, { recursive: true });
   // With tokens on, the session gets its own agent token, good for a day and
   // revoked the moment it ends.
-  const key = config.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1 }) : undefined;
+  const key = config.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined }) : undefined;
   const mcpFile = join(config.dir, `${run}.mcp.json`);
   writeFileSync(mcpFile, JSON.stringify({ mcpServers: { lattice: { type: 'http', url: config.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
   const transcript = join(config.dir, `${run}.jsonl`);

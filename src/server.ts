@@ -85,10 +85,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const tokens = options.auth === 'tokens';
 
   /** The workspace a request is for and who is making it. */
-  async function resolve(req: IncomingMessage, surface: 'human' | 'agent'): Promise<{ ws: Workspace; actor: (label?: string) => Actor }> {
+  async function resolve(req: IncomingMessage, surface: 'human' | 'agent'): Promise<{ ws: Workspace; lattice: Lattice; actor: (label?: string) => Actor }> {
     if (!tokens) {
       const ws = await workspaces.get(DEFAULT_WORKSPACE);
-      return { ws, actor: (label) => (surface === 'human' ? { kind: 'human', name: 'local' } : { kind: 'agent', name: label || 'claude' }) };
+      return { ws, lattice: ws.lattice, actor: (label) => (surface === 'human' ? { kind: 'human', name: 'local', admin: true } : { kind: 'agent', name: label || 'claude' }) };
     }
     const token = bearer(req.headers.authorization);
     const id = token && workspaceOf(token);
@@ -100,7 +100,13 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     const identity = await verifyToken(ws.lattice.db, token);
     if (!identity) throw denied;
     // A token's identity is fixed; an agent may add a label to say which session it is.
-    return { ws, actor: (label) => (label && identity.actor.kind === 'agent' ? { kind: 'agent', name: `${identity.actor.name}/${label}` } : identity.actor) };
+    return {
+      ws,
+      // Everything this request reads or writes goes through the database as
+      // this person sees it. A token tied to nobody sees only what is shared.
+      lattice: ws.lattice.as(identity.actor.person ?? ''),
+      actor: (label) => (label && identity.actor.kind === 'agent' ? { ...identity.actor, name: `${identity.actor.name}/${label}` } : identity.actor),
+    };
   }
 
   /** Keep other web pages out: only our own UI's origin, only JSON, only our host name. */
@@ -127,8 +133,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (url.pathname === '/mcp') {
         if (req.method !== 'POST') return send(res, 405, { error: 'This server is stateless: POST only.' });
-        const { ws, actor } = await resolve(req, 'agent');
-        const mcp = buildMcp(ws.lattice, actor);
+        const { lattice, actor } = await resolve(req, 'agent');
+        const mcp = buildMcp(lattice, actor);
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined,
           enableDnsRebindingProtection: true,
@@ -145,14 +151,14 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const surface = url.pathname.startsWith('/api/') ? 'api' : url.pathname.startsWith('/agent/') ? 'agent' : undefined;
       if (req.method === 'POST' && surface) {
         if (!local(req)) return send(res, 403, { error: 'The API accepts only local JSON requests from the CLI, hooks or the lattice UI.' });
-        const { ws, actor } = await resolve(req, surface === 'api' ? 'human' : 'agent');
+        const { lattice, actor } = await resolve(req, surface === 'api' ? 'human' : 'agent');
         const name = url.pathname.slice(surface.length + 2);
         try {
           const body = ((await readJson(req)) ?? {}) as Record<string, unknown>;
-          if (surface === 'api') return send(res, 200, { result: await callTool(ws.lattice, actor(), name, body) });
+          if (surface === 'api') return send(res, 200, { result: await callTool(lattice, actor(), name, body) });
           // Scripts say which one they are in the body, as MCP callers do in their arguments.
           const { actor: label, ...input } = body;
-          return send(res, 200, { result: await callTool(ws.lattice, actor((label as string) || 'script'), name, input) });
+          return send(res, 200, { result: await callTool(lattice, actor((label as string) || 'script'), name, input) });
         } catch (err) {
           return send(res, 400, { error: (err as Error).message });
         }
@@ -160,14 +166,14 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are local only.' });
-        const { ws } = await resolve(req, 'agent');
+        const { lattice } = await resolve(req, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; reason?: string };
         if (url.pathname === '/hooks/session-start') {
-          const additionalContext = await hookSessionStart(ws.lattice, body);
+          const additionalContext = await hookSessionStart(lattice, body);
           return send(res, 200, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext } });
         }
         if (url.pathname === '/hooks/session-end') {
-          await hookSessionEnd(ws.lattice, body);
+          await hookSessionEnd(lattice, body);
           return send(res, 200, {});
         }
       }
@@ -182,7 +188,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           const { id, name } = ((await readJson(req)) ?? {}) as { id?: string; name?: string };
           try {
             const ws = await workspaces.create(id ?? '', name ?? '');
-            const owner = await createToken(ws.lattice.db, ws.id, { kind: 'human', name: 'owner' });
+            const owner = await createToken(ws.lattice.db, ws.id, { kind: 'human', name: 'owner', admin: true });
             return send(res, 200, { result: { workspace: { id: ws.id, name: ws.name }, owner_token: owner.token, note: owner.note } });
           } catch (err) {
             return send(res, 400, { error: (err as Error).message });
@@ -218,7 +224,7 @@ if (import.meta.main) {
     const operator = workspaces.ensureOperator();
     if (operator) console.log(`\nOperator secret (creates workspaces; shown once):\n  ${operator}`);
     if (!(await hasHumanToken(main.lattice.db))) {
-      const owner = await createToken(main.lattice.db, DEFAULT_WORKSPACE, { kind: 'human', name: 'owner' });
+      const owner = await createToken(main.lattice.db, DEFAULT_WORKSPACE, { kind: 'human', name: 'owner', admin: true });
       console.log(`\nYour token for the default workspace (shown once):\n  ${owner.token}\nPaste it into the web UI, and set LATTICE_TOKEN for the CLI.`);
     }
   });

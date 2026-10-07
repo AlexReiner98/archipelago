@@ -74,7 +74,7 @@ test('with tokens on, nothing but the UI files and health answers without one', 
 test('a token fixes identity and authority, whichever surface is used', async () => {
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).lattice.db;
-  const owner = (await createToken(db, 'default', { kind: 'human', name: 'alex' })).token;
+  const owner = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
 
   const who = await call('/whoami', owner, undefined, 'GET');
   assert.deepEqual([who.auth, who.actor.kind, who.actor.name], ['tokens', 'human', 'alex']);
@@ -149,4 +149,84 @@ test('each workspace is its own database: tokens, data and local types do not cr
   const typeIds = async (token: string) => ((await call('/api/schema', token)).result.types as any[]).map((t) => t.id);
   assert.ok((await typeIds(theirs)).includes('local.site_visit'));
   assert.ok(!(await typeIds(mine)).includes('local.site_visit'));
+});
+
+test('inside a workspace, private things are hidden from other members by the database', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const db = (await workspaces.get('default')).lattice.db;
+  const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const api = async (token: string, tool: string, body: unknown = {}) => {
+    const r = await call(`/api/${tool}`, token, body);
+    if (r.status !== 200) throw new Error(r.error);
+    return r.result;
+  };
+  const titles = async (token: string, type = 'task') => ((await api(token, 'search', { type })) as any[]).map((e) => e.title).sort();
+
+  // The first admin becomes a person; then adds a colleague.
+  const me = (await api(alex, 'init', { name: 'Alex' })).me;
+  const added = await api(alex, 'member_add', { name: 'Sam' });
+  const sam = added.token as string;
+  assert.deepEqual(await titles(sam, 'person'), ['Alex', 'Sam'], 'people are shared so colleagues can refer to each other');
+
+  // New things are private to their author unless they say otherwise.
+  const mine = await api(alex, 'change', { reason: 'x', ops: [
+    { op: 'create', ref: 'p', type: 'project', title: 'Launch', visibility: 'shared' },
+    { op: 'create', ref: 's', type: 'task', title: 'Shared task', visibility: 'shared', owner: me },
+    { op: 'create', ref: 'x', type: 'task', title: 'Alex private', owner: me },
+    { op: 'link', type: 'part_of', from: 's', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'x', to: 'p' },
+    { op: 'link', type: 'depends_on', from: 's', to: 'x' },
+  ] });
+  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Sam private', owner: added.person }] });
+  assert.deepEqual(await titles(alex), ['Alex private', 'Shared task']);
+  assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
+
+  // Hidden means hidden everywhere: by id, in relations, the graph, the log and the views.
+  assert.match((await call('/api/get', sam, { id: mine.created.x })).error, /No entity/);
+  const project = await api(sam, 'get', { id: mine.created.p });
+  assert.deepEqual(project.incoming.map((r: any) => r.title), ['Shared task']);
+  const graph = await api(sam, 'view', { name: 'graph', params: { relations: 'all' } });
+  assert.ok(!graph.nodes.some((n: any) => n.title === 'Alex private'));
+  const log = (await api(sam, 'events', { limit: 100 })) as any[];
+  assert.ok(!JSON.stringify(log).includes('Alex private'));
+  assert.match((await call('/api/change', sam, { reason: 'x', ops: [{ op: 'update', id: mine.created.x, title: 'Hijacked' }] })).error, /no entity/);
+  assert.match((await call('/api/change', sam, { reason: 'x', ops: [{ op: 'link', type: 'depends_on', from: mine.created.s, to: mine.created.x }] })).error, /no entity or ref/);
+
+  // Each person's views are their own.
+  assert.deepEqual((await api(sam, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title), ['Sam private']);
+  assert.deepEqual((await api(alex, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title), ['Alex private']);
+
+  // Sharing is an explicit edit, and it works both ways.
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'update', id: mine.created.x, visibility: 'shared' }] });
+  assert.deepEqual(await titles(sam), ['Alex private', 'Sam private', 'Shared task']);
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'update', id: mine.created.x, visibility: 'private' }] });
+  assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
+
+  // Someone's agent acts for them: it sees what they see and proposes to them alone.
+  const samAgent = (await api(sam, 'token_create', { kind: 'agent', name: 'sam-claude' })).token as string;
+  assert.deepEqual(await titles(samAgent), ['Sam private', 'Shared task']);
+  const proposed = await api(samAgent, 'change', { reason: 'From Sam\'s inbox', ops: [{ op: 'create', type: 'task', title: 'Reply to the client' }] });
+  assert.equal((await api(alex, 'proposals')).length, 0, 'not Alex\'s to review');
+  assert.equal((await api(sam, 'proposals')).length, 1);
+  assert.match((await call('/api/decide', alex, { proposal: proposed.proposal, approve: true })).error, /No proposal/);
+  await api(sam, 'decide', { proposal: proposed.proposal, approve: true });
+  assert.ok((await titles(sam)).includes('Reply to the client'));
+  assert.ok(!(await titles(alex)).includes('Reply to the client'));
+  await api(samAgent, 'notify', { title: 'Sam, your build failed' });
+  assert.equal((await api(sam, 'view', { name: 'notifications' })).length, 1);
+  assert.equal((await api(alex, 'view', { name: 'notifications' })).length, 0);
+
+  // Only an admin manages people, other people's tokens and settings.
+  for (const [tool, body] of [['member_add', { name: 'Eve' }], ['token_create', { kind: 'human', name: 'eve' }], ['token_create', { kind: 'agent', name: 'x', entity: me }], ['workspace_set', { default_visibility: 'shared' }]] as const) {
+    assert.match((await call(`/api/${tool}`, sam, body)).error, /Only a workspace admin/, tool);
+  }
+  assert.deepEqual((await api(sam, 'token_list')).map((t: any) => t.name).sort(), ['Sam', 'sam-claude']);
+  assert.ok((await api(alex, 'token_list')).length >= 3);
+  const alexTokenId = (await api(alex, 'token_list')).find((t: any) => t.name === 'alex').id;
+  assert.match((await call('/api/token_revoke', sam, { id: alexTokenId })).error, /No active token/);
+
+  // A team that prefers openness can flip the default.
+  await api(alex, 'workspace_set', { default_visibility: 'shared' });
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Open by default' }] });
+  assert.ok((await titles(sam)).includes('Open by default'));
 });

@@ -589,7 +589,7 @@ async function entity(id) {
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`)),
+      h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you')),
       h('h1', { style: 'margin-top: 6px' }, e.title),
     ),
     h(
@@ -612,7 +612,7 @@ async function entity(id) {
                 onSubmit: async (next) => {
                   const props = { ...next.props };
                   for (const key of Object.keys(e.props)) if (!(key in props) && !types.get(e.type)?.fields[key]?.system) props[key] = null;
-                  await api('change', { ops: [{ op: 'update', id, title: next.title, body: next.body, status: next.status, props }], reason: 'Edited in the UI' });
+                  await api('change', { ops: [{ op: 'update', id, title: next.title, body: next.body, status: next.status, visibility: next.visibility || undefined, props }], reason: 'Edited in the UI' });
                   entity(id);
                 },
               });
@@ -703,7 +703,7 @@ async function entity(id) {
 /** A form for any type, built from its schema. System-kept fields are left out. */
 function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
   const type = types.get(typeId);
-  const state = { title: initial.title ?? '', status: initial.status ?? type.statuses.open[0], body: initial.body ?? '', props: { ...(initial.props ?? {}) } };
+  const state = { title: initial.title ?? '', status: initial.status ?? type.statuses.open[0], body: initial.body ?? '', visibility: initial.visibility ?? '', props: { ...(initial.props ?? {}) } };
   const bad = new Set();
   const error = h('div', { class: 'error', style: 'white-space: pre-wrap; padding: 0 14px 14px' });
 
@@ -774,6 +774,16 @@ function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
         .filter(([, def]) => !def.system)
         .map(([key, def]) => row(key.replaceAll('_', ' '), control(key, def), def.description)),
       row('Notes', h('textarea', { rows: 5, value: state.body, oninput: (e) => (state.body = e.target.value) })),
+      row(
+        'Who can see it',
+        h(
+          'select',
+          { onchange: (e) => (state.visibility = e.target.value) },
+          !initial.id && h('option', { value: '' }, 'Workspace default'),
+          [['private', 'Only me'], ['shared', 'Everyone in the workspace']].map(([v, label]) => h('option', { value: v, selected: v === state.visibility }, label)),
+        ),
+        'Only matters when several people share a workspace.',
+      ),
     ),
     error,
     h('div', { class: 'actions' }, save, h('button', { onclick: onCancel }, 'Cancel')),
@@ -787,7 +797,7 @@ function newEntity(typeId) {
       submitLabel: 'Create',
       onCancel: () => history.back(),
       onSubmit: async (next) => {
-        const result = await api('change', { ops: [{ op: 'create', ref: 'new', type: typeId, title: next.title, status: next.status, body: next.body || undefined, props: next.props }], reason: 'Created in the UI' });
+        const result = await api('change', { ops: [{ op: 'create', ref: 'new', type: typeId, title: next.title, status: next.status, body: next.body || undefined, visibility: next.visibility || undefined, props: next.props }], reason: 'Created in the UI' });
         location.hash = `#/e/${result.created.new}`;
       },
     });
