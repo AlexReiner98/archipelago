@@ -68,7 +68,8 @@ export interface UploadTarget {
 async function upload(file: string, workspace: string, target: UploadTarget): Promise<void> {
   const res = await fetch(`${target.url.replace(/\/$/, '')}/${workspace}/${basename(file)}`, {
     method: 'POST',
-    headers: { authorization: `Bearer ${target.key}`, 'content-type': 'application/gzip', 'x-upsert': 'true' },
+    // Supabase's gateway wants the key as `apikey` as well as in the bearer header.
+    headers: { authorization: `Bearer ${target.key}`, apikey: target.key, 'content-type': 'application/gzip', 'x-upsert': 'true' },
     body: readFileSync(file),
   });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
