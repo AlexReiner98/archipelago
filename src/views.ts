@@ -497,6 +497,93 @@ async function tree(l: Lattice, input: { tree?: string; root?: string }) {
   };
 }
 
+/**
+ * A project's open questions: the decisions not yet made and the hypotheses
+ * not yet settled, each with what is waiting on it, most-blocking first, and
+ * the ones settled lately. A question belongs to a project when it is part of
+ * it, is about something in it, or something in it depends on or assumes it.
+ * Without a project, the projects and how many open questions each has.
+ */
+async function questions(l: Lattice, input: { project?: string }) {
+  const kindOf = (type: string) => (l.registry.isA(type, 'decision') ? 'decision' : l.registry.isA(type, 'hypothesis') ? 'hypothesis' : undefined);
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, body, status, is_open, props, updated_at from entity where archived_at is null`);
+  const byId = new Map(entities.map((e) => [e.id, e]));
+  const { rows: links } = await l.db.query<{ type: string; from_id: string; to_id: string }>(
+    `select type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`,
+    [['part_of', 'depends_on', 'assumes', 'about', 'tests', 'supports', 'refutes']],
+  );
+  const live = links.filter((r) => byId.has(r.from_id) && byId.has(r.to_id));
+  /** Everything with this relation pointing at `to`. */
+  const into = (type: string, to: string) => live.filter((r) => r.type === type && r.to_id === to).map((r) => byId.get(r.from_id)!);
+  const scopeOf = (root: string) => {
+    const scope = new Set([root]);
+    const stack = [root];
+    while (stack.length) {
+      for (const child of into('part_of', stack.pop()!)) {
+        if (scope.has(child.id)) continue;
+        scope.add(child.id);
+        stack.push(child.id);
+      }
+    }
+    return scope;
+  };
+  const belonging = (scope: Set<string>) =>
+    entities.filter(
+      (e) =>
+        kindOf(e.type) &&
+        (scope.has(e.id) ||
+          live.some((r) => (r.to_id === e.id && scope.has(r.from_id) && (r.type === 'depends_on' || r.type === 'assumes')) || (r.from_id === e.id && r.type === 'about' && scope.has(r.to_id)))),
+    );
+  const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status, open: e.is_open });
+  if (!input.project) {
+    const projects = entities.filter((e) => l.registry.isA(e.type, 'project')).map((e) => ({ ...slim(e), questions: belonging(scopeOf(e.id)).filter((q) => q.is_open).length }));
+    return { projects: projects.sort((a, b) => b.questions - a.questions || a.title.localeCompare(b.title)) };
+  }
+  const root = byId.get(input.project);
+  if (!root) throw new Error(`No entity "${input.project}"`);
+
+  const waitingOn = (id: string) => into('depends_on', id).filter((e) => e.is_open);
+  /** How much open work sits behind this, counting what waits on what waits on it. */
+  const behind = (id: string) => {
+    const seen = new Set<string>();
+    const stack = [id];
+    while (stack.length) {
+      for (const e of waitingOn(stack.pop()!)) {
+        if (e.id === id || seen.has(e.id)) continue;
+        seen.add(e.id);
+        stack.push(e.id);
+      }
+    }
+    return seen.size;
+  };
+  const card = (q: Entity) => ({
+    ...slim(q),
+    kind: kindOf(q.type)!,
+    body: q.body,
+    due: (q.props.due as string | undefined) ?? null,
+    options: Array.isArray(q.props.options) ? (q.props.options as unknown[]).map(String) : [],
+    outcome: (q.props.outcome as string | undefined) ?? null,
+    rationale: (q.props.rationale as string | undefined) ?? null,
+    decided_on: (q.props.decided_on as string | undefined) ?? null,
+    waiting: waitingOn(q.id).map(slim),
+    holds_up: behind(q.id),
+    assumed_by: into('assumes', q.id).map(slim),
+    tests: into('tests', q.id).map(slim),
+    evidence: [...into('supports', q.id).map((e) => ({ ...slim(e), says: 'supports' })), ...into('refutes', q.id).map((e) => ({ ...slim(e), says: 'refutes' }))],
+  });
+  const mine = belonging(scopeOf(root.id));
+  const open = mine
+    .filter((q) => q.is_open)
+    .map(card)
+    .sort((a, b) => b.holds_up - a.holds_up || (a.due ?? '9').localeCompare(b.due ?? '9') || a.title.localeCompare(b.title));
+  const settled = mine
+    .filter((q) => !q.is_open)
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 15)
+    .map(card);
+  return { project: slim(root), open, settled };
+}
+
 async function notifications(l: Lattice) {
   const { rows } = await l.db.query(
     `select n.id, n.title, n.body, n.props->>'level' as level, n.props->>'from' as from, n.created_at,
@@ -550,6 +637,11 @@ export const VIEWS: Record<string, View> = {
     description:
       'A tree a pack declares over "is part of", such as software.roadmap: one root and its branches in order, the work under each, progress rolled up, and what is being worked on now. Params: root (an entity id; without it, the roots to choose from), tree (needed only when packs declare more than one).',
     run: tree,
+  },
+  questions: {
+    description:
+      'A project\'s open questions: decisions not yet made and hypotheses not yet settled, most-blocking first, each with what waits on it, its options, and what is testing it; then the ones settled lately with their outcome. Params: project (an entity id; without it, the projects and how many open questions each has).',
+    run: questions,
   },
   notifications: {
     description: 'Unread notifications for the human, newest first.',

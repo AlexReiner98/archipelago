@@ -50,7 +50,7 @@ have human authority; the MCP endpoint does not, and two tools (`decide`,
 The web UI's screens: **Today** (notifications, sessions and the
 standing questions), **Review** (approve, exclude or correct proposed changes),
 **Map** (search, create, and each entity with its fields, relations and
-history), **Graph**, **Roadmap**, **Automations**, **Workspace** and
+history), **Graph**, **Roadmap**, **Questions**, **Automations**, **Workspace** and
 **Activity** (the event log, one line per change set).
 
 The roadmap is one project's features in the order they are to be built. Each
@@ -64,6 +64,14 @@ too. The tree itself is declared in the software pack (`trees` in
 [packs/software/pack.json](packs/software/pack.json)): which types are roots,
 branches and work, which field orders them, and which statuses mean "now". A
 pack can declare another tree the same way, with no code.
+
+**Questions** is one project's undecided things, to be worked through from the
+top: open decisions and unsettled hypotheses, the ones holding up the most
+first, each with what waits on it and what is testing it. A decision is made
+where it stands: pick one of its options or type the outcome, add why, and it
+is recorded as decided. A question belongs to a project when it is part of it,
+is about something in it, or something in it depends on or assumes it. Agents
+get the same list from the `questions` view.
 
 **Following agents.** With "Follow agents" ticked (bottom of the menu), an
 agent can bring your page to what it is working on: every change it makes

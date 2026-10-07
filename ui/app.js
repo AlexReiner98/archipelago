@@ -1948,6 +1948,127 @@ async function roadmap(rootId) {
   );
 }
 
+// ---- Questions -----------------------------------------------------------
+
+// One project's open questions, to be worked through from the top: what holds
+// up the most comes first, and each is answered where it stands.
+async function questions(rootId) {
+  const remembered = () => {
+    try {
+      return localStorage.getItem('lattice-roadmap') ?? '';
+    } catch {
+      return '';
+    }
+  };
+  const { projects } = await api('view', { name: 'questions' });
+  if (!rootId) {
+    const last = projects.find((p) => p.id === remembered()) ?? projects.find((p) => p.questions > 0) ?? projects[0];
+    if (last) return void (location.hash = `#/questions/${last.id}`);
+    return main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Questions')), h('section', { class: 'card' }, h('div', { class: 'empty' }, 'There are no projects yet.')));
+  }
+  try {
+    localStorage.setItem('lattice-roadmap', rootId);
+  } catch {
+    // Remembering the project is a convenience only.
+  }
+  const data = await api('view', { name: 'questions', params: { project: rootId } });
+  const change = async (ops, reason) => {
+    try {
+      await api('change', { ops, reason });
+      questions(rootId);
+    } catch (err) {
+      tell('That change was not made', err.message);
+    }
+  };
+  const listed = (label, items, extra) => items.length > 0 && h('div', { class: 'row-sub' }, `${label}: `, items.map((x, i) => [i > 0 && ', ', link(x), extra?.(x)]));
+
+  const question = (q) => {
+    const closed = types.get(q.type)?.statuses.closed ?? [];
+    let answer;
+    if (q.kind === 'decision') {
+      const outcome = h('input', { type: 'text', placeholder: 'What is decided', style: 'flex: 1; min-width: 220px' });
+      const why = h('input', { type: 'text', placeholder: 'Why (optional)', style: 'flex: 1; min-width: 220px' });
+      const option = h('input', { type: 'text', placeholder: 'Add an option', class: 'option-new' });
+      const picks = h('div', { class: 'toolbar options' });
+      const pick = (o, button) => {
+        outcome.value = o;
+        dirty = true; // a choice not yet confirmed must survive a live update
+        for (const b of picks.querySelectorAll('button')) b.classList.toggle('on', b === button);
+      };
+      picks.append(
+        ...q.options.map((o) => {
+          const button = h('button', { onclick: () => pick(o, button) }, o);
+          return button;
+        }),
+        option,
+      );
+      option.addEventListener('keydown', (e) => e.key === 'Enter' && option.value.trim() && change([{ op: 'update', id: q.id, props: { options: [...q.options, option.value.trim()] } }], 'Option added in the UI'));
+      const decide = () => {
+        if (!outcome.value.trim()) return outcome.focus();
+        change([{ op: 'update', id: q.id, status: closed[0], props: { outcome: outcome.value.trim(), rationale: why.value.trim() || null, decided_on: new Date().toISOString().slice(0, 10) } }], 'Decided in the UI');
+      };
+      answer = [picks, h('div', { class: 'toolbar' }, outcome, why, h('button', { class: 'primary', onclick: decide }, 'Decide'))];
+    } else {
+      answer = h(
+        'div',
+        { class: 'toolbar' },
+        h('span', { class: 'muted' }, 'It turned out to be'),
+        closed.map((st) => h('button', { onclick: async () => (await ask({ title: `Mark this ${st}?`, message: q.title, action: `Mark ${st}` })) && change([{ op: 'update', id: q.id, status: st }], `Marked ${st} in the UI`) }, st)),
+      );
+    }
+    return h(
+      'li',
+      { class: 'question' },
+      h('div', { class: 'row-top' }, chip(q.type), h('strong', { class: 'grow' }, link(q)), q.due && h('span', { class: 'pill warn' }, `due ${q.due}`), q.holds_up > 0 && h('span', { class: 'pill bad' }, `holds up ${q.holds_up}`), pill(q.type, q.status)),
+      q.body && h('div', { class: 'question-body' }, q.body),
+      listed('Waiting on this', q.waiting),
+      listed('Rests on this', q.assumed_by),
+      listed('Being tested by', q.tests, (x) => ` (${x.status})`),
+      listed('Evidence', q.evidence, (x) => ` (${x.says})`),
+      answer,
+    );
+  };
+  const settledRow = (q) =>
+    h(
+      'li',
+      {},
+      h(
+        'div',
+        { class: 'row-top' },
+        chip(q.type),
+        h('span', { class: 'grow' }, link(q), q.outcome && [' ', h('span', { class: 'arrow' }, '→'), ' ', h('strong', {}, q.outcome)]),
+        pill(q.type, q.status),
+        h('button', { onclick: async () => (await ask({ title: 'Open this question again?', message: q.title, action: 'Reopen' })) && change([{ op: 'update', id: q.id, status: statusesOf(q.type)[0], ...(q.kind === 'decision' && { props: { outcome: null, rationale: null, decided_on: null } }) }], 'Reopened in the UI') }, 'Reopen'),
+      ),
+      (q.rationale || q.decided_on) && h('div', { class: 'row-sub' }, [q.rationale, q.decided_on && `decided ${q.decided_on}`].filter(Boolean).join(' · ')),
+    );
+
+  const held = new Set(data.open.flatMap((q) => q.waiting.map((w) => w.id))).size;
+  main.replaceChildren(
+    h('div', { class: 'page-head' }, h('h1', {}, 'Questions'), h('p', { class: 'muted' }, 'What is still undecided on a project: decisions to make and hypotheses to settle. What holds up the most is first. Answer each where it stands.')),
+    h(
+      'div',
+      { class: 'toolbar', style: 'margin-bottom: 14px' },
+      h('select', { onchange: (e) => (location.hash = `#/questions/${e.target.value}`) }, projects.map((p) => h('option', { value: p.id, selected: p.id === rootId }, `${p.title} (${p.questions})`))),
+      h('a', { href: `#/e/${rootId}` }, 'Open project'),
+      h('a', { href: `#/roadmap/${rootId}` }, 'Roadmap'),
+      h('span', { class: 'grow' }),
+      h('span', { class: 'muted' }, `${data.open.length} open`, held > 0 && `, ${held} thing${held === 1 ? '' : 's'} waiting on them`),
+    ),
+    h(
+      'div',
+      { class: 'grid' },
+      h(
+        'section',
+        { class: 'card wide' },
+        h('header', {}, h('h2', {}, 'Open'), h('span', { class: 'n' }, data.open.length)),
+        data.open.length ? h('ul', { class: 'rows' }, data.open.map(question)) : h('div', { class: 'empty' }, 'Nothing is undecided here.'),
+      ),
+      data.settled.length > 0 && h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Settled lately'), h('span', { class: 'n' }, data.settled.length)), h('ul', { class: 'rows' }, data.settled.map(settledRow))),
+    ),
+  );
+}
+
 // ---- live updates --------------------------------------------------------
 
 // The server's pulse moves whenever the map or the review queue does. The page
@@ -2050,7 +2171,7 @@ document.addEventListener('visibilitychange', checkPulse);
 
 // ---- routing -------------------------------------------------------------
 
-const ROUTES = { today, review, map, activity, automations, graph, roadmap, workspace };
+const ROUTES = { today, review, map, activity, automations, graph, roadmap, questions, workspace };
 
 async function route() {
   const [, name = 'today', arg] = location.hash.split('/');
@@ -2062,6 +2183,7 @@ async function route() {
     if (name === 'e' && arg) await entity(arg);
     else if (name === 'graph') await graph(arg);
     else if (name === 'roadmap') await roadmap(arg);
+    else if (name === 'questions') await questions(arg);
     else if (name === 'new') newEntity(arg);
     else await (ROUTES[name] ?? today)();
   } catch (err) {

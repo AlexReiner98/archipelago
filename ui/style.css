@@ -163,6 +163,13 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .rm-node.work.active circle { fill: var(--warn); stroke: var(--warn); stroke-width: 3; stroke-opacity: 0.35; }
 .rm-node.work.blocked circle { fill: var(--g-blocked); }
 
+/* Questions */
+.rows > li.question { padding: 14px; display: grid; gap: 8px; }
+.question .row-sub { margin-top: 0; }
+.question-body { color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 80ch; }
+.question .options button.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.question .option-new { width: 150px; border-style: dashed; }
+
 /* Review */
 .proposal { margin-bottom: 18px; }
 .proposal .meta { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }

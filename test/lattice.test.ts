@@ -696,3 +696,43 @@ test('the roadmap tree orders a project\'s features, rolls up progress, and show
   const placed = (await VIEWS.tree.run(l, { root: made.p })) as any;
   assert.deepEqual([placed.unplaced.length, placed.branches[1].work.map((w: any) => w.title).sort()], [0, ['Loose', 'T3']], 'work given a feature sits under it, though still part of the project');
 });
+
+test('a project\'s questions are its open decisions and hypotheses, most-blocking first, with what waits on each', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'other', type: 'project', title: 'Other' },
+    { op: 'create', ref: 'f', type: 'software.feature', title: 'Feature' },
+    { op: 'create', ref: 't', type: 'task', title: 'Task' },
+    { op: 'create', ref: 'big', type: 'decision', title: 'Big', props: { options: ['A', 'B'] } },
+    { op: 'create', ref: 'small', type: 'decision', title: 'Small' },
+    { op: 'create', ref: 'old', type: 'decision', title: 'Old', status: 'decided', props: { outcome: 'Yes', rationale: 'Because' } },
+    { op: 'create', ref: 'hyp', type: 'hypothesis', title: 'Hyp' },
+    { op: 'create', ref: 'exp', type: 'experiment', title: 'Try it' },
+    { op: 'create', ref: 'else', type: 'decision', title: 'Elsewhere' },
+    { op: 'link', type: 'part_of', from: 'f', to: 'p' },
+    { op: 'link', type: 'part_of', from: 't', to: 'f' },
+    { op: 'link', type: 'part_of', from: 'small', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'old', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'else', to: 'other' },
+    { op: 'link', type: 'depends_on', from: 'f', to: 'big' },
+    { op: 'link', type: 'depends_on', from: 't', to: 'f' },
+    { op: 'link', type: 'assumes', from: 't', to: 'hyp' },
+    { op: 'link', type: 'tests', from: 'exp', to: 'hyp' },
+  ]);
+
+  const all = (await VIEWS.questions.run(l, {})) as any;
+  assert.deepEqual(all.projects.map((p: any) => [p.title, p.questions]), [['Proj', 3], ['Other', 1]]);
+
+  const q = (await VIEWS.questions.run(l, { project: made.p })) as any;
+  assert.deepEqual(q.open.map((x: any) => x.title), ['Big', 'Hyp', 'Small'], 'what holds up the most comes first; another project\'s question is left out');
+  const big = q.open[0];
+  assert.deepEqual([big.kind, big.options, big.holds_up, big.waiting.map((w: any) => w.title)], ['decision', ['A', 'B'], 2, ['Feature']], 'found through what depends on it, counting what waits behind that');
+  const hyp = q.open[1];
+  assert.deepEqual([hyp.kind, hyp.assumed_by[0].title, hyp.tests[0].title], ['hypothesis', 'Task', 'Try it']);
+  assert.deepEqual(q.settled.map((x: any) => [x.title, x.outcome, x.rationale]), [['Old', 'Yes', 'Because']]);
+
+  await make(l, [{ op: 'update', id: made.big, status: 'decided', props: { outcome: 'A', decided_on: '2026-10-07' } }]);
+  const after = (await VIEWS.questions.run(l, { project: made.p })) as any;
+  assert.deepEqual([after.open.map((x: any) => x.title), after.settled[0].title, after.settled[0].outcome], [['Hyp', 'Small'], 'Big', 'A']);
+});

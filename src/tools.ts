@@ -198,8 +198,8 @@ export const TOOLS: Record<string, Tool> = {
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
     input: {
       entity: z.string().optional().describe('An entity id: open its page.'),
-      screen: z.enum(['today', 'review', 'map', 'graph', 'roadmap', 'automations', 'activity', 'workspace']).optional(),
-      of: z.string().optional().describe('With screen graph or roadmap: the entity it is drawn for.'),
+      screen: z.enum(['today', 'review', 'map', 'graph', 'roadmap', 'questions', 'automations', 'activity', 'workspace']).optional(),
+      of: z.string().optional().describe('With screen graph, roadmap or questions: the entity (for the last two, a project) it is drawn for.'),
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
     },
     run: async (l, actor, input) => {
