@@ -211,11 +211,17 @@ if (import.meta.main) {
   const config = loadConfig();
   const rootDir = join(config.dataDir, '..', 'workspaces');
   const workspaces = new Workspaces({ dataDir: config.dataDir, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy, runAutomations: true });
-  const main = await workspaces.get(DEFAULT_WORKSPACE);
   configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 
   const server = createHttpServer(workspaces, config.port, { auth: config.auth });
+  // The port is taken before any database is opened: a second server started
+  // by mistake must fail here, never open data another server is writing.
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    console.error(err.code === 'EADDRINUSE' ? `Port ${config.port} is in use: another lattice server is probably running. Stop it first. No data was opened.` : err.message);
+    process.exit(1);
+  });
   server.listen(config.port, '127.0.0.1', async () => {
+    const main = await workspaces.get(DEFAULT_WORKSPACE);
     console.log(`lattice listening on http://127.0.0.1:${config.port}  (MCP at /mcp)`);
     console.log(`data: ${config.dataDir}`);
     console.log(`packs: ${main.lattice.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
