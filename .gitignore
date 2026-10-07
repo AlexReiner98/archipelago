@@ -3,3 +3,5 @@ data/
 data-backup-*/
 runs/
 workspaces/
+data.lock
+data-damaged/

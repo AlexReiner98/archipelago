@@ -1318,6 +1318,64 @@ function secretBox(label, token) {
   );
 }
 
+// The operator runs the installation: they make workspaces and hand each its
+// first sign-in token, and can read none of them. The secret is kept only in
+// this page's memory, so it is asked for again after a reload.
+let operatorSecret = '';
+
+function operatorCard(current) {
+  const body = h('div');
+  const call = async (method, payload) => {
+    const res = await fetch('/operator/workspaces', {
+      method,
+      headers: { authorization: `Bearer ${operatorSecret}`, ...(payload && { 'content-type': 'application/json' }) },
+      body: payload && JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error);
+    return json.result;
+  };
+  const draw = async (made) => {
+    if (!operatorSecret) {
+      const secret = h('input', { type: 'password', placeholder: 'Operator secret', autocomplete: 'off', style: 'flex: 1; min-width: 220px' });
+      const error = h('div');
+      const open = async () => {
+        operatorSecret = secret.value.trim();
+        try {
+          await draw();
+        } catch (err) {
+          operatorSecret = '';
+          error.replaceChildren(h('div', { class: 'error' }, err.message));
+        }
+      };
+      return body.replaceChildren(
+        h('div', { class: 'empty' }, 'Creating and listing workspaces needs the operator secret, printed the first time the server started with tokens on.'),
+        h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, secret, h('button', { onclick: open }, 'Show workspaces')),
+        error,
+      );
+    }
+    const list = await call('GET');
+    const id = h('input', { type: 'text', placeholder: 'id, e.g. acme', style: 'flex: 1; min-width: 140px' });
+    const name = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: 160px' });
+    const error = h('div');
+    const create = () =>
+      call('POST', { id: id.value.trim(), name: name.value.trim() })
+        .then((r) => draw(r))
+        .catch((err) => error.replaceChildren(h('div', { class: 'error' }, err.message)));
+    body.replaceChildren(
+      made ? h('div', { style: 'padding: 12px 14px 0' }, secretBox(`Owner token for "${made.workspace.name}". Send it to its owner privately.`, made.owner_token)) : '',
+      h('ul', { class: 'rows' }, list.map((w) => h('li', { class: 'row-top' }, h('strong', {}, w.name), h('span', { class: 'grow muted' }, w.id), w.id === current && h('span', { class: 'pill ok' }, 'this one')))),
+      h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, id, name, h('button', { class: 'primary', onclick: create }, 'Create workspace'), h('button', { onclick: () => ((operatorSecret = ''), draw()) }, 'Forget secret')),
+      error,
+    );
+  };
+  draw().catch((err) => {
+    operatorSecret = '';
+    body.replaceChildren(h('div', { class: 'error' }, err.message));
+  });
+  return h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Installation'), h('span', { class: 'n' }, 'Every workspace on this server. For whoever runs it.')), body);
+}
+
 async function workspace() {
   const me = await (await fetch('/whoami', { headers: authHeaders() })).json();
   const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name));
@@ -1455,6 +1513,7 @@ async function workspace() {
             ),
           ),
         ),
+      operatorCard(info.id),
     ),
   );
 }

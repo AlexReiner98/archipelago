@@ -19,6 +19,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
@@ -213,6 +214,24 @@ if (import.meta.main) {
   const workspaces = new Workspaces({ dataDir: config.dataDir, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy, runAutomations: true });
   configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 
+  // One server per data folder, whatever port each is on: two of them writing
+  // the same database files destroy it. The lock names the process that has it.
+  const lock = `${config.dataDir}.lock`;
+  const holder = existsSync(lock) ? Number(readFileSync(lock, 'utf8')) : 0;
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (err) {
+      return (err as NodeJS.ErrnoException).code === 'EPERM';
+    }
+  };
+  if (holder && holder !== process.pid && alive(holder)) {
+    console.error(`${config.dataDir} is in use by another lattice server (process ${holder}). Stop it first. No data was opened.
+If that process is not a lattice server, delete ${lock}.`);
+    process.exit(1);
+  }
+
   const server = createHttpServer(workspaces, config.port, { auth: config.auth });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
@@ -221,6 +240,7 @@ if (import.meta.main) {
     process.exit(1);
   });
   server.listen(config.port, '127.0.0.1', async () => {
+    writeFileSync(lock, String(process.pid));
     const main = await workspaces.get(DEFAULT_WORKSPACE);
     console.log(`lattice listening on http://127.0.0.1:${config.port}  (MCP at /mcp)`);
     console.log(`data: ${config.dataDir}`);
@@ -241,6 +261,7 @@ if (import.meta.main) {
     stopAllLaunched();
     server.close();
     await workspaces.closeAll();
+    rmSync(lock, { force: true });
     process.exit(code);
   };
   process.on('SIGINT', () => stop());

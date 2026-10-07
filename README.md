@@ -12,6 +12,8 @@ npm start
 
 The server listens on `http://127.0.0.1:3100` and keeps its data in `data/`
 (embedded Postgres, no install needed). Everything else talks to that server.
+Only one server may use a data folder at a time: it writes `data.lock` beside
+the folder, and a second one refuses to start.
 
 ### Dev mode
 
@@ -177,10 +179,7 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 ## Not built yet
 
 - Launching into the desktop app. Launched sessions are headless.
-- Adding relations in the web UI. They can be read on an entity page and in the graph, but only added through `change`.
 - Semantic search. Search is text matching.
-- A screen for the operator. Workspaces are created with a request to
-  `/operator/workspaces`.
 - Hosting: a Postgres server instead of the embedded database, TLS, and
   listening beyond this machine.
 - Single sign-on.
@@ -209,7 +208,8 @@ change that:
 - **Workspaces: one database per customer.** Each workspace has its own
   database, its own locally defined types and its own automation runner.
   Nothing is shared, so there is no filter to get wrong. The operator creates
-  one and receives its first human token:
+  one and receives its first human token, in the web UI (Workspace screen,
+  **Installation**, with the operator secret) or with a request:
 
   ```bash
   curl -X POST http://127.0.0.1:3100/operator/workspaces -H "content-type: application/json" -H "Authorization: Bearer <operator secret>" -d '{"id":"acme","name":"Acme Architects"}'
