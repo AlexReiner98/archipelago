@@ -6,6 +6,7 @@ import type { Actor, Lattice } from './lattice.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
+import { undo } from './undo.ts';
 import { VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
@@ -62,6 +63,7 @@ const op = z.discriminatedUnion('op', [
   }),
   z.object({ op: z.literal('unlink'), relation: z.string().describe('The relation id, from the get tool.') }),
   z.object({ op: z.literal('archive'), id: z.string() }),
+  z.object({ op: z.literal('restore'), id: z.string().describe('An archived entity to bring back.') }),
   z.object({ op: z.literal('merge'), keep: z.string(), drop: z.string().describe('Its relations move to keep, then it is archived.') }),
   z.object({
     op: z.literal('define_type'),
@@ -144,7 +146,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   change: {
     description:
-      'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, merge, define_type) with the reason. ' +
+      'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type) with the reason. ' +
       'Creates can carry a ref so later ops in the same change can link to them. Give the source the facts came from. ' +
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human.',
     input: {
@@ -153,6 +155,12 @@ export const TOOLS: Record<string, Tool> = {
       source: source.optional().describe('Where these facts came from. Individual ops can override it.'),
     },
     run: async (l, actor, input) => l.change(actor, input),
+  },
+  undo: {
+    description:
+      'Reverse one change set (its id is on every event it logged) by applying the opposite as a new change: created entities are archived, edits put back, links removed or restored. An edit changed again since is left alone and reported. Subject to the same policy as any change.',
+    input: { changeset: z.string() },
+    run: async (l, actor, input) => undo(l, actor, input),
   },
   claim: {
     description:

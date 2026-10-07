@@ -558,3 +558,45 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   assert.equal(log.filter((e) => e.action === 'automation.fire').length, 3);
   assert.equal(log[0].actor, `agent:automation:${made.hourly}`);
 });
+
+test('undo reverses a change set as a new change, and leaves later edits alone', async () => {
+  const { undo } = await import('../src/undo.ts');
+  const l = await fresh();
+  const base = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'old', type: 'task', title: 'Old task', body: 'x'.repeat(500), props: { priority: 'low' } },
+    { op: 'link', type: 'part_of', from: 'old', to: 'p' },
+  ]);
+  const rel = (await l.get(base.old)).outgoing[0] as any;
+  const second = await l.change(human, {
+    reason: 'Reshuffle',
+    ops: [
+      { op: 'create', ref: 'n', type: 'task', title: 'New task' },
+      { op: 'link', type: 'part_of', from: 'n', to: base.p },
+      { op: 'update', id: base.old, status: 'doing', body: 'short', props: { priority: 'high', due: '2026-12-01' } },
+      { op: 'unlink', relation: rel.relation },
+      { op: 'archive', id: base.p },
+    ],
+  });
+  const set = (second as { changeset: string }).changeset;
+  // Someone changes one of those fields again before the undo.
+  await make(l, [{ op: 'update', id: base.old, props: { priority: 'urgent' } }]);
+
+  // An agent's undo is a proposal like any other change.
+  assert.equal((await undo(l, agent, { changeset: set })).status, 'proposed');
+
+  const result = await undo(l, human, { changeset: set });
+  assert.equal(result.status, 'applied');
+  assert.deepEqual(result.skipped, ['"Old task": priority has changed again since, so it was left as it is']);
+  const old = (await l.entity(base.old))!;
+  assert.deepEqual([old.status, old.body.length, old.props.priority, old.props.due], ['todo', 500, 'urgent', undefined], 'long text comes back whole');
+  assert.equal((await l.entity(base.p))!.archived_at, null, 'the archived project is restored');
+  assert.deepEqual((await l.get(base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
+  assert.deepEqual((await l.search({ type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
+
+  await assert.rejects(undo(l, human, { changeset: set }), /already been undone/);
+  await assert.rejects(undo(l, human, { changeset: 'c_nope' }), /No change set/);
+  // Undoing the undo puts the second change back.
+  await undo(l, human, { changeset: (result as { changeset: string }).changeset });
+  assert.equal((await l.entity(base.old))!.status, 'doing');
+});

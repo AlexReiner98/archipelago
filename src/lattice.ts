@@ -14,7 +14,7 @@ export interface Actor {
 }
 
 export type Level = 'auto' | 'propose' | 'forbidden';
-export type OpKind = 'create' | 'update' | 'link' | 'unlink' | 'archive' | 'merge' | 'define_type';
+export type OpKind = 'create' | 'update' | 'link' | 'unlink' | 'archive' | 'restore' | 'merge' | 'define_type';
 export type Policy = Record<OpKind, Level>;
 
 /** Agents propose everything until trust is built; loosen per op in lattice.config.json. */
@@ -24,6 +24,7 @@ export const DEFAULT_AGENT_POLICY: Policy = {
   link: 'propose',
   unlink: 'propose',
   archive: 'propose',
+  restore: 'propose',
   merge: 'propose',
   define_type: 'propose',
 };
@@ -72,6 +73,10 @@ export interface ArchiveOp {
   op: 'archive';
   id: string;
 }
+export interface RestoreOp {
+  op: 'restore';
+  id: string;
+}
 export interface MergeOp {
   op: 'merge';
   keep: string;
@@ -81,7 +86,7 @@ export interface DefineTypeOp {
   op: 'define_type';
   type: TypeDef;
 }
-export type Op = CreateOp | UpdateOp | LinkOp | UnlinkOp | ArchiveOp | MergeOp | DefineTypeOp;
+export type Op = CreateOp | UpdateOp | LinkOp | UnlinkOp | ArchiveOp | RestoreOp | MergeOp | DefineTypeOp;
 
 export interface SourceSpec {
   uri: string;
@@ -128,8 +133,6 @@ export interface Proposal {
 }
 
 export const actorId = (actor: Actor) => `${actor.kind}:${actor.name}`;
-
-const clip = (value: unknown) => (typeof value === 'string' && value.length > 200 ? value.slice(0, 200) + '…' : value);
 
 export class Lattice {
   readonly db: PGlite;
@@ -280,6 +283,11 @@ export class Lattice {
         case 'archive':
           await existing(op.id, where);
           break;
+        case 'restore': {
+          const target = await existing(op.id, where);
+          if (target && !target.archived_at) errors.push(`${where}: "${target.title}" is not archived`);
+          break;
+        }
         case 'merge': {
           const keep = await existing(op.keep, where);
           const drop = await existing(op.drop, where);
@@ -349,7 +357,7 @@ export class Lattice {
             const props = { ...before.props };
             const changes: Record<string, { from: unknown; to: unknown }> = {};
             for (const [key, value] of Object.entries(op.props ?? {})) {
-              changes[`props.${key}`] = { from: clip(props[key] ?? null), to: clip(value) };
+              changes[`props.${key}`] = { from: props[key] ?? null, to: value };
               if (value === null) delete props[key];
               else props[key] = value;
             }
@@ -362,7 +370,7 @@ export class Lattice {
               confidence: op.confidence ?? before.confidence,
             };
             for (const key of Object.keys(next) as (keyof typeof next)[]) {
-              if (next[key] !== before[key]) changes[key] = { from: clip(before[key]), to: clip(next[key]) };
+              if (next[key] !== before[key]) changes[key] = { from: before[key], to: next[key] };
             }
             await tx.query(
               `update entity set title = $2, body = $3, status = $4, is_open = $5, owner = $6, visibility = $7,
@@ -399,6 +407,11 @@ export class Lattice {
           case 'archive': {
             const { rows } = await tx.query<{ title: string }>(`update entity set archived_at = now(), updated_at = now() where id = $1 returning title`, [op.id]);
             await log('entity.archive', op.id, { title: rows[0].title });
+            break;
+          }
+          case 'restore': {
+            const { rows } = await tx.query<{ title: string }>(`update entity set archived_at = null, updated_at = now() where id = $1 returning title`, [op.id]);
+            await log('entity.restore', op.id, { title: rows[0].title });
             break;
           }
           case 'merge': {

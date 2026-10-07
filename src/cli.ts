@@ -63,6 +63,8 @@ function describeOp(op: Record<string, any>): string {
       return `unlink ${op.relation}`;
     case 'archive':
       return `archive ${op.id}`;
+    case 'restore':
+      return `restore ${op.id}`;
     case 'merge':
       return `merge  ${op.drop} into ${op.keep}`;
     case 'define_type':

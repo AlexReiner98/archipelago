@@ -23,7 +23,7 @@ const MODE_NOTE: Record<LaunchMode, string> = {
 
 // The lattice tools a launched session may call unprompted. `change` is safe
 // here because agent changes are held as proposals.
-const ALLOWED_TOOLS = ['session_update', 'schema', 'search', 'get', 'view', 'events', 'change', 'claim', 'release'].map((t) => `mcp__lattice__${t}`).join(',');
+const ALLOWED_TOOLS = ['session_update', 'schema', 'search', 'get', 'view', 'events', 'change', 'claim', 'release', 'notify'].map((t) => `mcp__lattice__${t}`).join(',');
 
 interface LauncherConfig {
   /** The lattice MCP endpoint to give the session. */

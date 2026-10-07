@@ -34,7 +34,8 @@ set). It is plain files in `ui/` with no build step.
 ## How a change happens
 
 Every change to the map goes through one tool, `change`: a list of ops
-(`create`, `update`, `link`, `unlink`, `archive`, `merge`, `define_type`) with a
+(`create`, `update`, `link`, `unlink`, `archive`, `restore`, `merge`,
+`define_type`) with a
 reason and a source.
 
 1. The whole change is validated against the schema and the current map.
@@ -52,6 +53,12 @@ npm run lattice -- reject <id> "why"
 
 4. Every applied op is written to the event log with who proposed it, who
    approved it, why, and the source.
+
+**Undo.** Any change set can be reversed, from its line in Activity or with
+the `undo` tool. The opposite is applied as a new change, so the log keeps
+both: created entities are archived, edits put back, links removed or
+restored, archived entities restored. An edit that has been changed again
+since is left alone and reported. A merge cannot be undone automatically.
 
 `claim` and `release` (taking an exclusive resource, such as the one live Rhino
 session) take effect at once for agents too.
@@ -145,7 +152,6 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 
 - Launching into the desktop app. Launched sessions are headless.
 - A graph view. Relations can be read on an entity page but only added through `change`.
-- Undo. The event log records what changed, but nothing replays it backwards.
 - Semantic search. Search is text matching.
 - Teams. The `workspace` and `visibility` columns exist but nothing enforces them.
 - Authentication. Agent and human are told apart by which endpoint is called,

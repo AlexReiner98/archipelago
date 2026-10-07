@@ -403,7 +403,7 @@ function proposalCard(p, names) {
       what =
         op.op === 'merge'
           ? h('div', {}, nameOf(op.drop), ' into ', nameOf(op.keep))
-          : op.op === 'archive'
+          : op.op === 'archive' || op.op === 'restore'
             ? nameOf(op.id)
             : op.op === 'define_type'
               ? [h('strong', {}, op.type.id), op.type.extends && ` (flavour of ${op.type.extends})`, h('div', { class: 'detail' }, op.type.description)]
@@ -786,7 +786,9 @@ async function automations() {
 function describeEvent(ev) {
   const d = ev.detail ?? {};
   if (ev.origin === 'external') return `${d.ok === false ? 'failed' : 'ok'}${d.durationMs != null ? ` in ${d.durationMs} ms` : ''}`;
-  if (ev.action === 'entity.update') return Object.entries(d.changes ?? {}).map(([k, c]) => `${k}: ${c.from ?? 'none'} → ${c.to ?? 'none'}`).join('; ');
+  const short = (v) => (v == null ? 'none' : String(typeof v === 'object' ? JSON.stringify(v) : v).replaceAll('\n', ' ').slice(0, 80));
+  if (ev.action === 'entity.update') return Object.entries(d.changes ?? {}).map(([k, c]) => `${k}: ${short(c.from)} → ${short(c.to)}`).join('; ');
+  if (ev.action === 'changeset.undo') return `undid ${d.undoes}${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
   if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${d.to}`;
   if (ev.action === 'entity.create') return `${typeTitle(d.type)}, ${d.status ?? ''}`;
   if (ev.action.startsWith('proposal.')) return `${d.proposal}${d.revised ? ', with corrections' : ''}`;
@@ -824,6 +826,7 @@ async function activity() {
   const list = h('div');
   const run = async () => {
     const events = await api('events', { limit: 500, origin: activityState.origin || undefined });
+    const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
     // Fold each changeset into one line: one decision, many effects.
     const groups = [];
     for (const ev of events) {
@@ -834,7 +837,8 @@ async function activity() {
     list.replaceChildren(
       ...groups.map((g) => {
         const first = g.events[0];
-        if (g.events.length === 1) return eventTable(g.events);
+        if (!g.changeset) return eventTable(g.events);
+        const undone = g.events.some((e) => e.action === 'changeset.undo') || undoneSets.has(g.changeset);
         // The newest event in an approved changeset is the approval itself;
         // the line should name who made the change, then who approved it.
         const work = g.events.find((e) => !e.action.startsWith('proposal.')) ?? first;
@@ -842,7 +846,27 @@ async function activity() {
         return h(
           'details',
           { class: 'group' },
-          h('summary', {}, h('span', { class: 'muted nowrap' }, when(first.ts)), h('span', {}, work.actor, approver && h('span', { class: 'muted' }, `, approved by ${approver}`)), h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? first.action), h('span', { class: 'chip' }, `${g.events.length} changes`)),
+          h('summary', {}, h('span', { class: 'muted nowrap' }, when(first.ts)), h('span', {}, work.actor, approver && h('span', { class: 'muted' }, `, approved by ${approver}`)), h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? first.action), h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
+            undone
+              ? h('span', { class: 'pill closed' }, g.events.some((e) => e.action === 'changeset.undo') ? 'an undo' : 'undone')
+              : h(
+                  'button',
+                  {
+                    onclick: async (click) => {
+                      click.preventDefault();
+                      if (!confirm('Undo this change set? The opposite is applied as a new change; nothing is erased from the log.')) return;
+                      try {
+                        const r = await api('undo', { changeset: g.changeset });
+                        if (r.skipped.length) alert(`Undone, except:\n- ${r.skipped.join('\n- ')}`);
+                        run();
+                      } catch (err) {
+                        alert(err.message);
+                      }
+                    },
+                  },
+                  'Undo',
+                ),
+          ),
           h('div', { class: 'inner' }, eventTable(g.events)),
         );
       }),
