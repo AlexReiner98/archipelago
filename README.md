@@ -232,8 +232,28 @@ at the platform.
 - `PORT` is honoured when `LATTICE_PORT` is not set.
 - Each workspace is its own database and costs about 200 MB of memory on top
   of about 350 MB for the server, so 2 GB holds roughly eight customers.
-- Not built yet: scheduled backups. A platform's disk snapshot is a copy of
-  files and is not to be relied on for a database.
+- Not built yet: copying backups off the server (see Backups).
+
+## Backups
+
+Every 6 hours the server writes each workspace out as one file of plain rows,
+`backups/<workspace>/<time>.json.gz`, and keeps the newest 28 (a week). It goes
+by the newest file, so restarting neither skips a backup nor piles them up.
+`"backup": false` in `lattice.config.json` turns it off, `"backup": { "dir",
+"everyHours", "keep" }` changes it, and `LATTICE_BACKUP_DIR` moves it.
+
+A backup holds everything in the workspace, private things and token hashes
+included, so treat the files like the data. A copy of the `data/` folder is not
+a backup: taken while the server runs, it may not open again.
+
+To restore, with the server stopped, into a folder that does not exist yet:
+
+```bash
+node src/backup.ts restore backups/default/<file>.json.gz data-restored
+```
+
+Then put that folder in place of `data/`. The backups sit on the same disk as
+the data until they are copied somewhere else, which is not built yet.
 
 ## Identity and workspaces
 

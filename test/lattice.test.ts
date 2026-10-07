@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { Automations } from '../src/automations.ts';
+import { backupAll, dump, newestBackup, readBackup, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
 import { configureLauncher, launch } from '../src/launcher.ts';
 import { Lattice, type Actor, type Op } from '../src/lattice.ts';
@@ -11,6 +12,7 @@ import { Registry } from '../src/packs.ts';
 import { hookSessionEnd, hookSessionStart, sessionEnd, sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
+import { Workspaces } from '../src/workspaces.ts';
 
 const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
@@ -735,4 +737,51 @@ test('a project\'s questions are its open decisions and hypotheses, most-blockin
   await make(l, [{ op: 'update', id: made.big, status: 'decided', props: { outcome: 'A', decided_on: '2026-10-07' } }]);
   const after = (await VIEWS.questions.run(l, { project: made.p })) as any;
   assert.deepEqual([after.open.map((x: any) => x.title), after.settled[0].title, after.settled[0].outcome], [['Hyp', 'Small'], 'Big', 'A']);
+});
+
+test('a backup holds every row, and restores into an empty database that then carries on', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj', owner: 'me' },
+    { op: 'create', ref: 't', type: 'task', title: 'Task', props: { due: '2026-11-01' } },
+    { op: 'link', type: 'part_of', from: 't', to: 'p' },
+  ]);
+  await l.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
+
+  const taken = await dump(l.db, { id: 'default', name: 'Default' }, { id: 'local', types: [] });
+  const copy = new Lattice(await openDb(), l.registry);
+  const counts = await restore(copy.db, JSON.parse(JSON.stringify(taken)));
+  assert.deepEqual([counts.entity, counts.relation, counts.proposal], [3, 1, 1]);
+  assert.equal(counts.event, taken.tables.event.length);
+
+  const task = (await copy.get(made.t)) as any;
+  assert.deepEqual([task.entity.title, task.entity.props.due, task.outgoing[0].title], ['Task', '2026-11-01', 'Proj']);
+  assert.equal((await copy.proposals()).length, 1, 'what was waiting for review still is');
+  const before = Math.max(...taken.tables.event.map((e) => e.seq as number));
+  await make(copy, [{ op: 'create', type: 'note', title: 'After the restore' }]);
+  const { rows } = await copy.db.query<{ seq: number }>(`select max(seq)::int as seq from event`);
+  assert.ok(rows[0].seq > before, 'new events are numbered after the restored ones');
+  await assert.rejects(restore(copy.db, taken), /not empty/);
+});
+
+test('backups are written per workspace, read back, and only the newest are kept', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lattice-backup-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
+  const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
+  await workspaces.create('acme', 'Acme');
+  await make((await workspaces.get('acme')).lattice, [{ op: 'create', type: 'task', title: 'Theirs' }]);
+  const dir = join(root, 'backups');
+  assert.equal(newestBackup(dir), undefined);
+  for (let i = 0; i < 3; i++) {
+    const done = await backupAll(workspaces, dir, 2);
+    assert.deepEqual(done.map((d) => [d.workspace, d.error]), [['default', undefined], ['acme', undefined]]);
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  const files = readdirSync(join(dir, 'acme'));
+  assert.equal(files.length, 2, 'the oldest was removed');
+  const read = readBackup(join(dir, 'acme', files.sort().at(-1)!));
+  assert.deepEqual([read.workspace, read.tables.entity.map((e) => e.title)], [{ id: 'acme', name: 'Acme' }, ['Theirs']]);
+  assert.ok(Date.now() - newestBackup(dir)!.getTime() < 60_000, 'the newest backup\'s time is read from its name');
+  await workspaces.closeAll();
 });

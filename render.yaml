@@ -10,7 +10,7 @@ services:
     healthCheckPath: /health
     disk:
       name: lattice-data
-      mountPath: /var/lattice # holds data/, workspaces/ and runs/
+      mountPath: /var/lattice # holds data/, workspaces/, runs/ and backups/
       sizeGB: 5
     envVars:
       - key: NODE_VERSION

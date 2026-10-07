@@ -29,6 +29,13 @@ export interface Config {
    */
   publicHosts: string[];
   /**
+   * Where and how often every workspace is written out as a backup, and how
+   * many of each to keep. On by default, beside the data folder, every 6
+   * hours, keeping 28 (a week). `"backup": false` turns it off;
+   * LATTICE_BACKUP_DIR moves it.
+   */
+  backup: false | { dir: string; everyHours: number; keep: number };
+  /**
    * For working on Lattice itself, one person on one machine: agent changes
    * apply without review unless `policy` says otherwise, and agents may restart
    * the server. Set by `npm run dev` (LATTICE_DEV=1). Refused with auth tokens.
@@ -53,6 +60,9 @@ export function loadConfig(): Config {
   if (!local && auth !== 'tokens') throw new Error(`Listening on ${host} makes the server reachable from outside, which needs auth "tokens": without it anyone who can reach it is the owner.`);
   if (!local && dev) throw new Error('Dev mode does not listen beyond this machine.');
   const named = process.env.LATTICE_PUBLIC_HOST?.split(',') ?? fromFile.publicHosts ?? [];
+  const dataDir = resolve(ROOT, process.env.LATTICE_DATA ?? fromFile.dataDir ?? 'data');
+  const wanted = fromFile.backup === false ? false : { ...(fromFile.backup as object | undefined) } as { dir?: string; everyHours?: number; keep?: number };
+  const backup = wanted && { dir: resolve(ROOT, process.env.LATTICE_BACKUP_DIR ?? wanted.dir ?? join(dataDir, '..', 'backups')), everyHours: wanted.everyHours ?? 6, keep: wanted.keep ?? 28 };
   const unreviewed = Object.fromEntries(Object.keys(DEFAULT_AGENT_POLICY).map((op) => [op, 'auto'])) as Policy;
   return {
     packs: fromFile.packs,
@@ -63,7 +73,8 @@ export function loadConfig(): Config {
     publicHosts: named.map((name) => name.trim().toLowerCase()).filter(Boolean),
     // Hosting platforms say which port to use through PORT.
     port: Number(process.env.LATTICE_PORT ?? process.env.PORT ?? fromFile.port ?? 3100),
-    dataDir: resolve(ROOT, process.env.LATTICE_DATA ?? fromFile.dataDir ?? 'data'),
+    dataDir,
+    backup,
     packsDir: resolve(ROOT, fromFile.packsDir ?? 'packs'),
   };
 }

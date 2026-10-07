@@ -5,3 +5,4 @@ runs/
 workspaces/
 data.lock
 data-damaged/
+backups/

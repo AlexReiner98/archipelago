@@ -48,8 +48,11 @@ start of a session:
   `LATTICE_PORT=3199 LATTICE_DATA=<temp folder>/data node src/server.ts`
   (add `LATTICE_AUTH=tokens` to test identity). Delete it afterwards. Never
   point a second server at `data/`; the lock refuses it.
-- **Back up `data/` before changing the database schema**, then confirm the
-  entity and event counts are unchanged after the restart.
+- **Before changing the database schema, make sure there is a fresh backup**
+  (`backups/default/`; the server writes one every 6 hours, and a restart
+  writes one if the newest is older than that), then confirm the entity and
+  event counts are unchanged after the restart. Never copy `data/` while the
+  server runs and call it a backup.
 - **One write path.** Every change to entities and relations goes through
   `Lattice.change` / `apply`. Sessions, claims and notifications are the only
   writes that skip approval, because they are operational state.

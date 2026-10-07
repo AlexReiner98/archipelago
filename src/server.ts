@@ -26,6 +26,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
+import { backupAll, newestBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT } from './config.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
@@ -272,6 +273,20 @@ If that process is not a lattice server, delete ${lock}.`);
     console.log(`packs: ${main.lattice.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
     console.log(`auth: ${config.auth}`);
     if (config.dev) console.log('dev mode: agent changes are not reviewed, and agents can restart the server');
+    if (config.backup) {
+      const { dir, everyHours, keep } = config.backup;
+      console.log(`backups: every ${everyHours} hours to ${dir}, keeping ${keep}`);
+      // Asked every few minutes whether one is due, going by the newest file,
+      // so restarting the server neither skips a backup nor piles them up.
+      const check = async () => {
+        const newest = newestBackup(dir);
+        if (newest && Date.now() - newest.getTime() < everyHours * 3600_000) return;
+        for (const r of await backupAll(workspaces, dir, keep)) console.log(r.error ? `backup of ${r.workspace} FAILED: ${r.error}` : `backed up ${r.workspace}: ${r.rows} rows`);
+      };
+      const safely = () => void check().catch((err) => console.error('backup failed:', err));
+      safely();
+      backups = setInterval(safely, 5 * 60_000);
+    }
     if (config.auth !== 'tokens') return;
     // First start with tokens on: there is nobody to ask for a token yet, so
     // make the two that everything else is created from, and show them once.
@@ -282,7 +297,9 @@ If that process is not a lattice server, delete ${lock}.`);
       console.log(`\nYour token for the default workspace (shown once):\n  ${owner.token}\nPaste it into the web UI, and set LATTICE_TOKEN for the CLI.`);
     }
   });
+  let backups: ReturnType<typeof setInterval> | undefined;
   const stop = async (code = 0) => {
+    clearInterval(backups);
     stopAllLaunched();
     server.close();
     await workspaces.closeAll();
