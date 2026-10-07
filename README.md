@@ -213,9 +213,27 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 
 - Launching into the desktop app. Launched sessions are headless.
 - Semantic search. Search is text matching.
-- Hosting: a Postgres server instead of the embedded database, TLS, and
-  listening beyond this machine.
+- Hosting is part built (see Hosting below): backups and the first deployment
+  are not done, and a Postgres server instead of the embedded database is the
+  later step.
 - Single sign-on.
+
+## Hosting
+
+The first hosted version is one server running everything, with the embedded
+database on a persistent disk, on Render ([render.yaml](render.yaml)). TLS ends
+at the platform.
+
+- `LATTICE_HOST=0.0.0.0` makes the server listen beyond this machine. It
+  refuses to start that way without `LATTICE_AUTH=tokens`, and never in dev
+  mode.
+- `LATTICE_PUBLIC_HOST=lattice.example.com` names what it is reached by.
+  Requests for any other host name are refused.
+- `PORT` is honoured when `LATTICE_PORT` is not set.
+- Each workspace is its own database and costs about 200 MB of memory on top
+  of about 350 MB for the server, so 2 GB holds roughly eight customers.
+- Not built yet: scheduled backups. A platform's disk snapshot is a copy of
+  files and is not to be relied on for a database.
 
 ## Identity and workspaces
 

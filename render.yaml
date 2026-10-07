@@ -1,0 +1,25 @@
+# Lattice on Render: one server running everything, with the embedded database
+# on a persistent disk. Decided 7 Oct 2026; see README, "Hosting".
+services:
+  - type: web
+    name: lattice
+    runtime: node
+    plan: standard # 2 GB: about 350 MB for the server and 200 MB for each workspace
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    disk:
+      name: lattice-data
+      mountPath: /var/lattice # holds data/, workspaces/ and runs/
+      sizeGB: 5
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: LATTICE_AUTH
+        value: tokens
+      - key: LATTICE_HOST
+        value: 0.0.0.0
+      - key: LATTICE_DATA
+        value: /var/lattice/data
+      - key: LATTICE_PUBLIC_HOST # the name(s) customers reach it by, e.g. lattice.example.com
+        sync: false

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync } from 'node:fs';
+import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -386,4 +387,42 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   const told = await call('/hooks/prompt', undefined, { session_id: 's1' });
   assert.match(told.hookSpecificOutput.additionalContext, /entity\.update decision "Which\?".*props\.outcome: nothing -> "This one"/s);
   assert.deepEqual(await call('/hooks/prompt', undefined, { session_id: 's1' }), { status: 200 }, 'told once');
+});
+
+test('beyond this machine the server needs tokens, and answers only to the names it is given', async () => {
+  const before = { ...process.env };
+  after(() => {
+    for (const key of ['LATTICE_HOST', 'LATTICE_AUTH', 'LATTICE_DEV', 'LATTICE_PUBLIC_HOST', 'PORT', 'LATTICE_PORT']) {
+      if (before[key] === undefined) delete process.env[key];
+      else process.env[key] = before[key];
+    }
+  });
+  for (const key of ['LATTICE_AUTH', 'LATTICE_DEV', 'LATTICE_PORT']) delete process.env[key];
+  process.env.LATTICE_HOST = '0.0.0.0';
+  assert.throws(() => loadConfig(), /needs auth "tokens"/);
+  process.env.LATTICE_AUTH = 'tokens';
+  process.env.LATTICE_PUBLIC_HOST = 'Lattice.Example.com, other.example.com';
+  process.env.PORT = '10000';
+  const hosted = loadConfig();
+  assert.deepEqual([hosted.host, hosted.port, hosted.publicHosts], ['0.0.0.0', 10000, ['lattice.example.com', 'other.example.com']]);
+
+  const workspaces = new Workspaces({ dataDir: null, rootDir: join(mkdtempSync(join(tmpdir(), 'lattice-public-')), 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
+  const server = createHttpServer(workspaces, 0, { auth: 'tokens', publicHosts: hosted.publicHosts });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  closers.push(async () => {
+    server.close();
+    await workspaces.closeAll();
+  });
+  const port = (server.address() as AddressInfo).port;
+  const owner = await createToken((await workspaces.get('default')).lattice.db, 'default', { kind: 'human', name: 'owner', admin: true });
+  const ask = (host: string) =>
+    new Promise<number>((done) => {
+      const req = request({ port, host: '127.0.0.1', path: '/api/schema', method: 'POST', headers: { host, 'content-type': 'application/json', authorization: `Bearer ${owner.token}` } }, (res) => {
+        res.resume();
+        done(res.statusCode ?? 0);
+      });
+      req.end('{}');
+    });
+  assert.equal(await ask('lattice.example.com'), 200, 'its public name');
+  assert.equal(await ask('evil.example.net'), 403, 'any other name');
 });

@@ -9,7 +9,7 @@
 //   GET  /whoami       which workspace and identity a request resolves to
 //   /operator/workspaces  list and create workspaces (operator secret)
 //   GET  /             the web UI
-// It listens on 127.0.0.1 only.
+// It listens on 127.0.0.1 unless told otherwise, and beyond it only with tokens on.
 //
 // Who is calling is decided one of two ways. With auth off (the default, for
 // one person on one machine) there is a single workspace and the surface
@@ -22,6 +22,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
@@ -81,9 +82,12 @@ class Refused extends Error {
   }
 }
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens' } = {}): Server {
-  const hosts = [`127.0.0.1:${port}`, `localhost:${port}`];
-  const origins = hosts.map((h) => `http://${h}`);
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[] } = {}): Server {
+  // The names this server answers to. A request for any other host is refused,
+  // which is what stops another web page from reaching it through the browser.
+  const named = options.publicHosts ?? [];
+  const hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named];
+  const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`)];
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => (workspaces.has(id) ? (await workspaces.get(id)).lattice : undefined));
 
@@ -233,7 +237,11 @@ if (import.meta.main) {
   // One server per data folder, whatever port each is on: two of them writing
   // the same database files destroy it. The lock names the process that has it.
   const lock = `${config.dataDir}.lock`;
-  const holder = existsSync(lock) ? Number(readFileSync(lock, 'utf8')) : 0;
+  // The machine is named too: in a container process ids start over, so a lock
+  // left by the last container would otherwise look like a live process.
+  const me = `${process.pid}@${hostname()}`;
+  const [pid, machine] = existsSync(lock) ? readFileSync(lock, 'utf8').split('@') : [];
+  const holder = machine === undefined || machine === hostname() ? Number(pid) || 0 : 0;
   const alive = (pid: number) => {
     try {
       process.kill(pid, 0);
@@ -248,17 +256,18 @@ If that process is not a lattice server, delete ${lock}.`);
     process.exit(1);
   }
 
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth });
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {
     console.error(err.code === 'EADDRINUSE' ? `Port ${config.port} is in use: another lattice server is probably running. Stop it first. No data was opened.` : err.message);
     process.exit(1);
   });
-  server.listen(config.port, '127.0.0.1', async () => {
-    writeFileSync(lock, String(process.pid));
+  server.listen(config.port, config.host, async () => {
+    writeFileSync(lock, me);
     const main = await workspaces.get(DEFAULT_WORKSPACE);
-    console.log(`lattice listening on http://127.0.0.1:${config.port}  (MCP at /mcp)`);
+    console.log(`lattice listening on http://${config.host}:${config.port}  (MCP at /mcp)`);
+    if (config.publicHosts.length) console.log(`answering to: ${config.publicHosts.join(', ')}`);
     console.log(`data: ${config.dataDir}`);
     console.log(`packs: ${main.lattice.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
     console.log(`auth: ${config.auth}`);
