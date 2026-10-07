@@ -347,3 +347,20 @@ test('dev mode turns review off and offers agents a restart; without it neither 
   process.env.LATTICE_DEV = '0';
   assert.equal(loadConfig().dev, false);
 });
+
+test('an agent can point the human\'s screen, and its changes point it too', async () => {
+  const { call } = await serve('off');
+  assert.match((await call('/agent/show', undefined, {})).error, /needs "entity" or "screen"/);
+
+  await call('/agent/show', undefined, { actor: 'robot', screen: 'roadmap', of: 'e_x', note: 'Look here' });
+  const shown = (await call('/api/pulse')).result.focus;
+  assert.deepEqual([shown.hash, shown.actor, shown.note], ['roadmap/e_x', 'robot', 'Look here']);
+
+  await call('/agent/change', undefined, { actor: 'robot', reason: 'A note', ops: [{ op: 'create', type: 'note', title: 'N' }] });
+  const proposed = (await call('/api/pulse')).result.focus;
+  assert.deepEqual([proposed.hash, proposed.note], ['review', 'A note'], 'a change that waits for review points at Review');
+  assert.ok(proposed.at >= shown.at);
+
+  await call('/api/change', undefined, { reason: 'mine', ops: [{ op: 'create', type: 'note', title: 'M' }] });
+  assert.equal((await call('/api/pulse')).result.focus.hash, 'review', 'the human\'s own changes do not move their screen');
+});

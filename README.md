@@ -63,6 +63,12 @@ too. The tree itself is declared in the software pack (`trees` in
 branches and work, which field orders them, and which statuses mean "now". A
 pack can declare another tree the same way, with no code.
 
+**Following agents.** With "Follow agents" ticked (bottom of the menu), an
+agent can bring your page to what it is working on: every change it makes
+opens what it touched (or Review, when the change waits there), and the `show`
+tool opens any entity or screen with a one-line note. Anything you are in the
+middle of is kept; the note offers the jump instead.
+
 The graph draws the map as nodes and arrows: what blocks what, what belongs to
 what, or every relation. Open it on one entity (the **Graph** button on its
 page) to see only its neighbourhood, one to four steps out. Colour shows the

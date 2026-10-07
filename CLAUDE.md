@@ -30,10 +30,18 @@ start of a session:
   `restart` tool and wait for `GET /health`. If it does not come back, the
   reason is in `runs/dev-server.log`; fix the code and it starts again on the
   next file change. Without dev mode (no `restart` tool), ask the owner.
-- **Never test against the real map.** `data/` is the owner's live map. To
-  exercise the server or the UI, start a throwaway one:
+- **Test where the owner can watch.** In dev mode, try things on the running
+  server (port 3100), which is the page the owner has open, and keep their
+  screen with you: call `show` before each step worth seeing (a change you make
+  already moves it). Say in the reason that it is a test, and undo what you
+  made when you are done (`undo` with the change set). Drive a browser only
+  when you need to click, and then a visible one on that same server.
+- **A throwaway server is for what the live one cannot take:** token identity,
+  schema changes, launches, and anything that destroys or floods data. Always
+  give it its own data folder:
   `LATTICE_PORT=3199 LATTICE_DATA=<temp folder>/data node src/server.ts`
-  (add `LATTICE_AUTH=tokens` to test identity). Delete it afterwards.
+  (add `LATTICE_AUTH=tokens` to test identity). Delete it afterwards. Never
+  point a second server at `data/`; the lock refuses it.
 - **Back up `data/` before changing the database schema**, then confirm the
   entity and event counts are unchanged after the restart.
 - **One write path.** Every change to entities and relations goes through

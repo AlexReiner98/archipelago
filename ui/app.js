@@ -1794,11 +1794,62 @@ main.addEventListener('input', (e) => {
   if (e.target.tagName !== 'SELECT') dirty = true;
 });
 
+// Following: an agent can point this page at what it is working on (the `show`
+// tool, and every change it makes). With "Follow agents" on, the page goes
+// there; a line at the bottom says who sent it and why. Anything half done on
+// the page is kept, and the line offers the jump instead.
+const following = {
+  get on() {
+    try {
+      return localStorage.getItem('lattice-follow') !== 'off';
+    } catch {
+      return true;
+    }
+  },
+  set on(value) {
+    try {
+      localStorage.setItem('lattice-follow', value ? 'on' : 'off');
+    } catch {
+      // Without storage the choice lasts until the page is reloaded.
+    }
+  },
+};
+const followBox = document.querySelector('#follow input');
+followBox.checked = following.on;
+followBox.addEventListener('change', () => (following.on = followBox.checked));
+const followed = h('div', { id: 'followed', hidden: true });
+document.body.append(followed);
+let seenFocus;
+let followedTimer;
+
+function follow(focus) {
+  // The first answer only says where things stand; an old pointer is not followed.
+  const fresh = seenFocus !== undefined && focus && focus.at !== seenFocus;
+  seenFocus = focus?.at ?? 0;
+  if (!fresh || !following.on) return;
+  const there = `#/${focus.hash}`;
+  const busy = dirty || document.querySelector('dialog[open]');
+  followed.replaceChildren(
+    ...[
+      h('strong', {}, focus.actor),
+      h('span', { class: 'grow' }, focus.note ?? (busy ? 'is working somewhere else' : 'brought you here')),
+      busy && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
+      h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
+    ].filter(Boolean),
+  );
+  followed.hidden = false;
+  clearTimeout(followedTimer);
+  followedTimer = setTimeout(() => (followed.hidden = true), 12000);
+  if (!busy && location.hash !== there) location.hash = there;
+}
+
 async function checkPulse() {
   if (document.hidden) return;
   let now;
   try {
-    now = (await api('pulse')).stamp;
+    const beat = await api('pulse');
+    now = beat.stamp;
+    follow(beat.focus);
   } catch {
     return;
   }

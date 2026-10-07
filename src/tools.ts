@@ -101,6 +101,26 @@ export function configureRestart(restart: (() => void) | undefined): void {
 }
 export const devMode = () => restartServer !== undefined;
 
+/** Where an agent last pointed the human's screen: a place in the web UI. */
+interface Focus {
+  /** When it was set; a new value is how the UI knows to move. */
+  at: number;
+  /** The UI address without its "#/", e.g. "e/e_abc" or "roadmap/e_abc". */
+  hash: string;
+  actor: string;
+  note?: string;
+}
+
+// Kept in memory, per workspace and per person: it is where to look right now,
+// not a fact about the map, and it means nothing after a restart.
+const focus = new Map<string, Focus>();
+const focusKey = (l: Lattice) => `${l.workspace}:${l.viewer ?? ''}`;
+function point(l: Lattice, actor: Actor, hash: string, note?: string): Focus {
+  const next = { at: Date.now(), hash, actor: actor.name, note };
+  focus.set(focusKey(l), next);
+  return next;
+}
+
 export const TOOLS: Record<string, Tool> = {
   schema: {
     description:
@@ -163,7 +183,23 @@ export const TOOLS: Record<string, Tool> = {
     description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
     humanOnly: true,
     input: {},
-    run: async (l) => l.pulse(),
+    run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)) }),
+  },
+  show: {
+    description:
+      'Point the human\'s web UI at something, so they can follow what you are doing: an entity, or a screen (optionally "of" one entity: the graph around it, or a project\'s roadmap). ' +
+      'Their page goes there within a couple of seconds if they have "Follow agents" on. Add a short note saying what they are looking at. ' +
+      'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
+    input: {
+      entity: z.string().optional().describe('An entity id: open its page.'),
+      screen: z.enum(['today', 'review', 'map', 'graph', 'roadmap', 'automations', 'activity', 'workspace']).optional(),
+      of: z.string().optional().describe('With screen graph or roadmap: the entity it is drawn for.'),
+      note: z.string().max(200).optional().describe('One line shown beside the page.'),
+    },
+    run: async (l, actor, input) => {
+      if (!input.entity && !input.screen) throw new Error('show needs "entity" or "screen".');
+      return point(l, actor, input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);
+    },
   },
   change: {
     description:
@@ -175,7 +211,18 @@ export const TOOLS: Record<string, Tool> = {
       reason: z.string().min(1).describe('Why this change is being made. Shown in the activity log.'),
       source: source.optional().describe('Where these facts came from. Individual ops can override it.'),
     },
-    run: async (l, actor, input) => l.change(actor, input),
+    run: async (l, actor, input) => {
+      const result = await l.change(actor, input);
+      // The human's screen follows an agent's change: to Review when it waits
+      // there, otherwise to the first thing it made or touched.
+      if (actor.kind === 'agent') {
+        const made = 'created' in result ? Object.values(result.created as Record<string, string>)[0] : undefined;
+        const touched = (input.ops as { id?: string }[]).find((o) => o.id)?.id;
+        const target = made ?? touched;
+        point(l, actor, result.status === 'proposed' ? 'review' : target ? `e/${target}` : 'activity', input.reason);
+      }
+      return result;
+    },
   },
   undo: {
     description:
