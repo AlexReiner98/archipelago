@@ -1,0 +1,43 @@
+{
+  "id": "sys",
+  "version": "0.1.0",
+  "title": "System",
+  "description": "The system's own primitives, stored in the same map so it describes itself.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "sys.source",
+      "title": "Source",
+      "description": "The original input a fact came from: a file, an email, a commit, a conversation.",
+      "statuses": { "open": ["recorded"], "closed": ["removed"] },
+      "fields": {
+        "uri": { "type": "string", "description": "A stable address: a file path, URL or message id." },
+        "kind": { "type": "enum", "values": ["file", "email", "web", "conversation", "commit", "other"] }
+      }
+    },
+    {
+      "id": "sys.connection",
+      "extends": "resource",
+      "title": "Connection",
+      "description": "An external tool, such as an MCP server. Status says whether it is reachable right now.",
+      "fields": {
+        "exclusive": { "type": "boolean", "default": false },
+        "url": { "type": "url", "description": "Checked by check_connections." },
+        "audit_log": { "type": "string", "description": "Path to a JSON-lines log of tool calls, read by import_audit." }
+      }
+    },
+    {
+      "id": "sys.run",
+      "title": "Run",
+      "description": "One agent session or one execution of an automation.",
+      "statuses": { "open": ["running", "waiting"], "closed": ["finished", "failed", "cancelled"] },
+      "fields": {
+        "surface": { "type": "string", "description": "Where it runs, e.g. claude-code." },
+        "cwd": { "type": "string" }
+      }
+    }
+  ],
+  "relations": [
+    { "id": "sys.works_on", "title": "is working on", "inverse": "is being worked on by", "from": ["sys.run", "agent", "person"], "to": ["*"], "description": "What a run or actor is doing right now." }
+  ]
+}

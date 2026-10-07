@@ -1,0 +1,705 @@
+// The map and its single write path. Every change to entities and relations
+// goes through change(): it is validated, checked against policy, then either
+// applied or stored as a proposal for a human, and always logged.
+
+import type { PGlite } from '@electric-sql/pglite';
+import { existsSync, readFileSync } from 'node:fs';
+import { newId, type Q } from './db.ts';
+import type { Registry, TypeDef } from './packs.ts';
+
+export interface Actor {
+  kind: 'human' | 'agent';
+  name: string;
+}
+
+export type Level = 'auto' | 'propose' | 'forbidden';
+export type OpKind = 'create' | 'update' | 'link' | 'unlink' | 'archive' | 'merge' | 'define_type';
+export type Policy = Record<OpKind, Level>;
+
+/** Agents propose everything until trust is built; loosen per op in lattice.config.json. */
+export const DEFAULT_AGENT_POLICY: Policy = {
+  create: 'propose',
+  update: 'propose',
+  link: 'propose',
+  unlink: 'propose',
+  archive: 'propose',
+  merge: 'propose',
+  define_type: 'propose',
+};
+
+type Props = Record<string, unknown>;
+
+export interface CreateOp {
+  op: 'create';
+  ref?: string;
+  type: string;
+  title: string;
+  body?: string;
+  status?: string;
+  owner?: string;
+  visibility?: 'private' | 'shared';
+  confidence?: number;
+  props?: Props;
+  /** Where this fact came from, when it differs from the change's source. */
+  source?: SourceSpec;
+}
+export interface UpdateOp {
+  op: 'update';
+  id: string;
+  title?: string;
+  body?: string;
+  status?: string;
+  owner?: string | null;
+  visibility?: 'private' | 'shared';
+  confidence?: number;
+  props?: Props;
+}
+export interface LinkOp {
+  op: 'link';
+  type: string;
+  from: string;
+  to: string;
+  props?: Props;
+  confidence?: number;
+  source?: SourceSpec;
+}
+export interface UnlinkOp {
+  op: 'unlink';
+  relation: string;
+}
+export interface ArchiveOp {
+  op: 'archive';
+  id: string;
+}
+export interface MergeOp {
+  op: 'merge';
+  keep: string;
+  drop: string;
+}
+export interface DefineTypeOp {
+  op: 'define_type';
+  type: TypeDef;
+}
+export type Op = CreateOp | UpdateOp | LinkOp | UnlinkOp | ArchiveOp | MergeOp | DefineTypeOp;
+
+export interface SourceSpec {
+  uri: string;
+  title?: string;
+  kind?: string;
+  excerpt?: string;
+}
+
+export interface ChangeInput {
+  ops: Op[];
+  reason: string;
+  source?: SourceSpec;
+}
+
+export interface Entity {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  status: string;
+  is_open: boolean;
+  owner: string | null;
+  visibility: string;
+  confidence: number;
+  props: Props;
+  source_id: string | null;
+  created_at: Date;
+  updated_at: Date;
+  archived_at: Date | null;
+}
+
+export interface Proposal {
+  id: string;
+  ts: Date;
+  actor: string;
+  reason: string;
+  source: SourceSpec | null;
+  ops: Op[];
+  warnings: string[];
+  status: string;
+  decided_by: string | null;
+  decided_at: Date | null;
+  note: string | null;
+}
+
+export const actorId = (actor: Actor) => `${actor.kind}:${actor.name}`;
+
+const clip = (value: unknown) => (typeof value === 'string' && value.length > 200 ? value.slice(0, 200) + '…' : value);
+
+export class Lattice {
+  readonly db: PGlite;
+  readonly registry: Registry;
+  readonly policy: Policy;
+
+  constructor(db: PGlite, registry: Registry, policy: Partial<Policy> = {}) {
+    this.db = db;
+    this.registry = registry;
+    this.policy = { ...DEFAULT_AGENT_POLICY, ...policy };
+  }
+
+  // ---- writes ----------------------------------------------------------
+
+  async change(actor: Actor, input: ChangeInput) {
+    if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
+    const { warnings } = await this.plan(input.ops);
+    const levels = input.ops.map((op) => (actor.kind === 'human' ? 'auto' : this.policy[op.op]));
+    const forbidden = input.ops.filter((_, i) => levels[i] === 'forbidden').map((op) => op.op);
+    if (forbidden.length) throw new Error(`Policy forbids agents from: ${[...new Set(forbidden)].join(', ')}`);
+
+    if (levels.includes('propose')) {
+      const id = newId('p');
+      await this.db.query(
+        `insert into proposal (id, actor, reason, source, ops, warnings) values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb)`,
+        [id, actorId(actor), input.reason, JSON.stringify(input.source ?? null), JSON.stringify(input.ops), JSON.stringify(warnings)],
+      );
+      await this.log(this.db, { actor: actorId(actor), action: 'proposal.create', reason: input.reason, detail: { proposal: id, ops: input.ops.length } });
+      return {
+        status: 'proposed' as const,
+        proposal: id,
+        warnings,
+        note: 'Nothing has changed yet. A human must approve this proposal before it appears in the map.',
+      };
+    }
+    return this.apply(actorId(actor), input);
+  }
+
+  /** `ops`, when given, replaces the proposed ops: the reviewer's corrected version. */
+  async decide(actor: Actor, input: { proposal: string; approve: boolean; except?: string[]; note?: string; ops?: Op[] }) {
+    if (actor.kind !== 'human') throw new Error('Only a human can approve or reject proposals.');
+    const { rows } = await this.db.query<Proposal>(`select * from proposal where id = $1`, [input.proposal]);
+    const proposal = rows[0];
+    if (!proposal) throw new Error(`No proposal "${input.proposal}"`);
+    if (proposal.status !== 'pending') throw new Error(`Proposal ${proposal.id} is already ${proposal.status}`);
+
+    let result: Awaited<ReturnType<Lattice['apply']>> | undefined;
+    if (input.approve) {
+      result = await this.apply(
+        proposal.actor,
+        { ops: input.ops ?? proposal.ops, reason: proposal.reason, source: proposal.source ?? undefined },
+        { except: input.except, approvedBy: actorId(actor), revised: Boolean(input.ops) },
+      );
+      if (input.ops) await this.db.query(`update proposal set ops = $2::jsonb where id = $1`, [proposal.id, JSON.stringify(input.ops)]);
+    }
+    const status = input.approve ? 'approved' : 'rejected';
+    await this.db.query(`update proposal set status = $2, decided_by = $3, decided_at = now(), note = $4 where id = $1`, [
+      proposal.id,
+      status,
+      actorId(actor),
+      input.note ?? null,
+    ]);
+    await this.log(this.db, {
+      actor: actorId(actor),
+      action: `proposal.${input.approve ? 'approve' : 'reject'}`,
+      changeset: result?.changeset,
+      reason: input.note ?? '',
+      detail: { proposal: proposal.id, proposed_by: proposal.actor, except: input.except ?? [], revised: Boolean(input.ops) },
+    });
+    return { ...result, proposal: proposal.id, status };
+  }
+
+  /** Validate ops against the schema and the current map. Throws listing every problem. */
+  async plan(ops: Op[]): Promise<{ warnings: string[] }> {
+    if (!ops.length) throw new Error('A change needs at least one op.');
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const refs = new Map<string, string>(); // ref -> type
+    const seen = new Set<string>();
+    const reg = this.registry;
+
+    const typeOf = async (key: string, where: string): Promise<string | undefined> => {
+      const local = refs.get(key);
+      if (local) return local;
+      const found = await this.entity(key);
+      if (!found) errors.push(`${where}: no entity or ref "${key}"`);
+      else if (found.archived_at) warnings.push(`${where}: "${found.title}" (${key}) is archived`);
+      return found?.type;
+    };
+    const existing = async (id: string, where: string) => {
+      const found = await this.entity(id);
+      if (!found) errors.push(`${where}: no entity "${id}"`);
+      return found;
+    };
+    const checkOwner = async (owner: string, where: string) => {
+      const type = await typeOf(owner, where);
+      if (type && !reg.isA(type, 'person') && !reg.isA(type, 'agent')) errors.push(`${where}: owner must be a person or agent, not ${type}`);
+    };
+
+    for (const [i, op] of ops.entries()) {
+      const where = `op ${i + 1} (${op.op})`;
+      switch (op.op) {
+        case 'create': {
+          if (!op.title?.trim()) errors.push(`${where}: title is required`);
+          errors.push(...reg.check(op.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
+          if (op.owner) await checkOwner(op.owner, where);
+          const type = reg.type(op.type);
+          if (!type) break;
+          if (op.ref) {
+            if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
+            refs.set(op.ref, op.type);
+          }
+          const root = type.lineage.at(-1)!;
+          const key = `${root}\n${op.title.trim().toLowerCase()}`;
+          if (seen.has(key)) warnings.push(`${where}: "${op.title}" appears more than once in this change`);
+          seen.add(key);
+          const { rows } = await this.db.query<Entity>(
+            `select id, type, title from entity where lower(title) = lower($1) and type = any($2::text[]) and archived_at is null`,
+            [op.title.trim(), reg.family(root)],
+          );
+          for (const dup of rows) warnings.push(`${where}: possible duplicate of existing ${dup.type} "${dup.title}" (${dup.id})`);
+          break;
+        }
+        case 'update': {
+          const target = await existing(op.id, where);
+          if (!target) break;
+          errors.push(...reg.check(target.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
+          if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
+          if (op.owner) await checkOwner(op.owner, where);
+          break;
+        }
+        case 'link': {
+          const from = await typeOf(op.from, where);
+          const to = await typeOf(op.to, where);
+          if (op.from === op.to) errors.push(`${where}: cannot link an entity to itself`);
+          if (from && to) {
+            const problem = reg.checkRelation(op.type, from, to);
+            if (problem) errors.push(`${where}: ${problem}`);
+          }
+          break;
+        }
+        case 'unlink': {
+          const { rows } = await this.db.query(`select 1 from relation where id = $1 and valid_to is null`, [op.relation]);
+          if (!rows.length) errors.push(`${where}: no active relation "${op.relation}"`);
+          break;
+        }
+        case 'archive':
+          await existing(op.id, where);
+          break;
+        case 'merge': {
+          const keep = await existing(op.keep, where);
+          const drop = await existing(op.drop, where);
+          if (op.keep === op.drop) errors.push(`${where}: keep and drop are the same entity`);
+          if (keep && drop && keep.type !== drop.type) warnings.push(`${where}: merging a ${drop.type} into a ${keep.type}`);
+          break;
+        }
+        case 'define_type':
+          errors.push(...reg.checkNewType(op.type).map((p) => `${where}: ${p}`));
+          break;
+      }
+    }
+    if (errors.length) throw new Error(`Change rejected:\n- ${errors.join('\n- ')}`);
+    return { warnings };
+  }
+
+  private async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean } = {}) {
+    const ops = dropExcepted(input.ops, opts.except ?? []);
+    if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
+    // Validate again: the map may have changed since this was proposed.
+    const { warnings } = await this.plan(ops);
+    const changeset = newId('c');
+    const created: Record<string, string> = {};
+    const extra = opts.approvedBy ? { approved_by: opts.approvedBy, ...(opts.revised && { revised_by: opts.approvedBy }) } : {};
+    const reg = this.registry;
+
+    await this.db.transaction(async (tx) => {
+      const defaultSource = input.source ? await this.ensureSource(tx, actor, input.source, changeset) : null;
+      const sourceOf = async (op: { source?: SourceSpec }) => (op.source ? this.ensureSource(tx, actor, op.source, changeset) : defaultSource);
+      const resolve = (key: string) => created[key] ?? key;
+      const log = (action: string, target: string, detail: Props) =>
+        this.log(tx, { actor, action, target, changeset, reason: input.reason, detail: { ...detail, ...extra } });
+
+      for (const [i, op] of ops.entries()) {
+        switch (op.op) {
+          case 'create': {
+            const type = reg.type(op.type)!;
+            const id = newId('e');
+            const status = op.status ?? type.statuses.open[0];
+            await tx.query(
+              `insert into entity (id, type, title, body, status, is_open, owner, visibility, confidence, props, source_id)
+               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)`,
+              [
+                id,
+                op.type,
+                op.title.trim(),
+                op.body ?? '',
+                status,
+                reg.isOpen(op.type, status),
+                op.owner ? resolve(op.owner) : null,
+                op.visibility ?? 'private',
+                op.confidence ?? 1,
+                JSON.stringify({ ...reg.defaults(op.type), ...op.props }),
+                await sourceOf(op),
+              ],
+            );
+            created[op.ref ?? `#${i + 1}`] = id;
+            await log('entity.create', id, { type: op.type, title: op.title.trim(), status });
+            break;
+          }
+          case 'update': {
+            const before = (await this.entity(op.id, tx))!;
+            const props = { ...before.props };
+            const changes: Record<string, { from: unknown; to: unknown }> = {};
+            for (const [key, value] of Object.entries(op.props ?? {})) {
+              changes[`props.${key}`] = { from: clip(props[key] ?? null), to: clip(value) };
+              if (value === null) delete props[key];
+              else props[key] = value;
+            }
+            const next = {
+              title: op.title?.trim() ?? before.title,
+              body: op.body ?? before.body,
+              status: op.status ?? before.status,
+              owner: op.owner === undefined ? before.owner : op.owner,
+              visibility: op.visibility ?? before.visibility,
+              confidence: op.confidence ?? before.confidence,
+            };
+            for (const key of Object.keys(next) as (keyof typeof next)[]) {
+              if (next[key] !== before[key]) changes[key] = { from: clip(before[key]), to: clip(next[key]) };
+            }
+            await tx.query(
+              `update entity set title = $2, body = $3, status = $4, is_open = $5, owner = $6, visibility = $7,
+                 confidence = $8, props = $9::jsonb, updated_at = now() where id = $1`,
+              [op.id, next.title, next.body, next.status, reg.isOpen(before.type, next.status), next.owner, next.visibility, next.confidence, JSON.stringify(props)],
+            );
+            await log('entity.update', op.id, { title: next.title, changes });
+            break;
+          }
+          case 'link': {
+            const from = resolve(op.from);
+            const to = resolve(op.to);
+            const same = await tx.query<{ id: string }>(
+              `select id from relation where type = $1 and from_id = $2 and to_id = $3 and valid_to is null`,
+              [op.type, from, to],
+            );
+            if (same.rows.length) break; // already linked
+            const id = newId('r');
+            await tx.query(
+              `insert into relation (id, type, from_id, to_id, props, confidence, source_id) values ($1, $2, $3, $4, $5::jsonb, $6, $7)`,
+              [id, op.type, from, to, JSON.stringify(op.props ?? {}), op.confidence ?? 1, await sourceOf(op)],
+            );
+            await log('relation.link', from, { relation: id, type: op.type, to });
+            break;
+          }
+          case 'unlink': {
+            const { rows } = await tx.query<{ type: string; from_id: string; to_id: string }>(
+              `update relation set valid_to = now() where id = $1 returning type, from_id, to_id`,
+              [op.relation],
+            );
+            await log('relation.unlink', rows[0].from_id, { relation: op.relation, type: rows[0].type, to: rows[0].to_id });
+            break;
+          }
+          case 'archive': {
+            const { rows } = await tx.query<{ title: string }>(`update entity set archived_at = now(), updated_at = now() where id = $1 returning title`, [op.id]);
+            await log('entity.archive', op.id, { title: rows[0].title });
+            break;
+          }
+          case 'merge': {
+            const keep = (await this.entity(op.keep, tx))!;
+            const drop = (await this.entity(op.drop, tx))!;
+            await tx.query(`update relation set from_id = $1 where from_id = $2`, [op.keep, op.drop]);
+            await tx.query(`update relation set to_id = $1 where to_id = $2`, [op.keep, op.drop]);
+            await tx.query(`update relation set valid_to = now() where from_id = to_id and valid_to is null`);
+            await tx.query(`update entity set owner = $1 where owner = $2`, [op.keep, op.drop]);
+            const body = [keep.body, drop.body].filter(Boolean).join('\n\n');
+            await tx.query(`update entity set props = $2::jsonb, body = $3, updated_at = now() where id = $1`, [
+              op.keep,
+              JSON.stringify({ ...drop.props, ...keep.props }),
+              body,
+            ]);
+            await tx.query(`update entity set archived_at = now(), updated_at = now() where id = $1`, [op.drop]);
+            await log('entity.merge', op.keep, { title: keep.title, absorbed: { id: drop.id, title: drop.title, props: drop.props } });
+            break;
+          }
+          case 'define_type':
+            break; // handled after the transaction
+        }
+      }
+    });
+
+    for (const op of ops) {
+      if (op.op !== 'define_type') continue;
+      this.registry.defineLocal(op.type);
+      await this.log(this.db, { actor, action: 'type.define', changeset, reason: input.reason, detail: { type: op.type, ...extra } });
+    }
+    return { status: 'applied' as const, changeset, created, warnings };
+  }
+
+  private async ensureSource(q: Q, actor: string, spec: SourceSpec, changeset: string): Promise<string | null> {
+    if (!this.registry.type('sys.source')) return null;
+    const found = await q.query<{ id: string }>(`select id from entity where type = 'sys.source' and props->>'uri' = $1 and archived_at is null`, [spec.uri]);
+    if (found.rows.length) return found.rows[0].id;
+    const id = newId('e');
+    const props: Props = { uri: spec.uri };
+    if (spec.kind) props.kind = spec.kind;
+    const problems = this.registry.check('sys.source', undefined, props);
+    if (problems.length) throw new Error(`Change rejected:\n- source: ${problems.join('\n- source: ')}`);
+    await q.query(
+      `insert into entity (id, type, title, body, status, is_open, props) values ($1, 'sys.source', $2, $3, 'recorded', true, $4::jsonb)`,
+      [id, spec.title ?? spec.uri, spec.excerpt ?? '', JSON.stringify(props)],
+    );
+    await this.log(q, { actor, action: 'entity.create', target: id, changeset, reason: 'Source of this change', detail: { type: 'sys.source', title: spec.title ?? spec.uri } });
+    return id;
+  }
+
+  async log(
+    q: Q,
+    e: { actor: string; action: string; target?: string; changeset?: string; reason?: string; detail?: Props; origin?: string; ts?: string },
+  ): Promise<void> {
+    await q.query(
+      `insert into event (actor, action, target_id, changeset, reason, detail, origin, ts)
+       values ($1, $2, $3, $4, $5, $6::jsonb, $7, coalesce($8::timestamptz, now()))`,
+      [e.actor, e.action, e.target ?? null, e.changeset ?? null, e.reason ?? '', JSON.stringify(e.detail ?? {}), e.origin ?? 'lattice', e.ts ?? null],
+    );
+  }
+
+  // ---- resources and connections ----------------------------------------
+  // These take effect at once for agents too: coordination that waits for
+  // approval is no coordination.
+
+  async claim(actor: Actor, input: { resource: string; holder: string; for?: string; reason: string }) {
+    return this.db.transaction(async (tx) => {
+      const resource = await this.entity(input.resource, tx);
+      if (!resource || !this.registry.isA(resource.type, 'resource')) throw new Error(`"${input.resource}" is not a resource`);
+      const holder = await this.entity(input.holder, tx);
+      if (!holder) throw new Error(`No entity "${input.holder}" to hold it`);
+      if (input.for && !(await this.entity(input.for, tx))) throw new Error(`No entity "${input.for}"`);
+      if (resource.status !== 'available') throw new Error(`"${resource.title}" is ${resource.status}`);
+
+      const { rows: held } = await tx.query<{ id: string; from_id: string; valid_from: Date; title: string }>(
+        `select r.id, r.from_id, r.valid_from, e.title from relation r join entity e on e.id = r.from_id
+         where r.type = 'holds' and r.to_id = $1 and r.valid_to is null`,
+        [resource.id],
+      );
+      const mine = held.find((h) => h.from_id === holder.id);
+      if (mine) return { status: 'already_held' as const, relation: mine.id };
+      if (resource.props.exclusive !== false && held.length) {
+        const h = held[0];
+        throw new Error(`"${resource.title}" is held by "${h.title}" (${h.from_id}) since ${h.valid_from.toISOString()}. It must be released first.`);
+      }
+      const id = newId('r');
+      await tx.query(`insert into relation (id, type, from_id, to_id, props) values ($1, 'holds', $2, $3, $4::jsonb)`, [
+        id,
+        holder.id,
+        resource.id,
+        JSON.stringify(input.for ? { for: input.for } : {}),
+      ]);
+      await this.log(tx, { actor: actorId(actor), action: 'resource.claim', target: resource.id, reason: input.reason, detail: { resource: resource.title, holder: holder.id, holder_title: holder.title, for: input.for } });
+      return { status: 'claimed' as const, relation: id };
+    });
+  }
+
+  async release(actor: Actor, input: { resource: string; holder?: string; reason: string }) {
+    const { rows } = await this.db.query<{ from_id: string }>(
+      `update relation set valid_to = now() where type = 'holds' and to_id = $1 and valid_to is null
+         and ($2::text is null or from_id = $2) returning from_id`,
+      [input.resource, input.holder ?? null],
+    );
+    for (const row of rows) {
+      await this.log(this.db, { actor: actorId(actor), action: 'resource.release', target: input.resource, reason: input.reason, detail: { holder: row.from_id } });
+    }
+    return { released: rows.length };
+  }
+
+  /** Ping every connection's URL and record whether it is reachable. */
+  async checkConnections(actor: Actor) {
+    const { rows } = await this.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and is_open`, [
+      this.registry.family('sys.connection'),
+    ]);
+    const out = [];
+    for (const conn of rows) {
+      const url = conn.props.url as string | undefined;
+      if (!url) continue;
+      // Any HTTP answer, even an error status, means something is listening.
+      const reachable = await fetch(url, { signal: AbortSignal.timeout(2000) }).then(
+        () => true,
+        () => false,
+      );
+      const status = reachable ? 'available' : 'unavailable';
+      if (status !== conn.status) {
+        await this.db.query(`update entity set status = $2, updated_at = now() where id = $1`, [conn.id, status]);
+        await this.log(this.db, { actor: actorId(actor), action: 'connection.check', target: conn.id, reason: 'Reachability changed', detail: { title: conn.title, from: conn.status, to: status } });
+      }
+      out.push({ id: conn.id, title: conn.title, url, status });
+    }
+    return out;
+  }
+
+  /**
+   * Copy new entries from a connection's JSON-lines tool-call log into the
+   * event log. Expects lines shaped {ts, tool, params, durationMs, ok, error}.
+   */
+  async importAudit(actor: Actor, input: { connection: string }) {
+    const conn = await this.entity(input.connection);
+    if (!conn || !this.registry.isA(conn.type, 'sys.connection')) throw new Error(`"${input.connection}" is not a connection`);
+    const path = conn.props.audit_log as string | undefined;
+    if (!path) throw new Error(`"${conn.title}" has no audit_log path`);
+    if (!existsSync(path)) return { imported: 0, path, note: 'Log file does not exist yet.' };
+
+    const cursorKey = `audit_cursor:${conn.id}`;
+    const cursor = (await this.setting<string>(cursorKey)) ?? '';
+    let latest = cursor;
+    let imported = 0;
+    let skipped = 0;
+    await this.db.transaction(async (tx) => {
+      for (const line of readFileSync(path, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        let entry: { ts?: string; tool?: string; params?: unknown; durationMs?: number; ok?: boolean; error?: unknown };
+        try {
+          entry = JSON.parse(line);
+        } catch {
+          skipped++;
+          continue;
+        }
+        if (!entry.ts || !entry.tool || Number.isNaN(Date.parse(entry.ts))) {
+          skipped++;
+          continue;
+        }
+        if (entry.ts <= cursor) continue;
+        await this.log(tx, {
+          actor: `external:${conn.title}`,
+          action: entry.tool,
+          target: conn.id,
+          origin: 'external',
+          ts: entry.ts,
+          detail: { params: entry.params, durationMs: entry.durationMs, ok: entry.ok, error: entry.error },
+        });
+        if (entry.ts > latest) latest = entry.ts;
+        imported++;
+      }
+      await tx.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [
+        cursorKey,
+        JSON.stringify(latest),
+      ]);
+    });
+    if (imported) await this.log(this.db, { actor: actorId(actor), action: 'audit.import', target: conn.id, detail: { imported, path } });
+    return { imported, skipped, path };
+  }
+
+  // ---- settings --------------------------------------------------------
+
+  async setting<T>(key: string): Promise<T | undefined> {
+    const { rows } = await this.db.query<{ value: T }>(`select value from setting where key = $1`, [key]);
+    return rows[0]?.value;
+  }
+
+  /** Create (or find) the person this workspace belongs to and make them the default for views. */
+  async init(actor: Actor, input: { name: string; email?: string }) {
+    if (actor.kind !== 'human') throw new Error('Only a human can set the workspace owner.');
+    const found = await this.db.query<{ id: string }>(`select id from entity where type = 'person' and lower(title) = lower($1) and archived_at is null`, [input.name]);
+    let id = found.rows[0]?.id;
+    if (!id) {
+      const result = await this.apply(actorId(actor), {
+        ops: [{ op: 'create', ref: 'me', type: 'person', title: input.name, props: input.email ? { email: input.email } : {} }],
+        reason: 'Workspace owner',
+      });
+      id = result.created.me;
+    }
+    await this.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(id)]);
+    return { me: id };
+  }
+
+  // ---- reads -----------------------------------------------------------
+
+  async entity(id: string, q: Q = this.db): Promise<Entity | undefined> {
+    const { rows } = await q.query<Entity>(`select * from entity where id = $1`, [id]);
+    return rows[0];
+  }
+
+  async search(input: { q?: string; type?: string; status?: string; owner?: string; open?: boolean; include_archived?: boolean; limit?: number }) {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    const add = (sql: string, value: unknown) => {
+      params.push(value);
+      where.push(sql.replaceAll('?', `$${params.length}`));
+    };
+    if (input.q) add(`(title ilike '%' || ? || '%' or to_tsvector('english', title || ' ' || body) @@ websearch_to_tsquery('english', ?))`, input.q);
+    if (input.type) {
+      if (!this.registry.type(input.type)) throw new Error(`Unknown type "${input.type}"`);
+      add(`type = any(?::text[])`, this.registry.family(input.type));
+    }
+    if (input.status) add(`status = ?`, input.status);
+    if (input.owner) add(`owner = ?`, input.owner);
+    if (input.open !== undefined) add(`is_open = ?`, input.open);
+    if (!input.include_archived) where.push(`archived_at is null`);
+    params.push(Math.min(input.limit ?? 25, 200));
+    const { rows } = await this.db.query<Entity>(
+      `select id, type, title, status, is_open, owner, confidence, props, updated_at from entity
+       ${where.length ? 'where ' + where.join(' and ') : ''} order by updated_at desc limit $${params.length}`,
+      params,
+    );
+    return rows;
+  }
+
+  async get(id: string) {
+    const entity = await this.entity(id);
+    if (!entity) throw new Error(`No entity "${id}"`);
+    const rel = `r.id as relation, r.type, r.props, r.confidence, e.id, e.type as entity_type, e.title, e.status`;
+    const [out, inc, events, source] = await Promise.all([
+      this.db.query(`select ${rel} from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.valid_to is null`, [id]),
+      this.db.query(`select ${rel} from relation r join entity e on e.id = r.from_id where r.to_id = $1 and r.valid_to is null`, [id]),
+      this.db.query(`select seq, ts, actor, action, reason, detail from event where target_id = $1 order by seq desc limit 15`, [id]),
+      entity.source_id ? this.entity(entity.source_id) : undefined,
+    ]);
+    return {
+      entity,
+      source: source && { id: source.id, title: source.title, uri: source.props.uri },
+      outgoing: out.rows,
+      incoming: inc.rows,
+      recent_events: events.rows,
+    };
+  }
+
+  async events(input: { since?: string; target?: string; actor?: string; origin?: string; limit?: number }) {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    const add = (sql: string, value: unknown) => {
+      params.push(value);
+      where.push(sql.replace('?', `$${params.length}`));
+    };
+    if (input.since) add(`ev.ts >= ?::timestamptz`, input.since);
+    if (input.target) add(`ev.target_id = ?`, input.target);
+    if (input.actor) add(`ev.actor = ?`, input.actor);
+    if (input.origin) add(`ev.origin = ?`, input.origin);
+    params.push(Math.min(input.limit ?? 50, 500));
+    const { rows } = await this.db.query(
+      `select ev.seq, ev.ts, ev.origin, ev.actor, ev.action, ev.target_id, e.title as target_title, ev.changeset, ev.reason, ev.detail
+       from event ev left join entity e on e.id = ev.target_id
+       ${where.length ? 'where ' + where.join(' and ') : ''} order by ev.seq desc limit $${params.length}`,
+      params,
+    );
+    return rows;
+  }
+
+  async proposals(input: { status?: string } = {}) {
+    const { rows } = await this.db.query<Proposal>(`select * from proposal where status = $1 order by ts`, [input.status ?? 'pending']);
+    return rows;
+  }
+}
+
+/**
+ * Remove the ops a reviewer excluded. An exclusion is a create's ref or "#n"
+ * for the nth op. Ops that depend on an excluded create go with it.
+ */
+function dropExcepted(ops: Op[], except: string[]): Op[] {
+  if (!except.length) return ops;
+  const skip = new Set(except);
+  const gone = new Set<string>();
+  const dropped = new Set<number>();
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const [i, op] of ops.entries()) {
+      if (dropped.has(i)) continue;
+      const excluded =
+        skip.has(`#${i + 1}`) ||
+        (op.op === 'create' && ((op.ref !== undefined && skip.has(op.ref)) || (op.owner !== undefined && gone.has(op.owner)))) ||
+        (op.op === 'link' && (gone.has(op.from) || gone.has(op.to)));
+      if (!excluded) continue;
+      dropped.add(i);
+      if (op.op === 'create' && op.ref) gone.add(op.ref);
+      changed = true;
+    }
+  }
+  return ops.filter((_, i) => !dropped.has(i));
+}
