@@ -502,6 +502,16 @@ test('a session that finishes says where the repository\'s open work stands', as
   assert.deepEqual([due.due, typeof due.projects[0].rechecked_at], [false, 'string']);
   await l.db.query(`update entity set props = props || '{"rechecked_at":"2020-01-01T00:00:00Z"}' where id = $1`, [made.proj]);
   assert.equal(((await VIEWS.recheck.run(l, { repo: made.repo })) as any).due, true, 'and is due again when it has');
+  // Asked for now, it does not wait: the interval and the items' age are set aside.
+  await callTool(l, agent, 'rechecked', { repo: made.repo });
+  const atOnce = (await VIEWS.recheck.run(l, { repo: made.repo, now: true })) as any;
+  assert.deepEqual([atOnce.due, atOnce.projects[0].items.length], [true, 2]);
+  // An issue filed as about a project, not as part of it, is the repository's work all the same.
+  const { drift } = await make(l, [
+    { op: 'create', ref: 'drift', type: 'issue', title: 'The carve reads origins' },
+    { op: 'link', type: 'about', from: 'drift', to: made.proj },
+  ]);
+  assert.ok(((await VIEWS.repo_work.run(l, { repo: made.repo })) as any).ready.some((i: any) => i.id === drift));
 
   // An open issue in the repository is its work too: shown at the start, asked about at the end.
   const { leak } = await make(l, [

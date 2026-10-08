@@ -323,11 +323,13 @@ change, and says it rests on the agent's reading of the commits.
 asks the server once a day whether a re-check is due. Each project living in
 the repository says how often, in its `recheck days` field (weekly when not
 set, 0 for never). When a project has waited that long and has open items
-nobody has changed or confirmed in that time, Claude checks the oldest five
-against the code: it changes what is done or wrong, marks what it has seen to
+nobody has changed or confirmed in that time, Claude is given the oldest of
+them and checks those the code can settle: it changes what is done or wrong, marks what it has seen to
 be still true (an update that changes nothing), notifies you of what the
 repository cannot tell it, and calls `rechecked`, which starts the wait again.
 A day when nothing is due ends before Claude is installed and costs no run.
+Run the workflow by hand from the Actions tab to have a re-check now,
+whatever the interval.
 The `oldest` view shows the same thing to anyone who asks: what has gone
 longest without a change or a confirmation.
 

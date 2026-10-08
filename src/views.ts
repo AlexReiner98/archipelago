@@ -332,18 +332,22 @@ async function findRepo(l: Lattice, key: string): Promise<Entity> {
   return repo;
 }
 
-/** Everything that lives in a repository, and all that is part of that, as a query over $1. */
+/**
+ * Everything that lives in a repository, and all that is part of that or about
+ * it, as a query over $1. An issue is often filed as about a project, not as
+ * part of it, and is the repository's work all the same.
+ */
 const REPO_SCOPE = `with recursive scope(id) as (
        select from_id from relation where type = 'software.lives_in' and to_id = $1 and valid_to is null
        union
-       select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null
+       select r.from_id from relation r join scope s on r.to_id = s.id where r.type in ('part_of', 'about') and r.valid_to is null
      )`;
 
-/** An item and all that is part of it, as a query over $1; everything, when $1 is null. */
+/** An item and all that is part of it or about it, as a query over $1; everything, when $1 is null. */
 const UNDER = `with recursive scope(id) as (
        select $1::text
        union
-       select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null
+       select r.from_id from relation r join scope s on r.to_id = s.id where r.type in ('part_of', 'about') and r.valid_to is null
      )`;
 
 /** Open work that belongs to whatever lives in a repository, split by whether it can run now. */
@@ -428,15 +432,18 @@ export async function projectsIn(l: Lattice, repo: string): Promise<Entity[]> {
 /**
  * What a scheduled agent should re-check in a repository now: for each
  * project there that has waited as long as it asks between re-checks, its
- * open items nobody has changed or confirmed in that time, oldest first.
+ * open items nobody has changed or confirmed in that time, oldest first. The
+ * list is long on purpose: the oldest are often chores no repository can
+ * settle, and the one re-checking has to be able to get past them.
  */
-async function recheck(l: Lattice, input: { repo?: string; limit?: number }) {
+async function recheck(l: Lattice, input: { repo?: string; limit?: number; now?: boolean }) {
   if (!input.repo) throw new Error('recheck needs "repo": the id of a repository, or its GitHub name ("owner/name")');
   const repo = await findRepo(l, input.repo);
   const projects = [];
   for (const p of await projectsIn(l, repo.id)) {
     const { every, last, waited } = recheckOf(p);
-    const items = waited ? (await oldest(l, { project: p.id, days: every, limit: input.limit ?? 5 })).items : [];
+    // Asked for now, the interval and the items' age are set aside: whatever is oldest is looked at.
+    const items = input.now || waited ? (await oldest(l, { project: p.id, days: input.now ? 0 : every, limit: input.limit ?? 25 })).items : [];
     projects.push({ id: p.id, title: p.title, every_days: every, rechecked_at: last, due: items.length > 0, items });
   }
   return {
@@ -776,7 +783,7 @@ export const VIEWS: Record<string, View> = {
   },
   recheck: {
     description:
-      'What is due for a scheduled re-check in a repository: each project living there says how often its oldest items are re-checked (its recheck_days; weekly when not set, 0 for never), and for each that has waited that long, its open items nobody has changed or confirmed in that time. Params: repo (required): its id or GitHub name, limit (items per project, default 5).',
+      'What is due for a scheduled re-check in a repository: each project living there says how often its oldest items are re-checked (its recheck_days; weekly when not set, 0 for never), and for each that has waited that long, its open items nobody has changed or confirmed in that time, oldest first. Params: repo (required): its id or GitHub name, limit (items per project, default 25), now (true to be given the oldest items of every project there, whatever its interval and however new they are).',
     run: recheck,
   },
   available_now: {

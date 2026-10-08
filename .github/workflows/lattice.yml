@@ -6,8 +6,8 @@
 # Once a day it also asks the map whether a re-check is due. Each project
 # living in the repository says how often (its "recheck days": weekly when
 # not set, 0 for never). When one is due and has open items nobody has
-# changed or confirmed in that time, an agent checks the oldest of them
-# against the code. A day when nothing is due costs no Claude run.
+# changed or confirmed in that time, an agent checks those the code can
+# settle, oldest first. A day when nothing is due costs no Claude run.
 #
 # Copy to .github/workflows/lattice.yml and set in the repository's settings:
 #   variable LATTICE_URL            the server, e.g. https://lattice.example.com
@@ -22,7 +22,7 @@ on:
     branches: ['**'] # not tags: a tag brings no new commits to read
   schedule:
     - cron: '17 6 * * *' # daily, to ask what is due; GitHub runs schedules on the default branch only
-  workflow_dispatch: # the same asking, by hand from the Actions tab
+  workflow_dispatch: # by hand from the Actions tab: a re-check now, without waiting for it to be due
 
 # No concurrency group: each push is read by a run of its own. A group keeps
 # only one run waiting, so a third push would drop the second's commits unread.
@@ -155,6 +155,8 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       REPO: ${{ github.repository }}
+      # Run by hand, it re-checks now, whatever each project's interval and however new its items.
+      NOW: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       # Asked before anything is installed: most days the answer is no, and the run ends here.
       - name: Ask Lattice what is due
@@ -162,12 +164,12 @@ jobs:
         run: |
           if [ -z "$LATTICE_AGENT_TOKEN" ]; then echo "::error::The repository secret LATTICE_AGENT_TOKEN is not set."; exit 1; fi
           node -e '
-            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, GITHUB_OUTPUT } = process.env;
+            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, NOW, RUNNER_TEMP, GITHUB_OUTPUT } = process.env;
             const fs = require("fs");
             fetch(LATTICE_URL.replace(/\/$/, "") + "/agent/view", {
               method: "POST",
               headers: { "content-type": "application/json", authorization: "Bearer " + LATTICE_AGENT_TOKEN },
-              body: JSON.stringify({ name: "recheck", params: { repo: REPO }, actor: "claude-code:lattice-recheck" }),
+              body: JSON.stringify({ name: "recheck", params: { repo: REPO, now: NOW === "true" }, actor: "claude-code:lattice-recheck" }),
             })
               .then(async (res) => {
                 const answer = await res.json().catch(() => ({}));
@@ -218,11 +220,15 @@ jobs:
 
           Lattice is the owner's map of work: projects, features, tasks, issues, decisions. You reach it through
           the lattice tools. Below, as JSON, are the projects in this repository that are due, each with its open
-          items nobody has changed or confirmed for longest. An item that old may no longer be true. Your one job
-          is to find out, for each, from what is in this repository, and say so in the map. Change no files here.
+          items nobody has changed or confirmed for longest, oldest first. An item that old may no longer be true.
+          Your one job is to find out, from what is in this repository, and say so in the map. Change no files here.
+          The list is longer than you can check in one run, and many of the oldest will be things no repository can
+          settle (a message to send, a question to ask someone, a choice that is the owner's). Read the titles first
+          and take the ones the code, the tests or the history could settle, oldest first, as many as you can do
+          properly. Leave the rest for the next run.
           Depending on the workspace, what you send is held for the owner or takes effect at once.
 
-          For each item:
+          For each item you take:
           1. `get` it, and read what it says and what it is part of. Call `schema` once: every type has its
              own statuses, and you must use the ones the item's type has.
           2. Look for the truth of it here: the code, the tests, `git log`. Look properly before you conclude.
@@ -240,9 +246,9 @@ jobs:
           4. Do not guess, and do not confirm what you have not checked: a wrong "still true" is worse than none.
 
           When you have been through them all:
-          - If there were items the repository could not tell you about, send one `notify` listing them by
-            title and id, asking the owner to open each and say whether it is still true. One notification, not
-            one per item.
+          - If there were items the repository could not tell you about, send one `notify` listing the ten
+            oldest of them by title and id, asking the owner to open each and say whether it is still true. One
+            notification, not one per item.
           - Call `rechecked` with this repository ("owner/name") and a summary of what you found. Always, even
             if you changed nothing: it is what starts the wait until the next re-check.
 
