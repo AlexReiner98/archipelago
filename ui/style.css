@@ -463,3 +463,12 @@ details.menu > .menu-items > button { max-width: 420px; overflow: hidden; text-o
 /* What a thing is for: asked for, not printed. A dotted line under a heading, or a small ? beside a control. */
 .hinted { cursor: help; text-decoration: underline dotted var(--muted); text-underline-offset: 4px; }
 .hint { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 6px; border: 1px solid var(--line); border-radius: 50%; font-size: 10.5px; color: var(--muted); cursor: help; vertical-align: middle; }
+
+/* An item's neighbourhood as a drawing: boxes in rows, joined to the item by curves. */
+.around-graph { padding: 6px 0 2px; display: grid; justify-items: center; }
+.nb-head { fill: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.rm-node.nb.more .box { stroke-dasharray: 4 3; }
+.rm-node.nb.more text { fill: var(--muted); }
+.rm-node.nb.closed text { fill: var(--muted); }
+.rm-node.nb-self { cursor: default; }
+.rm-node.nb-self:hover .box { stroke: var(--accent); }

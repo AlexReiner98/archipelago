@@ -1115,6 +1115,114 @@ function ageChip(e) {
   return h('span', { class: `mark ${days >= 14 ? 'mark-old' : 'mark-human'}`, title: `Last changed or confirmed ${when(e.updated_at)}` }, days === 0 ? 'true today' : days === 1 ? 'true yesterday' : `${days} days unconfirmed`);
 }
 
+/** Which items' neighbourhoods are shown in full. */
+const aroundAll = new Set();
+
+/**
+ * An item's neighbourhood, drawn the way the roadmap is: what it reaches for
+ * in a column to its left, itself in the middle, what reaches for it to its
+ * right, each joined to it by a curve and gathered under what the relation
+ * says. It is laid out by arithmetic, so nothing can overlap: every box has
+ * its own row. A long group shows its first eight and a box that opens the rest.
+ */
+function neighbourhood(e, data, redraw) {
+  const BOX = { w: 250, h: 26 };
+  const GAP = 6;
+  const HEAD = 20;
+  const COL = 330;
+  const all = aroundAll.has(e.id);
+  const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '\u2026' : text);
+  const column = (rows, direction) => {
+    const groups = new Map();
+    for (const r of rows) {
+      const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
+      if (!groups.has(phrase)) groups.set(phrase, []);
+      groups.get(phrase).push(r);
+    }
+    const out = [];
+    let y = 0;
+    for (const [phrase, items] of groups) {
+      // Open work first: it is what the eye is looking for.
+      const sorted = [...items].sort((a, b) => isClosed(a.entity_type, a.status) - isClosed(b.entity_type, b.status));
+      const shown = all || sorted.length <= 9 ? sorted : sorted.slice(0, 8);
+      out.push({ kind: 'head', phrase, n: items.length, y });
+      y += HEAD;
+      for (const r of shown) {
+        out.push({ kind: 'item', r, y });
+        y += BOX.h + GAP;
+      }
+      if (shown.length < sorted.length) {
+        out.push({ kind: 'more', n: sorted.length - shown.length, y });
+        y += BOX.h + GAP;
+      }
+      y += 10;
+    }
+    return { rows: out, height: Math.max(0, y - 10 - GAP) };
+  };
+  const left = column(data.outgoing, 'out');
+  const right = column(data.incoming, 'in');
+  const height = Math.max(left.height, right.height, 64);
+  const selfH = 54;
+  const pad = 14;
+  const hasLeft = left.rows.length > 0;
+  const x = { left: 0, self: hasLeft ? COL : 0, right: (hasLeft ? COL : 0) + COL };
+  const width = x.right + (right.rows.length ? BOX.w : -COL + BOX.w) + pad * 2;
+  const selfY = height / 2 - selfH / 2;
+  const inner = s('g', { transform: `translate(${pad},${pad})` });
+  const curve = (x1, y1, x2, y2) => `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
+  const draw = (col, atX, offset, direction) => {
+    for (const row of col.rows) {
+      const y = row.y + offset;
+      if (row.kind === 'head') {
+        inner.append(s('text', { class: 'nb-head', x: atX + (direction === 'out' ? BOX.w : 0), y: y + 12, 'text-anchor': direction === 'out' ? 'end' : 'start' }, document.createTextNode(`${row.phrase}${row.n > 1 ? `  ${row.n}` : ''}`)));
+        continue;
+      }
+      const mid = y + BOX.h / 2;
+      inner.append(s('path', { class: 'rm-link', d: direction === 'out' ? curve(atX + BOX.w, mid, x.self, selfY + selfH / 2) : curve(x.self + BOX.w, selfY + selfH / 2, atX, mid) }));
+      if (row.kind === 'more') {
+        const more = s('g', { class: 'rm-node nb more', transform: `translate(${atX},${y})` }, s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 6 }), s('text', { x: 10, y: 17 }, document.createTextNode(`and ${row.n} more`)));
+        more.addEventListener('click', () => (aroundAll.add(e.id), redraw()));
+        inner.append(more);
+        continue;
+      }
+      const r = row.r;
+      titles.set(r.id, r.title);
+      const box = s(
+        'g',
+        { class: `rm-node nb${isClosed(r.entity_type, r.status) ? ' closed' : ''}`, transform: `translate(${atX},${y})` },
+        s('title', {}, document.createTextNode(`${r.title}\n${typeTitle(r.entity_type)}, ${r.status}`)),
+        s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 6 }),
+        s('text', { x: 10, y: 17 }, document.createTextNode(cut(r.title, 38))),
+      );
+      box.addEventListener('click', () => (location.hash = `#/e/${r.id}`));
+      inner.append(box);
+    }
+  };
+  draw(left, x.left, (height - left.height) / 2, 'out');
+  draw(right, x.right, (height - right.height) / 2, 'in');
+  const words = e.title.split(' ');
+  const lines = [''];
+  for (const word of words) {
+    if ((lines.at(-1) + ' ' + word).trim().length <= 34) lines[lines.length - 1] = (lines.at(-1) + ' ' + word).trim();
+    else if (lines.length < 2) lines.push(word);
+    else {
+      lines[1] = cut(lines[1] + ' ' + word, 34);
+      break;
+    }
+  }
+  inner.append(
+    s(
+      'g',
+      { class: 'rm-node root nb-self', transform: `translate(${x.self},${selfY})` },
+      s('rect', { class: 'box', width: BOX.w, height: selfH, rx: 8 }),
+      s('text', { class: 'small', x: 12, y: 16 }, document.createTextNode(typeTitle(e.type))),
+      ...lines.map((line, k) => s('text', { x: 12, y: (lines.length === 1 ? 37 : 32) + k * 15 }, document.createTextNode(line))),
+    ),
+  );
+  const svg = s('svg', { width, height: height + pad * 2, viewBox: `0 0 ${width} ${height + pad * 2}`, role: 'img', 'aria-label': 'What this is linked to' }, inner);
+  return h('div', { class: 'roadmap-graph around-graph' }, svg, all && h('button', { class: 'quiet', onclick: () => (aroundAll.delete(e.id), redraw()) }, 'Show fewer'));
+}
+
 async function entity(id) {
   main.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
   let data;
@@ -1159,33 +1267,6 @@ async function entity(id) {
         ),
       );
     });
-
-  // One side of the item's neighbourhood: its relations in one direction, gathered by what they say.
-  const side = (rows, direction) => {
-    const groups = new Map();
-    for (const r of rows) {
-      const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
-      if (!groups.has(phrase)) groups.set(phrase, []);
-      groups.get(phrase).push(r);
-    }
-    return h(
-      'div',
-      { class: `around-side ${direction}` },
-      [...groups].map(([phrase, items]) =>
-        h(
-          'div',
-          { class: 'around-group' },
-          h('span', { class: 'around-phrase' }, phrase),
-          h(
-            'div',
-            { class: 'around-items' },
-            items.slice(0, 6).map((r) => h('a', { class: `around-item${isClosed(r.entity_type, r.status) ? ' closed' : ''}`, href: `#/e/${r.id}`, title: `${typeTitle(r.entity_type)}, ${r.status}` }, (titles.set(r.id, r.title), r.title))),
-            items.length > 6 && h('span', { class: 'muted small' }, `and ${items.length - 6} more`),
-          ),
-        ),
-      ),
-    );
-  };
 
   // Every way this entity can be linked, read from its side: "depends on" and
   // "blocks" are one relation in its two directions.
@@ -1325,7 +1406,7 @@ async function entity(id) {
         data.outgoing.length + data.incoming.length
           ? [
               // Where it sits: what it reaches for on the left, what reaches for it on the right.
-              h('div', { class: 'around' }, side(data.outgoing, 'out'), h('div', { class: 'around-self' }, chip(e.type), h('strong', {}, e.title)), side(data.incoming, 'in')),
+              neighbourhood(e, data, () => entity(id)),
               !e.archived_at && h('details', { class: 'folded' }, h('summary', {}, 'Change relations'), h('table', { class: 'list' }, h('tbody', {}, relRows(data.outgoing, 'out'), relRows(data.incoming, 'in')))),
             ]
           : h('div', { class: 'empty' }, 'Not linked to anything.'),
