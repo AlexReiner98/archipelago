@@ -834,6 +834,17 @@ function proposalCard(p, names) {
 
 const mapState = { q: '', type: '', open: 'open' };
 
+/** The search box alone, above an open item or a graph: what is typed is looked for on the Search screen. */
+function searchBar() {
+  const go = (e) => {
+    if (e.key !== 'Enter') return;
+    mapState.q = e.target.value;
+    location.hash = '#/map';
+  };
+  // Typing here is not an edit that a redraw would lose.
+  part('map').replaceChildren(h('div', { class: 'toolbar' }, h('input', { type: 'search', placeholder: 'Search titles and text', style: 'flex: 1; min-width: 200px', onkeydown: go, oninput: (e) => e.stopPropagation() })));
+}
+
 function map() {
   const main = part('map');
   const results = h('div');
@@ -882,12 +893,6 @@ function map() {
           'div',
           { class: 'tiles kinds' },
           [...counts].sort((a, b) => b[1] - a[1]).map(([type, n]) => h('button', { class: 'tile kind', onclick: () => ((mapState.type = type), map()) }, h('strong', {}, n), h('span', {}, typeTitle(type)))),
-        ),
-        h(
-          'section',
-          { class: 'card' },
-          h('header', {}, h('h2', {}, 'Changed lately')),
-          h('ul', { class: 'rows' }, rows.slice(0, 8).map((e) => h('li', {}, h('div', { class: 'row-top nowrap-row' }, chip(e.type), h('span', { class: 'grow gist' }, link(e)), pill(e.type, e.status), ago(e.updated_at))))),
         ),
       );
     } catch (err) {
@@ -2065,7 +2070,7 @@ function ownerCard(owner, redraw) {
 async function workspace() {
   const main = part('workspace');
   const me = await (await fetch('/whoami', { headers: authHeaders() })).json();
-  const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name, ' \u00b7 ', h('a', { href: '#/automations' }, 'Automations')));
+  const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name));
   if (me.auth !== 'tokens') {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
@@ -2656,7 +2661,6 @@ async function roadmap(rootId) {
       menu('More', [
         ['Project details', () => (location.hash = `#/e/${rootId}`)],
         ['Graph around this project', () => (location.hash = `#/graph/${rootId}`)],
-        ...roots.filter((r) => r.id !== rootId).map((r) => [`Go to ${r.title}`, () => (location.hash = `#/roadmap/${r.id}`)]),
       ]),
     ),
     h(
@@ -2804,79 +2808,6 @@ function questionItem(q, change, where, plain = false) {
   );
 };
 
-// One project's open questions, to be worked through from the top: what holds
-// up the most comes first, and each is answered where it stands.
-async function questions(rootId) {
-  const main = part('questions');
-  const remembered = () => {
-    try {
-      return localStorage.getItem('lattice-roadmap') ?? '';
-    } catch {
-      return '';
-    }
-  };
-  const { projects } = await api('view', { name: 'questions' });
-  if (!rootId) {
-    const last = projects.find((p) => p.id === remembered()) ?? projects.find((p) => p.questions > 0) ?? projects[0];
-    if (last) return void (location.hash = `#/questions/${last.id}`);
-    return main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Questions')), h('section', { class: 'card' }, h('div', { class: 'empty' }, 'There are no projects yet.')));
-  }
-  try {
-    localStorage.setItem('lattice-roadmap', rootId);
-  } catch {
-    // Remembering the project is a convenience only.
-  }
-  const data = await api('view', { name: 'questions', params: { project: rootId } });
-  const change = async (ops, reason) => {
-    try {
-      await api('change', { ops, reason });
-      dirty = false;
-      questions(rootId);
-    } catch (err) {
-      tell('That change was not made', err.message);
-    }
-  };
-  const question = (q) => questionItem(q, change);
-  const settledRow = (q) =>
-    h(
-      'li',
-      {},
-      h(
-        'div',
-        { class: 'row-top' },
-        chip(q.type),
-        h('span', { class: 'grow', title: [q.rationale, q.decided_on && `decided ${q.decided_on}`].filter(Boolean).join(' · ') }, link(q), q.outcome && [' ', h('span', { class: 'arrow' }, '→'), ' ', h('strong', {}, q.outcome)]),
-        pill(q.type, q.status),
-        h('button', { onclick: async () => (await ask({ title: 'Open this question again?', message: q.title, action: 'Reopen' })) && change([{ op: 'update', id: q.id, status: statusesOf(q.type)[0], ...(q.kind === 'decision' && { props: { outcome: null, rationale: null, decided_on: null } }) }], 'Reopened in the UI') }, 'Reopen'),
-      ),
-    );
-
-  const held = new Set(data.open.flatMap((q) => q.waiting.map((w) => w.id))).size;
-  const holding = data.open.filter((q) => q.holds_up > 0);
-  const idle = data.open.filter((q) => !(q.holds_up > 0));
-  main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Questions')),
-    h(
-      'div',
-      { class: 'toolbar', style: 'margin-bottom: 14px' },
-      h('select', { onchange: (e) => (location.hash = `#/questions/${e.target.value}`) }, projects.map((p) => h('option', { value: p.id, selected: p.id === rootId }, `${p.title} (${p.questions})`))),
-      h('a', { href: `#/e/${rootId}` }, 'Open project'),
-      h('a', { href: `#/roadmap/${rootId}` }, 'Roadmap'),
-      h('span', { class: 'grow' }),
-      h('span', { class: 'muted' }, `${data.open.length} open`, held > 0 && ` · ${held} waiting`),
-    ),
-    h(
-      'div',
-      { class: 'grid' },
-      // Two piles: the questions other work is waiting on, and the ones nothing waits on yet.
-      !data.open.length && h('section', { class: 'card wide' }, h('div', { class: 'empty' }, 'Nothing is undecided here.')),
-      holding.length > 0 && h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Holding work up'), h('span', { class: 'n' }, holding.length)), h('ul', { class: 'rows' }, holding.map(question))),
-      idle.length > 0 && h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Nothing waits on these'), h('span', { class: 'n' }, idle.length)), h('ul', { class: 'rows' }, idle.map(question))),
-      data.settled.length > 0 && h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Settled lately'), h('span', { class: 'n' }, data.settled.length)), h('ul', { class: 'rows' }, data.settled.map(settledRow))),
-    ),
-  );
-}
-
 // ---- live updates --------------------------------------------------------
 
 // The server's pulse moves whenever the map or the review queue does. The page
@@ -2985,13 +2916,13 @@ document.addEventListener('visibilitychange', checkPulse);
 // ---- routing -------------------------------------------------------------
 
 // Each page in the menu is its parts, one under the other. What used to be a
-// page of its own (a project's roadmap and questions, an item, the graph,
-// automations) is a part of the page it was reached from, and its old address
-// leads to that part.
-const PAGES = { today: ['today', 'roadmap', 'questions'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace', 'automations'] };
+// page of its own (a project's roadmap, automations) is a part of the page it
+// was reached from, and its old address leads to that part. Search is one
+// thing at a time under its search box: the search, an item, or a graph.
+const PAGES = { today: ['today', 'roadmap'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace', 'automations'] };
 const UNDER = { e: 'map', new: 'map', graph: 'map', roadmap: 'today', questions: 'today', automations: 'workspace' };
 /** The part an address names, where that is not the address's own name. */
-const PART = { e: 'item', new: 'item' };
+const PART = { e: 'item', new: 'item', questions: 'roadmap' };
 /** The project whose roadmap and questions Home shows. */
 let homeProject = '';
 
@@ -3015,12 +2946,11 @@ async function route(pulse = false) {
   const draw = {
     today,
     review,
-    // With no project chosen yet the roadmap chooses one, and its address brings the questions with it.
+    // With no project chosen yet the roadmap chooses one.
     roadmap: () => roadmap(homeProject || undefined),
-    questions: homeProject && (() => questions(homeProject)),
-    map,
+    map: name === 'map' || page !== 'map' ? map : searchBar,
     item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
-    graph: () => graph(name === 'graph' ? arg : undefined),
+    graph: name === 'graph' && (() => graph(arg)),
     workspace,
     automations,
   };
@@ -3047,13 +2977,13 @@ async function route(pulse = false) {
         if (err instanceof SignInNeeded) signedOut = true;
         else el.replaceChildren(h('div', { class: 'error' }, err.message));
       }
-      if (!pulse && p === named && el.isConnected) p === wanted[0] ? scrollTo(0, 0) : el.scrollIntoView();
+      if (!pulse && p === named && el.isConnected) p === wanted[0] || page === 'map' ? scrollTo(0, 0) : el.scrollIntoView();
     }),
   );
   if (signedOut) return signIn(store.token ? 'Your token is no longer accepted.' : '');
   // The parts above the one asked for have their final height only now, and a list in them a moment later.
   const settle = () => location.hash.split('/')[1] === name && part(named).scrollIntoView();
-  if (!pulse && named !== wanted[0] && part(named) !== main) (settle(), setTimeout(settle, 700));
+  if (!pulse && named !== wanted[0] && page !== 'map' && part(named) !== main) (settle(), setTimeout(settle, 700));
   refreshReviewCount();
   showIdentity();
 }
