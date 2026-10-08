@@ -168,7 +168,9 @@ at once; they are the session's own state, not facts about the world.
   tools.
 - **Automatically, from Claude Code:** merge
   [examples/claude-code-hooks.json](examples/claude-code-hooks.json) into a
-  project's `.claude/settings.json`. Each session opened there then registers
+  project's `.claude/settings.json` (that file calls a server on the same
+  machine; for a hosted one, copy [scripts/lattice-hook.mjs](scripts/lattice-hook.mjs)
+  and this repository's own `.claude/settings.json`, which send the token). Each session opened there then registers
   on start and closes on end, and starts with what the map knows about that
   repository: the open work nothing blocks, the blocked work and what it waits
   on, and whether each exclusive resource is free. The repository is matched
@@ -410,8 +412,11 @@ change that:
   of an agent's session and off a shared screen. The connection is kept in the machine's environment
   on purpose: an entry added with `claude mcp add --scope local` lives in
   Claude Code's own settings file, and was lost once when a running session
-  wrote that file back. The hooks in `.claude/settings.json` are separate
-  and still point at this machine.
+  wrote that file back. The hooks in `.claude/settings.json` follow the
+  same two variables: each runs `scripts/lattice-hook.mjs`, which passes the
+  hook on to that server with the token, or to the server on this machine
+  when the variables are not set. So a session registers, hears what the
+  owner did and closes on the same map its tools write to.
 - **Using a token:** paste it into the web UI's sign-in screen; set
   `LATTICE_TOKEN` for the CLI; for Claude Code by hand, add
   `"headers": { "Authorization": "Bearer ${LATTICE_AGENT_TOKEN}" }` to the

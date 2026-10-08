@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
@@ -392,6 +393,35 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   const told = await call('/hooks/prompt', undefined, { session_id: 's1' });
   assert.match(told.hookSpecificOutput.additionalContext, /entity\.update decision "Which\?".*props\.outcome: nothing -> "This one"/s);
   assert.deepEqual(await call('/hooks/prompt', undefined, { session_id: 's1' }), { status: 200 }, 'told once');
+});
+
+test('the hook script takes a Claude Code hook to whichever server the machine is connected to, with its token', async () => {
+  const { workspaces, call, base } = await serve('tokens');
+  const db = (await workspaces.get('default')).lattice.db;
+  const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
+  const hook = (name: string, input: unknown, env: Record<string, string>) =>
+    new Promise<{ out: string; err: string; code: number | null }>((done) => {
+      const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'lattice-hook.mjs'), name], { env: { ...process.env, LATTICE_URL: base, LATTICE_AGENT_TOKEN: '', ...env } });
+      let out = '';
+      let err = '';
+      child.stdout.on('data', (d) => (out += d));
+      child.stderr.on('data', (d) => (err += d));
+      child.on('close', (code) => done({ out, err, code }));
+      child.stdin.end(JSON.stringify(input));
+    });
+
+  const started = await hook('session-start', { session_id: 'desk-1', cwd: '/nowhere' }, { LATTICE_AGENT_TOKEN: robot });
+  assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, /registered in Lattice/, 'the server\u2019s answer comes back for Claude Code to read');
+  const open = (await call('/agent/view', robot, { name: 'sessions' })).result.open;
+  assert.deepEqual(open.map((s: any) => s.surface), ['claude-code'], 'and the session is on that server\u2019s map');
+  await hook('session-end', { session_id: 'desk-1', reason: 'exit' }, { LATTICE_AGENT_TOKEN: robot });
+  assert.equal((await call('/agent/view', robot, { name: 'sessions' })).result.open.length, 0, 'and is closed there');
+
+  // Refused or unreachable, it says so and still lets the session go on.
+  const refused = await hook('prompt', { session_id: 'desk-1' }, {});
+  assert.deepEqual([refused.code, refused.out, /answered 401/.test(refused.err)], [0, '', true]);
+  const away = await hook('prompt', { session_id: 'desk-1' }, { LATTICE_URL: 'http://127.0.0.1:9' });
+  assert.deepEqual([away.code, away.out, /did not answer/.test(away.err)], [0, '', true]);
 });
 
 test('beyond this machine the server needs tokens, and answers only to the names it is given', async () => {

@@ -217,9 +217,12 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       }
 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {
-        if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are local only.' });
+        // Never from a web page, and only under a name this server answers to; with tokens on, the token says whose session it is.
+        if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are called by Claude Code, not from a web page, and at an address this server is known by.' });
         const { lattice } = await resolve(req, res, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; reason?: string };
+        // Said in the server's log, so "did the hook run?" has an answer.
+        console.log(`hook ${url.pathname.slice('/hooks/'.length)} from session ${body.session_id ?? 'unknown'}`);
         // Each time the owner sends a session a message, the session is told what
         // the owner has done in the map since it last heard: a decision made
         // in the UI reaches the session with the next thing they say.
