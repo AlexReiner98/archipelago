@@ -48,7 +48,7 @@ have human authority; the MCP endpoint does not, and two tools (`decide`,
 `init`) are not offered to agents at all.
 
 The web UI has three places. **Home** is what needs you, project by project.
-Proposals to approve or reject come first. Then each project is a card: its
+Changes held for you, to apply or decline, come first. Then each project is a card: its
 progress, what is being worked on, and under it what there is for you to
 read, to decide and to do in that project, each dealt with where it stands
 and each list showing its first two until asked for more. A project's
@@ -59,8 +59,10 @@ session or held is a row of counts, opened one at a time.
 until you ask), creates new things, and opens each entity with its fields,
 relations and history; **Activity** (the event log, one line per change set)
 is beside it. **Workspace** holds the owner, tokens, members, importing a backup and
-automations. A proposal's changes can be excluded or corrected one by one in
-**Review**, reached from the proposal on Home. The **Graph** opens from an
+automations. A held change's parts can be excluded or corrected one by one in
+**Changes**, reached from it on Home; below them the same screen lists what
+agents changed without waiting since you last looked, each with Undo, and
+"Mark all seen" records that you looked. The **Graph** opens from an
 entity's page.
 
 The roadmap is one project's features in the order they are to be built. Each
@@ -118,7 +120,12 @@ reason and a source.
    project it belongs to. By default agents
    propose everything. Loosen it per op in `lattice.config.json`:
    `{ "policy": { "create": "auto", "link": "auto" } }`.
-3. You review and decide, in the web UI's Review screen or from the CLI:
+   A workspace can make the choice for itself, on its Workspace screen under
+   Settings ("What agents change"): held until you have looked, or taking
+   effect as agents make it, merges and archives included. Then the log and
+   Undo are the record, not a gate. Its admin sets it; an agent cannot.
+3. You look at what is held and apply or decline it, in the web UI's Changes
+   screen or from the CLI (where the words are still approve and reject):
 
 ```bash
 npm run lattice -- review

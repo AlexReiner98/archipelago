@@ -313,7 +313,7 @@ test('a workspace receives notifications only from workspaces its admin accepts'
   assert.match((await call('/api/notify_workspace', agent, { workspace: 'acme', title: 'x' })).error, /humans only/);
 
   const set = await call('/api/workspace_set', theirs, { accepts_from: ['default'] });
-  assert.deepEqual(set.result, { id: 'acme', default_visibility: 'private', accepts_from: ['default'] });
+  assert.deepEqual(set.result, { id: 'acme', default_visibility: 'private', agent_changes: 'hold', accepts_from: ['default'] });
   assert.deepEqual((await send(mine, 'acme')).result, { delivered_to: 'acme' });
 
   const inbox = (await call('/api/view', theirs, { name: 'notifications' })).result as any[];
@@ -673,4 +673,45 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   const again = (await call('/api/github', admin, { new_secret: true })).result.secret as string;
   assert.equal((await deliver(push('main', 'x'))).status, 401, 'a replaced secret no longer works');
   assert.equal((await deliver(push('main', 'x'), { secret: again })).status, 200);
+});
+
+test('a workspace chooses whether agents’ changes are applied as made or held; settling a question waits for a human either way', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const db = (await workspaces.get('default')).lattice.db;
+  const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const member = (await createToken(db, 'default', { kind: 'human', name: 'sam' })).token;
+  const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
+  const change = (token: string, ops: unknown[]) => call(token === admin ? '/api/change' : '/agent/change', token, { reason: 'x', ops });
+  const made = (await change(admin, [
+    { op: 'create', ref: 'a', type: 'task', title: 'Paint the fence', visibility: 'shared' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Paint the fence again', visibility: 'shared' },
+    { op: 'create', ref: 'd', type: 'decision', title: 'Which colour?', visibility: 'shared' },
+  ])).result.created;
+
+  assert.equal((await call('/api/workspace_info', admin)).result.agent_changes, 'hold', 'held unless the workspace says otherwise');
+  assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'One', visibility: 'shared' }])).result.status, 'proposed');
+  assert.match((await call('/api/workspace_set', member, { agent_changes: 'apply' })).error, /admin/);
+  assert.match((await call('/agent/workspace_set', robot, { agent_changes: 'apply' })).error, /humans only/, 'an agent cannot let itself through');
+
+  assert.equal((await call('/api/workspace_set', admin, { agent_changes: 'apply' })).result.agent_changes, 'apply');
+  const applied = (await change(robot, [{ op: 'create', type: 'note', title: 'Two', visibility: 'shared' }])).result;
+  assert.equal(applied.status, 'applied');
+  assert.equal((await change(robot, [{ op: 'merge', keep: made.a, drop: made.b }])).result.status, 'applied', 'merging too');
+  assert.equal((await change(robot, [{ op: 'archive', id: made.a }])).result.status, 'applied', 'and archiving');
+  assert.equal((await change(robot, [{ op: 'update', id: made.d, status: 'decided' }])).result.status, 'proposed', 'but a decision is the human’s to make');
+
+  // What was applied is on the record, with who made it, and can be put back.
+  const logged = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).filter((e) => e.changeset === applied.changeset);
+  assert.deepEqual([logged.length > 0, logged.every((e) => /robot/.test(e.actor))], [true, true]);
+  assert.equal((await call('/api/undo', admin, { changeset: applied.changeset })).status, 200);
+  // That a human looked is a record of its own, and nothing an agent can make for them.
+  assert.match((await call('/agent/seen', robot, { upto: logged[0].seq })).error, /humans only/);
+  assert.equal((await call('/api/seen', admin, { upto: logged[0].seq })).result.seen_upto, logged[0].seq);
+  const looked = ((await call('/api/events', admin, { limit: 5 })).result as any[]).find((e) => e.action === 'changes.seen');
+  assert.deepEqual([looked.detail.upto, /alex/.test(looked.actor), logged[0].target_type], [logged[0].seq, true, 'note']);
+
+  await call('/api/workspace_set', admin, { agent_changes: 'hold' });
+  assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
+  const set = ((await call('/api/events', admin, { limit: 50 })).result as any[]).filter((e) => e.action === 'workspace.set').map((e) => e.reason);
+  assert.deepEqual(set, ['agent_changes set to "hold"', 'agent_changes set to "apply"'], 'and the choice itself is in the log');
 });

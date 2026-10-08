@@ -34,6 +34,9 @@ export const DEFAULT_AGENT_POLICY: Policy = {
   define_type: 'propose',
 };
 
+/** The setting that holds a workspace's own choice between applying agents' changes and holding them. */
+const AGENT_CHANGES = 'agent_changes';
+
 type Props = Record<string, unknown>;
 
 export interface CreateOp {
@@ -178,6 +181,18 @@ export class Lattice {
     return rows[0]?.value === 'shared' ? 'shared' : 'private';
   }
 
+  /**
+   * What becomes of an agent's change in this workspace: applied as it is
+   * made, with the log and undo as the record ("apply"), or held until a
+   * human has looked ("hold"). The workspace's setting; without one, what the
+   * server's policy comes to. Settling a question waits for a human either way.
+   */
+  async agentChanges(): Promise<'apply' | 'hold'> {
+    const chosen = await this.setting<string>(AGENT_CHANGES);
+    if (chosen === 'apply' || chosen === 'hold') return chosen;
+    return Object.values(this.policy).every((level) => level === 'auto') ? 'apply' : 'hold';
+  }
+
   /** Who a new private thing is private to: the viewer, when there is one. */
   private privateTo(visibility: 'private' | 'shared'): string | null {
     return visibility === 'private' && this.viewer ? this.viewer : null;
@@ -188,7 +203,15 @@ export class Lattice {
   async change(actor: Actor, input: ChangeInput) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
     const { warnings } = await this.plan(input.ops);
-    const levels = input.ops.map((op) => (actor.kind === 'human' ? 'auto' : this.policy[op.op]));
+    // The workspace's own choice, when it has made one, stands in for the
+    // server's policy on everything the policy does not forbid outright.
+    const chosen = actor.kind === 'human' ? undefined : await this.setting<string>(AGENT_CHANGES);
+    const levels = input.ops.map((op): Level => {
+      if (actor.kind === 'human') return 'auto';
+      const level = this.policy[op.op];
+      if (level === 'forbidden') return level;
+      return chosen === 'apply' ? 'auto' : chosen === 'hold' ? 'propose' : level;
+    });
     const forbidden = input.ops.filter((_, i) => levels[i] === 'forbidden').map((op) => op.op);
     if (forbidden.length) throw new Error(`Policy forbids agents from: ${[...new Set(forbidden)].join(', ')}`);
     // Settling a question is the human's, whatever the policy lets agents do
@@ -825,7 +848,7 @@ export class Lattice {
     if (input.origin) add(`ev.origin = ?`, input.origin);
     params.push(Math.min(input.limit ?? 50, 500));
     const { rows } = await this.db.query(
-      `select ev.seq, ev.ts, ev.origin, ev.actor, ev.action, ev.target_id, e.title as target_title, ev.changeset, ev.reason, ev.detail
+      `select ev.seq, ev.ts, ev.origin, ev.actor, ev.action, ev.target_id, e.title as target_title, e.type as target_type, ev.changeset, ev.reason, ev.detail
        from event ev left join entity e on e.id = ev.target_id
        ${where.length ? 'where ' + where.join(' and ') : ''} order by ev.seq desc limit $${params.length}`,
       params,

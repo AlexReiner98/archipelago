@@ -262,7 +262,7 @@ function card(title, { wide } = {}) {
 
 const WHY = { depends_on: 'depends on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
 
-// The count beside Home: proposals to approve and notifications not yet read.
+// The count beside Home: changes held for the owner and notifications not yet read.
 async function refreshReviewCount() {
   const badge = document.getElementById('notice-count');
   try {
@@ -329,7 +329,7 @@ async function today() {
       items.length > 2 && h('li', { class: 'more' }, h('button', { class: 'quiet', onclick: () => ((todayAll.has(key) ? todayAll.delete(key) : todayAll.add(key)), today()) }, todayAll.has(key) ? 'fewer' : `${items.length - 2} more`)),
     );
   const decide = async (pr, yes) => {
-    const note = yes ? undefined : await ask({ title: 'Reject this proposal?', message: pr.reason, input: { placeholder: 'Why reject it? (optional, recorded in the log)' }, action: 'Reject', danger: true });
+    const note = yes ? undefined : await ask({ title: 'Decline this change?', message: pr.reason, input: { placeholder: 'Why not? (optional, kept in the log for whoever made it)' }, action: 'Decline', danger: true });
     if (!yes && note === null) return;
     try {
       await api('decide', { proposal: pr.id, approve: yes, note: note || undefined });
@@ -435,7 +435,7 @@ async function today() {
       h(
         'section',
         { class: 'card' },
-        h('header', {}, h('h2', {}, 'To approve'), h('span', { class: 'n' }, bulk.length)),
+        h('header', {}, h('h2', {}, 'Held for you'), h('span', { class: 'n' }, bulk.length)),
         rows('approve', bulk, (pr) =>
           h(
             'li',
@@ -445,8 +445,8 @@ async function today() {
               { class: 'row-top' },
               h('strong', { class: 'grow' }, pr.reason),
               h('a', { href: '#/review' }, `${pr.ops.length} change${pr.ops.length === 1 ? '' : 's'}`),
-              h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Approve'),
-              h('button', { onclick: () => decide(pr, false) }, 'Reject'),
+              h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Apply'),
+              h('button', { onclick: () => decide(pr, false) }, 'Decline'),
             ),
             h('div', { class: 'row-sub' }, pr.actor, pr.warnings.length > 0 && [' · ', h('span', { class: 'warning' }, `${pr.warnings.length} warning${pr.warnings.length === 1 ? '' : 's'}`)]),
           ),
@@ -574,12 +574,71 @@ async function resourceRows(view) {
 
 // ---- Review --------------------------------------------------------------
 
+// What agents have changed: first what is held for the owner, then what took
+// effect as it was made, since the owner last looked, each to be undone if it
+// is wrong. Looking is recorded; it permits nothing.
 async function review() {
-  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Review')));
-  const [pending, known] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true })]);
+  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes')));
+  const [pending, known, events] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('events', { limit: 500 })]);
   const names = new Map(known.map((e) => [e.id, e]));
-  if (!pending.length) main.append(h('section', { class: 'card' }, h('div', { class: 'empty' }, 'Nothing to review.')));
+  if (pending.length) main.append(h('h2', {}, `Held for you (${pending.length})`));
   for (const p of pending) main.append(proposalCard(p, names));
+  main.append(appliedCard(events));
+}
+
+function appliedCard(events) {
+  const seenUpto = events.find((e) => e.action === 'changes.seen')?.detail?.upto ?? 0;
+  const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
+  const sets = new Map();
+  for (const ev of events) {
+    if (!ev.changeset || ev.seq <= seenUpto) continue;
+    if (!sets.has(ev.changeset)) sets.set(ev.changeset, []);
+    sets.get(ev.changeset).push(ev);
+  }
+  // An agent's own change sets: not the ones a human applied, and not a
+  // session keeping its own record.
+  const groups = [...sets.entries()]
+    .map(([changeset, evs]) => ({ changeset, events: evs }))
+    .filter((g) => g.events.every((e) => e.actor.startsWith('agent:') && !e.detail?.approved_by) && !g.events.every((e) => (e.target_type ?? 'sys.').startsWith('sys.')));
+  const undo = async (g) => {
+    if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
+    try {
+      const r = await api('undo', { changeset: g.changeset });
+      if (r.skipped.length) await tell('Undone, except:', `- ${r.skipped.join('\n- ')}`);
+    } catch (err) {
+      await tell('That was not undone', err.message);
+    }
+    review();
+  };
+  return h(
+    'section',
+    { class: 'card' },
+    h(
+      'header',
+      {},
+      h('h2', {}, 'Applied by agents'),
+      h('span', { class: 'n' }, groups.length),
+      groups.length > 0 && h('button', { onclick: () => api('seen', { upto: events[0].seq }).then(review, (err) => tell('That was not recorded', err.message)) }, 'Mark all seen'),
+    ),
+    !groups.length && h('div', { class: 'empty' }, seenUpto ? 'Nothing new from agents since you last looked.' : 'Nothing applied by agents.'),
+    groups.map((g) => {
+      const isUndo = g.events.some((e) => e.action === 'changeset.undo');
+      return h(
+        'details',
+        { class: 'group' },
+        h(
+          'summary',
+          {},
+          h('span', { class: 'muted nowrap' }, when(g.events[0].ts)),
+          h('span', {}, g.events[0].actor),
+          h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? g.events[0].action),
+          h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
+          isUndo || undoneSets.has(g.changeset) ? h('span', { class: 'pill closed' }, isUndo ? 'an undo' : 'undone') : h('button', { onclick: (click) => (click.preventDefault(), undo(g)) }, 'Undo'),
+        ),
+        h('div', { class: 'inner' }, eventTable(g.events)),
+      );
+    }),
+  );
 }
 
 function proposalCard(p, names) {
@@ -628,14 +687,14 @@ function proposalCard(p, names) {
       'div',
       { class: 'actions' },
       approve,
-      h('button', { class: 'danger', onclick: () => decide(false) }, 'Reject all'),
+      h('button', { class: 'danger', onclick: () => decide(false) }, 'Decline all'),
       status,
     ),
   );
 
   function draw() {
     const count = ops.filter((op, i) => included[i] && !dead(op)).length;
-    approve.textContent = count === ops.length ? `Approve all ${count}` : `Approve ${count} of ${ops.length}`;
+    approve.textContent = count === ops.length ? `Apply all ${count}` : `Apply ${count} of ${ops.length}`;
     approve.disabled = count === 0;
     status.textContent = edited.size ? `${edited.size} corrected by you` : '';
     const section = (label, filter) => {
@@ -727,7 +786,7 @@ function proposalCard(p, names) {
   }
 
   async function decide(yes) {
-    const note = yes ? undefined : await ask({ title: 'Reject this proposal?', message: p.reason, input: { placeholder: 'Why reject it? (optional, recorded in the log)' }, action: 'Reject', danger: true });
+    const note = yes ? undefined : await ask({ title: 'Decline this change?', message: p.reason, input: { placeholder: 'Why not? (optional, kept in the log for whoever made it)' }, action: 'Decline', danger: true });
     if (!yes && note === null) return;
     approve.disabled = true;
     try {
@@ -738,7 +797,7 @@ function proposalCard(p, names) {
         except: yes ? included.map((on, i) => (on ? null : `#${i + 1}`)).filter(Boolean) : undefined,
         ops: yes && edited.size ? ops : undefined,
       });
-      el.replaceChildren(h('div', { class: 'empty' }, yes ? `Approved: ${p.reason}` : `Rejected: ${p.reason}`));
+      el.replaceChildren(h('div', { class: 'empty' }, yes ? `Applied: ${p.reason}` : `Declined: ${p.reason}`));
       refreshReviewCount();
       if (yes && ops.some((o) => o.op === 'define_type')) await loadSchema();
     } catch (err) {
@@ -1905,6 +1964,17 @@ async function workspace() {
                 [['private', 'Private to their author unless shared'], ['shared', 'Shared with everyone unless made private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label)),
               ),
             ),
+            h('dt', {}, 'What agents change'),
+            h(
+              'dd',
+              {},
+              h(
+                'select',
+                { onchange: (e) => api('workspace_set', { agent_changes: e.target.value }).then(workspace, fail) },
+                [['hold', 'Is held until I have looked'], ['apply', 'Takes effect as they make it']].map(([v, label]) => h('option', { value: v, selected: v === info.agent_changes }, label)),
+              ),
+              h('div', { class: 'muted small' }, 'Either way every change is in the log with who made it and why, and can be undone. The answer to a decision or a hypothesis always waits for you.'),
+            ),
             h('dt', {}, 'Accept notifications from'),
             h(
               'dd',
@@ -1958,7 +2028,7 @@ function eventTable(events, withTarget = true) {
           h('td', { class: 'nowrap' }, ev.actor),
           h('td', { class: 'nowrap' }, ev.action),
           withTarget && h('td', {}, ev.target_id ? h('a', { href: `#/e/${ev.target_id}` }, ev.target_title ?? ev.target_id) : ''),
-          h('td', { class: 'muted' }, describeEvent(ev), ev.detail?.approved_by && ` · approved by ${ev.detail.approved_by}`, !withTarget && ev.reason && ` · ${ev.reason}`),
+          h('td', { class: 'muted' }, describeEvent(ev), ev.detail?.approved_by && ` · applied by ${ev.detail.approved_by}`, !withTarget && ev.reason && ` · ${ev.reason}`),
         ),
       ),
     ),
@@ -1991,7 +2061,7 @@ async function activity() {
         return h(
           'details',
           { class: 'group' },
-          h('summary', {}, h('span', { class: 'muted nowrap' }, when(first.ts)), h('span', {}, work.actor, approver && h('span', { class: 'muted' }, `, approved by ${approver}`)), h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? first.action), h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
+          h('summary', {}, h('span', { class: 'muted nowrap' }, when(first.ts)), h('span', {}, work.actor, approver && h('span', { class: 'muted' }, `, applied by ${approver}`)), h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? first.action), h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
             undone
               ? h('span', { class: 'pill closed' }, g.events.some((e) => e.action === 'changeset.undo') ? 'an undo' : 'undone')
               : h(
@@ -2031,7 +2101,7 @@ async function activity() {
             run();
           },
         },
-        [['', 'Everything'], ['lattice', 'Changes to the map'], ['external', 'External tool calls']].map(([v, label]) => h('option', { value: v, selected: v === activityState.origin }, label)),
+        [['', 'Everything'], ['lattice', 'Changes to the map'], ['github', 'Pushes heard from GitHub'], ['external', 'External tool calls']].map(([v, label]) => h('option', { value: v, selected: v === activityState.origin }, label)),
       ),
     ),
     h('section', { class: 'card' }, list),
