@@ -69,7 +69,9 @@ pack can declare another tree the same way, with no code.
 top: open decisions and unsettled hypotheses, the ones holding up the most
 first, each with what waits on it and what is testing it. A decision is made
 where it stands: pick one of its options or type the outcome, add why, and it
-is recorded as decided. A question belongs to a project when it is part of it,
+is recorded as decided. To have something looked into first, type it in
+"Ask an agent" on the card: that makes a task about the question, leaves the
+question open, and reaches any agent that is listening. A question belongs to a project when it is part of it,
 is about something in it, or something in it depends on or assumes it. Agents
 get the same list from the `questions` view.
 
@@ -297,8 +299,9 @@ change that:
   curl -X POST http://127.0.0.1:3100/operator/workspaces -H "content-type: application/json" -H "Authorization: Bearer <operator secret>" -d '{"id":"acme","name":"Acme Architects"}'
   ```
 
-  The operator secret can create and list workspaces and nothing else: it
-  cannot read any workspace's map.
+  The operator secret can create and list workspaces, and issue a workspace a
+  new owner token when its owner has lost theirs ("New owner token" on the
+  same card); it cannot read any workspace's map.
 
 - **Several people in one workspace.** An admin adds people with
   `member_add`, which creates their person entity and their token. From then

@@ -428,3 +428,16 @@ test('beyond this machine the server needs tokens, and answers only to the names
   assert.equal(await ask('lattice.example.com'), 200, 'its public name');
   assert.equal(await ask('evil.example.net'), 403, 'any other name');
 });
+
+test('the operator can issue a workspace a new owner token, and nobody else can', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const operator = workspaces.ensureOperator()!;
+  const made = await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' });
+  assert.equal((await call('/operator/workspaces/acme/owner-token', made.result.owner_token)).status, 401, 'not the workspace\'s own owner');
+  assert.equal((await call('/operator/workspaces/nope/owner-token', operator)).status, 404);
+  const again = await call('/operator/workspaces/acme/owner-token', operator);
+  assert.notEqual(again.result.owner_token, made.result.owner_token);
+  const who = await call('/whoami', again.result.owner_token, undefined, 'GET');
+  assert.deepEqual([who.workspace.id, who.actor.kind, who.actor.admin], ['acme', 'human', true]);
+  assert.equal((await call('/whoami', made.result.owner_token, undefined, 'GET')).workspace.id, 'acme', 'the first token still works');
+});

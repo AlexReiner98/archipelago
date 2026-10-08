@@ -736,6 +736,15 @@ test('a project\'s questions are its open decisions and hypotheses, most-blockin
   assert.deepEqual([hyp.kind, hyp.assumed_by[0].title, hyp.tests[0].title], ['hypothesis', 'Task', 'Try it']);
   assert.deepEqual(q.settled.map((x: any) => [x.title, x.outcome, x.rationale]), [['Old', 'Yes', 'Because']]);
 
+  await make(l, [
+    { op: 'create', ref: 'ask', type: 'task', title: 'Compare A and B first' },
+    { op: 'create', ref: 'aside', type: 'note', title: 'A note about it' },
+    { op: 'link', type: 'about', from: 'ask', to: made.big },
+    { op: 'link', type: 'about', from: 'aside', to: made.big },
+  ]);
+  const asked = (await VIEWS.questions.run(l, { project: made.p })) as any;
+  assert.deepEqual(asked.open[0].asks.map((a: any) => [a.title, a.status]), [['Compare A and B first', 'todo']], 'a task about a question is something asked of an agent; a note is not');
+
   await make(l, [{ op: 'update', id: made.big, status: 'decided', props: { outcome: 'A', decided_on: '2026-10-07' } }]);
   const after = (await VIEWS.questions.run(l, { project: made.p })) as any;
   assert.deepEqual([after.open.map((x: any) => x.title), after.settled[0].title, after.settled[0].outcome], [['Hyp', 'Small'], 'Big', 'A']);

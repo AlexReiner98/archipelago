@@ -7,7 +7,8 @@
 //                      Claude Code HTTP hooks: a session registers itself and
 //                      is handed what the map knows about its repository
 //   GET  /whoami       which workspace and identity a request resolves to
-//   /operator/workspaces  list and create workspaces (operator secret)
+//   /operator/workspaces  list and create workspaces, and issue a workspace a
+//                      new owner token (operator secret)
 //   GET  /             the web UI
 // It listens on 127.0.0.1 unless told otherwise, and beyond it only with tokens on.
 //
@@ -204,6 +205,18 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       // The operator runs the installation: they create workspaces and hand
       // each one its first human token. They cannot read any workspace's map.
+      // A workspace whose owner has lost their token gets a new one from the
+      // operator. It does not revoke the old one: the owner does that once in.
+      const reissue = tokens && req.method === 'POST' ? /^\/operator\/workspaces\/([^/]+)\/owner-token$/.exec(url.pathname) : null;
+      if (reissue) {
+        if (!local(req)) return send(res, 403, { error: 'Local requests only.' });
+        if (!workspaces.isOperator(bearer(req.headers.authorization))) return send(res, 401, { error: 'The operator secret is required.' });
+        const id = decodeURIComponent(reissue[1]);
+        if (!workspaces.has(id)) return send(res, 404, { error: `No workspace "${id}"` });
+        const ws = await workspaces.get(id);
+        const owner = await createToken(ws.lattice.db, ws.id, { kind: 'human', name: 'owner (reissued)', admin: true });
+        return send(res, 200, { result: { workspace: { id: ws.id, name: ws.name }, owner_token: owner.token, note: owner.note } });
+      }
       if (url.pathname === '/operator/workspaces' && tokens) {
         if (!local(req, req.method === 'POST')) return send(res, 403, { error: 'Local requests only.' });
         if (!workspaces.isOperator(bearer(req.headers.authorization))) return send(res, 401, { error: 'The operator secret is required.' });

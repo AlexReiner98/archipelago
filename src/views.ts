@@ -569,6 +569,10 @@ async function questions(l: Lattice, input: { project?: string }) {
     holds_up: behind(q.id),
     assumed_by: into('assumes', q.id).map(slim),
     tests: into('tests', q.id).map(slim),
+    // What the owner has asked to be looked into before deciding: tasks about the question.
+    asks: into('about', q.id)
+      .filter((e) => l.registry.isA(e.type, 'task'))
+      .map((e) => ({ ...slim(e), body: e.body })),
     evidence: [...into('supports', q.id).map((e) => ({ ...slim(e), says: 'supports' })), ...into('refutes', q.id).map((e) => ({ ...slim(e), says: 'refutes' }))],
   });
   const mine = belonging(scopeOf(root.id));
@@ -640,7 +644,7 @@ export const VIEWS: Record<string, View> = {
   },
   questions: {
     description:
-      'A project\'s open questions: decisions not yet made and hypotheses not yet settled, most-blocking first, each with what waits on it, its options, and what is testing it; then the ones settled lately with their outcome. Params: project (an entity id; without it, the projects and how many open questions each has).',
+      'A project\'s open questions: decisions not yet made and hypotheses not yet settled, most-blocking first, each with what waits on it, its options, what is testing it, and anything the owner has asked an agent to look into first (`asks`: do those, write what you found into the notes or options of the question, and mark the ask done); then the ones settled lately with their outcome. Params: project (an entity id; without it, the projects and how many open questions each has).',
     run: questions,
   },
   notifications: {

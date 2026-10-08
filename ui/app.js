@@ -1333,8 +1333,8 @@ let operatorSecret = '';
 
 function operatorCard(current) {
   const body = h('div');
-  const call = async (method, payload) => {
-    const res = await fetch('/operator/workspaces', {
+  const call = async (method, payload, path = '') => {
+    const res = await fetch(`/operator/workspaces${path}`, {
       method,
       headers: { authorization: `Bearer ${operatorSecret}`, ...(payload && { 'content-type': 'application/json' }) },
       body: payload && JSON.stringify(payload),
@@ -1372,7 +1372,31 @@ function operatorCard(current) {
         .catch((err) => error.replaceChildren(h('div', { class: 'error' }, err.message)));
     body.replaceChildren(
       made ? h('div', { style: 'padding: 12px 14px 0' }, secretBox(`Owner token for "${made.workspace.name}". Send it to its owner privately.`, made.owner_token)) : '',
-      h('ul', { class: 'rows' }, list.map((w) => h('li', { class: 'row-top' }, h('strong', {}, w.name), h('span', { class: 'grow muted' }, w.id), w.id === current && h('span', { class: 'pill ok' }, 'this one')))),
+      h(
+        'ul',
+        { class: 'rows' },
+        list.map((w) =>
+          h(
+            'li',
+            { class: 'row-top' },
+            h('strong', {}, w.name),
+            h('span', { class: 'grow muted' }, w.id),
+            w.id === current && h('span', { class: 'pill ok' }, 'this one'),
+            h(
+              'button',
+              {
+                title: 'For an owner who has lost theirs',
+                onclick: async () =>
+                  (await ask({ title: `Issue a new owner token for "${w.name}"?`, message: 'It gives full control of that workspace. Tokens already issued keep working until its owner revokes them.', action: 'Issue token' })) &&
+                  call('POST', {}, `/${encodeURIComponent(w.id)}/owner-token`)
+                    .then((r) => draw(r))
+                    .catch((err) => error.replaceChildren(h('div', { class: 'error' }, err.message))),
+              },
+              'New owner token',
+            ),
+          ),
+        ),
+      ),
       h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, id, name, h('button', { class: 'primary', onclick: create }, 'Create workspace'), h('button', { onclick: () => ((operatorSecret = ''), draw()) }, 'Forget secret')),
       error,
     );
@@ -2048,6 +2072,19 @@ async function questions(rootId) {
         closed.map((st) => h('button', { onclick: async () => (await ask({ title: `Mark this ${st}?`, message: q.title, action: `Mark ${st}` })) && change([{ op: 'update', id: q.id, status: st }], `Marked ${st} in the UI`) }, st)),
       );
     }
+    // Asking is not deciding: it leaves the question open and makes a task about
+    // it, which any agent listening hears at once.
+    const wish = h('input', { type: 'text', placeholder: 'Ask an agent to look into something first', style: 'flex: 1; min-width: 220px' });
+    const askAgent = () =>
+      wish.value.trim() &&
+      change(
+        [
+          { op: 'create', ref: 'ask', type: 'task', title: wish.value.trim(), body: `Asked by the owner on the question "${q.title}". Write what you find into that question's notes or options, then mark this done.` },
+          { op: 'link', type: 'about', from: 'ask', to: q.id },
+        ],
+        'Asked an agent in the UI',
+      );
+    wish.addEventListener('keydown', (e) => e.key === 'Enter' && askAgent());
     return h(
       'li',
       { class: 'question' },
@@ -2057,7 +2094,9 @@ async function questions(rootId) {
       listed('Rests on this', q.assumed_by),
       listed('Being tested by', q.tests, (x) => ` (${x.status})`),
       listed('Evidence', q.evidence, (x) => ` (${x.says})`),
+      listed('Asked of an agent', q.asks, (x) => ` (${x.status})`),
       answer,
+      h('div', { class: 'toolbar' }, wish, h('button', { onclick: askAgent }, 'Ask an agent')),
     );
   };
   const settledRow = (q) =>
