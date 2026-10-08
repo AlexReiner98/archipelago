@@ -26,11 +26,13 @@ are two servers, and they are not the same thing:
 
 At the start of a session:
 
-1. With the lattice MCP tools: `view` with name `repo_work` for this repo's
-   open work, and `search` for type `software.handoff` to read the latest
-   handoff note.
-2. Register what you take on with `session_start` and `session_update`, and
-   propose a new handoff note before you finish.
+1. With the lattice MCP tools: `view` with name `repo_work` and `repo` (the
+   id the session hook gave, or `AlexReiner98/lattice`) for this repo's open
+   work, and `search` for type `software.handoff` to read the latest handoff
+   note.
+2. The session hook has registered the session (it gives the run id; call
+   `session_start` only if it did not). Say what you take on with
+   `session_update`, and propose a new handoff note before you finish.
 3. Make sure the local server is running before you change code
    (`npm run dev`; port 3100).
 

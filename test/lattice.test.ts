@@ -432,7 +432,11 @@ test('the session-start hook registers the session and hands it the repo\'s work
   const made = await laneSetup(l);
   const text = await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Aperture' });
   assert.match(text, /registered in Lattice/);
-  assert.match(text, /Repository: Aperture repo/);
+  const repoId = /Repository: Aperture repo \((e_\w+)\)/.exec(text)?.[1];
+  assert.ok(repoId, 'the repository comes with its id');
+  // What the session was told is enough to ask for the repository's work; asked for none, the view says which there are.
+  for (const repo of [repoId, 'aperture repo']) assert.equal(((await VIEWS.repo_work.run(l, { repo })) as any).repo.id, repoId);
+  await assert.rejects(async () => VIEWS.repo_work.run(l, {}), new RegExp(`repo_work needs "repo".*Repositories here: Aperture repo \\(${repoId}\\)`));
   assert.match(text, new RegExp(`Write unit tests \\(${made.offline}\\)`));
   assert.match(text, /Tune the solver .* waiting on: Which target\?/);
   assert.match(text, /"Live lane" .* is free/);

@@ -489,7 +489,7 @@ export const TOOLS: Record<string, Tool> = {
     description:
       'Say that the scheduled re-check of a repository has been done: each project there that was waiting for one starts its interval again (its recheck_days). Call it once, after you have changed or confirmed the items the recheck view gave you. Takes effect at once.',
     input: {
-      repo: z.string().describe('The repository: its id, or its GitHub name "owner/name".'),
+      repo: z.string().describe('The repository: its id, its GitHub name "owner/name", or its title.'),
       summary: z.string().optional().describe('What was checked and what was found.'),
     },
     run: async (l, actor, input) => {

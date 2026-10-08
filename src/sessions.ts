@@ -207,7 +207,7 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
       ready: { id: string; title: string; type: string; last_confirmed: string | Date }[];
       blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[];
     };
-    lines.push(`Repository: ${repo.title}.`);
+    lines.push(`Repository: ${repo.title} (${repo.id}).`);
     const kind = (t: { type: string }) => (l.registry.isA(t.type, 'issue') ? 'Issue: ' : '');
     // What nobody has touched for a while is said to be so: it may no longer be true.
     const age = (t: { last_confirmed: string | Date }) => {
