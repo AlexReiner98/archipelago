@@ -278,6 +278,10 @@ either direction:
   is decided; the file's history is added to the activity log.
 - Tokens and settings are not touched. Sessions still open where the file
   came from, and what they hold, are left out.
+- A map from elsewhere has its own person for its owner. When that differs
+  from this workspace's owner you are asked whether they are one person; on
+  yes, the owner here becomes the person in the file, with their tokens and
+  everything private to them, so later imports line up.
 - You are shown what would change before anything does, and the server takes
   a backup first, which is the way back: an import cannot be undone from the
   activity log.

@@ -533,3 +533,34 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   assert.deepEqual(heard.map((c) => c.action), ['workspace.import'], "what the laptop's owner did there long ago is not news here");
   assert.equal((await call('/api/import_backup', admin, { backup, apply: true })).result.events.added, 0);
 });
+
+test('an import can make the owner in the file and the owner here one person, and they keep their token and what is theirs', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const operator = workspaces.ensureOperator()!;
+  const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
+  const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
+  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'From the laptop', owner: theirs }] });
+  const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).lattice.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');
+
+  const db = (await workspaces.get('default')).lattice.db;
+  const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const mine = (await call('/api/init', alex, { name: 'Alex R' })).result.me as string;
+  await call('/api/change', alex, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Mine alone' }] });
+
+  const preview = (await call('/api/import_backup', alex, { backup })).result;
+  assert.deepEqual(preview.owners, { here: { id: mine, title: 'Alex R' }, file: { id: theirs, title: 'Alex Reiner' }, made_one: false });
+  const apart = (await call('/api/import_backup', alex, { backup, apply: true })).result;
+  assert.equal(apart.owners.made_one, false, 'not unless asked');
+  assert.equal((await call('/whoami', alex, undefined, 'GET')).actor.person, mine);
+
+  // Asked afterwards, with a file that has nothing else new in it.
+  const done = (await call('/api/import_backup', alex, { backup, apply: true, same_owner: true })).result;
+  assert.deepEqual([done.owners.made_one, done.entities.added], [true, 0]);
+  assert.equal((await call('/whoami', alex, undefined, 'GET')).actor.person, theirs, 'the token is now the person from the file');
+  assert.equal((await call('/api/workspace_info', alex)).result.owner.id, theirs, 'who owns the workspace');
+  const tasks = ((await call('/api/search', alex, { type: 'task' })).result as any[]).map((e) => e.title).sort();
+  assert.deepEqual(tasks, ['From the laptop', 'Mine alone'], 'and still sees what was private to them');
+  const people = ((await call('/api/search', alex, { type: 'person' })).result as any[]).map((e) => e.title);
+  assert.deepEqual(people, ['Alex Reiner'], 'one person, not two');
+  assert.equal((await call('/api/import_backup', alex, { backup })).result.owners, undefined, 'and later imports line up');
+});

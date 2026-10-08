@@ -268,11 +268,16 @@ export const TOOLS: Record<string, Tool> = {
     description:
       'Merge a backup file into this workspace, matching by id. Nothing is deleted: what the file has and this map lacks is added; an entity on both sides keeps whichever was edited later; ' +
       'a relation ended or a proposal decided on either side is ended or decided; the file’s history is added to the activity log. Tokens and settings are not touched, and sessions still open in the file are left out. ' +
-      'Without `apply` nothing changes and the answer says what would. With it, the server backs up first. Admins only.',
+      'Without `apply` nothing changes and the answer says what would. With it, the server backs up first. Admins only.' +
+      ' If the file\u2019s owner and this workspace\u2019s are different people entities, the answer names both as `owners`; see `same_owner`.',
     humanOnly: true,
     input: {
       backup: z.string().min(1).describe('The backup file (.json.gz) in base64.'),
       apply: z.boolean().optional().describe('Do it. Leave out to see what it would do.'),
+      same_owner: z
+        .boolean()
+        .optional()
+        .describe('When the answer names two `owners`: they are one person. This workspace\u2019s owner becomes the person in the file, with their tokens and everything private to them, so later imports of the same map line up.'),
     },
     run: async (l, actor, input) => {
       needAdmin(actor, 'import a backup');
@@ -286,7 +291,24 @@ export const TOOLS: Record<string, Tool> = {
       const backed_up_first = input.apply ? Boolean(backUp && (await backUp())) : undefined;
       // The file's own types first, in the order they were defined: its entities need them.
       if (input.apply) for (const def of defined) whole.registry.defineLocal(def);
+      // A map brought from elsewhere has its own person for its owner. If that is
+      // who owns this workspace too, the two can be made one.
+      const theirs = file.tables?.setting?.find((s) => s.key === 'me')?.value as string | undefined;
+      const mine = await whole.setting<string>('me');
+      const their = theirs && mine && theirs !== mine ? file.tables.entity?.find((e) => e.id === theirs) : undefined;
+      const my = their ? await whole.entity(mine!) : undefined;
+      const owners = their && my && !my.archived_at ? { here: { id: my.id, title: my.title }, file: { id: theirs!, title: their.title as string }, made_one: false } : undefined;
       const report = await merge(whole.db, file, { workspace: l.workspace, sessionTypes: whole.registry.family('sys.run'), apply: input.apply });
+      if (input.apply && input.same_owner && owners) {
+        await whole.apply(actorId(actor), { ops: [{ op: 'merge', keep: owners.file.id, drop: owners.here.id }], reason: 'The owner here and the owner in the imported backup are one person' });
+        // Who they are goes with them: their tokens, what is private to them, and owning the workspace.
+        await whole.db.transaction(async (tx) => {
+          await tx.query(`update token set entity_id = $1 where entity_id = $2`, [owners.file.id, owners.here.id]);
+          for (const table of ['entity', 'proposal', 'event']) await tx.query(`update ${table} set private_to = $1 where private_to = $2`, [owners.file.id, owners.here.id]);
+          await tx.query(`update setting set value = to_jsonb($1::text) where key = 'me'`, [owners.file.id]);
+        });
+        owners.made_one = true;
+      }
       if (input.apply) {
         await whole.log(whole.db, {
           actor: actorId(actor),
@@ -295,7 +317,7 @@ export const TOOLS: Record<string, Tool> = {
           detail: { from: file.workspace, taken: file.taken, first_seq: report.events.first_seq, last_seq: report.events.last_seq, entities: report.entities, relations: report.relations },
         });
       }
-      return { ...report, types_added: defined.map((t) => t.id), backed_up_first };
+      return { ...report, owners, types_added: defined.map((t) => t.id), backed_up_first };
     },
   },
   watch: {

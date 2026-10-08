@@ -1427,7 +1427,25 @@ function importCard(done) {
       const backup = await base64(file.files[0]);
       const p = await api('import_backup', { backup });
       const e = p.entities;
-      if (!e.added && !e.updated && !p.relations.added && !p.relations.ended && !p.events.added && !p.proposals.added && !p.proposals.decided && !p.types_added.length)
+      // The file's owner may be this workspace's owner under another id.
+      const same_owner =
+        Boolean(p.owners) &&
+        Boolean(
+          await ask({
+            title: `Is "${p.owners.file.title}" you?`,
+            message: `The backup belongs to "${p.owners.file.title}". This workspace belongs to "${p.owners.here.title}". If they are one person, "${p.owners.here.title}" becomes "${p.owners.file.title}" here, keeping every token and everything private, and later imports of the same map line up.`,
+            action: 'Yes, one person',
+            cancel: 'No, keep both',
+          }),
+        );
+      const nothing = !e.added && !e.updated && !p.relations.added && !p.relations.ended && !p.events.added && !p.proposals.added && !p.proposals.decided && !p.types_added.length;
+      if (nothing && same_owner) {
+        await api('import_backup', { backup, apply: true, same_owner });
+        file.value = '';
+        say('muted small', `"${p.owners.here.title}" and "${p.owners.file.title}" are now one person. Nothing else in the backup was new.`);
+        return done?.();
+      }
+      if (nothing)
         return say('muted small', `Nothing to import: this map already has everything in the backup of "${p.from.name}" taken ${new Date(p.taken).toLocaleString()}.`);
       const message = [
         `From the backup of "${p.from.name}" taken ${new Date(p.taken).toLocaleString()}.`,
@@ -1442,7 +1460,7 @@ function importCard(done) {
         .filter(Boolean)
         .join('\n');
       if (!(await ask({ title: 'Merge this backup into the map?', message, action: 'Merge' }))) return;
-      const r = await api('import_backup', { backup, apply: true });
+      const r = await api('import_backup', { backup, apply: true, same_owner });
       file.value = '';
       say('muted small', `Merged: ${r.entities.added} added, ${r.entities.updated} replaced, ${r.entities.kept_newer_here} kept as they are here, ${r.events.added} events.${r.backed_up_first ? '' : ' Backups are off on this server, so none was taken first.'}`);
       done?.();
