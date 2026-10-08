@@ -452,7 +452,7 @@ async function today() {
       {},
       h(
         'a',
-        { class: `project-row${pr.status !== 'active' ? ' resting' : ''}${pr.id === homeProject ? ' on' : ''}`, href: `#/roadmap/${pr.id}`, title: `${pr.title}: open its roadmap` },
+        { class: `project-row${pr.status !== 'active' ? ' resting' : ''}`, href: `#/e/${pr.id}`, title: pr.title },
         h('strong', { class: 'grow' }, pr.title),
         pr.status !== 'active' && pill(pr.type, pr.status),
         count(c.decide, 'decide', 'warn', 'Questions open in it'),
@@ -1190,6 +1190,8 @@ async function entity(id) {
   };
 
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
+  // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
+  const project = isA(e.type, 'project');
   const workish = !e.archived_at && ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t);
   // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
   const fields = Object.entries(e.props).filter(([, v]) => v !== null && v !== '');
@@ -1206,7 +1208,8 @@ async function entity(id) {
         entity(id);
       },
     });
-    main.querySelector('.grid').firstChild.replaceWith(form);
+    main.querySelector('.note').replaceWith(form);
+    form.scrollIntoView({ block: 'nearest' });
   };
   const copyBrief = async () => {
     const brief = await api('view', { name: 'brief', params: { task: id } });
@@ -1255,12 +1258,13 @@ async function entity(id) {
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),
     ),
+    project && h('div', { id: 'roadmap', 'data-root': id }),
     h(
       'div',
       { class: 'grid' },
       h(
         'section',
-        { class: 'card wide' },
+        { class: 'card wide note' },
         long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v))])),
         e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       ),
@@ -1285,6 +1289,7 @@ async function entity(id) {
       h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'History')), eventTable(data.recent_events, false)),
     ),
   );
+  if (project) roadmap(id).catch((err) => document.getElementById('roadmap')?.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
 // ---- forms ---------------------------------------------------------------
@@ -2570,25 +2575,9 @@ async function projectNeeds(rootId, data, change, redraw) {
 }
 
 async function roadmap(rootId) {
-  const main = part('roadmap');
-  const remembered = () => {
-    try {
-      return localStorage.getItem('lattice-roadmap') ?? '';
-    } catch {
-      return '';
-    }
-  };
-  const { roots } = await api('view', { name: 'tree', params: { tree: 'software.roadmap' } });
-  if (!rootId) {
-    const last = roots.find((r) => r.id === remembered()) ?? roots.find((r) => r.branches > 0);
-    if (last) return void (location.hash = `#/roadmap/${last.id}`);
-    return main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Roadmap')), h('section', { class: 'card' }, h('div', { class: 'empty' }, 'No project has features yet. Create a feature and make it part of a project.')));
-  }
-  try {
-    localStorage.setItem('lattice-roadmap', rootId);
-  } catch {
-    // Remembering the project is a convenience only.
-  }
+  const main = document.getElementById('roadmap');
+  // Drawn only on the page of the project it is the roadmap of.
+  if (main?.dataset.root !== rootId) return;
   const data = await api('view', { name: 'tree', params: { tree: 'software.roadmap', root: rootId } });
   const change = async (ops, reason) => {
     try {
@@ -2652,19 +2641,6 @@ async function roadmap(rootId) {
   main.replaceChildren(
     h(
       'div',
-      { class: 'page-head' },
-      h('h1', {}, data.root.title),
-      data.root.status !== 'active' && pill(data.root.type, data.root.status),
-      progressBar(data.progress),
-      h('span', { class: 'grow' }),
-      h('a', { class: 'button', href: `#/questions/${rootId}` }, 'Questions'),
-      menu('More', [
-        ['Project details', () => (location.hash = `#/e/${rootId}`)],
-        ['Graph around this project', () => (location.hash = `#/graph/${rootId}`)],
-      ]),
-    ),
-    h(
-      'div',
       { class: 'grid' },
       needsYou,
       h(
@@ -2674,6 +2650,7 @@ async function roadmap(rootId) {
           'header',
           { class: 'bar' },
           h('h2', {}, 'Features'),
+          progressBar(data.progress),
           statuses.map((st) => h('span', { class: `pill${isClosed('software.feature', st) ? ' closed' : ''}` }, `${data.by_status[st]} ${st}`)),
           h('span', { class: 'grow' }),
           // What is being worked on is marked in the drawing; the names are one click away, not a paragraph of links.
@@ -2919,35 +2896,25 @@ document.addEventListener('visibilitychange', checkPulse);
 // page of its own (a project's roadmap, automations) is a part of the page it
 // was reached from, and its old address leads to that part. Search is one
 // thing at a time under its search box: the search, an item, or a graph.
-const PAGES = { today: ['today', 'roadmap'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace', 'automations'] };
-const UNDER = { e: 'map', new: 'map', graph: 'map', roadmap: 'today', questions: 'today', automations: 'workspace' };
+const PAGES = { today: ['today'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace', 'automations'] };
+const UNDER = { e: 'map', new: 'map', graph: 'map', automations: 'workspace' };
 /** The part an address names, where that is not the address's own name. */
-const PART = { e: 'item', new: 'item', questions: 'roadmap' };
-/** The project whose roadmap and questions Home shows. */
-let homeProject = '';
-
+const PART = { e: 'item', new: 'item' };
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
 async function route(pulse = false) {
   const [, name = 'today', arg] = location.hash.split('/');
   // Addresses that have been folded into another screen still lead somewhere.
   if (name === 'activity') return activity();
   if (name === 'projects') return void (location.hash = '#/today');
+  // A project's roadmap and its questions are on the project's own page.
+  if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/today');
   const page = PAGES[UNDER[name] ?? name] ? (UNDER[name] ?? name) : 'today';
   dirty = false;
   stale.hidden = true;
   for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === page);
-  if (page === 'today') {
-    try {
-      homeProject = (name === 'roadmap' || name === 'questions' ? arg : '') || localStorage.getItem('lattice-roadmap') || '';
-    } catch {
-      homeProject = arg ?? '';
-    }
-  }
   const draw = {
     today,
     review,
-    // With no project chosen yet the roadmap chooses one.
-    roadmap: () => roadmap(homeProject || undefined),
     map: name === 'map' || page !== 'map' ? map : searchBar,
     item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
     graph: name === 'graph' && (() => graph(arg)),

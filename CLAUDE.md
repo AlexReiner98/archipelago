@@ -103,6 +103,12 @@ by agents, who write paragraphs. Every screen keeps to these (the owner's
 goal, 8 Oct 2026: minimal, no walls of text, text never stacking vertically,
 spatial where it can be):
 
+- **One thing, one page.** An item has a single page, and every way to it
+  (Home, a search, a link, an agent's `show`) leads to that same page, so a
+  person always lands somewhere they recognise. A list or dashboard points at
+  the page; it never draws its own version of the item. What one kind of item
+  needs beyond the common page (a project's roadmap) is a part of that page,
+  not a second screen. Before adding a screen, ask whose page it belongs on.
 - **One line per row.** A row never wraps at any width: what does not fit is
   cut with an ellipsis, and the whole of it is in the tooltip and one click
   away. Check a new row at 1280 and at 560 px.
