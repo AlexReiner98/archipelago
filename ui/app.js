@@ -1973,7 +1973,7 @@ async function workspace() {
                 { onchange: (e) => api('workspace_set', { agent_changes: e.target.value }).then(workspace, fail) },
                 [['hold', 'Is held until I have looked'], ['apply', 'Takes effect as they make it']].map(([v, label]) => h('option', { value: v, selected: v === info.agent_changes }, label)),
               ),
-              h('div', { class: 'muted small' }, 'Either way every change is in the log with who made it and why, and can be undone. The answer to a decision or a hypothesis always waits for you.'),
+              h('div', { class: 'muted small' }, 'Either way every change is in the log with who made it and why, and can be undone. Held, the answer to a decision or a hypothesis waits for you too. Taking effect, an agent can settle one: it has to say what was chosen and why, and you are notified on Home.'),
             ),
             h('dt', {}, 'Accept notifications from'),
             h(

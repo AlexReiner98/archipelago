@@ -115,15 +115,18 @@ reason and a source.
 
 1. The whole change is validated against the schema and the current map.
 2. Policy decides: applied at once, or held as a proposal. Closing a decision
-   or a hypothesis is always held when an agent does it, whatever the policy:
+   or a hypothesis is held when an agent does it, whatever the server's policy
+   (unless the workspace itself has chosen otherwise, below):
    the agent proposes the answer and you confirm it on Home, under the
    project it belongs to. By default agents
    propose everything. Loosen it per op in `lattice.config.json`:
    `{ "policy": { "create": "auto", "link": "auto" } }`.
    A workspace can make the choice for itself, on its Workspace screen under
    Settings ("What agents change"): held until you have looked, or taking
-   effect as agents make it, merges and archives included. Then the log and
-   Undo are the record, not a gate. Its admin sets it; an agent cannot.
+   effect as agents make it, merges and archives included. Then an agent can
+   settle a decision or a hypothesis too: a decision must say what was chosen
+   and why, and you are notified on Home. The log and Undo are the record,
+   not a gate. Its admin sets it; an agent cannot.
 3. You look at what is held and apply or decline it, in the web UI's Changes
    screen or from the CLI (where the words are still approve and reject):
 

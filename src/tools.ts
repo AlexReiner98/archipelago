@@ -367,7 +367,7 @@ export const TOOLS: Record<string, Tool> = {
       'Creates can carry a ref so later ops in the same change can link to them. Give the source the facts came from. ' +
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
       'Keep the map true as you work: when what you did or found settles something that is still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, instead of leaving it open with a note. ' +
-      'Closing a decision or a hypothesis is always held for the human to confirm, so propose the answer freely: it costs them one click.',
+      'Closing a decision or a hypothesis is held for the human to confirm, so propose the answer freely: it costs them one click. Only in a workspace set to apply agents\u2019 changes does it take effect at once: then a decision must carry what was chosen (props.outcome) and why (props.rationale), the human is notified, and it is yours to get right. Settle what the work or the owner has in fact settled; a choice that is still the owner\u2019s to make stays open.',
     input: {
       ops: z.array(op).min(1),
       reason: z.string().min(1).describe('Why this change is being made. Shown in the activity log.'),
@@ -375,6 +375,8 @@ export const TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       const result = await l.change(actor, input);
+      // A question an agent settled is not left for the human to come across.
+      if ('answered' in result) for (const a of result.answered) await notify(l, actor, { title: `${actor.name} settled "${a.title}": ${a.outcome ?? a.status}`, body: input.reason, about: a.id });
       // The human's screen follows an agent's change: to Review when it waits
       // there, otherwise to the first thing it made or touched.
       if (actor.kind === 'agent') {
@@ -560,7 +562,7 @@ export const TOOLS: Record<string, Tool> = {
     },
   },
   workspace_set: {
-    description: 'Change workspace settings. default_visibility: whether new things are private to their author (the default) or shared unless they say otherwise. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human; settling a decision or hypothesis waits either way. accepts_from: which other workspaces may send this one notifications. Admins only.',
+    description: 'Change workspace settings. default_visibility: whether new things are private to their author (the default) or shared unless they say otherwise. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human. With "apply" an agent can also settle a decision or a hypothesis: it must say what was chosen and why, and the human is notified. accepts_from: which other workspaces may send this one notifications. Admins only.',
     humanOnly: true,
     input: {
       default_visibility: z.enum(['private', 'shared']).optional(),

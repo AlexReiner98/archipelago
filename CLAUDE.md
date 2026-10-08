@@ -38,7 +38,10 @@ Keep the map true as you go: when what you did or found settles something
 that is still open (a task, an experiment, a decision made in practice),
 change its status with the outcome and the evidence. Do not leave it open
 with a note. Closing a decision or hypothesis is held for the owner to
-confirm, so propose the answer.
+confirm, so propose the answer; where the workspace applies agents' changes
+as made (the hosted one does, since 8 Oct 2026) it takes effect at once and
+the owner is notified, so settle only what the work or the owner has in fact
+settled, with what was chosen and why.
 
 ## Rules
 

@@ -675,7 +675,7 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   assert.equal((await deliver(push('main', 'x'), { secret: again })).status, 200);
 });
 
-test('a workspace chooses whether agents’ changes are applied as made or held; settling a question waits for a human either way', async () => {
+test('a workspace chooses whether agents’ changes are applied as made or held, the answer to a question with them', async () => {
   const { workspaces, call } = await serve('tokens');
   const db = (await workspaces.get('default')).lattice.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
@@ -698,7 +698,14 @@ test('a workspace chooses whether agents’ changes are applied as made or held;
   assert.equal(applied.status, 'applied');
   assert.equal((await change(robot, [{ op: 'merge', keep: made.a, drop: made.b }])).result.status, 'applied', 'merging too');
   assert.equal((await change(robot, [{ op: 'archive', id: made.a }])).result.status, 'applied', 'and archiving');
-  assert.equal((await change(robot, [{ op: 'update', id: made.d, status: 'decided' }])).result.status, 'proposed', 'but a decision is the human’s to make');
+  // An agent can settle a question too, when the record stands on its own, and the human is told.
+  assert.match((await change(robot, [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Green' } }])).error, /what was chosen \(props\.outcome\) and why \(props\.rationale\)/);
+  const answer = (await change(robot, [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Green', rationale: 'It is the paint we have.' } }])).result;
+  assert.deepEqual([answer.status, answer.answered], ['applied', [{ id: made.d, title: 'Which colour?', status: 'decided', outcome: 'Green' }]]);
+  const told = (await call('/api/view', admin, { name: 'notifications' })).result as any[];
+  assert.deepEqual(told.map((n) => [n.title, n.about_id]), [['robot/script settled "Which colour?": Green', made.d]]);
+  const guess = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green hides dirt', visibility: 'shared' }])).result.created.h;
+  assert.equal((await change(robot, [{ op: 'update', id: guess, status: 'supported' }])).result.status, 'applied', 'and a hypothesis');
 
   // What was applied is on the record, with who made it, and can be put back.
   const logged = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).filter((e) => e.changeset === applied.changeset);

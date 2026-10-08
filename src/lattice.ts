@@ -185,7 +185,8 @@ export class Lattice {
    * What becomes of an agent's change in this workspace: applied as it is
    * made, with the log and undo as the record ("apply"), or held until a
    * human has looked ("hold"). The workspace's setting; without one, what the
-   * server's policy comes to. Settling a question waits for a human either way.
+   * server's policy comes to. Only the workspace's own "apply" lets an agent
+   * settle a decision or a hypothesis.
    */
   async agentChanges(): Promise<'apply' | 'hold'> {
     const chosen = await this.setting<string>(AGENT_CHANGES);
@@ -214,15 +215,28 @@ export class Lattice {
     });
     const forbidden = input.ops.filter((_, i) => levels[i] === 'forbidden').map((op) => op.op);
     if (forbidden.length) throw new Error(`Policy forbids agents from: ${[...new Set(forbidden)].join(', ')}`);
-    // Settling a question is the human's, whatever the policy lets agents do
-    // unreviewed: an agent that sees one settled proposes the answer, and the
-    // human confirms it. Otherwise agents leave such things open with a note.
+    // Settling a question is the human's, whatever the server's policy lets
+    // agents do unreviewed: an agent that sees one settled proposes the answer,
+    // and the human confirms it. Only a workspace that has itself chosen to
+    // have agents' changes applied lets an agent settle one, and then the
+    // record has to stand on its own: a decision says what was chosen and why,
+    // and the human is told (see `answered`).
+    const answered: { id: string; title: string; status: string; outcome?: string }[] = [];
     if (actor.kind !== 'human') {
-      const questions = new Set([...this.registry.family('decision'), ...this.registry.family('hypothesis')]);
+      const decisions = new Set(this.registry.family('decision'));
+      const questions = new Set([...decisions, ...this.registry.family('hypothesis')]);
       for (const [i, op] of input.ops.entries()) {
         if (op.op !== 'update' || !op.status || levels[i] !== 'auto') continue;
         const e = await this.entity(op.id);
-        if (e && questions.has(e.type) && e.is_open && this.registry.type(e.type)?.statuses.closed.includes(op.status)) levels[i] = 'propose';
+        if (!e || !questions.has(e.type) || !e.is_open || !this.registry.type(e.type)?.statuses.closed.includes(op.status)) continue;
+        if (chosen !== 'apply') {
+          levels[i] = 'propose';
+          continue;
+        }
+        const props = { ...e.props, ...op.props };
+        if (decisions.has(e.type) && !(props.outcome && props.rationale))
+          throw new Error(`Change rejected:\n- "${e.title}": to settle a decision, say what was chosen (props.outcome) and why (props.rationale).`);
+        answered.push({ id: e.id, title: e.title, status: op.status, outcome: props.outcome as string | undefined });
       }
     }
 
@@ -240,7 +254,8 @@ export class Lattice {
         note: 'Nothing has changed yet. A human must approve this proposal before it appears in the map.',
       };
     }
-    return this.apply(actorId(actor), input);
+    const applied = await this.apply(actorId(actor), input);
+    return answered.length ? { ...applied, answered } : applied;
   }
 
   /** `ops`, when given, replaces the proposed ops: the reviewer's corrected version. */
