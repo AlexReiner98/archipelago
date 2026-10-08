@@ -362,17 +362,33 @@ change that:
   sign in to and switches between them from the menu's bottom corner; the
   workspace's name is shown under "Lattice" and on the tab. Signing out
   forgets that one.
-- **Connecting Claude Code:** on the Workspace screen, press **Connect an
-  agent**, copy the command it shows, and run it once in the project's
-  folder. It looks like this, and takes the place of the project's own
-  `lattice` entry for you alone:
+- **Connecting Claude Code:** done once per machine. On the Workspace
+  screen, press **Connect an agent**. It makes an agent token and shows two
+  commands that put the server's address and the token into the environment
+  variables `LATTICE_URL` and `LATTICE_AGENT_TOKEN` (on Windows, `setx`).
+  Run them, then quit Claude Code completely and open it again. Every project
+  whose `.mcp.json` reads those variables is then connected as you; this
+  repository's does, and the same file works in any other:
 
-  ```bash
-  claude mcp add --transport http --scope local lattice https://<server>/mcp --header "Authorization: Bearer <agent token>"
+  ```json
+  {
+    "mcpServers": {
+      "lattice": {
+        "type": "http",
+        "url": "${LATTICE_URL:-http://127.0.0.1:3100}/mcp",
+        "headers": { "Authorization": "Bearer ${LATTICE_AGENT_TOKEN:-none}" }
+      }
+    }
+  }
   ```
 
-  New sessions in that folder then use that workspace as you. The hooks in
-  `.claude/settings.json` are separate and still point where they did.
+  With the variables unset it falls back to a server on this machine.
+  `claude mcp get lattice`, run in the project's folder, says which server a
+  session there will use. The connection is kept in the machine's environment
+  on purpose: an entry added with `claude mcp add --scope local` lives in
+  Claude Code's own settings file, and was lost once when a running session
+  wrote that file back. The hooks in `.claude/settings.json` are separate
+  and still point at this machine.
 - **Using a token:** paste it into the web UI's sign-in screen; set
   `LATTICE_TOKEN` for the CLI; for Claude Code by hand, add
   `"headers": { "Authorization": "Bearer ${LATTICE_AGENT_TOKEN}" }` to the

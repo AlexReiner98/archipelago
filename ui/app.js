@@ -1511,18 +1511,28 @@ function secretBox(label, token) {
   );
 }
 
-// Connecting an agent is one paste: the command gives Claude Code this
-// server's address and the new token, for that project folder and that
-// person only, in place of whatever lattice server the project names itself.
+// Connecting an agent is done once per machine: this server's address and the
+// new token go into two environment variables, and every project whose
+// .mcp.json reads them is connected. A setting kept inside Claude Code's own
+// files can be overwritten by a running session; the machine's environment
+// cannot.
 function connectBox(made) {
-  const command = `claude mcp add --transport http --scope local lattice ${location.origin}/mcp --header "Authorization: Bearer ${made.token}"`;
+  const windows = /win/i.test(navigator.platform);
+  const set = windows
+    ? `setx LATTICE_URL "${location.origin}"\nsetx LATTICE_AGENT_TOKEN "${made.token}"`
+    : `echo 'export LATTICE_URL="${location.origin}"' >> ~/.zshenv\necho 'export LATTICE_AGENT_TOKEN="${made.token}"' >> ~/.zshenv`;
+  const file = `{\n  "mcpServers": {\n    "lattice": {\n      "type": "http",\n      "url": "\${LATTICE_URL:-http://127.0.0.1:3100}/mcp",\n      "headers": { "Authorization": "Bearer \${LATTICE_AGENT_TOKEN:-none}" }\n    }\n  }\n}`;
+  const copy = (text, label) => h('button', { onclick: (e) => navigator.clipboard.writeText(text).then(() => (e.target.textContent = 'Copied')) }, label);
   return h(
     'div',
     { class: 'secret' },
     h('div', {}, h('strong', {}, `Connect Claude Code as "${made.name}"`)),
-    h('div', { class: 'muted small' }, 'Run this once in a terminal, in the folder of the project the agent works in. Then start a new Claude Code session there.'),
-    h('code', {}, command),
-    h('div', { class: 'toolbar' }, h('button', { class: 'primary', onclick: (e) => navigator.clipboard.writeText(command).then(() => (e.target.textContent = 'Copied')) }, 'Copy command'), h('span', { class: 'muted small' }, 'Shown once: it holds the token, which is not stored. Revoke it below to disconnect.')),
+    h('div', { class: 'muted small' }, `1. Once on this machine, in a terminal${windows ? '' : ' (zsh; for the desktop app on a Mac also run each with "launchctl setenv NAME value")'}. Then quit Claude Code completely and open it again.`),
+    h('code', { style: 'white-space: pre-wrap' }, set),
+    h('div', { class: 'toolbar' }, copy(set, 'Copy commands'), h('span', { class: 'muted small' }, 'Shown once: they hold the token. Revoke it below to disconnect.')),
+    h('div', { class: 'muted small', style: 'margin-top: 10px' }, '2. Once in each project: a file named .mcp.json in its folder with this in it. It holds no secret, so it can be committed.'),
+    h('code', { style: 'white-space: pre-wrap' }, file),
+    h('div', { class: 'toolbar' }, copy(file, 'Copy file')),
   );
 }
 

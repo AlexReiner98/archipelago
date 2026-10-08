@@ -11,9 +11,11 @@ are two servers, and they are not the same thing:
 
 - **The map of record is the owner's workspace on the hosted server**
   (https://lattice.aperture.tools). The owner decided this on 8 Oct 2026. The
-  lattice MCP tools in this folder point there once the owner has run the
-  "Connect an agent" command here (`claude mcp get lattice` says which server
-  you have). What you write there waits for the owner in Review or on Home;
+  lattice MCP tools in this folder point there when the machine has the
+  environment variables `LATTICE_URL` and `LATTICE_AGENT_TOKEN` (set once
+  from "Connect an agent" on the Workspace screen; `.mcp.json` reads them).
+  Check before you rely on it: `claude mcp get lattice` says which server
+  you have, and without the variables it is the local one. What you write there waits for the owner in Review or on Home;
   there is no dev mode and no `restart` tool.
 - **The local server on port 3100 (`npm run dev`) is where the code is
   tried.** Its map is a scratch copy: do not record the state of the work
