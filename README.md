@@ -265,6 +265,23 @@ node src/backup.ts restore backups/default/<file>.json.gz data-restored
 
 Then put that folder in place of `data/`.
 
+To bring a backup into a map that already exists, an admin of that workspace
+uses **Import a backup** on the Workspace screen (or the `import_backup`
+tool). It merges, matching by id, and can be repeated as often as wanted, in
+either direction:
+
+- What the file has and the map lacks is added. Nothing is deleted.
+- An entity on both sides keeps whichever was edited later, as a whole. Two
+  edits to different fields of the same entity do not combine: the later one
+  wins.
+- A relation ended on either side is ended; a proposal decided on either side
+  is decided; the file's history is added to the activity log.
+- Tokens and settings are not touched. Sessions still open where the file
+  came from, and what they hold, are left out.
+- You are shown what would change before anything does, and the server takes
+  a backup first, which is the way back: an import cannot be undone from the
+  activity log.
+
 The backups sit on the same disk as the data. To send a copy of each one off
 the server, set `LATTICE_BACKUP_UPLOAD_URL` and `LATTICE_BACKUP_UPLOAD_KEY`:
 any address that takes a file by POST with a bearer key. For Supabase Storage

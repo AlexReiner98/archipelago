@@ -5,6 +5,7 @@
 // logged with its result.
 
 import { AUTOMATION_TOOLS, checkAutomation } from './automation-rules.ts';
+import { notImported } from './backup.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Lattice } from './lattice.ts';
 import { notify } from './notify.ts';
@@ -100,7 +101,7 @@ export class Automations {
     const { rows } = await this.l.db.query<LoggedEvent>(
       `select ev.seq::int as seq, ev.actor, ev.action, ev.target_id, e.title as target_title, ev.reason
        from event ev left join entity e on e.id = ev.target_id
-       where ev.seq > $1 and ev.seq <= $2 and ev.origin = 'lattice' and ev.actor not like '%:automation:%' and ev.action <> 'automation.fire'
+       where ev.seq > $1 and ev.seq <= $2 and ev.origin = 'lattice' and ev.actor not like '%:automation:%' and ev.action <> 'automation.fire' and ${notImported('ev')}
        order by ev.seq`,
       [cursor, latest],
     );

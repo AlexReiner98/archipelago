@@ -15,6 +15,14 @@ export function configureOutbox(next: Lookup): void {
   lookup = next;
 }
 
+/** The whole of a map, not one person's view of it, for the few things an admin does to all of it. */
+export async function wholeMap(l: Lattice): Promise<Lattice> {
+  if (l.viewer === undefined) return l;
+  const whole = await lookup?.(l.workspace);
+  if (!whole) throw new Error('This server cannot reach the whole workspace.');
+  return whole;
+}
+
 export async function acceptedSenders(l: Lattice): Promise<string[]> {
   return (await l.setting<string[]>('accepts_from')) ?? [];
 }

@@ -6,9 +6,11 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { actorId, type Actor, type Lattice } from './lattice.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
+import { merge, notImported, parseBackup } from './backup.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
-import { acceptedSenders, notifyWorkspace } from './outbox.ts';
+import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
+import type { TypeDef } from './packs.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
 import { VIEWS } from './views.ts';
@@ -135,7 +137,7 @@ export async function humanChanges(l: Lattice, after: number): Promise<HumanChan
   const { rows } = await l.db.query<{ seq: number; ts: string; actor: string; action: string; target_id: string | null; type: string | null; title: string | null; reason: string | null; detail: Record<string, unknown> | null }>(
     `select e.seq::int as seq, e.ts, e.actor, e.action, e.target_id, t.type, t.title, e.reason, e.detail
      from event e left join entity t on t.id = e.target_id
-     where e.seq > $1 and e.actor like 'human:%' and t.type is distinct from 'sys.notification' order by e.seq limit 50`,
+     where e.seq > $1 and e.actor like 'human:%' and t.type is distinct from 'sys.notification' and ${notImported('e')} order by e.seq limit 50`,
     [after],
   );
   return rows.map((r) => ({
@@ -260,6 +262,40 @@ export const TOOLS: Record<string, Tool> = {
     run: async () => {
       if (!backUp) throw new Error('Backups are turned off on this server.');
       return backUp();
+    },
+  },
+  import_backup: {
+    description:
+      'Merge a backup file into this workspace, matching by id. Nothing is deleted: what the file has and this map lacks is added; an entity on both sides keeps whichever was edited later; ' +
+      'a relation ended or a proposal decided on either side is ended or decided; the file’s history is added to the activity log. Tokens and settings are not touched, and sessions still open in the file are left out. ' +
+      'Without `apply` nothing changes and the answer says what would. With it, the server backs up first. Admins only.',
+    humanOnly: true,
+    input: {
+      backup: z.string().min(1).describe('The backup file (.json.gz) in base64.'),
+      apply: z.boolean().optional().describe('Do it. Leave out to see what it would do.'),
+    },
+    run: async (l, actor, input) => {
+      needAdmin(actor, 'import a backup');
+      const file = parseBackup(Buffer.from(input.backup, 'base64'));
+      // Everything in the file goes in, whoever it is private to: this is the map as a whole, as a backup is.
+      const whole = await wholeMap(l);
+      const defined = ((file.local_pack as { types?: TypeDef[] } | null)?.types ?? []).filter((t) => !whole.registry.types.has(t.id));
+      const known = new Set([...whole.registry.types.keys(), ...defined.map((t) => t.id)]);
+      const unknown = [...new Set((file.tables?.entity ?? []).map((e) => e.type as string))].filter((t) => !known.has(t));
+      if (unknown.length) throw new Error(`The file uses types this server does not have: ${unknown.join(', ')}. Install the pack that defines them first.`);
+      const backed_up_first = input.apply ? Boolean(backUp && (await backUp())) : undefined;
+      // The file's own types first, in the order they were defined: its entities need them.
+      if (input.apply) for (const def of defined) whole.registry.defineLocal(def);
+      const report = await merge(whole.db, file, { workspace: l.workspace, sessionTypes: whole.registry.family('sys.run'), apply: input.apply });
+      if (input.apply) {
+        await whole.log(whole.db, {
+          actor: actorId(actor),
+          action: 'workspace.import',
+          reason: `Merged the backup of "${file.workspace?.name}" taken ${file.taken}`,
+          detail: { from: file.workspace, taken: file.taken, first_seq: report.events.first_seq, last_seq: report.events.last_seq, entities: report.entities, relations: report.relations },
+        });
+      }
+      return { ...report, types_added: defined.map((t) => t.id), backed_up_first };
     },
   },
   watch: {

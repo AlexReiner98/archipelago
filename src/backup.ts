@@ -64,6 +64,113 @@ export async function restore(db: Db, backup: Dump, as?: string): Promise<Record
   return counts;
 }
 
+/** What merging a backup into a map did, or would do. */
+export interface MergeReport {
+  applied: boolean;
+  from: { id: string; name: string };
+  taken: string;
+  entities: { added: number; updated: number; kept_newer_here: number; same: number };
+  /** Up to twenty of each, to show what the numbers mean. */
+  examples: { added: string[]; updated: string[]; kept_newer_here: string[] };
+  relations: { added: number; ended: number };
+  events: { added: number; first_seq: number | null; last_seq: number | null };
+  proposals: { added: number; decided: number };
+  /** Sessions still open where the file came from, and what they hold: they belong to that machine. */
+  left_out: { open_sessions: number; holds: number };
+  owner_set: boolean;
+}
+
+class Preview extends Error {}
+
+/** True of an event that was written here, false of one that arrived in a merged backup: those are history, not news. */
+export const notImported = (ev: string) =>
+  `not exists (select 1 from event imp where imp.action = 'workspace.import' and ${ev}.seq between (imp.detail->>'first_seq')::bigint and (imp.detail->>'last_seq')::bigint)`;
+
+/**
+ * Merge a dump into a database that already holds a map, matching rows by id.
+ * Nothing is deleted. An entity on both sides keeps whichever was edited
+ * later, as a whole: there is no common ancestor to merge fields against. A
+ * relation ended on either side is ended. A proposal decided on either side
+ * is decided. Events the map does not have are added after its own, keeping
+ * their times. Tokens and settings stay as they are here, except that a map
+ * with no owner takes the file's. Sessions still open in the file, and what
+ * they hold, are left out. Without `apply` it changes nothing and reports
+ * what it would do. Give it the unscoped database.
+ */
+export async function merge(db: Db, backup: Dump, options: { workspace: string; sessionTypes?: string[]; apply?: boolean }): Promise<MergeReport> {
+  if (backup?.format !== 1 || typeof backup.tables !== 'object') throw new Error(`This backup is format ${backup?.format}; this version reads format 1.`);
+  const here = (rows: Record<string, unknown>[] = []) => rows.map((row) => ({ ...row, workspace: options.workspace }));
+  const openSession = (e: Record<string, unknown>) => Boolean(options.sessionTypes?.includes(e.type as string) && e.is_open);
+  const all = backup.tables.entity ?? [];
+  const entities = JSON.stringify(here(all.filter((e) => !openSession(e))));
+  const held = (r: Record<string, unknown>) => r.type === 'holds' && r.valid_to == null;
+  const relations = backup.tables.relation ?? [];
+  let report!: MergeReport;
+  try {
+    await db.transaction(async (tx) => {
+      const { rows: plan } = await tx.query<{ title: string; what: 'added' | 'updated' | 'kept_newer_here' | 'same' }>(
+        `select i.title, case when e.id is null then 'added' when i.updated_at > e.updated_at then 'updated' when e.updated_at > i.updated_at then 'kept_newer_here' else 'same' end as what
+         from jsonb_populate_recordset(null::entity, $1::jsonb) i left join entity e on e.id = i.id order by i.updated_at desc`,
+        [entities],
+      );
+      const count = (what: string) => plan.filter((p) => p.what === what).length;
+      const some = (what: string) => plan.filter((p) => p.what === what).slice(0, 20).map((p) => p.title);
+      const { rows: cols } = await tx.query<{ set: string }>(`select string_agg(format('%I = excluded.%I', column_name, column_name), ', ') as set from information_schema.columns where table_schema = 'public' and table_name = 'entity' and column_name <> 'id'`);
+      // One statement: rows that point at each other (an entity's owner) are checked together.
+      await tx.query(`insert into entity select * from jsonb_populate_recordset(null::entity, $1::jsonb) on conflict (id) do update set ${cols[0].set} where excluded.updated_at > entity.updated_at`, [entities]);
+
+      const { rows: rels } = await tx.query<{ added: boolean }>(
+        `insert into relation select i.* from jsonb_populate_recordset(null::relation, $1::jsonb) i
+         where exists (select 1 from entity where id = i.from_id) and exists (select 1 from entity where id = i.to_id)
+         on conflict (id) do update set valid_to = excluded.valid_to where relation.valid_to is null and excluded.valid_to is not null
+         returning (xmax = 0) as added`,
+        [JSON.stringify(here(relations.filter((r) => !held(r))))],
+      );
+      const { rows: props } = await tx.query<{ added: boolean }>(
+        `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)
+         on conflict (id) do update set status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at, note = excluded.note
+         where proposal.status = 'pending' and excluded.status <> 'pending'
+         returning (xmax = 0) as added`,
+        [JSON.stringify(here(backup.tables.proposal))],
+      );
+      // An event is the same one if everything about it but its number is the same.
+      const { rows: events } = await tx.query<{ seq: number }>(
+        `insert into event (workspace, ts, origin, actor, action, target_id, changeset, reason, detail, private_to)
+         select i.workspace, i.ts, i.origin, i.actor, i.action, i.target_id, i.changeset, i.reason, i.detail, i.private_to
+         from jsonb_populate_recordset(null::event, $1::jsonb) i
+         where (i.target_id is null or exists (select 1 from entity where id = i.target_id))
+           and not exists (select 1 from event e where e.ts = i.ts and e.actor = i.actor and e.action = i.action and e.origin = i.origin and e.reason = i.reason and e.detail = i.detail
+                           and e.target_id is not distinct from i.target_id and e.changeset is not distinct from i.changeset)
+         order by i.seq
+         returning seq::int as seq`,
+        [JSON.stringify(here(backup.tables.event))],
+      );
+      const { rows: owner } = await tx.query(
+        `insert into setting (key, value) select 'me', $1::jsonb where exists (select 1 from entity where to_jsonb(id) = $1::jsonb) on conflict (key) do nothing returning key`,
+        [JSON.stringify(backup.tables.setting?.find((s) => s.key === 'me')?.value ?? null)],
+      );
+      const seqs = events.map((e) => e.seq);
+      report = {
+        applied: Boolean(options.apply),
+        from: backup.workspace,
+        taken: backup.taken,
+        entities: { added: count('added'), updated: count('updated'), kept_newer_here: count('kept_newer_here'), same: count('same') },
+        examples: { added: some('added'), updated: some('updated'), kept_newer_here: some('kept_newer_here') },
+        relations: { added: rels.filter((r) => r.added).length, ended: rels.filter((r) => !r.added).length },
+        events: { added: seqs.length, first_seq: seqs.length ? seqs.reduce((a, b) => Math.min(a, b)) : null, last_seq: seqs.length ? seqs.reduce((a, b) => Math.max(a, b)) : null },
+        proposals: { added: props.filter((p) => p.added).length, decided: props.filter((p) => !p.added).length },
+        left_out: { open_sessions: all.filter(openSession).length, holds: relations.filter(held).length },
+        owner_set: owner.length > 0,
+      };
+      // Looking only: undo all of it.
+      if (!options.apply) throw new Preview();
+    });
+  } catch (err) {
+    if (!(err instanceof Preview)) throw err;
+  }
+  return report;
+}
+
 /**
  * Where a copy of each backup is sent, off the server: an address that takes
  * a file by POST with a bearer key. Supabase Storage is one:

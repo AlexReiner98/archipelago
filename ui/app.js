@@ -1390,6 +1390,61 @@ function secretBox(label, token) {
   );
 }
 
+/** A chosen file's bytes in base64, which is how a backup file is sent. */
+const base64 = (blob) =>
+  new Promise((done, fail) => {
+    const reader = new FileReader();
+    reader.onload = () => done(reader.result.slice(reader.result.indexOf(',') + 1));
+    reader.onerror = () => fail(new Error('That file could not be read.'));
+    reader.readAsDataURL(blob);
+  });
+
+// Bring a map kept somewhere else into this one, as often as wanted: the
+// server says what the file would add and change, and does it only on a yes.
+function importCard(done) {
+  const file = h('input', { type: 'file', accept: '.gz' });
+  const result = h('div');
+  const say = (cls, text) => result.replaceChildren(h('div', { class: cls, style: 'padding: 0 14px 12px' }, text));
+  const list = (titles, n) => (titles.length ? `: ${titles.slice(0, 5).join(', ')}${n > 5 ? ', \u2026' : ''}` : '');
+  const start = async () => {
+    try {
+      if (!file.files[0]) return say('error', 'Choose a backup file first.');
+      const backup = await base64(file.files[0]);
+      const p = await api('import_backup', { backup });
+      const e = p.entities;
+      if (!e.added && !e.updated && !p.relations.added && !p.relations.ended && !p.events.added && !p.proposals.added && !p.proposals.decided && !p.types_added.length)
+        return say('muted small', `Nothing to import: this map already has everything in the backup of "${p.from.name}" taken ${new Date(p.taken).toLocaleString()}.`);
+      const message = [
+        `From the backup of "${p.from.name}" taken ${new Date(p.taken).toLocaleString()}.`,
+        `Added: ${e.added}${list(p.examples.added, e.added)}`,
+        `Replaced by the file's later edit: ${e.updated}${list(p.examples.updated, e.updated)}`,
+        `Kept, because edited later here: ${e.kept_newer_here}${list(p.examples.kept_newer_here, e.kept_newer_here)}`,
+        `Relations: ${p.relations.added} added, ${p.relations.ended} ended. Activity: ${p.events.added} events. Proposals: ${p.proposals.added} added, ${p.proposals.decided} decided.`,
+        p.types_added.length ? `Types added: ${p.types_added.join(', ')}` : '',
+        p.left_out.open_sessions ? `Left out: ${p.left_out.open_sessions} sessions still open there.` : '',
+        'Nothing is deleted. The server backs this map up first.',
+      ]
+        .filter(Boolean)
+        .join('\n');
+      if (!(await ask({ title: 'Merge this backup into the map?', message, action: 'Merge' }))) return;
+      const r = await api('import_backup', { backup, apply: true });
+      file.value = '';
+      say('muted small', `Merged: ${r.entities.added} added, ${r.entities.updated} replaced, ${r.entities.kept_newer_here} kept as they are here, ${r.events.added} events.${r.backed_up_first ? '' : ' Backups are off on this server, so none was taken first.'}`);
+      done?.();
+    } catch (err) {
+      say('error', err.message);
+    }
+  };
+  return h(
+    'section',
+    { class: 'card wide' },
+    h('header', {}, h('h2', {}, 'Import a backup'), h('span', { class: 'n' }, 'Merge a map kept elsewhere into this one.')),
+    h('div', { class: 'empty' }, 'Matched by id. What the file has and this map lacks is added; where both have something, the later edit wins; nothing is deleted. You are shown what would change first.'),
+    h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, file, h('button', { class: 'primary', onclick: start }, 'Import\u2026')),
+    result,
+  );
+}
+
 // The operator runs the installation: they make workspaces and hand each its
 // first sign-in token, and can read none of them. The secret is kept only in
 // this page's memory, so it is asked for again after a reload.
@@ -1432,13 +1487,6 @@ function operatorCard(current) {
     const error = h('div');
     // With a backup file chosen, the new workspace starts as the map in that file.
     const file = h('input', { type: 'file', accept: '.gz', title: 'Optional: a backup file (.json.gz) to start the workspace from' });
-    const base64 = (blob) =>
-      new Promise((done, fail) => {
-        const reader = new FileReader();
-        reader.onload = () => done(reader.result.slice(reader.result.indexOf(',') + 1));
-        reader.onerror = () => fail(new Error('That file could not be read.'));
-        reader.readAsDataURL(blob);
-      });
     const create = async () => {
       try {
         const backup = file.files[0] && (await base64(file.files[0]));
@@ -1650,6 +1698,7 @@ async function workspace() {
             ),
           ),
         ),
+      me.actor.admin && importCard(),
       operatorCard(info.id),
     ),
   );

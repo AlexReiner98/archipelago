@@ -498,3 +498,38 @@ test('a lost operator secret is replaced by whoever can write on the server\'s d
   assert.equal((await call('/operator/workspaces', fresh, undefined, 'GET')).status, 200);
   assert.equal((await (await serve('off')).call('/operator/reset', undefined, { proof })).status, 404, 'no operator without tokens');
 });
+
+test('a workspace admin merges a backup into their map; nobody else can, and listeners hear of the import, not of its history', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const operator = workspaces.ensureOperator()!;
+  // Where the file comes from: another map, with a type of its own and things its owner did.
+  const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
+  await call('/api/change', there, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
+  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'task', title: 'Order the stone' }] });
+  const laptop = await workspaces.get('laptop');
+  const taken = await dump(laptop.lattice.db, { id: 'laptop', name: 'Laptop' }, JSON.parse(readFileSync(join(workspaces.config.rootDir, 'laptop', 'local-pack', 'pack.json'), 'utf8')));
+  const backup = gzipSync(JSON.stringify(taken)).toString('base64');
+
+  const main = await workspaces.get('default');
+  const admin = (await createToken(main.lattice.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const member = (await call('/api/member_add', admin, { name: 'Sam' })).result.token as string;
+  const robot = (await createToken(main.lattice.db, 'default', { kind: 'agent', name: 'robot' })).token;
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Already here', visibility: 'shared' }] });
+  assert.match((await call('/api/import_backup', member, { backup })).error, /Only a workspace admin/);
+  assert.match((await call('/agent/import_backup', robot, { backup })).error, /humans only/);
+  assert.match((await call('/api/import_backup', admin, { backup: 'bm90IGEgYmFja3Vw' })).error, /not a Lattice backup/);
+
+  const { latest } = (await call('/agent/watch', robot)).result;
+  const preview = (await call('/api/import_backup', admin, { backup })).result;
+  assert.deepEqual([preview.applied, preview.entities.added, preview.types_added], [false, 2, ['local.site_visit']]);
+  const titles = async () => ((await call('/api/search', admin)).result as any[]).map((e) => e.title).sort();
+  assert.ok(!(await titles()).includes('Order the stone'), 'looking changes nothing');
+  const done = (await call('/api/import_backup', admin, { backup, apply: true })).result;
+  assert.deepEqual([done.applied, done.entities.added], [true, 2]);
+  assert.deepEqual((await titles()).filter((t) => ['Already here', 'Order the stone', 'Visit the quarry'].includes(t)), ['Already here', 'Order the stone', 'Visit the quarry']);
+  assert.equal(((await call('/api/search', admin, { type: 'local.site_visit' })).result as any[]).length, 1, 'with the type it needed');
+
+  const heard = (await call('/agent/watch', robot, { after: latest })).result.changes as any[];
+  assert.deepEqual(heard.map((c) => c.action), ['workspace.import'], "what the laptop's owner did there long ago is not news here");
+  assert.equal((await call('/api/import_backup', admin, { backup, apply: true })).result.events.added, 0);
+});

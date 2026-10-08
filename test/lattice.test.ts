@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { Automations } from '../src/automations.ts';
-import { backupAll, dump, newestBackup, readBackup, restore } from '../src/backup.ts';
+import { backupAll, dump, merge, newestBackup, readBackup, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
 import { configureLauncher, launch } from '../src/launcher.ts';
 import { Lattice, type Actor, type Op } from '../src/lattice.ts';
@@ -774,6 +774,67 @@ test('a backup holds every row, and restores into an empty database that then ca
   const { rows } = await copy.db.query<{ seq: number }>(`select max(seq)::int as seq from event`);
   assert.ok(rows[0].seq > before, 'new events are numbered after the restored ones');
   await assert.rejects(restore(copy.db, taken), /not empty/);
+});
+
+test('a backup merges into a map that has moved on: nothing is lost, the later edit wins, and twice is the same as once', async () => {
+  const a = await fresh();
+  const made = await make(a, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 't', type: 'task', title: 'Task' },
+    { op: 'create', ref: 'u', type: 'task', title: 'Other task' },
+    { op: 'link', type: 'part_of', from: 't', to: 'p' },
+  ]);
+  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
+  const snapshot = async (l: Lattice) => JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' })));
+  // b starts as a copy of a, then each goes its own way.
+  const b = new Lattice(await openDb(), a.registry);
+  await restore(b.db, await snapshot(a));
+  const partOf = ((await a.get(made.t)) as any).outgoing[0].relation;
+
+  await make(b, [{ op: 'update', id: made.p, title: 'Proj, renamed in b' }, { op: 'create', type: 'note', title: 'Only in b' }]);
+  await make(a, [
+    { op: 'update', id: made.t, title: 'Task, renamed in a' },
+    { op: 'unlink', relation: partOf },
+    { op: 'archive', id: made.u },
+    { op: 'create', ref: 'n', type: 'task', title: 'New in a' },
+    { op: 'link', type: 'part_of', from: 'n', to: made.p },
+  ]);
+  const [pending] = await a.proposals();
+  await a.decide(human, { proposal: pending.id, approve: false, note: 'no' });
+  const session = await sessionStart(a, agent, { title: 'Still running in a', surface: 'test' });
+  const from = await snapshot(a);
+  const count = async (l: Lattice, table: string) => (await l.db.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0].n;
+  const before = [await count(b, 'entity'), await count(b, 'event')];
+
+  const options = { workspace: 'default', sessionTypes: b.registry.family('sys.run') };
+  const preview = await merge(b.db, from, options);
+  assert.deepEqual([preview.applied, await count(b, 'entity'), await count(b, 'event')], [false, ...before], 'looking changes nothing');
+  const done = await merge(b.db, from, { ...options, apply: true });
+  assert.deepEqual({ ...done, applied: false, events: { ...done.events, first_seq: 0, last_seq: 0 } }, { ...preview, events: { ...preview.events, first_seq: 0, last_seq: 0 } }, 'and it does what it said it would');
+  assert.deepEqual([done.entities.added, done.entities.updated, done.entities.kept_newer_here], [1, 2, 1], 'the new task; the renamed and the archived one; and the project b renamed stays');
+  assert.deepEqual([done.relations, done.proposals, done.left_out.open_sessions], [{ added: 1, ended: 1 }, { added: 0, decided: 1 }, 1]);
+  assert.ok(done.events.added > 0 && done.events.last_seq! - done.events.first_seq! === done.events.added - 1, 'its history arrives as one run of events');
+
+  const title = async (l: Lattice, id: string) => (await l.entity(id))!.title;
+  assert.deepEqual([await title(b, made.t), await title(b, made.p)], ['Task, renamed in a', 'Proj, renamed in b'], "each side's edit survives");
+  assert.ok((await b.entity(made.u))!.archived_at, 'archived there, archived here');
+  assert.deepEqual(((await b.get(made.t)) as any).outgoing, [], 'unlinked there, unlinked here');
+  assert.equal((await b.search({ q: 'Only in b' })).filter((e) => e.title === 'Only in b').length, 1, 'and what b made is still there');
+  assert.equal(await b.entity(session.run), undefined, 'a session still open there stays there');
+  assert.equal((await b.proposals()).length, 0);
+  assert.ok(((await b.get(made.t)) as any).recent_events.some((e: any) => e.action === 'entity.update'), 'with the history of what changed');
+
+  const again = await merge(b.db, from, { ...options, apply: true });
+  assert.deepEqual([again.entities.added, again.entities.updated, again.relations, again.events.added, again.proposals], [0, 0, { added: 0, ended: 0 }, 0, { added: 0, decided: 0 }], 'a second time adds nothing');
+
+  // And back the other way: a hears of what b did, and keeps its own.
+  const back = await merge(a.db, await snapshot(b), { ...options, apply: true });
+  assert.deepEqual([back.entities.added, back.entities.updated, back.entities.kept_newer_here], [1, 1, 0]);
+  assert.deepEqual([await title(a, made.p), await title(a, made.t)], ['Proj, renamed in b', 'Task, renamed in a']);
+  assert.ok(await a.entity(session.run), 'its own session is untouched');
+  // An older file never undoes a newer map.
+  const stale = await merge(b.db, from, { ...options, apply: true });
+  assert.equal(stale.entities.updated, 0);
 });
 
 test('backups are written per workspace, read back, and only the newest are kept', async () => {
