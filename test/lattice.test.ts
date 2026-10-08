@@ -465,6 +465,16 @@ test('a session that finishes says where the repository\'s open work stands', as
   assert.equal(ended.status, 'finished');
   assert.match((await l.entity(run))!.body, /Tests written\nSaid still true: .*Capture probe.*Tune the solver/);
 
+  // An open issue in the repository is its work too: shown at the start, asked about at the end.
+  const { leak } = await make(l, [
+    { op: 'create', ref: 'leak', type: 'issue', title: 'The probe leaks handles' },
+    { op: 'link', type: 'part_of', from: 'leak', to: made.proj },
+  ]);
+  assert.match(await hookSessionStart(l, { session_id: 'r5', cwd: 'C:\\code\\Aperture' }), new RegExp(`- Issue: The probe leaks handles \\(${leak}\\)`));
+  assert.ok(((await callTool(l, agent, 'session_end', { run: 'r5' })) as any).unreconciled.some((i: any) => i.id === leak));
+  await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r5', outcome: 'cancelled' });
+  await make(l, [{ op: 'archive', id: leak }]);
+
   // A session closed over its head (the hook, a crash) is recorded as not having said.
   await hookSessionStart(l, { session_id: 'r2', cwd: 'C:\\code\\Aperture' });
   await hookSessionEnd(l, { session_id: 'r2', reason: 'exit' });

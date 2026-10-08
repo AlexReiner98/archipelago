@@ -200,7 +200,8 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
       blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[];
     };
     lines.push(`Repository: ${repo.title}.`);
-    if (work.ready.length) lines.push('', 'Open work here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${t.title} (${t.id})`));
+    const kind = (t: { type: string }) => (l.registry.isA(t.type, 'issue') ? 'Issue: ' : '');
+    if (work.ready.length) lines.push('', 'Open work and issues here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${kind(t)}${t.title} (${t.id})`));
     if (work.blocked.length) lines.push('', 'Blocked work here:', ...work.blocked.slice(0, 15).map((t) => `- ${t.title} (${t.id}), waiting on: ${t.waiting_on.join('; ')}`));
   } else {
     lines.push('Lattice does not know a repository for this folder.');

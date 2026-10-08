@@ -343,7 +343,7 @@ async function repoWork(l: Lattice, input: { repo?: string }) {
      from entity e join scope s on s.id = e.id
      where e.is_open and e.archived_at is null and e.type = any($2::text[])
      order by e.props->>'due' nulls last, e.updated_at desc`,
-    [input.repo, [...l.registry.family('task'), ...l.registry.family('decision')]],
+    [input.repo, [...l.registry.family('task'), ...l.registry.family('decision'), ...l.registry.family('issue')]],
   );
   const names = await briefs(l, rows.flatMap((r) => graph.roots(r.id)));
   return {
@@ -667,7 +667,7 @@ export const VIEWS: Record<string, View> = {
     run: brief,
   },
   repo_work: {
-    description: 'Open tasks and decisions belonging to whatever lives in a repository, split into ready and blocked, and when GitHub last reported a push to it. Params: repo (required): its id, or its GitHub name "owner/name".',
+    description: 'Open tasks, decisions and issues belonging to whatever lives in a repository, split into ready and blocked, and when GitHub last reported a push to it. Params: repo (required): its id, or its GitHub name "owner/name".',
     run: repoWork,
   },
   available_now: {
