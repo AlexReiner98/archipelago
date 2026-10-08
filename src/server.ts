@@ -97,7 +97,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const heardUpTo = new Map<string, number>();
 
   /** The workspace a request is for and who is making it. */
-  async function resolve(req: IncomingMessage, surface: 'human' | 'agent'): Promise<{ ws: Workspace; lattice: Lattice; actor: (label?: string) => Actor }> {
+  async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent'): Promise<{ ws: Workspace; lattice: Lattice; actor: (label?: string) => Actor }> {
     if (!tokens) {
       const ws = await workspaces.get(DEFAULT_WORKSPACE);
       return { ws, lattice: ws.lattice, actor: (label) => (surface === 'human' ? { kind: 'human', name: 'local', admin: true } : { kind: 'agent', name: label || 'claude' }) };
@@ -108,6 +108,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     // a workspace that does not exist: nothing to probe.
     const denied = new Refused(401, 'A valid token is required. Send it as: Authorization: Bearer <token>');
     if (!token || !id || !workspaces.has(id)) throw denied;
+    // The workspace stays open for as long as this request lasts, however long that is.
+    res.once('close', workspaces.hold(id));
     const ws = await workspaces.get(id);
     const identity = await verifyToken(ws.lattice.db, token);
     if (!identity) throw denied;
@@ -139,13 +141,13 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'GET' && url.pathname === '/whoami') {
         if (!local(req, false)) return send(res, 403, { error: 'Local requests only.' });
-        const { ws, actor } = await resolve(req, 'human');
+        const { ws, actor } = await resolve(req, res, 'human');
         return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: actor() });
       }
 
       if (url.pathname === '/mcp') {
         if (req.method !== 'POST') return send(res, 405, { error: 'This server is stateless: POST only.' });
-        const { lattice, actor } = await resolve(req, 'agent');
+        const { lattice, actor } = await resolve(req, res, 'agent');
         const mcp = buildMcp(lattice, actor);
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined,
@@ -163,7 +165,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const surface = url.pathname.startsWith('/api/') ? 'api' : url.pathname.startsWith('/agent/') ? 'agent' : undefined;
       if (req.method === 'POST' && surface) {
         if (!local(req)) return send(res, 403, { error: 'The API accepts only local JSON requests from the CLI, hooks or the lattice UI.' });
-        const { lattice, actor } = await resolve(req, surface === 'api' ? 'human' : 'agent');
+        const { lattice, actor } = await resolve(req, res, surface === 'api' ? 'human' : 'agent');
         const name = url.pathname.slice(surface.length + 2);
         try {
           const body = ((await readJson(req)) ?? {}) as Record<string, unknown>;
@@ -178,7 +180,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are local only.' });
-        const { lattice } = await resolve(req, 'agent');
+        const { lattice } = await resolve(req, res, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; reason?: string };
         // Each time the owner sends a session a message, the session is told what
         // the owner has done in the map since it last heard: a decision made
@@ -286,6 +288,10 @@ If that process is not a lattice server, delete ${lock}.`);
     console.log(`packs: ${main.lattice.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
     console.log(`auth: ${config.auth}`);
     if (config.dev) console.log('dev mode: agent changes are not reviewed, and agents can restart the server');
+    if (config.idleMinutes > 0) {
+      console.log(`workspaces unused for ${config.idleMinutes} minutes are closed until next needed`);
+      idle = setInterval(() => void workspaces.closeIdle(config.idleMinutes * 60_000).then((closed) => closed.length && console.log(`closed idle workspaces: ${closed.join(', ')}`), (err) => console.error('closing idle workspaces failed:', err)), 60_000);
+    }
     if (config.backup) {
       const { dir, everyHours, keep, upload } = config.backup;
       console.log(`backups: every ${everyHours} hours to ${dir}, keeping ${keep}${upload ? ', each copied off the server' : ' (NOT copied off the server)'}`);
@@ -316,8 +322,10 @@ If that process is not a lattice server, delete ${lock}.`);
     }
   });
   let backups: ReturnType<typeof setInterval> | undefined;
+  let idle: ReturnType<typeof setInterval> | undefined;
   const stop = async (code = 0) => {
     clearInterval(backups);
+    clearInterval(idle);
     stopAllLaunched();
     server.close();
     await workspaces.closeAll();

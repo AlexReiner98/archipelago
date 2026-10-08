@@ -95,6 +95,10 @@ export async function backupAll(
 ): Promise<{ workspace: string; file?: string; rows?: number; error?: string; copied?: boolean; copy_error?: string }[]> {
   const done = [];
   for (const { id, name } of workspaces.list()) {
+    // A workspace opened only to be backed up is closed again, or a backup would
+    // put every customer's database in memory at once.
+    const wasOpen = workspaces.isOpen(id);
+    const release = workspaces.hold(id);
     try {
       const ws = await workspaces.get(id);
       const taken = await dump(ws.lattice.db, { id, name }, localPackOf(ws));
@@ -111,6 +115,9 @@ export async function backupAll(
       done.push({ workspace: id, file, rows: Object.values(taken.tables).reduce((n, rows) => n + rows.length, 0), ...copy });
     } catch (err) {
       done.push({ workspace: id, error: (err as Error).message });
+    } finally {
+      release();
+      if (!wasOpen) await workspaces.closeIfUnused(id).catch(() => false);
     }
   }
   return done;

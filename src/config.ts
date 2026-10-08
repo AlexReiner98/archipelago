@@ -36,6 +36,11 @@ export interface Config {
    * LATTICE_BACKUP_UPLOAD_KEY set, a copy of each is sent off the server.
    */
   backup: false | { dir: string; everyHours: number; keep: number; upload?: { url: string; key: string } };
+  /**
+   * A workspace nobody has used for this long has its database closed until
+   * the next request, to free its memory (LATTICE_IDLE_MINUTES). 0 never closes.
+   */
+  idleMinutes: number;
   /** Whether this server may start Claude Code sessions: only when it listens on this machine alone. */
   launch: boolean;
   /**
@@ -75,6 +80,7 @@ export function loadConfig(): Config {
     auth,
     dev,
     host,
+    idleMinutes: Number(process.env.LATTICE_IDLE_MINUTES ?? fromFile.idleMinutes ?? 30),
     // A hosted server has neither its customers' repositories nor their Claude CLI.
     launch: local,
     publicHosts: named.map((name) => name.trim().toLowerCase()).filter(Boolean),

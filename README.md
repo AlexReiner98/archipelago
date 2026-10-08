@@ -234,8 +234,12 @@ at the platform.
 - `LATTICE_PUBLIC_HOST=lattice.example.com` names what it is reached by.
   Requests for any other host name are refused.
 - `PORT` is honoured when `LATTICE_PORT` is not set.
-- Each workspace is its own database and costs about 200 MB of memory on top
-  of about 350 MB for the server, so 2 GB holds roughly eight customers.
+- Each workspace is its own database and costs about 200 MB of memory while
+  open, on top of about 350 MB for the server. A workspace nobody has used for
+  30 minutes (`LATTICE_IDLE_MINUTES`; 0 for never) is closed and opens again
+  on the next request, in under half a second. So 2 GB holds roughly eight
+  customers working at the same moment, and more than that in all. A workspace
+  with an enabled automation or an open session stays open.
 - A hosted server does not launch sessions: launching starts Claude Code in a
   repository on the server's own machine.
 - Not done yet: the first deployment, and a copy of the backups off the

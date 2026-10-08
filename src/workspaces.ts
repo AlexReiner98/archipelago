@@ -40,6 +40,10 @@ interface IndexFile {
 export class Workspaces {
   readonly config: WorkspacesConfig;
   private readonly open = new Map<string, Promise<Workspace>>();
+  private readonly closing = new Map<string, Promise<void>>();
+  /** Requests in hand on each workspace, and when each was last used. */
+  private readonly held = new Map<string, number>();
+  private readonly touched = new Map<string, number>();
   private index: IndexFile;
 
   constructor(config: WorkspacesConfig) {
@@ -68,12 +72,65 @@ export class Workspaces {
   /** Open a workspace, once. Unknown ids are refused rather than created. */
   get(id: string): Promise<Workspace> {
     if (!this.has(id)) return Promise.reject(new Error(`No workspace "${id}"`));
+    this.touched.set(id, Date.now());
     let opening = this.open.get(id);
     if (!opening) {
-      opening = this.load(id);
+      // A database being closed must be shut before it is opened again.
+      opening = (this.closing.get(id) ?? Promise.resolve()).then(() => this.load(id));
       this.open.set(id, opening);
     }
     return opening;
+  }
+
+  isOpen(id: string): boolean {
+    return this.open.has(id);
+  }
+
+  /** Say a workspace is in use, for as long as a request on it lasts. Call what it returns when done. */
+  hold(id: string): () => void {
+    this.held.set(id, (this.held.get(id) ?? 0) + 1);
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      this.held.set(id, (this.held.get(id) ?? 1) - 1);
+      this.touched.set(id, Date.now());
+    };
+  }
+
+  /**
+   * Close one workspace's database if nothing needs it open: no request in
+   * hand, no automation that must keep running, no session that could go quiet
+   * unnoticed. It opens again on the next request. Each open workspace costs
+   * about 200 MB, so this is what lets one server hold more customers than
+   * fit in memory at once. The default workspace and in-memory ones stay open.
+   */
+  async closeIfUnused(id: string): Promise<boolean> {
+    const opening = this.open.get(id);
+    if (!opening || id === DEFAULT_WORKSPACE || this.config.dataDir === null || this.held.get(id)) return false;
+    const ws = await opening.catch(() => undefined);
+    if (!ws) return false;
+    const { rows } = await ws.lattice.db.query<{ busy: boolean }>(
+      `select exists(select 1 from entity where archived_at is null and ((type = any($1::text[]) and status = 'enabled') or (type = any($2::text[]) and is_open))) as busy`,
+      [ws.lattice.registry.family('sys.automation'), ws.lattice.registry.family('sys.run')],
+    );
+    // Asked again after waiting: a request may have arrived meanwhile.
+    if (rows[0].busy || this.held.get(id) || this.open.get(id) !== opening) return false;
+    this.open.delete(id);
+    ws.automations.stop();
+    const closing = ws.lattice.db.close().finally(() => this.closing.delete(id));
+    this.closing.set(id, closing);
+    await closing;
+    return true;
+  }
+
+  /** Close every workspace nobody has used for `idleMs`. Returns the ones closed. */
+  async closeIdle(idleMs: number, now = Date.now()): Promise<string[]> {
+    const closed = [];
+    for (const id of [...this.open.keys()]) {
+      if (now - (this.touched.get(id) ?? 0) >= idleMs && (await this.closeIfUnused(id))) closed.push(id);
+    }
+    return closed;
   }
 
   private async load(id: string): Promise<Workspace> {

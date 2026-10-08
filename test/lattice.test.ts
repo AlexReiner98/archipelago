@@ -833,3 +833,31 @@ test('search puts the best match first and forgives a slip of the keys', async (
   assert.deepEqual(await titles('roadmp'), ['Roadmap for the garden app'], 'a typo in a title word');
   assert.deepEqual(await titles('zebra'), []);
 });
+
+test('a workspace nobody is using is closed, and opens again with its data', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lattice-idle-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
+  const workspaces = new Workspaces({ dataDir: join(root, 'data'), rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
+  await workspaces.get('default');
+  const acme = await workspaces.create('acme', 'Acme');
+  await make(acme.lattice, [{ op: 'create', type: 'task', title: 'Theirs' }]);
+
+  const release = workspaces.hold('acme');
+  assert.deepEqual(await workspaces.closeIdle(0), [], 'not while a request is in hand, and never the default workspace');
+  release();
+  assert.deepEqual(await workspaces.closeIdle(60_000), [], 'not until it has been unused for long enough');
+  assert.deepEqual(await workspaces.closeIdle(0), ['acme']);
+  assert.deepEqual([workspaces.isOpen('acme'), workspaces.isOpen('default')], [false, true]);
+
+  const again = await workspaces.get('acme');
+  assert.deepEqual((await again.lattice.search({ type: 'task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
+  const session = await sessionStart(again.lattice, agent, { title: 'Working' });
+  assert.deepEqual(await workspaces.closeIdle(0), [], 'a workspace with an open session stays open, so the session can be seen to go quiet');
+  await sessionEnd(again.lattice, agent, { run: session.run, outcome: 'finished', summary: 'done' });
+
+  const dir = join(root, 'backups');
+  assert.deepEqual(await workspaces.closeIdle(0), ['acme']);
+  await backupAll(workspaces, dir, 2);
+  assert.equal(workspaces.isOpen('acme'), false, 'a backup closes what it had to open');
+  await workspaces.closeAll();
+});
