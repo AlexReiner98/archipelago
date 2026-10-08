@@ -376,23 +376,27 @@ function card(title, { wide } = {}) {
 
 const WHY = { depends_on: 'depends on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
 
-// The count beside Home: changes held for the owner and notifications not yet read.
+// A count beside each page of the menu that has something waiting on it, and
+// each counts only what that page shows: beside Home what there is to read,
+// beside Changes the changes held for the owner.
 async function refreshReviewCount() {
-  const badge = document.getElementById('notice-count');
-  try {
-    const [pending, notes] = await Promise.all([api('proposals'), api('view', { name: 'notifications' })]);
-    badge.textContent = pending.length + notes.length;
-    badge.hidden = pending.length + notes.length === 0;
-  } catch {
-    badge.hidden = true;
+  const badges = { 'notice-count': () => api('view', { name: 'notifications' }), 'held-count': () => api('proposals') };
+  for (const [id, waiting] of Object.entries(badges)) {
+    const badge = document.getElementById(id);
+    try {
+      const n = (await waiting()).length;
+      badge.textContent = n;
+      badge.hidden = n === 0;
+    } catch {
+      badge.hidden = true;
+    }
   }
 }
 
 // ---- Home ----------------------------------------------------------------
 
 // The projects, one to a row: where each stands and how much of it is
-// waiting for the owner, which is dealt with on its roadmap. The rest of what
-// the map knows about today is a row of counts, opened one at a time.
+// waiting for the owner, which is dealt with on its own page.
 let todayOpen = '';
 
 async function today() {
@@ -410,13 +414,12 @@ async function today() {
       tell('That change was not made', err.message);
     }
   };
-  const [info, notes, asked, needs, blockers, waiting, risk] = await Promise.all([
+  const [info, notes, asked, needs, blockers, risk] = await Promise.all([
     api('workspace_info'),
     view('notifications'),
     view('questions'),
     view('needs_me'),
     view('blockers'),
-    view('waiting_on'),
     view('at_risk'),
   ]);
   const trees = await projectTrees(asked.projects);
@@ -473,18 +476,8 @@ async function today() {
       notes.map((n) => [n.title, () => (n.about_id ? ((location.hash = `#/e/${n.about_id}`), markRead([n.id])) : markRead([n.id]))]).concat([['Mark all read', () => markRead(notes.map((n) => n.id)), 'quiet']]),
     );
 
-  // Everything else: a count each, and the list behind it on a click.
+  // What is about to go wrong, anywhere: a count when there is any, and the list behind it on a click.
   const others = {
-    blocked: {
-      label: 'Blocked',
-      n: blockers.length,
-      list: () => blockers.map((b) => entityRow(b.entity, ['waiting on: ', b.root_blockers.map((r, i) => [i > 0 && ', ', chip(r.type), ' ', link(r)])])),
-    },
-    waiting: {
-      label: 'Waiting on others',
-      n: waiting.blocked_by_others.length + waiting.owed_to_me.length,
-      list: () => [...waiting.blocked_by_others.map((r) => entityRow(r.entity, ['waiting on: ', r.waiting_on.map((e, i) => [i > 0 && ', ', link(e)])])), ...waiting.owed_to_me.map((e) => entityRow(e, 'owed to you'))],
-    },
     risk: {
       label: 'At risk',
       n: risk.due_soon_or_overdue.length + risk.resting_on_refuted_hypothesis.length,
@@ -526,7 +519,7 @@ async function today() {
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, 'Home'), h('span', { class: 'grow' }), tray, h('button', { title: 'Start a new project', onclick: () => (location.hash = '#/new/project') }, '+ Project')),
     h('div', { class: 'inbox' }, inbox),
-    strip,
+    Object.values(others).some((o) => o.n > 0) ? strip : '',
     drawer,
   );
   openDrawer();
