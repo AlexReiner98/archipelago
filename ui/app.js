@@ -231,6 +231,107 @@ const daysAgo = (ts) => {
   const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86_400_000);
   return days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
 };
+// ---- Saying things briefly -------------------------------------------------
+// The screens show what agents write, and agents write paragraphs. These keep
+// a row to one line: a short name, a few words, a mark. The whole of it is
+// always one click or one hover away.
+
+/** How long ago, in a word: "now", "5 min", "3 h", "yesterday", "12 Oct". The exact time is the tooltip. */
+const ago = (ts) => {
+  const then = new Date(ts);
+  const mins = Math.floor((Date.now() - then.getTime()) / 60_000);
+  const text =
+    mins < 1 ? 'now' : mins < 60 ? `${mins} min` : mins < 24 * 60 ? `${Math.floor(mins / 60)} h` : mins < 48 * 60 ? 'yesterday' : then.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return h('span', { class: 'ago', title: when(ts) }, text);
+};
+
+/** An actor as a person would name it; what the log holds ("agent:claude-code/claude-code:lattice") is the tooltip. */
+function who(actor) {
+  const raw = actor ?? '';
+  const [kind, ...rest] = raw.split(':');
+  const name = rest.join(':').split('/').at(-1) ?? '';
+  const label =
+    kind === 'human' ? (name === 'local' || name === 'owner' ? 'You' : name)
+    : kind === 'github' ? 'GitHub'
+    : name.startsWith('automation:') ? 'Automation'
+    : name === 'lattice' && !raw.includes('/') && !raw.includes('claude') ? 'Lattice'
+    : name.split(':').at(-1) || raw;
+  return h('span', { class: `who who-${kind === 'human' ? 'human' : kind === 'github' ? 'github' : 'agent'}`, title: raw }, label);
+}
+
+/** The first clause of a reason. Agents explain at length; a row has room for the point. */
+const gist = (text) => (text ?? '').split(/(?<=[.:;])\s|\n/)[0].replace(/[.:;]$/, '');
+
+/** On whose authority, as a mark. The sentence is the tooltip. */
+function authorityMark(a) {
+  if (!a) return h('span', { class: 'mark mark-none', title: 'Authority not recorded' }, '?');
+  const yours = a.of === 'human';
+  return h('span', { class: `mark ${yours ? 'mark-human' : 'mark-agent'}`, title: authorityText(a) }, yours ? 'your word' : 'its call');
+}
+
+/** What an event did, in a word. */
+const VERBS = {
+  'entity.create': 'created', 'entity.update': 'changed', 'entity.archive': 'archived', 'entity.restore': 'restored', 'entity.merge': 'merged',
+  'relation.link': 'linked', 'relation.unlink': 'unlinked', 'type.define': 'new type',
+  'proposal.create': 'held', 'proposal.approve': 'applied', 'proposal.reject': 'declined', 'proposal.supersede': 'overtaken',
+  'changeset.undo': 'undid', 'changes.seen': 'marked seen', 'repo.push': 'push', 'recheck.done': 're-checked',
+  'automation.fire': 'automation', 'run.stale': 'went quiet', 'connection.check': 'connection', 'resource.claim': 'took', 'resource.release': 'gave back',
+};
+const verb = (ev) => (ev.action === 'entity.update' && !Object.keys(ev.detail?.changes ?? {}).length ? 'confirmed' : (VERBS[ev.action] ?? ev.action));
+
+/**
+ * One change set as one line: who, the point of it, what it did, on whose
+ * word, when. Opened, it gives the whole reason and each thing it touched.
+ */
+/** An event that belongs to no change set (a push heard, a session gone quiet), as the same kind of line. */
+function eventLine(ev) {
+  const about = describeEvent(ev);
+  return h(
+    'div',
+    { class: 'change line' },
+    who(ev.actor),
+    h('span', { class: 'gist', title: ev.reason ?? '' }, h('span', { class: 'muted' }, `${verb(ev)} `), ev.target_id ? h('a', { href: `#/e/${ev.target_id}` }, ev.target_title ?? ev.target_id) : gist(ev.reason) || about),
+    ago(ev.ts),
+  );
+}
+
+function changeRow(g, { undone, onUndo }) {
+  const first = g.events[0];
+  const work = g.events.find((e) => !e.action.startsWith('proposal.')) ?? first;
+  const reason = g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? '';
+  const isUndo = g.events.some((e) => e.action === 'changeset.undo');
+  const approver = work.detail?.approved_by;
+  // What it did, as marks: a status that moved, or how many things it touched.
+  const touched = g.events.filter((e) => (e.target_type ?? '') !== 'sys.source' && e.action !== 'changeset.undo' && !e.action.startsWith('proposal.'));
+  const moved = touched.filter((e) => e.action === 'entity.update' && e.detail?.changes?.status);
+  const effect =
+    moved.length === 1
+      ? h('span', { class: 'effect' }, h('span', { class: 'pill closed' }, moved[0].detail.changes.status.from), ' \u2192 ', h('span', { class: 'pill' }, moved[0].detail.changes.status.to))
+      : touched.length > 0 && h('span', { class: 'effect muted' }, `${new Set(touched.map((e) => e.target_id)).size} item${new Set(touched.map((e) => e.target_id)).size === 1 ? '' : 's'}`);
+  const subject = moved.length === 1 ? moved[0] : touched.length && touched.every((e) => e.target_id === touched[0].target_id) ? touched[0] : undefined;
+  return h(
+    'details',
+    { class: `group change${undone || isUndo ? ' quiet' : ''}` },
+    h(
+      'summary',
+      {},
+      who(work.actor),
+      h('span', { class: 'gist', title: reason }, subject?.target_title ? [h('strong', {}, subject.target_title), reason && ` \u00b7 ${gist(reason)}`] : gist(reason) || verb(first)),
+      effect,
+      approver ? h('span', { class: 'mark mark-human', title: `Applied by ${approver}` }, 'you applied') : touched.length > 0 && authorityMark(work.detail?.authority),
+      ago(first.ts),
+      undone || isUndo ? h('span', { class: 'pill closed' }, isUndo ? 'undo' : 'undone') : onUndo && h('button', { class: 'quiet-button', onclick: (click) => (click.preventDefault(), onUndo(g)) }, 'Undo'),
+    ),
+    h(
+      'div',
+      { class: 'inner' },
+      reason && h('p', { class: 'reason' }, reason),
+      work.detail?.authority && h('p', { class: 'reason muted' }, authorityText(work.detail.authority)),
+      eventTable(touched.length ? touched : g.events),
+    ),
+  );
+}
+
 const chip = (typeId) => h('span', { class: 'chip', title: typeId }, typeTitle(typeId));
 const pill = (typeId, status) => h('span', { class: `pill${isClosed(typeId, status) ? ' closed' : ''}` }, status);
 const link = (e) => (e ? h('a', { href: `#/e/${e.id}` }, e.title) : h('span', { class: 'muted' }, '(missing)'));
@@ -604,6 +705,10 @@ function appliedCard(events) {
   const groups = [...sets.entries()]
     .map(([changeset, evs]) => ({ changeset, events: evs }))
     .filter((g) => g.events.every((e) => e.actor.startsWith('agent:') && !e.detail?.approved_by) && !g.events.every((e) => (e.target_type ?? 'sys.').startsWith('sys.')));
+  // What was undone, and the undoing of it, cancel out: they are kept, folded away.
+  const cancelled = (g) => undoneSets.has(g.changeset) || g.events.some((e) => e.action === 'changeset.undo');
+  const live = groups.filter((g) => !cancelled(g));
+  const quiet = groups.filter(cancelled);
   const undo = async (g) => {
     if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
     try {
@@ -621,27 +726,18 @@ function appliedCard(events) {
       'header',
       {},
       h('h2', {}, 'Applied by agents'),
-      h('span', { class: 'n' }, groups.length),
+      h('span', { class: 'n' }, live.length),
       groups.length > 0 && h('button', { onclick: () => api('seen', { upto: events[0].seq }).then(review, (err) => tell('That was not recorded', err.message)) }, 'Mark all seen'),
     ),
     !groups.length && h('div', { class: 'empty' }, seenUpto ? 'Nothing new from agents since you last looked.' : 'Nothing applied by agents.'),
-    groups.map((g) => {
-      const isUndo = g.events.some((e) => e.action === 'changeset.undo');
-      return h(
+    live.map((g) => changeRow(g, { onUndo: undo })),
+    quiet.length > 0 &&
+      h(
         'details',
-        { class: 'group' },
-        h(
-          'summary',
-          {},
-          h('span', { class: 'muted nowrap' }, when(g.events[0].ts)),
-          h('span', {}, g.events[0].actor, h('span', { class: 'muted' }, `, ${authorityText(g.events.find((e) => e.detail?.authority)?.detail.authority) || 'authority not recorded'}`)),
-          h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? g.events[0].action),
-          h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
-          isUndo || undoneSets.has(g.changeset) ? h('span', { class: 'pill closed' }, isUndo ? 'an undo' : 'undone') : h('button', { onclick: (click) => (click.preventDefault(), undo(g)) }, 'Undo'),
-        ),
-        h('div', { class: 'inner' }, eventTable(g.events)),
-      );
-    }),
+        { class: 'folded' },
+        h('summary', {}, `${quiet.length} undone or undoing`),
+        quiet.map((g) => changeRow(g, { undone: true })),
+      ),
   );
 }
 
@@ -2041,11 +2137,11 @@ function eventTable(events, withTarget = true) {
         h(
           'tr',
           {},
-          h('td', { class: 'nowrap muted' }, when(ev.ts)),
-          h('td', { class: 'nowrap' }, ev.actor),
-          h('td', { class: 'nowrap' }, ev.action),
+          h('td', { class: 'nowrap muted' }, ago(ev.ts)),
+          h('td', { class: 'nowrap' }, who(ev.actor)),
+          h('td', { class: 'nowrap', title: ev.action }, verb(ev)),
           withTarget && h('td', {}, ev.target_id ? h('a', { href: `#/e/${ev.target_id}` }, ev.target_title ?? ev.target_id) : ''),
-          h('td', { class: 'muted' }, describeEvent(ev), ev.detail?.approved_by && ` · applied by ${ev.detail.approved_by}`, !withTarget && ev.reason && ` · ${ev.reason}`),
+          h('td', { class: 'muted', title: !withTarget ? (ev.reason ?? '') : '' }, describeEvent(ev), !withTarget && ev.reason && ` · ${gist(ev.reason)}`),
         ),
       ),
     ),
@@ -2059,6 +2155,16 @@ async function activity() {
   const run = async () => {
     const events = await api('events', { limit: 500, origin: activityState.origin || undefined });
     const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
+    const undo = async (g) => {
+      if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
+      try {
+        const r = await api('undo', { changeset: g.changeset });
+        if (r.skipped.length) await tell('Undone, except:', `- ${r.skipped.join('\n- ')}`);
+        run();
+      } catch (err) {
+        tell('That was not undone', err.message);
+      }
+    };
     // Fold each changeset into one line: one decision, many effects.
     const groups = [];
     for (const ev of events) {
@@ -2067,40 +2173,9 @@ async function activity() {
       else groups.push({ changeset: ev.changeset, events: [ev] });
     }
     list.replaceChildren(
-      ...groups.map((g) => {
-        const first = g.events[0];
-        if (!g.changeset) return eventTable(g.events);
-        const undone = g.events.some((e) => e.action === 'changeset.undo') || undoneSets.has(g.changeset);
-        // The newest event in an approved changeset is the approval itself;
-        // the line should name who made the change, then who approved it.
-        const work = g.events.find((e) => !e.action.startsWith('proposal.')) ?? first;
-        const approver = work.detail?.approved_by;
-        return h(
-          'details',
-          { class: 'group' },
-          h('summary', {}, h('span', { class: 'muted nowrap' }, when(first.ts)), h('span', {}, work.actor, approver && h('span', { class: 'muted' }, `, applied by ${approver}`), !approver && work.detail?.authority && h('span', { class: 'muted' }, `, ${authorityText(work.detail.authority)}`)), h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? first.action), h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
-            undone
-              ? h('span', { class: 'pill closed' }, g.events.some((e) => e.action === 'changeset.undo') ? 'an undo' : 'undone')
-              : h(
-                  'button',
-                  {
-                    onclick: async (click) => {
-                      click.preventDefault();
-                      if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
-                      try {
-                        const r = await api('undo', { changeset: g.changeset });
-                        if (r.skipped.length) await tell('Undone, except:', `- ${r.skipped.join('\n- ')}`);
-                        run();
-                      } catch (err) {
-                        tell('That was not undone', err.message);
-                      }
-                    },
-                  },
-                  'Undo',
-                ),
-          ),
-          h('div', { class: 'inner' }, eventTable(g.events)),
-        );
+      ...groups.flatMap((g) => {
+        if (!g.changeset) return g.events.map(eventLine);
+        return changeRow(g, { undone: undoneSets.has(g.changeset), onUndo: undo });
       }),
     );
     if (!events.length) list.replaceChildren(h('div', { class: 'empty' }, 'No activity.'));

@@ -217,16 +217,41 @@ table.list td.act { width: 1%; white-space: nowrap; text-align: right; }
 /* Activity is many small tables; fixed columns keep them aligned. */
 table.events { table-layout: fixed; }
 table.events td { overflow: hidden; text-overflow: ellipsis; }
-table.events td:nth-child(1) { width: 160px; }
-table.events td:nth-child(2) { width: 210px; }
-table.events td:nth-child(3) { width: 130px; }
-table.events td:last-child { white-space: normal; overflow-wrap: anywhere; }
+table.events td:nth-child(1) { width: 84px; }
+table.events td:nth-child(2) { width: 110px; }
+table.events td:nth-child(3) { width: 96px; }
+table.events td:last-child { white-space: nowrap; }
 
 details.group > summary { padding: 9px 14px; cursor: pointer; border-bottom: 1px solid var(--line); list-style: none; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 details.group > summary::-webkit-details-marker { display: none; }
 details.group > summary::before { content: "▸"; color: var(--muted); }
 details.group[open] > summary::before { content: "▾"; }
 details.group .inner { background: var(--bg); }
+
+/* One change, one line: who, the point, what it did, on whose word, when. Nothing wraps; what is cut is in the tooltip and in the opened row. */
+details.change > summary, .change.line { flex-wrap: nowrap; align-items: center; gap: 10px; }
+.change.line { display: flex; padding: 9px 14px 9px 32px; border-bottom: 1px solid var(--line); }
+details.change > summary > *, .change.line > * { flex: none; white-space: nowrap; }
+details.change > summary > .gist, .change.line > .gist { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+details.change > summary > .gist strong { font-weight: 600; }
+details.change.quiet > summary { opacity: 0.6; }
+details.change .reason { margin: 0; padding: 10px 14px 0; max-width: 72ch; line-height: 1.5; }
+details.change .reason + table, details.change .reason + .reason { margin-top: 0; }
+details.change .inner > table { margin-top: 8px; }
+details.folded > summary { padding: 9px 14px; cursor: pointer; color: var(--muted); font-size: 12.5px; list-style: none; }
+details.folded > summary::-webkit-details-marker { display: none; }
+details.folded > summary::before { content: "\25B8  "; }
+details.folded[open] > summary::before { content: "\25BE  "; }
+.who { font-weight: 600; min-width: 64px; }
+.who::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: var(--g-system); }
+.who-human::before { background: var(--ok); }
+.who-github::before { background: var(--muted); }
+.ago { color: var(--muted); font-size: 12px; min-width: 56px; text-align: right; }
+.mark { font-size: 11px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+.mark-human { border-color: var(--ok); color: var(--ok); }
+.mark-none { border-style: dashed; }
+.effect { font-size: 12px; }
+button.quiet-button { padding: 2px 9px; font-size: 12px; }
 
 @media (max-width: 720px) {
   body { grid-template-columns: 1fr; }
