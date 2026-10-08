@@ -389,6 +389,8 @@ async function refreshReviewCount() {
 // Proposals come first. The rest of what the map knows about today is a row
 // of counts, opened one at a time.
 let todayOpen = '';
+/** The project whose detail is open on Home. */
+let todayProject = '';
 /** The lists on Home shown in full; the others stop at the first two. */
 const todayAll = new Set();
 
@@ -520,22 +522,52 @@ async function today() {
     part('To do', m.todo, rows(`${key}:todo`, m.todo, (e) => plainRow(e))),
     part('Others are waiting on', m.holding, rows(`${key}:holding`, m.holding, (r) => plainRow(r.entity, ['holding up: ', r.holding_up.map((e, i) => [i > 0 && ', ', link(e)])]))),
   ];
-  const projectCard = (pr) => {
+  // Where blocked work sits, by project, for the tile's third number.
+  const blockedIn = (id) => blockers.filter((b) => (home.get(b.entity.id) ?? '') === id).length;
+  const ordered = [...asked.projects].sort((a, b) => amount(mineIn(b.id)) - amount(mineIn(a.id)));
+  if (todayProject && !asked.projects.some((pr) => pr.id === todayProject)) todayProject = '';
+
+  // What needs the owner now, from every project, as one short list: answers
+  // to confirm first, then the questions that hold up the most, then work.
+  const tag = (id) => {
+    const pr = asked.projects.find((x) => x.id === projectOf(id) || x.id === home.get(id));
+    return pr && h('span', { class: 'muted small nowrap' }, pr.title);
+  };
+  const now = [
+    ...answers.map((pr) => answerRow(pr)),
+    ...undecided.filter((q) => !answered.has(q.id)).map((q) => questionItem(q, change, null, true)),
+    ...todo.map((e) => h('li', {}, h('div', { class: 'row-top' }, chip(e.type), h('span', { class: 'grow' }, link(e)), e.due && h('span', { class: 'pill warn' }, `due ${e.due}`), tag(e.id)))),
+  ];
+  const NOW = 5;
+  const needsYou =
+    now.length > 0 &&
+    h(
+      'section',
+      { class: 'card needs' },
+      h('header', {}, h('h2', {}, 'Needs you'), h('span', { class: 'n' }, now.length)),
+      h(
+        'ul',
+        { class: 'rows' },
+        todayAll.has('now') ? now : now.slice(0, NOW),
+        now.length > NOW && h('li', { class: 'more' }, h('button', { class: 'quiet', onclick: () => ((todayAll.has('now') ? todayAll.delete('now') : todayAll.add('now')), today()) }, todayAll.has('now') ? 'fewer' : `${now.length - NOW} more`)),
+      ),
+    );
+
+  // Projects as tiles: where each stands and how much of it is waiting, at a glance.
+  const tile = (pr) => {
     const tree = trees.get(pr.id);
     const m = mineIn(pr.id);
+    const pct = tree?.progress.total ? Math.round((tree.progress.done / tree.progress.total) * 100) : null;
+    const count = (n, label, cls = '') => h('span', { class: `count-of ${n ? cls : 'none'}` }, h('strong', {}, n), ` ${label}`);
     return h(
-      'section',
-      { class: 'card project' },
-      h(
-        'header',
-        {},
-        h('h2', {}, h('a', { href: `#/roadmap/${pr.id}` }, pr.title)),
-        tree?.branches.length > 0 && progressBar(tree.progress),
-        pr.status !== 'active' && pill(pr.type, pr.status),
-      ),
-      amount(m) > 0 && parts(pr.id, m),
+      'button',
+      { class: `tile${todayProject === pr.id ? ' on' : ''}${pr.status !== 'active' ? ' resting' : ''}`, onclick: () => ((todayProject = todayProject === pr.id ? '' : pr.id), today()) },
+      h('span', { class: 'tile-head' }, h('strong', {}, pr.title), pr.status !== 'active' && pill(pr.type, pr.status)),
+      h('span', { class: 'ring', style: `--pct: ${pct ?? 0}`, title: tree?.progress.total ? `${tree.progress.done} of ${tree.progress.total} tasks and issues closed` : 'No tasks yet' }, h('span', {}, pct === null ? '\u2013' : `${pct}%`)),
+      h('span', { class: 'tile-counts' }, count(m.decide.length + m.confirm.length, 'decide', 'warn'), count(m.todo.length, 'do'), count(blockedIn(pr.id), 'blocked', 'bad')),
     );
   };
+  const opened = asked.projects.find((pr) => pr.id === todayProject);
   const loose = mineIn('');
   const inbox = [
     !info.owner && h('p', { class: 'error' }, 'This workspace has no owner yet, so there is nobody for this page to be about. ', h('a', { href: '#/workspace' }, 'Set the owner'), '.'),
@@ -550,22 +582,37 @@ async function today() {
             {},
             h(
               'div',
-              { class: 'row-top' },
-              h('strong', { class: 'grow' }, pr.reason),
+              { class: 'row-top nowrap-row' },
+              who(pr.actor),
+              h('span', { class: 'grow gist', title: pr.reason }, gist(pr.reason)),
               h('a', { href: '#/review' }, `${pr.ops.length} change${pr.ops.length === 1 ? '' : 's'}`),
+              pr.warnings.length > 0 && h('span', { class: 'warning' }, `${pr.warnings.length} warning${pr.warnings.length === 1 ? '' : 's'}`),
               h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Apply'),
               h('button', { onclick: () => decide(pr, false) }, 'Decline'),
             ),
-            h('div', { class: 'row-sub' }, pr.actor, pr.warnings.length > 0 && [' · ', h('span', { class: 'warning' }, `${pr.warnings.length} warning${pr.warnings.length === 1 ? '' : 's'}`)]),
           ),
         ),
       ),
-    // The project with the most waiting for the owner comes first.
-    [...asked.projects].sort((a, b) => amount(mineIn(b.id)) - amount(mineIn(a.id))).map(projectCard),
-    amount(loose) > 0 && h('section', { class: 'card project' }, h('header', {}, h('h2', {}, 'Not in a project')), parts('', loose)),
+    needsYou,
+    h('div', { class: 'tiles' }, ordered.map(tile), h('button', { class: 'tile add', onclick: () => (location.hash = '#/new/project') }, '+ Project')),
+    opened &&
+      h(
+        'section',
+        { class: 'card project' },
+        h('header', {}, h('h2', {}, opened.title), h('a', { href: `#/roadmap/${opened.id}` }, 'Roadmap'), h('a', { href: `#/questions/${opened.id}` }, 'Questions'), h('a', { href: `#/e/${opened.id}` }, 'Open')),
+        amount(mineIn(opened.id)) > 0 ? parts(opened.id, mineIn(opened.id)) : h('div', { class: 'empty' }, 'Nothing here is waiting for you.'),
+      ),
+    amount({ ...loose, read: [] }) > 0 && h('section', { class: 'card project' }, h('header', {}, h('h2', {}, 'Not in a project')), parts('', { ...loose, read: [] })),
   ]
     .flat()
     .filter(Boolean);
+  // What there is to read, from anywhere, behind a count at the top of the page.
+  const tray =
+    notes.length > 0 &&
+    menu(
+      `${notes.length} to read`,
+      notes.map((n) => [n.title, () => (n.about_id ? ((location.hash = `#/e/${n.about_id}`), markRead([n.id])) : markRead([n.id]))]).concat([['Mark all read', () => markRead(notes.map((n) => n.id)), 'quiet']]),
+    );
 
   // Everything else: a count each, and the list behind it on a click.
   const others = {
@@ -649,8 +696,8 @@ async function today() {
     ),
   );
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Home')),
-    h('div', { class: 'inbox' }, inbox, h('div', {}, h('button', { onclick: () => (location.hash = '#/new/project') }, 'New project'))),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Home'), h('span', { class: 'grow' }), tray),
+    h('div', { class: 'inbox' }, inbox),
     strip,
     drawer,
   );
