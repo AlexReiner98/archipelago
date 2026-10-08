@@ -109,6 +109,13 @@ spatial where it can be):
   the page; it never draws its own version of the item. What one kind of item
   needs beyond the common page (a project's roadmap) is a part of that page,
   not a second screen. Before adding a screen, ask whose page it belongs on.
+- **No wall of text, anywhere.** A screen never opens on more than one short
+  paragraph of prose (about four lines). A note shows its first paragraph and
+  the titles of its sections, each one click away (`renderBody` does this:
+  keep to it, and never print a body, a reason or a field whole). If you find
+  a screen that shows a block of text, that is a bug: fold it. When you write
+  a note, lead with the point in two or three sentences and give every further
+  part a short title on a line of its own, so it folds.
 - **One line per row.** A row never wraps at any width: what does not fit is
   cut with an ellipsis, and the whole of it is in the tooltip and one click
   away. Check a new row at 1280 and at 560 px.

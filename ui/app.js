@@ -410,7 +410,7 @@ async function today() {
       tell('That change was not made', err.message);
     }
   };
-  const [info, notes, asked, needs, blockers, waiting, risk, sessions] = await Promise.all([
+  const [info, notes, asked, needs, blockers, waiting, risk] = await Promise.all([
     api('workspace_info'),
     view('notifications'),
     view('questions'),
@@ -418,7 +418,6 @@ async function today() {
     view('blockers'),
     view('waiting_on'),
     view('at_risk'),
-    view('sessions'),
   ]);
   const trees = await projectTrees(asked.projects);
   if (!here()) return;
@@ -494,44 +493,13 @@ async function today() {
         ...risk.resting_on_refuted_hypothesis.map((e) => entityRow(e, ['rests on a refuted hypothesis: ', h('a', { href: `#/e/${e.hypothesis}` }, e.hypothesis_title)])),
       ],
     },
-    sessions: {
-      label: 'Sessions',
-      n: sessions.open.length,
-      warn: sessions.open.some((r) => r.stale),
-      list: () =>
-        sessions.open.map((r) =>
-          h(
-            'li',
-            {},
-            h(
-              'div',
-              { class: 'row-top' },
-              h('span', { class: 'grow' }, link(r)),
-              r.stale && h('span', { class: 'pill bad', title: `No report for over ${sessions.stale_after_minutes} minutes` }, 'gone quiet'),
-              h(
-                'button',
-                {
-                  onclick: async () => {
-                    if (!(await ask({ title: `End "${r.title}"?`, message: 'Anything it holds is released.', action: 'End session', danger: true }))) return;
-                    await api('session_end', { run: r.id, outcome: 'cancelled', summary: 'Ended from the UI' });
-                    today();
-                  },
-                },
-                'End',
-              ),
-            ),
-            h('div', { class: 'row-sub' }, r.working_on.length ? r.working_on.map((e, i) => [i > 0 && ', ', link(e)]) : 'no task named', r.holds.length > 0 && [' · holds: ', r.holds.map((e, i) => [i > 0 && ', ', link(e)])], ` · last heard ${when(r.last_seen)}`),
-          ),
-        ),
-    },
-    resources: { label: 'Resources', n: null, list: null },
   };
   if (todayOpen && !others[todayOpen]) todayOpen = '';
   const drawer = h('div', { class: 'drawer' });
-  const openDrawer = async () => {
+  const openDrawer = () => {
     const o = others[todayOpen];
     if (!o) return drawer.replaceChildren();
-    const list = o.list ? o.list() : await resourceRows(view);
+    const list = o.list();
     drawer.replaceChildren(h('section', { class: 'card' }, list.length ? h('ul', { class: 'rows' }, list) : h('div', { class: 'empty' }, 'Nothing.')));
   };
   const strip = h(
@@ -562,29 +530,6 @@ async function today() {
     drawer,
   );
   openDrawer();
-}
-
-/** Connections, resources and who holds them, as rows. */
-async function resourceRows(view) {
-  const [connections, now, all] = await Promise.all([api('check_connections'), view('available_now'), api('search', { type: 'resource', limit: 100 })]);
-  const connIds = new Set(connections.map((c) => c.id));
-  const heldBy = new Map(now.held_resources.map((r) => [r.resource, r]));
-  return [
-    ...connections.map((c) => h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(c)), h('span', { class: `pill ${c.status === 'available' ? 'ok' : 'bad'}` }, c.status === 'available' ? 'reachable' : 'not reachable')))),
-    ...all
-      .filter((r) => !connIds.has(r.id))
-      .map((r) => {
-        const held = heldBy.get(r.id);
-        const state = r.status !== 'available' ? ['bad', r.status] : held ? ['warn', 'held'] : ['ok', 'free'];
-        return h(
-          'li',
-          {},
-          h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(r)), h('span', { class: `pill ${state[0]}` }, state[1])),
-          held && h('div', { class: 'row-sub' }, 'held by ', h('a', { href: `#/e/${held.held_by}` }, held.held_by_title), ` since ${when(held.since)}`),
-        );
-      }),
-    ...now.waiting_on_resource.map((t) => entityRow(t, ['cannot run: ', t.waiting_on.map((w) => `${WHY[w.why]} ${w.resource}`).join(', ')])),
-  ];
 }
 
 // ---- Review --------------------------------------------------------------
@@ -833,6 +778,8 @@ function proposalCard(p, names) {
 // ---- Search --------------------------------------------------------------
 
 const mapState = { q: '', type: '', open: 'open' };
+/** The system's own records that are looked for like work: the rest (sources, notifications) are found from what they are about. */
+const FOUND = ['sys.automation', 'sys.run', 'sys.connection'];
 
 /** The search box alone, above an open item or a graph: what is typed is looked for on the Search screen. */
 function searchBar() {
@@ -885,8 +832,9 @@ function map() {
   };
   const atRest = async () => {
     try {
-      const rows = (await api('search', { open: mapState.open === 'all' ? undefined : mapState.open === 'open', limit: 200 })).filter((e) => !e.type.startsWith('sys.'));
-      const counts = new Map();
+      const rows = (await api('search', { open: mapState.open === 'all' ? undefined : mapState.open === 'open', limit: 200 })).filter((e) => !e.type.startsWith('sys.') || FOUND.includes(e.type));
+      // Automations have a place here before there are any: this is where one is made.
+      const counts = new Map([['sys.automation', 0]]);
       for (const e of rows) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
       rest.replaceChildren(
         h(
@@ -917,17 +865,22 @@ function map() {
 }
 
 /**
- * A body as a page, not a block. Agents write notes with headings in capitals,
- * numbered points and dashes; this draws them as headings and lists at a
- * readable width, and folds every section after the opening one, so a long
- * note opens as its first few lines and a list of what else it holds.
+ * A body as a page, not a block, and never a wall of text. Agents write notes
+ * with headings (a line in capitals, or a short line of its own at the top of
+ * a paragraph), numbered points and dashes; this draws them as headings and
+ * lists at a readable width. A note opens as its first paragraph and the
+ * titles of what else it holds: every section, and the rest of the opening,
+ * is one click away.
  */
 function renderBody(text) {
   const heading = (line) => /^[A-Z0-9][A-Z0-9 ,'()\/&-]{2,60}:?$/.test(line.trim()) && /[A-Z]{3}/.test(line);
   const item = (line) => /^\s*(-|\*|\d+\.|[A-Z]\.)\s+/.exec(line);
   const sections = [{ title: null, lines: [] }];
-  for (const line of text.split('\n')) {
-    if (heading(line)) sections.push({ title: line.trim().replace(/:$/, ''), lines: [] });
+  const lines = text.split('\n');
+  // A short line that opens a paragraph and does not end as a sentence is that paragraph's title.
+  const titles = (line, i) => !lines[i - 1]?.trim() && Boolean(lines[i + 1]?.trim()) && line.trim().length <= 90 && !/[.;,]$/.test(line.trim()) && !item(line);
+  for (const [i, line] of lines.entries()) {
+    if (heading(line) || (line.trim() && titles(line, i))) sections.push({ title: line.trim().replace(/:$/, ''), lines: [] });
     else sections.at(-1).lines.push(line);
   }
   const blocks = (lines) => {
@@ -957,13 +910,24 @@ function renderBody(text) {
     flush();
     return out;
   };
-  const sentence = (title) => title.charAt(0) + title.slice(1).toLowerCase();
+  const sentence = (title) => (/[a-z]/.test(title) ? title : title.charAt(0) + title.slice(1).toLowerCase());
+  // The opening is its first paragraph; what follows it before the first title is folded like a section.
+  const opening = (lines) => {
+    const [first, ...more] = blocks(lines);
+    if (!first) return [];
+    // A first paragraph that is itself long is shown as its first sentences, and whole with the rest.
+    const text = first.textContent;
+    const long = text.length > 320 || first.tagName !== 'P';
+    const start = long ? h('p', {}, `${(/^.{80,300}?[.:](?=\s)/s.exec(text)?.[0] ?? text.slice(0, 240)).trim()} …`) : first;
+    const rest = long ? [first, ...more] : more;
+    return [start, rest.length > 0 && h('details', { class: 'section' }, h('summary', {}, 'More'), rest)];
+  };
   return h(
     'div',
     { class: 'body-text' },
     sections
       .filter((sec) => sec.title || sec.lines.some((l) => l.trim()))
-      .map((sec, i) => (sec.title ? h('details', { class: 'section', open: i === 0 }, h('summary', {}, sentence(sec.title)), blocks(sec.lines)) : blocks(sec.lines))),
+      .map((sec) => (sec.title ? h('details', { class: 'section' }, h('summary', { title: sec.title }, sentence(sec.title)), blocks(sec.lines)) : opening(sec.lines))),
   );
 }
 
@@ -1192,6 +1156,17 @@ async function entity(id) {
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
   // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
   const project = isA(e.type, 'project');
+  const session = isA(e.type, 'sys.run') && e.is_open && !e.archived_at;
+  const automation = isA(e.type, 'sys.automation');
+  const endSession = async () => {
+    if (!(await ask({ title: `End "${e.title}"?`, message: 'Anything it holds is released.', action: 'End session', danger: true }))) return;
+    try {
+      await api('session_end', { run: id, outcome: 'cancelled', summary: 'Ended from the UI' });
+    } catch (err) {
+      await tell('The session was not ended', err.message);
+    }
+    entity(id);
+  };
   const workish = !e.archived_at && ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t);
   // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
   const fields = Object.entries(e.props).filter(([, v]) => v !== null && v !== '');
@@ -1244,6 +1219,9 @@ async function entity(id) {
       ),
       live && ageChip(e),
       live && h('button', { title: 'Record that you checked this and it is still true as written', onclick: () => change([{ op: 'update', id }], 'Checked in the UI: still true as written') }, 'Still true'),
+      session && h('button', { title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
+      automation && h('span', { class: 'fact' }, automationDoes(e.props)),
+      automation && e.props.last_fired && h('span', { class: `fact${String(e.props.last_result).startsWith('failed') ? ' error' : ''}`, title: String(e.props.last_result) }, `last fired ${when(e.props.last_fired)}`),
       h('span', { class: 'fact' }, owner ? link(owner) : h('span', { class: 'muted' }, 'no owner')),
       short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), String(v))),
       data.source && h('a', { class: 'fact', href: `#/e/${data.source.id}`, title: `Source: ${data.source.title}` }, 'source'),
@@ -1258,7 +1236,7 @@ async function entity(id) {
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),
     ),
-    project && h('div', { id: 'roadmap', 'data-root': id }),
+    project ? h('div', { id: 'roadmap', 'data-root': id }) : '',
     h(
       'div',
       { class: 'grid' },
@@ -1426,48 +1404,12 @@ function newEntity(typeId) {
   draw();
 }
 
-// ---- Automations ---------------------------------------------------------
-
-async function automations() {
-  const main = part('automations');
-  const rows = await api('search', { type: 'sys.automation', limit: 200 });
-  const describe = (p) => {
-    const when = p.trigger === 'every' ? `every ${p.every_minutes} min` : p.trigger === 'daily' ? `daily at ${p.at}` : `when ${p.on_action} is logged`;
-    const what = p.action === 'notify' ? `notify: ${p.message ?? '(its title)'}` : p.action === 'tool' ? `call ${p.tool}` : `launch a session (${p.input?.mode ?? 'plan'}) on ${p.input?.task}`;
-    return `${when} → ${what}`;
-  };
-  const toggle = async (a) => {
-    await api('change', { ops: [{ op: 'update', id: a.id, status: a.status === 'enabled' ? 'paused' : 'enabled' }], reason: `${a.status === 'enabled' ? 'Paused' : 'Enabled'} in the UI` });
-    automations();
-  };
-  main.replaceChildren(
-    h(
-      'div',
-      { class: 'page-head' },
-      h('h1', {}, 'Automations'),
-    ),
-    h('div', { class: 'toolbar', style: 'margin-bottom: 12px' }, h('button', { class: 'primary', onclick: () => (location.hash = '#/new/sys.automation') }, 'New automation')),
-    h(
-      'section',
-      { class: 'card' },
-      rows.length
-        ? h(
-            'ul',
-            { class: 'rows' },
-            rows.map((a) =>
-              h(
-                'li',
-                {},
-                h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(a)), h('span', { class: `pill ${a.status === 'enabled' ? 'ok' : 'closed'}` }, a.status), h('button', { onclick: () => toggle(a) }, a.status === 'enabled' ? 'Pause' : 'Enable')),
-                h('div', { class: 'row-sub' }, describe(a.props)),
-                a.props.last_fired && h('div', { class: `row-sub${String(a.props.last_result).startsWith('failed') ? ' error' : ''}` }, `last fired ${when(a.props.last_fired)} · ${a.props.last_result}`),
-              ),
-            ),
-          )
-        : h('div', { class: 'empty' }, 'No automations yet.'),
-    ),
-  );
-}
+/** What an automation does, in a line: when it fires and what it then does. */
+const automationDoes = (p) => {
+  const when = p.trigger === 'every' ? `every ${p.every_minutes} min` : p.trigger === 'daily' ? `daily at ${p.at}` : `when ${p.on_action} is logged`;
+  const what = p.action === 'notify' ? `notify: ${p.message ?? '(its title)'}` : p.action === 'tool' ? `call ${p.tool}` : `launch a session (${p.input?.mode ?? 'plan'}) on ${p.input?.task}`;
+  return `${when} → ${what}`;
+};
 
 // ---- Graph ---------------------------------------------------------------
 
@@ -2893,11 +2835,12 @@ document.addEventListener('visibilitychange', checkPulse);
 // ---- routing -------------------------------------------------------------
 
 // Each page in the menu is its parts, one under the other. What used to be a
-// page of its own (a project's roadmap, automations) is a part of the page it
-// was reached from, and its old address leads to that part. Search is one
-// thing at a time under its search box: the search, an item, or a graph.
-const PAGES = { today: ['today'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace', 'automations'] };
-const UNDER = { e: 'map', new: 'map', graph: 'map', automations: 'workspace' };
+// page of its own (a project's roadmap, the list of automations) is on the
+// page of the thing it is about or in the search, and its old address leads
+// there. Search is one thing at a time under its search box: the search, an
+// item, or a graph.
+const PAGES = { today: ['today'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace'] };
+const UNDER = { e: 'map', new: 'map', graph: 'map' };
 /** The part an address names, where that is not the address's own name. */
 const PART = { e: 'item', new: 'item' };
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
@@ -2906,6 +2849,8 @@ async function route(pulse = false) {
   // Addresses that have been folded into another screen still lead somewhere.
   if (name === 'activity') return activity();
   if (name === 'projects') return void (location.hash = '#/today');
+  // Automations are found like any other kind of item.
+  if (name === 'automations') return void ((mapState.type = 'sys.automation'), (location.hash = '#/map'));
   // A project's roadmap and its questions are on the project's own page.
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/today');
   const page = PAGES[UNDER[name] ?? name] ? (UNDER[name] ?? name) : 'today';
@@ -2919,7 +2864,6 @@ async function route(pulse = false) {
     item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
     graph: name === 'graph' && (() => graph(arg)),
     workspace,
-    automations,
   };
   const wanted = PAGES[page];
   if ([...main.children].map((c) => c.dataset.part).join() !== wanted.join()) main.replaceChildren(...wanted.map((p) => h('div', { class: 'part', 'data-part': p })));

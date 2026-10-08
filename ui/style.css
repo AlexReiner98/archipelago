@@ -389,7 +389,7 @@ details.menu > .menu-items > button:hover { background: var(--accent-soft); }
 .body-text ul { margin: 0 0 10px; padding-left: 4px; list-style: none; }
 .body-text li { margin: 3px 0; }
 .body-text details.section { border-top: 1px solid var(--line); padding: 8px 0 2px; }
-.body-text details.section > summary { cursor: pointer; font-weight: 600; list-style: none; margin-bottom: 6px; }
+.body-text details.section > summary { cursor: pointer; font-weight: 600; list-style: none; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .body-text details.section > summary::-webkit-details-marker { display: none; }
 .body-text details.section > summary::before { content: "\25B8  "; color: var(--muted); }
 .body-text details.section[open] > summary::before { content: "\25BE  "; }
