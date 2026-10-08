@@ -594,7 +594,7 @@ async function today() {
         ),
       ),
     needsYou,
-    h('div', { class: 'tiles' }, ordered.map(tile), h('button', { class: 'tile add', onclick: () => (location.hash = '#/new/project') }, '+ Project')),
+    h('div', { class: 'tiles' }, ordered.map(tile)),
     opened &&
       h(
         'section',
@@ -696,7 +696,7 @@ async function today() {
     ),
   );
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Home'), h('span', { class: 'grow' }), tray),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Home'), h('span', { class: 'grow' }), tray, h('button', { title: 'Start a new project', onclick: () => (location.hash = '#/new/project') }, '+ Project')),
     h('div', { class: 'inbox' }, inbox),
     strip,
     drawer,
@@ -1338,6 +1338,9 @@ async function entity(id) {
 
 // ---- forms ---------------------------------------------------------------
 
+/** A sentence of explanation, kept behind a small mark: there to be asked for, not to be read past. */
+const hint = (text) => h('span', { class: 'hint', title: text, tabindex: 0 }, '?');
+
 /** A stored field name as a person would label it: "recheck_days" is "Recheck days". */
 const label = (key) => key.charAt(0).toUpperCase() + key.slice(1).replaceAll('_', ' ');
 
@@ -1925,8 +1928,7 @@ function importCard(done) {
   return h(
     'section',
     { class: 'card wide' },
-    h('header', {}, h('h2', {}, 'Import a backup'), h('span', { class: 'n' }, 'Merge a map kept elsewhere into this one.')),
-    h('div', { class: 'empty' }, 'Matched by id. What the file has and this map lacks is added; where both have something, the later edit wins; nothing is deleted. You are shown what would change first.'),
+    h('header', {}, h('h2', { class: 'hinted', title: 'Merge a map kept elsewhere into this one.' }, 'Import a backup')),
     h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, file, h('button', { class: 'primary', onclick: start }, 'Import\u2026')),
     result,
   );
@@ -1975,7 +1977,7 @@ function githubCard() {
   };
   const fail = (err) => body.replaceChildren(h('div', { class: 'error' }, err.message));
   draw().catch(fail);
-  return h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'GitHub'), h('span', { class: 'n' }, 'Pushes keep the map current.')), body);
+  return h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: 'hinted', title: 'Pushes keep the map current.' }, 'GitHub')), body);
 }
 
 // The operator runs the installation: they make workspaces and hand each its
@@ -2009,7 +2011,7 @@ function operatorCard(current) {
         }
       };
       return body.replaceChildren(
-        h('div', { class: 'empty' }, 'Creating and listing workspaces needs the operator secret, printed the first time the server started with tokens on. If it is lost, run "node src/cli.ts operator-reset" on the server.'),
+        h('div', { class: 'empty' }, 'Needs the operator secret. ', hint('It was printed the first time the server started with tokens on. If it is lost, run "node src/cli.ts operator-reset" on the server.')),
         h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, secret, h('button', { onclick: open }, 'Show workspaces')),
         error,
       );
@@ -2067,7 +2069,7 @@ function operatorCard(current) {
     operatorSecret = '';
     body.replaceChildren(h('div', { class: 'error' }, err.message));
   });
-  return h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Installation'), h('span', { class: 'n' }, 'Every workspace on this server. For whoever runs it.')), body);
+  return h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: 'hinted', title: 'Every workspace on this server. For whoever runs it.' }, 'Installation')), body);
 }
 
 // Whose workspace this is. "Needs you now" and the other standing questions
@@ -2087,7 +2089,7 @@ function ownerCard(owner, redraw) {
     h('header', {}, h('h2', {}, 'Owner')),
     owner
       ? h('ul', { class: 'rows' }, h('li', { class: 'row-top' }, chip('person'), h('span', { class: 'grow' }, link(owner))))
-      : [h('div', { class: 'empty' }, 'This workspace has no owner yet. Enter your name to become it; a person is created for you in the map.'), h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, name, email, h('button', { class: 'primary', onclick: set }, 'Set owner')), error],
+      : [h('div', { class: 'empty' }, 'No owner yet. ', hint('Enter your name to become it; a person is created for you in the map.')), h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, name, email, h('button', { class: 'primary', onclick: set }, 'Set owner')), error],
   );
 }
 
@@ -2136,7 +2138,7 @@ async function workspace() {
           'Revoke',
         ),
       ),
-      h('div', { class: 'row-sub' }, t.entity_id ? `for ${personName(t.entity_id) ?? t.entity_id}` : 'not tied to a person', ` · ends in ${t.hint} · `, t.last_used ? `last used ${when(t.last_used)}` : 'never used', t.expires_at && ` · expires ${when(t.expires_at)}`),
+      h('div', { class: 'row-sub' }, t.entity_id && `${personName(t.entity_id) ?? t.entity_id} · `, `${t.hint} · `, t.last_used ? ['used ', ago(t.last_used)] : 'never used', t.expires_at && ` · expires ${when(t.expires_at)}`),
     );
 
   const agentName = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1; min-width: 180px' });
@@ -2155,7 +2157,7 @@ async function workspace() {
       h(
         'section',
         { class: 'card wide' },
-        h('header', {}, h('h2', {}, 'Agent tokens'), h('span', { class: 'n' }, 'An agent with one of these acts for you: it sees what you see and proposes to you.')),
+        h('header', {}, h('h2', { class: 'hinted', title: 'An agent with one of these acts for you: it sees what you see and proposes to you.' }, 'Agent tokens')),
         h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'agent').map(tokenRow)),
         h(
           'div',
@@ -2189,7 +2191,7 @@ async function workspace() {
         h(
           'section',
           { class: 'card wide' },
-          h('header', {}, h('h2', {}, 'Members'), h('span', { class: 'n' }, 'People who can sign in to this workspace.')),
+          h('header', {}, h('h2', { class: 'hinted', title: 'People who can sign in to this workspace.' }, 'Members')),
           h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'human').map(tokenRow)),
           h(
             'div',
@@ -2237,7 +2239,7 @@ async function workspace() {
                 { onchange: (e) => api('workspace_set', { agent_changes: e.target.value }).then(workspace, fail) },
                 [['hold', 'Is held until I have looked'], ['apply', 'Takes effect as they make it']].map(([v, label]) => h('option', { value: v, selected: v === info.agent_changes }, label)),
               ),
-              h('div', { class: 'muted small' }, 'Either way every change is in the log with who made it and why, and can be undone. Held, the answer to a decision or a hypothesis waits for you too. Taking effect, an agent can settle one: it has to say what was chosen and why, and you are notified on Home.'),
+              hint('Either way every change is in the log with who made it and why, and can be undone. Held, the answer to a decision or a hypothesis waits for you too. Taking effect, an agent can settle one: it has to say what was chosen and why, and you are notified on Home.'),
             ),
             h('dt', {}, 'Accept notifications from'),
             h(
@@ -2249,7 +2251,7 @@ async function workspace() {
                 accepts,
                 h('button', { onclick: () => api('workspace_set', { accepts_from: accepts.value.split(',').map((s) => s.trim()).filter(Boolean) }).then(workspace, fail) }, 'Save'),
               ),
-              h('div', { class: 'muted small' }, `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".`),
+              hint(`Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".`),
             ),
           ),
         ),
