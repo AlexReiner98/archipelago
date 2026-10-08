@@ -2668,8 +2668,9 @@ function follow(focus) {
   const busy = dirty || document.querySelector('dialog[open]');
   followed.replaceChildren(
     ...[
-      h('strong', {}, focus.actor),
-      h('span', { class: 'grow' }, focus.note ?? (busy ? 'is working somewhere else' : 'brought you here')),
+      // One line: who, and the first few words of why. The whole reason is on the page it brought you to.
+      h('strong', {}, focus.actor.split('/').at(-1)),
+      h('span', { class: 'grow', title: focus.note ?? '' }, focus.note ? focus.note.split(/(?<=[.:;])\s/)[0] : busy ? 'is working somewhere else' : 'brought you here'),
       busy && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
       h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
     ].filter(Boolean),
