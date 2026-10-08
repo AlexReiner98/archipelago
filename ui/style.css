@@ -452,3 +452,10 @@ details.menu > .menu-items > button { max-width: 420px; overflow: hidden; text-o
 .tile.kind { display: flex; gap: 8px; align-items: baseline; padding: 10px 12px; }
 .tile.kind strong { font-size: 17px; }
 .tile.kind span { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Narrow windows: a title takes the row to itself and its marks sit under it, so it is never squeezed into a column. */
+@media (max-width: 560px) {
+  .row-top:not(.nowrap-row) > .grow { flex-basis: 100%; }
+  table.list td { overflow-wrap: anywhere; }
+  .toolbar.facts > .grow { display: none; }
+}
