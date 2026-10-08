@@ -641,8 +641,8 @@ function proposalCard(p, names) {
     h(
       'div',
       { class: 'meta' },
-      h('div', {}, h('strong', {}, p.reason)),
-      h('div', { class: 'muted small' }, `${p.actor} · ${when(p.ts)} · ${p.id}`, p.source && ` · source: ${p.source.title ?? p.source.uri}`),
+      h('div', { class: 'row-top nowrap-row' }, h('strong', { class: 'grow gist', title: p.reason }, gist(p.reason)), who(p.actor), ago(p.ts)),
+      p.source && h('div', { class: 'muted small gist', title: p.source.uri }, `source: ${p.source.title ?? p.source.uri}`),
       p.warnings.map((w) => h('div', { class: 'warning small' }, `Warning: ${w}`)),
     ),
     h('table', { class: 'ops' }, h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'Change'), h('th', {}, 'What'), h('th', {}, 'Status'))), body),
@@ -761,7 +761,7 @@ function proposalCard(p, names) {
         except: yes ? included.map((on, i) => (on ? null : `#${i + 1}`)).filter(Boolean) : undefined,
         ops: yes && edited.size ? ops : undefined,
       });
-      el.replaceChildren(h('div', { class: 'empty' }, yes ? `Applied: ${p.reason}` : `Declined: ${p.reason}`));
+      el.replaceChildren(h('div', { class: 'empty' }, yes ? `Applied: ${gist(p.reason)}` : `Declined: ${gist(p.reason)}`));
       refreshReviewCount();
       if (yes && ops.some((o) => o.op === 'define_type')) await loadSchema();
     } catch (err) {
@@ -1243,7 +1243,7 @@ async function entity(id) {
       h(
         'section',
         { class: 'card wide note' },
-        long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v))])),
+        long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
         e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       ),
       h(
@@ -1682,7 +1682,8 @@ async function graph(focus) {
     h(
       'div',
       { class: 'page-head' },
-      h('h1', {}, focused ? ['Around: ', focused.title] : 'Graph'),
+      // Around an item it is drawn on that item's page, which has the name.
+      h('h1', {}, focused ? 'Around it' : 'Graph'),
     ),
     h(
       'div',
@@ -2857,11 +2858,13 @@ async function route(pulse = false) {
   dirty = false;
   stale.hidden = true;
   for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === page);
+  const around = name === 'graph' && Boolean(arg);
   const draw = {
     today,
     review,
     map: name === 'map' || page !== 'map' ? map : searchBar,
-    item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
+    // The graph around an item is drawn on that item's page, under it.
+    item: (name === 'e' || name === 'graph') && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
     graph: name === 'graph' && (() => graph(arg)),
     workspace,
   };
@@ -2888,13 +2891,13 @@ async function route(pulse = false) {
         if (err instanceof SignInNeeded) signedOut = true;
         else el.replaceChildren(h('div', { class: 'error' }, err.message));
       }
-      if (!pulse && p === named && el.isConnected) p === wanted[0] || page === 'map' ? scrollTo(0, 0) : el.scrollIntoView();
+      if (!pulse && p === named && el.isConnected) p === wanted[0] || (page === 'map' && !around) ? scrollTo(0, 0) : el.scrollIntoView();
     }),
   );
   if (signedOut) return signIn(store.token ? 'Your token is no longer accepted.' : '');
   // The parts above the one asked for have their final height only now, and a list in them a moment later.
   const settle = () => location.hash.split('/')[1] === name && part(named).scrollIntoView();
-  if (!pulse && named !== wanted[0] && page !== 'map' && part(named) !== main) (settle(), setTimeout(settle, 700));
+  if (!pulse && named !== wanted[0] && (page !== 'map' || around) && part(named) !== main) (settle(), setTimeout(settle, 700));
   refreshReviewCount();
   showIdentity();
 }
