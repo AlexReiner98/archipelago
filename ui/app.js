@@ -2719,12 +2719,12 @@ function questionItem(q, change, where, plain = false) {
   wish.addEventListener('keydown', (e) => e.key === 'Enter' && askAgent());
   // Folded to one line until it is to be answered. What is unfolded is kept
   // across redraws, which happen on every change to the map.
-  const first = (q.body ?? '').replace(/\s+/g, ' ').trim();
-  const preview = !plain && first && h('div', { class: 'row-sub', hidden: openQuestions.has(q.id) }, first.length > 150 ? `${first.slice(0, 150)}\u2026` : first);
+  // No preview of the notes: a sentence cut in half says nothing. The title is the question; the rest opens.
+  const preview = null;
   const more = h(
     'div',
     { class: 'question-more', hidden: !openQuestions.has(q.id) },
-    q.body && h('div', { class: 'question-body' }, q.body),
+    q.body && renderBody(q.body),
     listed('Waiting on this', q.waiting),
     listed('Rests on this', q.assumed_by),
     listed('Being tested by', q.tests, (x) => ` (${x.status})`),
@@ -2751,7 +2751,7 @@ function questionItem(q, change, where, plain = false) {
     { class: 'question' },
     plain
       ? h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(q)), q.due && h('span', { class: 'pill warn' }, `due ${q.due}`), q.holds_up > 0 && h('span', { class: 'muted small', title: 'How many things wait on this' }, `holds up ${q.holds_up}`), toggle)
-      : h('div', { class: 'row-top' }, chip(q.type), h('strong', { class: 'grow' }, link(q)), where, q.due && h('span', { class: 'pill warn' }, `due ${q.due}`), q.holds_up > 0 && h('span', { class: 'pill bad' }, `holds up ${q.holds_up}`), toggle),
+      : h('div', { class: 'row-top' }, chip(q.type), h('strong', { class: 'grow' }, link(q)), where, q.due && h('span', { class: 'pill warn' }, `due ${q.due}`), q.holds_up > 0 && h('span', { class: 'pill bad', title: q.waiting.map((w) => w.title).join('\n') }, `holds up ${q.holds_up}`), toggle),
     preview,
     more,
   );
@@ -2797,14 +2797,15 @@ async function questions(rootId) {
         'div',
         { class: 'row-top' },
         chip(q.type),
-        h('span', { class: 'grow' }, link(q), q.outcome && [' ', h('span', { class: 'arrow' }, '→'), ' ', h('strong', {}, q.outcome)]),
+        h('span', { class: 'grow', title: [q.rationale, q.decided_on && `decided ${q.decided_on}`].filter(Boolean).join(' · ') }, link(q), q.outcome && [' ', h('span', { class: 'arrow' }, '→'), ' ', h('strong', {}, q.outcome)]),
         pill(q.type, q.status),
         h('button', { onclick: async () => (await ask({ title: 'Open this question again?', message: q.title, action: 'Reopen' })) && change([{ op: 'update', id: q.id, status: statusesOf(q.type)[0], ...(q.kind === 'decision' && { props: { outcome: null, rationale: null, decided_on: null } }) }], 'Reopened in the UI') }, 'Reopen'),
       ),
-      (q.rationale || q.decided_on) && h('div', { class: 'row-sub' }, [q.rationale, q.decided_on && `decided ${q.decided_on}`].filter(Boolean).join(' · ')),
     );
 
   const held = new Set(data.open.flatMap((q) => q.waiting.map((w) => w.id))).size;
+  const holding = data.open.filter((q) => q.holds_up > 0);
+  const idle = data.open.filter((q) => !(q.holds_up > 0));
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, 'Questions')),
     h(
@@ -2814,17 +2815,15 @@ async function questions(rootId) {
       h('a', { href: `#/e/${rootId}` }, 'Open project'),
       h('a', { href: `#/roadmap/${rootId}` }, 'Roadmap'),
       h('span', { class: 'grow' }),
-      h('span', { class: 'muted' }, `${data.open.length} open`, held > 0 && `, ${held} thing${held === 1 ? '' : 's'} waiting on them`),
+      h('span', { class: 'muted' }, `${data.open.length} open`, held > 0 && ` · ${held} waiting`),
     ),
     h(
       'div',
       { class: 'grid' },
-      h(
-        'section',
-        { class: 'card wide' },
-        h('header', {}, h('h2', {}, 'Open'), h('span', { class: 'n' }, data.open.length)),
-        data.open.length ? h('ul', { class: 'rows' }, data.open.map(question)) : h('div', { class: 'empty' }, 'Nothing is undecided here.'),
-      ),
+      // Two piles: the questions other work is waiting on, and the ones nothing waits on yet.
+      !data.open.length && h('section', { class: 'card wide' }, h('div', { class: 'empty' }, 'Nothing is undecided here.')),
+      holding.length > 0 && h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Holding work up'), h('span', { class: 'n' }, holding.length)), h('ul', { class: 'rows' }, holding.map(question))),
+      idle.length > 0 && h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Nothing waits on these'), h('span', { class: 'n' }, idle.length)), h('ul', { class: 'rows' }, idle.map(question))),
       data.settled.length > 0 && h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'Settled lately'), h('span', { class: 'n' }, data.settled.length)), h('ul', { class: 'rows' }, data.settled.map(settledRow))),
     ),
   );
