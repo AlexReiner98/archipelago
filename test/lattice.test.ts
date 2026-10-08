@@ -667,6 +667,36 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   assert.equal(log[0].actor, `agent:automation:${made.hourly}`);
 });
 
+test('a note is added to, or one passage of it replaced, without sending it again', async () => {
+  const { undo } = await import('../src/undo.ts');
+  const l = await fresh();
+  const note = 'Seen\n- once, on Monday.\n\nWhat would help\nA smaller answer.';
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Trim the answer', body: note }]);
+  const body = async () => (await l.entity(t))!.body;
+
+  const added = await l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, status: 'done', append: 'Outcome\nTrimmed to a tenth.\n' }] });
+  assert.equal(await body(), `${note}\n\nOutcome\nTrimmed to a tenth.`, 'after a blank line, the rest untouched');
+
+  await make(l, [{ op: 'update', id: t, replace: { find: '- once, on Monday.', with: '- twice: Monday and $& Tuesday.' }, append: 'Checked again.' }]);
+  assert.equal(await body(), `${note.replace('once, on Monday', () => 'twice: Monday and $& Tuesday')}\n\nOutcome\nTrimmed to a tenth.\n\nChecked again.`, 'what replaces it is taken as written');
+
+  const before = await body();
+  const refused = (ops: Op[], why: RegExp) => assert.rejects(l.change(human, { reason: 'test', ops }), why);
+  await refused([{ op: 'update', id: t, replace: { find: 'not in the note', with: 'x' } }], /"Trim the answer": replace\.find must be in the note exactly once, and is there not at all/);
+  await refused([{ op: 'update', id: t, replace: { find: '\n\n', with: 'x' } }], /is there 3 times/);
+  await refused([{ op: 'update', id: t, body: 'All new', append: 'and more' }], /not both/);
+  assert.equal(await body(), before, 'a refused change leaves the note alone');
+
+  // A part of a note held for review is checked again when it is approved: the note may have moved on.
+  const held = await l.change(agent, { reason: 'test', ops: [{ op: 'update', id: t, replace: { find: 'Checked again.', with: 'Checked twice.' } }] });
+  assert.equal(held.status, 'proposed');
+  await make(l, [{ op: 'update', id: t, replace: { find: 'Checked again.', with: 'Checked.' } }]);
+  await assert.rejects(l.decide(human, { proposal: (held as { proposal: string }).proposal, approve: true }), /is there not at all/);
+
+  await undo(l, human, { changeset: (added as { changeset: string }).changeset });
+  assert.equal((await l.entity(t))!.status, 'todo', 'undone like any other edit');
+});
+
 test('undo reverses a change set as a new change, and leaves later edits alone', async () => {
   const { undo } = await import('../src/undo.ts');
   const l = await fresh();

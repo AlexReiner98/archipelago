@@ -912,7 +912,7 @@ function proposalCard(p, names) {
         h('div', {}, nameOf(op.id), op.title && op.title !== target?.title && [' ', h('span', { class: 'arrow' }, '→'), ` ${op.title}`]),
         target && newStatus && h('div', { class: 'detail' }, `status: ${target.status} → ${newStatus}`),
         !newStatus && Object.keys(changes).length === 0 && h('div', { class: 'detail' }, 'checked: still true as written'),
-        fold(i, Object.entries(changes).filter(([k]) => k !== 'title').map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)),
+        fold(i, Object.entries(changes).filter(([k]) => k !== 'title').map(([k, v]) => (k === 'replace' ? `replace: ${v.find} → ${v.with}` : `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`))),
       ];
       st = target ? statusSelect(target.type, newStatus, `unchanged (${target.status})`) : '';
     } else if (op.op === 'link') {

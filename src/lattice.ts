@@ -58,6 +58,10 @@ export interface UpdateOp {
   id: string;
   title?: string;
   body?: string;
+  /** Added to the end of the note, after a blank line. */
+  append?: string;
+  /** One exact passage of the note, which must be there once, and what goes in its place. */
+  replace?: { find: string; with: string };
   status?: string;
   owner?: string | null;
   visibility?: 'private' | 'shared';
@@ -374,6 +378,11 @@ export class Lattice {
           if (!target) break;
           errors.push(...reg.check(target.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
           if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
+          try {
+            bodyAfter(target.body, op);
+          } catch (e) {
+            errors.push(`${where}: "${target.title}": ${(e as Error).message}`);
+          }
           if (op.owner) await checkOwner(op.owner, where);
           break;
         }
@@ -546,7 +555,7 @@ export class Lattice {
             }
             const next = {
               title: op.title?.trim() ?? before.title,
-              body: op.body ?? before.body,
+              body: bodyAfter(before.body, op),
               status: op.status ?? before.status,
               owner: op.owner === undefined ? before.owner : op.owner,
               visibility: op.visibility ?? before.visibility,
@@ -930,6 +939,25 @@ export class Lattice {
     const { rows } = await this.db.query<Proposal>(`select * from proposal where status = $1 order by ts`, [input.status ?? 'pending']);
     return rows;
   }
+}
+
+/**
+ * The note an update leaves: a whole new one (`body`), or the one that is
+ * there with one passage replaced and a paragraph added, so a long note is
+ * changed without being sent again. Throws saying what is wrong with the op.
+ */
+function bodyAfter(before: string, op: UpdateOp): string {
+  if (op.body !== undefined && (op.append !== undefined || op.replace)) throw new Error('send body (the whole note) or append and replace (parts of it), not both');
+  let body = op.body ?? before;
+  if (op.replace) {
+    const { find } = op.replace;
+    if (!find) throw new Error('replace.find cannot be empty');
+    const found = body.split(find).length - 1;
+    if (found !== 1) throw new Error(`replace.find must be in the note exactly once, and is there ${found === 0 ? 'not at all' : `${found} times`}: ${JSON.stringify(find.length > 80 ? `${find.slice(0, 80)}…` : find)}. Copy it from the note as it is now (get), with more around it if it repeats.`);
+    body = body.replace(find, () => op.replace!.with);
+  }
+  if (op.append?.trim()) body = [body.trimEnd(), op.append.trim()].filter(Boolean).join('\n\n');
+  return body;
 }
 
 /**

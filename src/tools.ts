@@ -52,7 +52,12 @@ const op = z.discriminatedUnion('op', [
     op: z.literal('update'),
     id: z.string(),
     title: z.string().optional(),
-    body: z.string().optional(),
+    body: z.string().optional().describe('The whole note, replacing what is there. To change part of a note, use append or replace instead.'),
+    append: z.string().optional().describe('Added to the end of the note after a blank line; the rest is left as it is. For an outcome, a new sighting, a further finding.'),
+    replace: z
+      .object({ find: z.string().min(1).describe('An exact passage of the note as it is now. It must be there exactly once.'), with: z.string().describe('What goes in its place; empty to remove it.') })
+      .optional()
+      .describe('Replace one passage of the note; the rest is left as it is.'),
     status: z.string().optional(),
     owner: z.string().nullable().optional(),
     visibility: visibility.optional(),
@@ -368,6 +373,7 @@ export const TOOLS: Record<string, Tool> = {
     description:
       'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type) with the reason. ' +
       'Creates can carry a ref so later ops in the same change can link to them. Give the source the facts came from. ' +
+      'To add to a note or change one passage of it, send append or replace on the update, not the whole body again. ' +
       'An update that changes nothing (only the id) says you checked the item and it is still true as written: it records when it was last known true. ' +
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
       'Keep the map true as you work: when what you did or found settles something that is still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, instead of leaving it open with a note. ' +
