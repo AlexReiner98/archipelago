@@ -1472,6 +1472,7 @@ const s = (tag, attrs = {}, ...kids) => {
   return el;
 };
 
+// The whole map opens on what belongs to what: projects with their features and work around them.
 const graphState = { relations: '', depth: 2, closed: false };
 
 /** Place nodes so linked ones sit together and nothing overlaps. Runs to rest before drawing. */
@@ -1533,7 +1534,7 @@ function layout(nodes, edges, width, height) {
 }
 
 async function graph(focus) {
-  const params = { focus: focus || undefined, depth: focus ? graphState.depth : undefined, relations: graphState.relations || undefined, include_closed: graphState.closed };
+  const params = { focus: focus || undefined, depth: focus ? graphState.depth : undefined, relations: graphState.relations || (focus ? undefined : 'structure'), include_closed: graphState.closed };
   const data = await api('view', { name: 'graph', params });
   const focused = focus ? data.nodes.find((n) => n.id === focus) : undefined;
   const redraw = () => graph(focus);
@@ -1592,7 +1593,7 @@ async function graph(focus) {
   }
   for (const n of nodes) {
     const group = groupOf(n.root);
-    const title = n.title.length > 30 ? n.title.slice(0, 29) + '…' : n.title;
+    const title = n.title.length > 40 ? n.title.slice(0, 39) + '…' : n.title;
     const el = s(
       'g',
       { class: `node group-${group.key}${n.open ? '' : ' closed'}${n.id === focus ? ' focus' : ''}`, transform: `translate(${n.x},${n.y})` },
@@ -1614,7 +1615,7 @@ async function graph(focus) {
       down.stopPropagation();
       el.setPointerCapture(down.pointerId);
       let moved = false;
-      const scale = () => width / svg.getBoundingClientRect().width / zoom.k;
+      const scale = () => 1 / zoom.k;
       const move = (ev) => {
         if (Math.abs(ev.clientX - down.clientX) + Math.abs(ev.clientY - down.clientY) > 3) moved = true;
         n.x += ev.movementX * scale();
@@ -1638,22 +1639,37 @@ async function graph(focus) {
 
   // Pan by dragging the background; zoom with the wheel, about the pointer.
   const zoom = { k: 1, x: 0, y: 0 };
-  const apply = () => viewport.setAttribute('transform', `translate(${zoom.x},${zoom.y}) scale(${zoom.k})`);
-  // Start with everything in view, leaving room on the right for labels.
-  if (nodes.length) {
+  // The drawing is measured in the screen's own pixels, so a label is the same size at any zoom:
+  // zooming moves things apart, it does not make the words bigger or smaller.
+  const view = { w: width, h: height };
+  const apply = () => {
+    viewport.setAttribute('transform', `translate(${zoom.x},${zoom.y}) scale(${zoom.k})`);
+    svg.style.setProperty('--k', zoom.k);
+  };
+  // Everything in view, leaving room on the right for labels.
+  const fit = () => {
+    if (!nodes.length) return;
     const xs = nodes.map((n) => n.x);
     const ys = nodes.map((n) => n.y);
-    const [x0, x1, y0, y1] = [Math.min(...xs) - 30, Math.max(...xs) + 190, Math.min(...ys) - 30, Math.max(...ys) + 30];
-    zoom.k = Math.min(width / (x1 - x0), height / (y1 - y0), 1.6);
-    zoom.x = (width - (x1 - x0) * zoom.k) / 2 - x0 * zoom.k;
-    zoom.y = (height - (y1 - y0) * zoom.k) / 2 - y0 * zoom.k;
+    const [x0, x1, y0, y1] = [Math.min(...xs) - 30, Math.max(...xs) + 30, Math.min(...ys) - 30, Math.max(...ys) + 30];
+    zoom.k = Math.min((view.w - 220) / (x1 - x0), view.h / (y1 - y0), 1.6);
+    zoom.x = (view.w - 220 - (x1 - x0) * zoom.k) / 2 - x0 * zoom.k + 20;
+    zoom.y = (view.h - (y1 - y0) * zoom.k) / 2 - y0 * zoom.k;
     apply();
-  }
+  };
+  const measure = () => {
+    if (!svg.isConnected || !svg.clientWidth) return;
+    view.w = svg.clientWidth;
+    view.h = svg.clientHeight;
+    svg.setAttribute('viewBox', `0 0 ${view.w} ${view.h}`);
+    fit();
+  };
+  fit();
   svg.addEventListener('wheel', (ev) => {
     ev.preventDefault();
     const box = svg.getBoundingClientRect();
-    const px = ((ev.clientX - box.left) / box.width) * width;
-    const py = ((ev.clientY - box.top) / box.height) * height;
+    const px = ((ev.clientX - box.left) / box.width) * view.w;
+    const py = ((ev.clientY - box.top) / box.height) * view.h;
     const k = Math.min(4, Math.max(0.3, zoom.k * (ev.deltaY < 0 ? 1.15 : 1 / 1.15)));
     zoom.x = px - ((px - zoom.x) / zoom.k) * k;
     zoom.y = py - ((py - zoom.y) / zoom.k) * k;
@@ -1662,7 +1678,7 @@ async function graph(focus) {
   }, { passive: false });
   svg.addEventListener('pointerdown', (down) => {
     svg.setPointerCapture(down.pointerId);
-    const ratio = width / svg.getBoundingClientRect().width;
+    const ratio = view.w / svg.getBoundingClientRect().width;
     const move = (ev) => {
       zoom.x += ev.movementX * ratio;
       zoom.y += ev.movementY * ratio;
@@ -1696,7 +1712,7 @@ async function graph(focus) {
             redraw();
           },
         },
-        [['blocking', 'What blocks what'], ['structure', 'What belongs to what'], ['all', 'Every relation']].map(([v, label]) => h('option', { value: v, selected: v === preset }, label)),
+        [['structure', 'What belongs to what'], ['blocking', 'What blocks what'], ['all', 'Every relation']].map(([v, label]) => h('option', { value: v, selected: v === preset }, label)),
       ),
       focus &&
         h(
@@ -1724,7 +1740,7 @@ async function graph(focus) {
         ' Include finished',
       ),
       focus && h('button', { onclick: () => (location.hash = '#/graph') }, 'Show the whole map'),
-      h('span', { class: 'muted small' }, `${nodes.length} entities, ${edges.length} relations`, data.truncated && ` (showing ${data.truncated.shown} of ${data.truncated.of})`),
+      h('span', { class: 'muted small' }, `${nodes.length} items`, data.truncated && ` of ${data.truncated.of}`),
     ),
     h(
       'section',
@@ -1736,11 +1752,13 @@ async function graph(focus) {
         GROUPS.filter((g) => present.has(g.key)).map((g) => h('span', { class: 'key' }, h('span', { class: `swatch group-${g.key}` }), g.label)),
         nodes.some((n) => !n.open) && h('span', { class: 'key' }, h('span', { class: 'swatch hollow' }), 'Finished'),
         nodes.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch ringed' }), 'Blocked'),
-        edges.some((e) => BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke blocking' }), 'Blocking relation (arrow points at what is needed)'),
+        edges.some((e) => BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke blocking' }), 'Waits on'),
         edges.some((e) => !BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke' }), 'Other relation'),
       ),
     ),
   );
+  measure();
+  new ResizeObserver(measure).observe(svg);
 }
 
 // ---- Workspace -----------------------------------------------------------
