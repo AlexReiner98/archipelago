@@ -301,7 +301,7 @@ function eventLine(ev) {
   );
 }
 
-function changeRow(g, { undone, onUndo }) {
+function changeRow(g, { undone, onUndo, attention, onRead }) {
   const first = g.events[0];
   const work = g.events.find((e) => !e.action.startsWith('proposal.')) ?? first;
   const reason = g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? '';
@@ -317,7 +317,8 @@ function changeRow(g, { undone, onUndo }) {
   const subject = moved.length === 1 ? moved[0] : touched.length && touched.every((e) => e.target_id === touched[0].target_id) ? touched[0] : undefined;
   return h(
     'details',
-    { class: `group change${undone || isUndo ? ' quiet' : ''}` },
+    // One the owner has been told about is marked, and opening it is reading what was said.
+    { class: `group change${undone || isUndo ? ' quiet' : ''}${attention?.length ? ' attn' : ''}`, title: attention?.map((n) => n.title).join(' / ') ?? '', ontoggle: (e) => e.target.open && attention?.length && onRead?.(attention, e.target) },
     h(
       'summary',
       {},
@@ -518,38 +519,67 @@ async function review() {
   main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes'), strands));
   const [pending, known, events, notes] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('events', { limit: 500 }), api('view', { name: 'notifications' })]);
   const names = new Map(known.map((e) => [e.id, e]));
-  // What agents and the system have told the owner, behind a count: each opens what it is about.
-  const markRead = async (ids) => {
+  // What agents and the system have told the owner is not a list of its own:
+  // the change it is about is marked in the list of changes, and opening that
+  // change is reading it.
+  const read = async (ns, row, gone = false) => {
+    if (!ns.length) return;
     try {
-      await api('change', { ops: ids.map((id) => ({ op: 'update', id, status: 'read' })), reason: 'Read in the UI' });
-      review();
+      await api('change', { ops: ns.map((n) => ({ op: 'update', id: n.id, status: 'read' })), reason: 'Read in the UI' });
+      ns.length = 0;
+      gone ? row?.remove() : row?.classList.remove('attn');
       refreshReviewCount();
     } catch (err) {
       tell('That change was not made', err.message);
     }
   };
-  if (notes.length)
-    main.firstChild.append(
-      h('span', { class: 'grow' }),
-      menu(
-        `${notes.length} to read`,
-        notes.map((n) => [n.title, () => (n.about_id ? ((location.hash = `#/e/${n.about_id}`), markRead([n.id])) : markRead([n.id]))]).concat([['Mark all read', () => markRead(notes.map((n) => n.id)), 'quiet']]),
-      ),
-    );
   if (pending.length) main.append(h('h2', {}, `Held for you (${pending.length})`));
   for (const p of pending) main.append(proposalCard(p, names));
-  if (reviewState.show === 'new') return void main.append(appliedCard(events));
+  if (reviewState.show === 'new') return void main.append(appliedCard(events, notes, read));
   const list = h('div');
   main.append(h('section', { class: 'card' }, list));
-  drawTimeline(list, reviewState.show === 'all' ? '' : reviewState.show).catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
+  drawTimeline(list, reviewState.show === 'all' ? '' : reviewState.show, notes, read).catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
-function appliedCard(events) {
+/**
+ * Which change each unread notification is about: the latest change an agent
+ * made to the thing it names, up to when it was sent. One that is about no
+ * change in sight (a session gone quiet, a plain message) is `loose`, and
+ * is a line of its own.
+ */
+function attentionOf(notes, events) {
+  const sets = new Map();
+  const loose = [];
+  for (const n of notes) {
+    const sent = new Date(n.created_at).getTime() + 2000;
+    const ev = n.about_id && events.find((e) => e.changeset && e.target_id === n.about_id && e.actor.startsWith('agent:') && !(e.target_type ?? 'sys.').startsWith('sys.') && new Date(e.ts).getTime() <= sent);
+    if (ev) sets.set(ev.changeset, [...(sets.get(ev.changeset) ?? []), n]);
+    else loose.push(n);
+  }
+  return { sets, loose };
+}
+
+/** A notification that is about no change in the list, as a line among them. */
+const noticeLine = (n, read) => {
+  const line = h(
+    'div',
+    { class: 'change line attn' },
+    who(n.from),
+    h('span', { class: 'gist', title: n.body ?? '' }, n.about_id ? h('a', { href: `#/e/${n.about_id}`, onclick: () => read([n]) }, n.title) : n.title),
+    ago(n.created_at),
+    h('button', { class: 'quiet-button', title: 'Mark this read', onclick: () => read([n], line, true) }, 'Read'),
+  );
+  return line;
+};
+
+function appliedCard(events, notes = [], read) {
+  const needs = attentionOf(notes, events);
   const seenUpto = events.find((e) => e.action === 'changes.seen')?.detail?.upto ?? 0;
   const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
   const sets = new Map();
   for (const ev of events) {
-    if (!ev.changeset || ev.seq <= seenUpto) continue;
+    // A change the owner has been told about stays in sight until that is read, seen or not.
+    if (!ev.changeset || (ev.seq <= seenUpto && !needs.sets.has(ev.changeset))) continue;
     if (!sets.has(ev.changeset)) sets.set(ev.changeset, []);
     sets.get(ev.changeset).push(ev);
   }
@@ -562,6 +592,8 @@ function appliedCard(events) {
   const cancelled = (g) => undoneSets.has(g.changeset) || g.events.some((e) => e.action === 'changeset.undo');
   const live = groups.filter((g) => !cancelled(g));
   const quiet = groups.filter(cancelled);
+  const shown = new Set(groups.map((g) => g.changeset));
+  const loose = [...needs.loose, ...[...needs.sets].filter(([set]) => !shown.has(set)).flatMap(([, ns]) => ns)];
   const undo = async (g) => {
     if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
     try {
@@ -580,10 +612,11 @@ function appliedCard(events) {
       {},
       h('h2', {}, 'Applied by agents'),
       h('span', { class: 'n' }, live.length),
-      groups.length > 0 && h('button', { onclick: () => api('seen', { upto: events[0].seq }).then(review, (err) => tell('That was not recorded', err.message)) }, 'Mark all seen'),
+      (groups.length > 0 || notes.length > 0) && h('button', { onclick: () => api('seen', { upto: events[0].seq }).then(() => read([...notes])).then(review, (err) => tell('That was not recorded', err.message)) }, 'Mark all seen'),
     ),
-    !groups.length && h('div', { class: 'empty' }, seenUpto ? 'Nothing new from agents since you last looked.' : 'Nothing applied by agents.'),
-    live.map((g) => changeRow(g, { onUndo: undo })),
+    loose.map((n) => noticeLine(n, read)),
+    !groups.length && !loose.length && h('div', { class: 'empty' }, seenUpto ? 'Nothing new from agents since you last looked.' : 'Nothing applied by agents.'),
+    live.map((g) => changeRow(g, { onUndo: undo, attention: needs.sets.get(g.changeset), onRead: read })),
     quiet.length > 0 &&
       h(
         'details',
@@ -2229,8 +2262,8 @@ function eventTable(events, withTarget = true) {
 }
 
 /** The whole record, or one strand of it, as lines into `list`. */
-async function drawTimeline(list, origin) {
-  const again = () => drawTimeline(list, origin);
+async function drawTimeline(list, origin, notes = [], read) {
+  const again = () => drawTimeline(list, origin, notes, read);
   const events = await api('events', { limit: 500, origin: origin || undefined });
   const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
   const undo = async (g) => {
@@ -2250,7 +2283,8 @@ async function drawTimeline(list, origin) {
     if (ev.changeset && last?.changeset === ev.changeset) last.events.push(ev);
     else groups.push({ changeset: ev.changeset, events: [ev] });
   }
-  list.replaceChildren(...groups.flatMap((g) => (g.changeset ? changeRow(g, { undone: undoneSets.has(g.changeset), onUndo: undo }) : g.events.map(eventLine))));
+  const needs = attentionOf(notes, events);
+  list.replaceChildren(...needs.loose.map((n) => noticeLine(n, read)), ...groups.flatMap((g) => (g.changeset ? changeRow(g, { undone: undoneSets.has(g.changeset), onUndo: undo, attention: needs.sets.get(g.changeset), onRead: read }) : g.events.map(eventLine))));
   if (!events.length) list.replaceChildren(h('div', { class: 'empty' }, 'Nothing here.'));
 }
 

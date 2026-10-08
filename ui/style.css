@@ -239,6 +239,8 @@ details.change > summary > *, .change.line > * { flex: none; white-space: nowrap
 details.change > summary > .gist, .change.line > .gist { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 details.change > summary > .gist strong { font-weight: 600; }
 details.change.quiet > summary { opacity: 0.6; }
+/* A change the owner has been told about, until it is opened. */
+details.change.attn > summary, .change.line.attn { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 details.change .reason { margin: 0; padding: 10px 14px 0; max-width: 72ch; line-height: 1.5; }
 details.change .reason + table, details.change .reason + .reason { margin-top: 0; }
 details.change .inner > table { margin-top: 8px; }
