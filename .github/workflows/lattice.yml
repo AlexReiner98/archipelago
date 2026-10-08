@@ -124,8 +124,10 @@ jobs:
 
           Finish with two or three lines saying what you sent, or that nothing needed changing.
           EOF
+          # Not the repository's own Claude settings: its hooks are for a person's machine, not for this runner.
           claude --print "$(cat "$RUNNER_TEMP/prompt.txt")" \
             --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
+            --setting-sources user \
             --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
             --max-budget-usd 2 2>&1 | tee "$RUNNER_TEMP/claude.txt"
           status=${PIPESTATUS[0]}
