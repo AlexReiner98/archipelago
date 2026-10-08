@@ -2760,6 +2760,8 @@ async function roadmap(rootId) {
     );
   const statuses = statusesOf('software.feature').filter((st) => data.by_status[st]);
   const asGraph = roadmapState.graph;
+  const inProgress = menu(`${data.now.length} in progress`, data.now.map((n) => [`${n.title}${n.sessions?.length ? '  · session open' : ''}`, () => (location.hash = `#/e/${n.id}`)]));
+  inProgress.classList.add('ok');
   const needsYou = await projectNeeds(rootId, data, change, () => roadmap(rootId)).catch(() => null);
   if (!location.hash.startsWith(`#/roadmap/${rootId}`)) return;
 
@@ -2791,10 +2793,11 @@ async function roadmap(rootId) {
           h('h2', {}, 'Features'),
           statuses.map((st) => h('span', { class: `pill${isClosed('software.feature', st) ? ' closed' : ''}` }, `${data.by_status[st]} ${st}`)),
           h('span', { class: 'grow' }),
+          // What is being worked on is marked in the drawing; the names are one click away, not a paragraph of links.
+          data.now.length > 0 && inProgress,
           asGraph && h('label', { class: 'muted small' }, h('input', { type: 'checkbox', checked: roadmapState.work, onchange: (e) => ((roadmapState.work = e.target.checked), roadmap(rootId)) }), ' Show tasks'),
           h('span', { class: 'switch' }, [['Graph', true], ['List', false]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label))),
         ),
-        data.now.length > 0 && h('div', { class: 'nowline' }, h('span', { class: 'around-phrase' }, 'Working now'), data.now.map((n) => h('span', { class: 'fact' }, link(n), working(n)))),
         !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? roadmapGraph(data, roadmapState.work) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
         h('div', { class: 'toolbar', style: 'padding: 12px 14px; border-top: 1px solid var(--line)' }, title, h('button', { class: 'primary', onclick: add }, 'Add feature')),
       ),

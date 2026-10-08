@@ -479,3 +479,7 @@ details.menu > .menu-items > button { max-width: 420px; overflow: hidden; text-o
 a.button { padding: 5px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); text-decoration: none; }
 a.button:hover { border-color: var(--muted); text-decoration: none; }
 .page-head .progress { margin-left: 4px; }
+
+/* A count that opens the names behind it. */
+details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var(--warn); color: var(--warn); border-radius: 10px; }
+.card > header.bar details.menu > .menu-items { font-weight: 400; }
