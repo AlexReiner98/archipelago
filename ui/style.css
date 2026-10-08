@@ -446,3 +446,9 @@ details.menu > .menu-items > button { max-width: 420px; overflow: hidden; text-o
 /* Questions: one line each until opened. */
 .rows > li.question { padding: 9px 14px; gap: 6px; }
 .question-more .body-text { padding: 4px 0; }
+
+/* Search at rest: each kind of thing as a small tile with how many there are. */
+.tiles.kinds { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.tile.kind { display: flex; gap: 8px; align-items: baseline; padding: 10px 12px; }
+.tile.kind strong { font-size: 17px; }
+.tile.kind span { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

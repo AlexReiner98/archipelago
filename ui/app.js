@@ -732,13 +732,20 @@ async function resourceRows(view) {
 // What agents have changed: first what is held for the owner, then what took
 // effect as it was made, since the owner last looked, each to be undone if it
 // is wrong. Looking is recorded; it permits nothing.
+const reviewState = { show: 'new' };
+const STRANDS = [['new', 'New from agents'], ['all', 'Everything'], ['github', 'Pushes'], ['external', 'Tool calls']];
+
 async function review() {
-  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes')));
+  const strands = h('span', { class: 'switch' }, STRANDS.map(([key, text]) => h('button', { class: reviewState.show === key ? 'on' : '', onclick: () => ((reviewState.show = key), review()) }, text)));
+  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes'), strands));
   const [pending, known, events] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('events', { limit: 500 })]);
   const names = new Map(known.map((e) => [e.id, e]));
   if (pending.length) main.append(h('h2', {}, `Held for you (${pending.length})`));
   for (const p of pending) main.append(proposalCard(p, names));
-  main.append(appliedCard(events));
+  if (reviewState.show === 'new') return void main.append(appliedCard(events));
+  const list = h('div');
+  main.append(h('section', { class: 'card' }, list));
+  drawTimeline(list, reviewState.show === 'all' ? '' : reviewState.show).catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
 function appliedCard(events) {
@@ -964,23 +971,18 @@ function proposalCard(p, names) {
 
 // ---- Search --------------------------------------------------------------
 
-/** Finding something in the map, or seeing how the map came to be. */
-const mapTabs = (on) =>
-  h(
-    'span',
-    { class: 'switch' },
-    [['Search', 'map'], ['Activity', 'activity']].map(([label, to]) => h('button', { class: on === to ? 'on' : '', onclick: () => (location.hash = `#/${to}`) }, label)),
-  );
-
 const mapState = { q: '', type: '', open: 'open' };
 
 function map() {
   const results = h('div');
   const list = h('section', { class: 'card', hidden: true }, results);
+  const rest = h('div', { class: 'inbox' });
   const run = async () => {
-    // Nothing is listed until something is asked for: words, or a type.
-    list.hidden = !mapState.q.trim() && !mapState.type;
-    if (list.hidden) return;
+    // With nothing asked for, the page shows what there is to ask about: each kind with its count, and what moved last.
+    const resting = !mapState.q.trim() && !mapState.type;
+    rest.hidden = !resting;
+    list.hidden = resting;
+    if (resting) return atRest();
     try {
       let rows = await api('search', {
         q: mapState.q || undefined,
@@ -995,8 +997,8 @@ function map() {
           ? h(
               'table',
               { class: 'list' },
-              h('thead', {}, h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Title'), h('th', {}, 'Status'), h('th', {}, 'Updated'))),
-              h('tbody', {}, rows.map((e) => h('tr', {}, h('td', { class: 'nowrap' }, chip(e.type)), h('td', {}, link(e), e.confidence < 1 && h('span', { class: 'muted small' }, `  confidence ${e.confidence}`)), h('td', {}, pill(e.type, e.status)), h('td', { class: 'nowrap muted' }, when(e.updated_at))))),
+              h('thead', {}, h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Title'), h('th', {}, 'Status'), h('th', {}, 'Changed'))),
+              h('tbody', {}, rows.map((e) => h('tr', {}, h('td', { class: 'nowrap' }, chip(e.type)), h('td', {}, link(e), e.confidence < 1 && h('span', { class: 'muted small' }, `  confidence ${e.confidence}`)), h('td', {}, pill(e.type, e.status)), h('td', { class: 'nowrap muted' }, ago(e.updated_at))))),
             )
           : h('div', { class: 'empty' }, 'Nothing matches.'),
       );
@@ -1008,8 +1010,30 @@ function map() {
     mapState[key] = e.target.value;
     run();
   };
+  const atRest = async () => {
+    try {
+      const rows = (await api('search', { open: mapState.open === 'all' ? undefined : mapState.open === 'open', limit: 200 })).filter((e) => !e.type.startsWith('sys.'));
+      const counts = new Map();
+      for (const e of rows) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
+      rest.replaceChildren(
+        h(
+          'div',
+          { class: 'tiles kinds' },
+          [...counts].sort((a, b) => b[1] - a[1]).map(([type, n]) => h('button', { class: 'tile kind', onclick: () => ((mapState.type = type), map()) }, h('strong', {}, n), h('span', {}, typeTitle(type)))),
+        ),
+        h(
+          'section',
+          { class: 'card' },
+          h('header', {}, h('h2', {}, 'Changed lately')),
+          h('ul', { class: 'rows' }, rows.slice(0, 8).map((e) => h('li', {}, h('div', { class: 'row-top nowrap-row' }, chip(e.type), h('span', { class: 'grow gist' }, link(e)), pill(e.type, e.status), ago(e.updated_at))))),
+        ),
+      );
+    } catch (err) {
+      rest.replaceChildren(h('div', { class: 'error' }, err.message));
+    }
+  };
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Search'), mapTabs('map')),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Search')),
     h(
       'div',
       { class: 'toolbar', style: 'margin-bottom: 12px' },
@@ -1018,6 +1042,7 @@ function map() {
       h('button', { onclick: () => (location.hash = `#/new/${mapState.type || 'task'}`) }, 'New'),
       h('select', { onchange: set('open') }, ['open', 'closed', 'all'].map((v) => h('option', { value: v, selected: v === mapState.open }, v === 'open' ? 'Unfinished' : v === 'closed' ? 'Finished' : 'Both'))),
     ),
+    rest,
     list,
   );
   main.querySelector('input[type=search]').focus();
@@ -1313,6 +1338,9 @@ async function entity(id) {
 
 // ---- forms ---------------------------------------------------------------
 
+/** A stored field name as a person would label it: "recheck_days" is "Recheck days". */
+const label = (key) => key.charAt(0).toUpperCase() + key.slice(1).replaceAll('_', ' ');
+
 /** A form for any type, built from its schema. System-kept fields are left out. */
 function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
   const type = types.get(typeId);
@@ -1359,7 +1387,8 @@ function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
     }
   };
 
-  const row = (label, input, hint) => [h('dt', {}, label), h('dd', {}, input, hint && h('div', { class: 'muted small' }, hint))];
+  // What a field is for is its tooltip: a sentence under every box made the form a page of reading.
+  const row = (name, input, hint) => [h('dt', { title: hint ?? '', class: hint ? 'hinted' : '' }, name), h('dd', {}, input)];
   const save = h('button', { class: 'primary' }, submitLabel);
   save.addEventListener('click', async () => {
     error.textContent = '';
@@ -1385,7 +1414,7 @@ function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
       row('Status', h('select', { onchange: (e) => (state.status = e.target.value) }, statusesOf(typeId).map((s) => h('option', { value: s, selected: s === state.status }, s)))),
       Object.entries(type.fields)
         .filter(([, def]) => !def.system)
-        .map(([key, def]) => row(key.replaceAll('_', ' '), control(key, def), def.description)),
+        .map(([key, def]) => row(label(key), control(key, def), def.description)),
       row('Notes', h('textarea', { rows: 5, value: state.body, oninput: (e) => (state.body = e.target.value) })),
       row(
         'Who can see it',
@@ -1415,7 +1444,7 @@ function newEntity(typeId) {
       },
     });
     main.replaceChildren(
-      h('div', { class: 'page-head' }, h('h1', {}, 'New'), h('p', { class: 'muted' }, 'You are creating this directly, so it is applied at once.')),
+      h('div', { class: 'page-head' }, h('h1', {}, 'New')),
       h(
         'div',
         { class: 'toolbar', style: 'margin-bottom: 12px' },
@@ -2055,7 +2084,7 @@ function ownerCard(owner, redraw) {
   return h(
     'section',
     { class: 'card wide' },
-    h('header', {}, h('h2', {}, 'Owner'), h('span', { class: 'n' }, 'Whose work Home is about.')),
+    h('header', {}, h('h2', {}, 'Owner')),
     owner
       ? h('ul', { class: 'rows' }, h('li', { class: 'row-top' }, chip('person'), h('span', { class: 'grow' }, link(owner))))
       : [h('div', { class: 'empty' }, 'This workspace has no owner yet. Enter your name to become it; a person is created for you in the map.'), h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, name, email, h('button', { class: 'primary', onclick: set }, 'Set owner')), error],
@@ -2076,7 +2105,7 @@ async function workspace() {
         h(
           'div',
           { class: 'empty' },
-          'This server is in single-user mode: one workspace, no sign-in, and everything you do here is done as its owner. To share it with other people or separate customers, set "auth": "tokens" in lattice.config.json and restart; the first start prints your token.',
+          h('strong', {}, 'Single user'), h('span', { class: 'muted', title: 'One workspace, no sign-in; everything done here is done as its owner. To share it, set "auth": "tokens" in lattice.config.json and restart: the first start prints your token.' }, ' \u00b7 no sign-in on this server'),
         ),
       ),
     );
@@ -2284,57 +2313,36 @@ function eventTable(events, withTarget = true) {
   );
 }
 
-const activityState = { origin: '' };
-
-async function activity() {
-  const list = h('div');
-  const run = async () => {
-    const events = await api('events', { limit: 500, origin: activityState.origin || undefined });
-    const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
-    const undo = async (g) => {
-      if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
-      try {
-        const r = await api('undo', { changeset: g.changeset });
-        if (r.skipped.length) await tell('Undone, except:', `- ${r.skipped.join('\n- ')}`);
-        run();
-      } catch (err) {
-        tell('That was not undone', err.message);
-      }
-    };
-    // Fold each changeset into one line: one decision, many effects.
-    const groups = [];
-    for (const ev of events) {
-      const last = groups.at(-1);
-      if (ev.changeset && last?.changeset === ev.changeset) last.events.push(ev);
-      else groups.push({ changeset: ev.changeset, events: [ev] });
+/** The whole record, or one strand of it, as lines into `list`. */
+async function drawTimeline(list, origin) {
+  const again = () => drawTimeline(list, origin);
+  const events = await api('events', { limit: 500, origin: origin || undefined });
+  const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
+  const undo = async (g) => {
+    if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
+    try {
+      const r = await api('undo', { changeset: g.changeset });
+      if (r.skipped.length) await tell('Undone, except:', `- ${r.skipped.join('\n- ')}`);
+      again();
+    } catch (err) {
+      tell('That was not undone', err.message);
     }
-    list.replaceChildren(
-      ...groups.flatMap((g) => {
-        if (!g.changeset) return g.events.map(eventLine);
-        return changeRow(g, { undone: undoneSets.has(g.changeset), onUndo: undo });
-      }),
-    );
-    if (!events.length) list.replaceChildren(h('div', { class: 'empty' }, 'No activity.'));
   };
-  main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Activity'), mapTabs('activity')),
-    h(
-      'div',
-      { class: 'toolbar', style: 'margin-bottom: 12px' },
-      h(
-        'select',
-        {
-          onchange: (e) => {
-            activityState.origin = e.target.value;
-            run();
-          },
-        },
-        [['', 'Everything'], ['lattice', 'Changes to the map'], ['github', 'Pushes heard from GitHub'], ['external', 'External tool calls']].map(([v, label]) => h('option', { value: v, selected: v === activityState.origin }, label)),
-      ),
-    ),
-    h('section', { class: 'card' }, list),
-  );
-  run().catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
+  // Fold each changeset into one line: one decision, many effects.
+  const groups = [];
+  for (const ev of events) {
+    const last = groups.at(-1);
+    if (ev.changeset && last?.changeset === ev.changeset) last.events.push(ev);
+    else groups.push({ changeset: ev.changeset, events: [ev] });
+  }
+  list.replaceChildren(...groups.flatMap((g) => (g.changeset ? changeRow(g, { undone: undoneSets.has(g.changeset), onUndo: undo }) : g.events.map(eventLine))));
+  if (!events.length) list.replaceChildren(h('div', { class: 'empty' }, 'Nothing here.'));
+}
+
+/** The old address of the record: it lives on Changes now. */
+function activity() {
+  reviewState.show = 'all';
+  location.hash = '#/review';
 }
 
 // ---- Projects ------------------------------------------------------------
@@ -2939,7 +2947,7 @@ document.addEventListener('visibilitychange', checkPulse);
 // Projects are on Home now; the old address still leads there.
 const ROUTES = { today, review, map, activity, automations, graph, roadmap, questions, workspace, projects: () => void (location.hash = '#/today') };
 // Where each screen sits in the menu, for the ones that are not in it themselves.
-const UNDER = { e: 'map', new: 'map', activity: 'map', graph: 'map', roadmap: 'today', questions: 'today', projects: 'today', automations: 'workspace' };
+const UNDER = { e: 'map', new: 'map', activity: 'review', graph: 'map', roadmap: 'today', questions: 'today', projects: 'today', automations: 'workspace' };
 
 async function route() {
   const [, name = 'today', arg] = location.hash.split('/');

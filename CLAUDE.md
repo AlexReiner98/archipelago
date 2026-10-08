@@ -94,6 +94,34 @@ settled, with what was chosen and why.
 - **Dependencies stay at three** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`) unless the owner agrees to another.
 
+## UI rules
+
+The UI is for a person glancing at it, and most of what it shows was written
+by agents, who write paragraphs. Every screen keeps to these (the owner's
+goal, 8 Oct 2026: minimal, no walls of text, text never stacking vertically,
+spatial where it can be):
+
+- **One line per row.** A row never wraps at any width: what does not fit is
+  cut with an ellipsis, and the whole of it is in the tooltip and one click
+  away. Check a new row at 1280 and at 560 px.
+- **The point, not the paragraph.** A reason is shown as its first clause
+  (`gist`), a note as a page with its sections folded (`renderBody`), at a
+  readable width (about 70 characters).
+- **Names, not identifiers.** Actors through `who`, events through `verb`,
+  times through `ago`, authority through `authorityMark`. An id is something
+  to copy, never something to read.
+- **A mark for a state.** Status, age, authority and counts are pills, marks
+  and numbers, not sentences.
+- **One or two actions in sight.** What is done rarely goes in a `menu`.
+- **Draw it when it has a shape.** Structure, order and neighbourhood are
+  pictures (the roadmap, the graph, an item's relations), with the list as
+  the second view.
+- **No explaining sentences on the page.** What a control is for is its
+  tooltip.
+
+Look at what you changed in a browser before you push it: the local server
+serves the working tree.
+
 ## Checks before committing
 
 ```bash
