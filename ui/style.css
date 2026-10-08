@@ -234,7 +234,9 @@ details.group .inner { background: var(--bg); }
 
 /* One change, one line: who, the point, what it did, on whose word, when. Nothing wraps; what is cut is in the tooltip and in the opened row. */
 details.change > summary, .change.line { flex-wrap: nowrap; align-items: center; gap: 10px; }
-.change.line { display: flex; padding: 9px 14px 9px 32px; border-bottom: 1px solid var(--line); }
+.change.line { display: flex; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+.change.line.quiet { opacity: 0.6; }
+.change.line > .gist strong { font-weight: 600; }
 details.change > summary > *, .change.line > * { flex: none; white-space: nowrap; }
 details.change > summary > .gist, .change.line > .gist { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 details.change > summary > .gist strong { font-weight: 600; }

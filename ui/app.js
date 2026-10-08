@@ -315,28 +315,25 @@ function changeRow(g, { undone, onUndo, attention, onRead }) {
       ? h('span', { class: 'effect' }, h('span', { class: 'pill closed' }, moved[0].detail.changes.status.from), ' \u2192 ', h('span', { class: 'pill' }, moved[0].detail.changes.status.to))
       : touched.length > 0 && h('span', { class: 'effect muted' }, `${new Set(touched.map((e) => e.target_id)).size} item${new Set(touched.map((e) => e.target_id)).size === 1 ? '' : 's'}`);
   const subject = moved.length === 1 ? moved[0] : touched.length && touched.every((e) => e.target_id === touched[0].target_id) ? touched[0] : undefined;
-  return h(
-    'details',
-    // One the owner has been told about is marked, and opening it is reading what was said.
-    { class: `group change${undone || isUndo ? ' quiet' : ''}${attention?.length ? ' attn' : ''}`, title: attention?.map((n) => n.title).join(' / ') ?? '', ontoggle: (e) => e.target.open && attention?.length && onRead?.(attention, e.target) },
-    h(
-      'summary',
-      {},
-      who(work.actor),
-      h('span', { class: 'gist', title: reason }, subject?.target_title ? [h('strong', {}, subject.target_title), reason && ` \u00b7 ${gist(reason)}`] : gist(reason) || verb(first)),
-      effect,
-      approver ? h('span', { class: 'mark mark-human', title: `Applied by ${approver}` }, 'you applied') : touched.length > 0 && authorityMark(work.detail?.authority),
-      ago(first.ts),
-      undone || isUndo ? h('span', { class: 'pill closed' }, isUndo ? 'undo' : 'undone') : onUndo && h('button', { class: 'quiet-button', onclick: (click) => (click.preventDefault(), onUndo(g)) }, 'Undo'),
-    ),
-    h(
-      'div',
-      { class: 'inner' },
-      reason && h('p', { class: 'reason' }, reason),
-      work.detail?.authority && h('p', { class: 'reason muted' }, authorityText(work.detail.authority)),
-      eventTable(touched.length ? touched : g.events),
-    ),
+  // A change is a line, not a page of its own: what it changed has a page, and
+  // the line leads there. One that touched several things offers each. One
+  // the owner has been told about is marked, and going to what it changed is
+  // reading what was said.
+  const ids = [...new Set(touched.map((e) => e.target_id).filter(Boolean))];
+  const read = () => attention?.length && onRead?.(attention, row);
+  const nameOf = (id) => touched.find((e) => e.target_id === id)?.target_title ?? named(id);
+  const one = subject?.target_id ?? (ids.length === 1 ? ids[0] : undefined);
+  const row = h(
+    'div',
+    { class: `change line${undone || isUndo ? ' quiet' : ''}${attention?.length ? ' attn' : ''}`, title: attention?.map((n) => n.title).join(' / ') ?? '' },
+    who(work.actor),
+    h('span', { class: 'gist', title: reason }, one ? [h('a', { href: `#/e/${one}`, onclick: read }, h('strong', {}, nameOf(one))), reason && ` · ${gist(reason)}`] : gist(reason) || verb(first)),
+    moved.length === 1 ? effect : ids.length > 1 && menu(`${ids.length} items`, ids.map((id) => [nameOf(id), () => (read(), (location.hash = `#/e/${id}`))])),
+    approver ? h('span', { class: 'mark mark-human', title: `Applied by ${approver}` }, 'you applied') : touched.length > 0 && authorityMark(work.detail?.authority),
+    ago(first.ts),
+    undone || isUndo ? h('span', { class: 'pill closed' }, isUndo ? 'undo' : 'undone') : onUndo && h('button', { class: 'quiet-button', onclick: () => onUndo(g) }, 'Undo'),
   );
+  return row;
 }
 
 const chip = (typeId) => h('span', { class: 'chip', title: typeId }, typeTitle(typeId));
