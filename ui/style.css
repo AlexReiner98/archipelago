@@ -421,7 +421,7 @@ details.menu > .menu-items > button { max-width: 420px; overflow: hidden; text-o
 
 /* Roadmap: the graph is the page; it shrinks to the window before it scrolls, and the list keeps its controls out of sight until wanted. */
 .roadmap-graph svg { max-width: 100%; min-width: min(100%, 720px); height: auto; }
-.nowline { margin: -4px 0 14px; gap: 14px; }
+.nowline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; padding: 9px 14px; border-bottom: 1px solid var(--line); }
 .tree .moves { opacity: 0; transition: opacity 0.1s; }
 .tree li:hover > details > summary .moves, .tree .moves:focus-within { opacity: 1; }
 
@@ -472,3 +472,10 @@ details.menu > .menu-items > button { max-width: 420px; overflow: hidden; text-o
 .rm-node.nb.closed text { fill: var(--muted); }
 .rm-node.nb-self { cursor: default; }
 .rm-node.nb-self:hover .box { stroke: var(--accent); }
+
+/* A card's header that carries the controls for what is in the card. */
+.card > header.bar { align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: wrap; }
+.card > header.bar .switch button { padding: 3px 10px; font-size: 12.5px; }
+a.button { padding: 5px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); text-decoration: none; }
+a.button:hover { border-color: var(--muted); text-decoration: none; }
+.page-head .progress { margin-left: 4px; }

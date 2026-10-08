@@ -2764,24 +2764,20 @@ async function roadmap(rootId) {
   if (!location.hash.startsWith(`#/roadmap/${rootId}`)) return;
 
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, data.root.title), data.root.status !== 'active' && pill(data.root.type, data.root.status)),
     h(
       'div',
-      { class: 'toolbar', style: 'margin-bottom: 14px' },
-      h('select', { onchange: (e) => (location.hash = `#/roadmap/${e.target.value}`) }, roots.map((r) => h('option', { value: r.id, selected: r.id === rootId }, `${r.title} (${r.branches})`))),
-      h('a', { href: `#/questions/${rootId}` }, 'Questions'),
-      h('a', { href: `#/e/${rootId}` }, 'Details'),
-      h(
-        'span',
-        { class: 'switch' },
-        [['Graph', true], ['List', false]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label)),
-      ),
-      asGraph && h('label', {}, h('input', { type: 'checkbox', checked: roadmapState.work, onchange: (e) => ((roadmapState.work = e.target.checked), roadmap(rootId)) }), ' Tasks'),
-      h('span', { class: 'grow' }),
-      statuses.map((st) => h('span', { class: `pill${isClosed('software.feature', st) ? ' closed' : ''}` }, `${data.by_status[st]} ${st}`)),
+      { class: 'page-head' },
+      h('h1', {}, data.root.title),
+      data.root.status !== 'active' && pill(data.root.type, data.root.status),
       progressBar(data.progress),
+      h('span', { class: 'grow' }),
+      h('a', { class: 'button', href: `#/questions/${rootId}` }, 'Questions'),
+      menu('More', [
+        ['Project details', () => (location.hash = `#/e/${rootId}`)],
+        ['Graph around this project', () => (location.hash = `#/graph/${rootId}`)],
+        ...roots.filter((r) => r.id !== rootId).map((r) => [`Go to ${r.title}`, () => (location.hash = `#/roadmap/${r.id}`)]),
+      ]),
     ),
-    data.now.length > 0 && h('div', { class: 'toolbar nowline' }, h('span', { class: 'muted' }, 'Now'), data.now.map((n) => h('span', { class: 'fact' }, chip(n.type), ' ', link(n), working(n)))),
     h(
       'div',
       { class: 'grid' },
@@ -2789,7 +2785,16 @@ async function roadmap(rootId) {
       h(
         'section',
         { class: 'card wide' },
-        h('header', {}, h('h2', {}, 'Features'), h('span', { class: 'n' }, features.length)),
+        h(
+          'header',
+          { class: 'bar' },
+          h('h2', {}, 'Features'),
+          statuses.map((st) => h('span', { class: `pill${isClosed('software.feature', st) ? ' closed' : ''}` }, `${data.by_status[st]} ${st}`)),
+          h('span', { class: 'grow' }),
+          asGraph && h('label', { class: 'muted small' }, h('input', { type: 'checkbox', checked: roadmapState.work, onchange: (e) => ((roadmapState.work = e.target.checked), roadmap(rootId)) }), ' Show tasks'),
+          h('span', { class: 'switch' }, [['Graph', true], ['List', false]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label))),
+        ),
+        data.now.length > 0 && h('div', { class: 'nowline' }, h('span', { class: 'around-phrase' }, 'Working now'), data.now.map((n) => h('span', { class: 'fact' }, link(n), working(n)))),
         !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? roadmapGraph(data, roadmapState.work) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
         h('div', { class: 'toolbar', style: 'padding: 12px 14px; border-top: 1px solid var(--line)' }, title, h('button', { class: 'primary', onclick: add }, 'Add feature')),
       ),
