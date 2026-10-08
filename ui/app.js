@@ -1610,8 +1610,6 @@ async function graph(focus) {
   const degree = new Map();
   for (const e of edges) for (const id of [e.from, e.to]) degree.set(id, (degree.get(id) ?? 0) + 1);
   const radius = (n) => 6 + Math.min(degree.get(n.id) ?? 0, 8) * 0.6;
-  // Label everything when there is room; otherwise the hubs, and the rest on hover.
-  const labelled = (n) => nodes.length <= 45 || n.id === focus || (degree.get(n.id) ?? 0) >= 4;
 
   const tip = h('div', { class: 'graph-tip', hidden: true });
   const viewport = s('g');
@@ -1662,7 +1660,7 @@ async function graph(focus) {
       { class: `node group-${group.key}${n.open ? '' : ' closed'}${n.id === focus ? ' focus' : ''}`, transform: `translate(${n.x},${n.y})` },
       n.blocked && s('circle', { r: radius(n) + 4, class: 'blocked-ring' }),
       s('circle', { r: radius(n), class: 'dot' }),
-      s('text', { x: radius(n) + 5, y: 4, class: `label${labelled(n) ? '' : ' quiet'}` }, document.createTextNode(title)),
+      s('text', { x: radius(n) + 5, y: 4, class: 'label' }, document.createTextNode(title)),
     );
     const near = new Set([n.id, ...edges.filter((e) => e.from === n.id || e.to === n.id).flatMap((e) => [e.from, e.to])]);
     el.addEventListener('mousemove', (ev) => {
@@ -1690,11 +1688,13 @@ async function graph(focus) {
         el.removeEventListener('pointermove', move);
         el.removeEventListener('pointerup', up);
         if (!moved) location.hash = `#/e/${n.id}`;
+        else declutter();
       };
       el.addEventListener('pointermove', move);
       el.addEventListener('pointerup', up);
     });
     el.addEventListener('dblclick', () => (location.hash = `#/graph/${n.id}`));
+    n.label = title;
     nodeEls.set(n.id, el);
     viewport.append(el);
   }
@@ -1705,9 +1705,29 @@ async function graph(focus) {
   // The drawing is measured in the screen's own pixels, so a label is the same size at any zoom:
   // zooming moves things apart, it does not make the words bigger or smaller.
   const view = { w: width, h: height };
+  // A label is drawn only where it does not run into one already drawn, or into another node's dot.
+  // The most connected are placed first, so the names that orient you are the ones that stay.
+  const byWeight = [...nodes].sort((a, b) => (b.id === focus) - (a.id === focus) || (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0));
+  const declutter = () => {
+    const at = (n) => [n.x * zoom.k + zoom.x, n.y * zoom.k + zoom.y];
+    const taken = nodes.map((n) => {
+      const [x, y] = at(n);
+      const r = radius(n) * zoom.k;
+      return { x0: x - r, x1: x + r, y0: y - r, y1: y + r, of: n };
+    });
+    for (const n of byWeight) {
+      const [x, y] = at(n);
+      const x0 = x + (radius(n) + 5) * zoom.k;
+      const box = { x0, x1: x0 + n.label.length * 6.9 + 6, y0: y - 9, y1: y + 7, of: n };
+      const clash = taken.some((t) => t.of !== n && box.x0 < t.x1 && t.x0 < box.x1 && box.y0 < t.y1 && t.y0 < box.y1);
+      nodeEls.get(n.id).querySelector('.label').classList.toggle('quiet', clash);
+      if (!clash) taken.push(box);
+    }
+  };
   const apply = () => {
     viewport.setAttribute('transform', `translate(${zoom.x},${zoom.y}) scale(${zoom.k})`);
     svg.style.setProperty('--k', zoom.k);
+    declutter();
   };
   // Everything in view, leaving room on the right for labels.
   const fit = () => {

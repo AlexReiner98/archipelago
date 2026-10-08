@@ -428,20 +428,20 @@ details.menu > .menu-items > button { max-width: 420px; overflow: hidden; text-o
 /* An item's neighbourhood, drawn: what it reaches for, itself, what reaches for it. */
 .around { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0 26px; align-items: center; padding: 16px 14px; }
 .around-self { display: grid; gap: 4px; justify-items: center; text-align: center; max-width: 220px; padding: 10px 14px; border: 1.5px solid var(--accent); border-radius: 10px; background: var(--accent-soft); }
-.around-side { display: grid; gap: 12px; }
+.around-side { display: grid; gap: 12px; min-width: 0; }
 .around-side.out { justify-items: end; text-align: right; }
-.around-group { display: grid; gap: 4px; position: relative; }
+.around-group { display: grid; gap: 4px; position: relative; min-width: 0; max-width: 100%; }
 .around-side.out .around-group { justify-items: end; }
 .around-phrase { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.around-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.around-items { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; }
 .around-side.out .around-items { justify-content: flex-end; }
-.around-item { max-width: 260px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); text-decoration: none; }
+.around-item { max-width: min(260px, 100%); box-sizing: border-box; padding: 3px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); text-decoration: none; }
 .around-item:hover { border-color: var(--accent); }
 .around-item.closed { color: var(--closed); border-style: dashed; }
 .around-side.out .around-group::after, .around-side.in .around-group::before { content: ""; position: absolute; top: 50%; width: 18px; border-top: 1px solid var(--edge); }
 .around-side.out .around-group::after { right: -22px; }
 .around-side.in .around-group::before { left: -22px; }
-@media (max-width: 700px) { .around { grid-template-columns: 1fr; gap: 12px; } .around-side.out, .around-side.out .around-group { justify-items: start; text-align: left; } .around-side.out .around-items { justify-content: flex-start; } .around-group::after, .around-group::before { display: none; } .around-self { justify-self: start; } }
+@media (max-width: 900px) { .around { grid-template-columns: 1fr; gap: 12px; } .around-side.out, .around-side.out .around-group { justify-items: start; text-align: left; } .around-side.out .around-items { justify-content: flex-start; } .around-group::after, .around-group::before { display: none; } .around-self { justify-self: start; } }
 
 /* Questions: one line each until opened. */
 .rows > li.question { padding: 9px 14px; gap: 6px; }
