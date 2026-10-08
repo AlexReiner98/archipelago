@@ -464,6 +464,28 @@ test('a session that finishes says where the repository\'s open work stands', as
   const ended = (await callTool(l, agent, 'session_end', { run, summary: 'Tests written', still_true: [made.live, made.gated] })) as any;
   assert.equal(ended.status, 'finished');
   assert.match((await l.entity(run))!.body, /Tests written\nSaid still true: .*Capture probe.*Tune the solver/);
+  // Vouching is said on the item as well: an update that changes nothing, which moves when it was last known true.
+  // It is the agent's word like any other, so here, where agents' changes are held, it waits for the owner.
+  const vouch = (await l.proposals()).at(-1)!;
+  assert.deepEqual(vouch.ops, [{ op: 'update', id: made.live }, { op: 'update', id: made.gated }]);
+  assert.match(vouch.reason, /still true as written/);
+  await l.decide({ kind: 'human', name: 'owner' }, { proposal: vouch.id, approve: true });
+  const said = ((await l.events({ target: made.live })) as any[])[0];
+  assert.deepEqual([said.action, said.detail.changes], ['entity.update', {}]);
+
+  // What nobody has changed or confirmed for longest comes first, with its age; the session is told of it at the start.
+  await l.db.query(`update entity set updated_at = now() - interval '40 days' where id = $1`, [made.gated]);
+  await l.db.query(`update entity set updated_at = now() - interval '20 days' where id = $1`, [made.live]);
+  const old = (await VIEWS.oldest.run(l, { repo: made.repo })) as any;
+  assert.deepEqual(old.items.map((i: any) => [i.title, i.days]), [['Tune the solver', 40], ['Capture probe', 20]]);
+  assert.equal(((await VIEWS.oldest.run(l, { days: 30 })) as any).items.length, 1, 'only those older than asked for');
+  const told = await hookSessionStart(l, { session_id: 'r0', cwd: 'C:\\code\\Aperture' });
+  assert.match(told, /Capture probe \(e_\w+\), not confirmed for 20 days/);
+  assert.doesNotMatch(told, /Write unit tests.*not confirmed/);
+  // Saying it is still true takes it off the list.
+  await make(l, [{ op: 'update', id: made.gated }]);
+  assert.deepEqual(((await VIEWS.oldest.run(l, {})) as any).items.map((i: any) => i.title), ['Capture probe']);
+  await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r0', outcome: 'cancelled' });
 
   // An open issue in the repository is its work too: shown at the start, asked about at the end.
   const { leak } = await make(l, [

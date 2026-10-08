@@ -325,21 +325,29 @@ async function brief(l: Lattice, input: { task?: string }) {
   };
 }
 
-/** Open work that belongs to whatever lives in a repository, split by whether it can run now. */
-async function repoWork(l: Lattice, input: { repo?: string }) {
-  if (!input.repo) throw new Error('repo_work needs "repo": the id of a repository, or its GitHub name ("owner/name")');
-  // An agent run from the repository itself knows its GitHub name, not its id in the map.
-  const repo = /^e_[a-z0-9]{8}$/.test(input.repo) ? await l.entity(input.repo) : await repoByName(l, repoName(input.repo));
-  if (!repo) throw new Error(`No repository "${input.repo}" in the map`);
-  input = { repo: repo.id };
-  const graph = await blockGraph(l);
-  const { rows } = await l.db.query<Brief>(
-    `with recursive scope(id) as (
+/** A repository by its id, or by its GitHub name: an agent run from the repository itself knows only that. */
+async function findRepo(l: Lattice, key: string): Promise<Entity> {
+  const repo = /^e_[a-z0-9]{8}$/.test(key) ? await l.entity(key) : await repoByName(l, repoName(key));
+  if (!repo) throw new Error(`No repository "${key}" in the map`);
+  return repo;
+}
+
+/** Everything that lives in a repository, and all that is part of that, as a query over $1. */
+const REPO_SCOPE = `with recursive scope(id) as (
        select from_id from relation where type = 'software.lives_in' and to_id = $1 and valid_to is null
        union
        select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null
-     )
-     select e.id, e.type, e.title, e.status, e.owner, e.props->>'due' as due
+     )`;
+
+/** Open work that belongs to whatever lives in a repository, split by whether it can run now. */
+async function repoWork(l: Lattice, input: { repo?: string }) {
+  if (!input.repo) throw new Error('repo_work needs "repo": the id of a repository, or its GitHub name ("owner/name")');
+  const repo = await findRepo(l, input.repo);
+  input = { repo: repo.id };
+  const graph = await blockGraph(l);
+  const { rows } = await l.db.query<Brief & { last_confirmed: Date }>(
+    `${REPO_SCOPE}
+     select e.id, e.type, e.title, e.status, e.owner, e.props->>'due' as due, e.updated_at as last_confirmed
      from entity e join scope s on s.id = e.id
      where e.is_open and e.archived_at is null and e.type = any($2::text[])
      order by e.props->>'due' nulls last, e.updated_at desc`,
@@ -351,6 +359,39 @@ async function repoWork(l: Lattice, input: { repo?: string }) {
     last_push: (await lastPushes(l)).get(repo.id) ?? null,
     ready: rows.filter((r) => !graph.isBlocked(r.id)),
     blocked: rows.filter((r) => graph.isBlocked(r.id)).map((r) => ({ ...r, waiting_on: graph.roots(r.id).map((id) => names.get(id)?.title) })),
+  };
+}
+
+/** Days without a change, or a word that it is still true, before open work is said to be unconfirmed. */
+export const UNCONFIRMED_DAYS = 14;
+
+/** The kinds of thing that are true or not of the world, and so go stale: work, questions and problems. */
+const GOES_STALE = ['task', 'decision', 'issue', 'hypothesis', 'experiment', 'software.feature'];
+
+/**
+ * Open work nobody has changed, or said is still true, for longest. An item's
+ * last change is when it was last known true: an update that changes nothing
+ * is how someone who checked it says so.
+ */
+async function oldest(l: Lattice, input: { days?: number; repo?: string; limit?: number }) {
+  const days = input.days ?? UNCONFIRMED_DAYS;
+  const repo = input.repo ? await findRepo(l, input.repo) : undefined;
+  const { rows } = await l.db.query(
+    `${REPO_SCOPE}
+     select e.id, e.type, e.title, e.status, e.owner, e.updated_at as last_confirmed,
+            floor(extract(epoch from now() - e.updated_at) / 86400)::int as days
+     from entity e
+     where e.is_open and e.archived_at is null and e.type = any($2::text[])
+       and e.updated_at <= now() - make_interval(days => $3::int)
+       and ($1::text is null or e.id in (select id from scope))
+     order by e.updated_at limit $4`,
+    [repo?.id ?? null, GOES_STALE.flatMap((t) => l.registry.family(t)), days, input.limit ?? 20],
+  );
+  return {
+    older_than_days: days,
+    repo: repo && { id: repo.id, title: repo.title },
+    items: rows,
+    note: 'Check each against what is so. If it is done or no longer as written, change it. If it is still true as written, send an update for it that changes nothing: that records that you checked, and when.',
   };
 }
 
@@ -669,6 +710,11 @@ export const VIEWS: Record<string, View> = {
   repo_work: {
     description: 'Open tasks, decisions and issues belonging to whatever lives in a repository, split into ready and blocked, and when GitHub last reported a push to it. Params: repo (required): its id, or its GitHub name "owner/name".',
     run: repoWork,
+  },
+  oldest: {
+    description:
+      'What may have gone stale: open tasks, decisions, issues, hypotheses, experiments and features nobody has changed or confirmed for longest, oldest first, each with when it was last known true. Params: days (only items older than this; default 14), repo (its id or GitHub name), limit (default 20).',
+    run: oldest,
   },
   available_now: {
     description: 'What can run right now: open tasks with nothing blocking them, tasks waiting only on a resource, and who holds each resource. Params: owner.',

@@ -5,7 +5,7 @@
 // world, and coordination that waits for approval is no coordination.
 
 import { actorId, type Actor, type Entity, type Lattice, type Op } from './lattice.ts';
-import { VIEWS } from './views.ts';
+import { UNCONFIRMED_DAYS, VIEWS } from './views.ts';
 
 const now = () => new Date().toISOString();
 const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
@@ -172,6 +172,14 @@ export async function sessionEnd(
     left.length && `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
   ].filter(Boolean);
   const summary = [input.summary, ...said].filter(Boolean).join('\n');
+  // Vouching is said on the items too: an update that changes nothing marks each as checked now.
+  if (vouched.length) {
+    await l.change(actor, {
+      ops: vouched.map((i): Op => ({ op: 'update', id: i.id })),
+      reason: `Checked at the end of session "${run.title}": still true as written`,
+      authority: { of: 'agent', basis: `Named in still_true when session ${run.id} ended` },
+    });
+  }
   const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'sys.works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
     ops: [
@@ -196,12 +204,17 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) {
     const work = (await VIEWS.repo_work.run(l, { repo: repo.id })) as {
-      ready: { id: string; title: string; type: string }[];
+      ready: { id: string; title: string; type: string; last_confirmed: string | Date }[];
       blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[];
     };
     lines.push(`Repository: ${repo.title}.`);
     const kind = (t: { type: string }) => (l.registry.isA(t.type, 'issue') ? 'Issue: ' : '');
-    if (work.ready.length) lines.push('', 'Open work and issues here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${kind(t)}${t.title} (${t.id})`));
+    // What nobody has touched for a while is said to be so: it may no longer be true.
+    const age = (t: { last_confirmed: string | Date }) => {
+      const days = Math.floor((Date.now() - new Date(t.last_confirmed).getTime()) / 86_400_000);
+      return days >= UNCONFIRMED_DAYS ? `, not confirmed for ${days} days: check it before relying on it` : '';
+    };
+    if (work.ready.length) lines.push('', 'Open work and issues here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${kind(t)}${t.title} (${t.id})${age(t)}`));
     if (work.blocked.length) lines.push('', 'Blocked work here:', ...work.blocked.slice(0, 15).map((t) => `- ${t.title} (${t.id}), waiting on: ${t.waiting_on.join('; ')}`));
   } else {
     lines.push('Lattice does not know a repository for this folder.');

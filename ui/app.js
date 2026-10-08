@@ -227,6 +227,10 @@ const fits = (allowed, typeId) => allowed.some((a) => a === '*' || isA(typeId, a
 const kept = (relId) => relId.startsWith('sys.') || relId === 'holds';
 
 const when = (ts) => new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const daysAgo = (ts) => {
+  const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86_400_000);
+  return days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+};
 const chip = (typeId) => h('span', { class: 'chip', title: typeId }, typeTitle(typeId));
 const pill = (typeId, status) => h('span', { class: `pill${isClosed(typeId, status) ? ' closed' : ''}` }, status);
 const link = (e) => (e ? h('a', { href: `#/e/${e.id}` }, e.title) : h('span', { class: 'muted' }, '(missing)'));
@@ -765,6 +769,7 @@ function proposalCard(p, names) {
       what = [
         h('div', {}, nameOf(op.id), op.title && op.title !== target?.title && [' ', h('span', { class: 'arrow' }, '→'), ` ${op.title}`]),
         target && newStatus && h('div', { class: 'detail' }, `status: ${target.status} → ${newStatus}`),
+        !newStatus && Object.keys(changes).length === 0 && h('div', { class: 'detail' }, 'checked: still true as written'),
         fold(i, Object.entries(changes).filter(([k]) => k !== 'title').map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)),
       ];
       st = target ? statusSelect(target.type, newStatus, `unchanged (${target.status})`) : '';
@@ -1052,6 +1057,10 @@ async function entity(id) {
           ),
         ),
       !e.archived_at &&
+        e.is_open &&
+        !e.type.startsWith('sys.') &&
+        h('button', { title: 'Record that you checked this and it is still true as written', onclick: () => change([{ op: 'update', id }], 'Checked in the UI: still true as written') }, 'Still true'),
+      !e.archived_at &&
         h('button', { class: 'danger', onclick: async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI') }, 'Archive'),
     ),
     h(
@@ -1068,8 +1077,8 @@ async function entity(id) {
           Object.entries(e.props).map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v))]),
           h('dt', {}, 'Source'),
           h('dd', {}, data.source ? h('a', { href: `#/e/${data.source.id}` }, data.source.title) : h('span', { class: 'muted' }, 'none recorded')),
-          h('dt', {}, 'Updated'),
-          h('dd', {}, when(e.updated_at)),
+          h('dt', {}, e.is_open ? 'Last known true' : 'Updated'),
+          h('dd', {}, when(e.updated_at), e.is_open && h('span', { class: 'muted small' }, `  ${daysAgo(e.updated_at)}, when it was last changed or confirmed`)),
           h('dt', {}, 'Id'),
           h('dd', { class: 'muted' }, e.id),
         ),
@@ -2009,7 +2018,7 @@ function describeEvent(ev) {
   const d = ev.detail ?? {};
   if (ev.origin === 'external') return `${d.ok === false ? 'failed' : 'ok'}${d.durationMs != null ? ` in ${d.durationMs} ms` : ''}`;
   const short = (v) => (v == null ? 'none' : String(typeof v === 'object' ? JSON.stringify(v) : v).replaceAll('\n', ' ').slice(0, 80));
-  if (ev.action === 'entity.update') return Object.entries(d.changes ?? {}).map(([k, c]) => `${k}: ${short(c.from)} → ${short(c.to)}`).join('; ');
+  if (ev.action === 'entity.update') return Object.entries(d.changes ?? {}).map(([k, c]) => `${k}: ${short(c.from)} → ${short(c.to)}`).join('; ') || 'checked: still true as written';
   if (ev.action === 'changeset.undo') return `undid ${d.undoes}${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
   if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${d.to}`;
   if (ev.action === 'entity.create') return `${typeTitle(d.type)}, ${d.status ?? ''}`;

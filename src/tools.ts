@@ -164,7 +164,9 @@ export function describeChanges(changes: HumanChange[]): string {
           : c.changes
             ? JSON.stringify(c.changes)
             : '';
-      return `- ${c.action} ${what}${fields ? `: ${fields}` : ''}${c.reason ? ` [${c.reason}]` : ''}`;
+      // An update that changed nothing is someone saying the item is still true.
+      const checked = c.action === 'entity.update' && !fields;
+      return `- ${checked ? 'checked, still true as written:' : c.action} ${what}${fields ? `: ${fields}` : ''}${c.reason ? ` [${c.reason}]` : ''}`;
     })
     .join('\n');
 }
@@ -366,6 +368,7 @@ export const TOOLS: Record<string, Tool> = {
     description:
       'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type) with the reason. ' +
       'Creates can carry a ref so later ops in the same change can link to them. Give the source the facts came from. ' +
+      'An update that changes nothing (only the id) says you checked the item and it is still true as written: it records when it was last known true. ' +
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
       'Keep the map true as you work: when what you did or found settles something that is still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, instead of leaving it open with a note. ' +
       'Closing a decision or a hypothesis is held for the human to confirm, so propose the answer freely: it costs them one click. Only in a workspace set to apply agents\u2019 changes does it take effect at once: then a decision must carry what was chosen (props.outcome) and why (props.rationale), the human is notified, and it is yours to get right. Settle what the work or the owner has in fact settled; a choice that is still the owner\u2019s to make stays open.',
