@@ -1,6 +1,7 @@
 // Views: the questions the map exists to answer. Nothing here is stored;
 // blockers are derived from relations every time, so they cannot go stale.
 
+import { lastPushes, repoByName, repoName } from './github.ts';
 import { ACTIVE_HOLDS, type Entity, type Lattice } from './lattice.ts';
 
 interface Edge {
@@ -326,7 +327,11 @@ async function brief(l: Lattice, input: { task?: string }) {
 
 /** Open work that belongs to whatever lives in a repository, split by whether it can run now. */
 async function repoWork(l: Lattice, input: { repo?: string }) {
-  if (!input.repo) throw new Error('repo_work needs "repo": the id of a repository');
+  if (!input.repo) throw new Error('repo_work needs "repo": the id of a repository, or its GitHub name ("owner/name")');
+  // An agent run from the repository itself knows its GitHub name, not its id in the map.
+  const repo = /^e_[a-z0-9]{8}$/.test(input.repo) ? await l.entity(input.repo) : await repoByName(l, repoName(input.repo));
+  if (!repo) throw new Error(`No repository "${input.repo}" in the map`);
+  input = { repo: repo.id };
   const graph = await blockGraph(l);
   const { rows } = await l.db.query<Brief>(
     `with recursive scope(id) as (
@@ -342,6 +347,8 @@ async function repoWork(l: Lattice, input: { repo?: string }) {
   );
   const names = await briefs(l, rows.flatMap((r) => graph.roots(r.id)));
   return {
+    repo: { id: repo.id, title: repo.title },
+    last_push: (await lastPushes(l)).get(repo.id) ?? null,
     ready: rows.filter((r) => !graph.isBlocked(r.id)),
     blocked: rows.filter((r) => graph.isBlocked(r.id)).map((r) => ({ ...r, waiting_on: graph.roots(r.id).map((id) => names.get(id)?.title) })),
   };
@@ -660,7 +667,7 @@ export const VIEWS: Record<string, View> = {
     run: brief,
   },
   repo_work: {
-    description: 'Open tasks and decisions belonging to whatever lives in a repository, split into ready and blocked. Params: repo (required).',
+    description: 'Open tasks and decisions belonging to whatever lives in a repository, split into ready and blocked, and when GitHub last reported a push to it. Params: repo (required): its id, or its GitHub name "owner/name".',
     run: repoWork,
   },
   available_now: {

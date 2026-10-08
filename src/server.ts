@@ -6,6 +6,8 @@
 //   POST /hooks/session-start, /hooks/session-end, /hooks/prompt
 //                      Claude Code HTTP hooks: a session registers itself and
 //                      is handed what the map knows about its repository
+//   POST /github/<workspace>  GitHub's webhook: pushes, signed with the
+//                      workspace's secret
 //   GET  /whoami       which workspace and identity a request resolves to
 //   /operator/workspaces  list and create workspaces (empty, or from a backup
 //                      file), and issue a workspace a new owner token
@@ -31,6 +33,7 @@ import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { backupAll, newestBackup, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT } from './config.ts';
+import { receivePush, signedByGithub } from './github.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
@@ -59,10 +62,14 @@ function buildMcp(lattice: Lattice, actorFor: (label?: string) => Actor): McpSer
   return mcp;
 }
 
-async function readJson(req: IncomingMessage): Promise<unknown> {
+async function readBody(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
-  const text = Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
+}
+
+async function readJson(req: IncomingMessage): Promise<unknown> {
+  const text = (await readBody(req)).toString('utf8');
   return text ? JSON.parse(text) : undefined;
 }
 
@@ -188,6 +195,22 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         } catch (err) {
           return send(res, 400, { error: (err as Error).message });
         }
+      }
+
+      // GitHub's deliveries carry no token: the signature over the body is who
+      // they are from, made with the secret this workspace gave GitHub.
+      const delivery = req.method === 'POST' ? /^\/github\/([^/]+)$/.exec(url.pathname) : null;
+      if (delivery) {
+        const id = decodeURIComponent(delivery[1]);
+        const body = await readBody(req);
+        const refused = () => send(res, 401, { error: 'Not a delivery signed for this workspace.' });
+        if (!workspaces.has(id)) return refused();
+        res.once('close', workspaces.hold(id));
+        const { lattice } = await workspaces.get(id);
+        if (!(await signedByGithub(lattice, body, req.headers['x-hub-signature-256']))) return refused();
+        const event = req.headers['x-github-event'];
+        if (event !== 'push') return send(res, 200, { result: { recorded: false, reason: event === 'ping' ? 'pong' : `Only pushes are taken in, not "${event}".` } });
+        return send(res, 200, { result: await receivePush(lattice, JSON.parse(body.toString('utf8'))) });
       }
 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {

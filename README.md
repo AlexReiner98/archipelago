@@ -258,6 +258,41 @@ at the platform.
 - Not done yet: the first deployment, and a copy of the backups off the
   server has not been tried against a real bucket (see Backups).
 
+## GitHub: pushes keep the map current
+
+A push is the moment reality moved, whoever did the work. Two things act on
+it.
+
+**The server hears the push.** On the Workspace screen, **GitHub** makes a
+secret and shows the address to give GitHub (`/github/<workspace>`): in each
+repository, Settings, Webhooks, Add webhook, content type `application/json`,
+that secret, push events only. A repository is matched to the one in the map
+whose `remote` is its GitHub address. From then on:
+
+- every push, on any branch, is recorded against the repository in the
+  activity log, and `repo_work` and the GitHub card say when it was last
+  pushed to;
+- on the default branch, a commit message that says what it finished
+  (`closes e_abc12345`, `fixes e_...`, `done: e_...`) closes that item the
+  way an agent would: held for you to confirm unless policy lets it through.
+  Decisions and hypotheses are left alone; a commit cannot say what was
+  decided.
+
+**An agent reads the push.** [examples/github/lattice.yml](examples/github/lattice.yml)
+is a GitHub Actions workflow: on every push it runs Claude in the repository,
+connected to the workspace with an agent token, to read the new commits
+against the repository's open items and propose what they change. Copy it to
+`.github/workflows/` and set, in the repository's settings:
+
+- variable `LATTICE_URL`: the server's address, e.g. `https://lattice.example.com`;
+- secret `LATTICE_AGENT_TOKEN`: an agent token ("Token only" on the Workspace
+  screen);
+- secret `ANTHROPIC_API_KEY`, or `CLAUDE_CODE_OAUTH_TOKEN` for a Claude
+  subscription.
+
+It does nothing until `LATTICE_URL` is set. Each push is billed as a Claude
+run. What it proposes waits for you on Home like any agent's change.
+
 ## Backups
 
 Every 6 hours the server writes each workspace out as one file of plain rows,

@@ -1599,6 +1599,52 @@ function importCard(done) {
   );
 }
 
+// GitHub tells this workspace when a repository is pushed to. The secret it
+// signs with is made here and shown once, with where to put it.
+function githubCard() {
+  const body = h('div', {}, h('div', { class: 'empty' }, 'Loading\u2026'));
+  const draw = async (made) => {
+    const s = made ?? (await api('github'));
+    const url = location.origin + s.webhook_path;
+    const fresh = async () => {
+      if (s.connected && !(await ask({ title: 'Make a new secret?', message: 'The one GitHub has now stops working until you replace it in each repository\'s webhook.', action: 'New secret', danger: true }))) return;
+      draw(await api('github', { new_secret: true })).catch(fail);
+    };
+    body.replaceChildren(
+      made?.secret
+        ? h(
+            'div',
+            { style: 'padding: 12px 14px 0' },
+            h(
+              'div',
+              { class: 'secret' },
+              h('div', {}, h('strong', {}, 'Webhook secret')),
+              h('code', {}, made.secret),
+              h('div', { class: 'toolbar' }, h('button', { onclick: (e) => navigator.clipboard.writeText(made.secret).then(() => (e.target.textContent = 'Copied')) }, 'Copy'), h('span', { class: 'muted small' }, 'Shown once. If it is lost, make a new one.')),
+            ),
+            h('div', { class: 'muted small', style: 'margin-top: 8px' }, 'In each repository on GitHub: Settings, Webhooks, Add webhook. Payload URL: ', h('code', {}, url), '. Content type: application/json. Secret: the one above. Events: just the push event.'),
+          )
+        : '',
+      h(
+        'ul',
+        { class: 'rows' },
+        s.repos.map((r) =>
+          h(
+            'li',
+            { class: 'row-top' },
+            h('span', { class: 'grow' }, link(r), r.github && [' ', h('span', { class: 'muted small' }, r.github)]),
+            h('span', { class: 'muted small' }, !r.github ? 'no GitHub address' : r.last_push ? `pushed ${when(r.last_push.at)}` : 'no push heard yet'),
+          ),
+        ),
+      ),
+      h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, s.connected && h('code', { class: 'grow' }, url), h('button', { class: s.connected ? '' : 'primary', onclick: fresh }, s.connected ? 'New secret' : 'Connect GitHub')),
+    );
+  };
+  const fail = (err) => body.replaceChildren(h('div', { class: 'error' }, err.message));
+  draw().catch(fail);
+  return h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'GitHub'), h('span', { class: 'n' }, 'Pushes keep the map current.')), body);
+}
+
 // The operator runs the installation: they make workspaces and hand each its
 // first sign-in token, and can read none of them. The secret is kept only in
 // this page's memory, so it is asked for again after a reload.
@@ -1863,6 +1909,7 @@ async function workspace() {
             ),
           ),
         ),
+      me.actor.admin && githubCard(),
       me.actor.admin && importCard(),
       operatorCard(info.id),
     ),

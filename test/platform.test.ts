@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -563,4 +564,64 @@ test('an import can make the owner in the file and the owner here one person, an
   const people = ((await call('/api/search', alex, { type: 'person' })).result as any[]).map((e) => e.title);
   assert.deepEqual(people, ['Alex Reiner'], 'one person, not two');
   assert.equal((await call('/api/import_backup', alex, { backup })).result.owners, undefined, 'and later imports line up');
+});
+
+test('GitHub tells the map of a push: it is recorded against its repository, and what a commit says it finished is proposed closed', async () => {
+  const { workspaces, call, base } = await serve('tokens');
+  const db = (await workspaces.get('default')).lattice.db;
+  const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
+  const made = (
+    await call('/api/change', admin, {
+      reason: 'x',
+      ops: [
+        { op: 'create', ref: 'r', type: 'software.repo', title: 'Site repo', visibility: 'shared', props: { remote: 'https://github.com/Acme/Site.git' } },
+        { op: 'create', ref: 't', type: 'task', title: 'Fix the footer', visibility: 'shared' },
+        { op: 'create', ref: 'd', type: 'decision', title: 'Which font?', visibility: 'shared' },
+        { op: 'link', type: 'software.lives_in', from: 't', to: 'r' },
+      ],
+    })
+  ).result.created;
+
+  assert.equal((await call('/api/github', admin)).result.connected, false);
+  assert.match((await call('/agent/github', robot, { new_secret: true })).error, /humans only/);
+  const connected = (await call('/api/github', admin, { new_secret: true })).result;
+  assert.deepEqual([connected.connected, connected.webhook_path, connected.repos[0].github], [true, '/github/default', 'acme/site']);
+
+  const deliver = async (payload: unknown, { event = 'push', secret = connected.secret as string, path = connected.webhook_path as string } = {}) => {
+    const body = JSON.stringify(payload);
+    const res = await fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', 'x-github-event': event, 'x-hub-signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}` }, body });
+    return { status: res.status, ...((await res.json()) as any) };
+  };
+  const push = (branch: string, message: string, repo = 'Acme/Site') => ({
+    ref: `refs/heads/${branch}`,
+    before: 'a'.repeat(40),
+    after: 'b'.repeat(40),
+    repository: { full_name: repo, default_branch: 'main' },
+    pusher: { name: 'sam' },
+    commits: [{ id: 'c0ffee1' + '0'.repeat(33), message, url: 'https://github.com/Acme/Site/commit/c0ffee1', author: { name: 'Sam' } }],
+  });
+
+  assert.equal((await deliver(push('main', 'x'), { secret: 'not the secret' })).status, 401, 'only what GitHub signed with our secret');
+  assert.equal((await deliver(push('main', 'x'), { path: '/github/nowhere' })).status, 401);
+  assert.equal((await deliver({}, { event: 'ping' })).result.reason, 'pong');
+  assert.equal((await deliver(push('main', 'x', 'Other/Repo'))).result.recorded, false, 'a repository the map does not know');
+
+  // Work on a branch is not finished work.
+  const onBranch = (await deliver(push('feat/footer', `Footer rebuilt\n\nCloses ${made.t}`))).result;
+  assert.deepEqual([onBranch.recorded, onBranch.branch, onBranch.settled], [true, 'feat/footer', []]);
+  // On the default branch the commit is taken at its word, for work; a decision is not a commit's to make.
+  const merged = (await deliver(push('main', `Merge the footer\n\nFixes ${made.t} and closes ${made.d}`))).result;
+  assert.deepEqual(merged.settled, [{ id: made.t, title: 'Fix the footer', status: 'done', result: 'proposed' }]);
+
+  const [waiting] = (await call('/api/proposals', admin)).result as any[];
+  assert.match(waiting.reason, /Commit c0ffee1 says it is finished: Merge the footer/);
+  await call('/api/decide', admin, { proposal: waiting.id, approve: true });
+  const work = (await call('/agent/view', robot, { name: 'repo_work', params: { repo: 'acme/site' } })).result;
+  assert.deepEqual([work.repo.id, work.last_push.branch, work.ready.length], [made.r, 'main', 0], 'found by its GitHub name, with its last push, and the task is done');
+  assert.equal((await call('/api/github', admin)).result.repos[0].last_push.subject, '1 commit to main: Merge the footer');
+
+  const again = (await call('/api/github', admin, { new_secret: true })).result.secret as string;
+  assert.equal((await deliver(push('main', 'x'))).status, 401, 'a replaced secret no longer works');
+  assert.equal((await deliver(push('main', 'x'), { secret: again })).status, 200);
 });

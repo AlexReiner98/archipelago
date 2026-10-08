@@ -1,0 +1,70 @@
+# Keep the Lattice map true to this repository: on every push, an agent reads
+# the new commits against the repository's open items in the map and proposes
+# what they change. Nothing it proposes is applied until the owner confirms it.
+#
+# Copy to .github/workflows/lattice.yml and set in the repository's settings:
+#   variable LATTICE_URL            the server, e.g. https://lattice.example.com
+#   secret   LATTICE_AGENT_TOKEN    an agent token from the Workspace screen
+#   secret   ANTHROPIC_API_KEY      or CLAUDE_CODE_OAUTH_TOKEN, used below
+# It does nothing until LATTICE_URL is set.
+
+name: Lattice
+
+on:
+  push:
+
+# One run at a time per branch: a second push waits for the first to be read.
+concurrency:
+  group: lattice-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    if: ${{ vars.LATTICE_URL != '' && !github.event.deleted }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --mcp-config '{"mcpServers":{"lattice":{"type":"http","url":"${{ vars.LATTICE_URL }}/mcp","headers":{"Authorization":"Bearer ${{ secrets.LATTICE_AGENT_TOKEN }}"}}}}'
+            --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)"
+            --max-turns 40
+          prompt: |
+            A push has just landed on the branch "${{ github.ref_name }}" of ${{ github.repository }}
+            (default branch: "${{ github.event.repository.default_branch }}").
+            The new commits are ${{ github.event.before }}..${{ github.event.after }}.
+            If the first of those is all zeros the branch is new: read the commits on it that are not on the default branch.
+
+            Your one job is to make the Lattice map true again for this repository. Lattice is the owner's map of
+            work: projects, features, tasks, issues, decisions. You reach it through the lattice tools. Change no
+            files here.
+
+            1. Read what changed: `git log` and `git diff --stat` over that range, and the diffs that matter.
+            2. Read what the map believes: the lattice `view` tool with name "repo_work" and params
+               {"repo": "${{ github.repository }}"}; `search` for anything else these commits touch; `get` an item
+               before you change it.
+            3. For each open item these commits settle or change, send one `change` of its own, with a reason
+               that says what the commit did and the commit as the source
+               (uri https://github.com/${{ github.repository }}/commit/<sha>, kind "commit"):
+               - work that is now finished: its status, to done;
+               - work that has visibly started: its status, to doing;
+               - a decision or hypothesis the code has in practice settled: propose its closing, with the outcome
+                 and why;
+               - a title or note the commits have made wrong: the correction.
+               On any branch other than the default, work is in progress, not finished: never close something
+               because of a commit that is not on the default branch.
+            4. If the commits show work the map does not know (a follow-up named in a message, a TODO that was
+               added, a feature that appeared), propose creating it, as part of the feature or project it
+               belongs to. Search first so you do not make a duplicate.
+            5. Do not guess. If nothing in the map is touched by these commits, change nothing.
+
+            Everything you send waits for the owner to confirm. Finish with two or three lines saying what you
+            proposed, or that nothing needed changing.

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { actorId, type Actor, type Lattice } from './lattice.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
+import { githubStatus, newGithubSecret } from './github.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
@@ -534,6 +535,20 @@ export const TOOLS: Record<string, Tool> = {
       level: z.enum(['info', 'warning', 'urgent']).optional(),
     },
     run: async (l, actor, input) => notifyWorkspace(l, actor, input),
+  },
+  github: {
+    description:
+      'This workspace and GitHub: whether pushes are being received, the address GitHub is to send them to, and for each repository in the map its GitHub name and when it was last pushed to. ' +
+      'With new_secret, makes (or replaces) the secret GitHub signs with and shows it once; put it and the address into the repository\u2019s webhook settings, content type application/json, push events only. Admins only for that.',
+    humanOnly: true,
+    input: { new_secret: z.boolean().optional() },
+    run: async (l, actor, input) => {
+      if (!input.new_secret) return githubStatus(l);
+      needAdmin(actor, 'connect GitHub');
+      const whole = await wholeMap(l);
+      const secret = await newGithubSecret(whole);
+      return { ...(await githubStatus(whole)), secret, note: 'Keep this secret now: it is shown once. A secret made earlier no longer works.' };
+    },
   },
   workspace_info: {
     description: 'This workspace\u2019s settings: its id, its owner (null until one is set with init), the default visibility of new things, and which workspaces it accepts notifications from.',
