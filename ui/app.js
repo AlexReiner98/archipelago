@@ -912,118 +912,7 @@ function ageChip(e) {
   return h('span', { class: `mark ${days >= 14 ? 'mark-old' : 'mark-human'}`, title: `Last changed or confirmed ${when(e.updated_at)}` }, days === 0 ? 'true today' : days === 1 ? 'true yesterday' : `${days} days unconfirmed`);
 }
 
-/** Which items' neighbourhoods are shown in full. */
-const aroundAll = new Set();
-
-/**
- * An item's neighbourhood, drawn the way the roadmap is: what it reaches for
- * in a column to its left, itself in the middle, what reaches for it to its
- * right, each joined to it by a curve and gathered under what the relation
- * says. It is laid out by arithmetic, so nothing can overlap: every box has
- * its own row. A long group shows its first eight and a box that opens the rest.
- */
-function neighbourhood(e, data, redraw, owner) {
-  const BOX = { w: 250, h: 26 };
-  const GAP = 6;
-  const HEAD = 20;
-  const COL = 330;
-  const all = aroundAll.has(e.id);
-  const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '\u2026' : text);
-  const column = (rows, direction) => {
-    const groups = new Map();
-    for (const r of rows) {
-      const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
-      if (!groups.has(phrase)) groups.set(phrase, []);
-      groups.get(phrase).push(r);
-    }
-    const out = [];
-    let y = 0;
-    for (const [phrase, items] of groups) {
-      // Open work first: it is what the eye is looking for.
-      const sorted = [...items].sort((a, b) => isClosed(a.entity_type, a.status) - isClosed(b.entity_type, b.status));
-      const shown = all || sorted.length <= 9 ? sorted : sorted.slice(0, 8);
-      out.push({ kind: 'head', phrase, n: items.length, y });
-      y += HEAD;
-      for (const r of shown) {
-        out.push({ kind: 'item', r, y });
-        y += BOX.h + GAP;
-      }
-      if (shown.length < sorted.length) {
-        out.push({ kind: 'more', n: sorted.length - shown.length, y });
-        y += BOX.h + GAP;
-      }
-      y += 10;
-    }
-    return { rows: out, height: Math.max(0, y - 10 - GAP) };
-  };
-  // Whose it is belongs in the picture too: an owner is a field, not a relation, but it is the first thing asked of a waiting item.
-  const owned = owner ? [{ type: 'owned by', id: owner.id, title: owner.title, entity_type: owner.type, status: owner.status }] : [];
-  const left = column([...owned, ...data.outgoing], 'out');
-  const right = column(data.incoming, 'in');
-  const height = Math.max(left.height, right.height, 64);
-  const selfH = 54;
-  const pad = 14;
-  const hasLeft = left.rows.length > 0;
-  const x = { left: 0, self: hasLeft ? COL : 0, right: (hasLeft ? COL : 0) + COL };
-  const width = x.right + (right.rows.length ? BOX.w : -COL + BOX.w) + pad * 2;
-  const selfY = height / 2 - selfH / 2;
-  const inner = s('g', { transform: `translate(${pad},${pad})` });
-  const curve = (x1, y1, x2, y2) => `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
-  const draw = (col, atX, offset, direction) => {
-    for (const row of col.rows) {
-      const y = row.y + offset;
-      if (row.kind === 'head') {
-        inner.append(s('text', { class: 'nb-head', x: atX + (direction === 'out' ? BOX.w : 0), y: y + 12, 'text-anchor': direction === 'out' ? 'end' : 'start' }, document.createTextNode(`${row.phrase}${row.n > 1 ? `  ${row.n}` : ''}`)));
-        continue;
-      }
-      const mid = y + BOX.h / 2;
-      inner.append(s('path', { class: 'rm-link', d: direction === 'out' ? curve(atX + BOX.w, mid, x.self, selfY + selfH / 2) : curve(x.self + BOX.w, selfY + selfH / 2, atX, mid) }));
-      if (row.kind === 'more') {
-        const more = s('g', { class: 'rm-node nb more', transform: `translate(${atX},${y})` }, s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 6 }), s('text', { x: 10, y: 17 }, document.createTextNode(`and ${row.n} more`)));
-        more.addEventListener('click', () => (aroundAll.add(e.id), redraw()));
-        inner.append(more);
-        continue;
-      }
-      const r = row.r;
-      titles.set(r.id, r.title);
-      const box = s(
-        'g',
-        { class: `rm-node nb${isClosed(r.entity_type, r.status) ? ' closed' : ''}`, transform: `translate(${atX},${y})` },
-        s('title', {}, document.createTextNode(`${r.title}\n${typeTitle(r.entity_type)}, ${r.status}`)),
-        s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 6 }),
-        s('text', { x: 10, y: 17 }, document.createTextNode(cut(r.title, 38))),
-      );
-      box.addEventListener('click', () => (location.hash = `#/e/${r.id}`));
-      inner.append(box);
-    }
-  };
-  draw(left, x.left, (height - left.height) / 2, 'out');
-  draw(right, x.right, (height - right.height) / 2, 'in');
-  const words = e.title.split(' ');
-  const lines = [''];
-  for (const word of words) {
-    if ((lines.at(-1) + ' ' + word).trim().length <= 34) lines[lines.length - 1] = (lines.at(-1) + ' ' + word).trim();
-    else if (lines.length < 2) lines.push(word);
-    else {
-      lines[1] = cut(lines[1] + ' ' + word, 34);
-      break;
-    }
-  }
-  inner.append(
-    s(
-      'g',
-      { class: 'rm-node root nb-self', transform: `translate(${x.self},${selfY})` },
-      s('rect', { class: 'box', width: BOX.w, height: selfH, rx: 8 }),
-      s('text', { class: 'small', x: 12, y: 16 }, document.createTextNode(typeTitle(e.type))),
-      ...lines.map((line, k) => s('text', { x: 12, y: (lines.length === 1 ? 37 : 32) + k * 15 }, document.createTextNode(line))),
-    ),
-  );
-  const svg = s('svg', { width, height: height + pad * 2, viewBox: `0 0 ${width} ${height + pad * 2}`, role: 'img', 'aria-label': 'What this is linked to' }, inner);
-  return h('div', { class: 'roadmap-graph around-graph' }, svg, all && h('button', { class: 'quiet', onclick: () => (aroundAll.delete(e.id), redraw()) }, 'Show fewer'));
-}
-
-/** How far out each item's relations are drawn, and which of its sections are unfolded, kept while the page is open. */
-const stepsOut = new Map();
+/** Which of each item's sections are unfolded, kept while the page is open. */
 const unfolded = new Map();
 
 async function entity(id) {
@@ -1129,12 +1018,9 @@ async function entity(id) {
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
   // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
   const project = isA(e.type, 'project');
-  // One drawing of where it sits. A project's features are drawn in its roadmap, so not again here.
-  const rel = project ? { ...data, incoming: data.incoming.filter((x) => x.type !== 'part_of') } : data;
-  const relCount = rel.outgoing.length + rel.incoming.length;
-  const steps = stepsOut.get(id) ?? 1;
-  // Changing relations is done rarely: the list to remove from and the form to add with open together.
-  const editor = h('div', { hidden: true }, h('table', { class: 'list' }, h('tbody', {}, relRows(rel.outgoing, 'out'), relRows(rel.incoming, 'in'))), adder);
+  const relCount = data.outgoing.length + data.incoming.length;
+  // Changing relations is done rarely: the list to remove from and the form to add with open together, from the menu.
+  const editor = h('section', { class: 'card', hidden: true, style: 'margin-bottom: 14px' }, h('table', { class: 'list' }, h('tbody', {}, relRows(data.outgoing, 'out'), relRows(data.incoming, 'in'))), adder);
   // What happened to it, as the same lines Changes shows.
   const sets = [];
   for (const ev of past) {
@@ -1221,6 +1107,7 @@ async function entity(id) {
       h('span', { class: 'grow' }),
       !e.archived_at && h('button', { onclick: edit }, 'Edit'),
       menu('More', [
+        !e.archived_at && phrases.length > 0 && ['Edit relations', () => ((editor.hidden = false), openAdder(), editor.scrollIntoView({ block: 'nearest' }))],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         data.source && [`Source: ${data.source.title}`, () => (location.hash = `#/e/${data.source.id}`)],
         workish && ['Copy session brief', copyBrief],
@@ -1230,6 +1117,7 @@ async function entity(id) {
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),
     ),
+    editor,
     project ? h('div', { id: 'roadmap', 'data-root': id }) : '',
     h(
       'div',
@@ -1240,26 +1128,11 @@ async function entity(id) {
         long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
         e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       ),
-      fold('relations', 'Relations', relCount, !project, [
-        h(
-          'div',
-          { class: 'toolbar fold-bar' },
-          relCount > 0 && h('span', { class: 'switch', title: 'How far out from this to draw' }, [1, 2, 3].map((d) => h('button', { class: d === steps ? 'on' : '', onclick: () => (stepsOut.set(id, d), entity(id)) }, d === 1 ? 'Near' : `${d} steps`))),
-          h('span', { class: 'grow' }),
-          !e.archived_at && phrases.length > 0 && h('button', { onclick: () => ((editor.hidden = false), openAdder()) }, 'Edit'),
-        ),
-        relCount + (owner ? 1 : 0)
-          ? steps === 1
-            ? // Where it sits: what it reaches for on the left, what reaches for it on the right.
-              neighbourhood(e, rel, () => entity(id), owner)
-            : h('div', { id: 'around', class: 'graph-card', 'data-root': id })
-          : h('div', { class: 'empty' }, 'Not linked to anything.'),
-        editor,
-      ]),
+      // Where it sits, as the one graph: a project's is its features, drawn in its roadmap above.
+      !project && fold('relations', 'Relations', relCount, true, graphView({ focus: id })),
       fold('history', 'History', lines.length, false, lines),
     ),
   );
-  if (steps > 1) graph(id).catch((err) => document.getElementById('around')?.replaceChildren(h('div', { class: 'error' }, err.message)));
   if (project) roadmap(id).catch((err) => document.getElementById('roadmap')?.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
@@ -1428,309 +1301,265 @@ const s = (tag, attrs = {}, ...kids) => {
   return el;
 };
 
-// The whole map opens on what belongs to what: projects with their features and work around them.
-const graphState = { relations: '', depth: 2, closed: false };
+// One drawing for every picture of the map: a project's features, what is
+// around an item, the whole map. They differ only in where it starts and in
+// its filters (which relations, how far out, whether what is finished shows),
+// never in how it looks. It is laid out, not simulated, so it looks the same
+// every time: what a thing belongs to or waits on is to its left, what belongs
+// to it or waits on it to its right. Anything can then be dragged aside.
+const KINDS = { structure: ['part_of', 'serves', 'software.lives_in', 'works_at'], blocking: BLOCKING, all: null };
+const KIND_LABELS = [['structure', 'Structure'], ['blocking', 'Blocking'], ['all', 'Everything']];
+/** Each drawing's filters and what was dragged in it, by what it is drawn around, kept while the page is open. */
+const graphPrefs = new Map();
+const prefsOf = (key, defaults = {}) => {
+  if (!graphPrefs.has(key)) graphPrefs.set(key, { kind: 'all', steps: 1, finished: true, fit: false, moved: new Map(), ...defaults });
+  return graphPrefs.get(key);
+};
 
-/** Place nodes so linked ones sit together and nothing overlaps. Runs to rest before drawing. */
-function layout(nodes, edges, width, height) {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  nodes.forEach((n, i) => {
-    const angle = (i / nodes.length) * Math.PI * 2;
-    const spread = Math.min(width, height) * 0.35;
-    n.x = width / 2 + Math.cos(angle) * spread;
-    n.y = height / 2 + Math.sin(angle) * spread;
-    n.vx = n.vy = 0;
-  });
-  const ideal = Math.max(70, Math.min(150, Math.sqrt((width * height) / Math.max(nodes.length, 1)) * 0.8));
-  for (let step = 0; step < 320; step++) {
-    const heat = 1 - step / 320;
-    for (let i = 0; i < nodes.length; i++) {
-      const a = nodes[i];
-      for (let j = i + 1; j < nodes.length; j++) {
-        const b = nodes[j];
-        let dx = a.x - b.x || 0.01;
-        let dy = a.y - b.y || 0.01;
-        const d2 = dx * dx + dy * dy;
-        // Only near neighbours push apart, or separate clusters drive each other off the page.
-        if (d2 > ideal * ideal * 9) continue;
-        const push = (ideal * ideal) / d2;
-        a.vx += dx * push * 0.05;
-        a.vy += dy * push * 0.05;
-        b.vx -= dx * push * 0.05;
-        b.vy -= dy * push * 0.05;
-      }
-      a.vx += (width / 2 - a.x) * 0.02;
-      a.vy += (height / 2 - a.y) * 0.03;
+/**
+ * The graph around `focus` (or of the whole map without one), with its
+ * filters above it. `extras` is what a page knows beyond the graph view: per
+ * item (`info`: progress, place in an order, whether it is being worked on)
+ * and edges to add (a feature waiting on another through their tasks).
+ */
+function graphView({ focus, defaults, extras } = {}) {
+  const prefs = prefsOf(focus ?? '', defaults);
+  const host = h('div', { class: 'graph-view' }, h('div', { class: 'empty' }, 'Loading…'));
+  const draw = async () => {
+    let data;
+    try {
+      data = await api('view', { name: 'graph', params: { focus, depth: focus ? prefs.steps : undefined, relations: 'all', include_closed: true } });
+    } catch (err) {
+      return host.replaceChildren(h('div', { class: 'error' }, err.message));
     }
-    for (const e of edges) {
-      const a = byId.get(e.from);
-      const b = byId.get(e.to);
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const d = Math.hypot(dx, dy) || 1;
-      const pull = ((d - ideal) / d) * 0.06;
-      a.vx += dx * pull;
-      a.vy += dy * pull;
-      b.vx -= dx * pull;
-      b.vy -= dy * pull;
-    }
-    for (const n of nodes) {
-      const speed = Math.hypot(n.vx, n.vy);
-      const cap = 40 * heat + 1;
-      if (speed > cap) {
-        n.vx *= cap / speed;
-        n.vy *= cap / speed;
-      }
-      n.x += n.vx;
-      n.y += n.vy;
-      n.vx *= 0.6;
-      n.vy *= 0.6;
-    }
-  }
+    // A filter changed lays it out afresh; how it is sized does not.
+    const set = (change, tidy = true) => () => {
+      Object.assign(prefs, change);
+      if (tidy) prefs.moved.clear();
+      draw();
+    };
+    const pick = (key, options, title) => h('span', { class: 'switch', title }, options.map(([value, label]) => h('button', { class: prefs[key] === value ? 'on' : '', onclick: set({ [key]: value }) }, label)));
+    const shaped = shapeGraph(data, focus, prefs, extras);
+    host.replaceChildren(
+      h(
+        'div',
+        { class: 'toolbar fold-bar' },
+        pick('kind', KIND_LABELS, 'Which relations to draw'),
+        focus && pick('steps', [[1, 'Near'], [2, '2 steps'], [3, '3 steps']], 'How far out to draw'),
+        h('span', { class: 'grow' }),
+        menu('View', [
+          [prefs.finished ? 'Hide what is finished' : 'Show what is finished', set({ finished: !prefs.finished })],
+          [prefs.fit ? 'Actual size' : 'Fit to width', set({ fit: !prefs.fit }, false)],
+          prefs.moved.size > 0 && ['Tidy', set({})],
+        ]),
+      ),
+      shaped.nodes.length > (focus ? 1 : 0) ? drawGraph(shaped, prefs) : h('div', { class: 'empty' }, focus ? 'Nothing is linked to it this way.' : 'Nothing to draw with these filters.'),
+    );
+  };
+  draw();
+  return host;
 }
 
-async function graph(focus) {
-  // Around an item it is drawn on that item's page, in its relations; by itself it is the whole map.
-  const slot = document.getElementById('around');
-  const embedded = Boolean(focus) && slot?.dataset.root === focus;
-  if (focus && !embedded) return;
-  const main = embedded ? slot : part('graph');
-  const params = { focus: focus || undefined, depth: focus ? (stepsOut.get(focus) ?? 2) : undefined, relations: graphState.relations || (focus ? undefined : 'structure'), include_closed: graphState.closed };
-  const data = await api('view', { name: 'graph', params });
-  const focused = focus ? data.nodes.find((n) => n.id === focus) : undefined;
-  const redraw = () => graph(focus);
+/** Which nodes and edges the filters leave, and where each node goes. */
+function shapeGraph(data, focus, prefs, extras = {}) {
+  const BOX = { w: 224, h: 56, col: 292, gap: 12 };
+  const info = extras.info ?? new Map();
+  const byId = new Map(data.nodes.filter((n) => n.id === focus || prefs.finished || n.open).map((n) => [n.id, { ...n, ...info.get(n.id) }]));
+  const seen = new Set();
+  const all = [...data.edges, ...(extras.edges ?? [])].filter((e) => byId.has(e.from) && byId.has(e.to) && !seen.has(e.id) && seen.add(e.id));
+  const counts = (e) => !KINDS[prefs.kind] || KINDS[prefs.kind].includes(e.type);
+  const walk = all.filter(counts);
 
-  const width = 1000;
-  const height = 640;
-  const { nodes, edges } = data;
-  layout(nodes, edges, width, height);
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const degree = new Map();
-  for (const e of edges) for (const id of [e.from, e.to]) degree.set(id, (degree.get(id) ?? 0) + 1);
-  const radius = (n) => 6 + Math.min(degree.get(n.id) ?? 0, 8) * 0.6;
-
-  const tip = h('div', { class: 'graph-tip', hidden: true });
-  const viewport = s('g');
-  const svg = s('svg', { viewBox: `0 0 ${width} ${height}`, class: 'graph', role: 'img', 'aria-label': 'Graph of the map' },
-    s('defs', {}, s('marker', { id: 'arrow', viewBox: '0 0 10 10', refX: 10, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: 'arrowhead' }))),
-    viewport,
-  );
-  const edgeEls = new Map();
-  const nodeEls = new Map();
-
-  const place = (e) => {
-    const a = byId.get(e.from);
-    const b = byId.get(e.to);
-    const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    // Stop the line at the edge of each circle so the arrowhead is not hidden.
-    const [ax, ay] = [a.x + ((b.x - a.x) / d) * radius(a), a.y + ((b.y - a.y) / d) * radius(a)];
-    const [bx, by] = [b.x - ((b.x - a.x) / d) * (radius(b) + 3), b.y - ((b.y - a.y) / d) * (radius(b) + 3)];
-    for (const line of edgeEls.get(e.id)) for (const [k, v] of Object.entries({ x1: ax, y1: ay, x2: bx, y2: by })) line.setAttribute(k, v);
-  };
-  const showTip = (event, ...content) => {
-    tip.replaceChildren(...content);
-    tip.hidden = false;
-    const box = svg.parentElement.getBoundingClientRect();
-    tip.style.left = `${Math.min(event.clientX - box.left + 14, box.width - 260)}px`;
-    tip.style.top = `${event.clientY - box.top + 14}px`;
-  };
-  const highlight = (ids) => {
-    for (const [id, el] of nodeEls) {
-      el.classList.toggle('dim', Boolean(ids) && !ids.has(id));
-      el.classList.toggle('near', Boolean(ids) && ids.has(id));
+  // How many columns from the start each thing is: to the right when it
+  // belongs to or waits on what it was reached from, to the left otherwise.
+  const rank = new Map();
+  const starts = focus ? [focus] : [...byId.keys()].filter((id) => !walk.some((e) => e.from === id) && walk.some((e) => e.to === id));
+  for (const id of starts) rank.set(id, 0);
+  for (let d = 0, frontier = starts; frontier.length && (!focus || d < prefs.steps); d++) {
+    const at = new Set(frontier);
+    const next = [];
+    for (const e of walk) {
+      for (const [cur, other, dir] of [[e.to, e.from, 1], [e.from, e.to, -1]]) {
+        if (!at.has(cur) || rank.has(other)) continue;
+        rank.set(other, rank.get(cur) + dir);
+        next.push(other);
+      }
     }
-    for (const e of edges) for (const line of edgeEls.get(e.id)) line.classList.toggle('dim', Boolean(ids) && !(ids.has(e.from) && ids.has(e.to)));
-  };
-
-  for (const e of edges) {
-    const line = s('line', { class: `edge${BLOCKING.includes(e.type) ? ' blocking' : ''}`, 'marker-end': 'url(#arrow)' });
-    const hit = s('line', { class: 'edge-hit' });
-    hit.addEventListener('mousemove', (ev) => showTip(ev, h('div', {}, byId.get(e.from).title), h('div', { class: 'muted' }, relations.get(e.type)?.title ?? e.type), h('div', {}, byId.get(e.to).title)));
-    hit.addEventListener('mouseleave', () => (tip.hidden = true));
-    edgeEls.set(e.id, [line, hit]);
-    viewport.append(line, hit);
+    frontier = next;
   }
+  const nodes = [...rank.keys()].map((id) => byId.get(id));
+  // What waits on what is drawn whatever the filter, among the things in sight.
+  const edges = all.filter((e) => rank.has(e.from) && rank.has(e.to) && (counts(e) || BLOCKING.includes(e.type)));
+  // What waits comes after what it waits on. A loop of waiting stops going round.
+  for (let pass = 0; pass < 12; pass++) {
+    let moved = false;
+    for (const e of edges) {
+      if (!BLOCKING.includes(e.type) || e.from === focus || rank.get(e.from) > rank.get(e.to)) continue;
+      rank.set(e.from, rank.get(e.to) + 1);
+      moved = true;
+    }
+    if (!moved) break;
+  }
+
+  // Each column sits as near as it can to what it is linked to in the columns already placed, nearest the start first.
+  const near = new Map(nodes.map((n) => [n.id, []]));
+  for (const e of edges) {
+    near.get(e.from).push(byId.get(e.to));
+    near.get(e.to).push(byId.get(e.from));
+  }
+  const cols = new Map();
+  for (const n of nodes) cols.set(rank.get(n.id), [...(cols.get(rank.get(n.id)) ?? []), n]);
+  const wanted = (n) => {
+    const placed = near.get(n.id).filter((p) => p.y !== undefined);
+    return placed.length ? placed.reduce((sum, p) => sum + p.y, 0) / placed.length : undefined;
+  };
+  for (const r of [...cols.keys()].sort((a, b) => Math.abs(a) - Math.abs(b) || b - a)) {
+    const want = new Map(cols.get(r).map((n) => [n, wanted(n)]));
+    const ordered = [...cols.get(r)].sort((a, b) => (want.get(a) ?? Infinity) - (want.get(b) ?? Infinity) || (a.place ?? 1e9) - (b.place ?? 1e9) || a.title.localeCompare(b.title));
+    let y = 0;
+    for (const n of ordered) {
+      n.y = Math.max(y, want.get(n) ?? y);
+      y = n.y + BOX.h + BOX.gap;
+    }
+  }
+  // The start sits level with the middle of what is around it, but never so far down that it opens out of sight.
+  const centre = focus && cols.get(0).length === 1 && byId.get(focus);
+  if (centre && near.get(focus).length) centre.y = Math.min(near.get(focus).reduce((sum, p) => sum + p.y, 0) / near.get(focus).length, 240);
+  const left = Math.min(0, ...cols.keys());
+  const top = Math.min(0, ...nodes.map((n) => n.y));
   for (const n of nodes) {
-    const group = groupOf(n.root);
-    const title = n.title.length > 40 ? n.title.slice(0, 39) + '…' : n.title;
+    n.x = (rank.get(n.id) - left) * BOX.col;
+    n.y -= top;
+    const dragged = prefs.moved.get(n.id);
+    if (dragged) Object.assign(n, dragged);
+  }
+  return { nodes, edges, byId, focus, BOX };
+}
+
+/** The drawing itself: boxes joined by lines, each box leading to its page and free to be dragged. */
+function drawGraph({ nodes, edges, byId, focus, BOX }, prefs) {
+  const pad = 16;
+  const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
+  // A title takes two lines in its box before it is cut, and is cut at a word.
+  const wrap = (text, max) => {
+    const lines = [''];
+    for (const word of text.split(' ')) {
+      if ((lines.at(-1) + ' ' + word).trim().length <= max) lines[lines.length - 1] = (lines.at(-1) + ' ' + word).trim();
+      else if (lines.length < 2) lines.push(cut(word, max));
+      else return [lines[0], cut(lines[1] + ' ' + word, max)];
+    }
+    return lines;
+  };
+  const width = Math.max(...nodes.map((n) => n.x)) + BOX.w + pad * 2;
+  const height = Math.max(...nodes.map((n) => n.y)) + BOX.h + pad * 2;
+  const lineLayer = s('g', { transform: `translate(${pad},${pad})` });
+  const boxLayer = s('g', { transform: `translate(${pad},${pad})` });
+  const marker = (id, cls) => s('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: cls }));
+  const svg = s(
+    'svg',
+    { ...(prefs.fit ? { width: '100%' } : { width, height }), viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Graph of the map' },
+    s('defs', {}, marker('rm-arrow', 'rm-arrowhead'), marker('rm-arrow-wait', 'rm-arrowhead wait')),
+    lineLayer,
+    boxLayer,
+  );
+
+  // A line leaves the side of one box that faces the other; two boxes in one column are joined round their right.
+  const path = (a, b) => {
+    const my = (n) => n.y + BOX.h / 2;
+    if (Math.abs(a.x - b.x) < BOX.w / 2) return `M${a.x + BOX.w},${my(a)} C${a.x + BOX.w + 46},${my(a)} ${b.x + BOX.w + 46},${my(b)} ${b.x + BOX.w + 2},${my(b)}`;
+    const [x1, x2] = a.x < b.x ? [a.x + BOX.w, b.x - 2] : [a.x, b.x + BOX.w + 2];
+    return `M${x1},${my(a)} C${(x1 + x2) / 2},${my(a)} ${(x1 + x2) / 2},${my(b)} ${x2},${my(b)}`;
+  };
+  const seen = { waiting: false, met: false, lifted: false, other: false };
+  const lines = edges.map((e) => {
+    const blocking = BLOCKING.includes(e.type);
+    // An arrow runs from what is needed to what needs it; any other line from the thing to what it belongs to.
+    const [a, b] = blocking ? [byId.get(e.to), byId.get(e.from)] : [byId.get(e.from), byId.get(e.to)];
+    const structure = KINDS.structure.includes(e.type);
+    seen.waiting ||= blocking && a.open;
+    seen.met ||= blocking && !a.open;
+    seen.lifted ||= Boolean(e.lifted);
+    seen.other ||= !blocking && !structure;
+    const phrase = relations.get(e.type)?.title ?? e.type;
     const el = s(
-      'g',
-      { class: `node group-${group.key}${n.open ? '' : ' closed'}${n.id === focus ? ' focus' : ''}`, transform: `translate(${n.x},${n.y})` },
-      n.blocked && s('circle', { r: radius(n) + 4, class: 'blocked-ring' }),
-      s('circle', { r: radius(n), class: 'dot' }),
-      s('text', { x: radius(n) + 5, y: 4, class: 'label' }, document.createTextNode(title)),
+      'path',
+      blocking ? { class: `rm-dep${a.open ? ' waiting' : ''}${e.lifted ? ' lifted' : ''}`, 'marker-end': `url(#rm-arrow${a.open ? '-wait' : ''})` } : { class: `rm-link${structure ? '' : ' other'}` },
+      s('title', {}, document.createTextNode(`${byId.get(e.from).title} ${e.lifted ? 'waits, through their tasks, on' : phrase} ${byId.get(e.to).title}`)),
     );
-    const near = new Set([n.id, ...edges.filter((e) => e.from === n.id || e.to === n.id).flatMap((e) => [e.from, e.to])]);
-    el.addEventListener('mousemove', (ev) => {
-      highlight(near);
-      showTip(ev, h('div', {}, chip(n.type), ' ', pill(n.type, n.status), n.blocked && [' ', h('span', { class: 'pill bad' }, 'blocked')]), h('strong', {}, n.title), h('div', { class: 'muted small' }, 'Click to open · double-click to centre the graph here'));
-    });
-    el.addEventListener('mouseleave', () => {
-      highlight(null);
-      tip.hidden = true;
-    });
-    // Drag to move a node; a press without movement is a click.
-    el.addEventListener('pointerdown', (down) => {
-      down.stopPropagation();
-      el.setPointerCapture(down.pointerId);
-      let moved = false;
-      const scale = () => 1 / zoom.k;
+    lineLayer.append(el);
+    return { el, a, b, ends: [e.from, e.to] };
+  });
+  const route = (l) => l.el.setAttribute('d', path(l.a, l.b));
+  lines.forEach(route);
+
+  const boxes = new Map();
+  const light = (id) => {
+    const lit = id && new Set([id, ...lines.filter((l) => l.ends.includes(id)).flatMap((l) => l.ends)]);
+    for (const [key, el] of boxes) el.classList.toggle('dim', Boolean(lit) && !lit.has(key));
+    for (const l of lines) l.el.classList.toggle('dim', Boolean(lit) && !l.ends.includes(id));
+  };
+  for (const n of nodes) {
+    const { done = 0, total = 0 } = n.progress ?? {};
+    const box = s(
+      'g',
+      { class: `rm-node g-node group-${groupOf(n.root).key}${n.id === focus ? ' root' : ''}${n.open ? '' : ' closed'}${n.active ? ' active' : ''}${n.blocked ? ' blocked' : ''}`, transform: `translate(${n.x},${n.y})` },
+      s('title', {}, document.createTextNode(`${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}`)),
+      s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 7 }),
+      s('rect', { class: 'stripe', x: 0, y: 8, width: 3, height: BOX.h - 16, rx: 1.5 }),
+      ...wrap(n.place ? `${n.place}. ${n.title}` : n.title, 31).map((line, k) => s('text', { x: 12, y: 17 + k * 15 }, document.createTextNode(line))),
+      total > 0 && s('rect', { class: 'track', x: 12, y: 42, width: 70, height: 5, rx: 2.5 }),
+      total > 0 && s('rect', { class: 'fill', x: 12, y: 42, width: (70 * done) / total, height: 5, rx: 2.5 }),
+      s('text', { class: 'small', x: total > 0 ? 88 : 12, y: 48 }, document.createTextNode(total > 0 ? `${done}/${total}` : typeTitle(n.type))),
+      s('text', { class: 'small', x: BOX.w - 10, y: 48, 'text-anchor': 'end' }, document.createTextNode(n.status)),
+      n.blocked && s('circle', { class: 'flag', cx: BOX.w - 4, cy: 4, r: 5 }),
+    );
+    boxes.set(n.id, box);
+    boxLayer.append(box);
+    box.addEventListener('pointerenter', () => light(n.id));
+    box.addEventListener('pointerleave', () => light());
+    // A press that moves is a drag, and the box stays where it is put; one that does not is a click, and leads to its page.
+    box.addEventListener('pointerdown', (down) => {
+      if (down.button !== 0) return;
+      box.setPointerCapture(down.pointerId);
+      const scale = width / svg.getBoundingClientRect().width;
+      const from = { x: n.x, y: n.y };
+      let far = false;
       const move = (ev) => {
-        if (Math.abs(ev.clientX - down.clientX) + Math.abs(ev.clientY - down.clientY) > 3) moved = true;
-        n.x += ev.movementX * scale();
-        n.y += ev.movementY * scale();
-        el.setAttribute('transform', `translate(${n.x},${n.y})`);
-        for (const e of edges) if (e.from === n.id || e.to === n.id) place(e);
+        const [dx, dy] = [(ev.clientX - down.clientX) * scale, (ev.clientY - down.clientY) * scale];
+        far ||= Math.hypot(dx, dy) > 4;
+        if (!far) return;
+        n.x = Math.max(0, from.x + dx);
+        n.y = Math.max(0, from.y + dy);
+        box.setAttribute('transform', `translate(${n.x},${n.y})`);
+        lines.filter((l) => l.ends.includes(n.id)).forEach(route);
       };
       const up = () => {
-        el.removeEventListener('pointermove', move);
-        el.removeEventListener('pointerup', up);
-        if (!moved) location.hash = `#/e/${n.id}`;
-        else declutter();
+        box.removeEventListener('pointermove', move);
+        box.removeEventListener('pointerup', up);
+        if (far) prefs.moved.set(n.id, { x: n.x, y: n.y });
+        else location.hash = `#/e/${n.id}`;
       };
-      el.addEventListener('pointermove', move);
-      el.addEventListener('pointerup', up);
+      box.addEventListener('pointermove', move);
+      box.addEventListener('pointerup', up);
     });
-    el.addEventListener('dblclick', () => (location.hash = `#/graph/${n.id}`));
-    n.label = title;
-    nodeEls.set(n.id, el);
-    viewport.append(el);
   }
-  edges.forEach(place);
 
-  // Pan by dragging the background; zoom with the wheel, about the pointer.
-  const zoom = { k: 1, x: 0, y: 0 };
-  // The drawing is measured in the screen's own pixels, so a label is the same size at any zoom:
-  // zooming moves things apart, it does not make the words bigger or smaller.
-  const view = { w: width, h: height };
-  // A label is drawn only where it does not run into one already drawn, or into another node's dot.
-  // The most connected are placed first, so the names that orient you are the ones that stay.
-  const byWeight = [...nodes].sort((a, b) => (b.id === focus) - (a.id === focus) || (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0));
-  const declutter = () => {
-    const at = (n) => [n.x * zoom.k + zoom.x, n.y * zoom.k + zoom.y];
-    const taken = nodes.map((n) => {
-      const [x, y] = at(n);
-      const r = radius(n) * zoom.k;
-      return { x0: x - r, x1: x + r, y0: y - r, y1: y + r, of: n };
-    });
-    for (const n of byWeight) {
-      const [x, y] = at(n);
-      const x0 = x + (radius(n) + 5) * zoom.k;
-      const box = { x0, x1: x0 + n.label.length * 6.9 + 6, y0: y - 9, y1: y + 7, of: n };
-      const clash = taken.some((t) => t.of !== n && box.x0 < t.x1 && t.x0 < box.x1 && box.y0 < t.y1 && t.y0 < box.y1);
-      nodeEls.get(n.id).querySelector('.label').classList.toggle('quiet', clash);
-      if (!clash) taken.push(box);
-    }
-  };
-  const apply = () => {
-    viewport.setAttribute('transform', `translate(${zoom.x},${zoom.y}) scale(${zoom.k})`);
-    svg.style.setProperty('--k', zoom.k);
-    declutter();
-  };
-  // Everything in view, leaving room on the right for labels.
-  const fit = () => {
-    if (!nodes.length) return;
-    const xs = nodes.map((n) => n.x);
-    const ys = nodes.map((n) => n.y);
-    const [x0, x1, y0, y1] = [Math.min(...xs) - 30, Math.max(...xs) + 30, Math.min(...ys) - 30, Math.max(...ys) + 30];
-    zoom.k = Math.min((view.w - 220) / (x1 - x0), view.h / (y1 - y0), 1.6);
-    zoom.x = (view.w - 220 - (x1 - x0) * zoom.k) / 2 - x0 * zoom.k + 20;
-    zoom.y = (view.h - (y1 - y0) * zoom.k) / 2 - y0 * zoom.k;
-    apply();
-  };
-  const measure = () => {
-    if (!svg.isConnected || !svg.clientWidth) return;
-    view.w = svg.clientWidth;
-    view.h = svg.clientHeight;
-    svg.setAttribute('viewBox', `0 0 ${view.w} ${view.h}`);
-    fit();
-  };
-  fit();
-  svg.addEventListener('wheel', (ev) => {
-    ev.preventDefault();
-    const box = svg.getBoundingClientRect();
-    const px = ((ev.clientX - box.left) / box.width) * view.w;
-    const py = ((ev.clientY - box.top) / box.height) * view.h;
-    const k = Math.min(4, Math.max(0.3, zoom.k * (ev.deltaY < 0 ? 1.15 : 1 / 1.15)));
-    zoom.x = px - ((px - zoom.x) / zoom.k) * k;
-    zoom.y = py - ((py - zoom.y) / zoom.k) * k;
-    zoom.k = k;
-    apply();
-  }, { passive: false });
-  svg.addEventListener('pointerdown', (down) => {
-    svg.setPointerCapture(down.pointerId);
-    const ratio = view.w / svg.getBoundingClientRect().width;
-    const move = (ev) => {
-      zoom.x += ev.movementX * ratio;
-      zoom.y += ev.movementY * ratio;
-      apply();
-    };
-    const up = () => {
-      svg.removeEventListener('pointermove', move);
-      svg.removeEventListener('pointerup', up);
-    };
-    svg.addEventListener('pointermove', move);
-    svg.addEventListener('pointerup', up);
-  });
+  const key = (cls, text) => h('span', { class: 'key' }, h('span', { class: cls }), text);
+  const legend = [
+    seen.waiting && key('stroke waits', 'Waits on something unfinished'),
+    seen.met && key('stroke blocking', 'Waited on something now finished'),
+    seen.lifted && key('stroke lifted', 'Through their tasks'),
+    seen.other && key('stroke dotted', 'Other relation'),
+    nodes.some((n) => n.active) && key('swatch rm-active', 'Being worked on'),
+    nodes.some((n) => !n.open) && key('swatch rm-closed', 'Finished'),
+    nodes.some((n) => n.blocked) && key('swatch rm-blocked', 'Blocked'),
+  ].filter(Boolean);
+  return h('div', {}, h('div', { class: 'graph-scroll' }, svg), legend.length > 0 && h('div', { class: 'legend' }, legend));
+}
 
-  const present = new Set(nodes.map((n) => groupOf(n.root).key));
-  const preset = data.preset;
-  const legend = h(
-    'div',
-    { class: 'legend' },
-    GROUPS.filter((g) => present.has(g.key)).map((g) => h('span', { class: 'key' }, h('span', { class: `swatch group-${g.key}` }), g.label)),
-    nodes.some((n) => !n.open) && h('span', { class: 'key' }, h('span', { class: 'swatch hollow' }), 'Finished'),
-    nodes.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch ringed' }), 'Blocked'),
-    edges.some((e) => BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke blocking' }), 'Waits on'),
-    edges.some((e) => !BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke' }), 'Other relation'),
-  );
-  const drawing = nodes.length ? [svg, tip] : [h('div', { class: 'empty' }, 'Nothing to draw with these settings.')];
-  if (embedded) {
-    main.replaceChildren(...drawing, legend);
-    measure();
-    new ResizeObserver(measure).observe(svg);
-    return;
-  }
-  main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Graph')),
-    h(
-      'div',
-      { class: 'toolbar', style: 'margin-bottom: 12px' },
-      h(
-        'select',
-        {
-          title: 'Which relations to draw',
-          onchange: (e) => {
-            graphState.relations = e.target.value;
-            redraw();
-          },
-        },
-        [['structure', 'What belongs to what'], ['blocking', 'What blocks what'], ['all', 'Every relation']].map(([v, label]) => h('option', { value: v, selected: v === preset }, label)),
-      ),
-      h(
-        'label',
-        {},
-        h('input', {
-          type: 'checkbox',
-          checked: graphState.closed,
-          onchange: (e) => {
-            graphState.closed = e.target.checked;
-            redraw();
-          },
-        }),
-        ' Include finished',
-      ),
-      h('span', { class: 'muted small' }, `${nodes.length} items`, data.truncated && ` of ${data.truncated.of}`),
-    ),
-    h(
-      'section',
-      { class: 'card graph-card' },
-      drawing,
-      legend,
-    ),
-  );
-  measure();
-  new ResizeObserver(measure).observe(svg);
+/** The whole map, as the same drawing with no one thing at its centre. */
+async function graph() {
+  part('graph').replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Graph')), h('section', { class: 'card' }, graphView({ defaults: { kind: 'structure' } })));
 }
 
 // ---- Workspace -----------------------------------------------------------
@@ -2265,158 +2094,6 @@ function progressBar({ done, total }) {
   return h('span', { class: 'progress', title: `${done} of ${total} tasks and issues closed` }, h('span', { class: 'bar' }, h('span', { style: `width: ${Math.round((done / total) * 100)}%` })), h('span', { class: 'muted small' }, `${done}/${total}`));
 }
 
-// The roadmap drawn so that position means order of work: the project on the
-// left, then each feature one column to the right of everything it waits on.
-// Arrows run from what is needed to what needs it. A feature also waits on
-// another when one of its tasks waits on one of the other's. It is laid out,
-// not simulated, so it looks the same every time.
-function roadmapGraph(data, withWork) {
-  const COL = 310;
-  const BOX = { w: 232, h: 58 };
-  const ROW = 20;
-  const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
-  // A title takes two lines in its box before it is cut, and is cut at a word.
-  const wrap = (text, max) => {
-    const lines = [''];
-    for (const word of text.split(' ')) {
-      if ((lines.at(-1) + ' ' + word).trim().length <= max) lines[lines.length - 1] = (lines.at(-1) + ' ' + word).trim();
-      else if (lines.length < 2) lines.push(word);
-      else return [lines[0], cut(lines[1] + ' ' + word, max)];
-    }
-    return lines;
-  };
-
-  const nodes = [];
-  const owner = new Map();
-  const titles = new Map();
-  const add = (b, parent, i) => {
-    const n = { ...b, kind: 'branch', place: i + 1, parent, work: withWork ? b.work : [], needs: new Map() };
-    nodes.push(n);
-    owner.set(b.id, n);
-    titles.set(b.id, b.title);
-    for (const w of b.work) {
-      owner.set(w.id, n);
-      titles.set(w.id, w.title);
-    }
-    b.branches.forEach((k, j) => add(k, n, j));
-  };
-  data.branches.forEach((b, i) => add(b, null, i));
-  for (const d of data.depends) {
-    const [a, b] = [owner.get(d.from), owner.get(d.to)];
-    if (!a || !b || a === b) continue;
-    const direct = a.id === d.from && b.id === d.to;
-    const known = a.needs.get(b) ?? { direct: false, why: [] };
-    a.needs.set(b, { direct: known.direct || direct, why: direct ? known.why : [...known.why, `${titles.get(d.from)} waits on ${titles.get(d.to)}`] });
-  }
-
-  // A feature's column is one past the furthest thing it waits on (or is part of).
-  const level = (n, trail = new Set()) => {
-    if (n.level !== undefined) return n.level;
-    if (trail.has(n)) return 0; // a loop of dependencies: stop going round
-    trail.add(n);
-    let at = n.parent ? level(n.parent, trail) + 1 : 0;
-    for (const p of n.needs.keys()) at = Math.max(at, level(p, trail) + 1);
-    trail.delete(n);
-    return (n.level = at);
-  };
-  const cols = [];
-  for (const n of nodes) (cols[level(n)] ??= []).push(n);
-  const tall = (n) => BOX.h + (n.work.length ? n.work.length * ROW + 8 : 0);
-  // The first column keeps roadmap order. Each later one sits as near as it can
-  // to what it waits on, so arrows stay short.
-  let bottom = 0;
-  cols.forEach((col, i) => {
-    const near = (n) => {
-      const from = [...n.needs.keys(), ...(n.parent ? [n.parent] : [])].filter((p) => p.y !== undefined);
-      return from.length ? from.reduce((sum, p) => sum + p.y, 0) / from.length : undefined;
-    };
-    const wanted = new Map(col.map((n) => [n, i ? near(n) : undefined]));
-    const ordered = i ? [...col].sort((a, b) => (wanted.get(a) ?? Infinity) - (wanted.get(b) ?? Infinity) || col.indexOf(a) - col.indexOf(b)) : col;
-    let y = 0;
-    for (const n of ordered) {
-      n.x = (i + 1) * COL;
-      n.y = Math.max(y, wanted.get(n) ?? y);
-      y = n.y + tall(n) + 12;
-    }
-    bottom = Math.max(bottom, y);
-  });
-  const first = cols[0] ?? [];
-  const root = { ...data.root, kind: 'root', open: true, progress: data.progress, work: withWork ? data.unplaced : [], x: 0 };
-  root.y = first.length ? Math.max(0, (first.at(-1).y + BOX.h) / 2 - BOX.h / 2) : 0;
-  bottom = Math.max(bottom, root.y + tall(root) + 12);
-
-  const pad = 16;
-  const width = cols.length * COL + BOX.w + 40 + pad * 2;
-  const height = bottom + pad * 2;
-  const inner = s('g', { transform: `translate(${pad},${pad})` });
-  const mid = (n) => n.y + BOX.h / 2;
-  const curve = (x1, y1, x2, y2) => `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
-  let waiting = false;
-  let met = false;
-  let lifted = false;
-  for (const n of nodes) {
-    // Belonging: to the project when nothing else places it, or to the feature it is part of.
-    if (n.parent) inner.append(s('path', { class: 'rm-link', d: curve(n.parent.x + BOX.w, mid(n.parent), n.x, mid(n)) }));
-    else if (!n.needs.size) inner.append(s('path', { class: 'rm-link', d: curve(BOX.w, mid(root), n.x, mid(n)) }));
-    for (const [p, info] of n.needs) {
-      waiting ||= p.open;
-      met ||= !p.open;
-      lifted ||= !info.direct;
-      inner.append(
-        s(
-          'path',
-          { class: `rm-dep${p.open ? ' waiting' : ''}${info.direct ? '' : ' lifted'}`, 'marker-end': `url(#rm-arrow${p.open ? '-wait' : ''})`, d: curve(p.x + BOX.w, mid(p), n.x - 2, mid(n)) },
-          s('title', {}, document.createTextNode([`${n.title} waits on ${p.title}${p.open ? '' : ' (finished)'}`, ...info.why].join('\n'))),
-        ),
-      );
-    }
-  }
-  for (const n of [root, ...nodes]) {
-    const state = (x) => `${x.open ? '' : ' closed'}${x.active ? ' active' : ''}${x.blocked ? ' blocked' : ''}`;
-    const hint = (x) => s('title', {}, document.createTextNode(`${x.title}\n${typeTitle(x.type)}, ${x.status}${x.blocked ? ', blocked' : ''}${x.sessions?.length ? ', session open' : ''}`));
-    const open = (x) => () => (location.hash = `#/e/${x.id}`);
-    const { done, total } = n.progress;
-    const box = s(
-      'g',
-      { class: `rm-node ${n.kind}${state(n)}`, transform: `translate(${n.x},${n.y})` },
-      hint(n),
-      s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 7 }),
-      ...wrap(n.place ? `${n.place}. ${n.title}` : n.title, 32).map((line, k) => s('text', { x: 10, y: 17 + k * 15 }, document.createTextNode(line))),
-      total > 0 && s('rect', { class: 'track', x: 10, y: 43, width: 80, height: 5, rx: 2.5 }),
-      total > 0 && s('rect', { class: 'fill', x: 10, y: 43, width: (80 * done) / total, height: 5, rx: 2.5 }),
-      total > 0 && s('text', { class: 'small', x: 96, y: 49 }, document.createTextNode(`${done}/${total}`)),
-      s('text', { class: 'small', x: BOX.w - 10, y: 49, 'text-anchor': 'end' }, document.createTextNode(n.kind === 'root' ? '' : n.status)),
-      n.blocked && s('circle', { class: 'flag', cx: BOX.w - 4, cy: 4, r: 5 }),
-    );
-    box.addEventListener('click', open(n));
-    inner.append(box);
-    n.work.forEach((w, j) => {
-      const el = s('g', { class: `rm-node work${state(w)}`, transform: `translate(${n.x + 12},${n.y + BOX.h + 8 + j * ROW + ROW / 2})` }, hint(w), s('circle', { cx: 6, r: 4.5 }), s('text', { x: 17, y: 4 }, document.createTextNode(cut(w.title, 44))));
-      el.addEventListener('click', open(w));
-      inner.append(el);
-    });
-  }
-  const marker = (id, cls) => s('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: cls }));
-  const svg = s('svg', { width, height, viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'The roadmap, laid out by what waits on what' }, s('defs', {}, marker('rm-arrow', 'rm-arrowhead'), marker('rm-arrow-wait', 'rm-arrowhead wait')), inner);
-  const everything = [root, ...nodes].flatMap((n) => [n, ...n.work]);
-  return h(
-    'div',
-    {},
-    h('div', { class: 'roadmap-graph' }, svg),
-    h(
-      'div',
-      { class: 'legend' },
-      h('span', { class: 'key' }, 'Left to right: what has to come first'),
-      waiting && h('span', { class: 'key' }, h('span', { class: 'stroke waits' }), 'Waits on something unfinished'),
-      met && h('span', { class: 'key' }, h('span', { class: 'stroke blocking' }), 'Waited on something now finished'),
-      lifted && h('span', { class: 'key' }, h('span', { class: 'stroke lifted' }), 'Through their tasks'),
-      everything.some((n) => n.active) && h('span', { class: 'key' }, h('span', { class: 'swatch rm-active' }), 'Being worked on'),
-      everything.some((n) => !n.open) && h('span', { class: 'key' }, h('span', { class: 'swatch rm-closed' }), 'Finished'),
-      everything.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch rm-blocked' }), 'Blocked'),
-    ),
-  );
-}
-
 const roadmapState = {
   get graph() {
     try {
@@ -2554,6 +2231,24 @@ async function roadmap(rootId) {
     );
   const statuses = statusesOf('software.feature').filter((st) => data.by_status[st]);
   const asGraph = roadmapState.graph;
+  // What the roadmap knows that the graph does not: each feature's progress and place, what is being worked on,
+  // and a feature that waits on another only through their tasks.
+  const info = new Map([[rootId, { progress: data.progress }]]);
+  const featureOf = new Map();
+  const learn = (b, i) => {
+    info.set(b.id, { progress: b.progress, place: i + 1, active: b.active, sessions: b.sessions });
+    featureOf.set(b.id, b.id);
+    for (const w of b.work) {
+      featureOf.set(w.id, b.id);
+      info.set(w.id, { active: w.active, sessions: w.sessions });
+    }
+    b.branches.forEach(learn);
+  };
+  data.branches.forEach(learn);
+  const through = data.depends
+    .map((d) => ({ from: featureOf.get(d.from), to: featureOf.get(d.to), direct: featureOf.get(d.from) === d.from && featureOf.get(d.to) === d.to }))
+    .filter((d) => d.from && d.to && d.from !== d.to && !d.direct)
+    .map((d) => ({ id: `through:${d.from}:${d.to}`, type: 'depends_on', from: d.from, to: d.to, lifted: true }));
   const inProgress = menu(`${data.now.length} in progress`, data.now.map((n) => [`${n.title}${n.sessions?.length ? '  · session open' : ''}`, () => (location.hash = `#/e/${n.id}`)]));
   inProgress.classList.add('ok');
   const needsYou = await projectNeeds(rootId, data, change, () => roadmap(rootId)).catch(() => null);
@@ -2576,10 +2271,9 @@ async function roadmap(rootId) {
           h('span', { class: 'grow' }),
           // What is being worked on is marked in the drawing; the names are one click away, not a paragraph of links.
           data.now.length > 0 && inProgress,
-          asGraph && h('label', { class: 'muted small' }, h('input', { type: 'checkbox', checked: roadmapState.work, onchange: (e) => ((roadmapState.work = e.target.checked), roadmap(rootId)) }), ' Show tasks'),
           h('span', { class: 'switch' }, [['Graph', true], ['List', false]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label))),
         ),
-        !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? roadmapGraph(data, roadmapState.work) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
+        !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? graphView({ focus: rootId, defaults: { kind: 'structure' }, extras: { info, edges: through } }) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
         h('div', { class: 'toolbar', style: 'padding: 12px 14px; border-top: 1px solid var(--line)' }, title, h('button', { class: 'primary', onclick: add }, 'Add feature')),
       ),
       data.unplaced.length > 0 &&
@@ -2830,7 +2524,7 @@ async function route(pulse = false) {
   if (name === 'projects') return void (location.hash = '#/today');
   // Automations are found like any other kind of item.
   // The graph around an item is its relations, drawn further out, on its own page.
-  if (name === 'graph' && arg) return void (stepsOut.set(arg, Math.max(stepsOut.get(arg) ?? 0, 2)), unfolded.set(`${arg}:relations`, true), (location.hash = `#/e/${arg}`));
+  if (name === 'graph' && arg) return void ((prefsOf(arg).steps = Math.max(prefsOf(arg).steps, 2)), unfolded.set(`${arg}:relations`, true), (location.hash = `#/e/${arg}`));
   if (name === 'automations') return void ((mapState.type = 'sys.automation'), (location.hash = '#/map'));
   // A project's roadmap and its questions are on the project's own page.
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/today');
@@ -2844,7 +2538,7 @@ async function route(pulse = false) {
     map: name === 'map' || page !== 'map' ? map : searchBar,
     // The graph around an item is drawn on that item's page, under it.
     item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
-    graph: name === 'graph' && (() => graph(arg)),
+    graph: name === 'graph' && graph,
     workspace,
   };
   const wanted = PAGES[page];
@@ -2863,7 +2557,8 @@ async function route(pulse = false) {
       el.hidden = !draw[p];
       if (!draw[p]) return el.replaceChildren();
       // The graph is as someone has arranged it: a change elsewhere does not draw it again.
-      if (pulse && el.childElementCount && (p === 'graph' || (p === 'item' && document.getElementById('around')))) return;
+      // The whole map is as someone has arranged it: a change elsewhere does not draw it again.
+      if (pulse && el.childElementCount && p === 'graph') return;
       try {
         await draw[p]();
       } catch (err) {
