@@ -301,7 +301,7 @@ function eventLine(ev) {
   );
 }
 
-function changeRow(g, { undone, onUndo, attention, onRead }) {
+function changeRow(g, { undone, onUndo, attention, onRead, here, fresh }) {
   const first = g.events[0];
   const work = g.events.find((e) => !e.action.startsWith('proposal.')) ?? first;
   const reason = g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? '';
@@ -322,13 +322,15 @@ function changeRow(g, { undone, onUndo, attention, onRead }) {
   const ids = [...new Set(touched.map((e) => e.target_id).filter(Boolean))];
   const read = () => attention?.length && onRead?.(attention, row);
   const nameOf = (id) => touched.find((e) => e.target_id === id)?.target_title ?? named(id);
-  const one = subject?.target_id ?? (ids.length === 1 ? ids[0] : undefined);
+  // On the page of the thing it changed, the line does not name that thing again.
+  const only = subject?.target_id ?? (ids.length === 1 ? ids[0] : undefined);
+  const one = only === here ? undefined : only;
   const row = h(
     'div',
-    { class: `change line${undone || isUndo ? ' quiet' : ''}${attention?.length ? ' attn' : ''}`, title: attention?.map((n) => n.title).join(' / ') ?? '' },
+    { class: `change line${undone || isUndo ? ' quiet' : ''}${attention?.length ? ' attn' : ''}${fresh ? ' fresh' : ''}`, title: attention?.map((n) => n.title).join(' / ') ?? '' },
     who(work.actor),
     h('span', { class: 'gist', title: reason }, one ? [h('a', { href: `#/e/${one}`, onclick: read }, h('strong', {}, nameOf(one))), reason && ` · ${gist(reason)}`] : gist(reason) || verb(first)),
-    moved.length === 1 ? effect : ids.length > 1 && menu(`${ids.length} items`, ids.map((id) => [nameOf(id), () => (read(), (location.hash = `#/e/${id}`))])),
+    moved.length === 1 ? effect : ids.length > 1 && !here && menu(`${ids.length} items`, ids.map((id) => [nameOf(id), () => (read(), (location.hash = `#/e/${id}`))])),
     approver ? h('span', { class: 'mark mark-human', title: `Applied by ${approver}` }, 'you applied') : touched.length > 0 && authorityMark(work.detail?.authority),
     ago(first.ts),
     undone || isUndo ? h('span', { class: 'pill closed' }, isUndo ? 'undo' : 'undone') : onUndo && h('button', { class: 'quiet-button', onclick: () => onUndo(g) }, 'Undo'),
@@ -504,17 +506,18 @@ async function today() {
 
 // ---- Review --------------------------------------------------------------
 
-// What agents have changed: first what is held for the owner, then what took
-// effect as it was made, since the owner last looked, each to be undone if it
-// is wrong. Looking is recorded; it permits nothing.
-const reviewState = { show: 'new' };
-const STRANDS = [['new', 'New from agents'], ['all', 'Everything'], ['github', 'Pushes'], ['external', 'Tool calls']];
+// What has changed, as one list, newest first: what is held for the owner
+// above it, and in it what agents did since the owner last looked, marked.
+// Looking is recorded; it permits nothing.
+const reviewState = { origin: '' };
+const ORIGINS = [['', 'Everything'], ['github', 'Pushes'], ['external', 'Tool calls']];
 
 async function review() {
   const main = part('review');
-  const strands = h('span', { class: 'switch' }, STRANDS.map(([key, text]) => h('button', { class: reviewState.show === key ? 'on' : '', onclick: () => ((reviewState.show = key), review()) }, text)));
-  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes'), strands));
-  const [pending, known, events, notes] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('events', { limit: 500 }), api('view', { name: 'notifications' })]);
+  const from = h('select', { title: 'Where the changes came from', onchange: (e) => ((reviewState.origin = e.target.value), review()) }, ORIGINS.map(([key, text]) => h('option', { value: key, selected: reviewState.origin === key }, text)));
+  const seen = h('button', { hidden: true, title: 'Record that you have looked at what agents changed' }, 'Mark all seen');
+  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes'), from, h('span', { class: 'grow' }), seen));
+  const [pending, known, notes] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('view', { name: 'notifications' })]);
   const names = new Map(known.map((e) => [e.id, e]));
   // What agents and the system have told the owner is not a list of its own:
   // the change it is about is marked in the list of changes, and opening that
@@ -532,10 +535,9 @@ async function review() {
   };
   if (pending.length) main.append(h('h2', {}, `Held for you (${pending.length})`));
   for (const p of pending) main.append(proposalCard(p, names));
-  if (reviewState.show === 'new') return void main.append(appliedCard(events, notes, read));
   const list = h('div');
   main.append(h('section', { class: 'card' }, list));
-  drawTimeline(list, reviewState.show === 'all' ? '' : reviewState.show, notes, read).catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
+  drawTimeline(list, reviewState.origin, notes, read, seen).catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
 /**
@@ -568,61 +570,6 @@ const noticeLine = (n, read) => {
   );
   return line;
 };
-
-function appliedCard(events, notes = [], read) {
-  const needs = attentionOf(notes, events);
-  const seenUpto = events.find((e) => e.action === 'changes.seen')?.detail?.upto ?? 0;
-  const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
-  const sets = new Map();
-  for (const ev of events) {
-    // A change the owner has been told about stays in sight until that is read, seen or not.
-    if (!ev.changeset || (ev.seq <= seenUpto && !needs.sets.has(ev.changeset))) continue;
-    if (!sets.has(ev.changeset)) sets.set(ev.changeset, []);
-    sets.get(ev.changeset).push(ev);
-  }
-  // An agent's own change sets: not the ones a human applied, and not a
-  // session keeping its own record.
-  const groups = [...sets.entries()]
-    .map(([changeset, evs]) => ({ changeset, events: evs }))
-    .filter((g) => g.events.every((e) => e.actor.startsWith('agent:') && !e.detail?.approved_by) && !g.events.every((e) => (e.target_type ?? 'sys.').startsWith('sys.')));
-  // What was undone, and the undoing of it, cancel out: they are kept, folded away.
-  const cancelled = (g) => undoneSets.has(g.changeset) || g.events.some((e) => e.action === 'changeset.undo');
-  const live = groups.filter((g) => !cancelled(g));
-  const quiet = groups.filter(cancelled);
-  const shown = new Set(groups.map((g) => g.changeset));
-  const loose = [...needs.loose, ...[...needs.sets].filter(([set]) => !shown.has(set)).flatMap(([, ns]) => ns)];
-  const undo = async (g) => {
-    if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
-    try {
-      const r = await api('undo', { changeset: g.changeset });
-      if (r.skipped.length) await tell('Undone, except:', `- ${r.skipped.join('\n- ')}`);
-    } catch (err) {
-      await tell('That was not undone', err.message);
-    }
-    review();
-  };
-  return h(
-    'section',
-    { class: 'card' },
-    h(
-      'header',
-      {},
-      h('h2', {}, 'Applied by agents'),
-      h('span', { class: 'n' }, live.length),
-      (groups.length > 0 || notes.length > 0) && h('button', { onclick: () => api('seen', { upto: events[0].seq }).then(() => read([...notes])).then(review, (err) => tell('That was not recorded', err.message)) }, 'Mark all seen'),
-    ),
-    loose.map((n) => noticeLine(n, read)),
-    !groups.length && !loose.length && h('div', { class: 'empty' }, seenUpto ? 'Nothing new from agents since you last looked.' : 'Nothing applied by agents.'),
-    live.map((g) => changeRow(g, { onUndo: undo, attention: needs.sets.get(g.changeset), onRead: read })),
-    quiet.length > 0 &&
-      h(
-        'details',
-        { class: 'folded' },
-        h('summary', {}, `${quiet.length} undone or undoing`),
-        quiet.map((g) => changeRow(g, { undone: true })),
-      ),
-  );
-}
 
 function proposalCard(p, names) {
   const ops = structuredClone(p.ops);
@@ -853,8 +800,7 @@ function map() {
   const atRest = async () => {
     try {
       const rows = (await api('search', { open: mapState.open === 'all' ? undefined : mapState.open === 'open', limit: 200 })).filter((e) => !e.type.startsWith('sys.') || FOUND.includes(e.type));
-      // Automations have a place here before there are any: this is where one is made.
-      const counts = new Map([['sys.automation', 0]]);
+      const counts = new Map();
       for (const e of rows) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
       rest.replaceChildren(
         h(
@@ -1076,12 +1022,19 @@ function neighbourhood(e, data, redraw, owner) {
   return h('div', { class: 'roadmap-graph around-graph' }, svg, all && h('button', { class: 'quiet', onclick: () => (aroundAll.delete(e.id), redraw()) }, 'Show fewer'));
 }
 
+/** How far out each item's relations are drawn, and which of its sections are unfolded, kept while the page is open. */
+const stepsOut = new Map();
+const unfolded = new Map();
+
 async function entity(id) {
   const main = part('item');
-  main.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
+  // Drawn again in place (after a change, a step further out), the page keeps its height and its scroll.
+  if (main.dataset.item !== id) main.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
+  main.dataset.item = id;
   let data;
+  let past;
   try {
-    data = await api('get', { id });
+    [data, past] = await Promise.all([api('get', { id }), api('events', { target: id, limit: 40 })]);
   } catch (err) {
     return main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
@@ -1176,6 +1129,28 @@ async function entity(id) {
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
   // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
   const project = isA(e.type, 'project');
+  // One drawing of where it sits. A project's features are drawn in its roadmap, so not again here.
+  const rel = project ? { ...data, incoming: data.incoming.filter((x) => x.type !== 'part_of') } : data;
+  const relCount = rel.outgoing.length + rel.incoming.length;
+  const steps = stepsOut.get(id) ?? 1;
+  // Changing relations is done rarely: the list to remove from and the form to add with open together.
+  const editor = h('div', { hidden: true }, h('table', { class: 'list' }, h('tbody', {}, relRows(rel.outgoing, 'out'), relRows(rel.incoming, 'in'))), adder);
+  // What happened to it, as the same lines Changes shows.
+  const sets = [];
+  for (const ev of past) {
+    const last = sets.at(-1);
+    if (ev.changeset && last?.changeset === ev.changeset) last.events.push(ev);
+    else sets.push({ changeset: ev.changeset, events: [ev] });
+  }
+  const lines = sets.flatMap((g) => (g.changeset ? changeRow(g, { here: id }) : g.events.map(eventLine)));
+  // A section that is not the point of the page is one line until it is asked for.
+  const fold = (key, title, n, open, content) =>
+    h(
+      'details',
+      { class: 'card wide fold', open: unfolded.get(`${id}:${key}`) ?? open, ontoggle: (ev) => unfolded.set(`${id}:${key}`, ev.target.open) },
+      h('summary', {}, h('h2', {}, title), n > 0 && h('span', { class: 'n' }, n)),
+      content,
+    );
   const session = isA(e.type, 'sys.run') && e.is_open && !e.archived_at;
   const automation = isA(e.type, 'sys.automation');
   const endSession = async () => {
@@ -1238,17 +1213,16 @@ async function entity(id) {
         statusesOf(e.type).map((st) => h('option', { value: st, selected: st === e.status }, st)),
       ),
       live && ageChip(e),
-      live && h('button', { title: 'Record that you checked this and it is still true as written', onclick: () => change([{ op: 'update', id }], 'Checked in the UI: still true as written') }, 'Still true'),
       session && h('button', { title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
       automation && h('span', { class: 'fact' }, automationDoes(e.props)),
       automation && e.props.last_fired && h('span', { class: `fact${String(e.props.last_result).startsWith('failed') ? ' error' : ''}`, title: String(e.props.last_result) }, `last fired ${when(e.props.last_fired)}`),
       h('span', { class: 'fact' }, owner ? link(owner) : h('span', { class: 'muted' }, 'no owner')),
       short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), String(v))),
-      data.source && h('a', { class: 'fact', href: `#/e/${data.source.id}`, title: `Source: ${data.source.title}` }, 'source'),
       h('span', { class: 'grow' }),
       !e.archived_at && h('button', { onclick: edit }, 'Edit'),
       menu('More', [
-        ['Graph around this', () => (location.hash = `#/graph/${id}`)],
+        live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
+        data.source && [`Source: ${data.source.title}`, () => (location.hash = `#/e/${data.source.id}`)],
         workish && ['Copy session brief', copyBrief],
         workish && ['Launch a session: investigate only', () => launch('plan')],
         workish && ['Launch a session: may edit files', () => launch('acceptEdits')],
@@ -1266,27 +1240,26 @@ async function entity(id) {
         long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
         e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       ),
-      h(
-        'section',
-        { class: 'card wide' },
+      fold('relations', 'Relations', relCount, !project, [
         h(
-          'header',
-          {},
-          h('h2', {}, 'Relations'),
-          h('span', { class: 'toolbar' }, h('span', { class: 'n' }, data.outgoing.length + data.incoming.length), !e.archived_at && phrases.length > 0 && h('button', { onclick: openAdder }, 'Add')),
+          'div',
+          { class: 'toolbar fold-bar' },
+          relCount > 0 && h('span', { class: 'switch', title: 'How far out from this to draw' }, [1, 2, 3].map((d) => h('button', { class: d === steps ? 'on' : '', onclick: () => (stepsOut.set(id, d), entity(id)) }, d === 1 ? 'Near' : `${d} steps`))),
+          h('span', { class: 'grow' }),
+          !e.archived_at && phrases.length > 0 && h('button', { onclick: () => ((editor.hidden = false), openAdder()) }, 'Edit'),
         ),
-        data.outgoing.length + data.incoming.length + (owner ? 1 : 0)
-          ? [
-              // Where it sits: what it reaches for on the left, what reaches for it on the right.
-              neighbourhood(e, data, () => entity(id), owner),
-              !e.archived_at && h('details', { class: 'folded' }, h('summary', {}, 'Change relations'), h('table', { class: 'list' }, h('tbody', {}, relRows(data.outgoing, 'out'), relRows(data.incoming, 'in')))),
-            ]
+        relCount + (owner ? 1 : 0)
+          ? steps === 1
+            ? // Where it sits: what it reaches for on the left, what reaches for it on the right.
+              neighbourhood(e, rel, () => entity(id), owner)
+            : h('div', { id: 'around', class: 'graph-card', 'data-root': id })
           : h('div', { class: 'empty' }, 'Not linked to anything.'),
-        adder,
-      ),
-      h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, 'History')), eventTable(data.recent_events, false)),
+        editor,
+      ]),
+      fold('history', 'History', lines.length, false, lines),
     ),
   );
+  if (steps > 1) graph(id).catch((err) => document.getElementById('around')?.replaceChildren(h('div', { class: 'error' }, err.message)));
   if (project) roadmap(id).catch((err) => document.getElementById('roadmap')?.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
@@ -1517,8 +1490,12 @@ function layout(nodes, edges, width, height) {
 }
 
 async function graph(focus) {
-  const main = part('graph');
-  const params = { focus: focus || undefined, depth: focus ? graphState.depth : undefined, relations: graphState.relations || (focus ? undefined : 'structure'), include_closed: graphState.closed };
+  // Around an item it is drawn on that item's page, in its relations; by itself it is the whole map.
+  const slot = document.getElementById('around');
+  const embedded = Boolean(focus) && slot?.dataset.root === focus;
+  if (focus && !embedded) return;
+  const main = embedded ? slot : part('graph');
+  const params = { focus: focus || undefined, depth: focus ? (stepsOut.get(focus) ?? 2) : undefined, relations: graphState.relations || (focus ? undefined : 'structure'), include_closed: graphState.closed };
   const data = await api('view', { name: 'graph', params });
   const focused = focus ? data.nodes.find((n) => n.id === focus) : undefined;
   const redraw = () => graph(focus);
@@ -1698,13 +1675,24 @@ async function graph(focus) {
 
   const present = new Set(nodes.map((n) => groupOf(n.root).key));
   const preset = data.preset;
+  const legend = h(
+    'div',
+    { class: 'legend' },
+    GROUPS.filter((g) => present.has(g.key)).map((g) => h('span', { class: 'key' }, h('span', { class: `swatch group-${g.key}` }), g.label)),
+    nodes.some((n) => !n.open) && h('span', { class: 'key' }, h('span', { class: 'swatch hollow' }), 'Finished'),
+    nodes.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch ringed' }), 'Blocked'),
+    edges.some((e) => BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke blocking' }), 'Waits on'),
+    edges.some((e) => !BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke' }), 'Other relation'),
+  );
+  const drawing = nodes.length ? [svg, tip] : [h('div', { class: 'empty' }, 'Nothing to draw with these settings.')];
+  if (embedded) {
+    main.replaceChildren(...drawing, legend);
+    measure();
+    new ResizeObserver(measure).observe(svg);
+    return;
+  }
   main.replaceChildren(
-    h(
-      'div',
-      { class: 'page-head' },
-      // Around an item it is drawn on that item's page, which has the name.
-      h('h1', {}, focused ? 'Around it' : 'Graph'),
-    ),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Graph')),
     h(
       'div',
       { class: 'toolbar', style: 'margin-bottom: 12px' },
@@ -1719,18 +1707,6 @@ async function graph(focus) {
         },
         [['structure', 'What belongs to what'], ['blocking', 'What blocks what'], ['all', 'Every relation']].map(([v, label]) => h('option', { value: v, selected: v === preset }, label)),
       ),
-      focus &&
-        h(
-          'select',
-          {
-            title: 'How far out from the centre to go',
-            onchange: (e) => {
-              graphState.depth = Number(e.target.value);
-              redraw();
-            },
-          },
-          [1, 2, 3, 4].map((d) => h('option', { value: d, selected: d === graphState.depth }, `${d} step${d === 1 ? '' : 's'} out`)),
-        ),
       h(
         'label',
         {},
@@ -1744,22 +1720,13 @@ async function graph(focus) {
         }),
         ' Include finished',
       ),
-      focus && h('button', { onclick: () => (location.hash = '#/graph') }, 'Show the whole map'),
       h('span', { class: 'muted small' }, `${nodes.length} items`, data.truncated && ` of ${data.truncated.of}`),
     ),
     h(
       'section',
       { class: 'card graph-card' },
-      nodes.length ? [svg, tip] : h('div', { class: 'empty' }, 'Nothing to draw with these settings.'),
-      h(
-        'div',
-        { class: 'legend' },
-        GROUPS.filter((g) => present.has(g.key)).map((g) => h('span', { class: 'key' }, h('span', { class: `swatch group-${g.key}` }), g.label)),
-        nodes.some((n) => !n.open) && h('span', { class: 'key' }, h('span', { class: 'swatch hollow' }), 'Finished'),
-        nodes.some((n) => n.blocked) && h('span', { class: 'key' }, h('span', { class: 'swatch ringed' }), 'Blocked'),
-        edges.some((e) => BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke blocking' }), 'Waits on'),
-        edges.some((e) => !BLOCKING.includes(e.type)) && h('span', { class: 'key' }, h('span', { class: 'stroke' }), 'Other relation'),
-      ),
+      drawing,
+      legend,
     ),
   );
   measure();
@@ -2235,32 +2202,9 @@ function describeEvent(ev) {
   return '';
 }
 
-function eventTable(events, withTarget = true) {
-  if (!events.length) return h('div', { class: 'empty' }, 'No activity.');
-  return h(
-    'table',
-    { class: `list events${withTarget ? '' : ' no-target'}` },
-    h(
-      'tbody',
-      {},
-      events.map((ev) =>
-        h(
-          'tr',
-          {},
-          h('td', { class: 'nowrap muted' }, ago(ev.ts)),
-          h('td', { class: 'nowrap' }, who(ev.actor)),
-          h('td', { class: 'nowrap', title: ev.action }, verb(ev)),
-          withTarget && h('td', {}, ev.target_id ? h('a', { href: `#/e/${ev.target_id}` }, ev.target_title ?? ev.target_id) : ''),
-          h('td', { class: 'muted', title: !withTarget ? (ev.reason ?? '') : '' }, describeEvent(ev), !withTarget && ev.reason && ` · ${gist(ev.reason)}`),
-        ),
-      ),
-    ),
-  );
-}
-
 /** The whole record, or one strand of it, as lines into `list`. */
-async function drawTimeline(list, origin, notes = [], read) {
-  const again = () => drawTimeline(list, origin, notes, read);
+async function drawTimeline(list, origin, notes = [], read, seen) {
+  const again = () => drawTimeline(list, origin, notes, read, seen);
   const events = await api('events', { limit: 500, origin: origin || undefined });
   const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
   const undo = async (g) => {
@@ -2281,13 +2225,26 @@ async function drawTimeline(list, origin, notes = [], read) {
     else groups.push({ changeset: ev.changeset, events: [ev] });
   }
   const needs = attentionOf(notes, events);
-  list.replaceChildren(...needs.loose.map((n) => noticeLine(n, read)), ...groups.flatMap((g) => (g.changeset ? changeRow(g, { undone: undoneSets.has(g.changeset), onUndo: undo, attention: needs.sets.get(g.changeset), onRead: read }) : g.events.map(eventLine))));
+  // What an agent did by itself since the owner last looked is marked: not what a human applied, nor a session keeping its own record.
+  const seenUpto = events.find((e) => e.action === 'changes.seen')?.detail?.upto ?? 0;
+  const fresh = (g) => g.events.some((e) => e.seq > seenUpto) && g.events.every((e) => e.actor.startsWith('agent:') && !e.detail?.approved_by) && !g.events.every((e) => (e.target_type ?? 'sys.').startsWith('sys.')) && !undoneSets.has(g.changeset);
+  const unseen = origin ? [] : groups.filter((g) => g.changeset && fresh(g));
+  const marked = new Set(unseen.map((g) => g.changeset));
+  list.replaceChildren(
+    ...needs.loose.map((n) => noticeLine(n, read)),
+    ...groups.flatMap((g) => (g.changeset ? changeRow(g, { undone: undoneSets.has(g.changeset), onUndo: undo, attention: needs.sets.get(g.changeset), onRead: read, fresh: marked.has(g.changeset) }) : g.events.map(eventLine))),
+  );
+  if (seen) {
+    seen.hidden = !unseen.length && !notes.length;
+    seen.textContent = unseen.length ? `Mark ${unseen.length} seen` : 'Mark all seen';
+    seen.onclick = () => api('seen', { upto: events[0].seq }).then(() => read?.([...notes])).then(review, (err) => tell('That was not recorded', err.message));
+  }
   if (!events.length) list.replaceChildren(h('div', { class: 'empty' }, 'Nothing here.'));
 }
 
 /** The old address of the record: it lives on Changes now. */
 function activity() {
-  reviewState.show = 'all';
+  reviewState.origin = '';
   location.hash = '#/review';
 }
 
@@ -2872,6 +2829,8 @@ async function route(pulse = false) {
   if (name === 'activity') return activity();
   if (name === 'projects') return void (location.hash = '#/today');
   // Automations are found like any other kind of item.
+  // The graph around an item is its relations, drawn further out, on its own page.
+  if (name === 'graph' && arg) return void (stepsOut.set(arg, Math.max(stepsOut.get(arg) ?? 0, 2)), unfolded.set(`${arg}:relations`, true), (location.hash = `#/e/${arg}`));
   if (name === 'automations') return void ((mapState.type = 'sys.automation'), (location.hash = '#/map'));
   // A project's roadmap and its questions are on the project's own page.
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/today');
@@ -2879,13 +2838,12 @@ async function route(pulse = false) {
   dirty = false;
   stale.hidden = true;
   for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === page);
-  const around = name === 'graph' && Boolean(arg);
   const draw = {
     today,
     review,
     map: name === 'map' || page !== 'map' ? map : searchBar,
     // The graph around an item is drawn on that item's page, under it.
-    item: (name === 'e' || name === 'graph') && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
+    item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
     graph: name === 'graph' && (() => graph(arg)),
     workspace,
   };
@@ -2905,20 +2863,20 @@ async function route(pulse = false) {
       el.hidden = !draw[p];
       if (!draw[p]) return el.replaceChildren();
       // The graph is as someone has arranged it: a change elsewhere does not draw it again.
-      if (pulse && p === 'graph' && el.childElementCount) return;
+      if (pulse && el.childElementCount && (p === 'graph' || (p === 'item' && document.getElementById('around')))) return;
       try {
         await draw[p]();
       } catch (err) {
         if (err instanceof SignInNeeded) signedOut = true;
         else el.replaceChildren(h('div', { class: 'error' }, err.message));
       }
-      if (!pulse && p === named && el.isConnected) p === wanted[0] || (page === 'map' && !around) ? scrollTo(0, 0) : el.scrollIntoView();
+      if (!pulse && p === named && el.isConnected) p === wanted[0] || page === 'map' ? scrollTo(0, 0) : el.scrollIntoView();
     }),
   );
   if (signedOut) return signIn(store.token ? 'Your token is no longer accepted.' : '');
   // The parts above the one asked for have their final height only now, and a list in them a moment later.
   const settle = () => location.hash.split('/')[1] === name && part(named).scrollIntoView();
-  if (!pulse && named !== wanted[0] && (page !== 'map' || around) && part(named) !== main) (settle(), setTimeout(settle, 700));
+  if (!pulse && named !== wanted[0] && page !== 'map' && part(named) !== main) (settle(), setTimeout(settle, 700));
   refreshReviewCount();
   showIdentity();
 }

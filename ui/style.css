@@ -72,6 +72,16 @@ p { margin: 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .card > header { padding: 11px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .card > header .n { color: var(--muted); font-size: 12px; }
+/* A section that is one line until it is asked for. */
+details.fold > summary { padding: 11px 14px; display: flex; align-items: baseline; gap: 10px; cursor: pointer; list-style: none; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::before { content: "\25B8"; color: var(--muted); }
+details.fold[open] > summary::before { content: "\25BE"; }
+details.fold[open] > summary { border-bottom: 1px solid var(--line); }
+details.fold > summary .n { color: var(--muted); font-size: 12px; }
+.fold-bar { padding: 10px 14px 0; }
+.fold-bar .switch button { padding: 3px 10px; font-size: 12.5px; }
+#around svg.graph { height: 520px; }
 .card .empty, .card .error { padding: 14px; color: var(--muted); }
 .card .error { color: var(--bad); }
 .card.wide { grid-column: 1 / -1; }
@@ -241,6 +251,8 @@ details.change > summary > *, .change.line > * { flex: none; white-space: nowrap
 details.change > summary > .gist, .change.line > .gist { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 details.change > summary > .gist strong { font-weight: 600; }
 details.change.quiet > summary { opacity: 0.6; }
+/* What an agent did since the owner last looked. */
+.change.line.fresh { box-shadow: inset 3px 0 0 var(--accent); }
 /* A change the owner has been told about, until it is opened. */
 details.change.attn > summary, .change.line.attn { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 details.change .reason { margin: 0; padding: 10px 14px 0; max-width: 72ch; line-height: 1.5; }
