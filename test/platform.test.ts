@@ -605,10 +605,12 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
     });
     return { status: res.status, ...((await res.json()) as any) };
   };
+  // Each push starts where the one before it on that branch ended, as real ones do.
+  const heads = new Map<string, number>();
   const push = (branch: string, message: string, repo = 'Acme/Site') => ({
     ref: `refs/heads/${branch}`,
-    before: 'a'.repeat(40),
-    after: 'b'.repeat(40),
+    before: String(heads.get(branch) ?? 0).padStart(40, '0').replace(/^0+$/, 'a'.repeat(40)),
+    after: String(heads.set(branch, (heads.get(branch) ?? 0) + 1).get(branch)).padStart(40, '0'),
     repository: { full_name: repo, default_branch: 'main' },
     pusher: { name: 'sam' },
     commits: [{ id: 'c0ffee1' + '0'.repeat(33), message, url: 'https://github.com/Acme/Site/commit/c0ffee1', author: { name: 'Sam' } }],
@@ -641,6 +643,16 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   const heard = (await call('/agent/events', robot, { target: made.r, limit: 2 })).result as any[];
   assert.deepEqual(heard.map((e) => e.reason), ['branch main deleted', 'tag v1.0 pushed']);
   assert.equal((await call('/api/github', admin)).result.repos[0].last_push.subject, '1 commit to main: Merge the footer');
+
+  // A push that never arrived shows in the next one, which starts somewhere the last heard push did not end.
+  const sha = (c: string) => c.repeat(40);
+  const moved = (before: string, after: string) => deliver({ ...push('feat/gap', 'x'), before: sha(before), after: sha(after) });
+  assert.equal((await moved('0', '1')).result.missed, undefined, 'a new branch has nothing before it');
+  assert.equal((await moved('1', '2')).result.missed, undefined, 'one push after another');
+  assert.deepEqual((await moved('3', '4')).result.missed, { from: sha('2'), to: sha('3') }, 'whatever moved it from 2 to 3 was not heard');
+  assert.equal((await moved('4', '5')).result.missed, undefined, 'and then it is in step again');
+  const warned = ((await call('/api/view', admin, { name: 'notifications' })).result as any[]).filter((n) => /was not heard/.test(n.title));
+  assert.deepEqual(warned.map((n) => [n.title, n.level, n.about_id, /git log 2222222\.\.3333333/.test(n.body)]), [['A push to feat/gap of Site repo was not heard', 'warning', made.r, true]]);
 
   // The repository's address may be written any way GitHub shows it, a page of it in the browser included.
   await call('/api/change', admin, { reason: 'x', ops: [{ op: 'update', id: made.r, props: { remote: 'https://github.com/Acme/Site/tree/main' } }] });

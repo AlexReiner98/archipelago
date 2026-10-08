@@ -8,6 +8,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { newSecret } from './auth.ts';
 import type { Entity, Lattice } from './lattice.ts';
+import { notify } from './notify.ts';
 
 /** The setting that holds a workspace's webhook secret. GitHub signs with it, so it is kept as it is, not as a hash. */
 const SECRET = 'github_secret';
@@ -124,6 +125,12 @@ export function finishedBy(message: string): string[] {
  * GitHub sends a delivery again when asked to, or when it did not hear the
  * answer, under the same id (the X-GitHub-Delivery header): it is taken in
  * once. And a thing already waiting to be closed is not proposed twice.
+ *
+ * A push GitHub could not deliver (the server was restarting, say) is not
+ * sent again unasked. It shows in the next one: that push starts from a
+ * commit other than the one the last heard push ended on. The gap is
+ * recorded with the push and the human is told, so the commits in it can be
+ * read; it cannot be filled in from here.
  */
 export async function receivePush(l: Lattice, payload: PushPayload, delivery?: string) {
   const name = payload.repository?.full_name?.toLowerCase();
@@ -142,14 +149,30 @@ export async function receivePush(l: Lattice, payload: PushPayload, delivery?: s
   const commits = payload.commits ?? [];
   const subject = (message: string) => message.split('\n')[0].slice(0, 200);
   const who = `github:${payload.pusher?.name ?? 'someone'}`;
+  let missed: { from: string; to: string } | undefined;
+  if (branch !== undefined && !deleted && payload.before && !/^0+$/.test(payload.before)) {
+    const { rows } = await l.db.query<{ after: string | null }>(
+      `select detail->>'after' as after from event where action = 'repo.push' and target_id = $1 and detail->>'branch' = $2 and detail->>'deleted' is null order by seq desc limit 1`,
+      [repo.id, branch],
+    );
+    if (rows[0]?.after && rows[0].after !== payload.before) missed = { from: rows[0].after, to: payload.before };
+  }
   await l.log(l.db, {
     actor: who,
     action: 'repo.push',
     target: repo.id,
     origin: 'github',
     reason: deleted ? `${what} deleted` : tag !== undefined ? `${what} pushed` : commits.length ? `${commits.length} commit${commits.length === 1 ? '' : 's'} to ${branch}: ${subject(commits.at(-1)!.message)}` : `${branch} moved`,
-    detail: { repo: name, delivery, branch, tag, deleted, default_branch: main, before: payload.before, after: payload.after, commits: commits.slice(-20).map((c) => ({ sha: c.id.slice(0, 7), subject: subject(c.message), url: c.url, author: c.author?.name })) },
+    detail: { repo: name, delivery, branch, tag, deleted, missed, default_branch: main, before: payload.before, after: payload.after, commits: commits.slice(-20).map((c) => ({ sha: c.id.slice(0, 7), subject: subject(c.message), url: c.url, author: c.author?.name })) },
   });
+
+  if (missed)
+    await notify(l, { kind: 'agent', name: 'github' }, {
+      title: `A push to ${branch} of ${repo.title} was not heard`,
+      body: `The push just recorded starts from ${missed.to.slice(0, 7)}, but the last one heard on ${branch} ended at ${missed.from.slice(0, 7)}. Whatever was pushed in between did not reach the map: nothing its commits said they finished was closed. To read them: git log ${missed.from.slice(0, 7)}..${missed.to.slice(0, 7)}`,
+      level: 'warning',
+      about: repo.id,
+    });
 
   const settled: { id: string; title: string; status: string; result: string }[] = [];
   if (main) {
@@ -172,5 +195,5 @@ export async function receivePush(l: Lattice, payload: PushPayload, delivery?: s
       }
     }
   }
-  return { recorded: true, repo: { id: repo.id, title: repo.title }, branch, tag, deleted, commits: commits.length, settled };
+  return { recorded: true, repo: { id: repo.id, title: repo.title }, branch, tag, deleted, missed, commits: commits.length, settled };
 }
