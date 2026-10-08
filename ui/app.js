@@ -2,6 +2,12 @@
 // tools as the CLI through /api/<tool>.
 
 const main = document.getElementById('main');
+/**
+ * Where a screen draws. A page in the menu is made of parts, one under the
+ * other; a screen that is one of them draws in its own, and can draw itself
+ * again without touching the rest.
+ */
+const part = (name) => main.querySelector(`:scope > .part[data-part="${name}"]`) ?? main;
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -390,7 +396,8 @@ async function refreshReviewCount() {
 let todayOpen = '';
 
 async function today() {
-  const here = () => location.hash === '' || location.hash.startsWith('#/today');
+  const main = part('today');
+  const here = () => main.isConnected;
   if (!main.querySelector('.inbox')) main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Home')), h('div', { class: 'inbox' }, h('div', { class: 'empty' }, 'Loading…')));
   const view = (name, params) => api('view', { name, params });
   const markRead = async (ids) => {
@@ -445,7 +452,7 @@ async function today() {
       {},
       h(
         'a',
-        { class: `project-row${pr.status !== 'active' ? ' resting' : ''}`, href: `#/roadmap/${pr.id}`, title: `${pr.title}: open its roadmap` },
+        { class: `project-row${pr.status !== 'active' ? ' resting' : ''}${pr.id === homeProject ? ' on' : ''}`, href: `#/roadmap/${pr.id}`, title: `${pr.title}: open its roadmap` },
         h('strong', { class: 'grow' }, pr.title),
         pr.status !== 'active' && pill(pr.type, pr.status),
         count(c.decide, 'decide', 'warn', 'Questions open in it'),
@@ -589,6 +596,7 @@ const reviewState = { show: 'new' };
 const STRANDS = [['new', 'New from agents'], ['all', 'Everything'], ['github', 'Pushes'], ['external', 'Tool calls']];
 
 async function review() {
+  const main = part('review');
   const strands = h('span', { class: 'switch' }, STRANDS.map(([key, text]) => h('button', { class: reviewState.show === key ? 'on' : '', onclick: () => ((reviewState.show = key), review()) }, text)));
   main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes'), strands));
   const [pending, known, events] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('events', { limit: 500 })]);
@@ -827,6 +835,7 @@ function proposalCard(p, names) {
 const mapState = { q: '', type: '', open: 'open' };
 
 function map() {
+  const main = part('map');
   const results = h('div');
   const list = h('section', { class: 'card', hidden: true }, results);
   const rest = h('div', { class: 'inbox' });
@@ -898,7 +907,7 @@ function map() {
     rest,
     list,
   );
-  main.querySelector('input[type=search]').focus();
+  if (location.hash.startsWith('#/map')) main.querySelector('input[type=search]').focus();
   run();
 }
 
@@ -1079,6 +1088,7 @@ function neighbourhood(e, data, redraw, owner) {
 }
 
 async function entity(id) {
+  const main = part('item');
   main.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
   let data;
   try {
@@ -1372,6 +1382,7 @@ function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
 }
 
 function newEntity(typeId) {
+  const main = part('item');
   if (!types.has(typeId)) typeId = 'task';
   const draw = () => {
     const form = entityForm(typeId, {}, {
@@ -1408,6 +1419,7 @@ function newEntity(typeId) {
 // ---- Automations ---------------------------------------------------------
 
 async function automations() {
+  const main = part('automations');
   const rows = await api('search', { type: 'sys.automation', limit: 200 });
   const describe = (p) => {
     const when = p.trigger === 'every' ? `every ${p.every_minutes} min` : p.trigger === 'daily' ? `daily at ${p.at}` : `when ${p.on_action} is logged`;
@@ -1533,6 +1545,7 @@ function layout(nodes, edges, width, height) {
 }
 
 async function graph(focus) {
+  const main = part('graph');
   const params = { focus: focus || undefined, depth: focus ? graphState.depth : undefined, relations: graphState.relations || (focus ? undefined : 'structure'), include_closed: graphState.closed };
   const data = await api('view', { name: 'graph', params });
   const focused = focus ? data.nodes.find((n) => n.id === focus) : undefined;
@@ -2050,6 +2063,7 @@ function ownerCard(owner, redraw) {
 }
 
 async function workspace() {
+  const main = part('workspace');
   const me = await (await fetch('/whoami', { headers: authHeaders() })).json();
   const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name, ' \u00b7 ', h('a', { href: '#/automations' }, 'Automations')));
   if (me.auth !== 'tokens') {
@@ -2125,7 +2139,7 @@ async function workspace() {
               class: 'primary',
               onclick: () =>
                 api('token_create', { kind: 'agent', name: agentName.value.trim() || 'claude-code' })
-                  .then((made) => workspace().then(() => document.getElementById('main').children[1].replaceChildren(connectBox(made))))
+                  .then((made) => workspace().then(() => main.children[1].replaceChildren(connectBox(made))))
                   .catch(fail),
             },
             'Connect an agent',
@@ -2136,7 +2150,7 @@ async function workspace() {
               title: 'For an agent that is not Claude Code: the bare token, to send as Authorization: Bearer',
               onclick: () =>
                 api('token_create', { kind: 'agent', name: agentName.value.trim() || 'agent' })
-                  .then((made) => workspace().then(() => document.getElementById('main').children[1].replaceChildren(secretBox(`Token for ${made.name}`, made.token))))
+                  .then((made) => workspace().then(() => main.children[1].replaceChildren(secretBox(`Token for ${made.name}`, made.token))))
                   .catch(fail),
             },
             'Token only',
@@ -2161,7 +2175,7 @@ async function workspace() {
                 class: 'primary',
                 onclick: () =>
                   api('member_add', { name: memberName.value.trim(), email: memberEmail.value.trim() || undefined, admin: memberAdmin.checked })
-                    .then((made) => workspace().then(() => document.getElementById('main').children[1].replaceChildren(secretBox(`Sign-in token for ${memberName.value.trim()}. Send it to them privately.`, made.token))))
+                    .then((made) => workspace().then(() => main.children[1].replaceChildren(secretBox(`Sign-in token for ${memberName.value.trim()}. Send it to them privately.`, made.token))))
                     .catch(fail),
               },
               'Add member',
@@ -2551,6 +2565,7 @@ async function projectNeeds(rootId, data, change, redraw) {
 }
 
 async function roadmap(rootId) {
+  const main = part('roadmap');
   const remembered = () => {
     try {
       return localStorage.getItem('lattice-roadmap') ?? '';
@@ -2627,7 +2642,7 @@ async function roadmap(rootId) {
   const inProgress = menu(`${data.now.length} in progress`, data.now.map((n) => [`${n.title}${n.sessions?.length ? '  · session open' : ''}`, () => (location.hash = `#/e/${n.id}`)]));
   inProgress.classList.add('ok');
   const needsYou = await projectNeeds(rootId, data, change, () => roadmap(rootId)).catch(() => null);
-  if (!location.hash.startsWith(`#/roadmap/${rootId}`)) return;
+  if (!main.isConnected) return;
 
   main.replaceChildren(
     h(
@@ -2792,6 +2807,7 @@ function questionItem(q, change, where, plain = false) {
 // One project's open questions, to be worked through from the top: what holds
 // up the most comes first, and each is answered where it stands.
 async function questions(rootId) {
+  const main = part('questions');
   const remembered = () => {
     try {
       return localStorage.getItem('lattice-roadmap') ?? '';
@@ -2953,14 +2969,14 @@ async function checkPulse() {
   const moved = pulse !== undefined && now !== pulse;
   pulse = now;
   if (!moved) return;
-  if (dirty || document.querySelector('dialog[open]') || /^#\/(graph|new)/.test(location.hash)) {
+  if (dirty || document.querySelector('dialog[open]') || /^#\/new/.test(location.hash)) {
     refreshReviewCount();
     stale.hidden = false;
     return;
   }
   // Hold the page's height while it is redrawn, so the scroll position stays.
   main.style.minHeight = `${main.offsetHeight}px`;
-  await route();
+  await route(true);
   setTimeout(() => (main.style.minHeight = ''), 1000);
 }
 setInterval(checkPulse, 2000);
@@ -2968,31 +2984,80 @@ document.addEventListener('visibilitychange', checkPulse);
 
 // ---- routing -------------------------------------------------------------
 
-// Projects are on Home now; the old address still leads there.
-const ROUTES = { today, review, map, activity, automations, graph, roadmap, questions, workspace, projects: () => void (location.hash = '#/today') };
-// Where each screen sits in the menu, for the ones that are not in it themselves.
-const UNDER = { e: 'map', new: 'map', activity: 'review', graph: 'map', roadmap: 'today', questions: 'today', projects: 'today', automations: 'workspace' };
+// Each page in the menu is its parts, one under the other. What used to be a
+// page of its own (a project's roadmap and questions, an item, the graph,
+// automations) is a part of the page it was reached from, and its old address
+// leads to that part.
+const PAGES = { today: ['today', 'roadmap', 'questions'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace', 'automations'] };
+const UNDER = { e: 'map', new: 'map', graph: 'map', roadmap: 'today', questions: 'today', automations: 'workspace' };
+/** The part an address names, where that is not the address's own name. */
+const PART = { e: 'item', new: 'item' };
+/** The project whose roadmap and questions Home shows. */
+let homeProject = '';
 
-async function route() {
+/** `pulse`: the map changed under the page, which is drawn again where it stands. */
+async function route(pulse = false) {
   const [, name = 'today', arg] = location.hash.split('/');
+  // Addresses that have been folded into another screen still lead somewhere.
+  if (name === 'activity') return activity();
+  if (name === 'projects') return void (location.hash = '#/today');
+  const page = PAGES[UNDER[name] ?? name] ? (UNDER[name] ?? name) : 'today';
   dirty = false;
   stale.hidden = true;
-  for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (UNDER[name] ?? name));
+  for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === page);
+  if (page === 'today') {
+    try {
+      homeProject = (name === 'roadmap' || name === 'questions' ? arg : '') || localStorage.getItem('lattice-roadmap') || '';
+    } catch {
+      homeProject = arg ?? '';
+    }
+  }
+  const draw = {
+    today,
+    review,
+    // With no project chosen yet the roadmap chooses one, and its address brings the questions with it.
+    roadmap: () => roadmap(homeProject || undefined),
+    questions: homeProject && (() => questions(homeProject)),
+    map,
+    item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
+    graph: () => graph(name === 'graph' ? arg : undefined),
+    workspace,
+    automations,
+  };
+  const wanted = PAGES[page];
+  if ([...main.children].map((c) => c.dataset.part).join() !== wanted.join()) main.replaceChildren(...wanted.map((p) => h('div', { class: 'part', 'data-part': p })));
+  const named = PART[name] ?? name;
+  let signedOut;
   try {
     if (!schema) await loadSchema();
-    if (name === 'e' && arg) await entity(arg);
-    else if (name === 'graph') await graph(arg);
-    else if (name === 'roadmap') await roadmap(arg);
-    else if (name === 'questions') await questions(arg);
-    else if (name === 'new') newEntity(arg);
-    else await (ROUTES[name] ?? today)();
   } catch (err) {
     if (err instanceof SignInNeeded) return signIn(store.token ? 'Your token is no longer accepted.' : '');
-    main.replaceChildren(h('div', { class: 'error' }, err.message));
+    return main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
+  await Promise.all(
+    wanted.map(async (p) => {
+      const el = part(p);
+      el.hidden = !draw[p];
+      if (!draw[p]) return el.replaceChildren();
+      // The graph is as someone has arranged it: a change elsewhere does not draw it again.
+      if (pulse && p === 'graph' && el.childElementCount) return;
+      try {
+        await draw[p]();
+      } catch (err) {
+        if (err instanceof SignInNeeded) signedOut = true;
+        else el.replaceChildren(h('div', { class: 'error' }, err.message));
+      }
+      if (!pulse && p === named && el.isConnected) p === wanted[0] ? scrollTo(0, 0) : el.scrollIntoView();
+    }),
+  );
+  if (signedOut) return signIn(store.token ? 'Your token is no longer accepted.' : '');
+  // The parts above the one asked for have their final height only now, and a list in them a moment later.
+  const settle = () => location.hash.split('/')[1] === name && part(named).scrollIntoView();
+  if (!pulse && named !== wanted[0] && part(named) !== main) (settle(), setTimeout(settle, 700));
   refreshReviewCount();
   showIdentity();
 }
 
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', () => route());
+
 route();
