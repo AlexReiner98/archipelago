@@ -1,6 +1,7 @@
 # Keep the Lattice map true to this repository: on every push, an agent reads
-# the new commits against the repository's open items in the map and proposes
-# what they change. Nothing it proposes is applied until the owner confirms it.
+# the new commits against the repository's open items in the map and sends
+# what they change. Whether that is held for the owner or takes effect as it
+# is sent is the workspace's own setting ("What agents change").
 #
 # Copy to .github/workflows/lattice.yml and set in the repository's settings:
 #   variable LATTICE_URL            the server, e.g. https://lattice.example.com
@@ -14,9 +15,8 @@ on:
   push:
     branches: ['**'] # not tags: a tag brings no new commits to read
 
-# One run at a time per branch: a second push waits for the first to be read.
-concurrency:
-  group: lattice-${{ github.ref }}
+# No concurrency group: each push is read by a run of its own. A group keeps
+# only one run waiting, so a third push would drop the second's commits unread.
 
 permissions:
   contents: read
@@ -25,47 +25,86 @@ jobs:
   reconcile:
     if: ${{ vars.LATTICE_URL != '' && !github.event.deleted }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Everything the steps need from the event comes in through the
+    # environment, so a branch name is never read as part of a command.
+    env:
+      LATTICE_URL: ${{ vars.LATTICE_URL }}
+      LATTICE_AGENT_TOKEN: ${{ secrets.LATTICE_AGENT_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      BEFORE: ${{ github.event.before }}
+      AFTER: ${{ github.event.after }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: actions/setup-node@v4
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: |
-            --mcp-config '{"mcpServers":{"lattice":{"type":"http","url":"${{ vars.LATTICE_URL }}/mcp","headers":{"Authorization":"Bearer ${{ secrets.LATTICE_AGENT_TOKEN }}"}}}}'
-            --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)"
-            --max-turns 40
-          prompt: |
-            A push has just landed on the branch "${{ github.ref_name }}" of ${{ github.repository }}
-            (default branch: "${{ github.event.repository.default_branch }}").
-            The new commits are ${{ github.event.before }}..${{ github.event.after }}.
-            If the first of those is all zeros the branch is new: read the commits on it that are not on the default branch.
+          node-version: 22
 
-            Your one job is to make the Lattice map true again for this repository. Lattice is the owner's map of
-            work: projects, features, tasks, issues, decisions. You reach it through the lattice tools. Change no
-            files here.
+      # The Claude Code CLI itself: the claude-code-action wrapper refuses push events.
+      - run: npm install --global @anthropic-ai/claude-code
 
-            1. Read what changed: `git log` and `git diff --stat` over that range, and the diffs that matter.
-            2. Read what the map believes: the lattice `view` tool with name "repo_work" and params
-               {"repo": "${{ github.repository }}"}; `search` for anything else these commits touch; `get` an item
-               before you change it.
-            3. For each open item these commits settle or change, send one `change` of its own, with a reason
-               that says what the commit did and the commit as the source
-               (uri https://github.com/${{ github.repository }}/commit/<sha>, kind "commit"):
-               - work that is now finished: its status, to done;
-               - work that has visibly started: its status, to doing;
-               - a decision or hypothesis the code has in practice settled: propose its closing, with the outcome
-                 and why;
-               - a title or note the commits have made wrong: the correction.
-               On any branch other than the default, work is in progress, not finished: never close something
-               because of a commit that is not on the default branch.
-            4. If the commits show work the map does not know (a follow-up named in a message, a TODO that was
-               added, a feature that appeared), propose creating it, as part of the feature or project it
-               belongs to. Search first so you do not make a duplicate.
-            5. Do not guess. If nothing in the map is touched by these commits, change nothing.
+      # The token goes into a file the CLI reads, not onto a command line.
+      - name: Connect to Lattice
+        run: |
+          node -e '
+            const { LATTICE_URL, LATTICE_AGENT_TOKEN, RUNNER_TEMP } = process.env;
+            if (!LATTICE_AGENT_TOKEN) { console.error("The secret LATTICE_AGENT_TOKEN is not set."); process.exit(1); }
+            const lattice = { type: "http", url: LATTICE_URL.replace(/\/$/, "") + "/mcp", headers: { Authorization: "Bearer " + LATTICE_AGENT_TOKEN } };
+            require("fs").writeFileSync(RUNNER_TEMP + "/lattice-mcp.json", JSON.stringify({ mcpServers: { lattice } }), { mode: 0o600 });
+          '
 
-            Everything you send waits for the owner to confirm. Finish with two or three lines saying what you
-            proposed, or that nothing needed changing.
+      - name: Read the push against the map
+        run: |
+          cat > "$RUNNER_TEMP/prompt.txt" <<EOF
+          A push has just landed on the branch "$BRANCH" of $REPO (default branch: "$DEFAULT_BRANCH").
+          The new commits are $BEFORE..$AFTER.
+          If the first of those is all zeros the branch is new: read the commits on it that are not on the default branch.
+          EOF
+          cat >> "$RUNNER_TEMP/prompt.txt" <<'EOF'
+
+          Your one job is to make the Lattice map true again for this repository. Lattice is the owner's map of
+          work: projects, features, tasks, issues, decisions. You reach it through the lattice tools. Change no
+          files here. Depending on the workspace, what you send is held for the owner or takes effect at once,
+          so send only what the commits show.
+
+          1. Read what changed: `git log` and `git diff --stat` over that range, and the diffs that matter.
+          2. Read what the map believes: the lattice `view` tool with name "repo_work" and the repository as
+             params.repo; `search` for anything else these commits touch; `get` an item before you change it.
+             Call `schema` once: every type has its own statuses, and you must use the ones the item's type has
+             (a task is done, a feature is built and later shipped, an issue is resolved).
+          3. Lattice itself has already read this push: where a commit on the default branch says "fixes",
+             "closes" or "resolves" with an item's id (e_ and eight characters), that item has been closed, or
+             a change closing it is held (`proposals` lists what is held). Do not send those again. If `get`
+             shows an item already in the state you would give it, leave it.
+          4. For each open item these commits settle or change, send one `change` of its own. Give it:
+             - a reason that says what the commit did;
+             - the commit as the source (uri https://github.com/<repository>/commit/<sha>, kind "commit");
+             - `authority`: {"of": "agent", "basis": "<what in which commit shows it>"}. It is your reading
+               of the commits, not the owner's word, so never "human".
+             What to send:
+             - work that is now finished: the closing status of its type;
+             - work that has visibly started: the status of its type that says so;
+             - a decision or hypothesis the code has in practice settled: its closing status, with
+               props.outcome (what was chosen) and props.rationale (why) for a decision. Only when the
+               commits leave no doubt; a choice that is still the owner's stays open, with a note if useful;
+             - a title or note the commits have made wrong: the correction.
+             On any branch other than the default, work is in progress, not finished: never close something
+             because of a commit that is not on the default branch.
+          5. If the commits show work the map does not know (a follow-up named in a message, a TODO that was
+             added, a feature that appeared), create it, as part of the feature or project it belongs to.
+             Search first so you do not make a duplicate.
+          6. Do not guess. If nothing in the map is touched by these commits, change nothing.
+
+          Finish with two or three lines saying what you sent, or that nothing needed changing.
+          EOF
+          claude --print "$(cat "$RUNNER_TEMP/prompt.txt")" \
+            --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
+            --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
+            --max-budget-usd 2

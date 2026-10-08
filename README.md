@@ -309,7 +309,10 @@ against the repository's open items and propose what they change. Copy it to
   subscription.
 
 It does nothing until `LATTICE_URL` is set. Each push is billed as a Claude
-run. What it proposes waits for you on Home like any agent's change.
+run, stopped at 2 dollars. It installs the Claude Code CLI and runs that (the
+`claude-code-action` wrapper does not take push events). What it sends is held
+for you or takes effect at once, as the workspace is set, like any agent's
+change, and says it rests on the agent's reading of the commits.
 
 ## Backups
 
