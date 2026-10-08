@@ -3,10 +3,11 @@
 // customer's map cannot leak into another's by a missed filter: there is no
 // shared table to filter.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { hashSecret, newSecret, sameSecret, validWorkspaceId } from './auth.ts';
+import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceId } from './auth.ts';
 import { Automations } from './automations.ts';
+import { restore, type Dump } from './backup.ts';
 import { openDb } from './db.ts';
 import { Lattice, type Policy } from './lattice.ts';
 import { Registry } from './packs.ts';
@@ -133,24 +134,56 @@ export class Workspaces {
     return closed;
   }
 
-  private async load(id: string): Promise<Workspace> {
+  private async load(id: string, backup?: Dump): Promise<Workspace> {
     const { dataDir, rootDir, packsDir, packs, policy } = this.config;
     const isDefault = id === DEFAULT_WORKSPACE;
     const dbDir = dataDir === null ? undefined : isDefault ? dataDir : join(rootDir, id, 'db');
     // Types a workspace defines for itself stay with that workspace.
     const localPack = isDefault ? undefined : join(rootDir, id, 'local-pack');
-    const lattice = new Lattice(await openDb(dbDir), new Registry(packsDir, packs, localPack), policy, id);
+    const db = await openDb(dbDir);
+    if (backup) {
+      await restore(db, backup, id).catch(async (err) => {
+        await db.close();
+        throw err;
+      });
+    }
+    const lattice = new Lattice(db, new Registry(packsDir, packs, localPack), policy, id);
     const automations = new Automations(lattice);
     if (this.config.runAutomations) automations.start();
     return { id, name: this.list().find((w) => w.id === id)!.name, lattice, automations };
   }
 
-  async create(id: string, name: string): Promise<Workspace> {
+  /**
+   * Make a workspace: an empty one, or with `backup` one holding everything a
+   * backup file holds, which is how a map moves between servers. If the backup
+   * cannot be put in, no workspace is left behind.
+   */
+  async create(id: string, name: string, backup?: Dump): Promise<Workspace> {
     if (!validWorkspaceId(id)) throw new Error('A workspace id is 1 to 40 characters: lowercase letters, digits and hyphens, starting with a letter or digit.');
     if (this.has(id)) throw new Error(`Workspace "${id}" already exists`);
-    this.index.workspaces.push({ id, name: name.trim() || id, created: new Date().toISOString() });
+    const folder = join(this.config.rootDir, id);
+    // Nothing found there is ours to restore over, or to delete if it fails.
+    if (backup && existsSync(folder)) throw new Error(`There is already a folder for "${id}" on this server. Choose another id.`);
+    this.index.workspaces.push({ id, name: name.trim() || backup?.workspace?.name || id, created: new Date().toISOString() });
     this.save();
-    return this.get(id);
+    if (!backup) return this.get(id);
+    try {
+      if (backup.local_pack) {
+        // The types it defined for itself, where load() looks for them.
+        mkdirSync(join(folder, 'local-pack'), { recursive: true });
+        writeFileSync(join(folder, 'local-pack', 'pack.json'), JSON.stringify(backup.local_pack, null, 2) + '\n');
+      }
+      this.touched.set(id, Date.now());
+      const opening = this.load(id, backup);
+      this.open.set(id, opening);
+      return await opening;
+    } catch (err) {
+      this.open.delete(id);
+      this.index.workspaces = this.index.workspaces.filter((w) => w.id !== id);
+      this.save();
+      rmSync(folder, { recursive: true, force: true });
+      throw err;
+    }
   }
 
   /** Make the operator secret if there is none. Returns it only at that moment. */
@@ -164,6 +197,24 @@ export class Workspaces {
 
   isOperator(secret: string | undefined): boolean {
     return Boolean(secret && this.index.operator && sameSecret(secret, this.index.operator));
+  }
+
+  /**
+   * Replace a lost operator secret. Nobody can be asked for the old one, so
+   * the proof is being able to write on the server's own disk: the caller
+   * puts a value in a file beside the workspaces and then names that value.
+   * The file is good for one try. Returns the new secret, once.
+   */
+  resetOperator(proof: string | undefined): string | undefined {
+    const file = join(this.config.rootDir, OPERATOR_RESET_FILE);
+    if (!existsSync(file)) return undefined;
+    const expected = readFileSync(file, 'utf8').trim();
+    rmSync(file, { force: true });
+    if (!proof || expected.length < 32 || !sameSecret(proof, hashSecret(expected))) return undefined;
+    const secret = newSecret('latop');
+    this.index.operator = hashSecret(secret);
+    this.save();
+    return secret;
   }
 
   async closeAll(): Promise<void> {

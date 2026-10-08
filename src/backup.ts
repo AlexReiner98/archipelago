@@ -35,9 +35,14 @@ export async function dump(db: Db, workspace: { id: string; name: string }, loca
   return { format: 1, taken: new Date().toISOString(), workspace, local_pack: localPack ?? null, tables };
 }
 
-/** Put a dump into an empty database. Refuses one that already holds anything. */
-export async function restore(db: Db, backup: Dump): Promise<Record<string, number>> {
-  if (backup.format !== 1) throw new Error(`This backup is format ${backup.format}; this version reads format 1.`);
+/**
+ * Put a dump into an empty database. Refuses one that already holds anything.
+ * Give `as` when it becomes a workspace under another id: its tokens name the
+ * workspace they were made for, so none of them would work there, and they are
+ * restored revoked.
+ */
+export async function restore(db: Db, backup: Dump, as?: string): Promise<Record<string, number>> {
+  if (backup?.format !== 1 || typeof backup.tables !== 'object') throw new Error(`This backup is format ${backup?.format}; this version reads format 1.`);
   const counts: Record<string, number> = {};
   await db.transaction(async (tx) => {
     for (const table of TABLES) {
@@ -51,6 +56,10 @@ export async function restore(db: Db, backup: Dump): Promise<Record<string, numb
       counts[table] = rows.length;
     }
     await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), 1))`);
+    if (as !== undefined && as !== backup.workspace?.id) {
+      for (const table of ['entity', 'relation', 'event', 'proposal']) await tx.query(`update ${table} set workspace = $1`, [as]);
+      await tx.query(`update token set revoked_at = now() where revoked_at is null`);
+    }
   });
   return counts;
 }
@@ -131,8 +140,17 @@ export function newestBackup(dir: string, workspace = 'default'): Date | undefin
   return newest ? new Date(newest.replace('.json.gz', '').replace(/T(\d\d)-(\d\d)-/, 'T$1:$2:')) : undefined;
 }
 
+/** A backup file's contents, as written by backupAll. */
+export function parseBackup(bytes: Uint8Array): Dump {
+  try {
+    return JSON.parse(gunzipSync(bytes).toString('utf8')) as Dump;
+  } catch {
+    throw new Error('That is not a Lattice backup file (a .json.gz written by the server).');
+  }
+}
+
 export function readBackup(file: string): Dump {
-  return JSON.parse(gunzipSync(readFileSync(file)).toString('utf8')) as Dump;
+  return parseBackup(readFileSync(file));
 }
 
 if (import.meta.main) {

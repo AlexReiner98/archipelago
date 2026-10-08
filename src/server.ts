@@ -7,8 +7,10 @@
 //                      Claude Code HTTP hooks: a session registers itself and
 //                      is handed what the map knows about its repository
 //   GET  /whoami       which workspace and identity a request resolves to
-//   /operator/workspaces  list and create workspaces, and issue a workspace a
-//                      new owner token (operator secret)
+//   /operator/workspaces  list and create workspaces (empty, or from a backup
+//                      file), and issue a workspace a new owner token
+//                      (operator secret)
+//   POST /operator/reset  replace a lost operator secret (`lattice operator-reset`)
 //   GET  /             the web UI
 // It listens on 127.0.0.1 unless told otherwise, and beyond it only with tokens on.
 //
@@ -27,7 +29,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
-import { backupAll, newestBackup } from './backup.ts';
+import { backupAll, newestBackup, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT } from './config.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
@@ -123,6 +125,16 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     };
   }
 
+  /**
+   * A token with full control of a workspace, for the operator to hand over.
+   * It is the owner's own when the workspace has one, so it sees what is
+   * private to them: a map brought in from a backup arrives with its owner.
+   */
+  async function ownerToken(ws: Workspace, name: string) {
+    const owner = await createToken(ws.lattice.db, ws.id, { kind: 'human', name, admin: true, entity: await ws.lattice.setting<string>('me') });
+    return { workspace: { id: ws.id, name: ws.name }, owner_token: owner.token, note: owner.note };
+  }
+
   /** Keep other web pages out: only our own UI's origin, only JSON, only our host name. */
   const local = (req: IncomingMessage, needJson = true) =>
     !(req.headers.origin && !origins.includes(req.headers.origin)) && hosts.includes(req.headers.host ?? '') && (!needJson || Boolean(req.headers['content-type']?.startsWith('application/json')));
@@ -215,20 +227,31 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (!workspaces.isOperator(bearer(req.headers.authorization))) return send(res, 401, { error: 'The operator secret is required.' });
         const id = decodeURIComponent(reissue[1]);
         if (!workspaces.has(id)) return send(res, 404, { error: `No workspace "${id}"` });
-        const ws = await workspaces.get(id);
-        const owner = await createToken(ws.lattice.db, ws.id, { kind: 'human', name: 'owner (reissued)', admin: true });
-        return send(res, 200, { result: { workspace: { id: ws.id, name: ws.name }, owner_token: owner.token, note: owner.note } });
+        return send(res, 200, { result: await ownerToken(await workspaces.get(id), 'owner (reissued)') });
+      }
+      if (tokens && req.method === 'POST' && url.pathname === '/operator/reset') {
+        // Only from the server's own machine, by its local name, and never through a browser.
+        const here = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '') && hosts.slice(0, 2).includes(req.headers.host ?? '');
+        if (req.headers.origin || !here) return send(res, 403, { error: 'Only from the machine the server runs on.' });
+        const secret = workspaces.resetOperator(((await readJson(req)) as { proof?: string } | undefined)?.proof);
+        if (!secret) return send(res, 401, { error: 'No reset was prepared, or the proof does not match.' });
+        console.log('The operator secret was replaced from this machine.');
+        return send(res, 200, { result: { operator_secret: secret, note: 'Keep this secret now: it is not stored and cannot be shown again. The old one no longer works.' } });
       }
       if (url.pathname === '/operator/workspaces' && tokens) {
         if (!local(req, req.method === 'POST')) return send(res, 403, { error: 'Local requests only.' });
         if (!workspaces.isOperator(bearer(req.headers.authorization))) return send(res, 401, { error: 'The operator secret is required.' });
         if (req.method === 'GET') return send(res, 200, { result: workspaces.list() });
         if (req.method === 'POST') {
-          const { id, name } = ((await readJson(req)) ?? {}) as { id?: string; name?: string };
+          // `backup` is a backup file's bytes in base64: the workspace starts as that map.
+          const { id, name, backup } = ((await readJson(req)) ?? {}) as { id?: string; name?: string; backup?: string };
           try {
-            const ws = await workspaces.create(id ?? '', name ?? '');
-            const owner = await createToken(ws.lattice.db, ws.id, { kind: 'human', name: 'owner', admin: true });
-            return send(res, 200, { result: { workspace: { id: ws.id, name: ws.name }, owner_token: owner.token, note: owner.note } });
+            const from = backup === undefined ? undefined : parseBackup(Buffer.from(String(backup), 'base64'));
+            const ws = await workspaces.create(id ?? '', name ?? '', from);
+            const owner = await ownerToken(ws, 'owner');
+            if (!from) return send(res, 200, { result: owner });
+            const { rows } = await ws.lattice.db.query<{ entities: number; events: number }>(`select (select count(*)::int from entity) as entities, (select count(*)::int from event) as events`);
+            return send(res, 200, { result: { ...owner, restored: { from: from.workspace, taken: from.taken, ...rows[0] } } });
           } catch (err) {
             return send(res, 400, { error: (err as Error).message });
           }

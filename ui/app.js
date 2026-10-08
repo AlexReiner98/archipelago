@@ -1421,7 +1421,7 @@ function operatorCard(current) {
         }
       };
       return body.replaceChildren(
-        h('div', { class: 'empty' }, 'Creating and listing workspaces needs the operator secret, printed the first time the server started with tokens on.'),
+        h('div', { class: 'empty' }, 'Creating and listing workspaces needs the operator secret, printed the first time the server started with tokens on. If it is lost, run "node src/cli.ts operator-reset" on the server.'),
         h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, secret, h('button', { onclick: open }, 'Show workspaces')),
         error,
       );
@@ -1430,11 +1430,27 @@ function operatorCard(current) {
     const id = h('input', { type: 'text', placeholder: 'id, e.g. acme', style: 'flex: 1; min-width: 140px' });
     const name = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: 160px' });
     const error = h('div');
-    const create = () =>
-      call('POST', { id: id.value.trim(), name: name.value.trim() })
-        .then((r) => draw(r))
-        .catch((err) => error.replaceChildren(h('div', { class: 'error' }, err.message)));
+    // With a backup file chosen, the new workspace starts as the map in that file.
+    const file = h('input', { type: 'file', accept: '.gz', title: 'Optional: a backup file (.json.gz) to start the workspace from' });
+    const base64 = (blob) =>
+      new Promise((done, fail) => {
+        const reader = new FileReader();
+        reader.onload = () => done(reader.result.slice(reader.result.indexOf(',') + 1));
+        reader.onerror = () => fail(new Error('That file could not be read.'));
+        reader.readAsDataURL(blob);
+      });
+    const create = async () => {
+      try {
+        const backup = file.files[0] && (await base64(file.files[0]));
+        await draw(await call('POST', { id: id.value.trim(), name: name.value.trim(), ...(backup && { backup }) }));
+      } catch (err) {
+        error.replaceChildren(h('div', { class: 'error' }, err.message));
+      }
+    };
     body.replaceChildren(
+      made?.restored
+        ? h('div', { class: 'muted small', style: 'padding: 12px 14px 0' }, `Restored ${made.restored.entities} entities and ${made.restored.events} events from the backup of "${made.restored.from.name}" taken ${new Date(made.restored.taken).toLocaleString()}. Tokens from where it came from do not work here.`)
+        : '',
       made ? h('div', { style: 'padding: 12px 14px 0' }, secretBox(`Owner token for "${made.workspace.name}". Send it to its owner privately.`, made.owner_token)) : '',
       h(
         'ul',
@@ -1461,7 +1477,8 @@ function operatorCard(current) {
           ),
         ),
       ),
-      h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, id, name, h('button', { class: 'primary', onclick: create }, 'Create workspace'), h('button', { onclick: () => ((operatorSecret = ''), draw()) }, 'Forget secret')),
+      h('div', { class: 'toolbar', style: 'padding: 12px 14px 0' }, id, name, h('button', { class: 'primary', onclick: create }, 'Create workspace'), h('button', { onclick: () => ((operatorSecret = ''), draw()) }, 'Forget secret')),
+      h('label', { class: 'toolbar muted small', style: 'padding: 8px 14px 12px' }, 'From a backup file (optional):', file),
       error,
     );
   };

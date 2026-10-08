@@ -1,7 +1,9 @@
 // The human surface. A thin client over the running server's local API, so it
 // uses exactly the tools agents use, plus the two only a human may call.
 
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { newSecret, OPERATOR_RESET_FILE } from './auth.ts';
 import { loadConfig } from './config.ts';
 
 const USAGE = `lattice <command>
@@ -16,6 +18,8 @@ const USAGE = `lattice <command>
   get <id>                     one entity with relations and history
   events [limit]               the activity log
   call <tool> [json | @file]   call any tool directly
+  operator-reset               replace a lost operator secret (run it on the
+                               server's own machine, with the server running)
 
 Start the server first:  npm start`;
 
@@ -155,6 +159,27 @@ async function main(): Promise<void> {
       if (!args[0]) throw new Error('Usage: lattice call <tool> [json | @file]');
       const raw = args[1]?.startsWith('@') ? readFileSync(args[1].slice(1), 'utf8') : args[1];
       return print(await call(args[0], raw ? JSON.parse(raw) : {}));
+    }
+
+    case 'operator-reset': {
+      // Being able to write beside the server's data is the proof of who is
+      // asking: the server reads this file, once, and compares.
+      const dir = join(loadConfig().dataDir, '..', 'workspaces');
+      const proof = newSecret('reset');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, OPERATOR_RESET_FILE), proof, { mode: 0o600 });
+      try {
+        const res = await fetch(`${base}/operator/reset`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proof }) });
+        const body = (await res.json()) as { result?: { operator_secret: string; note: string }; error?: string };
+        if (res.status === 404) throw new Error('This server has no operator: it runs without tokens.');
+        if (!res.ok || !body.result) throw new Error(body.error ?? `The server answered ${res.status}.`);
+        console.log(`New operator secret (shown once):
+  ${body.result.operator_secret}
+The old one no longer works.`);
+      } finally {
+        rmSync(join(dir, OPERATOR_RESET_FILE), { force: true });
+      }
+      return;
     }
 
     default:

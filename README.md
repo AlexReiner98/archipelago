@@ -311,6 +311,25 @@ change that:
   new owner token when its owner has lost theirs ("New owner token" on the
   same card); it cannot read any workspace's map.
 
+  **A workspace from a backup file.** Choose a backup file on the same card
+  before pressing Create (or send its bytes in base64 as `"backup"` in the
+  request above) and the new workspace starts as the map in that file:
+  everything in it, the types it defined for itself, and its owner, whose
+  token is the one handed back. This is how a map moves from one server to
+  another. Tokens from where it came from do not work in the new workspace
+  and arrive revoked. If the file cannot be put in, no workspace is made.
+
+  **If the operator secret is lost**, run this on the machine the server runs
+  on (on Render, in the service's Shell), with the server running:
+
+  ```bash
+  node src/cli.ts operator-reset
+  ```
+
+  It prints a new secret once and the old one stops working. What it proves
+  is that you can write on the server's disk, so it needs the same
+  `LATTICE_DATA` and port settings as the server.
+
 - **Several people in one workspace.** An admin adds people with
   `member_add`, which creates their person entity and their token. From then
   on:

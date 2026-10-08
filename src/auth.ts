@@ -90,6 +90,8 @@ export async function hasHumanToken(db: Q): Promise<boolean> {
 
 /** For the one secret kept outside any workspace: the operator's. */
 export const hashSecret = hash;
+/** Written by `lattice operator-reset`, in the folder that holds the workspaces. */
+export const OPERATOR_RESET_FILE = 'operator-reset';
 export const newSecret = (prefix: string) => `${prefix}_${randomBytes(24).toString('hex')}`;
 export function sameSecret(given: string, expectedHash: string): boolean {
   const a = Buffer.from(hash(given));

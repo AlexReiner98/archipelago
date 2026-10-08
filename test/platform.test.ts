@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { createToken, workspaceOf } from '../src/auth.ts';
+import { gzipSync } from 'node:zlib';
+import { createToken, OPERATOR_RESET_FILE, workspaceOf } from '../src/auth.ts';
+import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
 import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
 import { createHttpServer } from '../src/server.ts';
@@ -440,4 +442,59 @@ test('the operator can issue a workspace a new owner token, and nobody else can'
   const who = await call('/whoami', again.result.owner_token, undefined, 'GET');
   assert.deepEqual([who.workspace.id, who.actor.kind, who.actor.admin], ['acme', 'human', true]);
   assert.equal((await call('/whoami', made.result.owner_token, undefined, 'GET')).workspace.id, 'acme', 'the first token still works');
+});
+
+test('the operator can create a workspace from a backup file: the map, its types and its owner arrive', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const operator = workspaces.ensureOperator()!;
+  const main = await workspaces.get('default');
+  const old = (await createToken(main.lattice.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const me = (await call('/api/init', old, { name: 'Alex' })).result.me as string;
+  await call('/api/change', old, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
+  await call('/api/change', old, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }] });
+
+  const taken = await dump(main.lattice.db, { id: 'default', name: 'Default' }, JSON.parse(readFileSync(join(workspaces.config.packsDir, 'local', 'pack.json'), 'utf8')));
+  const backup = gzipSync(JSON.stringify(taken)).toString('base64');
+  assert.equal((await call('/operator/workspaces', old, { id: 'moved', backup })).status, 401, 'only the operator');
+  assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: 'bm90IGEgYmFja3Vw' })).error, /not a Lattice backup/);
+  assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: gzipSync(JSON.stringify({ ...taken, tables: { ...taken.tables, relation: [{ id: 'r_x', type: 'part_of', from_id: 'e_nobody', to_id: 'e_nowhere' }] } })).toString('base64') })).error, /./, 'a backup that does not go in');
+  assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.map((w: any) => w.id), ['default'], 'a failed one leaves no workspace behind');
+  assert.equal(existsSync(join(workspaces.config.rootDir, 'moved')), false);
+
+  const made = (await call('/operator/workspaces', operator, { id: 'moved', name: 'Alex, moved', backup })).result;
+  assert.deepEqual([made.restored.entities, made.restored.events, made.restored.from.id], [taken.tables.entity.length, taken.tables.event.length, 'default']);
+  const who = await call('/whoami', made.owner_token, undefined, 'GET');
+  assert.deepEqual([who.workspace.id, who.workspace.name, who.actor.admin, who.actor.person], ['moved', 'Alex, moved', true, me], 'the new token is the owner\'s own');
+  assert.equal((await call('/api/workspace_info', made.owner_token)).result.owner.title, 'Alex');
+  const found = (await call('/api/search', made.owner_token, { type: 'local.site_visit' })).result as any[];
+  assert.deepEqual(found.map((e) => e.title), ['Visit the quarry'], 'with the types it defined for itself');
+  assert.equal((await call('/whoami', old.replace('lat_default_', 'lat_moved_'), undefined, 'GET')).status, 401, 'tokens from where it came from do not work here');
+  const tokens = (await call('/api/token_list', made.owner_token)).result as any[];
+  assert.deepEqual(tokens.filter((t) => !t.revoked_at).map((t) => t.name), ['owner']);
+
+  // It carries on from there, and the original is untouched.
+  await call('/api/change', made.owner_token, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Written after the move' }] });
+  assert.equal(((await call('/api/search', old, { q: 'Written after the move' })).result as any[]).length, 0);
+  assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup })).error, /already exists/);
+});
+
+test('a lost operator secret is replaced by whoever can write on the server\'s disk, and by nobody else', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const lost = workspaces.ensureOperator()!;
+  const file = join(workspaces.config.rootDir, OPERATOR_RESET_FILE);
+  const proof = 'reset_' + 'a'.repeat(48);
+  assert.equal((await call('/operator/reset', undefined, { proof })).status, 401, 'nothing was prepared');
+  writeFileSync(file, proof);
+  assert.equal((await call('/operator/reset', undefined, { proof: 'reset_' + 'b'.repeat(48) })).status, 401, 'a wrong proof');
+  assert.equal(existsSync(file), false, 'and the file is good for one try');
+  assert.equal((await call('/operator/reset', undefined, { proof })).status, 401);
+  writeFileSync(file, 'short');
+  assert.equal((await call('/operator/reset', undefined, { proof: 'short' })).status, 401, 'a guessable proof is not one');
+
+  mkdirSync(workspaces.config.rootDir, { recursive: true });
+  writeFileSync(file, proof);
+  const fresh = (await call('/operator/reset', undefined, { proof })).result.operator_secret as string;
+  assert.equal((await call('/operator/workspaces', lost, undefined, 'GET')).status, 401, 'the old secret is finished');
+  assert.equal((await call('/operator/workspaces', fresh, undefined, 'GET')).status, 200);
+  assert.equal((await (await serve('off')).call('/operator/reset', undefined, { proof })).status, 404, 'no operator without tokens');
 });
