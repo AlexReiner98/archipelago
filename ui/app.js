@@ -389,8 +389,6 @@ async function refreshReviewCount() {
 // Proposals come first. The rest of what the map knows about today is a row
 // of counts, opened one at a time.
 let todayOpen = '';
-/** The project whose detail is open on Home. */
-let todayProject = '';
 /** The lists on Home shown in full; the others stop at the first two. */
 const todayAll = new Set();
 
@@ -525,7 +523,6 @@ async function today() {
   // Where blocked work sits, by project, for the tile's third number.
   const blockedIn = (id) => blockers.filter((b) => (home.get(b.entity.id) ?? '') === id).length;
   const ordered = [...asked.projects].sort((a, b) => amount(mineIn(b.id)) - amount(mineIn(a.id)));
-  if (todayProject && !asked.projects.some((pr) => pr.id === todayProject)) todayProject = '';
 
   // What needs the owner now, from every project, as one short list: answers
   // to confirm first, then the questions that hold up the most, then work.
@@ -561,13 +558,12 @@ async function today() {
     const count = (n, label, cls = '') => h('span', { class: `count-of ${n ? cls : 'none'}` }, h('strong', {}, n), ` ${label}`);
     return h(
       'button',
-      { class: `tile${todayProject === pr.id ? ' on' : ''}${pr.status !== 'active' ? ' resting' : ''}`, onclick: () => ((todayProject = todayProject === pr.id ? '' : pr.id), today()) },
+      { class: `tile${pr.status !== 'active' ? ' resting' : ''}`, title: 'Open its roadmap', onclick: () => (location.hash = `#/roadmap/${pr.id}`) },
       h('span', { class: 'tile-head' }, h('strong', {}, pr.title), pr.status !== 'active' && pill(pr.type, pr.status)),
       h('span', { class: 'ring', style: `--pct: ${pct ?? 0}`, title: tree?.progress.total ? `${tree.progress.done} of ${tree.progress.total} tasks and issues closed` : 'No tasks yet' }, h('span', {}, pct === null ? '\u2013' : `${pct}%`)),
       h('span', { class: 'tile-counts' }, count(m.decide.length + m.confirm.length, 'decide', 'warn'), count(m.todo.length, 'do'), count(blockedIn(pr.id), 'blocked', 'bad')),
     );
   };
-  const opened = asked.projects.find((pr) => pr.id === todayProject);
   const loose = mineIn('');
   const inbox = [
     !info.owner && h('p', { class: 'error' }, 'This workspace has no owner yet, so there is nobody for this page to be about. ', h('a', { href: '#/workspace' }, 'Set the owner'), '.'),
@@ -595,13 +591,6 @@ async function today() {
       ),
     needsYou,
     h('div', { class: 'tiles' }, ordered.map(tile)),
-    opened &&
-      h(
-        'section',
-        { class: 'card project' },
-        h('header', {}, h('h2', {}, opened.title), h('a', { href: `#/roadmap/${opened.id}` }, 'Roadmap'), h('a', { href: `#/questions/${opened.id}` }, 'Questions'), h('a', { href: `#/e/${opened.id}` }, 'Open')),
-        amount(mineIn(opened.id)) > 0 ? parts(opened.id, mineIn(opened.id)) : h('div', { class: 'empty' }, 'Nothing here is waiting for you.'),
-      ),
     amount({ ...loose, read: [] }) > 0 && h('section', { class: 'card project' }, h('header', {}, h('h2', {}, 'Not in a project')), parts('', { ...loose, read: [] })),
   ]
     .flat()
@@ -2638,6 +2627,65 @@ const roadmapState = {
   work: false,
 };
 
+/** Which roadmaps show the whole of what needs the owner. */
+const roadmapAll = new Set();
+
+/**
+ * What in one project needs the owner: answers to confirm, questions to
+ * decide (what holds up the most first), work that is theirs, and what
+ * others are waiting on them for. The same list Home shows across every
+ * project, here for one. Nothing, when nothing does.
+ */
+async function projectNeeds(rootId, data, change, redraw) {
+  const [pending, asked, needs, mine] = await Promise.all([api('proposals'), api('view', { name: 'questions', params: { project: rootId } }), api('view', { name: 'needs_me' }), api('view', { name: 'blocked_on_me' })]);
+  const inside = new Set([rootId]);
+  const walk = (b) => {
+    inside.add(b.id);
+    for (const w of b.work ?? []) inside.add(w.id);
+    for (const inner of b.branches ?? []) walk(inner);
+  };
+  data.branches.forEach(walk);
+  for (const w of data.unplaced) inside.add(w.id);
+  const questions = asked.open;
+  for (const q of questions) inside.add(q.id);
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  const answerOf = (pr) => (pr.ops.length === 1 && pr.ops[0].op === 'update' && pr.ops[0].status && inside.has(pr.ops[0].id) ? pr.ops[0] : null);
+  const answers = pending.filter(answerOf);
+  const answered = new Set(answers.map((pr) => answerOf(pr).id));
+  const decide = async (pr, yes) => {
+    try {
+      await api('decide', { proposal: pr.id, approve: yes });
+    } catch (err) {
+      await tell('That was not done', err.message);
+    }
+    redraw();
+    refreshReviewCount();
+  };
+  const shown = new Set([...answered, ...questions.map((q) => q.id)]);
+  const todo = needs.actionable.filter((e) => inside.has(e.id) && !shown.has(e.id));
+  for (const e of todo) shown.add(e.id);
+  const holding = mine.filter((r) => inside.has(r.entity.id) && !shown.has(r.entity.id));
+  const rows = [
+    ...answers.map((pr) => {
+      const op = answerOf(pr);
+      const e = byId.get(op.id) ?? { id: op.id, title: named(op.id) };
+      return h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'grow', title: pr.reason }, link(e), ' ', h('span', { class: 'arrow' }, '\u2192'), ' ', h('strong', {}, op.props?.outcome ?? op.status)), h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Confirm'), h('button', { onclick: () => decide(pr, false) }, 'No')));
+    }),
+    ...questions.filter((q) => !answered.has(q.id)).map((q) => questionItem(q, change, null, true)),
+    ...todo.map((e) => h('li', {}, h('div', { class: 'row-top' }, chip(e.type), h('span', { class: 'grow' }, link(e)), e.due && h('span', { class: 'pill warn' }, `due ${e.due}`)))),
+    ...holding.map((r) => h('li', {}, h('div', { class: 'row-top' }, chip(r.entity.type), h('span', { class: 'grow' }, link(r.entity)), h('span', { class: 'muted small', title: r.holding_up.map((x) => x.title).join('\n') }, `holds up ${r.holding_up.length}`)))),
+  ];
+  if (!rows.length) return null;
+  const NOW = 5;
+  const all = roadmapAll.has(rootId);
+  return h(
+    'section',
+    { class: 'card wide needs' },
+    h('header', {}, h('h2', {}, 'Needs you'), h('span', { class: 'n' }, rows.length)),
+    h('ul', { class: 'rows' }, all ? rows : rows.slice(0, NOW), rows.length > NOW && h('li', { class: 'more' }, h('button', { class: 'quiet', onclick: () => ((all ? roadmapAll.delete(rootId) : roadmapAll.add(rootId)), redraw()) }, all ? 'fewer' : `${rows.length - NOW} more`))),
+  );
+}
+
 async function roadmap(rootId) {
   const remembered = () => {
     try {
@@ -2712,19 +2760,17 @@ async function roadmap(rootId) {
     );
   const statuses = statusesOf('software.feature').filter((st) => data.by_status[st]);
   const asGraph = roadmapState.graph;
+  const needsYou = await projectNeeds(rootId, data, change, () => roadmap(rootId)).catch(() => null);
+  if (!location.hash.startsWith(`#/roadmap/${rootId}`)) return;
 
   main.replaceChildren(
-    h(
-      'div',
-      { class: 'page-head' },
-      h('h1', {}, 'Roadmap'),
-    ),
+    h('div', { class: 'page-head' }, h('h1', {}, data.root.title), data.root.status !== 'active' && pill(data.root.type, data.root.status)),
     h(
       'div',
       { class: 'toolbar', style: 'margin-bottom: 14px' },
       h('select', { onchange: (e) => (location.hash = `#/roadmap/${e.target.value}`) }, roots.map((r) => h('option', { value: r.id, selected: r.id === rootId }, `${r.title} (${r.branches})`))),
       h('a', { href: `#/questions/${rootId}` }, 'Questions'),
-      h('a', { href: `#/e/${rootId}` }, 'Open project'),
+      h('a', { href: `#/e/${rootId}` }, 'Details'),
       h(
         'span',
         { class: 'switch' },
@@ -2739,6 +2785,7 @@ async function roadmap(rootId) {
     h(
       'div',
       { class: 'grid' },
+      needsYou,
       h(
         'section',
         { class: 'card wide' },
