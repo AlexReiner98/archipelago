@@ -384,21 +384,18 @@ async function refreshReviewCount() {
 
 // ---- Home ----------------------------------------------------------------
 
-// What needs the owner, project by project: under each project, what there
-// is to read, to decide and to do in it, each dealt with where it stands.
-// Proposals come first. The rest of what the map knows about today is a row
-// of counts, opened one at a time.
+// The projects, one to a row: where each stands and how much of it is
+// waiting for the owner, which is dealt with on its roadmap. The rest of what
+// the map knows about today is a row of counts, opened one at a time.
 let todayOpen = '';
-/** The lists on Home shown in full; the others stop at the first two. */
-const todayAll = new Set();
 
 async function today() {
   const here = () => location.hash === '' || location.hash.startsWith('#/today');
   if (!main.querySelector('.inbox')) main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Home')), h('div', { class: 'inbox' }, h('div', { class: 'empty' }, 'Loading…')));
   const view = (name, params) => api('view', { name, params });
-  const change = async (ops, reason) => {
+  const markRead = async (ids) => {
     try {
-      await api('change', { ops, reason });
+      await api('change', { ops: ids.map((id) => ({ op: 'update', id, status: 'read' })), reason: 'Read in the UI' });
       dirty = false;
       today();
       refreshReviewCount();
@@ -406,49 +403,19 @@ async function today() {
       tell('That change was not made', err.message);
     }
   };
-  const [info, pending, notes, asked, needs, mine, blockers, waiting, risk, sessions] = await Promise.all([
+  const [info, notes, asked, needs, blockers, waiting, risk, sessions] = await Promise.all([
     api('workspace_info'),
-    api('proposals'),
     view('notifications'),
     view('questions'),
     view('needs_me'),
-    view('blocked_on_me'),
     view('blockers'),
     view('waiting_on'),
     view('at_risk'),
     view('sessions'),
   ]);
-  // Every project's open questions as one list, what holds up the most first.
-  const perProject = await Promise.all(asked.projects.filter((pr) => pr.questions > 0).map((pr) => view('questions', { project: pr.id }).then((d) => d.open.map((q) => ({ ...q, project: pr })))));
-  const seen = new Set();
-  const undecided = perProject
-    .flat()
-    .filter((q) => !seen.has(q.id) && seen.add(q.id))
-    .sort((a, b) => b.holds_up - a.holds_up);
   const trees = await projectTrees(asked.projects);
   if (!here()) return;
 
-  // The top of each list is what matters most; the rest is one click away.
-  const rows = (key, items, render) =>
-    h(
-      'ul',
-      { class: 'rows' },
-      (todayAll.has(key) ? items : items.slice(0, 2)).map(render),
-      items.length > 2 && h('li', { class: 'more' }, h('button', { class: 'quiet', onclick: () => ((todayAll.has(key) ? todayAll.delete(key) : todayAll.add(key)), today()) }, todayAll.has(key) ? 'fewer' : `${items.length - 2} more`)),
-    );
-  const decide = async (pr, yes) => {
-    const note = yes ? undefined : await ask({ title: 'Decline this change?', message: pr.reason, input: { placeholder: 'Why not? (optional, kept in the log for whoever made it)' }, action: 'Decline', danger: true });
-    if (!yes && note === null) return;
-    try {
-      await api('decide', { proposal: pr.id, approve: yes, note: note || undefined });
-      if (yes && pr.ops.some((o) => o.op === 'define_type')) await loadSchema();
-    } catch (err) {
-      await tell('That was not done', err.message);
-    }
-    today();
-    refreshReviewCount();
-  };
-  const markRead = (ids) => change(ids.map((id) => ({ op: 'update', id, status: 'read' })), 'Read in the UI');
   // Which project a thing belongs to: the project itself and everything in its tree.
   const home = new Map();
   for (const pr of asked.projects) {
@@ -461,140 +428,37 @@ async function today() {
     for (const b of trees.get(pr.id)?.branches ?? []) walk(b);
     for (const w of trees.get(pr.id)?.unplaced ?? []) home.set(w.id, pr.id);
   }
-  const todo = needs.actionable.filter((e) => !seen.has(e.id));
-  const shown = new Set([...seen, ...todo.map((e) => e.id)]);
-  const holding = mine.filter((r) => !shown.has(r.entity.id));
-  // A proposal that settles one thing is an answer offered by an agent: it is
-  // shown at that thing, to be confirmed with one press, not in the pile above.
-  const answerOf = (pr) => (pr.ops.length === 1 && pr.ops[0].op === 'update' && pr.ops[0].status ? pr.ops[0] : null);
-  const answers = pending.filter(answerOf);
-  const bulk = pending.filter((pr) => !answerOf(pr));
-  const asked_ = new Map(undecided.map((q) => [q.id, q]));
-  const named = answers.some((pr) => !asked_.has(answerOf(pr).id)) ? new Map((await api('search', { limit: 200, include_archived: true })).map((e) => [e.id, e])) : new Map();
-  if (!here()) return;
-  const answered = new Set(answers.map((pr) => answerOf(pr).id));
-  const projectOf = (id) => asked_.get(id)?.project.id ?? home.get(id) ?? '';
-  // What needs the owner, under the project it belongs to ('' for none).
-  const mineIn = (id) => ({
-    confirm: answers.filter((pr) => projectOf(answerOf(pr).id) === id),
-    read: notes.filter((n) => (home.get(n.about_id) ?? '') === id),
-    decide: undecided.filter((q) => (id ? q.project.id === id : false) && !answered.has(q.id)),
-    todo: todo.filter((e) => (home.get(e.id) ?? '') === id),
-    holding: holding.filter((r) => (home.get(r.entity.id) ?? '') === id),
-  });
-  const amount = (m) => m.confirm.length + m.read.length + m.decide.length + m.todo.length + m.holding.length;
-  const part = (title, items, list) => items.length > 0 && [h('div', { class: 'sub' }, title, ' ', items.length), list];
-  const plainRow = (e, sub) => h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(e)), e.due && h('span', { class: 'pill warn' }, `due ${e.due}`)), sub && h('div', { class: 'row-sub' }, sub));
-  const noteRow = (n) =>
-    h(
-      'li',
-      {},
-      h(
-        'div',
-        { class: 'row-top' },
-        n.level && n.level !== 'info' && h('span', { class: `pill ${n.level === 'urgent' ? 'bad' : 'warn'}` }, n.level),
-        h('span', { class: 'grow' }, n.about_id ? h('a', { href: `#/e/${n.about_id}` }, n.title) : h('strong', {}, n.title)),
-        h('button', { onclick: () => markRead([n.id]) }, 'Mark read'),
-      ),
-    );
-  const answerRow = (pr) => {
-    const op = answerOf(pr);
-    const e = asked_.get(op.id) ?? named.get(op.id) ?? { id: op.id, title: op.id };
-    return h(
-      'li',
-      {},
-      h(
-        'div',
-        { class: 'row-top' },
-        h('span', { class: 'grow' }, link(e), ' ', h('span', { class: 'arrow' }, '\u2192'), ' ', h('strong', {}, op.props?.outcome ?? op.status)),
-        h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Confirm'),
-        h('button', { onclick: () => decide(pr, false) }, 'No'),
-      ),
-      h('div', { class: 'row-sub' }, pr.reason),
-    );
-  };
-  const parts = (key, m) => [
-    part('To confirm', m.confirm, rows(`${key}:confirm`, m.confirm, answerRow)),
-    part('To read', m.read, rows(`${key}:read`, m.read, noteRow)),
-    part(key ? h('a', { href: `#/questions/${key}` }, 'To decide') : 'To decide', m.decide, rows(`${key}:decide`, m.decide, (q) => questionItem(q, change, null, true))),
-    part('To do', m.todo, rows(`${key}:todo`, m.todo, (e) => plainRow(e))),
-    part('Others are waiting on', m.holding, rows(`${key}:holding`, m.holding, (r) => plainRow(r.entity, ['holding up: ', r.holding_up.map((e, i) => [i > 0 && ', ', link(e)])]))),
-  ];
-  // Where blocked work sits, by project, for the tile's third number.
-  const blockedIn = (id) => blockers.filter((b) => (home.get(b.entity.id) ?? '') === id).length;
-  const ordered = [...asked.projects].sort((a, b) => amount(mineIn(b.id)) - amount(mineIn(a.id)));
+  // A project's three numbers: questions open in it (an answer an agent has
+  // offered is still one to decide), work that is the owner's, and what is blocked.
+  const inProject = (id, items, of = (e) => e.id) => items.filter((x) => home.get(of(x)) === id).length;
+  const counts = (pr) => ({ decide: pr.questions, todo: inProject(pr.id, needs.actionable), blocked: inProject(pr.id, blockers, (b) => b.entity.id) });
+  const weight = (pr) => (pr.status === 'active' ? 1000 : 0) + pr.questions + inProject(pr.id, needs.actionable);
+  const ordered = [...asked.projects].sort((a, b) => weight(b) - weight(a));
 
-  // What needs the owner now, from every project, as one short list: answers
-  // to confirm first, then the questions that hold up the most, then work.
-  const tag = (id) => {
-    const pr = asked.projects.find((x) => x.id === projectOf(id) || x.id === home.get(id));
-    return pr && h('span', { class: 'muted small nowrap' }, pr.title);
-  };
-  const now = [
-    ...answers.map((pr) => answerRow(pr)),
-    ...undecided.filter((q) => !answered.has(q.id)).map((q) => questionItem(q, change, null, true)),
-    ...todo.map((e) => h('li', {}, h('div', { class: 'row-top' }, chip(e.type), h('span', { class: 'grow' }, link(e)), e.due && h('span', { class: 'pill warn' }, `due ${e.due}`), tag(e.id)))),
-  ];
-  const NOW = 5;
-  const needsYou =
-    now.length > 0 &&
-    h(
-      'section',
-      { class: 'card needs' },
-      h('header', {}, h('h2', {}, 'Needs you'), h('span', { class: 'n' }, now.length)),
-      h(
-        'ul',
-        { class: 'rows' },
-        todayAll.has('now') ? now : now.slice(0, NOW),
-        now.length > NOW && h('li', { class: 'more' }, h('button', { class: 'quiet', onclick: () => ((todayAll.has('now') ? todayAll.delete('now') : todayAll.add('now')), today()) }, todayAll.has('now') ? 'fewer' : `${now.length - NOW} more`)),
-      ),
-    );
-
-  // Projects as tiles: where each stands and how much of it is waiting, at a glance.
-  const tile = (pr) => {
+  const projectRow = (pr) => {
     const tree = trees.get(pr.id);
-    const m = mineIn(pr.id);
-    const pct = tree?.progress.total ? Math.round((tree.progress.done / tree.progress.total) * 100) : null;
-    const count = (n, label, cls = '') => h('span', { class: `count-of ${n ? cls : 'none'}` }, h('strong', {}, n), ` ${label}`);
+    const c = counts(pr);
+    // A number that is nought keeps its place, so the columns line up down the list.
+    const count = (n, label, cls, title) => h('span', { class: `count-of ${n ? cls : 'none'}`, title }, n > 0 && [h('strong', {}, n), ` ${label}`]);
     return h(
-      'button',
-      { class: `tile${pr.status !== 'active' ? ' resting' : ''}`, title: 'Open its roadmap', onclick: () => (location.hash = `#/roadmap/${pr.id}`) },
-      h('span', { class: 'tile-head' }, h('strong', {}, pr.title), pr.status !== 'active' && pill(pr.type, pr.status)),
-      h('span', { class: 'ring', style: `--pct: ${pct ?? 0}`, title: tree?.progress.total ? `${tree.progress.done} of ${tree.progress.total} tasks and issues closed` : 'No tasks yet' }, h('span', {}, pct === null ? '\u2013' : `${pct}%`)),
-      h('span', { class: 'tile-counts' }, count(m.decide.length + m.confirm.length, 'decide', 'warn'), count(m.todo.length, 'do'), count(blockedIn(pr.id), 'blocked', 'bad')),
+      'li',
+      {},
+      h(
+        'a',
+        { class: `project-row${pr.status !== 'active' ? ' resting' : ''}`, href: `#/roadmap/${pr.id}`, title: `${pr.title}: open its roadmap` },
+        h('strong', { class: 'grow' }, pr.title),
+        pr.status !== 'active' && pill(pr.type, pr.status),
+        count(c.decide, 'decide', 'warn', 'Questions open in it'),
+        count(c.todo, 'do', '', 'Yours to do, with nothing in the way'),
+        count(c.blocked, 'blocked', 'bad', 'Blocked work in it'),
+        tree?.progress.total ? progressBar(tree.progress) : h('span', { class: 'progress muted small' }, 'no tasks'),
+      ),
     );
   };
-  const loose = mineIn('');
   const inbox = [
     !info.owner && h('p', { class: 'error' }, 'This workspace has no owner yet, so there is nobody for this page to be about. ', h('a', { href: '#/workspace' }, 'Set the owner'), '.'),
-    bulk.length > 0 &&
-      h(
-        'section',
-        { class: 'card' },
-        h('header', {}, h('h2', {}, 'Held for you'), h('span', { class: 'n' }, bulk.length)),
-        rows('approve', bulk, (pr) =>
-          h(
-            'li',
-            {},
-            h(
-              'div',
-              { class: 'row-top nowrap-row' },
-              who(pr.actor),
-              h('span', { class: 'grow gist', title: pr.reason }, gist(pr.reason)),
-              h('a', { href: '#/review' }, `${pr.ops.length} change${pr.ops.length === 1 ? '' : 's'}`),
-              pr.warnings.length > 0 && h('span', { class: 'warning' }, `${pr.warnings.length} warning${pr.warnings.length === 1 ? '' : 's'}`),
-              h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Apply'),
-              h('button', { onclick: () => decide(pr, false) }, 'Decline'),
-            ),
-          ),
-        ),
-      ),
-    needsYou,
-    h('div', { class: 'tiles' }, ordered.map(tile)),
-    amount({ ...loose, read: [] }) > 0 && h('section', { class: 'card project' }, h('header', {}, h('h2', {}, 'Not in a project')), parts('', { ...loose, read: [] })),
-  ]
-    .flat()
-    .filter(Boolean);
+    ordered.length ? h('section', { class: 'card' }, h('ul', { class: 'rows projects' }, ordered.map(projectRow))) : h('div', { class: 'empty' }, 'No projects yet.'),
+  ].filter(Boolean);
   // What there is to read, from anywhere, behind a count at the top of the page.
   const tray =
     notes.length > 0 &&

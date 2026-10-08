@@ -254,8 +254,8 @@ details.folded[open] > summary::before { content: "\25BE  "; }
 button.quiet-button { padding: 2px 9px; font-size: 12px; }
 
 @media (max-width: 720px) {
-  body { grid-template-columns: 1fr; }
-  #nav { position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
+  body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  #nav { align-items: center; position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
   #nav .brand { padding: 4px 10px; }
   #main { padding: 16px; }
   .ops td.kind { width: auto; }
@@ -396,6 +396,15 @@ details.menu > .menu-items > button:hover { background: var(--accent-soft); }
 
 /* Home: what needs the owner as one short list, then each project as a tile that says where it stands. */
 .page-head { display: flex; align-items: center; gap: 12px; }
+.projects > li { padding: 0; }
+.project-row { display: flex; gap: 14px; align-items: center; padding: 11px 14px; color: inherit; text-decoration: none; white-space: nowrap; }
+.project-row:hover { background: var(--accent-soft); }
+.project-row.resting { opacity: 0.65; }
+.project-row > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+.project-row > :not(strong) { flex: none; }
+.project-row .count-of { width: 78px; text-align: right; font-size: 12px; color: var(--muted); }
+@media (max-width: 720px) { .project-row { gap: 10px; } .project-row .count-of { width: auto; } .project-row .count-of.none, .project-row .progress .bar { display: none; } .project-row .progress { width: auto; } }
+.project-row .progress { width: 132px; justify-content: flex-end; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .tile { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "head ring" "counts ring"; gap: 8px 12px; align-items: center; text-align: left; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); cursor: pointer; }
 .tile:hover, .tile.on { border-color: var(--accent); }
