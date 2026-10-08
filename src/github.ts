@@ -12,10 +12,14 @@ import type { Entity, Lattice } from './lattice.ts';
 /** The setting that holds a workspace's webhook secret. GitHub signs with it, so it is kept as it is, not as a hash. */
 const SECRET = 'github_secret';
 
-/** "owner/name" from any way of writing a GitHub repository's address, or from the name itself. */
+/**
+ * "owner/name" from any way of writing a GitHub repository's address, or from
+ * the name itself. An address copied from the browser on some page of the
+ * repository (.../tree/main, .../issues/3) is the repository's too.
+ */
 export function repoName(remote: string | undefined): string | undefined {
   const text = (remote ?? '').trim();
-  const match = /github\.com[:/]+([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i.exec(text) ?? /^([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(text);
+  const match = /github\.com[:/]+([^/\s]+)\/([^/\s?#]+?)(?:\.git)?(?:[/?#]\S*)?$/i.exec(text) ?? /^([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(text);
   return match ? `${match[1]}/${match[2]}`.toLowerCase() : undefined;
 }
 
@@ -29,7 +33,10 @@ export async function repoByName(l: Lattice, name: string | undefined): Promise<
 /** When each repository was last pushed to, as GitHub told us. */
 export async function lastPushes(l: Lattice): Promise<Map<string, { at: string; branch: string; subject: string }>> {
   const { rows } = await l.db.query<{ target_id: string; ts: string; reason: string; detail: { branch?: string } }>(
-    `select distinct on (target_id) target_id, ts, reason, detail from event where action = 'repo.push' and target_id is not null order by target_id, seq desc`,
+    // A tag, or a branch that was deleted, is heard but is not a push of work to a branch.
+    `select distinct on (target_id) target_id, ts, reason, detail from event
+     where action = 'repo.push' and target_id is not null and coalesce(detail->>'branch', '') <> '' and detail->>'deleted' is null
+     order by target_id, seq desc`,
   );
   return new Map(rows.map((r) => [r.target_id, { at: r.ts, branch: r.detail?.branch ?? '', subject: r.reason }]));
 }
@@ -64,6 +71,7 @@ interface PushPayload {
   ref?: string;
   before?: string;
   after?: string;
+  deleted?: boolean;
   repository?: { full_name?: string; default_branch?: string };
   pusher?: { name?: string };
   commits?: { id: string; message: string; url?: string; author?: { name?: string } }[];
@@ -106,7 +114,8 @@ export function finishedBy(message: string): string[] {
 }
 
 /**
- * Take a push in. It is recorded against its repository whatever the branch.
+ * Take a push in. It is recorded against its repository whatever the branch,
+ * and so is a tag, or a branch or tag being deleted, as what it is.
  * On the default branch, anything a commit message says it closes is closed
  * the way any agent would: as a change of its own, held for the human unless
  * policy lets it through. Questions are left alone: a commit cannot say what
@@ -124,8 +133,12 @@ export async function receivePush(l: Lattice, payload: PushPayload, delivery?: s
     const { rows } = await l.db.query(`select 1 from event where action = 'repo.push' and detail->>'delivery' = $1 limit 1`, [delivery]);
     if (rows.length) return { recorded: false, reason: 'This delivery was already taken in.' };
   }
-  const branch = (payload.ref ?? '').replace(/^refs\/heads\//, '');
-  const main = branch === payload.repository?.default_branch;
+  const ref = payload.ref ?? '';
+  const tag = ref.startsWith('refs/tags/') ? ref.slice('refs/tags/'.length) : undefined;
+  const branch = tag === undefined ? ref.replace(/^refs\/heads\//, '') : undefined;
+  const deleted = payload.deleted || undefined;
+  const main = !deleted && branch !== undefined && branch === payload.repository?.default_branch;
+  const what = tag === undefined ? `branch ${branch}` : `tag ${tag}`;
   const commits = payload.commits ?? [];
   const subject = (message: string) => message.split('\n')[0].slice(0, 200);
   const who = `github:${payload.pusher?.name ?? 'someone'}`;
@@ -134,8 +147,8 @@ export async function receivePush(l: Lattice, payload: PushPayload, delivery?: s
     action: 'repo.push',
     target: repo.id,
     origin: 'github',
-    reason: commits.length ? `${commits.length} commit${commits.length === 1 ? '' : 's'} to ${branch}: ${subject(commits.at(-1)!.message)}` : `${branch} moved`,
-    detail: { repo: name, delivery, branch, default_branch: main, before: payload.before, after: payload.after, commits: commits.slice(-20).map((c) => ({ sha: c.id.slice(0, 7), subject: subject(c.message), url: c.url, author: c.author?.name })) },
+    reason: deleted ? `${what} deleted` : tag !== undefined ? `${what} pushed` : commits.length ? `${commits.length} commit${commits.length === 1 ? '' : 's'} to ${branch}: ${subject(commits.at(-1)!.message)}` : `${branch} moved`,
+    detail: { repo: name, delivery, branch, tag, deleted, default_branch: main, before: payload.before, after: payload.after, commits: commits.slice(-20).map((c) => ({ sha: c.id.slice(0, 7), subject: subject(c.message), url: c.url, author: c.author?.name })) },
   });
 
   const settled: { id: string; title: string; status: string; result: string }[] = [];
@@ -159,5 +172,5 @@ export async function receivePush(l: Lattice, payload: PushPayload, delivery?: s
       }
     }
   }
-  return { recorded: true, repo: { id: repo.id, title: repo.title }, branch, commits: commits.length, settled };
+  return { recorded: true, repo: { id: repo.id, title: repo.title }, branch, tag, deleted, commits: commits.length, settled };
 }

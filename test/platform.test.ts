@@ -633,6 +633,19 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   assert.deepEqual([work.repo.id, work.last_push.branch, work.ready.length], [made.r, 'main', 0], 'found by its GitHub name, with its last push, and the task is done');
   assert.equal((await call('/api/github', admin)).result.repos[0].last_push.subject, '1 commit to main: Merge the footer');
 
+  // A tag, and a branch being deleted, are heard as what they are, and are not the repository's last push of work.
+  const tagged = (await deliver({ ...push('main', `Fixes ${made.d}`), ref: 'refs/tags/v1.0' })).result;
+  assert.deepEqual([tagged.recorded, tagged.tag, tagged.branch, tagged.settled], [true, 'v1.0', undefined, []]);
+  const gone = (await deliver({ ...push('main', 'x'), commits: [], deleted: true, after: '0'.repeat(40) })).result;
+  assert.deepEqual([gone.recorded, gone.deleted, gone.settled], [true, true, []]);
+  const heard = (await call('/agent/events', robot, { target: made.r, limit: 2 })).result as any[];
+  assert.deepEqual(heard.map((e) => e.reason), ['branch main deleted', 'tag v1.0 pushed']);
+  assert.equal((await call('/api/github', admin)).result.repos[0].last_push.subject, '1 commit to main: Merge the footer');
+
+  // The repository's address may be written any way GitHub shows it, a page of it in the browser included.
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'update', id: made.r, props: { remote: 'https://github.com/Acme/Site/tree/main' } }] });
+  assert.equal((await call('/api/github', admin)).result.repos[0].github, 'acme/site');
+
   // A webhook left on GitHub's default content type sends a form; anything that is neither is refused, not crashed on.
   assert.equal((await deliver(push('feat/form', 'x'), { form: true })).result.branch, 'feat/form');
   assert.equal((await deliver(null, { raw: 'not json' })).status, 400);

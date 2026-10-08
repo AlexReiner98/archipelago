@@ -12,6 +12,7 @@ name: Lattice
 
 on:
   push:
+    branches: ['**'] # not tags: a tag brings no new commits to read
 
 # One run at a time per branch: a second push waits for the first to be read.
 concurrency:
