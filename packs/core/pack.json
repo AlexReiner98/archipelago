@@ -49,7 +49,18 @@
       "title": "Project",
       "description": "A body of work with an end.",
       "statuses": { "open": ["planned", "active", "paused"], "closed": ["done", "dropped"] },
-      "fields": { "due": { "type": "date" } }
+      "fields": {
+        "due": { "type": "date" },
+        "recheck_days": {
+          "type": "number",
+          "description": "How often, in days, an agent re-checks this project's oldest open items against its repository. Weekly when not set; 0 turns it off."
+        },
+        "rechecked_at": {
+          "type": "datetime",
+          "description": "When an agent last re-checked this project's oldest items.",
+          "system": true
+        }
+      }
     },
     {
       "id": "task",

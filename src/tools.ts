@@ -14,7 +14,7 @@ import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
-import { VIEWS } from './views.ts';
+import { awaitingRecheck, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared']);
@@ -478,6 +478,24 @@ export const TOOLS: Record<string, Tool> = {
     description: 'Ping every connection (external tool) and record whether it is reachable. Work that needs an unreachable connection shows as blocked.',
     input: {},
     run: async (l, actor) => l.checkConnections(actor),
+  },
+  rechecked: {
+    description:
+      'Say that the scheduled re-check of a repository has been done: each project there that was waiting for one starts its interval again (its recheck_days). Call it once, after you have changed or confirmed the items the recheck view gave you. Takes effect at once.',
+    input: {
+      repo: z.string().describe('The repository: its id, or its GitHub name "owner/name".'),
+      summary: z.string().optional().describe('What was checked and what was found.'),
+    },
+    run: async (l, actor, input) => {
+      const projects = await awaitingRecheck(l, input.repo);
+      const at = new Date().toISOString();
+      for (const p of projects) {
+        // Bookkeeping stays out of the project's history; the re-check itself is the event.
+        await l.db.query(`update entity set props = props || jsonb_build_object('rechecked_at', $2::text) where id = $1`, [p.id, at]);
+        await l.log(l.db, { actor: actorId(actor), action: 'recheck.done', target: p.id, reason: input.summary ?? 'Scheduled re-check of the oldest open items' });
+      }
+      return { rechecked: projects.map((p) => ({ id: p.id, title: p.title })), at };
+    },
   },
   import_audit: {
     description: 'Copy new entries from a connection\'s tool-call log into the activity log, so actions taken in that tool are visible here.',

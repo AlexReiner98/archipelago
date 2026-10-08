@@ -319,6 +319,18 @@ run, stopped at 2 dollars. It installs the Claude Code CLI and runs that (the
 for you or takes effect at once, as the workspace is set, like any agent's
 change, and says it rests on the agent's reading of the commits.
 
+**An agent re-checks what has gone longest unconfirmed.** The same workflow
+asks the server once a day whether a re-check is due. Each project living in
+the repository says how often, in its `recheck days` field (weekly when not
+set, 0 for never). When a project has waited that long and has open items
+nobody has changed or confirmed in that time, Claude checks the oldest five
+against the code: it changes what is done or wrong, marks what it has seen to
+be still true (an update that changes nothing), notifies you of what the
+repository cannot tell it, and calls `rechecked`, which starts the wait again.
+A day when nothing is due ends before Claude is installed and costs no run.
+The `oldest` view shows the same thing to anyone who asks: what has gone
+longest without a change or a confirmation.
+
 ## Backups
 
 Every 6 hours the server writes each workspace out as one file of plain rows,

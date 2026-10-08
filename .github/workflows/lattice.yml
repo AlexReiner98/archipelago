@@ -3,6 +3,12 @@
 # what they change. Whether that is held for the owner or takes effect as it
 # is sent is the workspace's own setting ("What agents change").
 #
+# Once a day it also asks the map whether a re-check is due. Each project
+# living in the repository says how often (its "recheck days": weekly when
+# not set, 0 for never). When one is due and has open items nobody has
+# changed or confirmed in that time, an agent checks the oldest of them
+# against the code. A day when nothing is due costs no Claude run.
+#
 # Copy to .github/workflows/lattice.yml and set in the repository's settings:
 #   variable LATTICE_URL            the server, e.g. https://lattice.example.com
 #   secret   LATTICE_AGENT_TOKEN    an agent token from the Workspace screen
@@ -14,6 +20,9 @@ name: Lattice
 on:
   push:
     branches: ['**'] # not tags: a tag brings no new commits to read
+  schedule:
+    - cron: '17 6 * * *' # daily, to ask what is due; GitHub runs schedules on the default branch only
+  workflow_dispatch: # the same asking, by hand from the Actions tab
 
 # No concurrency group: each push is read by a run of its own. A group keeps
 # only one run waiting, so a third push would drop the second's commits unread.
@@ -23,7 +32,7 @@ permissions:
 
 jobs:
   reconcile:
-    if: ${{ vars.LATTICE_URL != '' && !github.event.deleted }}
+    if: ${{ github.event_name == 'push' && vars.LATTICE_URL != '' && !github.event.deleted }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Everything the steps need from the event comes in through the
@@ -129,6 +138,123 @@ jobs:
             --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
             --setting-sources user \
             --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
+            --max-budget-usd 2 2>&1 | tee "$RUNNER_TEMP/claude.txt"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::error::Claude stopped with exit code $status: $(tail -n 3 "$RUNNER_TEMP/claude.txt" | tr '\n' ' ' | cut -c1-400)"
+            exit "$status"
+          fi
+
+  recheck:
+    if: ${{ github.event_name != 'push' && vars.LATTICE_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LATTICE_URL: ${{ vars.LATTICE_URL }}
+      LATTICE_AGENT_TOKEN: ${{ secrets.LATTICE_AGENT_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      # Asked before anything is installed: most days the answer is no, and the run ends here.
+      - name: Ask Lattice what is due
+        id: due
+        run: |
+          if [ -z "$LATTICE_AGENT_TOKEN" ]; then echo "::error::The repository secret LATTICE_AGENT_TOKEN is not set."; exit 1; fi
+          node -e '
+            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, GITHUB_OUTPUT } = process.env;
+            const fs = require("fs");
+            fetch(LATTICE_URL.replace(/\/$/, "") + "/agent/view", {
+              method: "POST",
+              headers: { "content-type": "application/json", authorization: "Bearer " + LATTICE_AGENT_TOKEN },
+              body: JSON.stringify({ name: "recheck", params: { repo: REPO }, actor: "claude-code:lattice-recheck" }),
+            })
+              .then(async (res) => {
+                const answer = await res.json().catch(() => ({}));
+                if (!res.ok || !answer.result) throw new Error("the server answered " + res.status + (answer.error ? ": " + answer.error : ""));
+                const due = answer.result.projects.filter((p) => p.due);
+                fs.writeFileSync(RUNNER_TEMP + "/due.json", JSON.stringify(due, null, 1));
+                fs.appendFileSync(GITHUB_OUTPUT, "due=" + (due.length > 0) + "\n");
+                console.log(due.length ? "Due: " + due.map((p) => p.title + " (" + p.items.length + " items)").join(", ") : "Nothing is due for a re-check.");
+              })
+              .catch((err) => { console.log("::error::Could not ask Lattice what is due: " + err.message); process.exit(1); });
+          '
+
+      - uses: actions/checkout@v4
+        if: steps.due.outputs.due == 'true'
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        if: steps.due.outputs.due == 'true'
+        with:
+          node-version: 22
+
+      - run: npm install --global @anthropic-ai/claude-code
+        if: steps.due.outputs.due == 'true'
+
+      - name: Connect to Lattice
+        if: steps.due.outputs.due == 'true'
+        run: |
+          node -e '
+            const { LATTICE_URL, LATTICE_AGENT_TOKEN, RUNNER_TEMP } = process.env;
+            const lattice = { type: "http", url: LATTICE_URL.replace(/\/$/, "") + "/mcp", headers: { Authorization: "Bearer " + LATTICE_AGENT_TOKEN } };
+            require("fs").writeFileSync(RUNNER_TEMP + "/lattice-mcp.json", JSON.stringify({ mcpServers: { lattice } }), { mode: 0o600 });
+          '
+
+      - name: Check the oldest items against the repository
+        if: steps.due.outputs.due == 'true'
+        run: |
+          [ -n "$ANTHROPIC_API_KEY" ] || unset ANTHROPIC_API_KEY
+          [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || unset CLAUDE_CODE_OAUTH_TOKEN
+          if [ -z "${ANTHROPIC_API_KEY:-}${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "::error::Neither repository secret ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is set, so Claude cannot run."
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/prompt.txt" <<EOF
+          This is the scheduled re-check of the Lattice map for the repository $REPO.
+          EOF
+          cat >> "$RUNNER_TEMP/prompt.txt" <<'EOF'
+
+          Lattice is the owner's map of work: projects, features, tasks, issues, decisions. You reach it through
+          the lattice tools. Below, as JSON, are the projects in this repository that are due, each with its open
+          items nobody has changed or confirmed for longest. An item that old may no longer be true. Your one job
+          is to find out, for each, from what is in this repository, and say so in the map. Change no files here.
+          Depending on the workspace, what you send is held for the owner or takes effect at once.
+
+          For each item:
+          1. `get` it, and read what it says and what it is part of. Call `schema` once: every type has its
+             own statuses, and you must use the ones the item's type has.
+          2. Look for the truth of it here: the code, the tests, `git log`. Look properly before you conclude.
+          3. Then exactly one of:
+             - It is done, or no longer as written: send a `change` that gives it the right status or corrects
+               it, with what you found as the reason. Close a decision or hypothesis only when the repository
+               leaves no doubt, with props.outcome and props.rationale for a decision.
+             - It is still true as written, and you have seen that it is: send a `change` with one update op
+               that carries only its id. That records that it was checked today. The reason says what you
+               looked at.
+             - This repository cannot tell you (a chore of the owner's, a choice that is theirs, something
+               outside the code): send nothing for it.
+             Every change carries `authority`: {"of": "agent", "basis": "<what in the repository shows it>"}.
+             It is your reading, not the owner's word, so never "human".
+          4. Do not guess, and do not confirm what you have not checked: a wrong "still true" is worse than none.
+
+          When you have been through them all:
+          - If there were items the repository could not tell you about, send one `notify` listing them by
+            title and id, asking the owner to open each and say whether it is still true. One notification, not
+            one per item.
+          - Call `rechecked` with this repository ("owner/name") and a summary of what you found. Always, even
+            if you changed nothing: it is what starts the wait until the next re-check.
+
+          Finish with two or three lines saying what you sent.
+
+          The projects that are due:
+          EOF
+          cat "$RUNNER_TEMP/due.json" >> "$RUNNER_TEMP/prompt.txt"
+          claude --print "$(cat "$RUNNER_TEMP/prompt.txt")" \
+            --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
+            --setting-sources user \
+            --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,mcp__lattice__notify,mcp__lattice__rechecked,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
             --max-budget-usd 2 2>&1 | tee "$RUNNER_TEMP/claude.txt"
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then

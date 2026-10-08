@@ -487,6 +487,22 @@ test('a session that finishes says where the repository\'s open work stands', as
   assert.deepEqual(((await VIEWS.oldest.run(l, {})) as any).items.map((i: any) => i.title), ['Capture probe']);
   await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r0', outcome: 'cancelled' });
 
+  // A scheduled re-check asks what is due: a project says how often, weekly when it does not.
+  let due = (await VIEWS.recheck.run(l, { repo: made.repo })) as any;
+  assert.deepEqual([due.due, due.projects[0].every_days, due.projects[0].items.map((i: any) => i.title)], [true, 7, ['Capture probe']]);
+  await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 30 } }]);
+  assert.equal(((await VIEWS.recheck.run(l, { repo: made.repo })) as any).due, false, 'nothing here has gone 30 days');
+  await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 0 } }]);
+  assert.equal(((await VIEWS.recheck.run(l, { repo: made.repo })) as any).due, false, '0 turns it off');
+  // Once done, the project waits out its interval again, even with old items left.
+  await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 7 } }]);
+  const done = (await callTool(l, agent, 'rechecked', { repo: made.repo, summary: 'One left for the owner' })) as any;
+  assert.deepEqual(done.rechecked.map((p: any) => p.title), ['Aperture']);
+  due = (await VIEWS.recheck.run(l, { repo: made.repo })) as any;
+  assert.deepEqual([due.due, typeof due.projects[0].rechecked_at], [false, 'string']);
+  await l.db.query(`update entity set props = props || '{"rechecked_at":"2020-01-01T00:00:00Z"}' where id = $1`, [made.proj]);
+  assert.equal(((await VIEWS.recheck.run(l, { repo: made.repo })) as any).due, true, 'and is due again when it has');
+
   // An open issue in the repository is its work too: shown at the start, asked about at the end.
   const { leak } = await make(l, [
     { op: 'create', ref: 'leak', type: 'issue', title: 'The probe leaks handles' },
