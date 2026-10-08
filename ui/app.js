@@ -2312,9 +2312,19 @@ function progressBar({ done, total }) {
 // not simulated, so it looks the same every time.
 function roadmapGraph(data, withWork) {
   const COL = 310;
-  const BOX = { w: 232, h: 42 };
+  const BOX = { w: 232, h: 58 };
   const ROW = 20;
   const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
+  // A title takes two lines in its box before it is cut, and is cut at a word.
+  const wrap = (text, max) => {
+    const lines = [''];
+    for (const word of text.split(' ')) {
+      if ((lines.at(-1) + ' ' + word).trim().length <= max) lines[lines.length - 1] = (lines.at(-1) + ' ' + word).trim();
+      else if (lines.length < 2) lines.push(word);
+      else return [lines[0], cut(lines[1] + ' ' + word, max)];
+    }
+    return lines;
+  };
 
   const nodes = [];
   const owner = new Map();
@@ -2411,17 +2421,17 @@ function roadmapGraph(data, withWork) {
       { class: `rm-node ${n.kind}${state(n)}`, transform: `translate(${n.x},${n.y})` },
       hint(n),
       s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 7 }),
-      s('text', { x: 10, y: 17 }, document.createTextNode(cut(n.place ? `${n.place}. ${n.title}` : n.title, 34))),
-      total > 0 && s('rect', { class: 'track', x: 10, y: 27, width: 80, height: 5, rx: 2.5 }),
-      total > 0 && s('rect', { class: 'fill', x: 10, y: 27, width: (80 * done) / total, height: 5, rx: 2.5 }),
-      s('text', { class: 'small', x: total ? 96 : 10, y: 33 }, document.createTextNode(total ? `${done}/${total}` : 'no tasks')),
-      s('text', { class: 'small', x: BOX.w - 10, y: 33, 'text-anchor': 'end' }, document.createTextNode(n.kind === 'root' ? '' : n.status)),
+      ...wrap(n.place ? `${n.place}. ${n.title}` : n.title, 32).map((line, k) => s('text', { x: 10, y: 17 + k * 15 }, document.createTextNode(line))),
+      total > 0 && s('rect', { class: 'track', x: 10, y: 43, width: 80, height: 5, rx: 2.5 }),
+      total > 0 && s('rect', { class: 'fill', x: 10, y: 43, width: (80 * done) / total, height: 5, rx: 2.5 }),
+      total > 0 && s('text', { class: 'small', x: 96, y: 49 }, document.createTextNode(`${done}/${total}`)),
+      s('text', { class: 'small', x: BOX.w - 10, y: 49, 'text-anchor': 'end' }, document.createTextNode(n.kind === 'root' ? '' : n.status)),
       n.blocked && s('circle', { class: 'flag', cx: BOX.w - 4, cy: 4, r: 5 }),
     );
     box.addEventListener('click', open(n));
     inner.append(box);
     n.work.forEach((w, j) => {
-      const el = s('g', { class: `rm-node work${state(w)}`, transform: `translate(${n.x + 12},${n.y + BOX.h + 8 + j * ROW + ROW / 2})` }, hint(w), s('circle', { cx: 6, r: 4.5 }), s('text', { x: 17, y: 4 }, document.createTextNode(cut(w.title, 36))));
+      const el = s('g', { class: `rm-node work${state(w)}`, transform: `translate(${n.x + 12},${n.y + BOX.h + 8 + j * ROW + ROW / 2})` }, hint(w), s('circle', { cx: 6, r: 4.5 }), s('text', { x: 17, y: 4 }, document.createTextNode(cut(w.title, 44))));
       el.addEventListener('click', open(w));
       inner.append(el);
     });
@@ -2450,19 +2460,20 @@ function roadmapGraph(data, withWork) {
 const roadmapState = {
   get graph() {
     try {
-      return localStorage.getItem('lattice-roadmap-as') === 'graph';
+      return localStorage.getItem('lattice-roadmap-as') !== 'list';
     } catch {
-      return false;
+      return true;
     }
   },
   set graph(value) {
     try {
       localStorage.setItem('lattice-roadmap-as', value ? 'graph' : 'list');
     } catch {
-      // Without storage the list is shown each time.
+      // Without storage the graph is shown each time.
     }
   },
-  work: true,
+  // Features alone are the overview; their tasks are one tick away.
+  work: false,
 };
 
 async function roadmap(rootId) {
@@ -2512,7 +2523,7 @@ async function roadmap(rootId) {
           'summary',
           {},
           h('span', { class: 'place muted' }, i + 1),
-          h('span', { class: 'grow' }, link(b), b.active && [' ', h('span', { class: 'pill warn' }, 'working here')]),
+          h('span', { class: 'grow' }, link(b)),
           b.blocked && h('span', { class: 'pill bad' }, 'blocked'),
           working(b),
           progressBar(b.progress),
@@ -2555,24 +2566,17 @@ async function roadmap(rootId) {
       h(
         'span',
         { class: 'switch' },
-        [['List', false], ['Graph', true]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label)),
+        [['Graph', true], ['List', false]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label)),
       ),
       asGraph && h('label', {}, h('input', { type: 'checkbox', checked: roadmapState.work, onchange: (e) => ((roadmapState.work = e.target.checked), roadmap(rootId)) }), ' Tasks'),
       h('span', { class: 'grow' }),
       statuses.map((st) => h('span', { class: `pill${isClosed('software.feature', st) ? ' closed' : ''}` }, `${data.by_status[st]} ${st}`)),
       progressBar(data.progress),
     ),
+    data.now.length > 0 && h('div', { class: 'toolbar nowline' }, h('span', { class: 'muted' }, 'Now'), data.now.map((n) => h('span', { class: 'fact' }, chip(n.type), ' ', link(n), working(n)))),
     h(
       'div',
       { class: 'grid' },
-      h(
-        'section',
-        { class: 'card wide' },
-        h('header', {}, h('h2', {}, 'Working now'), h('span', { class: 'n' }, data.now.length)),
-        data.now.length
-          ? h('ul', { class: 'rows' }, data.now.map((n) => h('li', {}, h('div', { class: 'row-top' }, chip(n.type), h('span', { class: 'grow' }, link(n)), working(n), pill(n.type, n.status)), n.path.length > 0 && h('div', { class: 'row-sub' }, n.path.join(' › ')))))
-          : h('div', { class: 'empty' }, 'Nothing is marked as being built, and no session is open on anything here.'),
-      ),
       h(
         'section',
         { class: 'card wide' },

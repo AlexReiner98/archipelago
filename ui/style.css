@@ -418,3 +418,9 @@ details.menu > .menu-items > button:hover { background: var(--accent-soft); }
 .nowrap-row > * { flex: none; white-space: nowrap; }
 .nowrap-row > .gist { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 details.menu > .menu-items > button { max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Roadmap: the graph is the page; it shrinks to the window before it scrolls, and the list keeps its controls out of sight until wanted. */
+.roadmap-graph svg { max-width: 100%; min-width: min(100%, 720px); height: auto; }
+.nowline { margin: -4px 0 14px; gap: 14px; }
+.tree .moves { opacity: 0; transition: opacity 0.1s; }
+.tree li:hover > details > summary .moves, .tree .moves:focus-within { opacity: 1; }
