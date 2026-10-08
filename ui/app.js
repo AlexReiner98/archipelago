@@ -334,7 +334,10 @@ function changeRow(g, { undone, onUndo }) {
 
 const chip = (typeId) => h('span', { class: 'chip', title: typeId }, typeTitle(typeId));
 const pill = (typeId, status) => h('span', { class: `pill${isClosed(typeId, status) ? ' closed' : ''}` }, status);
-const link = (e) => (e ? h('a', { href: `#/e/${e.id}` }, e.title) : h('span', { class: 'muted' }, '(missing)'));
+/** Titles of the items the pages have shown, so a line that only holds an id can still say a name. */
+const titles = new Map();
+const named = (id) => titles.get(id) ?? id;
+const link = (e) => (e ? (titles.set(e.id, e.title), h('a', { href: `#/e/${e.id}` }, e.title)) : h('span', { class: 'muted' }, '(missing)'));
 
 /** The usual one-line rendering of an entity. */
 function entityRow(e, sub) {
@@ -974,6 +977,72 @@ function map() {
   run();
 }
 
+/**
+ * A body as a page, not a block. Agents write notes with headings in capitals,
+ * numbered points and dashes; this draws them as headings and lists at a
+ * readable width, and folds every section after the opening one, so a long
+ * note opens as its first few lines and a list of what else it holds.
+ */
+function renderBody(text) {
+  const heading = (line) => /^[A-Z0-9][A-Z0-9 ,'()\/&-]{2,60}:?$/.test(line.trim()) && /[A-Z]{3}/.test(line);
+  const item = (line) => /^\s*(-|\*|\d+\.|[A-Z]\.)\s+/.exec(line);
+  const sections = [{ title: null, lines: [] }];
+  for (const line of text.split('\n')) {
+    if (heading(line)) sections.push({ title: line.trim().replace(/:$/, ''), lines: [] });
+    else sections.at(-1).lines.push(line);
+  }
+  const blocks = (lines) => {
+    const out = [];
+    let list;
+    let para = [];
+    const flush = () => {
+      if (para.length) out.push(h('p', {}, para.join(' ')));
+      para = [];
+    };
+    for (const line of lines) {
+      const mark = item(line);
+      if (mark) {
+        flush();
+        if (!list) out.push((list = h('ul', {})));
+        list.append(h('li', {}, h('span', { class: 'muted' }, /^[-*]$/.test(mark[1]) ? '• ' : `${mark[1]} `), line.slice(mark[0].length)));
+      } else if (!line.trim()) {
+        flush();
+        list = undefined;
+      } else if (list && /^\s{2,}/.test(line)) {
+        list.lastChild.append(` ${line.trim()}`);
+      } else {
+        list = undefined;
+        para.push(line.trim());
+      }
+    }
+    flush();
+    return out;
+  };
+  const sentence = (title) => title.charAt(0) + title.slice(1).toLowerCase();
+  return h(
+    'div',
+    { class: 'body-text' },
+    sections
+      .filter((sec) => sec.title || sec.lines.some((l) => l.trim()))
+      .map((sec, i) => (sec.title ? h('details', { class: 'section', open: i === 0 }, h('summary', {}, sentence(sec.title)), blocks(sec.lines)) : blocks(sec.lines))),
+  );
+}
+
+/** A small menu for what is done rarely: the page keeps one or two actions in sight. */
+function menu(label, items) {
+  const box = h('details', { class: 'menu' }, h('summary', {}, label), h('div', { class: 'menu-items' }, items.filter(Boolean).map(([text, onclick, cls]) => h('button', { class: cls ?? '', onclick: (ev) => ((box.open = false), onclick(ev)) }, text))));
+  return box;
+}
+document.addEventListener('click', (ev) => {
+  for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target)) open.open = false;
+});
+
+/** When an open item was last changed or confirmed, as a mark that turns as it ages. */
+function ageChip(e) {
+  const days = Math.floor((Date.now() - new Date(e.updated_at).getTime()) / 86_400_000);
+  return h('span', { class: `mark ${days >= 14 ? 'mark-old' : 'mark-human'}`, title: `Last changed or confirmed ${when(e.updated_at)}` }, days === 0 ? 'true today' : days === 1 ? 'true yesterday' : `${days} days unconfirmed`);
+}
+
 async function entity(id) {
   main.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
   let data;
@@ -1070,6 +1139,41 @@ async function entity(id) {
     q.focus();
   };
 
+  const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
+  const workish = !e.archived_at && ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t);
+  // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
+  const fields = Object.entries(e.props).filter(([, v]) => v !== null && v !== '');
+  const short = fields.filter(([, v]) => String(v).length <= 32);
+  const long = fields.filter(([, v]) => String(v).length > 32);
+  const edit = () => {
+    const form = entityForm(e.type, e, {
+      submitLabel: 'Save',
+      onCancel: () => entity(id),
+      onSubmit: async (next) => {
+        const props = { ...next.props };
+        for (const key of Object.keys(e.props)) if (!(key in props) && !types.get(e.type)?.fields[key]?.system) props[key] = null;
+        await api('change', { ops: [{ op: 'update', id, title: next.title, body: next.body, status: next.status, visibility: next.visibility || undefined, props }], reason: 'Edited in the UI' });
+        entity(id);
+      },
+    });
+    main.querySelector('.grid').firstChild.replaceWith(form);
+  };
+  const copyBrief = async () => {
+    const brief = await api('view', { name: 'brief', params: { task: id } });
+    await navigator.clipboard.writeText(brief.text);
+  };
+  const launch = async (mode) => {
+    const what = mode === 'plan' ? 'It can read and investigate but not change anything.' : 'It can EDIT FILES in the repository with nobody approving each change. It is told not to commit, push or delete.';
+    const instructions = await ask({ title: `Launch a headless Claude Code session on "${e.title}"?`, message: what, input: { placeholder: 'Anything to add to its brief? (optional)' }, action: 'Launch', danger: mode !== 'plan' });
+    if (instructions === null) return;
+    try {
+      const started = await api('launch', { task: id, mode, instructions: instructions || undefined });
+      location.hash = `#/e/${started.run}`;
+    } catch (err) {
+      tell('The session did not start', err.message);
+    }
+  };
+
   main.replaceChildren(
     h(
       'div',
@@ -1079,85 +1183,27 @@ async function entity(id) {
     ),
     h(
       'div',
-      { class: 'toolbar', style: 'margin-bottom: 14px' },
-      h('label', { class: 'muted' }, 'Status '),
+      { class: 'toolbar facts' },
       h(
         'select',
-        { onchange: (ev) => change([{ op: 'update', id, status: ev.target.value }], `Status set to ${ev.target.value} in the UI`) },
-        statusesOf(e.type).map((s) => h('option', { value: s, selected: s === e.status }, s)),
+        { title: 'Status', onchange: (ev) => change([{ op: 'update', id, status: ev.target.value }], `Status set to ${ev.target.value} in the UI`) },
+        statusesOf(e.type).map((st) => h('option', { value: st, selected: st === e.status }, st)),
       ),
-      !e.archived_at &&
-        h(
-          'button',
-          {
-            onclick: () => {
-              const form = entityForm(e.type, e, {
-                submitLabel: 'Save',
-                onCancel: () => entity(id),
-                onSubmit: async (next) => {
-                  const props = { ...next.props };
-                  for (const key of Object.keys(e.props)) if (!(key in props) && !types.get(e.type)?.fields[key]?.system) props[key] = null;
-                  await api('change', { ops: [{ op: 'update', id, title: next.title, body: next.body, status: next.status, visibility: next.visibility || undefined, props }], reason: 'Edited in the UI' });
-                  entity(id);
-                },
-              });
-              main.querySelector('.grid').firstChild.replaceWith(form);
-            },
-          },
-          'Edit',
-        ),
-      h('button', { onclick: () => (location.hash = `#/graph/${id}`) }, 'Graph'),
-      !e.archived_at &&
-        ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t) &&
-        h(
-          'button',
-          {
-            onclick: async (ev) => {
-              const brief = await api('view', { name: 'brief', params: { task: id } });
-              await navigator.clipboard.writeText(brief.text);
-              ev.target.textContent = 'Brief copied';
-            },
-            title: 'Copy what a session needs to start on this: context, blockers, resources and rules',
-          },
-          'Copy session brief',
-        ),
-      !e.archived_at &&
-        ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t) &&
-        h(
-          'span',
-          { class: 'toolbar' },
-          h('select', { id: 'launch-mode', title: 'What the session may do with nobody there to approve it' }, h('option', { value: 'plan' }, 'Investigate only'), h('option', { value: 'acceptEdits' }, 'May edit files')),
-          h(
-            'button',
-            {
-              onclick: async () => {
-                const mode = document.getElementById('launch-mode').value;
-                const what = mode === 'plan' ? 'It can read and investigate but not change anything.' : 'It can EDIT FILES in the repository with nobody approving each change. It is told not to commit, push or delete.';
-                const instructions = await ask({
-                  title: `Launch a headless Claude Code session on "${e.title}"?`,
-                  message: what,
-                  input: { placeholder: 'Anything to add to its brief? (optional)' },
-                  action: 'Launch',
-                  danger: mode !== 'plan',
-                });
-                if (instructions === null) return;
-                try {
-                  const started = await api('launch', { task: id, mode, instructions: instructions || undefined });
-                  location.hash = `#/e/${started.run}`;
-                } catch (err) {
-                  tell('The session did not start', err.message);
-                }
-              },
-            },
-            'Launch session',
-          ),
-        ),
-      !e.archived_at &&
-        e.is_open &&
-        !e.type.startsWith('sys.') &&
-        h('button', { title: 'Record that you checked this and it is still true as written', onclick: () => change([{ op: 'update', id }], 'Checked in the UI: still true as written') }, 'Still true'),
-      !e.archived_at &&
-        h('button', { class: 'danger', onclick: async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI') }, 'Archive'),
+      live && ageChip(e),
+      live && h('button', { title: 'Record that you checked this and it is still true as written', onclick: () => change([{ op: 'update', id }], 'Checked in the UI: still true as written') }, 'Still true'),
+      h('span', { class: 'fact' }, owner ? link(owner) : h('span', { class: 'muted' }, 'no owner')),
+      short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), String(v))),
+      data.source && h('a', { class: 'fact', href: `#/e/${data.source.id}`, title: `Source: ${data.source.title}` }, 'source'),
+      h('span', { class: 'grow' }),
+      !e.archived_at && h('button', { onclick: edit }, 'Edit'),
+      menu('More', [
+        ['Graph around this', () => (location.hash = `#/graph/${id}`)],
+        workish && ['Copy session brief', copyBrief],
+        workish && ['Launch a session: investigate only', () => launch('plan')],
+        workish && ['Launch a session: may edit files', () => launch('acceptEdits')],
+        ['Copy id', () => navigator.clipboard.writeText(e.id)],
+        !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
+      ]),
     ),
     h(
       'div',
@@ -1165,20 +1211,8 @@ async function entity(id) {
       h(
         'section',
         { class: 'card wide' },
-        h(
-          'dl',
-          { class: 'fields' },
-          h('dt', {}, 'Owner'),
-          h('dd', {}, owner ? link(owner) : h('span', { class: 'muted' }, 'nobody')),
-          Object.entries(e.props).map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v))]),
-          h('dt', {}, 'Source'),
-          h('dd', {}, data.source ? h('a', { href: `#/e/${data.source.id}` }, data.source.title) : h('span', { class: 'muted' }, 'none recorded')),
-          h('dt', {}, e.is_open ? 'Last known true' : 'Updated'),
-          h('dd', {}, when(e.updated_at), e.is_open && h('span', { class: 'muted small' }, `  ${daysAgo(e.updated_at)}, when it was last changed or confirmed`)),
-          h('dt', {}, 'Id'),
-          h('dd', { class: 'muted' }, e.id),
-        ),
-        e.body && h('div', { class: 'body-text' }, e.body),
+        long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v))])),
+        e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       ),
       h(
         'section',
@@ -2114,9 +2148,15 @@ function describeEvent(ev) {
   const d = ev.detail ?? {};
   if (ev.origin === 'external') return `${d.ok === false ? 'failed' : 'ok'}${d.durationMs != null ? ` in ${d.durationMs} ms` : ''}`;
   const short = (v) => (v == null ? 'none' : String(typeof v === 'object' ? JSON.stringify(v) : v).replaceAll('\n', ' ').slice(0, 80));
-  if (ev.action === 'entity.update') return Object.entries(d.changes ?? {}).map(([k, c]) => `${k}: ${short(c.from)} → ${short(c.to)}`).join('; ') || 'checked: still true as written';
+  // A rewritten note is said to be rewritten; printing both versions is what made a row a paragraph.
+  if (ev.action === 'entity.update')
+    return (
+      Object.entries(d.changes ?? {})
+        .map(([k, c]) => (k === 'body' ? 'notes rewritten' : `${k.replace(/^props./, '')}: ${short(c.from)} → ${short(c.to)}`))
+        .join('; ') || 'checked: still true as written'
+    );
   if (ev.action === 'changeset.undo') return `undid ${d.undoes}${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
-  if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${d.to}`;
+  if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${named(d.to)}`;
   if (ev.action === 'entity.create') return `${typeTitle(d.type)}, ${d.status ?? ''}`;
   if (ev.action === 'proposal.supersede') return `${d.proposal} asked only for what ${d.by} had already made so`;
   if (ev.action.startsWith('proposal.')) return `${d.proposal}${d.revised ? ', with corrections' : ''}`;

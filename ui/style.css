@@ -373,3 +373,23 @@ button.quiet { border: 0; background: none; padding: 0; color: var(--muted); fon
 button.quiet:hover { color: var(--accent); text-decoration: underline; }
 .project .question > .row-top > button { padding: 1px 9px; font-size: 12px; }
 .project .rows > li > .row-top > button { padding: 1px 9px; font-size: 12px; }
+
+/* The item page: facts to glance at in one row, the note as a page at a readable width, rare actions in a menu. */
+.toolbar.facts { margin-bottom: 14px; gap: 10px; }
+.fact { font-size: 12.5px; white-space: nowrap; }
+.mark-old { border-color: var(--warn); color: var(--warn); }
+details.menu { position: relative; }
+details.menu > summary { list-style: none; cursor: pointer; padding: 5px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+details.menu > summary::-webkit-details-marker { display: none; }
+details.menu > .menu-items { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; display: grid; min-width: 230px; padding: 5px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 6px 18px rgb(0 0 0 / 0.22); }
+details.menu > .menu-items > button { text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 6px; white-space: nowrap; }
+details.menu > .menu-items > button:hover { background: var(--accent-soft); }
+.body-text { white-space: normal; max-width: 72ch; line-height: 1.55; border-top: 0; }
+.body-text p { margin: 0 0 10px; }
+.body-text ul { margin: 0 0 10px; padding-left: 4px; list-style: none; }
+.body-text li { margin: 3px 0; }
+.body-text details.section { border-top: 1px solid var(--line); padding: 8px 0 2px; }
+.body-text details.section > summary { cursor: pointer; font-weight: 600; list-style: none; margin-bottom: 6px; }
+.body-text details.section > summary::-webkit-details-marker { display: none; }
+.body-text details.section > summary::before { content: "\25B8  "; color: var(--muted); }
+.body-text details.section[open] > summary::before { content: "\25BE  "; }
