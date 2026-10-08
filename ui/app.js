@@ -1135,6 +1135,33 @@ async function entity(id) {
       );
     });
 
+  // One side of the item's neighbourhood: its relations in one direction, gathered by what they say.
+  const side = (rows, direction) => {
+    const groups = new Map();
+    for (const r of rows) {
+      const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
+      if (!groups.has(phrase)) groups.set(phrase, []);
+      groups.get(phrase).push(r);
+    }
+    return h(
+      'div',
+      { class: `around-side ${direction}` },
+      [...groups].map(([phrase, items]) =>
+        h(
+          'div',
+          { class: 'around-group' },
+          h('span', { class: 'around-phrase' }, phrase),
+          h(
+            'div',
+            { class: 'around-items' },
+            items.slice(0, 6).map((r) => h('a', { class: `around-item${isClosed(r.entity_type, r.status) ? ' closed' : ''}`, href: `#/e/${r.id}`, title: `${typeTitle(r.entity_type)}, ${r.status}` }, (titles.set(r.id, r.title), r.title))),
+            items.length > 6 && h('span', { class: 'muted small' }, `and ${items.length - 6} more`),
+          ),
+        ),
+      ),
+    );
+  };
+
   // Every way this entity can be linked, read from its side: "depends on" and
   // "blocks" are one relation in its two directions.
   const phrases = schema.relations
@@ -1271,7 +1298,11 @@ async function entity(id) {
           h('span', { class: 'toolbar' }, h('span', { class: 'n' }, data.outgoing.length + data.incoming.length), !e.archived_at && phrases.length > 0 && h('button', { onclick: openAdder }, 'Add')),
         ),
         data.outgoing.length + data.incoming.length
-          ? h('table', { class: 'list' }, h('tbody', {}, relRows(data.outgoing, 'out'), relRows(data.incoming, 'in')))
+          ? [
+              // Where it sits: what it reaches for on the left, what reaches for it on the right.
+              h('div', { class: 'around' }, side(data.outgoing, 'out'), h('div', { class: 'around-self' }, chip(e.type), h('strong', {}, e.title)), side(data.incoming, 'in')),
+              !e.archived_at && h('details', { class: 'folded' }, h('summary', {}, 'Change relations'), h('table', { class: 'list' }, h('tbody', {}, relRows(data.outgoing, 'out'), relRows(data.incoming, 'in')))),
+            ]
           : h('div', { class: 'empty' }, 'Not linked to anything.'),
         adder,
       ),
