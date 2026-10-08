@@ -775,6 +775,33 @@ test('an agent may settle its own work unreviewed, but only proposes the answer 
   assert.equal((await free.change(human, { reason: 'mine to settle', ops: [{ op: 'update', id: made.h, status: settled }] })).status, 'applied');
 });
 
+test('a held change that asks only for what is already so leaves the queue as superseded', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'd', type: 'decision', title: 'Where do backups go?' },
+    { op: 'create', ref: 't', type: 'task', title: 'Wire the upload' },
+    { op: 'create', ref: 'u', type: 'task', title: 'Prune old copies' },
+  ]);
+  const hold = async (ops: any[]) => ((await l.change(agent, { reason: 'held', ops })) as { proposal: string }).proposal;
+  const answer = await hold([{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Supabase' } }]);
+  const both = await hold([{ op: 'update', id: made.t, status: 'done' }, { op: 'update', id: made.u, status: 'done' }]);
+  const more = await hold([{ op: 'update', id: made.t, status: 'done', body: 'With a note that is not there yet.' }]);
+  const other = await hold([{ op: 'update', id: made.d, status: 'reversed' }]);
+
+  // The human settles the decision and one of the two tasks themselves.
+  const settled = await l.change(human, { reason: 'mine', ops: [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Supabase Storage' } }, { op: 'update', id: made.t, status: 'done' }] });
+  const pending = async () => (await l.proposals()).map((p) => p.id);
+  assert.deepEqual(await pending(), [both, more, other], 'the answer already given is gone; what asks for more, or for something else, stays');
+  const [gone] = await l.proposals({ status: 'superseded' });
+  assert.deepEqual([gone.id, gone.note, gone.decided_by], [answer, `Already so since ${(settled as { changeset: string }).changeset}`, 'agent:lattice']);
+  const said = (await l.events({ limit: 20 })).find((e: any) => e.action === 'proposal.supersede') as any;
+  assert.deepEqual([said.detail.proposal, said.detail.by], [answer, (settled as { changeset: string }).changeset], 'and the log says what overtook it');
+
+  await l.change(human, { reason: 'mine', ops: [{ op: 'update', id: made.u, status: 'done' }] });
+  assert.deepEqual(await pending(), [more, other], 'once every part of it is so');
+  await assert.rejects(l.decide(human, { proposal: answer, approve: true }), /already superseded/);
+});
+
 test('a backup holds every row, and restores into an empty database that then carries on', async () => {
   const l = await fresh();
   const made = await make(l, [

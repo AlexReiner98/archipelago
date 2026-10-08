@@ -2013,6 +2013,7 @@ function describeEvent(ev) {
   if (ev.action === 'changeset.undo') return `undid ${d.undoes}${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
   if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${d.to}`;
   if (ev.action === 'entity.create') return `${typeTitle(d.type)}, ${d.status ?? ''}`;
+  if (ev.action === 'proposal.supersede') return `${d.proposal} asked only for what ${d.by} had already made so`;
   if (ev.action.startsWith('proposal.')) return `${d.proposal}${d.revised ? ', with corrections' : ''}`;
   if (ev.action === 'connection.check') return `${d.from} → ${d.to}`;
   if (ev.action.startsWith('resource.')) return d.holder_title ?? d.holder ?? '';

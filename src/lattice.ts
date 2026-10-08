@@ -631,7 +631,29 @@ export class Lattice {
       this.registry.defineLocal(op.type);
       await this.log(this.db, { actor, action: 'type.define', changeset, reason: input.reason, detail: { type: op.type, ...extra } });
     }
+    await this.supersede(changeset);
     return { status: 'applied' as const, changeset, created, warnings };
+  }
+
+  /**
+   * A held change that asks only for what is now so (each thing it would
+   * settle already has that status) has been overtaken: it leaves the queue
+   * as superseded, and the log says by which change. Nobody decided it, so
+   * it is neither applied nor declined.
+   */
+  private async supersede(changeset: string): Promise<void> {
+    const { rows } = await this.db.query<Proposal>(`select * from proposal where status = 'pending'`);
+    for (const p of rows) {
+      let moot = p.ops.length > 0;
+      for (const op of p.ops) {
+        if (op.op !== 'update' || !op.status || Object.keys(op).some((key) => !['op', 'id', 'status', 'props'].includes(key))) moot = false;
+        else moot = (await this.entity(op.id))?.status === op.status;
+        if (!moot) break;
+      }
+      if (!moot) continue;
+      const done = await this.db.query(`update proposal set status = 'superseded', decided_by = 'agent:lattice', decided_at = now(), note = $2 where id = $1 and status = 'pending' returning id`, [p.id, `Already so since ${changeset}`]);
+      if (done.rows.length) await this.log(this.db, { actor: 'agent:lattice', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
+    }
   }
 
   private async ensureSource(q: Q, actor: string, spec: SourceSpec, changeset: string): Promise<string | null> {

@@ -137,6 +137,9 @@ npm run lattice -- approve <id> --except some_ref,#12
 npm run lattice -- reject <id> "why"
 ```
 
+   A held change that asks only for what a later change has already made
+   so (the task it would close is closed) leaves the queue as superseded,
+   and the log says by which change.
 4. Every applied op is written to the event log with who proposed it, who
    approved it, why, and the source, and on whose authority it was made:
    the human's own (their change, or a held one they applied), a human's

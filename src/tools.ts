@@ -247,8 +247,9 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => l.events(input),
   },
   proposals: {
-    description: 'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined). Agents can read these but only a human can decide them.',
-    input: { status: z.enum(['pending', 'approved', 'rejected']).optional() },
+    description:
+      'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so). Agents can read these but only a human can decide them.',
+    input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded']).optional() },
     run: async (l, _actor, input) => l.proposals(input),
   },
   pulse: {
