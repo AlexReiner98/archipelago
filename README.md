@@ -47,7 +47,7 @@ All three call the tools in [src/tools.ts](src/tools.ts). The web UI and CLI
 have human authority; the MCP endpoint does not, and two tools (`decide`,
 `init`) are not offered to agents at all.
 
-The web UI has three places. **Home** is what needs you, project by project.
+The web UI has four places. **Home** is what needs you, project by project.
 Changes held for you, to apply or decline, come first. Then each project is a card: its
 progress, what is being worked on, and under it what there is for you to
 read, to decide and to do in that project, each dealt with where it stands
@@ -60,7 +60,7 @@ until you ask), creates new things, and opens each entity with its fields,
 relations and history; **Activity** (the event log, one line per change set)
 is beside it. **Workspace** holds the owner, tokens, members, importing a backup and
 automations. A held change's parts can be excluded or corrected one by one in
-**Changes**, reached from it on Home; below them the same screen lists what
+**Changes**, in the menu and reached from it on Home; below them the same screen lists what
 agents changed without waiting since you last looked, each with Undo, and
 "Mark all seen" records that you looked. The **Graph** opens from an
 entity's page.

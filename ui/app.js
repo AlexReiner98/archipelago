@@ -2715,7 +2715,7 @@ document.addEventListener('visibilitychange', checkPulse);
 // Projects are on Home now; the old address still leads there.
 const ROUTES = { today, review, map, activity, automations, graph, roadmap, questions, workspace, projects: () => void (location.hash = '#/today') };
 // Where each screen sits in the menu, for the ones that are not in it themselves.
-const UNDER = { e: 'map', new: 'map', activity: 'map', graph: 'map', review: 'today', roadmap: 'today', questions: 'today', projects: 'today', automations: 'workspace' };
+const UNDER = { e: 'map', new: 'map', activity: 'map', graph: 'map', roadmap: 'today', questions: 'today', projects: 'today', automations: 'workspace' };
 
 async function route() {
   const [, name = 'today', arg] = location.hash.split('/');
