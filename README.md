@@ -289,6 +289,10 @@ change that:
 - **Tokens** are made with `token_create`, listed with `token_list` and
   revoked with `token_revoke` (human only). Only a hash is stored. A launched
   session gets its own agent token, valid for a day and revoked when it ends.
+- **Several workspaces in one browser:** the UI remembers each workspace you
+  sign in to and switches between them from the menu's bottom corner; the
+  workspace's name is shown under "Lattice" and on the tab. Signing out
+  forgets that one.
 - **Using a token:** paste it into the web UI's sign-in screen; set
   `LATTICE_TOKEN` for the CLI; for Claude Code, add
   `"headers": { "Authorization": "Bearer ${LATTICE_AGENT_TOKEN}" }` to the

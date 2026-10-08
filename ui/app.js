@@ -72,6 +72,43 @@ const store = {
 };
 const authHeaders = () => (store.token ? { authorization: `Bearer ${store.token}` } : {});
 
+// The workspaces this browser has signed in to, so moving between them does
+// not mean finding and pasting a token each time. Kept beside the token.
+const known = {
+  all() {
+    try {
+      return JSON.parse(localStorage.getItem('lattice-workspaces') ?? '{}');
+    } catch {
+      return {};
+    }
+  },
+  save(map) {
+    try {
+      localStorage.setItem('lattice-workspaces', JSON.stringify(map));
+    } catch {
+      // Without storage there is only the workspace signed in to now.
+    }
+  },
+  remember(ws) {
+    this.save({ ...this.all(), [ws.id]: { name: ws.name, token: store.token } });
+  },
+  forget(id) {
+    const map = this.all();
+    delete map[id];
+    this.save(map);
+  },
+};
+
+/** Become whoever a token says, starting from Today: nothing on the page belongs to the new workspace. */
+function enter(token) {
+  store.token = token;
+  schema = undefined;
+  pulse = undefined;
+  seenFocus = undefined;
+  if (location.hash && location.hash !== '#/today') location.hash = '#/today';
+  else route();
+}
+
 class SignInNeeded extends Error {}
 
 async function api(tool, input = {}) {
@@ -96,9 +133,18 @@ function signIn(message) {
     route();
   };
   input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  const others = Object.entries(known.all());
+  document.querySelector('#nav .brand').replaceChildren('Lattice');
+  document.title = 'Lattice';
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, 'Sign in'), h('p', { class: 'muted' }, 'This server asks for a token. It decides which workspace you see and what you may do.')),
-    h('section', { class: 'card', style: 'max-width: 620px' }, h('div', { class: 'toolbar', style: 'padding: 14px' }, input, h('button', { class: 'primary', onclick: submit }, 'Sign in')), error),
+    h(
+      'section',
+      { class: 'card', style: 'max-width: 620px' },
+      others.length > 0 && h('div', { class: 'toolbar', style: 'padding: 14px 14px 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
+      h('div', { class: 'toolbar', style: 'padding: 14px' }, input, h('button', { class: 'primary', onclick: submit }, 'Sign in')),
+      error,
+    ),
   );
   input.focus();
 }
@@ -110,16 +156,34 @@ async function showIdentity() {
     if (!res.ok) return slot.replaceChildren();
     const me = await res.json();
     if (me.auth !== 'tokens') return slot.replaceChildren();
+    known.remember(me.workspace);
+    // Which workspace this is, where it cannot be missed: under the name at the top, and on the tab.
+    document.querySelector('#nav .brand').replaceChildren('Lattice', h('div', { class: 'workspace-name' }, me.workspace.name));
+    document.title = `${me.workspace.name} · Lattice`;
+    const others = Object.entries(known.all()).filter(([id]) => id !== me.workspace.id);
     slot.replaceChildren(
       h('div', {}, h('strong', {}, me.workspace.name)),
       h('div', { class: 'muted small' }, `${me.actor.name} (${me.actor.kind})`),
+      h(
+        'select',
+        {
+          class: 'small',
+          title: 'Workspaces this browser has signed in to',
+          onchange: (e) => (e.target.value === '+' ? signIn() : e.target.value && enter(known.all()[e.target.value].token)),
+        },
+        h('option', { value: '' }, 'Switch workspace…'),
+        others.map(([id, w]) => h('option', { value: id }, w.name)),
+        h('option', { value: '+' }, 'Sign in to another…'),
+      ),
       h(
         'a',
         {
           href: '#',
           class: 'small',
+          title: 'Forget this workspace on this browser',
           onclick: (e) => {
             e.preventDefault();
+            known.forget(me.workspace.id);
             store.token = '';
             schema = undefined;
             route();
