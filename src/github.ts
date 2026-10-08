@@ -69,8 +69,41 @@ interface PushPayload {
   commits?: { id: string; message: string; url?: string; author?: { name?: string } }[];
 }
 
+/**
+ * The payload of a delivery, in either content type a webhook can be set to:
+ * JSON, or GitHub's default, a form with the JSON in its "payload" field.
+ * Undefined when the body is neither.
+ */
+export function deliveryPayload(body: Buffer, contentType: string | undefined): PushPayload | undefined {
+  const text = body.toString('utf8');
+  try {
+    const parsed: unknown = JSON.parse(/x-www-form-urlencoded/i.test(contentType ?? '') ? (new URLSearchParams(text).get('payload') ?? '') : text);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as PushPayload) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // "closes e_abc12345", "fixes e_..., e_...", "done: e_...": the commit says what it finished.
 const CLOSES = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|finish(?:e[sd])?|done)\b[:\s]+((?:e_[a-z0-9]{8}\b[\s,&]*(?:and\s+)?)+)/gi;
+// "does not fix e_... yet", "only partly fixes e_...": said earlier in the same sentence, it takes the claim back.
+const NEGATED = /(?:\b(?:not|never|no longer|cannot|partly|partially)\b|n't\b)[^.;\n]*$/i;
+
+/**
+ * The ids a commit message says it finished. Only what the commit says in
+ * its own words counts: a revert repeats the message of the commit it
+ * undoes, and quoted text is someone else's claim.
+ */
+export function finishedBy(message: string): string[] {
+  if (/^revert\b/i.test(message) || /^This reverts commit\b/im.test(message)) return [];
+  const own = message.replace(/^\s*>.*$/gm, '').replace(/"[^"\n]*"/g, '""');
+  const ids: string[] = [];
+  for (const match of own.matchAll(CLOSES)) {
+    if (NEGATED.test(own.slice(0, match.index))) continue;
+    ids.push(...(match[1].match(/e_[a-z0-9]{8}/g) ?? []));
+  }
+  return [...new Set(ids)];
+}
 
 /**
  * Take a push in. It is recorded against its repository whatever the branch.
@@ -78,11 +111,19 @@ const CLOSES = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|finish(?:e[sd])?|done
  * the way any agent would: as a change of its own, held for the human unless
  * policy lets it through. Questions are left alone: a commit cannot say what
  * was decided.
+ *
+ * GitHub sends a delivery again when asked to, or when it did not hear the
+ * answer, under the same id (the X-GitHub-Delivery header): it is taken in
+ * once. And a thing already waiting to be closed is not proposed twice.
  */
-export async function receivePush(l: Lattice, payload: PushPayload) {
+export async function receivePush(l: Lattice, payload: PushPayload, delivery?: string) {
   const name = payload.repository?.full_name?.toLowerCase();
   const repo = await repoByName(l, name);
   if (!repo) return { recorded: false, reason: `No repository in this map has the remote github.com/${name}. Give one that address and pushes to it will be recorded.` };
+  if (delivery) {
+    const { rows } = await l.db.query(`select 1 from event where action = 'repo.push' and detail->>'delivery' = $1 limit 1`, [delivery]);
+    if (rows.length) return { recorded: false, reason: 'This delivery was already taken in.' };
+  }
   const branch = (payload.ref ?? '').replace(/^refs\/heads\//, '');
   const main = branch === payload.repository?.default_branch;
   const commits = payload.commits ?? [];
@@ -94,7 +135,7 @@ export async function receivePush(l: Lattice, payload: PushPayload) {
     target: repo.id,
     origin: 'github',
     reason: commits.length ? `${commits.length} commit${commits.length === 1 ? '' : 's'} to ${branch}: ${subject(commits.at(-1)!.message)}` : `${branch} moved`,
-    detail: { repo: name, branch, default_branch: main, before: payload.before, after: payload.after, commits: commits.slice(-20).map((c) => ({ sha: c.id.slice(0, 7), subject: subject(c.message), url: c.url, author: c.author?.name })) },
+    detail: { repo: name, delivery, branch, default_branch: main, before: payload.before, after: payload.after, commits: commits.slice(-20).map((c) => ({ sha: c.id.slice(0, 7), subject: subject(c.message), url: c.url, author: c.author?.name })) },
   });
 
   const settled: { id: string; title: string; status: string; result: string }[] = [];
@@ -102,16 +143,19 @@ export async function receivePush(l: Lattice, payload: PushPayload) {
     const questions = new Set([...l.registry.family('decision'), ...l.registry.family('hypothesis')]);
     const seen = new Set<string>();
     for (const c of commits) {
-      for (const match of c.message.matchAll(CLOSES)) {
-        for (const id of match[1].match(/e_[a-z0-9]{8}/g) ?? []) {
-          if (seen.has(id)) continue;
-          seen.add(id);
-          const e = await l.entity(id);
-          const status = e && l.registry.type(e.type)?.statuses.closed[0];
-          if (!e || !status || !e.is_open || e.archived_at || questions.has(e.type)) continue;
-          const result = await l.change({ kind: 'agent', name: who.slice('github:'.length) + ' (github)' }, { ops: [{ op: 'update', id, status }], reason: `Commit ${c.id.slice(0, 7)} says it is finished: ${subject(c.message)}`, source: { uri: c.url ?? `${name}@${c.id}`, kind: 'commit', title: subject(c.message) } });
-          settled.push({ id, title: e.title, status, result: result.status });
+      for (const id of finishedBy(c.message)) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const e = await l.entity(id);
+        const status = e && l.registry.type(e.type)?.statuses.closed[0];
+        if (!e || !status || !e.is_open || e.archived_at || questions.has(e.type)) continue;
+        const { rows: waiting } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([{ op: 'update', id, status }])]);
+        if (waiting.length) {
+          settled.push({ id, title: e.title, status, result: 'already proposed' });
+          continue;
         }
+        const result = await l.change({ kind: 'agent', name: who.slice('github:'.length) + ' (github)' }, { ops: [{ op: 'update', id, status }], reason: `Commit ${c.id.slice(0, 7)} says it is finished: ${subject(c.message)}`, source: { uri: c.url ?? `${name}@${c.id}`, kind: 'commit', title: subject(c.message) } });
+        settled.push({ id, title: e.title, status, result: result.status });
       }
     }
   }

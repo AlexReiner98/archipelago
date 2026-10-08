@@ -33,7 +33,7 @@ import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { backupAll, newestBackup, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT } from './config.ts';
-import { receivePush, signedByGithub } from './github.ts';
+import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
@@ -210,7 +210,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (!(await signedByGithub(lattice, body, req.headers['x-hub-signature-256']))) return refused();
         const event = req.headers['x-github-event'];
         if (event !== 'push') return send(res, 200, { result: { recorded: false, reason: event === 'ping' ? 'pong' : `Only pushes are taken in, not "${event}".` } });
-        return send(res, 200, { result: await receivePush(lattice, JSON.parse(body.toString('utf8'))) });
+        const payload = deliveryPayload(body, req.headers['content-type']);
+        if (!payload) return send(res, 400, { error: 'The delivery is not JSON, nor a form with JSON in its "payload" field. Set the webhook\'s content type to application/json.' });
+        const deliveryId = req.headers['x-github-delivery'];
+        return send(res, 200, { result: await receivePush(lattice, payload, typeof deliveryId === 'string' ? deliveryId : undefined) });
       }
 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {

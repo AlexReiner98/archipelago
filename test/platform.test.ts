@@ -588,9 +588,21 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   const connected = (await call('/api/github', admin, { new_secret: true })).result;
   assert.deepEqual([connected.connected, connected.webhook_path, connected.repos[0].github], [true, '/github/default', 'acme/site']);
 
-  const deliver = async (payload: unknown, { event = 'push', secret = connected.secret as string, path = connected.webhook_path as string } = {}) => {
-    const body = JSON.stringify(payload);
-    const res = await fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', 'x-github-event': event, 'x-hub-signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}` }, body });
+  const deliver = async (
+    payload: unknown,
+    { event = 'push', secret = connected.secret as string, path = connected.webhook_path as string, delivery = '', form = false, raw = undefined as string | undefined } = {},
+  ) => {
+    const body = raw ?? (form ? `payload=${encodeURIComponent(JSON.stringify(payload))}` : JSON.stringify(payload));
+    const res = await fetch(base + path, {
+      method: 'POST',
+      headers: {
+        'content-type': form ? 'application/x-www-form-urlencoded' : 'application/json',
+        'x-github-event': event,
+        'x-hub-signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`,
+        ...(delivery && { 'x-github-delivery': delivery }),
+      },
+      body,
+    });
     return { status: res.status, ...((await res.json()) as any) };
   };
   const push = (branch: string, message: string, repo = 'Acme/Site') => ({
@@ -620,6 +632,30 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   const work = (await call('/agent/view', robot, { name: 'repo_work', params: { repo: 'acme/site' } })).result;
   assert.deepEqual([work.repo.id, work.last_push.branch, work.ready.length], [made.r, 'main', 0], 'found by its GitHub name, with its last push, and the task is done');
   assert.equal((await call('/api/github', admin)).result.repos[0].last_push.subject, '1 commit to main: Merge the footer');
+
+  // A webhook left on GitHub's default content type sends a form; anything that is neither is refused, not crashed on.
+  assert.equal((await deliver(push('feat/form', 'x'), { form: true })).result.branch, 'feat/form');
+  assert.equal((await deliver(null, { raw: 'not json' })).status, 400);
+  assert.equal((await deliver(null, { raw: 'ref=x', form: true })).status, 400);
+
+  // Only what a commit says in its own words counts: not a denial, a quotation or a revert.
+  const header = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'h', type: 'task', title: 'Fix the header', visibility: 'shared' }] })).result.created.h;
+  for (const message of [
+    `Start on the header\n\nThis does not fix ${header} yet.`,
+    `Header, first half\n\nOnly partly fixes ${header}`,
+    `Reword the note that said "fixes ${header}"`,
+    `Revert "Rebuild the header"\n\nThis reverts commit 1234567.\n\nFixes ${header}`,
+    `Back out the header\n\nThis reverts commit 1234567.\n> Fixes ${header}`,
+  ])
+    assert.deepEqual((await deliver(push('main', message))).result.settled, [], message);
+  const denied = (await deliver(push('main', `Not the footer this time. Fixes ${header}`), { delivery: 'd-1' })).result;
+  assert.equal(denied.settled[0].result, 'proposed', 'a "not" in an earlier sentence takes nothing back');
+
+  // A delivery sent again is taken in once, and a thing waiting to be closed is not proposed again.
+  const resent = (await deliver(push('main', `Not the footer this time. Fixes ${header}`), { delivery: 'd-1' })).result;
+  assert.deepEqual([resent.recorded, resent.reason], [false, 'This delivery was already taken in.']);
+  assert.equal((await deliver(push('main', `Tidy up\n\nCloses ${header}`), { delivery: 'd-2' })).result.settled[0].result, 'already proposed');
+  assert.equal(((await call('/api/proposals', admin)).result as any[]).length, 1);
 
   const again = (await call('/api/github', admin, { new_secret: true })).result.secret as string;
   assert.equal((await deliver(push('main', 'x'))).status, 401, 'a replaced secret no longer works');

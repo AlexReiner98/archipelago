@@ -383,8 +383,10 @@ change that:
   ```
 
   With the variables unset it falls back to a server on this machine.
-  `claude mcp get lattice`, run in the project's folder, says which server a
-  session there will use. The connection is kept in the machine's environment
+  Printing `LATTICE_URL` (`echo $LATTICE_URL`; in PowerShell,
+  `$env:LATTICE_URL`) says which server a session will use. `claude mcp get
+  lattice` says it too, but prints the token in full with it: keep that out
+  of an agent's session and off a shared screen. The connection is kept in the machine's environment
   on purpose: an entry added with `claude mcp add --scope local` lives in
   Claude Code's own settings file, and was lost once when a running session
   wrote that file back. The hooks in `.claude/settings.json` are separate

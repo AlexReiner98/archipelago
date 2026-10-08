@@ -14,8 +14,10 @@ are two servers, and they are not the same thing:
   lattice MCP tools in this folder point there when the machine has the
   environment variables `LATTICE_URL` and `LATTICE_AGENT_TOKEN` (set once
   from "Connect an agent" on the Workspace screen; `.mcp.json` reads them).
-  Check before you rely on it: `claude mcp get lattice` says which server
-  you have, and without the variables it is the local one. What you write there waits for the owner in Review or on Home;
+  Check before you rely on it: print `LATTICE_URL` (`echo $LATTICE_URL`; in
+  PowerShell, `$env:LATTICE_URL`), and if it is empty you have the local one.
+  Do not run `claude mcp get lattice` to find out: it prints the agent token
+  in full, into your transcript. What you write there waits for the owner in Review or on Home;
   there is no dev mode and no `restart` tool.
 - **The local server on port 3100 (`npm run dev`) is where the code is
   tried.** Its map is a scratch copy: do not record the state of the work
