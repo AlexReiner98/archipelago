@@ -191,6 +191,17 @@ export class Lattice {
     const levels = input.ops.map((op) => (actor.kind === 'human' ? 'auto' : this.policy[op.op]));
     const forbidden = input.ops.filter((_, i) => levels[i] === 'forbidden').map((op) => op.op);
     if (forbidden.length) throw new Error(`Policy forbids agents from: ${[...new Set(forbidden)].join(', ')}`);
+    // Settling a question is the human's, whatever the policy lets agents do
+    // unreviewed: an agent that sees one settled proposes the answer, and the
+    // human confirms it. Otherwise agents leave such things open with a note.
+    if (actor.kind !== 'human') {
+      const questions = new Set([...this.registry.family('decision'), ...this.registry.family('hypothesis')]);
+      for (const [i, op] of input.ops.entries()) {
+        if (op.op !== 'update' || !op.status || levels[i] !== 'auto') continue;
+        const e = await this.entity(op.id);
+        if (e && questions.has(e.type) && e.is_open && this.registry.type(e.type)?.statuses.closed.includes(op.status)) levels[i] = 'propose';
+      }
+    }
 
     if (levels.includes('propose')) {
       const id = newId('p');

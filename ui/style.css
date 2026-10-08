@@ -316,3 +316,33 @@ svg.graph .dim { opacity: 0.18; }
 .legend .swatch.rm-blocked { background: var(--g-blocked); }
 .legend .stroke.waits { border-top: 2px solid var(--g-blocked); }
 .legend .stroke.lifted { border-top: 2px dashed var(--edge-strong); }
+
+/* Today: one column of what needs the owner, then counts for the rest. */
+.inbox { display: grid; gap: 14px; max-width: 980px; }
+.drawer { max-width: 980px; }
+.project > header { gap: 12px; flex-wrap: wrap; justify-content: flex-start; }
+.project > header h2 { margin-right: auto; }
+.project > header > a { font-weight: 400; font-size: 13px; }
+.project .now { padding: 8px 14px 0; margin: 0; }
+.sub { padding: 10px 14px 2px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.strip { margin: 18px 0 12px; flex-wrap: wrap; }
+.strip button:disabled { opacity: 0.5; cursor: default; }
+.page-head { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.page-head > h1, .page-head > p { margin: 0; }
+.question-more { display: grid; gap: 8px; }
+.question-more[hidden], .question .row-sub[hidden] { display: none; }
+.rows > li.question { padding: 9px 14px; gap: 6px; }
+.project-body { padding: 12px 14px; display: grid; gap: 8px; }
+
+/* Home's cards: a name, a bar, and short plain lists. */
+.project > header { border-bottom: 0; padding-bottom: 6px; }
+.project .rows > li { border-bottom: 0; padding: 4px 14px; }
+.project .rows > li.question { padding: 4px 14px; }
+.project .rows > li.more { padding: 0 14px 6px; }
+.project .rows { padding-bottom: 6px; }
+.project .sub { padding-top: 8px; }
+.project .sub a { color: inherit; }
+button.quiet { border: 0; background: none; padding: 0; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+button.quiet:hover { color: var(--accent); text-decoration: underline; }
+.project .question > .row-top > button { padding: 1px 9px; font-size: 12px; }
+.project .rows > li > .row-top > button { padding: 1px 9px; font-size: 12px; }

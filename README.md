@@ -47,11 +47,21 @@ All three call the tools in [src/tools.ts](src/tools.ts). The web UI and CLI
 have human authority; the MCP endpoint does not, and two tools (`decide`,
 `init`) are not offered to agents at all.
 
-The web UI's screens: **Today** (notifications, sessions and the
-standing questions), **Review** (approve, exclude or correct proposed changes),
-**Map** (search, create, and each entity with its fields, relations and
-history), **Graph**, **Roadmap**, **Questions**, **Automations**, **Workspace** and
-**Activity** (the event log, one line per change set).
+The web UI has three places. **Home** is what needs you, project by project.
+Proposals to approve or reject come first. Then each project is a card: its
+progress, what is being worked on, and under it what there is for you to
+read, to decide and to do in that project, each dealt with where it stands
+and each list showing its first two until asked for more. A project's
+**Roadmap** and **Questions** open from its card. What belongs to no project
+has a card of its own, and what is blocked, at risk, waiting on others, in
+session or held is a row of counts, opened one at a time.
+**Search** finds anything in the map by words or type (it lists nothing
+until you ask), creates new things, and opens each entity with its fields,
+relations and history; **Activity** (the event log, one line per change set)
+is beside it. **Workspace** holds the owner, tokens, members, importing a backup and
+automations. A proposal's changes can be excluded or corrected one by one in
+**Review**, reached from the proposal on Home. The **Graph** opens from an
+entity's page.
 
 The roadmap is one project's features in the order they are to be built. Each
 shows its own status and how much of the work that is part of it is closed, and
@@ -102,7 +112,10 @@ Every change to the map goes through one tool, `change`: a list of ops
 reason and a source.
 
 1. The whole change is validated against the schema and the current map.
-2. Policy decides: applied at once, or held as a proposal. By default agents
+2. Policy decides: applied at once, or held as a proposal. Closing a decision
+   or a hypothesis is always held when an agent does it, whatever the policy:
+   the agent proposes the answer and you confirm it on Home, under the
+   project it belongs to. By default agents
    propose everything. Loosen it per op in `lattice.config.json`:
    `{ "policy": { "create": "auto", "link": "auto" } }`.
 3. You review and decide, in the web UI's Review screen or from the CLI:
@@ -154,7 +167,7 @@ at once; they are the session's own state, not facts about the world.
   the full transcript is kept under `runs/`. Ending the run from the UI stops
   the process. This needs the `claude` CLI on the PATH.
 
-The Today screen lists open sessions, flags one that has not reported for 30
+Home lists open sessions (under Sessions), flags one that has not reported for 30
 minutes, and can end it, which releases what it holds. An entity page has
 **Copy session brief**: the task's context, blockers, needed resources and the
 rules that govern them, as text to start a session with.
@@ -162,7 +175,7 @@ rules that govern them, as text to start a session with.
 ## Notifications and automations
 
 - **Notifications:** an agent (`notify`), an automation or the system can leave
-  you a message. Unread ones sit at the top of Today. A session that stops
+  you a message. Unread ones sit at the top of Home. A session that stops
   reporting raises one, saying what it still holds.
 - **Automations:** a trigger and an action, stored as an entity.
   - Triggers: `every` N minutes, `daily` at a local time, or an `event` in the

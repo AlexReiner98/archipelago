@@ -364,7 +364,9 @@ export const TOOLS: Record<string, Tool> = {
     description:
       'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type) with the reason. ' +
       'Creates can carry a ref so later ops in the same change can link to them. Give the source the facts came from. ' +
-      'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human.',
+      'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
+      'Keep the map true as you work: when what you did or found settles something that is still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, instead of leaving it open with a note. ' +
+      'Closing a decision or a hypothesis is always held for the human to confirm, so propose the answer freely: it costs them one click.',
     input: {
       ops: z.array(op).min(1),
       reason: z.string().min(1).describe('Why this change is being made. Shown in the activity log.'),
@@ -445,7 +447,7 @@ export const TOOLS: Record<string, Tool> = {
     },
   },
   notify: {
-    description: 'Send the human a notification: something they should know or act on that is not itself a change to the map. Shown on their Today screen until read. Use sparingly.',
+    description: 'Send the human a notification: something they should know or act on that is not itself a change to the map. Shown on their Home screen until read. Use sparingly.',
     input: {
       title: z.string().min(1).describe('The whole message in one line if possible.'),
       body: z.string().optional(),

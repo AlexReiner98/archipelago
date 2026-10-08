@@ -171,6 +171,7 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
   lines.push(
     '',
     'If the lattice MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. The session is closed for you when it ends.',
+    'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm, so propose the answer.',
   );
   return lines.join('\n');
 }

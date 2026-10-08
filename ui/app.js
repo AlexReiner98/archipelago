@@ -99,7 +99,7 @@ const known = {
   },
 };
 
-/** Become whoever a token says, starting from Today: nothing on the page belongs to the new workspace. */
+/** Become whoever a token says, starting from Home: nothing on the page belongs to the new workspace. */
 function enter(token) {
   store.token = token;
   schema = undefined;
@@ -262,100 +262,237 @@ function card(title, { wide } = {}) {
 
 const WHY = { depends_on: 'depends on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
 
+// The count beside Home: proposals to approve and notifications not yet read.
 async function refreshReviewCount() {
-  const set = async (id, count) => {
-    const badge = document.getElementById(id);
-    try {
-      const n = await count();
-      badge.textContent = n;
-      badge.hidden = n === 0;
-    } catch {
-      badge.hidden = true;
-    }
-  };
-  set('review-count', async () => (await api('proposals')).length);
-  set('notice-count', async () => (await api('view', { name: 'notifications' })).length);
+  const badge = document.getElementById('notice-count');
+  try {
+    const [pending, notes] = await Promise.all([api('proposals'), api('view', { name: 'notifications' })]);
+    badge.textContent = pending.length + notes.length;
+    badge.hidden = pending.length + notes.length === 0;
+  } catch {
+    badge.hidden = true;
+  }
 }
 
-// ---- Today ---------------------------------------------------------------
+// ---- Home ----------------------------------------------------------------
 
-function today() {
-  const needs = card('Needs you now');
-  const blocked = card('Blocked, and what has to move first');
-  const waiting = card('Waiting on others');
-  const risk = card('At risk');
-  const mine = card('You are holding up');
-  const resources = card('Resources and connections');
-  const running = card('Sessions', { wide: true });
-  const notices = card('Notifications', { wide: true });
-  main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Today'), h('p', { class: 'muted' }, 'Derived from the map each time you open this page.')),
-    h('div', { class: 'grid' }, notices.el, running.el, needs.el, blocked.el, mine.el, waiting.el, risk.el, resources.el),
-  );
-  // Most of this page is about the owner; say so when there is none yet.
-  api('workspace_info').then(
-    ({ owner }) => {
-      const stillHere = location.hash === '' || location.hash.startsWith('#/today');
-      if (!owner && stillHere) main.firstChild.append(h('p', { class: 'error' }, 'This workspace has no owner yet, so there is nobody for this page to be about. ', h('a', { href: '#/workspace' }, 'Set the owner'), '.'));
-    },
-    () => {},
-  );
+// What needs the owner, project by project: under each project, what there
+// is to read, to decide and to do in it, each dealt with where it stands.
+// Proposals come first. The rest of what the map knows about today is a row
+// of counts, opened one at a time.
+let todayOpen = '';
+/** The lists on Home shown in full; the others stop at the first two. */
+const todayAll = new Set();
 
-  const markRead = async (ids) => {
-    await api('change', { ops: ids.map((id) => ({ op: 'update', id, status: 'read' })), reason: 'Read in the UI' });
+async function today() {
+  const here = () => location.hash === '' || location.hash.startsWith('#/today');
+  if (!main.querySelector('.inbox')) main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Home')), h('div', { class: 'inbox' }, h('div', { class: 'empty' }, 'Loading…')));
+  const view = (name, params) => api('view', { name, params });
+  const change = async (ops, reason) => {
+    try {
+      await api('change', { ops, reason });
+      dirty = false;
+      today();
+      refreshReviewCount();
+    } catch (err) {
+      tell('That change was not made', err.message);
+    }
+  };
+  const [info, pending, notes, asked, needs, mine, blockers, waiting, risk, sessions] = await Promise.all([
+    api('workspace_info'),
+    api('proposals'),
+    view('notifications'),
+    view('questions'),
+    view('needs_me'),
+    view('blocked_on_me'),
+    view('blockers'),
+    view('waiting_on'),
+    view('at_risk'),
+    view('sessions'),
+  ]);
+  // Every project's open questions as one list, what holds up the most first.
+  const perProject = await Promise.all(asked.projects.filter((pr) => pr.questions > 0).map((pr) => view('questions', { project: pr.id }).then((d) => d.open.map((q) => ({ ...q, project: pr })))));
+  const seen = new Set();
+  const undecided = perProject
+    .flat()
+    .filter((q) => !seen.has(q.id) && seen.add(q.id))
+    .sort((a, b) => b.holds_up - a.holds_up);
+  const trees = await projectTrees(asked.projects);
+  if (!here()) return;
+
+  // The top of each list is what matters most; the rest is one click away.
+  const rows = (key, items, render) =>
+    h(
+      'ul',
+      { class: 'rows' },
+      (todayAll.has(key) ? items : items.slice(0, 2)).map(render),
+      items.length > 2 && h('li', { class: 'more' }, h('button', { class: 'quiet', onclick: () => ((todayAll.has(key) ? todayAll.delete(key) : todayAll.add(key)), today()) }, todayAll.has(key) ? 'fewer' : `${items.length - 2} more`)),
+    );
+  const decide = async (pr, yes) => {
+    const note = yes ? undefined : await ask({ title: 'Reject this proposal?', message: pr.reason, input: { placeholder: 'Why reject it? (optional, recorded in the log)' }, action: 'Reject', danger: true });
+    if (!yes && note === null) return;
+    try {
+      await api('decide', { proposal: pr.id, approve: yes, note: note || undefined });
+      if (yes && pr.ops.some((o) => o.op === 'define_type')) await loadSchema();
+    } catch (err) {
+      await tell('That was not done', err.message);
+    }
     today();
     refreshReviewCount();
   };
-  notices
-    .fill(
-      api('view', { name: 'notifications' }),
-      (rows) => [
-        rows.length,
-        h(
-          'ul',
-          { class: 'rows' },
-          rows.map((n) =>
-            h(
-              'li',
-              {},
-              h(
-                'div',
-                { class: 'row-top' },
-                h('span', { class: `pill ${n.level === 'urgent' ? 'bad' : n.level === 'warning' ? 'warn' : ''}` }, n.level ?? 'info'),
-                h('span', { class: 'grow' }, h('strong', {}, n.title)),
-                h('button', { onclick: () => markRead([n.id]) }, 'Mark read'),
-              ),
-              h('div', { class: 'row-sub' }, n.body && [n.body, ' · '], n.about_id && [h('a', { href: `#/e/${n.about_id}` }, n.about_title), ' · '], `${n.from ?? ''} · ${when(n.created_at)}`),
-            ),
-          ),
-          rows.length > 1 && h('li', {}, h('button', { onclick: () => markRead(rows.map((n) => n.id)) }, `Mark all ${rows.length} read`)),
-        ),
-      ],
-      '',
-    )
-    .then(() => {
-      // Nothing unread: the card would only be noise.
-      if (notices.el.querySelector('.n').textContent === '0') notices.el.remove();
-    });
-
-  running.fill(
-    api('view', { name: 'sessions' }),
-    (v) => [
-      v.open.length,
+  const markRead = (ids) => change(ids.map((id) => ({ op: 'update', id, status: 'read' })), 'Read in the UI');
+  // Which project a thing belongs to: the project itself and everything in its tree.
+  const home = new Map();
+  for (const pr of asked.projects) {
+    const walk = (b) => {
+      home.set(b.id, pr.id);
+      for (const w of b.work ?? []) home.set(w.id, pr.id);
+      for (const inner of b.branches ?? []) walk(inner);
+    };
+    home.set(pr.id, pr.id);
+    for (const b of trees.get(pr.id)?.branches ?? []) walk(b);
+    for (const w of trees.get(pr.id)?.unplaced ?? []) home.set(w.id, pr.id);
+  }
+  const todo = needs.actionable.filter((e) => !seen.has(e.id));
+  const shown = new Set([...seen, ...todo.map((e) => e.id)]);
+  const holding = mine.filter((r) => !shown.has(r.entity.id));
+  // A proposal that settles one thing is an answer offered by an agent: it is
+  // shown at that thing, to be confirmed with one press, not in the pile above.
+  const answerOf = (pr) => (pr.ops.length === 1 && pr.ops[0].op === 'update' && pr.ops[0].status ? pr.ops[0] : null);
+  const answers = pending.filter(answerOf);
+  const bulk = pending.filter((pr) => !answerOf(pr));
+  const asked_ = new Map(undecided.map((q) => [q.id, q]));
+  const named = answers.some((pr) => !asked_.has(answerOf(pr).id)) ? new Map((await api('search', { limit: 200, include_archived: true })).map((e) => [e.id, e])) : new Map();
+  if (!here()) return;
+  const answered = new Set(answers.map((pr) => answerOf(pr).id));
+  const projectOf = (id) => asked_.get(id)?.project.id ?? home.get(id) ?? '';
+  // What needs the owner, under the project it belongs to ('' for none).
+  const mineIn = (id) => ({
+    confirm: answers.filter((pr) => projectOf(answerOf(pr).id) === id),
+    read: notes.filter((n) => (home.get(n.about_id) ?? '') === id),
+    decide: undecided.filter((q) => (id ? q.project.id === id : false) && !answered.has(q.id)),
+    todo: todo.filter((e) => (home.get(e.id) ?? '') === id),
+    holding: holding.filter((r) => (home.get(r.entity.id) ?? '') === id),
+  });
+  const amount = (m) => m.confirm.length + m.read.length + m.decide.length + m.todo.length + m.holding.length;
+  const part = (title, items, list) => items.length > 0 && [h('div', { class: 'sub' }, title, ' ', items.length), list];
+  const plainRow = (e, sub) => h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(e)), e.due && h('span', { class: 'pill warn' }, `due ${e.due}`)), sub && h('div', { class: 'row-sub' }, sub));
+  const noteRow = (n) =>
+    h(
+      'li',
+      {},
       h(
-        'ul',
-        { class: 'rows' },
-        v.open.map((r) =>
+        'div',
+        { class: 'row-top' },
+        n.level && n.level !== 'info' && h('span', { class: `pill ${n.level === 'urgent' ? 'bad' : 'warn'}` }, n.level),
+        h('span', { class: 'grow' }, n.about_id ? h('a', { href: `#/e/${n.about_id}` }, n.title) : h('strong', {}, n.title)),
+        h('button', { onclick: () => markRead([n.id]) }, 'Mark read'),
+      ),
+    );
+  const answerRow = (pr) => {
+    const op = answerOf(pr);
+    const e = asked_.get(op.id) ?? named.get(op.id) ?? { id: op.id, title: op.id };
+    return h(
+      'li',
+      {},
+      h(
+        'div',
+        { class: 'row-top' },
+        h('span', { class: 'grow' }, link(e), ' ', h('span', { class: 'arrow' }, '\u2192'), ' ', h('strong', {}, op.props?.outcome ?? op.status)),
+        h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Confirm'),
+        h('button', { onclick: () => decide(pr, false) }, 'No'),
+      ),
+      h('div', { class: 'row-sub' }, pr.reason),
+    );
+  };
+  const parts = (key, m) => [
+    part('To confirm', m.confirm, rows(`${key}:confirm`, m.confirm, answerRow)),
+    part('To read', m.read, rows(`${key}:read`, m.read, noteRow)),
+    part(key ? h('a', { href: `#/questions/${key}` }, 'To decide') : 'To decide', m.decide, rows(`${key}:decide`, m.decide, (q) => questionItem(q, change, null, true))),
+    part('To do', m.todo, rows(`${key}:todo`, m.todo, (e) => plainRow(e))),
+    part('Others are waiting on', m.holding, rows(`${key}:holding`, m.holding, (r) => plainRow(r.entity, ['holding up: ', r.holding_up.map((e, i) => [i > 0 && ', ', link(e)])]))),
+  ];
+  const projectCard = (pr) => {
+    const tree = trees.get(pr.id);
+    const m = mineIn(pr.id);
+    return h(
+      'section',
+      { class: 'card project' },
+      h(
+        'header',
+        {},
+        h('h2', {}, h('a', { href: `#/roadmap/${pr.id}` }, pr.title)),
+        tree?.branches.length > 0 && progressBar(tree.progress),
+        pr.status !== 'active' && pill(pr.type, pr.status),
+      ),
+      amount(m) > 0 && parts(pr.id, m),
+    );
+  };
+  const loose = mineIn('');
+  const inbox = [
+    !info.owner && h('p', { class: 'error' }, 'This workspace has no owner yet, so there is nobody for this page to be about. ', h('a', { href: '#/workspace' }, 'Set the owner'), '.'),
+    bulk.length > 0 &&
+      h(
+        'section',
+        { class: 'card' },
+        h('header', {}, h('h2', {}, 'To approve'), h('span', { class: 'n' }, bulk.length)),
+        rows('approve', bulk, (pr) =>
           h(
             'li',
             {},
             h(
               'div',
               { class: 'row-top' },
-              h('span', { class: 'chip' }, r.surface ?? 'session'),
+              h('strong', { class: 'grow' }, pr.reason),
+              h('a', { href: '#/review' }, `${pr.ops.length} change${pr.ops.length === 1 ? '' : 's'}`),
+              h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Approve'),
+              h('button', { onclick: () => decide(pr, false) }, 'Reject'),
+            ),
+            h('div', { class: 'row-sub' }, pr.actor, pr.warnings.length > 0 && [' · ', h('span', { class: 'warning' }, `${pr.warnings.length} warning${pr.warnings.length === 1 ? '' : 's'}`)]),
+          ),
+        ),
+      ),
+    // The project with the most waiting for the owner comes first.
+    [...asked.projects].sort((a, b) => amount(mineIn(b.id)) - amount(mineIn(a.id))).map(projectCard),
+    amount(loose) > 0 && h('section', { class: 'card project' }, h('header', {}, h('h2', {}, 'Not in a project')), parts('', loose)),
+  ]
+    .flat()
+    .filter(Boolean);
+
+  // Everything else: a count each, and the list behind it on a click.
+  const others = {
+    blocked: {
+      label: 'Blocked',
+      n: blockers.length,
+      list: () => blockers.map((b) => entityRow(b.entity, ['waiting on: ', b.root_blockers.map((r, i) => [i > 0 && ', ', chip(r.type), ' ', link(r)])])),
+    },
+    waiting: {
+      label: 'Waiting on others',
+      n: waiting.blocked_by_others.length + waiting.owed_to_me.length,
+      list: () => [...waiting.blocked_by_others.map((r) => entityRow(r.entity, ['waiting on: ', r.waiting_on.map((e, i) => [i > 0 && ', ', link(e)])])), ...waiting.owed_to_me.map((e) => entityRow(e, 'owed to you'))],
+    },
+    risk: {
+      label: 'At risk',
+      n: risk.due_soon_or_overdue.length + risk.resting_on_refuted_hypothesis.length,
+      list: () => [
+        ...risk.due_soon_or_overdue.map((e) => entityRow(e, [e.overdue ? 'Overdue' : `Due within ${risk.due_within_days} days`, e.blocked && ', and blocked'])),
+        ...risk.resting_on_refuted_hypothesis.map((e) => entityRow(e, ['rests on a refuted hypothesis: ', h('a', { href: `#/e/${e.hypothesis}` }, e.hypothesis_title)])),
+      ],
+    },
+    sessions: {
+      label: 'Sessions',
+      n: sessions.open.length,
+      warn: sessions.open.some((r) => r.stale),
+      list: () =>
+        sessions.open.map((r) =>
+          h(
+            'li',
+            {},
+            h(
+              'div',
+              { class: 'row-top' },
               h('span', { class: 'grow' }, link(r)),
-              r.stale && h('span', { class: 'pill bad', title: `No report for over ${v.stale_after_minutes} minutes` }, 'gone quiet'),
-              h('span', { class: `pill ${r.status === 'waiting' ? 'warn' : 'ok'}` }, r.status),
+              r.stale && h('span', { class: 'pill bad', title: `No report for over ${sessions.stale_after_minutes} minutes` }, 'gone quiet'),
               h(
                 'button',
                 {
@@ -368,104 +505,77 @@ function today() {
                 'End',
               ),
             ),
-            h(
-              'div',
-              { class: 'row-sub' },
-              r.working_on.length ? ['working on: ', r.working_on.map((e, i) => [i > 0 && ', ', link(e)])] : 'no task named',
-              r.holds.length > 0 && [' · holds: ', r.holds.map((e, i) => [i > 0 && ', ', link(e)])],
-              r.repo && [' · ', link(r.repo)],
-              ` · last heard ${when(r.last_seen)}`,
-            ),
+            h('div', { class: 'row-sub' }, r.working_on.length ? r.working_on.map((e, i) => [i > 0 && ', ', link(e)]) : 'no task named', r.holds.length > 0 && [' · holds: ', r.holds.map((e, i) => [i > 0 && ', ', link(e)])], ` · last heard ${when(r.last_seen)}`),
           ),
         ),
-      ),
-    ],
-    'No sessions are running.',
-  );
-  const view = (name, params) => api('view', { name, params });
-
-  needs.fill(view('needs_me'), (v) => [v.actionable.length, h('ul', { class: 'rows' }, v.actionable.map((e) => entityRow(e)))], 'Nothing is waiting on you.');
-
-  blocked.fill(
-    view('blockers'),
-    (rows) => [
-      rows.length,
-      h(
-        'ul',
-        { class: 'rows' },
-        rows.map((b) => entityRow(b.entity, ['waiting on: ', b.root_blockers.map((r, i) => [i > 0 && ', ', chip(r.type), ' ', link(r)])])),
-      ),
-    ],
-    'Nothing is blocked.',
-  );
-
-  mine.fill(
-    view('blocked_on_me'),
-    (rows) => [rows.length, h('ul', { class: 'rows' }, rows.map((r) => entityRow(r.entity, ['holding up: ', r.holding_up.map((e, i) => [i > 0 && ', ', link(e)])])))],
-    'You are not holding anything up.',
-  );
-
-  waiting.fill(
-    view('waiting_on'),
-    (v) => [
-      v.blocked_by_others.length + v.owed_to_me.length,
-      h(
-        'ul',
-        { class: 'rows' },
-        v.blocked_by_others.map((r) => entityRow(r.entity, ['waiting on: ', r.waiting_on.map((e, i) => [i > 0 && ', ', link(e)])])),
-        v.owed_to_me.map((e) => entityRow(e, 'owed to you')),
-      ),
-    ],
-    'You are not waiting on anyone.',
-  );
-
-  risk.fill(
-    view('at_risk'),
-    (v) => [
-      v.due_soon_or_overdue.length + v.resting_on_refuted_hypothesis.length,
-      h(
-        'ul',
-        { class: 'rows' },
-        v.due_soon_or_overdue.map((e) => entityRow(e, [e.overdue ? 'Overdue' : `Due within ${v.due_within_days} days`, e.blocked && ', and blocked'])),
-        v.resting_on_refuted_hypothesis.map((e) => entityRow(e, ['rests on a refuted hypothesis: ', h('a', { href: `#/e/${e.hypothesis}` }, e.hypothesis_title)])),
-      ),
-    ],
-    'Nothing is due soon, and no open work rests on a refuted hypothesis.',
-  );
-
-  resources.fill(
-    Promise.all([api('check_connections'), view('available_now'), api('search', { type: 'resource', limit: 100 })]),
-    ([connections, now, all]) => {
-      const connIds = new Set(connections.map((c) => c.id));
-      const heldBy = new Map(now.held_resources.map((r) => [r.resource, r]));
-      const rows = [
-        ...connections.map((c) =>
-          h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'chip' }, 'Connection'), h('span', { class: 'grow' }, link(c)), h('span', { class: `pill ${c.status === 'available' ? 'ok' : 'bad'}` }, c.status === 'available' ? 'reachable' : 'not reachable')), h('div', { class: 'row-sub' }, c.url)),
-        ),
-        ...all
-          .filter((r) => !connIds.has(r.id))
-          .map((r) => {
-            const held = heldBy.get(r.id);
-            const state = r.status !== 'available' ? ['bad', r.status] : held ? ['warn', 'held'] : ['ok', 'free'];
-            return h(
-              'li',
-              {},
-              h('div', { class: 'row-top' }, h('span', { class: 'chip' }, 'Resource'), h('span', { class: 'grow' }, link(r)), h('span', { class: `pill ${state[0]}` }, state[1])),
-              held && h('div', { class: 'row-sub' }, 'held by ', h('a', { href: `#/e/${held.held_by}` }, held.held_by_title), ` since ${when(held.since)}`),
-            );
-          }),
-        ...now.waiting_on_resource.map((t) => entityRow(t, ['cannot run: ', t.waiting_on.map((w) => `${WHY[w.why]} ${w.resource}`).join(', ')])),
-      ];
-      return [rows.length, h('ul', { class: 'rows' }, rows)];
     },
-    'No resources or connections in the map.',
+    resources: { label: 'Resources', n: null, list: null },
+  };
+  if (todayOpen && !others[todayOpen]) todayOpen = '';
+  const drawer = h('div', { class: 'drawer' });
+  const openDrawer = async () => {
+    const o = others[todayOpen];
+    if (!o) return drawer.replaceChildren();
+    const list = o.list ? o.list() : await resourceRows(view);
+    drawer.replaceChildren(h('section', { class: 'card' }, list.length ? h('ul', { class: 'rows' }, list) : h('div', { class: 'empty' }, 'Nothing.')));
+  };
+  const strip = h(
+    'div',
+    { class: 'switch strip' },
+    Object.entries(others).map(([key, o]) =>
+      h(
+        'button',
+        {
+          class: todayOpen === key ? 'on' : '',
+          disabled: o.n === 0,
+          onclick: () => {
+            todayOpen = todayOpen === key ? '' : key;
+            for (const b of strip.children) b.classList.toggle('on', b.dataset.key === todayOpen);
+            openDrawer();
+          },
+          'data-key': key,
+        },
+        o.label,
+        o.n != null && [' ', h('span', { class: o.warn ? 'warning' : 'muted' }, o.n)],
+      ),
+    ),
   );
+  main.replaceChildren(
+    h('div', { class: 'page-head' }, h('h1', {}, 'Home')),
+    h('div', { class: 'inbox' }, inbox, h('div', {}, h('button', { onclick: () => (location.hash = '#/new/project') }, 'New project'))),
+    strip,
+    drawer,
+  );
+  openDrawer();
+}
+
+/** Connections, resources and who holds them, as rows. */
+async function resourceRows(view) {
+  const [connections, now, all] = await Promise.all([api('check_connections'), view('available_now'), api('search', { type: 'resource', limit: 100 })]);
+  const connIds = new Set(connections.map((c) => c.id));
+  const heldBy = new Map(now.held_resources.map((r) => [r.resource, r]));
+  return [
+    ...connections.map((c) => h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(c)), h('span', { class: `pill ${c.status === 'available' ? 'ok' : 'bad'}` }, c.status === 'available' ? 'reachable' : 'not reachable')))),
+    ...all
+      .filter((r) => !connIds.has(r.id))
+      .map((r) => {
+        const held = heldBy.get(r.id);
+        const state = r.status !== 'available' ? ['bad', r.status] : held ? ['warn', 'held'] : ['ok', 'free'];
+        return h(
+          'li',
+          {},
+          h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(r)), h('span', { class: `pill ${state[0]}` }, state[1])),
+          held && h('div', { class: 'row-sub' }, 'held by ', h('a', { href: `#/e/${held.held_by}` }, held.held_by_title), ` since ${when(held.since)}`),
+        );
+      }),
+    ...now.waiting_on_resource.map((t) => entityRow(t, ['cannot run: ', t.waiting_on.map((w) => `${WHY[w.why]} ${w.resource}`).join(', ')])),
+  ];
 }
 
 // ---- Review --------------------------------------------------------------
 
 async function review() {
-  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Review'), h('p', { class: 'muted' }, 'Changes agents have proposed. Nothing here is in the map until you approve it.')));
+  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Review')));
   const [pending, known] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true })]);
   const names = new Map(known.map((e) => [e.id, e]));
   if (!pending.length) main.append(h('section', { class: 'card' }, h('div', { class: 'empty' }, 'Nothing to review.')));
@@ -642,13 +752,25 @@ function proposalCard(p, names) {
   return el;
 }
 
-// ---- Map -----------------------------------------------------------------
+// ---- Search --------------------------------------------------------------
+
+/** Finding something in the map, or seeing how the map came to be. */
+const mapTabs = (on) =>
+  h(
+    'span',
+    { class: 'switch' },
+    [['Search', 'map'], ['Activity', 'activity']].map(([label, to]) => h('button', { class: on === to ? 'on' : '', onclick: () => (location.hash = `#/${to}`) }, label)),
+  );
 
 const mapState = { q: '', type: '', open: 'open' };
 
 function map() {
   const results = h('div');
+  const list = h('section', { class: 'card', hidden: true }, results);
   const run = async () => {
+    // Nothing is listed until something is asked for: words, or a type.
+    list.hidden = !mapState.q.trim() && !mapState.type;
+    if (list.hidden) return;
     try {
       let rows = await api('search', {
         q: mapState.q || undefined,
@@ -677,17 +799,18 @@ function map() {
     run();
   };
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Map'), h('p', { class: 'muted' }, 'Everything in the map. A type includes its flavours. Sources, sessions and other system records are listed only when you pick their type.')),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Search'), mapTabs('map')),
     h(
       'div',
       { class: 'toolbar', style: 'margin-bottom: 12px' },
-      h('input', { type: 'search', placeholder: 'Search titles and text', value: mapState.q, oninput: set('q'), style: 'flex: 1; min-width: 200px' }),
+      h('input', { type: 'search', placeholder: 'Search titles and text', value: mapState.q, oninput: set('q'), autofocus: true, style: 'flex: 1; min-width: 200px' }),
       h('select', { onchange: set('type') }, h('option', { value: '' }, 'All types'), schema.types.map((t) => h('option', { value: t.id, selected: t.id === mapState.type }, `${t.title}${t.pack === 'core' ? '' : ` (${t.pack})`}`))),
       h('button', { onclick: () => (location.hash = `#/new/${mapState.type || 'task'}`) }, 'New'),
       h('select', { onchange: set('open') }, ['open', 'closed', 'all'].map((v) => h('option', { value: v, selected: v === mapState.open }, v === 'open' ? 'Unfinished' : v === 'closed' ? 'Finished' : 'Both'))),
     ),
-    h('section', { class: 'card' }, results),
+    list,
   );
+  main.querySelector('input[type=search]').focus();
   run();
 }
 
@@ -1056,7 +1179,6 @@ async function automations() {
       'div',
       { class: 'page-head' },
       h('h1', {}, 'Automations'),
-      h('p', { class: 'muted' }, 'A trigger that fires an action. One an agent proposes does nothing until you approve it in Review. Every firing is in Activity.'),
     ),
     h('div', { class: 'toolbar', style: 'margin-bottom: 12px' }, h('button', { class: 'primary', onclick: () => (location.hash = '#/new/sys.automation') }, 'New automation')),
     h(
@@ -1316,7 +1438,6 @@ async function graph(focus) {
       'div',
       { class: 'page-head' },
       h('h1', {}, focused ? ['Around: ', focused.title] : 'Graph'),
-      h('p', { class: 'muted' }, focused ? 'What this is connected to. ' : 'What is connected to what. Entities with no drawn relation are left out. ', 'Drag to move, scroll to zoom. The Map screen lists the same things as a table.'),
     ),
     h(
       'div',
@@ -1584,7 +1705,7 @@ function ownerCard(owner, redraw) {
   return h(
     'section',
     { class: 'card wide' },
-    h('header', {}, h('h2', {}, 'Owner'), h('span', { class: 'n' }, 'Whose work the Today screen is about.')),
+    h('header', {}, h('h2', {}, 'Owner'), h('span', { class: 'n' }, 'Whose work Home is about.')),
     owner
       ? h('ul', { class: 'rows' }, h('li', { class: 'row-top' }, chip('person'), h('span', { class: 'grow' }, link(owner))))
       : [h('div', { class: 'empty' }, 'This workspace has no owner yet. Enter your name to become it; a person is created for you in the map.'), h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, name, email, h('button', { class: 'primary', onclick: set }, 'Set owner')), error],
@@ -1593,7 +1714,7 @@ function ownerCard(owner, redraw) {
 
 async function workspace() {
   const me = await (await fetch('/whoami', { headers: authHeaders() })).json();
-  const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name));
+  const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name, ' \u00b7 ', h('a', { href: '#/automations' }, 'Automations')));
   if (me.auth !== 'tokens') {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
@@ -1841,7 +1962,7 @@ async function activity() {
     if (!events.length) list.replaceChildren(h('div', { class: 'empty' }, 'No activity.'));
   };
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Activity'), h('p', { class: 'muted' }, 'Every change to the map, and every tool call imported from a connection. Newest first.')),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Activity'), mapTabs('activity')),
     h(
       'div',
       { class: 'toolbar', style: 'margin-bottom: 12px' },
@@ -1859,6 +1980,13 @@ async function activity() {
     h('section', { class: 'card' }, list),
   );
   run().catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
+}
+
+// ---- Projects ------------------------------------------------------------
+
+/** Each project's roadmap tree, by project id. `all` is the project list of the `questions` view. */
+async function projectTrees(all) {
+  return new Map(await Promise.all(all.map(async (pr) => [pr.id, await api('view', { name: 'tree', params: { root: pr.id, tree: 'software.roadmap' } }).catch(() => null)])));
 }
 
 // ---- Roadmap -------------------------------------------------------------
@@ -2111,12 +2239,12 @@ async function roadmap(rootId) {
       'div',
       { class: 'page-head' },
       h('h1', {}, 'Roadmap'),
-      h('p', { class: 'muted' }, 'A project\'s features in the order they are to be built. Progress counts the tasks and issues that are part of each feature; the status is the feature\'s own.'),
     ),
     h(
       'div',
       { class: 'toolbar', style: 'margin-bottom: 14px' },
       h('select', { onchange: (e) => (location.hash = `#/roadmap/${e.target.value}`) }, roots.map((r) => h('option', { value: r.id, selected: r.id === rootId }, `${r.title} (${r.branches})`))),
+      h('a', { href: `#/questions/${rootId}` }, 'Questions'),
       h('a', { href: `#/e/${rootId}` }, 'Open project'),
       h(
         'span',
@@ -2180,6 +2308,96 @@ async function roadmap(rootId) {
 
 // ---- Questions -----------------------------------------------------------
 
+const openQuestions = new Set();
+const listed = (label, items, extra) => items.length > 0 && h('div', { class: 'row-sub' }, `${label}: `, items.map((x, i) => [i > 0 && ', ', link(x), extra?.(x)]));
+
+function questionItem(q, change, where, plain = false) {
+  const closed = types.get(q.type)?.statuses.closed ?? [];
+  let answer;
+  if (q.kind === 'decision') {
+    const outcome = h('input', { type: 'text', placeholder: 'What is decided', style: 'flex: 1; min-width: 220px' });
+    const why = h('input', { type: 'text', placeholder: 'Why (optional)', style: 'flex: 1; min-width: 220px' });
+    const option = h('input', { type: 'text', placeholder: 'Add an option', class: 'option-new' });
+    const picks = h('div', { class: 'toolbar options' });
+    const pick = (o, button) => {
+      outcome.value = o;
+      dirty = true; // a choice not yet confirmed must survive a live update
+      for (const b of picks.querySelectorAll('button')) b.classList.toggle('on', b === button);
+    };
+    picks.append(
+      ...q.options.map((o) => {
+        const button = h('button', { onclick: () => pick(o, button) }, o);
+        return button;
+      }),
+      option,
+    );
+    option.addEventListener('keydown', (e) => e.key === 'Enter' && option.value.trim() && change([{ op: 'update', id: q.id, props: { options: [...q.options, option.value.trim()] } }], 'Option added in the UI'));
+    const decide = () => {
+      if (!outcome.value.trim()) return outcome.focus();
+      change([{ op: 'update', id: q.id, status: closed[0], props: { outcome: outcome.value.trim(), rationale: why.value.trim() || null, decided_on: new Date().toISOString().slice(0, 10) } }], 'Decided in the UI');
+    };
+    answer = [picks, h('div', { class: 'toolbar' }, outcome, why, h('button', { class: 'primary', onclick: decide }, 'Decide'))];
+  } else {
+    answer = h(
+      'div',
+      { class: 'toolbar' },
+      h('span', { class: 'muted' }, 'It turned out to be'),
+      closed.map((st) => h('button', { onclick: async () => (await ask({ title: `Mark this ${st}?`, message: q.title, action: `Mark ${st}` })) && change([{ op: 'update', id: q.id, status: st }], `Marked ${st} in the UI`) }, st)),
+    );
+  }
+  // Asking is not deciding: it leaves the question open and makes a task about
+  // it, which any agent listening hears at once.
+  const wish = h('input', { type: 'text', placeholder: 'Ask an agent to look into something first', style: 'flex: 1; min-width: 220px' });
+  const askAgent = () =>
+    wish.value.trim() &&
+    change(
+      [
+        { op: 'create', ref: 'ask', type: 'task', title: wish.value.trim(), body: `Asked by the owner on the question "${q.title}". Write what you find into that question's notes or options, then mark this done.` },
+        { op: 'link', type: 'about', from: 'ask', to: q.id },
+      ],
+      'Asked an agent in the UI',
+    );
+  wish.addEventListener('keydown', (e) => e.key === 'Enter' && askAgent());
+  // Folded to one line until it is to be answered. What is unfolded is kept
+  // across redraws, which happen on every change to the map.
+  const first = (q.body ?? '').replace(/\s+/g, ' ').trim();
+  const preview = !plain && first && h('div', { class: 'row-sub', hidden: openQuestions.has(q.id) }, first.length > 150 ? `${first.slice(0, 150)}\u2026` : first);
+  const more = h(
+    'div',
+    { class: 'question-more', hidden: !openQuestions.has(q.id) },
+    q.body && h('div', { class: 'question-body' }, q.body),
+    listed('Waiting on this', q.waiting),
+    listed('Rests on this', q.assumed_by),
+    listed('Being tested by', q.tests, (x) => ` (${x.status})`),
+    listed('Evidence', q.evidence, (x) => ` (${x.says})`),
+    listed('Asked of an agent', q.asks, (x) => ` (${x.status})`),
+    answer,
+    h('div', { class: 'toolbar' }, wish, h('button', { onclick: askAgent }, 'Ask an agent')),
+  );
+  const toggle = h(
+    'button',
+    {
+      onclick: () => {
+        more.hidden = !more.hidden;
+        if (more.hidden) openQuestions.delete(q.id);
+        else openQuestions.add(q.id);
+        if (preview) preview.hidden = !more.hidden;
+        toggle.textContent = more.hidden ? 'Answer' : 'Close';
+      },
+    },
+    openQuestions.has(q.id) ? 'Close' : 'Answer',
+  );
+  return h(
+    'li',
+    { class: 'question' },
+    plain
+      ? h('div', { class: 'row-top' }, h('span', { class: 'grow' }, link(q)), q.due && h('span', { class: 'pill warn' }, `due ${q.due}`), q.holds_up > 0 && h('span', { class: 'muted small', title: 'How many things wait on this' }, `holds up ${q.holds_up}`), toggle)
+      : h('div', { class: 'row-top' }, chip(q.type), h('strong', { class: 'grow' }, link(q)), where, q.due && h('span', { class: 'pill warn' }, `due ${q.due}`), q.holds_up > 0 && h('span', { class: 'pill bad' }, `holds up ${q.holds_up}`), toggle),
+    preview,
+    more,
+  );
+};
+
 // One project's open questions, to be worked through from the top: what holds
 // up the most comes first, and each is answered where it stands.
 async function questions(rootId) {
@@ -2205,74 +2423,13 @@ async function questions(rootId) {
   const change = async (ops, reason) => {
     try {
       await api('change', { ops, reason });
+      dirty = false;
       questions(rootId);
     } catch (err) {
       tell('That change was not made', err.message);
     }
   };
-  const listed = (label, items, extra) => items.length > 0 && h('div', { class: 'row-sub' }, `${label}: `, items.map((x, i) => [i > 0 && ', ', link(x), extra?.(x)]));
-
-  const question = (q) => {
-    const closed = types.get(q.type)?.statuses.closed ?? [];
-    let answer;
-    if (q.kind === 'decision') {
-      const outcome = h('input', { type: 'text', placeholder: 'What is decided', style: 'flex: 1; min-width: 220px' });
-      const why = h('input', { type: 'text', placeholder: 'Why (optional)', style: 'flex: 1; min-width: 220px' });
-      const option = h('input', { type: 'text', placeholder: 'Add an option', class: 'option-new' });
-      const picks = h('div', { class: 'toolbar options' });
-      const pick = (o, button) => {
-        outcome.value = o;
-        dirty = true; // a choice not yet confirmed must survive a live update
-        for (const b of picks.querySelectorAll('button')) b.classList.toggle('on', b === button);
-      };
-      picks.append(
-        ...q.options.map((o) => {
-          const button = h('button', { onclick: () => pick(o, button) }, o);
-          return button;
-        }),
-        option,
-      );
-      option.addEventListener('keydown', (e) => e.key === 'Enter' && option.value.trim() && change([{ op: 'update', id: q.id, props: { options: [...q.options, option.value.trim()] } }], 'Option added in the UI'));
-      const decide = () => {
-        if (!outcome.value.trim()) return outcome.focus();
-        change([{ op: 'update', id: q.id, status: closed[0], props: { outcome: outcome.value.trim(), rationale: why.value.trim() || null, decided_on: new Date().toISOString().slice(0, 10) } }], 'Decided in the UI');
-      };
-      answer = [picks, h('div', { class: 'toolbar' }, outcome, why, h('button', { class: 'primary', onclick: decide }, 'Decide'))];
-    } else {
-      answer = h(
-        'div',
-        { class: 'toolbar' },
-        h('span', { class: 'muted' }, 'It turned out to be'),
-        closed.map((st) => h('button', { onclick: async () => (await ask({ title: `Mark this ${st}?`, message: q.title, action: `Mark ${st}` })) && change([{ op: 'update', id: q.id, status: st }], `Marked ${st} in the UI`) }, st)),
-      );
-    }
-    // Asking is not deciding: it leaves the question open and makes a task about
-    // it, which any agent listening hears at once.
-    const wish = h('input', { type: 'text', placeholder: 'Ask an agent to look into something first', style: 'flex: 1; min-width: 220px' });
-    const askAgent = () =>
-      wish.value.trim() &&
-      change(
-        [
-          { op: 'create', ref: 'ask', type: 'task', title: wish.value.trim(), body: `Asked by the owner on the question "${q.title}". Write what you find into that question's notes or options, then mark this done.` },
-          { op: 'link', type: 'about', from: 'ask', to: q.id },
-        ],
-        'Asked an agent in the UI',
-      );
-    wish.addEventListener('keydown', (e) => e.key === 'Enter' && askAgent());
-    return h(
-      'li',
-      { class: 'question' },
-      h('div', { class: 'row-top' }, chip(q.type), h('strong', { class: 'grow' }, link(q)), q.due && h('span', { class: 'pill warn' }, `due ${q.due}`), q.holds_up > 0 && h('span', { class: 'pill bad' }, `holds up ${q.holds_up}`), pill(q.type, q.status)),
-      q.body && h('div', { class: 'question-body' }, q.body),
-      listed('Waiting on this', q.waiting),
-      listed('Rests on this', q.assumed_by),
-      listed('Being tested by', q.tests, (x) => ` (${x.status})`),
-      listed('Evidence', q.evidence, (x) => ` (${x.says})`),
-      listed('Asked of an agent', q.asks, (x) => ` (${x.status})`),
-      answer,
-      h('div', { class: 'toolbar' }, wish, h('button', { onclick: askAgent }, 'Ask an agent')),
-    );
-  };
+  const question = (q) => questionItem(q, change);
   const settledRow = (q) =>
     h(
       'li',
@@ -2290,7 +2447,7 @@ async function questions(rootId) {
 
   const held = new Set(data.open.flatMap((q) => q.waiting.map((w) => w.id))).size;
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Questions'), h('p', { class: 'muted' }, 'What is still undecided on a project: decisions to make and hypotheses to settle. What holds up the most is first. Answer each where it stands.')),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Questions')),
     h(
       'div',
       { class: 'toolbar', style: 'margin-bottom: 14px' },
@@ -2420,13 +2577,16 @@ document.addEventListener('visibilitychange', checkPulse);
 
 // ---- routing -------------------------------------------------------------
 
-const ROUTES = { today, review, map, activity, automations, graph, roadmap, questions, workspace };
+// Projects are on Home now; the old address still leads there.
+const ROUTES = { today, review, map, activity, automations, graph, roadmap, questions, workspace, projects: () => void (location.hash = '#/today') };
+// Where each screen sits in the menu, for the ones that are not in it themselves.
+const UNDER = { e: 'map', new: 'map', activity: 'map', graph: 'map', review: 'today', roadmap: 'today', questions: 'today', projects: 'today', automations: 'workspace' };
 
 async function route() {
   const [, name = 'today', arg] = location.hash.split('/');
   dirty = false;
   stale.hidden = true;
-  for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (name === 'e' || name === 'new' ? 'map' : name));
+  for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (UNDER[name] ?? name));
   try {
     if (!schema) await loadSchema();
     if (name === 'e' && arg) await entity(arg);

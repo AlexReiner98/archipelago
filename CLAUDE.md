@@ -6,17 +6,35 @@ is how to work on it.
 
 ## Where things stand
 
-The state of this build is kept in Lattice itself, not in this file. At the
-start of a session:
+The state of this build is kept in Lattice itself, not in this file. There
+are two servers, and they are not the same thing:
 
-1. Make sure the server is running (`npm run dev` while building Lattice,
-   otherwise `npm start`; port 3100).
-2. With the lattice MCP tools: `view` with name `repo_work` for this repo's
+- **The map of record is the owner's workspace on the hosted server**
+  (https://lattice.aperture.tools). The owner decided this on 8 Oct 2026. The
+  lattice MCP tools in this folder point there once the owner has run the
+  "Connect an agent" command here (`claude mcp get lattice` says which server
+  you have). What you write there waits for the owner in Review or on Home;
+  there is no dev mode and no `restart` tool.
+- **The local server on port 3100 (`npm run dev`) is where the code is
+  tried.** Its map is a scratch copy: do not record the state of the work
+  there. If your lattice tools still point at it, tell the owner, and they
+  can import a backup of it into the hosted workspace.
+
+At the start of a session:
+
+1. With the lattice MCP tools: `view` with name `repo_work` for this repo's
    open work, and `search` for type `software.handoff` to read the latest
-   handoff note. If the session-start hook is working you were already given
-   the open work.
-3. Register what you take on with `session_update`, and propose a new handoff
-   note before you finish.
+   handoff note.
+2. Register what you take on with `session_start` and `session_update`, and
+   propose a new handoff note before you finish.
+3. Make sure the local server is running before you change code
+   (`npm run dev`; port 3100).
+
+Keep the map true as you go: when what you did or found settles something
+that is still open (a task, an experiment, a decision made in practice),
+change its status with the outcome and the evidence. Do not leave it open
+with a note. Closing a decision or hypothesis is held for the owner to
+confirm, so propose the answer.
 
 ## Rules
 
@@ -25,15 +43,16 @@ start of a session:
   once, so check them before you send them. Either way, never approve, reject,
   launch or manage tokens by calling the CLI or `/api` yourself: those carry
   the human's authority.
-- **Restart the server yourself in dev mode.** After changing anything under
-  `src/` or `packs/`, run `npm test` and `npm run typecheck`, then call the
-  `restart` tool and wait for `GET /health`. If it does not come back, the
+- **Restart the local server yourself in dev mode.** After changing anything
+  under `src/` or `packs/`, run `npm test` and `npm run typecheck`, then
+  restart it and wait for `GET /health`: with the `restart` tool if your
+  lattice tools are the local server's, otherwise
+  `curl -X POST http://127.0.0.1:3100/agent/restart -H "content-type: application/json" -d "{}"`. If it does not come back, the
   reason is in `runs/dev-server.log`; fix the code and it starts again on the
   next file change. Without dev mode (no `restart` tool), ask the owner.
-- **Test where the owner can watch.** In dev mode, try things on the running
-  server (port 3100), which is the page the owner has open, and keep their
-  screen with you: call `show` before each step worth seeing (a change you make
-  already moves it). Say in the reason that it is a test, and undo what you
+- **Test where the owner can watch.** Try things on the local server (port
+  3100), and keep the owner's screen with you when they have it open there:
+  `show` before each step worth seeing (a change you make already moves it). Say in the reason that it is a test, and undo what you
   made when you are done (`undo` with the change set). Drive a browser only
   when you need to click, and then a visible one on that same server.
 - **Listen for the owner.** What they do in the web UI (a decision made, an

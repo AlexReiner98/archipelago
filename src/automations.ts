@@ -158,7 +158,7 @@ export class Automations {
         { kind: 'agent', name: 'lattice' },
         {
           title: `Session "${run.title}" has gone quiet`,
-          body: run.holds.length ? `It still holds: ${run.holds.map((h) => h.title).join(', ')}. End it from Today to release them.` : 'End it from Today if it is no longer running.',
+          body: run.holds.length ? `It still holds: ${run.holds.map((h) => h.title).join(', ')}. End it from Home (Sessions) to release them.` : 'End it from Home (Sessions) if it is no longer running.',
           level: run.holds.length ? 'warning' : 'info',
           about: run.id,
         },

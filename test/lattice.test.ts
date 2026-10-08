@@ -750,6 +750,31 @@ test('a project\'s questions are its open decisions and hypotheses, most-blockin
   assert.deepEqual([after.open.map((x: any) => x.title), after.settled[0].title, after.settled[0].outcome], [['Hyp', 'Small'], 'Big', 'A']);
 });
 
+test('an agent may settle its own work unreviewed, but only proposes the answer to a question', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'd', type: 'decision', title: 'Where do backups go?' },
+    { op: 'create', ref: 'h', type: 'hypothesis', title: 'Hooks run in the desktop app' },
+    { op: 'create', ref: 't', type: 'task', title: 'Wire the upload' },
+  ]);
+  // As in dev mode: nothing an agent does is reviewed.
+  const free = new Lattice(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
+  const decided = l.registry.type('decision')!.statuses.closed[0];
+  const settled = l.registry.type('hypothesis')!.statuses.closed[0];
+
+  assert.equal((await free.change(agent, { reason: 'did it', ops: [{ op: 'update', id: made.t, status: 'done' }] })).status, 'applied', 'its own task');
+  assert.equal((await free.change(agent, { reason: 'a note', ops: [{ op: 'update', id: made.d, body: 'Supabase is set up.' }] })).status, 'applied', 'a note on a question');
+  const answer = await free.change(agent, { reason: 'Backups have gone to Supabase Storage since the deployment', ops: [{ op: 'update', id: made.d, status: decided, props: { outcome: 'Supabase Storage' } }] });
+  assert.equal(answer.status, 'proposed', 'the answer to a decision waits for the human');
+  assert.equal((await free.change(agent, { reason: 'seen twice', ops: [{ op: 'update', id: made.h, status: settled }] })).status, 'proposed', 'and so does a hypothesis');
+  assert.equal((await l.entity(made.d))!.status, 'open');
+
+  await l.decide(human, { proposal: (answer as { proposal: string }).proposal, approve: true });
+  const d = (await l.entity(made.d))!;
+  assert.deepEqual([d.status, d.props.outcome], [decided, 'Supabase Storage'], 'one yes from the human and it is decided');
+  assert.equal((await free.change(human, { reason: 'mine to settle', ops: [{ op: 'update', id: made.h, status: settled }] })).status, 'applied');
+});
+
 test('a backup holds every row, and restores into an empty database that then carries on', async () => {
   const l = await fresh();
   const made = await make(l, [
