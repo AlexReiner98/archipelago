@@ -122,15 +122,60 @@ export async function sessionUpdate(l: Lattice, actor: Actor, input: { run: stri
   return { run: run.id, status: input.status ?? run.status };
 }
 
-export async function sessionEnd(l: Lattice, actor: Actor, input: { run: string; outcome?: 'finished' | 'failed' | 'cancelled'; summary?: string }) {
+type Item = { id: string; type: string; title: string; status: string };
+
+/**
+ * What a session has left unsaid: the open work of the repository it ran in
+ * that nobody has changed since it began. A session that settled something
+ * says so by changing it; what it leaves as it found it, it has to vouch for.
+ */
+async function unreconciled(l: Lattice, run: Entity): Promise<Item[]> {
+  const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'software.lives_in' and from_id = $1 and valid_to is null`, [run.id]);
+  if (!repos.length) return [];
+  const work = (await VIEWS.repo_work.run(l, { repo: repos[0].to_id })) as { ready: Item[]; blocked: Item[] };
+  const open = [...work.ready, ...work.blocked];
+  const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
+  return open.filter((i) => untouched.some((u) => u.id === i.id)).map(({ id, type, title, status }) => ({ id, type, title, status }));
+}
+
+export async function sessionEnd(
+  l: Lattice,
+  actor: Actor,
+  input: {
+    run: string;
+    outcome?: 'finished' | 'failed' | 'cancelled';
+    summary?: string;
+    /** Open items the session vouches for as it found them. */
+    still_true?: string[];
+    /** Ask the session about the repository's open work before letting it finish. */
+    reconcile?: boolean;
+  },
+) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) return { run: run.id, status: run.status, already_ended: true };
   const outcome = input.outcome ?? 'finished';
+  const unsaid = outcome === 'finished' ? await unreconciled(l, run) : [];
+  const vouched = unsaid.filter((i) => input.still_true?.includes(i.id));
+  const left = unsaid.filter((i) => !vouched.includes(i));
+  if (input.reconcile && left.length) {
+    return {
+      run: run.id,
+      status: run.status,
+      ended: false,
+      unreconciled: left,
+      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with the change tool; if it is still true as written, name its id in still_true. Then call session_end again.',
+    };
+  }
+  const said = [
+    vouched.length && `Said still true: ${vouched.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
+    left.length && `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
+  ].filter(Boolean);
+  const summary = [input.summary, ...said].filter(Boolean).join('\n');
   const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'sys.works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
     ops: [
-      { op: 'update', id: run.id, status: outcome, body: input.summary ? [run.body, `[${now()}] ${outcome}: ${input.summary}`].filter(Boolean).join('\n') : undefined },
+      { op: 'update', id: run.id, status: outcome, body: summary ? [run.body, `[${now()}] ${outcome}: ${summary}`].filter(Boolean).join('\n') : undefined },
       ...working.map((w): Op => ({ op: 'unlink', relation: w.id })),
     ],
     reason: input.summary ?? `Session ${outcome}`,
@@ -170,7 +215,7 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
   }
   lines.push(
     '',
-    'If the lattice MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. The session is closed for you when it ends.',
+    'If the lattice MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each or say it is still true. A session that ends without it is closed for you and recorded as not reconciled.',
     'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm unless this workspace applies agents’ changes as made, so send the answer with what was chosen and why.',
   );
   return lines.join('\n');

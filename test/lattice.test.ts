@@ -447,6 +447,37 @@ test('the session-start hook registers the session and hands it the repo\'s work
   await hookSessionEnd(l, { session_id: 'never-seen' });
 });
 
+test('a session that finishes says where the repository\'s open work stands', async () => {
+  const l = await fresh();
+  const made = await laneSetup(l);
+  const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture', session_id: 'r1' });
+
+  // It did one task and closed it; the other two it has not said a word about.
+  await make(l, [{ op: 'update', id: made.offline, status: 'done' }]);
+  const asked = (await callTool(l, agent, 'session_end', { run, summary: 'Tests written' })) as any;
+  assert.equal(asked.ended, false);
+  assert.deepEqual(asked.unreconciled.map((i: any) => i.title).sort(), ['Capture probe', 'Tune the solver'], 'what it changed is not asked about');
+  assert.equal((await l.entity(run))!.is_open, true, 'and the session is still open');
+
+  // Vouching for one is not enough; for both, it ends and the run keeps what was said.
+  assert.equal(((await callTool(l, agent, 'session_end', { run, still_true: [made.live] })) as any).unreconciled.length, 1);
+  const ended = (await callTool(l, agent, 'session_end', { run, summary: 'Tests written', still_true: [made.live, made.gated] })) as any;
+  assert.equal(ended.status, 'finished');
+  assert.match((await l.entity(run))!.body, /Tests written\nSaid still true: .*Capture probe.*Tune the solver/);
+
+  // A session closed over its head (the hook, a crash) is recorded as not having said.
+  await hookSessionStart(l, { session_id: 'r2', cwd: 'C:\\code\\Aperture' });
+  await hookSessionEnd(l, { session_id: 'r2', reason: 'exit' });
+  const { rows } = await l.db.query<{ body: string }>(`select body from entity where props->>'session_id' = 'r2'`);
+  assert.match(rows[0].body, /Session ended \(exit\)\nNot reconciled, open and left unsaid: .*Capture probe/);
+
+  // The human ending one from the UI is not asked, and neither is a session that failed.
+  const third = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture' });
+  assert.equal(((await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: third.run, outcome: 'cancelled' })) as any).status, 'cancelled');
+  const fourth = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture' });
+  assert.equal(((await callTool(l, agent, 'session_end', { run: fourth.run, outcome: 'failed' })) as any).status, 'failed');
+});
+
 test('launching runs a headless session on a task, holding the lane and recording the outcome', async () => {
   const l = await fresh();
   const dir = mkdtempSync(join(tmpdir(), 'lattice-launch-'));

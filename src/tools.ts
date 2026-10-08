@@ -445,14 +445,18 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => sessionUpdate(l, actor, input),
   },
   session_end: {
-    description: 'Close a registered session with its outcome and a summary. Everything it held is released.',
+    description:
+      'Close a registered session with its outcome and a summary. Everything it held is released. A session that finishes in a repository is first shown that repository\'s open work nobody has changed since it began (answer: ended false, with the list): change what is done or no longer as written, name what is still true in still_true, and call again.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
       outcome: z.enum(['finished', 'failed', 'cancelled']).optional(),
       summary: z.string().optional().describe('What was done and what is left.'),
+      still_true: z.array(z.string()).optional().describe('Ids of open items you have checked and found still true as written.'),
     },
     run: async (l, actor, input) => {
-      const result = await sessionEnd(l, actor, input);
+      // An agent says where the repository's work stands; the human ending a session from the UI is not asked.
+      const result = await sessionEnd(l, actor, { ...input, reconcile: actor.kind === 'agent' });
+      if ('ended' in result) return result;
       // If this server started the session's process, stop that too.
       return { ...result, process_stopped: stopLaunched(result.run) };
     },

@@ -165,7 +165,10 @@ When the session ends, everything it held is released. These writes take effect
 at once; they are the session's own state, not facts about the world.
 
 - **From an agent:** the `session_start`, `session_update` and `session_end`
-  tools.
+  tools. An agent that finishes a session in a repository is first shown that
+  repository's open work nobody has changed since the session began, and has
+  to change each item or say it is still true; a session closed without that
+  (by the hook, or a crash) is recorded as not reconciled.
 - **Automatically, from Claude Code:** merge
   [examples/claude-code-hooks.json](examples/claude-code-hooks.json) into a
   project's `.claude/settings.json` (that file calls a server on the same
