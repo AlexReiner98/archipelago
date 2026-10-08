@@ -55,7 +55,7 @@ jobs:
         run: |
           node -e '
             const { LATTICE_URL, LATTICE_AGENT_TOKEN, RUNNER_TEMP } = process.env;
-            if (!LATTICE_AGENT_TOKEN) { console.error("The secret LATTICE_AGENT_TOKEN is not set."); process.exit(1); }
+            if (!LATTICE_AGENT_TOKEN) { console.log("::error::The repository secret LATTICE_AGENT_TOKEN is not set."); process.exit(1); }
             const lattice = { type: "http", url: LATTICE_URL.replace(/\/$/, "") + "/mcp", headers: { Authorization: "Bearer " + LATTICE_AGENT_TOKEN } };
             require("fs").writeFileSync(RUNNER_TEMP + "/lattice-mcp.json", JSON.stringify({ mcpServers: { lattice } }), { mode: 0o600 });
           '
@@ -70,11 +70,18 @@ jobs:
             if [ "$steady" -ge 12 ]; then exit 0; fi
             sleep 5
           done
-          echo "The Lattice server at $LATTICE_URL did not stay up for a minute within six minutes." >&2
+          echo "::error::The Lattice server at $LATTICE_URL did not stay up for a minute within six minutes."
           exit 1
 
       - name: Read the push against the map
         run: |
+          # A secret that is not set arrives as an empty value, which is not the same as no value to the CLI.
+          [ -n "$ANTHROPIC_API_KEY" ] || unset ANTHROPIC_API_KEY
+          [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || unset CLAUDE_CODE_OAUTH_TOKEN
+          if [ -z "${ANTHROPIC_API_KEY:-}${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "::error::Neither repository secret ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is set, so Claude cannot run."
+            exit 1
+          fi
           cat > "$RUNNER_TEMP/prompt.txt" <<EOF
           A push has just landed on the branch "$BRANCH" of $REPO (default branch: "$DEFAULT_BRANCH").
           The new commits are $BEFORE..$AFTER.
@@ -120,4 +127,9 @@ jobs:
           claude --print "$(cat "$RUNNER_TEMP/prompt.txt")" \
             --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
             --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
-            --max-budget-usd 2
+            --max-budget-usd 2 2>&1 | tee "$RUNNER_TEMP/claude.txt"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::error::Claude stopped with exit code $status: $(tail -n 3 "$RUNNER_TEMP/claude.txt" | tr '\n' ' ' | cut -c1-400)"
+            exit "$status"
+          fi
