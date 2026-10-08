@@ -200,6 +200,21 @@ function point(l: Lattice, actor: Actor, hash: string, note?: string): Focus {
   return next;
 }
 
+/**
+ * History as an agent reads it: a long value before or after an edit (a note,
+ * mostly) is cut to its start and its length, so an item edited ten times does
+ * not answer with its note twenty times over. `full` asks for all of it.
+ */
+function shortHistory<T>(events: T[]): T[] {
+  const cut = (v: unknown) => (typeof v === 'string' && v.length > 300 ? `${v.slice(0, 200)}… (${v.length} characters; ask again with full: true for all of it)` : v);
+  return events.map((ev) => {
+    const detail = (ev as { detail?: { changes?: Record<string, { from: unknown; to: unknown }> } | null }).detail;
+    if (!detail?.changes) return ev;
+    return { ...ev, detail: { ...detail, changes: Object.fromEntries(Object.entries(detail.changes).map(([key, c]) => [key, { from: cut(c.from), to: cut(c.to) }])) } };
+  });
+}
+const FULL = z.boolean().optional().describe('true to be given long notes in the history whole. Left out, an agent is given the start of each and its length.');
+
 export const TOOLS: Record<string, Tool> = {
   schema: {
     description:
@@ -222,8 +237,11 @@ export const TOOLS: Record<string, Tool> = {
   },
   get: {
     description: 'One entity in full: its fields, the source it came from, its relations in both directions, and its recent history.',
-    input: { id: z.string() },
-    run: async (l, _actor, input) => l.get(input.id),
+    input: { id: z.string(), full: FULL },
+    run: async (l, actor, input) => {
+      const found = await l.get(input.id);
+      return actor.kind === 'human' || input.full ? found : { ...found, recent_events: shortHistory(found.recent_events) };
+    },
   },
   view: {
     description:
@@ -250,8 +268,12 @@ export const TOOLS: Record<string, Tool> = {
       actor: z.string().optional().describe('e.g. "agent:claude" or "human:local".'),
       origin: z.enum(['lattice', 'external', 'github']).optional(),
       limit: z.number().int().positive().optional(),
+      full: FULL,
     },
-    run: async (l, _actor, input) => l.events(input),
+    run: async (l, actor, { full, ...input }) => {
+      const events = await l.events(input);
+      return actor.kind === 'human' || full ? events : shortHistory(events);
+    },
   },
   proposals: {
     description:

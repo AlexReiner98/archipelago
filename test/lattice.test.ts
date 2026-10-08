@@ -699,6 +699,18 @@ test('a note is added to, or one passage of it replaced, without sending it agai
 
   await undo(l, human, { changeset: (added as { changeset: string }).changeset });
   assert.equal((await l.entity(t))!.status, 'todo', 'undone like any other edit');
+
+  // An agent reading history is given the start of a long note and its length; the whole of it when it asks, and a person always.
+  const long = 'A long note. '.repeat(100);
+  await make(l, [{ op: 'update', id: t, body: long }]);
+  const to = (answer: any) => (answer.recent_events ?? answer)[0].detail.changes.body.to as string;
+  for (const tool of ['get', 'events']) {
+    const input = tool === 'get' ? { id: t } : { target: t };
+    assert.match(to(await callTool(l, agent, tool, input)), /^A long note\. .{180,200}… \(1300 characters; ask again with full: true/, tool);
+    assert.equal(to(await callTool(l, agent, tool, { ...input, full: true })), long, `${tool}, in full`);
+    assert.equal(to(await callTool(l, human, tool, input)), long, `${tool}, for a person`);
+  }
+  assert.equal(((await callTool(l, agent, 'get', { id: t })) as any).entity.body, long, 'the note itself is always whole');
 });
 
 test('undo reverses a change set as a new change, and leaves later edits alone', async () => {
