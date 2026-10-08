@@ -624,6 +624,17 @@ test('an agent can notify the human; a stale session raises one notification', a
   const stale = unread.filter((n) => n.title.includes('gone quiet'));
   assert.equal(stale.length, 1, 'told once, not every pass');
   assert.match(stale[0].body, /still holds: Live lane/);
+
+  // Heard from again, the notice is no longer true and leaves what there is to read; quiet again, it is told again; ended, it leaves again.
+  const quiet = async () => ((await VIEWS.notifications.run(l, {})) as any[]).filter((n) => n.title.includes('gone quiet')).length;
+  await sessionUpdate(l, agent, { run });
+  assert.equal(await quiet(), 0, 'withdrawn when the session reports in');
+  await l.db.query(`update entity set props = props || '{"last_seen":"2020-01-01T00:00:00Z"}' where id = $1`, [run]);
+  await autos.tick();
+  assert.equal(await quiet(), 1, 'told again when it goes quiet again');
+  await sessionEnd(l, human, { run, outcome: 'cancelled' });
+  assert.equal(await quiet(), 0, 'withdrawn when the session ends');
+  assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, 1, 'other notifications are left alone');
 });
 
 test('automations fire on a schedule and on events, are logged, and cannot trigger each other', async () => {

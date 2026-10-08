@@ -99,10 +99,27 @@ async function touch(l: Lattice, run: string): Promise<void> {
   await l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text) where id = $1`, [run, now()]);
 }
 
+/**
+ * A session that had gone quiet has been heard from, or has ended: the notice
+ * that said so is no longer true, so it leaves what the human has to read. It
+ * can be flagged again if it goes quiet again.
+ */
+async function heard(l: Lattice, run: Entity, why: string): Promise<void> {
+  if (!run.props.stale_flagged) return;
+  await l.db.query(`update entity set props = props - 'stale_flagged' where id = $1`, [run.id]);
+  const { rows } = await l.db.query<{ id: string }>(
+    `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
+     where r.to_id = $1 and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.props->>'from' = 'agent:lattice'`,
+    [run.id],
+  );
+  if (rows.length) await l.apply('agent:lattice', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });
+}
+
 export async function sessionUpdate(l: Lattice, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string }) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
+  await heard(l, run, `Session "${run.title}" reported in again`);
   // A bare call is a heartbeat: it moves last_seen and leaves no event.
   if (!input.status && !input.note && !input.task) {
     await touch(l, run.id);
@@ -188,6 +205,7 @@ export async function sessionEnd(
     ],
     reason: input.summary ?? `Session ${outcome}`,
   });
+  await heard(l, run, `Session "${run.title}" ended`);
   // Whatever it held goes back, so a finished session can never keep the lane.
   const { rows: held } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'holds' and from_id = $1 and valid_to is null`, [run.id]);
   for (const h of held) await l.release(actor, { resource: h.to_id, holder: run.id, reason: `Session ${outcome}` });
