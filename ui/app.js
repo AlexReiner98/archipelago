@@ -376,20 +376,17 @@ function card(title, { wide } = {}) {
 
 const WHY = { depends_on: 'depends on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
 
-// A count beside each page of the menu that has something waiting on it, and
-// each counts only what that page shows: beside Home what there is to read,
-// beside Changes the changes held for the owner.
+// The count beside Changes: what that page holds for the owner, the changes
+// held for them and what there is to read. A count sits only beside the page
+// that shows what it counts.
 async function refreshReviewCount() {
-  const badges = { 'notice-count': () => api('view', { name: 'notifications' }), 'held-count': () => api('proposals') };
-  for (const [id, waiting] of Object.entries(badges)) {
-    const badge = document.getElementById(id);
-    try {
-      const n = (await waiting()).length;
-      badge.textContent = n;
-      badge.hidden = n === 0;
-    } catch {
-      badge.hidden = true;
-    }
+  const badge = document.getElementById('held-count');
+  try {
+    const [pending, notes] = await Promise.all([api('proposals'), api('view', { name: 'notifications' })]);
+    badge.textContent = pending.length + notes.length;
+    badge.hidden = pending.length + notes.length === 0;
+  } catch {
+    badge.hidden = true;
   }
 }
 
@@ -404,19 +401,8 @@ async function today() {
   const here = () => main.isConnected;
   if (!main.querySelector('.inbox')) main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Home')), h('div', { class: 'inbox' }, h('div', { class: 'empty' }, 'Loading…')));
   const view = (name, params) => api('view', { name, params });
-  const markRead = async (ids) => {
-    try {
-      await api('change', { ops: ids.map((id) => ({ op: 'update', id, status: 'read' })), reason: 'Read in the UI' });
-      dirty = false;
-      today();
-      refreshReviewCount();
-    } catch (err) {
-      tell('That change was not made', err.message);
-    }
-  };
-  const [info, notes, asked, needs, blockers, risk] = await Promise.all([
+  const [info, asked, needs, blockers, risk] = await Promise.all([
     api('workspace_info'),
-    view('notifications'),
     view('questions'),
     view('needs_me'),
     view('blockers'),
@@ -469,13 +455,6 @@ async function today() {
     ordered.length ? h('section', { class: 'card' }, h('ul', { class: 'rows projects' }, ordered.map(projectRow))) : h('div', { class: 'empty' }, 'No projects yet.'),
   ].filter(Boolean);
   // What there is to read, from anywhere, behind a count at the top of the page.
-  const tray =
-    notes.length > 0 &&
-    menu(
-      `${notes.length} to read`,
-      notes.map((n) => [n.title, () => (n.about_id ? ((location.hash = `#/e/${n.about_id}`), markRead([n.id])) : markRead([n.id]))]).concat([['Mark all read', () => markRead(notes.map((n) => n.id)), 'quiet']]),
-    );
-
   // What is about to go wrong, anywhere: a count when there is any, and the list behind it on a click.
   const others = {
     risk: {
@@ -517,7 +496,7 @@ async function today() {
     ),
   );
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Home'), h('span', { class: 'grow' }), tray, h('button', { title: 'Start a new project', onclick: () => (location.hash = '#/new/project') }, '+ Project')),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Home'), h('span', { class: 'grow' }), h('button', { title: 'Start a new project', onclick: () => (location.hash = '#/new/project') }, '+ Project')),
     h('div', { class: 'inbox' }, inbox),
     Object.values(others).some((o) => o.n > 0) ? strip : '',
     drawer,
@@ -537,8 +516,26 @@ async function review() {
   const main = part('review');
   const strands = h('span', { class: 'switch' }, STRANDS.map(([key, text]) => h('button', { class: reviewState.show === key ? 'on' : '', onclick: () => ((reviewState.show = key), review()) }, text)));
   main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes'), strands));
-  const [pending, known, events] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('events', { limit: 500 })]);
+  const [pending, known, events, notes] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('events', { limit: 500 }), api('view', { name: 'notifications' })]);
   const names = new Map(known.map((e) => [e.id, e]));
+  // What agents and the system have told the owner, behind a count: each opens what it is about.
+  const markRead = async (ids) => {
+    try {
+      await api('change', { ops: ids.map((id) => ({ op: 'update', id, status: 'read' })), reason: 'Read in the UI' });
+      review();
+      refreshReviewCount();
+    } catch (err) {
+      tell('That change was not made', err.message);
+    }
+  };
+  if (notes.length)
+    main.firstChild.append(
+      h('span', { class: 'grow' }),
+      menu(
+        `${notes.length} to read`,
+        notes.map((n) => [n.title, () => (n.about_id ? ((location.hash = `#/e/${n.about_id}`), markRead([n.id])) : markRead([n.id]))]).concat([['Mark all read', () => markRead(notes.map((n) => n.id)), 'quiet']]),
+      ),
+    );
   if (pending.length) main.append(h('h2', {}, `Held for you (${pending.length})`));
   for (const p of pending) main.append(proposalCard(p, names));
   if (reviewState.show === 'new') return void main.append(appliedCard(events));
