@@ -167,7 +167,7 @@ export async function receivePush(l: Lattice, payload: PushPayload, delivery?: s
           settled.push({ id, title: e.title, status, result: 'already proposed' });
           continue;
         }
-        const result = await l.change({ kind: 'agent', name: who.slice('github:'.length) + ' (github)' }, { ops: [{ op: 'update', id, status }], reason: `Commit ${c.id.slice(0, 7)} says it is finished: ${subject(c.message)}`, source: { uri: c.url ?? `${name}@${c.id}`, kind: 'commit', title: subject(c.message) } });
+        const result = await l.change({ kind: 'agent', name: who.slice('github:'.length) + ' (github)' }, { ops: [{ op: 'update', id, status }], reason: `Commit ${c.id.slice(0, 7)} says it is finished: ${subject(c.message)}`, authority: { of: 'human', basis: `Commit ${c.id.slice(0, 7)} by ${c.author?.name ?? payload.pusher?.name ?? 'its author'} says so` }, source: { uri: c.url ?? `${name}@${c.id}`, kind: 'commit', title: subject(c.message) } });
         settled.push({ id, title: e.title, status, result: result.status });
       }
     }

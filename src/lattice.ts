@@ -103,10 +103,27 @@ export interface SourceSpec {
   excerpt?: string;
 }
 
+/**
+ * On whose authority a change is made: a human's, or the agent's own
+ * judgment. An agent that says a human's must say where the human said so,
+ * and the record keeps that it is the agent's report (`stated_by`).
+ */
+export interface Authority {
+  of: 'human' | 'agent';
+  /** Who: the human or agent itself, when the system knows. */
+  who?: string;
+  /** What it rests on: the human's words and where they were said, or what the agent saw. */
+  basis?: string;
+  /** The agent that reported a human's authority. Absent when the human acted themselves. */
+  stated_by?: string;
+}
+
 export interface ChangeInput {
   ops: Op[];
   reason: string;
   source?: SourceSpec;
+  /** From an agent: whether this is a human's word or its own judgment. A human's own change is theirs. */
+  authority?: Pick<Authority, 'of' | 'basis'>;
 }
 
 export interface Entity {
@@ -204,6 +221,12 @@ export class Lattice {
   async change(actor: Actor, input: ChangeInput) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
     const { warnings } = await this.plan(input.ops);
+    const me = actorId(actor);
+    const claimed = input.authority;
+    if (actor.kind !== 'human' && claimed?.of === 'human' && !claimed.basis?.trim())
+      throw new Error('Change rejected:\n- authority: to act on a human\u2019s word, say what they said and where (authority.basis).');
+    const authority: Authority =
+      actor.kind === 'human' ? { of: 'human', who: me } : claimed?.of === 'human' ? { of: 'human', basis: claimed.basis, stated_by: me } : { of: 'agent', who: me, ...(claimed?.basis && { basis: claimed.basis }) };
     // The workspace's own choice, when it has made one, stands in for the
     // server's policy on everything the policy does not forbid outright.
     const chosen = actor.kind === 'human' ? undefined : await this.setting<string>(AGENT_CHANGES);
@@ -221,7 +244,7 @@ export class Lattice {
     // have agents' changes applied lets an agent settle one, and then the
     // record has to stand on its own: a decision says what was chosen and why,
     // and the human is told (see `answered`).
-    const answered: { id: string; title: string; status: string; outcome?: string }[] = [];
+    const answered: { id: string; title: string; status: string; outcome?: string; authority: Authority }[] = [];
     if (actor.kind !== 'human') {
       const decisions = new Set(this.registry.family('decision'));
       const questions = new Set([...decisions, ...this.registry.family('hypothesis')]);
@@ -236,7 +259,8 @@ export class Lattice {
         const props = { ...e.props, ...op.props };
         if (decisions.has(e.type) && !(props.outcome && props.rationale))
           throw new Error(`Change rejected:\n- "${e.title}": to settle a decision, say what was chosen (props.outcome) and why (props.rationale).`);
-        answered.push({ id: e.id, title: e.title, status: op.status, outcome: props.outcome as string | undefined });
+        if (!claimed) throw new Error(`Change rejected:\n- "${e.title}": to settle a question, say on whose authority (authority.of: "human" with where they said so, or "agent" for your own judgment).`);
+        answered.push({ id: e.id, title: e.title, status: op.status, outcome: props.outcome as string | undefined, authority });
       }
     }
 
@@ -254,7 +278,7 @@ export class Lattice {
         note: 'Nothing has changed yet. A human must approve this proposal before it appears in the map.',
       };
     }
-    const applied = await this.apply(actorId(actor), input);
+    const applied = await this.apply(me, input, { authority });
     return answered.length ? { ...applied, answered } : applied;
   }
 
@@ -271,7 +295,8 @@ export class Lattice {
       result = await this.apply(
         proposal.actor,
         { ops: input.ops ?? proposal.ops, reason: proposal.reason, source: proposal.source ?? undefined },
-        { except: input.except, approvedBy: actorId(actor), revised: Boolean(input.ops) },
+        // Held and then applied by a human: it rests on that human, whatever the agent thought it rested on.
+        { except: input.except, approvedBy: actorId(actor), revised: Boolean(input.ops), authority: { of: 'human', who: actorId(actor) } },
       );
       if (input.ops) await this.db.query(`update proposal set ops = $2::jsonb where id = $1`, [proposal.id, JSON.stringify(input.ops)]);
     }
@@ -464,14 +489,14 @@ export class Lattice {
    * Apply a change without consulting policy. For human changes, approved
    * proposals, and the system's own bookkeeping (sessions).
    */
-  async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean } = {}) {
+  async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority } = {}) {
     const ops = dropExcepted(input.ops, opts.except ?? []);
     if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
     // Validate again: the map may have changed since this was proposed.
     const { warnings } = await this.plan(ops);
     const changeset = newId('c');
     const created: Record<string, string> = {};
-    const extra = opts.approvedBy ? { approved_by: opts.approvedBy, ...(opts.revised && { revised_by: opts.approvedBy }) } : {};
+    const extra = { ...(opts.approvedBy && { approved_by: opts.approvedBy, ...(opts.revised && { revised_by: opts.approvedBy }) }), ...(opts.authority && { authority: opts.authority }) };
     const reg = this.registry;
 
     await this.db.transaction(async (tx) => {

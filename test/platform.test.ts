@@ -681,7 +681,7 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const member = (await createToken(db, 'default', { kind: 'human', name: 'sam' })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
-  const change = (token: string, ops: unknown[]) => call(token === admin ? '/api/change' : '/agent/change', token, { reason: 'x', ops });
+  const change = (token: string, ops: unknown[], authority?: unknown) => call(token === admin ? '/api/change' : '/agent/change', token, { reason: 'x', ops, authority });
   const made = (await change(admin, [
     { op: 'create', ref: 'a', type: 'task', title: 'Paint the fence', visibility: 'shared' },
     { op: 'create', ref: 'b', type: 'task', title: 'Paint the fence again', visibility: 'shared' },
@@ -700,12 +700,24 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   assert.equal((await change(robot, [{ op: 'archive', id: made.a }])).result.status, 'applied', 'and archiving');
   // An agent can settle a question too, when the record stands on its own, and the human is told.
   assert.match((await change(robot, [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Green' } }])).error, /what was chosen \(props\.outcome\) and why \(props\.rationale\)/);
-  const answer = (await change(robot, [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Green', rationale: 'It is the paint we have.' } }])).result;
-  assert.deepEqual([answer.status, answer.answered], ['applied', [{ id: made.d, title: 'Which colour?', status: 'decided', outcome: 'Green' }]]);
+  const green = [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Green', rationale: 'It is the paint we have.' } }];
+  assert.match((await change(robot, green)).error, /on whose authority/, 'and on whose authority');
+  assert.match((await change(robot, green, { of: 'human' })).error, /what they said and where/, 'a human\u2019s word has to be quoted');
+  const word = { of: 'human', basis: 'Alex, in chat on 8 Oct: "go with green"' };
+  const answer = (await change(robot, green, word)).result;
+  const onWord = { ...word, stated_by: 'agent:robot/script' };
+  assert.deepEqual([answer.status, answer.answered], ['applied', [{ id: made.d, title: 'Which colour?', status: 'decided', outcome: 'Green', authority: onWord }]]);
   const told = (await call('/api/view', admin, { name: 'notifications' })).result as any[];
   assert.deepEqual(told.map((n) => [n.title, n.about_id]), [['robot/script settled "Which colour?": Green', made.d]]);
   const guess = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green hides dirt', visibility: 'shared' }])).result.created.h;
-  assert.equal((await change(robot, [{ op: 'update', id: guess, status: 'supported' }])).result.status, 'applied', 'and a hypothesis');
+  assert.equal((await change(robot, [{ op: 'update', id: guess, status: 'supported' }], { of: 'agent', basis: 'Two weeks of photos' })).result.status, 'applied', 'and a hypothesis');
+  // Every change says on whose authority it was made: the human's own, a human's word as an agent reports it, or the agent's judgment.
+  const authorityOf = async (id: string) => ((await call('/api/events', admin, { target: id, limit: 1 })).result as any[])[0].detail.authority;
+  assert.deepEqual(await authorityOf(made.d), onWord);
+  assert.deepEqual(await authorityOf(guess), { of: 'agent', who: 'agent:robot/script', basis: 'Two weeks of photos' });
+  assert.deepEqual(await authorityOf(applied.created['#1']), { of: 'agent', who: 'agent:robot/script' }, 'unsaid, it is the agent\u2019s own');
+  const mine = (await change(admin, [{ op: 'create', ref: 'n', type: 'note', title: 'Mine', visibility: 'shared' }], { of: 'agent' })).result.created.n;
+  assert.deepEqual([(await authorityOf(mine)).of, /alex/.test((await authorityOf(mine)).who)], ['human', true], 'a human\u2019s own change is theirs, whatever it claims');
 
   // What was applied is on the record, with who made it, and can be put back.
   const logged = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).filter((e) => e.changeset === applied.changeset);
@@ -719,6 +731,10 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
 
   await call('/api/workspace_set', admin, { agent_changes: 'hold' });
   assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
+  const [held] = (await call('/api/proposals', admin)).result as any[];
+  const let_in = (await call('/api/decide', admin, { proposal: held.id, approve: true })).result;
+  const by = (await authorityOf(Object.values(let_in.created)[0] as string)) as any;
+  assert.deepEqual([by.of, /alex/.test(by.who), by.stated_by], ['human', true, undefined], 'what a human applies rests on that human');
   const set = ((await call('/api/events', admin, { limit: 50 })).result as any[]).filter((e) => e.action === 'workspace.set').map((e) => e.reason);
   assert.deepEqual(set, ['agent_changes set to "hold"', 'agent_changes set to "apply"'], 'and the choice itself is in the log');
 });

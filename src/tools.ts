@@ -372,11 +372,18 @@ export const TOOLS: Record<string, Tool> = {
       ops: z.array(op).min(1),
       reason: z.string().min(1).describe('Why this change is being made. Shown in the activity log.'),
       source: source.optional().describe('Where these facts came from. Individual ops can override it.'),
+      authority: z
+        .object({
+          of: z.enum(['human', 'agent']).describe('"human" when a person told you to make this change or decided what it records; "agent" when it is your own judgment of the work.'),
+          basis: z.string().optional().describe('For "human": what they said and where (required). For "agent": what you saw that it rests on.'),
+        })
+        .optional()
+        .describe('On whose authority this change is made. Kept on every event it logs. Left out, it is recorded as your own judgment; settling a decision or hypothesis needs it said.'),
     },
     run: async (l, actor, input) => {
       const result = await l.change(actor, input);
       // A question an agent settled is not left for the human to come across.
-      if ('answered' in result) for (const a of result.answered) await notify(l, actor, { title: `${actor.name} settled "${a.title}": ${a.outcome ?? a.status}`, body: input.reason, about: a.id });
+      if ('answered' in result) for (const a of result.answered) await notify(l, actor, { title: `${actor.name} settled "${a.title}": ${a.outcome ?? a.status}`, body: `${a.authority.of === 'human' ? `On a human\u2019s word, as the agent reports it: ${a.authority.basis}` : `On the agent\u2019s own judgment${a.authority.basis ? `: ${a.authority.basis}` : ''}`}\n\n${input.reason}`, about: a.id });
       // The human's screen follows an agent's change: to Review when it waits
       // there, otherwise to the first thing it made or touched.
       if (actor.kind === 'agent') {

@@ -138,7 +138,12 @@ npm run lattice -- reject <id> "why"
 ```
 
 4. Every applied op is written to the event log with who proposed it, who
-   approved it, why, and the source.
+   approved it, why, and the source, and on whose authority it was made:
+   the human's own (their change, or a held one they applied), a human's
+   word as an agent reports it (the agent must say what was said and where,
+   and the log keeps that it is the agent's report), or the agent's own
+   judgment (the default when it says nothing). An agent settling a decision
+   or a hypothesis has to say which.
 
 **Undo.** Any change set can be reversed, from its line in Activity or with
 the `undo` tool. The opposite is applied as a new change, so the log keeps

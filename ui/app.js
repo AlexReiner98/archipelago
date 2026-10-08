@@ -630,7 +630,7 @@ function appliedCard(events) {
           'summary',
           {},
           h('span', { class: 'muted nowrap' }, when(g.events[0].ts)),
-          h('span', {}, g.events[0].actor),
+          h('span', {}, g.events[0].actor, h('span', { class: 'muted' }, `, ${authorityText(g.events.find((e) => e.detail?.authority)?.detail.authority) || 'authority not recorded'}`)),
           h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? g.events[0].action),
           h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
           isUndo || undoneSets.has(g.changeset) ? h('span', { class: 'pill closed' }, isUndo ? 'an undo' : 'undone') : h('button', { onclick: (click) => (click.preventDefault(), undo(g)) }, 'Undo'),
@@ -1998,6 +1998,13 @@ async function workspace() {
 
 // ---- Activity ------------------------------------------------------------
 
+// On whose authority a change was made, as the log has it.
+function authorityText(a) {
+  if (!a) return '';
+  if (a.of === 'agent') return `on the agent's own judgment${a.basis ? `: ${a.basis}` : ''}`;
+  return a.stated_by ? `on a human's word, as ${a.stated_by} reports it: ${a.basis}` : `on the authority of ${a.who}`;
+}
+
 function describeEvent(ev) {
   const d = ev.detail ?? {};
   if (ev.origin === 'external') return `${d.ok === false ? 'failed' : 'ok'}${d.durationMs != null ? ` in ${d.durationMs} ms` : ''}`;
@@ -2061,7 +2068,7 @@ async function activity() {
         return h(
           'details',
           { class: 'group' },
-          h('summary', {}, h('span', { class: 'muted nowrap' }, when(first.ts)), h('span', {}, work.actor, approver && h('span', { class: 'muted' }, `, applied by ${approver}`)), h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? first.action), h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
+          h('summary', {}, h('span', { class: 'muted nowrap' }, when(first.ts)), h('span', {}, work.actor, approver && h('span', { class: 'muted' }, `, applied by ${approver}`), !approver && work.detail?.authority && h('span', { class: 'muted' }, `, ${authorityText(work.detail.authority)}`)), h('strong', { class: 'grow', style: 'flex-basis: 100%' }, g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? first.action), h('span', { class: 'chip' }, `${g.events.length} change${g.events.length === 1 ? '' : 's'}`),
             undone
               ? h('span', { class: 'pill closed' }, g.events.some((e) => e.action === 'changeset.undo') ? 'an undo' : 'undone')
               : h(

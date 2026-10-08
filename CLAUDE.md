@@ -50,6 +50,10 @@ settled, with what was chosen and why.
   once, so check them before you send them. Either way, never approve, reject,
   launch or manage tokens by calling the CLI or `/api` yourself: those carry
   the human's authority.
+- **Say on whose authority.** A `change` takes `authority`: `of: "human"`
+  with `basis` (what the owner said and where) when the owner told you to or
+  decided it, `of: "agent"` when it is your own reading of the work. Do not
+  claim the owner's word for your own judgment; the log keeps both apart.
 - **Restart the local server yourself in dev mode.** After changing anything
   under `src/` or `packs/`, run `npm test` and `npm run typecheck`, then
   restart it and wait for `GET /health`: with the `restart` tool if your
