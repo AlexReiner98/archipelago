@@ -1125,7 +1125,7 @@ const aroundAll = new Set();
  * says. It is laid out by arithmetic, so nothing can overlap: every box has
  * its own row. A long group shows its first eight and a box that opens the rest.
  */
-function neighbourhood(e, data, redraw) {
+function neighbourhood(e, data, redraw, owner) {
   const BOX = { w: 250, h: 26 };
   const GAP = 6;
   const HEAD = 20;
@@ -1159,7 +1159,9 @@ function neighbourhood(e, data, redraw) {
     }
     return { rows: out, height: Math.max(0, y - 10 - GAP) };
   };
-  const left = column(data.outgoing, 'out');
+  // Whose it is belongs in the picture too: an owner is a field, not a relation, but it is the first thing asked of a waiting item.
+  const owned = owner ? [{ type: 'owned by', id: owner.id, title: owner.title, entity_type: owner.type, status: owner.status }] : [];
+  const left = column([...owned, ...data.outgoing], 'out');
   const right = column(data.incoming, 'in');
   const height = Math.max(left.height, right.height, 64);
   const selfH = 54;
@@ -1403,10 +1405,10 @@ async function entity(id) {
           h('h2', {}, 'Relations'),
           h('span', { class: 'toolbar' }, h('span', { class: 'n' }, data.outgoing.length + data.incoming.length), !e.archived_at && phrases.length > 0 && h('button', { onclick: openAdder }, 'Add')),
         ),
-        data.outgoing.length + data.incoming.length
+        data.outgoing.length + data.incoming.length + (owner ? 1 : 0)
           ? [
               // Where it sits: what it reaches for on the left, what reaches for it on the right.
-              neighbourhood(e, data, () => entity(id)),
+              neighbourhood(e, data, () => entity(id), owner),
               !e.archived_at && h('details', { class: 'folded' }, h('summary', {}, 'Change relations'), h('table', { class: 'list' }, h('tbody', {}, relRows(data.outgoing, 'out'), relRows(data.incoming, 'in')))),
             ]
           : h('div', { class: 'empty' }, 'Not linked to anything.'),
