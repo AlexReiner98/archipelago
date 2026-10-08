@@ -1390,6 +1390,21 @@ function secretBox(label, token) {
   );
 }
 
+// Connecting an agent is one paste: the command gives Claude Code this
+// server's address and the new token, for that project folder and that
+// person only, in place of whatever lattice server the project names itself.
+function connectBox(made) {
+  const command = `claude mcp add --transport http --scope local lattice ${location.origin}/mcp --header "Authorization: Bearer ${made.token}"`;
+  return h(
+    'div',
+    { class: 'secret' },
+    h('div', {}, h('strong', {}, `Connect Claude Code as "${made.name}"`)),
+    h('div', { class: 'muted small' }, 'Run this once in a terminal, in the folder of the project the agent works in. Then start a new Claude Code session there.'),
+    h('code', {}, command),
+    h('div', { class: 'toolbar' }, h('button', { class: 'primary', onclick: (e) => navigator.clipboard.writeText(command).then(() => (e.target.textContent = 'Copied')) }, 'Copy command'), h('span', { class: 'muted small' }, 'Shown once: it holds the token, which is not stored. Revoke it below to disconnect.')),
+  );
+}
+
 /** A chosen file's bytes in base64, which is how a backup file is sent. */
 const base64 = (blob) =>
   new Promise((done, fail) => {
@@ -1606,7 +1621,7 @@ async function workspace() {
       h('div', { class: 'row-sub' }, t.entity_id ? `for ${personName(t.entity_id) ?? t.entity_id}` : 'not tied to a person', ` · ends in ${t.hint} · `, t.last_used ? `last used ${when(t.last_used)}` : 'never used', t.expires_at && ` · expires ${when(t.expires_at)}`),
     );
 
-  const agentName = h('input', { type: 'text', placeholder: 'e.g. claude-code', style: 'flex: 1; min-width: 180px' });
+  const agentName = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1; min-width: 180px' });
   const memberName = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: 160px' });
   const memberEmail = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: 160px' });
   const memberAdmin = h('input', { type: 'checkbox' });
@@ -1633,11 +1648,22 @@ async function workspace() {
             {
               class: 'primary',
               onclick: () =>
-                api('token_create', { kind: 'agent', name: agentName.value.trim() })
+                api('token_create', { kind: 'agent', name: agentName.value.trim() || 'claude-code' })
+                  .then((made) => workspace().then(() => document.getElementById('main').children[1].replaceChildren(connectBox(made))))
+                  .catch(fail),
+            },
+            'Connect an agent',
+          ),
+          h(
+            'button',
+            {
+              title: 'For an agent that is not Claude Code: the bare token, to send as Authorization: Bearer',
+              onclick: () =>
+                api('token_create', { kind: 'agent', name: agentName.value.trim() || 'agent' })
                   .then((made) => workspace().then(() => document.getElementById('main').children[1].replaceChildren(secretBox(`Token for ${made.name}`, made.token))))
                   .catch(fail),
             },
-            'Create agent token',
+            'Token only',
           ),
         ),
       ),

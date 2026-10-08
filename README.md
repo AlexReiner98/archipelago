@@ -310,8 +310,19 @@ change that:
   sign in to and switches between them from the menu's bottom corner; the
   workspace's name is shown under "Lattice" and on the tab. Signing out
   forgets that one.
+- **Connecting Claude Code:** on the Workspace screen, press **Connect an
+  agent**, copy the command it shows, and run it once in the project's
+  folder. It looks like this, and takes the place of the project's own
+  `lattice` entry for you alone:
+
+  ```bash
+  claude mcp add --transport http --scope local lattice https://<server>/mcp --header "Authorization: Bearer <agent token>"
+  ```
+
+  New sessions in that folder then use that workspace as you. The hooks in
+  `.claude/settings.json` are separate and still point where they did.
 - **Using a token:** paste it into the web UI's sign-in screen; set
-  `LATTICE_TOKEN` for the CLI; for Claude Code, add
+  `LATTICE_TOKEN` for the CLI; for Claude Code by hand, add
   `"headers": { "Authorization": "Bearer ${LATTICE_AGENT_TOKEN}" }` to the
   `lattice` entry in `.mcp.json`, and the same header to each hook.
 - **Workspaces: one database per customer.** Each workspace has its own
