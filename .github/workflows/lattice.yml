@@ -60,6 +60,19 @@ jobs:
             require("fs").writeFileSync(RUNNER_TEMP + "/lattice-mcp.json", JSON.stringify({ mcpServers: { lattice } }), { mode: 0o600 });
           '
 
+      # A server that deploys from this same push is away for a minute or so
+      # about now. Go on only once it has answered for a minute without a miss.
+      - name: Wait for the server
+        run: |
+          steady=0
+          for attempt in $(seq 1 72); do
+            if curl --silent --fail --max-time 5 --output /dev/null "${LATTICE_URL%/}/health"; then steady=$((steady + 1)); else steady=0; fi
+            if [ "$steady" -ge 12 ]; then exit 0; fi
+            sleep 5
+          done
+          echo "The Lattice server at $LATTICE_URL did not stay up for a minute within six minutes." >&2
+          exit 1
+
       - name: Read the push against the map
         run: |
           cat > "$RUNNER_TEMP/prompt.txt" <<EOF
