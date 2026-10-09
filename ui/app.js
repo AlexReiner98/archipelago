@@ -1305,8 +1305,11 @@ const s = (tag, attrs = {}, ...kids) => {
 // around an item, the whole map. They differ only in where it starts and in
 // its filters (which relations, how far out, whether what is finished shows),
 // never in how it looks. It is laid out, not simulated, so it looks the same
-// every time: what a thing belongs to or waits on is to its left, what belongs
-// to it or waits on it to its right. Anything can then be dragged aside.
+// every time. Where there is work in sight, across is tokens: each piece of
+// work as long as it is expected to take, with what it has used so far.
+// Where there is none, what a thing belongs to or waits on is to its left
+// and what belongs to it or waits on it to its right. Anything can then be
+// dragged aside.
 const KINDS = { structure: ['part_of', 'serves', 'software.lives_in', 'works_at'], blocking: BLOCKING, all: null };
 const KIND_LABELS = [['structure', 'Structure'], ['blocking', 'Blocking'], ['all', 'Everything']];
 /** Each drawing's filters and what was dragged in it, by what it is drawn around, kept while the page is open. */
@@ -1401,7 +1404,13 @@ function shapeGraph(data, focus, prefs, extras = {}) {
     if (!moved) break;
   }
 
-  // Each column sits as near as it can to what it is linked to in the columns already placed, nearest the start first.
+  // Where there is work in sight, across is tokens, and the work is laid along it.
+  if (nodes.filter((n) => n.work).length > 1) {
+    const { axis, drawn } = timeline(nodes, edges, byId, focus, prefs);
+    return { nodes, edges: drawn, byId, focus, axis };
+  }
+
+  // Otherwise each column sits as near as it can to what it is linked to in the columns already placed, nearest the start first.
   const near = new Map(nodes.map((n) => [n.id, []]));
   for (const e of edges) {
     near.get(e.from).push(byId.get(e.to));
@@ -1430,14 +1439,84 @@ function shapeGraph(data, focus, prefs, extras = {}) {
   for (const n of nodes) {
     n.x = (rank.get(n.id) - left) * BOX.col;
     n.y -= top;
+    n.w = BOX.w;
+    n.h = BOX.h;
     const dragged = prefs.moved.get(n.id);
     if (dragged) Object.assign(n, dragged);
   }
-  return { nodes, edges, byId, focus, BOX };
+  return { nodes, edges, byId, focus };
+}
+
+/** A count of tokens as a person says it: 1.2M, 340k. */
+const tokensText = (t) => (t >= 1e6 ? `${+(t / 1e6).toFixed(1)}M` : t >= 1000 ? `${Math.round(t / 1000)}k` : `${Math.round(t)}`);
+
+/**
+ * Where there is work in sight, across is tokens. Work is laid end to end in
+ * the order it is to be done (its place on the roadmap, and after what it
+ * waits on), each thing as long as it is expected to take, so where a thing
+ * ends is what will have been spent by then; a thing spans what is part of
+ * it. What has no estimate is given a middling length and drawn as a guess.
+ * What is not work (a person, a repository, a note) has no place on the
+ * scale and sits under it.
+ */
+function timeline(nodes, edges, byId, focus, prefs) {
+  const ROW = { h: 30, gap: 10, top: 28 };
+  const timed = nodes.filter((n) => n.work);
+  const parentOf = new Map();
+  for (const e of edges) if (e.type === 'part_of' && byId.get(e.from).work && byId.get(e.to).work && !parentOf.has(e.from)) parentOf.set(e.from, e.to);
+  const kids = new Map();
+  for (const [kid, parent] of parentOf) kids.set(parent, [...(kids.get(parent) ?? []), byId.get(kid)]);
+  const waits = edges.filter((e) => BLOCKING.includes(e.type));
+  const inOrder = (list) => {
+    const sorted = [...list].sort((a, b) => (a.place ?? a.order ?? 1e9) - (b.place ?? b.order ?? 1e9) || a.title.localeCompare(b.title));
+    // What waits comes after what it waits on. A loop of waiting stops going round.
+    for (let pass = 0; pass < sorted.length; pass++) {
+      let moved = false;
+      for (const e of waits) {
+        const [i, j] = [sorted.findIndex((n) => n.id === e.from), sorted.findIndex((n) => n.id === e.to)];
+        if (i < 0 || j <= i) continue;
+        sorted.splice(j, 0, ...sorted.splice(i, 1));
+        moved = true;
+      }
+      if (!moved) break;
+    }
+    return sorted;
+  };
+  const known = timed.filter((n) => n.tokens?.estimated > 0 && !kids.get(n.id)?.length).map((n) => n.tokens.estimated).sort((a, b) => a - b);
+  const middling = known.length ? known[Math.floor(known.length / 2)] : 50_000;
+  const rows = [];
+  const place = (n, start) => {
+    if (rows.includes(n)) return start; // a loop of belonging: stop going round
+    rows.push(n);
+    let cursor = start;
+    for (const kid of inOrder(kids.get(n.id) ?? [])) cursor = place(kid, cursor);
+    const estimated = n.tokens?.estimated ?? 0;
+    n.guess = !(estimated > 0);
+    n.t0 = start;
+    n.len = Math.max(estimated, cursor - start) || Math.max(n.tokens?.used ?? 0, middling);
+    return start + n.len;
+  };
+  const roots = timed.filter((n) => !parentOf.has(n.id));
+  let total = 0;
+  for (const n of [...roots.filter((x) => x.id === focus), ...inOrder(roots.filter((x) => x.id !== focus))]) total = place(n, total);
+  const scale = 1000 / (total || middling);
+  rows.forEach((n, i) => {
+    const used = n.tokens?.used ?? 0;
+    Object.assign(n, { bar: true, x: n.t0 * scale, y: ROW.top + i * (ROW.h + ROW.gap), w: Math.max(n.len * scale, 6), h: ROW.h, usedW: Math.min(used, n.len) * scale, overW: Math.max(used - n.len, 0) * scale });
+  });
+  const bottom = ROW.top + rows.length * (ROW.h + ROW.gap);
+  const loose = nodes.filter((n) => !n.work).sort((a, b) => a.title.localeCompare(b.title));
+  loose.forEach((n, i) => Object.assign(n, { bar: true, loose: true, x: 0, y: bottom + 12 + i * (ROW.h + ROW.gap), w: 210, h: ROW.h, usedW: 0, overW: 0 }));
+  // A bar can be moved up or down out of the way; where it is across is what it means.
+  for (const n of nodes) if (prefs.moved.has(n.id)) n.y = prefs.moved.get(n.id).y;
+  // What a thing is part of is said by its bar spanning it, not by a line as well.
+  // Nor is waiting that is over drawn: the order along the scale already says what came first.
+  const over = (e) => BLOCKING.includes(e.type) && !byId.get(e.to).open;
+  return { axis: { scale, total: total || middling, top: ROW.top, bottom }, drawn: edges.filter((e) => !(e.type === 'part_of' && parentOf.get(e.from) === e.to) && !over(e)) };
 }
 
 /** The drawing itself: boxes joined by lines, each box leading to its page and free to be dragged. */
-function drawGraph({ nodes, edges, byId, focus, BOX }, prefs) {
+function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
   const pad = 16;
   const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
   // A title takes two lines in its box before it is cut, and is cut at a word.
@@ -1450,24 +1529,47 @@ function drawGraph({ nodes, edges, byId, focus, BOX }, prefs) {
     }
     return lines;
   };
-  const width = Math.max(...nodes.map((n) => n.x)) + BOX.w + pad * 2;
-  const height = Math.max(...nodes.map((n) => n.y)) + BOX.h + pad * 2;
+  // On the scale of tokens a thing is a bar with its name in it, or beside it when it does not fit.
+  const CHAR = 6.7;
+  for (const n of nodes.filter((x) => x.bar)) {
+    n.name = cut(n.place ? `${n.place}. ${n.title}` : n.title, 46);
+    const { estimated = 0, used = 0 } = n.tokens ?? {};
+    n.count = n.loose ? typeTitle(n.type) : used > 0 || !n.guess ? `${tokensText(used)} / ${n.guess ? '?' : tokensText(estimated)}${!n.guess && n.len > estimated ? '+' : ''}` : 'no estimate';
+    n.inside = n.loose || n.name.length * CHAR + 20 <= n.w;
+    n.reach = n.w + n.overW + 8 + (n.inside ? 0 : n.name.length * CHAR + 8) + (n.loose ? 0 : n.count.length * 6 + 8);
+  }
+  const width = Math.max(...nodes.map((n) => n.x + (n.reach ?? n.w))) + pad * 2;
+  const height = Math.max(...nodes.map((n) => n.y + n.h)) + pad * 2;
   const lineLayer = s('g', { transform: `translate(${pad},${pad})` });
   const boxLayer = s('g', { transform: `translate(${pad},${pad})` });
+  const scaleLayer = s('g', { class: 'g-axis', transform: `translate(${pad},${pad})` });
+  if (axis) {
+    // A round number of tokens between the marks, about seven of them.
+    const rough = axis.total / 7;
+    const step = [1, 2, 5, 10].map((m) => m * 10 ** Math.floor(Math.log10(rough))).find((x) => x >= rough);
+    for (let t = 0; t <= axis.total; t += step) {
+      scaleLayer.append(s('line', { x1: t * axis.scale, x2: t * axis.scale, y1: axis.top - 8, y2: axis.bottom }), s('text', { x: t * axis.scale + 4, y: 11 }, document.createTextNode(t ? tokensText(t) : '0 tokens')));
+    }
+  }
   const marker = (id, cls) => s('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: cls }));
   const svg = s(
     'svg',
-    { ...(prefs.fit ? { width: '100%' } : { width, height }), viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Graph of the map' },
+    { ...(prefs.fit ? { width: '100%' } : { width, height }), viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': axis ? 'The work laid out by the tokens it takes' : 'Graph of the map' },
     s('defs', {}, marker('rm-arrow', 'rm-arrowhead'), marker('rm-arrow-wait', 'rm-arrowhead wait')),
+    scaleLayer,
     lineLayer,
     boxLayer,
   );
 
-  // A line leaves the side of one box that faces the other; two boxes in one column are joined round their right.
+  // A line leaves the side of one box that faces the other; two that overlap across are joined round their right.
   const path = (a, b) => {
-    const my = (n) => n.y + BOX.h / 2;
-    if (Math.abs(a.x - b.x) < BOX.w / 2) return `M${a.x + BOX.w},${my(a)} C${a.x + BOX.w + 46},${my(a)} ${b.x + BOX.w + 46},${my(b)} ${b.x + BOX.w + 2},${my(b)}`;
-    const [x1, x2] = a.x < b.x ? [a.x + BOX.w, b.x - 2] : [a.x, b.x + BOX.w + 2];
+    const my = (n) => n.y + n.h / 2;
+    const [ar, br] = [a.x + a.w, b.x + b.w];
+    if (ar > b.x + 4 && br > a.x + 4) {
+      const out = Math.max(ar, br) + 46;
+      return `M${ar},${my(a)} C${out},${my(a)} ${out},${my(b)} ${br + 2},${my(b)}`;
+    }
+    const [x1, x2] = ar <= b.x + 4 ? [ar, b.x - 2] : [a.x, br + 2];
     return `M${x1},${my(a)} C${(x1 + x2) / 2},${my(a)} ${(x1 + x2) / 2},${my(b)} ${x2},${my(b)}`;
   };
   const seen = { waiting: false, met: false, lifted: false, other: false };
@@ -1483,7 +1585,7 @@ function drawGraph({ nodes, edges, byId, focus, BOX }, prefs) {
     const phrase = relations.get(e.type)?.title ?? e.type;
     const el = s(
       'path',
-      blocking ? { class: `rm-dep${a.open ? ' waiting' : ''}${e.lifted ? ' lifted' : ''}`, 'marker-end': `url(#rm-arrow${a.open ? '-wait' : ''})` } : { class: `rm-link${structure ? '' : ' other'}` },
+      blocking ? { class: `rm-dep${a.open ? ' waiting' : ''}${e.lifted ? ' lifted' : ''}`, 'marker-end': `url(#rm-arrow${a.open ? '-wait' : ''})` } : { class: `rm-link${structure ? '' : ' other'}${a.loose || b.loose ? ' faint' : ''}` },
       s('title', {}, document.createTextNode(`${byId.get(e.from).title} ${e.lifted ? 'waits, through their tasks, on' : phrase} ${byId.get(e.to).title}`)),
     );
     lineLayer.append(el);
@@ -1500,19 +1602,43 @@ function drawGraph({ nodes, edges, byId, focus, BOX }, prefs) {
   };
   for (const n of nodes) {
     const { done = 0, total = 0 } = n.progress ?? {};
-    const box = s(
-      'g',
-      { class: `rm-node g-node group-${groupOf(n.root).key}${n.id === focus ? ' root' : ''}${n.open ? '' : ' closed'}${n.active ? ' active' : ''}${n.blocked ? ' blocked' : ''}`, transform: `translate(${n.x},${n.y})` },
-      s('title', {}, document.createTextNode(`${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}`)),
-      s('rect', { class: 'box', width: BOX.w, height: BOX.h, rx: 7 }),
-      s('rect', { class: 'stripe', x: 0, y: 8, width: 3, height: BOX.h - 16, rx: 1.5 }),
-      ...wrap(n.place ? `${n.place}. ${n.title}` : n.title, 31).map((line, k) => s('text', { x: 12, y: 17 + k * 15 }, document.createTextNode(line))),
-      total > 0 && s('rect', { class: 'track', x: 12, y: 42, width: 70, height: 5, rx: 2.5 }),
-      total > 0 && s('rect', { class: 'fill', x: 12, y: 42, width: (70 * done) / total, height: 5, rx: 2.5 }),
-      s('text', { class: 'small', x: total > 0 ? 88 : 12, y: 48 }, document.createTextNode(total > 0 ? `${done}/${total}` : typeTitle(n.type))),
-      s('text', { class: 'small', x: BOX.w - 10, y: 48, 'text-anchor': 'end' }, document.createTextNode(n.status)),
-      n.blocked && s('circle', { class: 'flag', cx: BOX.w - 4, cy: 4, r: 5 }),
+    const { estimated = 0, used = 0 } = n.tokens ?? {};
+    const state = `${n.id === focus ? ' root' : ''}${n.open ? '' : ' closed'}${n.active ? ' active' : ''}${n.blocked ? ' blocked' : ''}`;
+    const hint = s(
+      'title',
+      {},
+      document.createTextNode(
+        `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}${n.work ? `\n${n.guess ? 'No estimate' : `Estimated ${tokensText(estimated)} tokens`}, ${tokensText(used)} used` : ''}`,
+      ),
     );
+    const after = n.w + (n.overW ?? 0) + 8;
+    const box = n.bar
+      ? s(
+          'g',
+          { class: `rm-node g-node bar group-${groupOf(n.root).key}${state}${n.guess ? ' guess' : ''}${n.loose ? ' loose' : ''}`, transform: `translate(${n.x},${n.y})` },
+          hint,
+          s('rect', { class: 'box', width: n.w, height: n.h, rx: 5 }),
+          n.usedW > 0 && s('rect', { class: 'used', width: n.usedW, height: n.h, rx: 5 }),
+          n.overW > 0 && s('rect', { class: 'over', x: n.w, y: 4, width: n.overW, height: n.h - 8, rx: 3 }),
+          n.w > 14 && s('rect', { class: 'stripe', x: 0, y: 6, width: 3, height: n.h - 12, rx: 1.5 }),
+          s('text', { x: n.inside ? 10 : after, y: 19 }, document.createTextNode(n.name)),
+          !n.loose && s('text', { class: 'small', x: after + (n.inside ? 0 : n.name.length * CHAR + 8), y: 19 }, document.createTextNode(n.count)),
+          n.loose && s('text', { class: 'small', x: after, y: 19 }, document.createTextNode(n.count)),
+          n.blocked && s('circle', { class: 'flag', cx: n.w - 3, cy: 3, r: 4.5 }),
+        )
+      : s(
+          'g',
+          { class: `rm-node g-node group-${groupOf(n.root).key}${state}`, transform: `translate(${n.x},${n.y})` },
+          hint,
+          s('rect', { class: 'box', width: n.w, height: n.h, rx: 7 }),
+          s('rect', { class: 'stripe', x: 0, y: 8, width: 3, height: n.h - 16, rx: 1.5 }),
+          ...wrap(n.place ? `${n.place}. ${n.title}` : n.title, 31).map((line, k) => s('text', { x: 12, y: 17 + k * 15 }, document.createTextNode(line))),
+          total > 0 && s('rect', { class: 'track', x: 12, y: 42, width: 70, height: 5, rx: 2.5 }),
+          total > 0 && s('rect', { class: 'fill', x: 12, y: 42, width: (70 * done) / total, height: 5, rx: 2.5 }),
+          s('text', { class: 'small', x: total > 0 ? 88 : 12, y: 48 }, document.createTextNode(total > 0 ? `${done}/${total}` : typeTitle(n.type))),
+          s('text', { class: 'small', x: n.w - 10, y: 48, 'text-anchor': 'end' }, document.createTextNode(n.status)),
+          n.blocked && s('circle', { class: 'flag', cx: n.w - 4, cy: 4, r: 5 }),
+        );
     boxes.set(n.id, box);
     boxLayer.append(box);
     box.addEventListener('pointerenter', () => light(n.id));
@@ -1521,14 +1647,15 @@ function drawGraph({ nodes, edges, byId, focus, BOX }, prefs) {
     box.addEventListener('pointerdown', (down) => {
       if (down.button !== 0) return;
       box.setPointerCapture(down.pointerId);
-      const scale = width / svg.getBoundingClientRect().width;
+      const ratio = width / svg.getBoundingClientRect().width;
       const from = { x: n.x, y: n.y };
       let far = false;
       const move = (ev) => {
-        const [dx, dy] = [(ev.clientX - down.clientX) * scale, (ev.clientY - down.clientY) * scale];
+        const [dx, dy] = [(ev.clientX - down.clientX) * ratio, (ev.clientY - down.clientY) * ratio];
         far ||= Math.hypot(dx, dy) > 4;
         if (!far) return;
-        n.x = Math.max(0, from.x + dx);
+        // On the scale of tokens, where a bar is across is what it means: it moves up and down only.
+        if (!axis) n.x = Math.max(0, from.x + dx);
         n.y = Math.max(0, from.y + dy);
         box.setAttribute('transform', `translate(${n.x},${n.y})`);
         lines.filter((l) => l.ends.includes(n.id)).forEach(route);
@@ -1546,6 +1673,10 @@ function drawGraph({ nodes, edges, byId, focus, BOX }, prefs) {
 
   const key = (cls, text) => h('span', { class: 'key' }, h('span', { class: cls }), text);
   const legend = [
+    axis && key('swatch g-est', 'As long as it is expected to take'),
+    nodes.some((n) => n.usedW > 0) && key('swatch g-used', 'Used so far'),
+    nodes.some((n) => n.overW > 0) && key('swatch g-over', 'Over its estimate'),
+    nodes.some((n) => n.guess) && key('swatch g-guess', 'No estimate yet'),
     seen.waiting && key('stroke waits', 'Waits on something unfinished'),
     seen.met && key('stroke blocking', 'Waited on something now finished'),
     seen.lifted && key('stroke lifted', 'Through their tasks'),

@@ -70,7 +70,9 @@
       "fields": {
         "due": { "type": "date" },
         "priority": { "type": "enum", "values": ["low", "normal", "high", "urgent"] },
-        "recurrence": { "type": "string", "description": "How often it repeats, in plain words or an RRULE." }
+        "recurrence": { "type": "string", "description": "How often it repeats, in plain words or an RRULE." },
+        "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects this to take: input and output, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
+        "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
       }
     },
     {
@@ -99,7 +101,9 @@
       "statuses": { "open": ["open", "investigating", "mitigated"], "closed": ["resolved", "wontfix"] },
       "fields": {
         "kind": { "type": "enum", "values": ["problem", "risk"] },
-        "severity": { "type": "enum", "values": ["low", "medium", "high", "critical"] }
+        "severity": { "type": "enum", "values": ["low", "medium", "high", "critical"] },
+        "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects fixing this to take: input and output, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
+        "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
       }
     },
     {

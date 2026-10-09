@@ -35,6 +35,11 @@ At the start of a session:
    `session_update`, and propose a new handoff note before you finish.
 3. Make sure the local server is running before you change code
    (`npm run dev`; port 3100).
+4. When you take on a task, issue or feature that has no estimate, give it
+   one: `tokens_estimated` in its props (input and output, not counting
+   cached re-reads). What the session actually uses is measured by the
+   session hook and added to what the session is working on, so name your
+   task with `session_update` before you start, and again when you move on.
 
 Keep the map true as you go: when what you did or found settles something
 that is still open (a task, an experiment, a decision made in practice),

@@ -115,6 +115,31 @@ async function heard(l: Lattice, run: Entity, why: string): Promise<void> {
   if (rows.length) await l.apply('agent:lattice', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });
 }
 
+/**
+ * What a session has used so far, as the machine it runs on counted it (the
+ * hook reads the session's own record). The session keeps the total; what is
+ * new since the last count goes to the work it is on now, shared between
+ * them when there is more than one. A measurement, not a fact someone
+ * states: it is written as the session's last-seen is, with no change to
+ * review and without making the work look newly confirmed.
+ */
+export async function recordUsage(l: Lattice, sessionId: string | undefined, tokens: unknown): Promise<{ run: string; added: number; to: string[] } | undefined> {
+  if (!sessionId || typeof tokens !== 'number' || !Number.isFinite(tokens) || tokens <= 0) return undefined;
+  const run = await resolveRun(l, sessionId, true);
+  if (!run) return undefined;
+  const added = Math.round(tokens) - Number(run.props.tokens_used ?? 0);
+  if (added <= 0) return { run: run.id, added: 0, to: [] };
+  const set = `update entity set props = props || jsonb_build_object('tokens_used', coalesce((props->>'tokens_used')::numeric, 0) + $2::numeric) where id = $1`;
+  await l.db.query(set, [run.id, added]);
+  const { rows } = await l.db.query<{ id: string; type: string }>(
+    `select e.id, e.type from relation r join entity e on e.id = r.to_id where r.type = 'sys.works_on' and r.from_id = $1 and r.valid_to is null and e.archived_at is null`,
+    [run.id],
+  );
+  const work = rows.filter((w) => l.registry.type(w.type)?.fields.tokens_used);
+  for (const w of work) await l.db.query(set, [w.id, Math.round(added / work.length)]);
+  return { run: run.id, added, to: work.map((w) => w.id) };
+}
+
 export async function sessionUpdate(l: Lattice, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string }) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
@@ -136,7 +161,14 @@ export async function sessionUpdate(l: Lattice, actor: Actor, input: { run: stri
   ];
   if (input.task) ops.push({ op: 'link', type: 'sys.works_on', from: run.id, to: input.task });
   await l.apply(actorId(actor), { ops, reason: input.note ?? `Session ${input.status ?? 'update'}` });
-  return { run: run.id, status: input.status ?? run.status };
+  // Work that is picked up with no estimate is the moment to give it one.
+  const task = input.task ? await l.entity(input.task) : undefined;
+  const unestimated = task && l.registry.type(task.type)?.fields.tokens_estimated && task.props.tokens_estimated == null;
+  return {
+    run: run.id,
+    status: input.status ?? run.status,
+    ...(unestimated && { estimate: `"${task.title}" has no estimate. Say how many tokens you expect it to take (input and output, not counting cached re-reads): change, update ${task.id}, props.tokens_estimated. What it actually uses is measured for you.` }),
+  };
 }
 
 type Item = { id: string; type: string; title: string; status: string };
@@ -247,6 +279,7 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
   }
   lines.push(
     '',
+    'When you take on a task that has no estimate, give it one: how many tokens you expect it to take (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.',
     'If the lattice MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each or say it is still true. A session that ends without it is closed for you and recorded as not reconciled.',
     'When Lattice itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.',
     'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm unless this workspace applies agents’ changes as made, so send the answer with what was chosen and why.',

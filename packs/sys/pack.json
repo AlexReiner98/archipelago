@@ -94,6 +94,11 @@
           "type": "boolean",
           "description": "Set once the human has been told this session went quiet.",
           "system": true
+        },
+        "tokens_used": {
+          "type": "number",
+          "description": "Tokens the session has used so far, as its machine counted them.",
+          "system": true
         }
       }
     },

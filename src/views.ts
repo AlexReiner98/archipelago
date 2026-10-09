@@ -478,7 +478,7 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
   const preset = input.relations ?? (input.focus ? 'all' : 'blocking');
   if (!(preset in GRAPH_PRESETS)) throw new Error(`relations must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
   const only = GRAPH_PRESETS[preset];
-  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open from entity where archived_at is null`);
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props from entity where archived_at is null`);
   const system = (type: string) => type.startsWith('sys.') && !l.registry.isA(type, 'resource');
   const eligible = new Map(
     entities.filter((e) => e.id === input.focus || ((input.include_closed || e.is_open) && (input.include_system || !system(e.type)))).map((e) => [e.id, e]),
@@ -516,6 +516,28 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
   if (keep.size > GRAPH_LIMIT) keep = new Set([...keep].slice(0, GRAPH_LIMIT));
   edges = edges.filter((e) => keep.has(e.from_id) && keep.has(e.to_id));
 
+  // Tokens: what each thing is expected to take and has taken, with everything that is part of it, in sight or not.
+  // An estimate of its own stands until its parts add up to more.
+  const all = new Map(entities.map((e) => [e.id, e]));
+  const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null`);
+  const partsOf = new Map<string, string[]>();
+  for (const p of parts) if (all.has(p.from_id)) partsOf.set(p.to_id, [...(partsOf.get(p.to_id) ?? []), p.from_id]);
+  const totals = new Map<string, { estimated: number; used: number }>();
+  const tokens = (id: string, trail = new Set<string>()): { estimated: number; used: number } => {
+    const known = totals.get(id);
+    if (known) return known;
+    if (trail.has(id)) return { estimated: 0, used: 0 }; // a loop of belonging: stop going round
+    trail.add(id);
+    const inside = (partsOf.get(id) ?? []).map((part) => tokens(part, trail));
+    trail.delete(id);
+    const own = all.get(id)?.props ?? {};
+    const sum = { estimated: Math.max(Number(own.tokens_estimated ?? 0), inside.reduce((n, t) => n + t.estimated, 0)), used: Number(own.tokens_used ?? 0) + inside.reduce((n, t) => n + t.used, 0) };
+    totals.set(id, sum);
+    return sum;
+  };
+  // What is work, and so has a place on a scale of tokens: what can be estimated, and what such things are part of.
+  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'project');
+
   const blocked = await blockGraph(l);
   return {
     preset,
@@ -523,7 +545,16 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
     truncated: total > GRAPH_LIMIT ? { shown: GRAPH_LIMIT, of: total } : undefined,
     nodes: [...keep].map((id) => {
       const e = eligible.get(id)!;
-      return { id, type: e.type, root: l.registry.type(e.type)?.lineage.at(-1) ?? e.type, title: e.title, status: e.status, open: e.is_open, blocked: blocked.isBlocked(id) };
+      return {
+        id,
+        type: e.type,
+        root: l.registry.type(e.type)?.lineage.at(-1) ?? e.type,
+        title: e.title,
+        status: e.status,
+        open: e.is_open,
+        blocked: blocked.isBlocked(id),
+        ...(work(e.type) && { work: true, tokens: tokens(id), estimated: e.props.tokens_estimated != null, order: e.props.order as number | undefined }),
+      };
     }),
     edges: edges.map((e) => ({ id: e.id, type: e.type, from: e.from_id, to: e.to_id })),
   };

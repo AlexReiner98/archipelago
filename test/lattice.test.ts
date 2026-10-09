@@ -11,7 +11,7 @@ import { openDb } from '../src/db.ts';
 import { configureLauncher, launch } from '../src/launcher.ts';
 import { Lattice, type Actor, type Op } from '../src/lattice.ts';
 import { Registry } from '../src/packs.ts';
-import { hookSessionEnd, hookSessionStart, sessionEnd, sessionStart, sessionUpdate } from '../src/sessions.ts';
+import { hookSessionEnd, hookSessionStart, recordUsage, sessionEnd, sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 import { Workspaces } from '../src/workspaces.ts';
@@ -603,6 +603,42 @@ test('launching runs a headless session on a task, holding the lane and recordin
   const failed = await ended(failing.run);
   assert.equal(failed.status, 'failed');
   assert.match(failed.body, /mode=acceptEdits/);
+});
+
+test('tokens: an estimate is asked for, what a session uses goes to its work, and the graph adds up what is part of what', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'f', type: 'software.feature', title: 'Feature', props: { tokens_estimated: 100_000 } },
+    { op: 'create', ref: 'a', type: 'task', title: 'Task A', props: { tokens_estimated: 80_000 } },
+    { op: 'create', ref: 'b', type: 'task', title: 'Task B' },
+    { op: 'create', ref: 'n', type: 'note', title: 'A note' },
+    { op: 'link', type: 'part_of', from: 'f', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'f' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'f' },
+    { op: 'link', type: 'about', from: 'n', to: 'p' },
+  ]);
+  const { run } = await sessionStart(l, agent, { session_id: 's1', title: 'Counting' });
+  const before = (await l.entity(made.b))!.updated_at;
+  // Used with nothing taken on: the session keeps it.
+  assert.deepEqual(await recordUsage(l, 's1', 10_000), { run, added: 10_000, to: [] });
+  assert.match(((await sessionUpdate(l, agent, { run, task: made.b })) as any).estimate, /"Task B" has no estimate.*tokens_estimated/);
+  assert.equal(((await sessionUpdate(l, agent, { run, task: made.a })) as any).estimate, undefined, 'one with an estimate is not asked about');
+  // The count is the session's total: only what is new is shared between what it is on.
+  assert.deepEqual((await recordUsage(l, 's1', 50_000))!.added, 40_000);
+  assert.equal((await recordUsage(l, 's1', 50_000))!.added, 0, 'the same count again adds nothing');
+  assert.equal(await recordUsage(l, 'nobody', 5), undefined);
+  const props = async (id: string) => (await l.entity(id))!.props;
+  assert.deepEqual([(await props(run)).tokens_used, (await props(made.a)).tokens_used, (await props(made.b)).tokens_used], [50_000, 20_000, 20_000]);
+  assert.deepEqual((await l.entity(made.b))!.updated_at, before, 'measuring does not make the work look newly confirmed');
+
+  const nodes = new Map(((await VIEWS.graph.run(l, { focus: made.p, depth: 1, relations: 'all', include_closed: true })) as any).nodes.map((n: any) => [n.title, n]));
+  const of = (title: string) => nodes.get(title) as any;
+  assert.deepEqual(of('Proj').tokens, { estimated: 100_000, used: 40_000 }, 'a project is what is part of it, in sight or not');
+  assert.deepEqual([of('Feature').tokens, of('Feature').estimated], [{ estimated: 100_000, used: 40_000 }, true], 'an estimate of its own stands until its parts add up to more');
+  assert.deepEqual([of('A note').work, of('A note').tokens], [undefined, undefined], 'what is not work has no tokens');
+  await make(l, [{ op: 'update', id: made.b, props: { tokens_estimated: 70_000 } }]);
+  assert.equal(((await VIEWS.graph.run(l, { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === made.f).tokens.estimated, 150_000);
 });
 
 test('an agent can notify the human; a stale session raises one notification', async () => {
