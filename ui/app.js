@@ -111,7 +111,7 @@ function enter(token) {
   schema = undefined;
   pulse = undefined;
   seenFocus = undefined;
-  if (location.hash && location.hash !== '#/today') location.hash = '#/today';
+  if (location.hash && location.hash !== '#/map') location.hash = '#/map';
   else route();
 }
 
@@ -343,6 +343,16 @@ const pill = (typeId, status) => h('span', { class: `pill${isClosed(typeId, stat
 /** Titles of the items the pages have shown, so a line that only holds an id can still say a name. */
 const titles = new Map();
 const named = (id) => titles.get(id) ?? id;
+/** Text an agent wrote, with each item id in it as a link by the item's name: an id is something to follow, never something to read. */
+const idsAsLinks = (text) => {
+  const out = [];
+  let from = 0;
+  for (const m of text.matchAll(/\be_[a-z0-9]{8}\b/g)) {
+    out.push(text.slice(from, m.index), h('a', { href: `#/e/${m[0]}`, title: 'Open it' }, titles.get(m[0]) ?? 'this item'));
+    from = m.index + m[0].length;
+  }
+  return [...out, text.slice(from)];
+};
 const link = (e) => (e ? (titles.set(e.id, e.title), h('a', { href: `#/e/${e.id}` }, e.title)) : h('span', { class: 'muted' }, '(missing)'));
 
 /** The usual one-line rendering of an entity. */
@@ -390,16 +400,15 @@ async function refreshReviewCount() {
   }
 }
 
-// ---- Home ----------------------------------------------------------------
+// ---- Projects, at the top of Search ----------------------------------------
 
 // The projects, one to a row: where each stands and how much of it is
 // waiting for the owner, which is dealt with on its own page.
 let todayOpen = '';
 
-async function today() {
-  const main = part('today');
+async function projects(main) {
   const here = () => main.isConnected;
-  if (!main.querySelector('.inbox')) main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Home')), h('div', { class: 'inbox' }, h('div', { class: 'empty' }, 'Loading…')));
+  if (!main.childElementCount) main.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
   const view = (name, params) => api('view', { name, params });
   const [info, asked, needs, blockers, risk] = await Promise.all([
     api('workspace_info'),
@@ -496,7 +505,6 @@ async function today() {
     ),
   );
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Home'), h('span', { class: 'grow' }), h('button', { title: 'Start a new project', onclick: () => (location.hash = '#/new/project') }, '+ Project')),
     h('div', { class: 'inbox' }, inbox),
     Object.values(others).some((o) => o.n > 0) ? strip : '',
     drawer,
@@ -802,7 +810,11 @@ function map() {
       const rows = (await api('search', { open: mapState.open === 'all' ? undefined : mapState.open === 'open', limit: 200 })).filter((e) => !e.type.startsWith('sys.') || FOUND.includes(e.type));
       const counts = new Map();
       for (const e of rows) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
+      // Drawn once and kept while the kinds under it are counted again, so the list does not blink.
+      const top = rest.querySelector('.projects-top') ?? h('div', { class: 'projects-top' });
+      projects(top).catch((err) => top.replaceChildren(h('div', { class: 'error' }, err.message)));
       rest.replaceChildren(
+        top,
         h(
           'div',
           { class: 'tiles kinds' },
@@ -854,7 +866,7 @@ function renderBody(text) {
     let list;
     let para = [];
     const flush = () => {
-      if (para.length) out.push(h('p', {}, para.join(' ')));
+      if (para.length) out.push(h('p', {}, idsAsLinks(para.join(' '))));
       para = [];
     };
     for (const line of lines) {
@@ -862,12 +874,12 @@ function renderBody(text) {
       if (mark) {
         flush();
         if (!list) out.push((list = h('ul', {})));
-        list.append(h('li', {}, h('span', { class: 'muted' }, /^[-*]$/.test(mark[1]) ? '• ' : `${mark[1]} `), line.slice(mark[0].length)));
+        list.append(h('li', {}, h('span', { class: 'muted' }, /^[-*]$/.test(mark[1]) ? '• ' : `${mark[1]} `), idsAsLinks(line.slice(mark[0].length))));
       } else if (!line.trim()) {
         flush();
         list = undefined;
       } else if (list && /^\s{2,}/.test(line)) {
-        list.lastChild.append(` ${line.trim()}`);
+        list.lastChild.append(...idsAsLinks(` ${line.trim()}`));
       } else {
         list = undefined;
         para.push(line.trim());
@@ -1109,7 +1121,7 @@ async function entity(id) {
       menu('More', [
         !e.archived_at && phrases.length > 0 && ['Edit relations', () => ((editor.hidden = false), openAdder(), editor.scrollIntoView({ block: 'nearest' }))],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
-        data.source && [`Source: ${data.source.title}`, () => (location.hash = `#/e/${data.source.id}`)],
+        data.source && [`Source: ${data.source.title.replace(/\b[a-z]_[a-z0-9]{8}\b/g, (found) => titles.get(found) ?? 'a session')}`, () => (location.hash = `#/e/${data.source.id}`)],
         workish && ['Copy session brief', copyBrief],
         workish && ['Launch a session: investigate only', () => launch('plan')],
         workish && ['Launch a session: may edit files', () => launch('acceptEdits')],
@@ -2684,28 +2696,28 @@ document.addEventListener('visibilitychange', checkPulse);
 // page of the thing it is about or in the search, and its old address leads
 // there. Search is one thing at a time under its search box: the search, an
 // item, or a graph.
-const PAGES = { today: ['today'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace'] };
+const PAGES = { review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace'] };
 const UNDER = { e: 'map', new: 'map', graph: 'map' };
 /** The part an address names, where that is not the address's own name. */
 const PART = { e: 'item', new: 'item' };
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
 async function route(pulse = false) {
-  const [, name = 'today', arg] = location.hash.split('/');
+  const [, name = 'map', arg] = location.hash.split('/');
   // Addresses that have been folded into another screen still lead somewhere.
   if (name === 'activity') return activity();
-  if (name === 'projects') return void (location.hash = '#/today');
+  // The projects are the top of Search, where the app opens.
+  if (name === 'projects' || name === 'today') return void (location.hash = '#/map');
   // Automations are found like any other kind of item.
   // The graph around an item is its relations, drawn further out, on its own page.
   if (name === 'graph' && arg) return void ((prefsOf(arg).steps = Math.max(prefsOf(arg).steps, 2)), unfolded.set(`${arg}:relations`, true), (location.hash = `#/e/${arg}`));
   if (name === 'automations') return void ((mapState.type = 'sys.automation'), (location.hash = '#/map'));
   // A project's roadmap and its questions are on the project's own page.
-  if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/today');
-  const page = PAGES[UNDER[name] ?? name] ? (UNDER[name] ?? name) : 'today';
+  if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/map');
+  const page = PAGES[UNDER[name] ?? name] ? (UNDER[name] ?? name) : 'map';
   dirty = false;
   stale.hidden = true;
   for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === page);
   const draw = {
-    today,
     review,
     map: name === 'map' || page !== 'map' ? map : searchBar,
     // The graph around an item is drawn on that item's page, under it.
