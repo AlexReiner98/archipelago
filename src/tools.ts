@@ -9,6 +9,7 @@ import { createToken, listTokens, revokeToken } from './auth.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
+import { hasReaderKey, READER_MODEL, setReaderKey } from './reader.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
@@ -657,20 +658,28 @@ export const TOOLS: Record<string, Tool> = {
     description:
       'This workspace and the server\u2019s GitHub App: whether the server has its app, and whether this workspace has connected it (and as which GitHub account). ' +
       'create: where to go to create the app, once for the whole server (an admin of the default workspace only). connect: where to go to choose repositories on GitHub; each one chosen is put in the map and its pushes are heard from then on. ' +
-      'disconnect: stop hearing from GitHub here (the app stays installed on GitHub until it is removed there). Admins only for those three.',
+      'disconnect: stop hearing from GitHub here (the app stays installed on GitHub until it is removed there). ' +
+      'key: the Anthropic key the agent on this server runs on when it reads a push or re-checks old items (kept on the server, never shown again); forget_key removes it, and pushes are then recorded but not read. Admins only for all of these.',
     humanOnly: true,
-    input: { create: z.boolean().optional(), connect: z.boolean().optional(), disconnect: z.boolean().optional() },
+    input: { create: z.boolean().optional(), connect: z.boolean().optional(), disconnect: z.boolean().optional(), key: z.string().min(20).optional().describe('An Anthropic API key.'), forget_key: z.boolean().optional() },
     run: async (l, actor, input) => {
       const app = githubApp;
-      const status = () => ({ available: Boolean(app), app: app?.app ?? null, can_create: Boolean(app) && !app!.app && Boolean(actor.admin) && l.workspace === 'default', installation: app?.installationOf(l.workspace) ?? null });
-      if (!input.create && !input.connect && !input.disconnect) return status();
+      const whole = await wholeMap(l);
+      const status = async () => ({ available: Boolean(app), app: app?.app ?? null, can_create: Boolean(app) && !app!.app && Boolean(actor.admin) && l.workspace === 'default', installation: app?.installationOf(l.workspace) ?? null, reader: { key: await hasReaderKey(whole), model: READER_MODEL } });
+      if (!input.create && !input.connect && !input.disconnect && !input.key && !input.forget_key) return status();
       if (!app) throw new Error('This server cannot have a GitHub App: it has nowhere to keep one.');
       needAdmin(actor, 'connect GitHub');
+      if (input.key || input.forget_key) {
+        await setReaderKey(whole, input.forget_key ? undefined : input.key);
+        // The log says that it was set, and by whom: never the key.
+        await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: input.forget_key ? 'Anthropic key removed' : 'Anthropic key set' });
+        return status();
+      }
       if (input.create) {
         if (l.workspace !== 'default') throw new Error('The GitHub App belongs to the whole server: it is created from the default workspace, by its admin.');
-        return { ...status(), url: app.startCreate(l.workspace) };
+        return { ...(await status()), url: app.startCreate(l.workspace) };
       }
-      if (input.connect) return { ...status(), url: app.startConnect(l.workspace) };
+      if (input.connect) return { ...(await status()), url: app.startConnect(l.workspace) };
       const mine = app.installationOf(l.workspace);
       if (mine) {
         app.forget(mine.id);

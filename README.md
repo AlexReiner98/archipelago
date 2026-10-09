@@ -329,6 +329,19 @@ server, and may only read (contents and metadata):
    with the app's secret, and is taken in exactly as below. Nothing is set up
    in the repository itself.
 
+**An agent on the server reads each push that arrives through the app.**
+Once the workspace's admin has given it an Anthropic key (the GitHub card,
+**Set Anthropic key**; kept on the server, never shown again), every push of
+commits to a branch is read against the repository's open items by an agent
+that runs on the Lattice server (`src/reader.ts`), and every hour it asks
+whether a re-check of old items is due. It has no checkout: it reads commits,
+diffs, files and history through the app, which may only read. It does what
+the workflow below does, sends its changes as any agent does (held or applied
+as the workspace says), stops at 40 turns or 600k tokens, and records each run
+in the repository with what it used. The model is `claude-sonnet-5-5`
+(`LATTICE_READER_MODEL` changes it). Without a key, pushes are recorded and
+not read. A repository connected both ways hears each push once.
+
 **Or the server hears the push through a webhook added by hand.** On the Workspace screen, **GitHub** makes a
 secret and shows the address to give GitHub (`/github/<workspace>`): in each
 repository, Settings, Webhooks, Add webhook, content type `application/json`,

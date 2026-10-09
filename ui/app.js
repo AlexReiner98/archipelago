@@ -925,7 +925,7 @@ function ageChip(e) {
 }
 
 /** Where a run was, as a person says it. */
-const RAN = { 'github-actions': 'Sync agent', 'claude-code': 'Session' };
+const RAN = { 'github-actions': 'Sync agent', server: 'Reader', 'claude-code': 'Session' };
 /** Which of each item's sections are unfolded, kept while the page is open. */
 const unfolded = new Map();
 
@@ -1986,6 +1986,22 @@ function githubCard() {
       if (!(await ask({ title: 'Stop hearing from GitHub?', message: 'Pushes to the repositories chosen there no longer reach this map. The app stays installed on GitHub until it is removed there.', action: 'Disconnect', danger: true }))) return;
       api('github_app', { disconnect: true }).then(() => draw()).catch(fail);
     };
+    // What reads the pushes: the agent on this server, once the workspace has given it a key to run on.
+    const setKey = async () => {
+      const key = await ask({ title: 'Anthropic key', message: 'The agent on this server reads each push against the map, and re-checks old items, on this key. It is kept on the server and never shown again.', input: { placeholder: 'sk-ant-\u2026' }, action: 'Save' });
+      if (key) api('github_app', { key }).then(() => draw()).catch(fail);
+    };
+    const reading =
+      app.available &&
+      app.installation &&
+      h(
+        'div',
+        { class: 'toolbar', style: 'padding: 10px 14px 0' },
+        h('span', { class: `pill ${app.reader?.key ? 'ok' : 'warn'}`, title: app.reader?.key ? 'An agent on this server reads each push against the open work' : 'Pushes are recorded, but nothing reads them until there is a key' }, app.reader?.key ? 'pushes are read' : 'pushes are not read'),
+        h('span', { class: 'grow muted small' }, app.reader?.key ? app.reader.model : ''),
+        h('button', { class: app.reader?.key ? '' : 'primary', onclick: setKey }, app.reader?.key ? 'New key' : 'Set Anthropic key'),
+        app.reader?.key && menu('More', [['Remove the key', () => api('github_app', { forget_key: true }).then(() => draw()).catch(fail), 'danger']]),
+      );
     const appBar =
       app.available &&
       (app.installation
@@ -2000,6 +2016,7 @@ function githubCard() {
     };
     body.replaceChildren(
       appBar || '',
+      reading || '',
       made?.secret
         ? h(
             'div',

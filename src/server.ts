@@ -44,6 +44,7 @@ import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
+import { hasReaderKey, readable, readPush, recheck } from './reader.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
@@ -269,7 +270,18 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (event === 'installation_repositories') return send(res, 200, { result: await addRepositories(lattice, (payload.repositories_added ?? []).map((r) => r.full_name), payload.installation?.account?.login ?? '') });
         if (event !== 'push') return send(res, 200, { result: { recorded: false, reason: `Only pushes are taken in, not "${event}".` } });
         const deliveryId = req.headers['x-github-delivery'];
-        return send(res, 200, { result: await receivePush(lattice, payload, typeof deliveryId === 'string' ? deliveryId : undefined) });
+        const taken = await receivePush(lattice, payload, typeof deliveryId === 'string' ? deliveryId : undefined);
+        // A push of commits to a branch is then read against the map, by the agent on this server. GitHub is not
+        // kept waiting for that: it is answered now, and the run says what it did when it is over.
+        const reading = Boolean(taken.recorded && taken.repo && taken.branch && !taken.deleted && taken.commits && payload.after && payload.repository?.full_name) && (await hasReaderKey(lattice));
+        if (reading) {
+          const release = workspaces.hold(workspace);
+          void readPush(lattice, github, { installation: String(installation), name: payload.repository!.full_name!, entity: taken.repo! }, { branch: taken.branch!, default_branch: payload.repository!.default_branch ?? taken.branch!, before: payload.before ?? '0', after: payload.after! })
+            .then((r) => console.log(`reader: ${payload.repository!.full_name} ${payload.after!.slice(0, 7)}: ${r.ran ? `${r.ok ? 'done' : 'failed'}, ${r.tokens} tokens` : r.reason}`))
+            .catch((err) => console.error(`reader: ${(err as Error).message}`))
+            .finally(release);
+        }
+        return send(res, 200, { result: { ...taken, reading } });
       }
 
       // GitHub's deliveries carry no token: the signature over the body is who
@@ -411,7 +423,33 @@ If that process is not a lattice server, delete ${lock}.`);
 
   // The GitHub App is told this server's address: the name it is reached by from outside, when it has one.
   const origin = config.publicHosts[0] ? `https://${config.publicHosts[0]}` : `http://127.0.0.1:${config.port}`;
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: new GithubApp({ dir: rootDir, origin }) });
+  const githubApp = new GithubApp({ dir: rootDir, origin });
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: githubApp });
+  // Every hour each workspace that connected GitHub is asked, for each repository the app can read, whether a
+  // re-check is due (each project says how often); the agent on this server does the ones that are. An hour when
+  // nothing is due costs no run. Asked that often because a server that is deployed daily never sees a whole day.
+  const recheckAll = async () => {
+    for (const { id } of workspaces.list()) {
+      const installation = githubApp.installationOf(id);
+      if (!installation) continue;
+      const release = workspaces.hold(id);
+      try {
+        const { lattice } = await workspaces.get(id);
+        for (const repo of await readable(lattice, githubApp, installation.id)) {
+          const about = (await githubApp.asInstallation(installation.id, `/repos/${repo.name}`)) as { default_branch?: string };
+          const r = await recheck(lattice, githubApp, repo, about.default_branch ?? 'main');
+          if (r.ran) console.log(`reader: re-check of ${repo.name}: ${r.ok ? 'done' : 'failed'}, ${r.tokens} tokens`);
+        }
+      } catch (err) {
+        console.error(`reader: re-check in ${id} failed: ${(err as Error).message}`);
+      } finally {
+        release();
+      }
+    }
+  };
+  const rechecks = setInterval(() => void recheckAll(), 3600_000);
+  rechecks.unref();
+  setTimeout(() => void recheckAll(), 120_000).unref();
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {

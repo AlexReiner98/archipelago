@@ -119,8 +119,10 @@ settled, with what was chosen and why.
 - **Types live in pack files** under `packs/`. Fields the system maintains are
   marked `"system": true`.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
-- **Dependencies stay at three** (`@electric-sql/pglite`,
-  `@modelcontextprotocol/sdk`, `zod`) unless the owner agrees to another.
+- **Dependencies stay at four** (`@electric-sql/pglite`,
+  `@modelcontextprotocol/sdk`, `zod`, and since 9 Oct 2026
+  `@anthropic-ai/sdk`, for the agent on the server that reads pushes) unless
+  the owner agrees to another.
 
 ## UI rules
 

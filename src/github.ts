@@ -140,6 +140,12 @@ export async function receivePush(l: Lattice, payload: PushPayload, delivery?: s
     const { rows } = await l.db.query(`select 1 from event where action = 'repo.push' and detail->>'delivery' = $1 limit 1`, [delivery]);
     if (rows.length) return { recorded: false, reason: 'This delivery was already taken in.' };
   }
+  // A repository connected twice (the app, and a webhook added by hand before it) says each push twice, under
+  // two delivery ids: the commit a branch was moved to is what makes it the same push.
+  if (payload.after && !payload.deleted && !/^0+$/.test(payload.after) && payload.ref?.startsWith('refs/heads/')) {
+    const { rows } = await l.db.query(`select 1 from event where action = 'repo.push' and target_id = $1 and detail->>'after' = $2 and detail->>'branch' = $3 and detail->>'deleted' is null limit 1`, [repo.id, payload.after, payload.ref.slice('refs/heads/'.length)]);
+    if (rows.length) return { recorded: false, reason: 'This push was already taken in: it arrived another way too.' };
+  }
   const ref = payload.ref ?? '';
   const tag = ref.startsWith('refs/tags/') ? ref.slice('refs/tags/'.length) : undefined;
   const branch = tag === undefined ? ref.replace(/^refs\/heads\//, '') : undefined;

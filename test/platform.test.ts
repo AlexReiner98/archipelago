@@ -13,6 +13,7 @@ import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
 import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
 import { GithubApp } from '../src/github-app.ts';
+import { configureReader } from '../src/reader.ts';
 import { createHttpServer } from '../src/server.ts';
 import { configureRestart } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
@@ -793,6 +794,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
     if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return say(201, { id: 7, slug: 'lattice-test', name: 'Lattice (test)', pem, webhook_secret: 'whsec' });
     if (req.url === '/app/installations/42') return isApp() ? say(200, { account: { login: 'acme' } }) : say(401, { message: 'Bad credentials' });
     if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
+    if (req.url?.startsWith('/repos/Acme/Tools/compare/')) return bearer === 'ghs_forty-two' ? say(200, { commits: [{ sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools\n\nThe whetstone still needs oiling.', author: { name: 'sam' } } }], files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1 }] }) : say(401, { message: 'Bad credentials' });
     if (req.url?.startsWith('/installation/repositories')) return bearer === 'ghs_forty-two' ? say(200, { repositories: [{ full_name: 'Acme/Site' }, { full_name: 'Acme/Tools' }] }) : say(401, { message: 'Bad credentials' });
     say(404, { message: 'Not Found' });
   });
@@ -808,7 +810,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   const page = (path: string) => fetch(base + path, { redirect: 'manual' });
 
   // 1. The server has no app until its owner creates one. An agent cannot.
-  assert.deepEqual((await call('/api/github_app', admin)).result, { available: true, app: null, can_create: true, installation: null });
+  assert.deepEqual((await call('/api/github_app', admin)).result, { available: true, app: null, can_create: true, installation: null, reader: { key: false, model: 'claude-sonnet-5-5' } });
   assert.match((await call('/agent/github_app', robot, { create: true })).error, /humans only/);
   assert.match((await call('/api/github_app', admin, { connect: true })).error, /no GitHub App yet/);
   const create = (await call('/api/github_app', admin, { create: true })).result.url as string;
@@ -844,6 +846,47 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   const heard = (await deliver('push', push(42))).result;
   assert.deepEqual([heard.recorded, heard.repo.title, heard.commits], [true, 'Tools repo', 1]);
   assert.equal((await deliver('push', push(99))).result.recorded, false, 'an installation no workspace connected is not anyone\'s');
+  // 4. With a key, the agent on this server reads the push: it looks at the commits through the app, asks the map,
+  // and sends what the commits show. Here the model is a script, so what is tried is everything around it.
+  assert.deepEqual((await call('/api/github_app', admin)).result.reader, { key: false, model: 'claude-sonnet-5-5' });
+  assert.equal(heard.reading, false, 'without a key a push is recorded and not read');
+  assert.match((await call('/agent/github_app', robot, { key: 'sk-ant-' + 'x'.repeat(30) })).error, /humans only/);
+  const asks: any[] = [];
+  const script = [
+    { stop_reason: 'tool_use', content: [{ type: 'text', text: 'Reading the push.' }, { type: 'tool_use', id: 'tu_1', name: 'commits', input: { base: 'a'.repeat(40), head: 'b'.repeat(40) } }, { type: 'tool_use', id: 'tu_2', name: 'view', input: { name: 'repo_work', params: { repo: 'acme/tools' } } }, { type: 'tool_use', id: 'tu_3', name: 'no_such_tool', input: {} }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', type: 'task', title: 'Oil the whetstone' }] } }] },
+    { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Made one task: Oil the whetstone.' }] },
+  ];
+  configureReader((key) => async (params) => {
+    asks.push({ key, ...params, messages: structuredClone(params.messages) }); // as they stood when asked: the run goes on adding to them
+    return { id: `msg_${asks.length}`, type: 'message', role: 'assistant', model: params.model, usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 5000, cache_creation_input_tokens: 0 }, ...script[asks.length - 1] } as any;
+  });
+  assert.equal((await call('/api/github_app', admin, { key: 'sk-ant-' + 'x'.repeat(30) })).result.reader.key, true);
+  const read = (await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result;
+  assert.deepEqual([read.recorded, read.reading], [true, true]);
+  let runs: any[] = [];
+  for (let i = 0; i < 50 && !runs.length; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    runs = (await call('/api/view', admin, { name: 'agent_usage', params: { repo: 'acme/tools' } })).result.runs;
+  }
+  assert.deepEqual([runs[0].title, runs[0].surface, runs[0].status, runs[0].tokens, runs[0].turns], ['Read the push to main (bbbbbbb)', 'server', 'finished', 3600, 3]);
+  // It asked with the workspace's key, on the model chosen, with the map's tools and the repository's beside them.
+  assert.deepEqual([asks[0].key, asks[0].model, asks[0].fallbacks], ['sk-ant-' + 'x'.repeat(30), 'claude-sonnet-5-5', 'default']);
+  assert.ok(['view', 'change', 'commits', 'diff', 'file'].every((name) => asks[0].tools.some((t: any) => t.name === name)));
+  assert.match(asks[0].messages[0].content, /branch "main" of Acme\/Tools[\s\S]*aaaaaaa.*\.\.b{40}/);
+  // What it asked for was done, all of a turn answered together, and a tool that is not there said so without ending the run.
+  const answers = asks[1].messages.at(-1).content;
+  assert.deepEqual(answers.map((a: any) => [a.tool_use_id, Boolean(a.is_error)]), [['tu_1', false], ['tu_2', false], ['tu_3', true]]);
+  assert.match(answers[0].content, /whetstone still needs oiling[\s\S]*tools\/sharpen\.ts/);
+  // What it sent is an agent's change like any other: here, where agents' changes are held, it waits for the owner.
+  const held = (await call('/api/proposals', admin)).result;
+  assert.deepEqual(held.map((p: any) => [p.actor, p.ops[0].title]), [['agent:reader', 'Oil the whetstone']]);
+  // The same push said twice (a webhook left in the repository beside the app) is taken in once, and read once.
+  assert.deepEqual((await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result.recorded, false);
+  // The key is never given back, and removing it stops the reading.
+  assert.ok(!JSON.stringify((await call('/api/github_app', admin)).result).includes('sk-ant-'));
+  assert.equal((await call('/api/github_app', admin, { forget_key: true })).result.reader.key, false);
+
   assert.deepEqual((await deliver('installation_repositories', { action: 'added', installation: { id: 42, account: { login: 'acme' } }, repositories_added: [{ full_name: 'Acme/Docs' }] })).result, { added: ['Acme/Docs'], known: [] });
   // Chosen again on GitHub later, they come back with no word: the installation is known, and the map is brought up to date.
   assert.equal((await page('/github/app/installed?installation_id=42&setup_action=update')).status, 302);
