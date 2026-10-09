@@ -523,6 +523,8 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
   const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null`);
   const partsOf = new Map<string, string[]>();
   for (const p of parts) if (all.has(p.from_id)) partsOf.set(p.to_id, [...(partsOf.get(p.to_id) ?? []), p.from_id]);
+  // What is work, and so has a place on a scale of tokens: what can be estimated, and what such things are part of.
+  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'project');
   type Tokens = { estimated: number; used: number; assumed?: boolean; partial?: boolean };
   const totals = new Map<string, Tokens>();
   // A feature that is built is done, though it stays open until it ships.
@@ -532,7 +534,10 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
     if (known) return known;
     if (trail.has(id)) return { estimated: 0, used: 0 }; // a loop of belonging: stop going round
     trail.add(id);
-    const inside = (partsOf.get(id) ?? []).map((part) => tokens(part, trail));
+    // Only work has tokens. And a part that is also part of another part (a task of a feature, linked to the project too) is counted there, once.
+    const mine = (partsOf.get(id) ?? []).filter((part) => work(all.get(part)!.type));
+    const nearer = new Set(mine.flatMap((part) => partsOf.get(part) ?? []));
+    const inside = mine.filter((part) => !nearer.has(part)).map((part) => tokens(part, trail));
     trail.delete(id);
     const own = all.get(id)?.props ?? {};
     const ofParts = inside.reduce((n, t) => n + t.estimated, 0);
@@ -544,8 +549,6 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
     totals.set(id, sum);
     return sum;
   };
-  // What is work, and so has a place on a scale of tokens: what can be estimated, and what such things are part of.
-  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'project');
 
   const blocked = await blockGraph(l);
   return {

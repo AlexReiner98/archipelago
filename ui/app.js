@@ -1641,12 +1641,6 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
   const route = (l) => l.el.setAttribute('d', path(l.a, l.b));
   lines.forEach(route);
 
-  const boxes = new Map();
-  const light = (id) => {
-    const lit = id && new Set([id, ...lines.filter((l) => l.ends.includes(id)).flatMap((l) => l.ends)]);
-    for (const [key, el] of boxes) el.classList.toggle('dim', Boolean(lit) && !lit.has(key));
-    for (const l of lines) l.el.classList.toggle('dim', Boolean(lit) && !l.ends.includes(id));
-  };
   for (const n of nodes) {
     const { done = 0, total = 0 } = n.progress ?? {};
     const { estimated = 0, used = 0 } = n.tokens ?? {};
@@ -1684,10 +1678,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
           s('text', { class: 'small', x: n.w - 10, y: 48, 'text-anchor': 'end' }, document.createTextNode(n.status)),
           n.blocked && s('circle', { class: 'flag', cx: n.w - 4, cy: 4, r: 5 }),
         );
-    boxes.set(n.id, box);
     boxLayer.append(box);
-    box.addEventListener('pointerenter', () => light(n.id));
-    box.addEventListener('pointerleave', () => light());
     // On the scale of tokens, where a bar is says when it happens and what it takes: it is not moved by hand, only followed.
     if (axis) {
       box.addEventListener('click', () => ((prefs.full = false), (location.hash = `#/e/${n.id}`)));

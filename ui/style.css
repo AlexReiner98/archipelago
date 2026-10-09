@@ -182,7 +182,9 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .g-node.group-knowledge .stripe { fill: var(--g-knowledge); } .g-node.group-problems .stripe { fill: var(--g-problems); }
 .g-node.group-time .stripe { fill: var(--g-time); } .g-node.group-resources .stripe { fill: var(--g-resources); }
 .g-node.root .box { stroke-width: 2; }
-.g-node.dim, .rm-link.dim, .rm-dep.dim { opacity: 0.25; }
+/* Under the pointer a box is a little brighter; nothing else changes. */
+.g-node:hover { filter: brightness(1.2); }
+.g-node:hover .box { stroke: var(--text); }
 /* On the scale of tokens. One colour for one meaning, and none used twice: green is used, amber is over the
    estimate, blue is being worked on, red is blocked or waiting, grey is still to come. Nothing is dashed. */
 .g-axis line { stroke: var(--line); stroke-width: 1; }
