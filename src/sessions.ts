@@ -4,6 +4,7 @@
 // release: they are the session's own operational state, not facts about the
 // world, and coordination that waits for approval is no coordination.
 
+import { repoByName, repoName } from './github.ts';
 import { actorId, type Actor, type Entity, type Lattice, type Op } from './lattice.ts';
 import { UNCONFIRMED_DAYS, VIEWS } from './views.ts';
 
@@ -138,6 +139,40 @@ export async function recordUsage(l: Lattice, sessionId: string | undefined, tok
   const work = rows.filter((w) => l.registry.type(w.type)?.fields.tokens_used);
   for (const w of work) await l.db.query(set, [w.id, Math.round(added / work.length)]);
   return { run: run.id, added, to: work.map((w) => w.id) };
+}
+
+/**
+ * A run that happened where Lattice cannot watch it (the agent in GitHub
+ * Actions that reads a push, or re-checks the map) says so once it is over:
+ * what it was, how it ended and what it used. It is kept as a run that has
+ * ended, in the repository it ran for. Told twice of the same run (its link
+ * is the same), it is recorded once.
+ */
+export async function recordRun(
+  l: Lattice,
+  actor: Actor,
+  input: { repo: string; title: string; ok?: boolean; tokens?: number; cost_usd?: number; turns?: number; link?: string; summary?: string; surface?: string },
+) {
+  const repo = /^e_[a-z0-9]{8}$/.test(input.repo) ? await l.entity(input.repo) : await repoByName(l, repoName(input.repo));
+  if (!repo) throw new Error(`No repository "${input.repo}" in the map`);
+  if (input.link) {
+    const { rows } = await l.db.query<{ id: string }>(`select id from entity where type = any($1::text[]) and props->>'link' = $2 and title = $3 and archived_at is null limit 1`, [l.registry.family('sys.run'), input.link, input.title]);
+    if (rows.length) return { run: rows[0].id, recorded: false };
+  }
+  const number = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : undefined);
+  const props: Record<string, unknown> = { surface: input.surface ?? 'github-actions', last_seen: now() };
+  if (number(input.tokens) !== undefined) props.tokens_used = Math.round(input.tokens!);
+  if (number(input.cost_usd) !== undefined) props.cost_usd = Math.round(input.cost_usd! * 10_000) / 10_000;
+  if (number(input.turns) !== undefined) props.turns = input.turns;
+  if (input.link) props.link = input.link;
+  const { created } = await l.apply(actorId(actor), {
+    ops: [
+      { op: 'create', ref: 'run', type: 'sys.run', title: input.title, status: input.ok === false ? 'failed' : 'finished', body: input.summary?.slice(0, 4000), props },
+      { op: 'link', type: 'software.lives_in', from: 'run', to: repo.id },
+    ],
+    reason: 'Run reported',
+  });
+  return { run: created.run, recorded: true };
 }
 
 export async function sessionUpdate(l: Lattice, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string }) {

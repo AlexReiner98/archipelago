@@ -654,6 +654,26 @@ test('tokens: an estimate is asked for, what a session uses goes to its work, an
   assert.equal(((await VIEWS.graph.run(l, { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === made.f).tokens.estimated, 150_000);
 });
 
+test('a run in GitHub Actions reports what it used, once, and the repository adds it up by where agents ran', async () => {
+  const l = await fresh();
+  const { repo } = await make(l, [{ op: 'create', ref: 'repo', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site.git', path: 'C:\\code\\site' } }]);
+  const told = { repo: 'acme/site', title: 'Read the push to main (abc1234)', tokens: 42_000.4, cost_usd: 0.31337, turns: 9, link: 'https://github.com/acme/site/actions/runs/1', summary: 'Closed one task.' };
+  const first = (await callTool(l, agent, 'run_report', told)) as any;
+  assert.equal(first.recorded, true);
+  assert.deepEqual(await callTool(l, agent, 'run_report', told), { run: first.run, recorded: false }, 'told twice, recorded once');
+  await callTool(l, agent, 'run_report', { repo, title: 'Scheduled re-check', ok: false, tokens: 8_000, link: 'https://github.com/acme/site/actions/runs/2' });
+  await assert.rejects(callTool(l, agent, 'run_report', { repo: 'acme/other', title: 'x' }), /No repository "acme\/other"/);
+  const run = (await l.entity(first.run))!;
+  assert.deepEqual([run.type, run.status, run.is_open, run.props.surface, run.props.tokens_used, run.props.cost_usd, run.props.turns, run.body], ['sys.run', 'finished', false, 'github-actions', 42_000, 0.3134, 9, 'Closed one task.']);
+  // A session on a machine in the same repository is counted beside it, apart.
+  await sessionStart(l, agent, { session_id: 'local', cwd: 'C:\\code\\site', surface: 'claude-code' });
+  await recordUsage(l, 'local', 100_000);
+  const usage = (await VIEWS.agent_usage.run(l, { repo: 'Site repo' })) as any;
+  assert.deepEqual(usage.week, { 'claude-code': { runs: 1, tokens: 100_000, cost_usd: 0 }, 'github-actions': { runs: 2, tokens: 50_000, cost_usd: 0.3134 } });
+  assert.deepEqual(usage.runs.map((x: any) => [x.title, x.status, x.tokens]).sort(), [['Read the push to main (abc1234)', 'finished', 42_000], ['Scheduled re-check', 'failed', 8_000], ['Session in Site repo', 'running', 100_000]]);
+  assert.equal((await l.proposals()).length, 0, 'a report is not a change to review');
+});
+
 test('an agent can notify the human; a stale session raises one notification', async () => {
   const l = await fresh();
   const made = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Ship it' }]);

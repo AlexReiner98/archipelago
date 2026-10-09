@@ -924,6 +924,8 @@ function ageChip(e) {
   return h('span', { class: `mark ${days >= 14 ? 'mark-old' : 'mark-human'}`, title: `Last changed or confirmed ${when(e.updated_at)}` }, days === 0 ? 'true today' : days === 1 ? 'true yesterday' : `${days} days unconfirmed`);
 }
 
+/** Where a run was, as a person says it. */
+const RAN = { 'github-actions': 'Sync agent', 'claude-code': 'Session' };
 /** Which of each item's sections are unfolded, kept while the page is open. */
 const unfolded = new Map();
 
@@ -949,6 +951,8 @@ async function entity(id) {
     }
   };
   const owner = e.owner ? await api('get', { id: e.owner }).then((r) => r.entity, () => null) : null;
+  // A repository says what the agents working in it have used: the sync agent in GitHub Actions, and sessions on a machine.
+  const used = isA(e.type, 'software.repo') ? await api('view', { name: 'agent_usage', params: { repo: id } }).catch(() => null) : null;
   const relRows = (rows, direction) =>
     rows.map((r) => {
       const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
@@ -1046,7 +1050,7 @@ async function entity(id) {
     h(
       'details',
       { class: 'card wide fold', open: unfolded.get(`${id}:${key}`) ?? open, ontoggle: (ev) => unfolded.set(`${id}:${key}`, ev.target.open) },
-      h('summary', {}, h('h2', {}, title), n > 0 && h('span', { class: 'n' }, n)),
+      h('summary', {}, h('h2', {}, title), n ? h('span', { class: 'n' }, n) : ''),
       content,
     );
   const session = isA(e.type, 'sys.run') && e.is_open && !e.archived_at;
@@ -1121,6 +1125,7 @@ async function entity(id) {
       menu('More', [
         !e.archived_at && phrases.length > 0 && ['Edit relations', () => ((editor.hidden = false), openAdder(), editor.scrollIntoView({ block: 'nearest' }))],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
+        e.props.link && ['Open where it ran', () => window.open(e.props.link, '_blank', 'noopener')],
         data.source && [`Source: ${data.source.title.replace(/\b[a-z]_[a-z0-9]{8}\b/g, (found) => titles.get(found) ?? 'a session')}`, () => (location.hash = `#/e/${data.source.id}`)],
         workish && ['Copy session brief', copyBrief],
         workish && ['Launch a session: investigate only', () => launch('plan')],
@@ -1140,6 +1145,27 @@ async function entity(id) {
         long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
         e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       ),
+      used?.runs.length > 0 &&
+        fold('usage', 'Tokens used here', `${tokensText(Object.values(used.month).reduce((sum, u) => sum + u.tokens, 0))} in 30 days`, false, [
+          h(
+            'div',
+            { class: 'toolbar fold-bar usage-sums', title: 'The last 30 days, by where the agents ran' },
+            Object.entries(used.month).map(([where, u]) =>
+              h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${RAN[where] ?? where} `), h('strong', {}, tokensText(u.tokens)), h('span', { class: 'muted' }, ` in ${u.runs} run${u.runs === 1 ? '' : 's'}${u.cost_usd > 0 ? ` · $${u.cost_usd.toFixed(2)}` : ''}`)),
+            ),
+          ),
+          used.runs.map((run) =>
+            h(
+              'div',
+              { class: 'change line' },
+              h('span', { class: 'chip' }, RAN[run.surface] ?? run.surface),
+              h('span', { class: 'gist', title: run.title }, h('a', { href: `#/e/${run.id}` }, run.title)),
+              run.status === 'failed' && h('span', { class: 'pill bad' }, 'failed'),
+              h('span', { class: 'muted small' }, `${tokensText(run.tokens)}${run.cost_usd ? ` · $${run.cost_usd.toFixed(2)}` : ''}`),
+              ago(run.at),
+            ),
+          ),
+        ]),
       // Where it sits, as the one graph. A project's work is drawn in its roadmap above, so here is what else it is linked to.
       fold('relations', 'Relations', project ? 0 : relCount, !project, graphView(project ? { focus: id, key: `${id}:rest`, extras: { restOnly: true } } : { focus: id })),
       fold('history', 'History', lines.length, false, lines),
@@ -1435,7 +1461,8 @@ function shapeGraph(data, focus, prefs, extras = {}) {
   }
 
   // Where there is work in sight, across is tokens, and the work is laid along it.
-  if (nodes.filter((n) => n.work).length > 1) {
+  // Only around work, though: around a repository or a person it is their neighbourhood that is wanted, not a scale.
+  if (nodes.filter((n) => n.work).length > 1 && (!focus || byId.get(focus).work)) {
     const { axis, drawn } = timeline(nodes, edges, byId, focus, prefs);
     return { nodes, edges: drawn, byId, focus, axis };
   }

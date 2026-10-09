@@ -465,6 +465,45 @@ export async function awaitingRecheck(l: Lattice, repoKey: string): Promise<Enti
   return (await projectsIn(l, repo.id)).filter((p) => recheckOf(p).waited);
 }
 
+/**
+ * What agents have used in a repository: every run there that counted its
+ * tokens (a session on someone's machine, the sync agent in GitHub Actions),
+ * newest first, and the sum for each place they ran over the last week and
+ * the last thirty days.
+ */
+async function agentUsage(l: Lattice, input: { repo?: string; limit?: number }) {
+  const repo = await findRepo(l, input.repo, 'agent_usage');
+  const { rows } = await l.db.query<Entity>(
+    `select e.* from entity e join relation r on r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null
+     where r.to_id = $1 and e.type = any($2::text[]) and e.archived_at is null and (e.props->>'tokens_used') is not null
+     order by e.created_at desc limit 500`,
+    [repo.id, l.registry.family('sys.run')],
+  );
+  const runs = rows.map((e) => ({
+    id: e.id,
+    title: e.title,
+    status: e.status,
+    surface: (e.props.surface as string | undefined) ?? 'unknown',
+    tokens: Number(e.props.tokens_used ?? 0),
+    cost_usd: e.props.cost_usd as number | undefined,
+    turns: e.props.turns as number | undefined,
+    link: e.props.link as string | undefined,
+    at: e.created_at,
+  }));
+  const within = (days: number) => {
+    const since = Date.now() - days * 86_400_000;
+    const by: Record<string, { runs: number; tokens: number; cost_usd: number }> = {};
+    for (const run of runs.filter((x) => new Date(x.at).getTime() >= since)) {
+      const sum = (by[run.surface] ??= { runs: 0, tokens: 0, cost_usd: 0 });
+      sum.runs++;
+      sum.tokens += run.tokens;
+      sum.cost_usd = Math.round((sum.cost_usd + (run.cost_usd ?? 0)) * 10_000) / 10_000;
+    }
+    return by;
+  };
+  return { repo: { id: repo.id, title: repo.title }, week: within(7), month: within(30), runs: runs.slice(0, input.limit ?? 20) };
+}
+
 /** Which relations each preset draws. */
 const GRAPH_PRESETS: Record<string, string[] | undefined> = {
   blocking: ['depends_on', 'needs', 'holds'],
@@ -811,6 +850,11 @@ export const VIEWS: Record<string, View> = {
   notifications: {
     description: 'Unread notifications for the human, newest first.',
     run: notifications,
+  },
+  agent_usage: {
+    description:
+      'What agents have used in a repository: each run there that counted its tokens (a session on a machine, the sync agent in GitHub Actions), newest first, and the sum by where they ran over the last 7 and 30 days. Params: repo (required): its id, GitHub name or title; limit (runs listed, default 20).',
+    run: agentUsage,
   },
   sessions: {
     description: 'Agent sessions and automation runs: what each open one is working on and holding, whether it has gone quiet, and the last ten that ended.',

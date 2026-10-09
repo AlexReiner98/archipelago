@@ -9,6 +9,9 @@
 # changed or confirmed in that time, an agent checks those the code can
 # settle, oldest first. A day when nothing is due costs no Claude run.
 #
+# Each Claude run tells the map what it used when it is over (tokens, cost,
+# turns), so the repository's page in Lattice shows what keeping it true costs.
+#
 # Copy to .github/workflows/lattice.yml and set in the repository's settings:
 #   variable LATTICE_URL            the server, e.g. https://lattice.example.com
 #   secret   LATTICE_AGENT_TOKEN    an agent token from the Workspace screen
@@ -138,12 +141,44 @@ jobs:
             --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
             --setting-sources user \
             --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
-            --max-budget-usd 2 2>&1 | tee "$RUNNER_TEMP/claude.txt"
-          status=${PIPESTATUS[0]}
-          if [ "$status" -ne 0 ]; then
-            echo "::error::Claude stopped with exit code $status: $(tail -n 3 "$RUNNER_TEMP/claude.txt" | tr '\n' ' ' | cut -c1-400)"
+            --max-budget-usd 2 --output-format json > "$RUNNER_TEMP/claude.json" || status=$?
+          # What it said goes in this run's log; what it used is in the same answer, for the step below.
+          node -e '
+            const raw = require("fs").readFileSync(process.env.RUNNER_TEMP + "/claude.json", "utf8");
+            try { console.log(JSON.parse(raw).result || "(Claude said nothing.)"); } catch { console.log(raw); }
+          ' || true
+          if [ "${status:-0}" -ne 0 ]; then
+            echo "::error::Claude stopped with exit code $status."
             exit "$status"
           fi
+
+      # What the run used, said to the map once it is over: tokens are input and output, not cached re-reads,
+      # counted as a session on a machine is. It never fails the run.
+      - name: Tell Lattice what the run used
+        if: always()
+        run: |
+          TITLE="Read the push to $BRANCH (${AFTER:0:7})"
+          TITLE="$TITLE" node -e '
+            const fs = require("fs");
+            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+            let out;
+            try { out = JSON.parse(fs.readFileSync(RUNNER_TEMP + "/claude.json", "utf8")); } catch { console.log("Claude did not run, so there is nothing to report."); process.exit(0); }
+            const used = out.usage || {};
+            const report = {
+              actor: "claude-code:lattice-sync",
+              repo: REPO,
+              title: TITLE,
+              ok: !out.is_error,
+              tokens: (used.input_tokens || 0) + (used.output_tokens || 0) + (used.cache_creation_input_tokens || 0),
+              cost_usd: out.total_cost_usd,
+              turns: out.num_turns,
+              link: GITHUB_SERVER_URL + "/" + GITHUB_REPOSITORY + "/actions/runs/" + GITHUB_RUN_ID,
+              summary: String(out.result || "").slice(0, 2000),
+            };
+            fetch(LATTICE_URL.replace(/\/$/, "") + "/agent/run_report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + LATTICE_AGENT_TOKEN }, body: JSON.stringify(report) })
+              .then(async (res) => console.log(res.ok ? "Told Lattice: " + report.tokens + " tokens." : "::warning::Lattice did not take the report: " + res.status + " " + (await res.text()).slice(0, 200)))
+              .catch((err) => console.log("::warning::Could not tell Lattice what the run used: " + err.message));
+          '
 
   recheck:
     if: ${{ github.event_name != 'push' && vars.LATTICE_URL != '' }}
@@ -261,9 +296,41 @@ jobs:
             --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
             --setting-sources user \
             --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,mcp__lattice__notify,mcp__lattice__rechecked,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
-            --max-budget-usd 2 2>&1 | tee "$RUNNER_TEMP/claude.txt"
-          status=${PIPESTATUS[0]}
-          if [ "$status" -ne 0 ]; then
-            echo "::error::Claude stopped with exit code $status: $(tail -n 3 "$RUNNER_TEMP/claude.txt" | tr '\n' ' ' | cut -c1-400)"
+            --max-budget-usd 2 --output-format json > "$RUNNER_TEMP/claude.json" || status=$?
+          # What it said goes in this run's log; what it used is in the same answer, for the step below.
+          node -e '
+            const raw = require("fs").readFileSync(process.env.RUNNER_TEMP + "/claude.json", "utf8");
+            try { console.log(JSON.parse(raw).result || "(Claude said nothing.)"); } catch { console.log(raw); }
+          ' || true
+          if [ "${status:-0}" -ne 0 ]; then
+            echo "::error::Claude stopped with exit code $status."
             exit "$status"
           fi
+
+      # What the run used, said to the map once it is over: tokens are input and output, not cached re-reads,
+      # counted as a session on a machine is. It never fails the run.
+      - name: Tell Lattice what the run used
+        if: always() && steps.due.outputs.due == 'true'
+        run: |
+          if [ "$NOW" = "true" ]; then TITLE="Re-check asked for by hand"; else TITLE="Scheduled re-check"; fi
+          TITLE="$TITLE" node -e '
+            const fs = require("fs");
+            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+            let out;
+            try { out = JSON.parse(fs.readFileSync(RUNNER_TEMP + "/claude.json", "utf8")); } catch { console.log("Claude did not run, so there is nothing to report."); process.exit(0); }
+            const used = out.usage || {};
+            const report = {
+              actor: "claude-code:lattice-sync",
+              repo: REPO,
+              title: TITLE,
+              ok: !out.is_error,
+              tokens: (used.input_tokens || 0) + (used.output_tokens || 0) + (used.cache_creation_input_tokens || 0),
+              cost_usd: out.total_cost_usd,
+              turns: out.num_turns,
+              link: GITHUB_SERVER_URL + "/" + GITHUB_REPOSITORY + "/actions/runs/" + GITHUB_RUN_ID,
+              summary: String(out.result || "").slice(0, 2000),
+            };
+            fetch(LATTICE_URL.replace(/\/$/, "") + "/agent/run_report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + LATTICE_AGENT_TOKEN }, body: JSON.stringify(report) })
+              .then(async (res) => console.log(res.ok ? "Told Lattice: " + report.tokens + " tokens." : "::warning::Lattice did not take the report: " + res.status + " " + (await res.text()).slice(0, 200)))
+              .catch((err) => console.log("::warning::Could not tell Lattice what the run used: " + err.message));
+          '

@@ -12,7 +12,7 @@ import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
-import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
+import { recordRun, sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
 import { awaitingRecheck, VIEWS } from './views.ts';
 
@@ -474,6 +474,22 @@ export const TOOLS: Record<string, Tool> = {
       task: z.string().optional(),
     },
     run: async (l, actor, input) => sessionUpdate(l, actor, input),
+  },
+  run_report: {
+    description:
+      'Record a run that happened where Lattice cannot watch it, once it is over: the agent in GitHub Actions that read a push or re-checked the map says what it was, how it ended and what it used. Kept as a run that has ended, in its repository. Takes effect at once.',
+    input: {
+      repo: z.string().describe('The repository it ran for: its id or its GitHub name "owner/name".'),
+      title: z.string().min(1).describe('What the run was, in a few words.'),
+      ok: z.boolean().optional().describe('false when it failed.'),
+      tokens: z.number().optional().describe('Tokens it used: input and output, not counting cached re-reads.'),
+      cost_usd: z.number().optional(),
+      turns: z.number().optional(),
+      link: z.string().optional().describe('Where the run can be looked at.'),
+      summary: z.string().optional().describe('What it said it did.'),
+      surface: z.string().optional().describe('Where it ran. Left out: github-actions.'),
+    },
+    run: async (l, actor, input) => recordRun(l, actor, input),
   },
   session_end: {
     description:

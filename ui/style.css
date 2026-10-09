@@ -80,6 +80,7 @@ details.fold[open] > summary::before { content: "\25BE"; }
 details.fold[open] > summary { border-bottom: 1px solid var(--line); }
 details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .fold-bar { padding: 10px 14px 0; }
+.fold-bar.usage-sums { padding-bottom: 10px; border-bottom: 1px solid var(--line); gap: 18px; }
 .fold-bar .switch button { padding: 3px 10px; font-size: 12.5px; }
 #around svg.graph { height: 520px; }
 .card .empty, .card .error { padding: 14px; color: var(--muted); }

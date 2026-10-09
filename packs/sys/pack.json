@@ -99,6 +99,21 @@
           "type": "number",
           "description": "Tokens the session has used so far, as its machine counted them.",
           "system": true
+        },
+        "cost_usd": {
+          "type": "number",
+          "description": "What the run cost, in US dollars, where its surface says.",
+          "system": true
+        },
+        "turns": {
+          "type": "number",
+          "description": "How many turns the run took.",
+          "system": true
+        },
+        "link": {
+          "type": "url",
+          "description": "Where the run can be looked at, e.g. its page in GitHub Actions.",
+          "system": true
         }
       }
     },
