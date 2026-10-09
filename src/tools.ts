@@ -9,7 +9,7 @@ import { createToken, listTokens, revokeToken } from './auth.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
-import { hasReaderKey, READER_MODEL, setReaderKey } from './reader.ts';
+import { hasReaderKey, readable, READER_MODEL, recheck, setReaderKey } from './reader.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
@@ -661,14 +661,32 @@ export const TOOLS: Record<string, Tool> = {
       'disconnect: stop hearing from GitHub here (the app stays installed on GitHub until it is removed there). ' +
       'key: the Anthropic key the agent on this server runs on when it reads a push or re-checks old items (kept on the server, never shown again); forget_key removes it, and pushes are then recorded but not read. Admins only for all of these.',
     humanOnly: true,
-    input: { create: z.boolean().optional(), connect: z.boolean().optional(), disconnect: z.boolean().optional(), key: z.string().min(20).optional().describe('An Anthropic API key.'), forget_key: z.boolean().optional() },
+    input: {
+      create: z.boolean().optional(),
+      connect: z.boolean().optional(),
+      disconnect: z.boolean().optional(),
+      key: z.string().min(20).optional().describe('An Anthropic API key.'),
+      forget_key: z.boolean().optional(),
+      recheck: z.string().optional().describe('A repository\u2019s id: have the agent on this server re-check its oldest open items against the code now, without waiting for one to be due. It runs on the workspace\u2019s key, and its run shows on the repository\u2019s page when it is over.'),
+    },
     run: async (l, actor, input) => {
       const app = githubApp;
       const whole = await wholeMap(l);
       const status = async () => ({ available: Boolean(app), app: app?.app ?? null, can_create: Boolean(app) && !app!.app && Boolean(actor.admin) && l.workspace === 'default', installation: app?.installationOf(l.workspace) ?? null, reader: { key: await hasReaderKey(whole), model: READER_MODEL } });
-      if (!input.create && !input.connect && !input.disconnect && !input.key && !input.forget_key) return status();
+      if (!input.create && !input.connect && !input.disconnect && !input.key && !input.forget_key && !input.recheck) return status();
       if (!app) throw new Error('This server cannot have a GitHub App: it has nowhere to keep one.');
       needAdmin(actor, 'connect GitHub');
+      if (input.recheck) {
+        const mine = app.installationOf(l.workspace);
+        if (!mine) throw new Error('This workspace has not connected GitHub, so there is nothing for the agent to read the repository through.');
+        if (!(await hasReaderKey(whole))) throw new Error('This workspace has no Anthropic key for the agent to run on. Set one on the Workspace screen.');
+        const repo = (await readable(whole, app, mine.id)).find((r) => r.entity.id === input.recheck);
+        if (!repo) throw new Error('That is not a repository the GitHub App was given. Choose it on GitHub first (Workspace, GitHub, Choose repositories).');
+        const about = (await app.asInstallation(mine.id, `/repos/${repo.name}`)) as { default_branch?: string };
+        // Not waited for: it takes minutes, and says what it did as a run when it is over.
+        void recheck(whole, app, repo, about.default_branch ?? 'main', true).catch((err) => console.error(`reader: re-check of ${repo.name} failed: ${(err as Error).message}`));
+        return { ...(await status()), started: true };
+      }
       if (input.key || input.forget_key) {
         const { checked } = await setReaderKey(whole, input.forget_key ? undefined : input.key);
         // The log says that it was set, and by whom: never the key.

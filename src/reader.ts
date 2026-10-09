@@ -295,13 +295,17 @@ ${fresh ? `The branch is new: read the commits on it that are not on the default
   return run(l, app, repo, push.after, ON_PUSH, task, `Read the push to ${push.branch} (${push.after.slice(0, 7)})`, commitLink(repo, push.after));
 }
 
-/** Ask whether a re-check of a repository is due, and do it if it is. */
-export async function recheck(l: Lattice, app: GithubApp, repo: Repo, branch: string) {
+/**
+ * Ask whether a re-check of a repository is due, and do it if it is. Asked
+ * for now (by a person, from the repository's page), it does not wait: the
+ * oldest items are checked whatever each project's interval.
+ */
+export async function recheck(l: Lattice, app: GithubApp, repo: Repo, branch: string, now = false) {
   const me = await l.setting<string>('me');
-  const due = (await callTool(me ? l.as(me) : l, { kind: 'agent', name: 'reader', person: me }, 'view', { name: 'recheck', params: { repo: repo.entity.id } })) as { due: boolean; projects: { due: boolean }[] };
+  const due = (await callTool(me ? l.as(me) : l, { kind: 'agent', name: 'reader', person: me }, 'view', { name: 'recheck', params: { repo: repo.entity.id, now } })) as { due: boolean; projects: { due: boolean }[] };
   if (!due.due) return { ran: false as const, reason: 'Nothing is due for a re-check.' };
-  const task = `This is the scheduled re-check for ${repo.name}. In the map the repository is "${repo.entity.title}" (${repo.entity.id}).\n\nThe projects that are due:\n${JSON.stringify(due.projects.filter((p) => p.due), null, 1)}`;
-  const done = await run(l, app, repo, branch, ON_RECHECK, task, 'Scheduled re-check', `https://github.com/${repo.name}#recheck-${new Date().toISOString().slice(0, 10)}`);
+  const task = `This is the ${now ? 're-check the owner asked for' : 'scheduled re-check'} for ${repo.name}. In the map the repository is "${repo.entity.title}" (${repo.entity.id}).\n\nThe projects that are due:\n${JSON.stringify(due.projects.filter((p) => p.due), null, 1)}`;
+  const done = await run(l, app, repo, branch, ON_RECHECK, task, now ? 'Re-check asked for by hand' : 'Scheduled re-check', `https://github.com/${repo.name}#recheck-${new Date().toISOString().slice(0, now ? 19 : 10)}`);
   // The wait starts again whether or not the run got as far as saying so: a run that broke is not tried again every hour.
   if (done.ran) await callTool(l, { kind: 'agent', name: 'reader', person: me }, 'rechecked', { repo: repo.entity.id, summary: done.ok ? undefined : 'The re-check did not finish.' }).catch(() => undefined);
   return done;

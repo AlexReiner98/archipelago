@@ -910,6 +910,11 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.match(asks.at(-1).messages[0].content, new RegExp(`${'b'.repeat(40)}\\.\\.${'d'.repeat(40)}`), 'from the last push that was read to the newest');
   assert.deepEqual(await readUnread(whole, theApp!, '42'), [], 'and once');
 
+  // Its admin can ask for a re-check of a repository now; only of one the app was given, and no agent can.
+  assert.match((await call('/agent/github_app', robot, { recheck: heard.repo.id })).error, /humans only/);
+  assert.match((await call('/api/github_app', admin, { recheck: 'e_notarepo' })).error, /not a repository the GitHub App was given/);
+  assert.equal((await call('/api/github_app', admin, { recheck: heard.repo.id })).result.started, true);
+
   // The key is never given back, and removing it stops the reading.
   assert.ok(!JSON.stringify((await call('/api/github_app', admin)).result).includes('sk-ant-'));
   assert.equal((await call('/api/github_app', admin, { forget_key: true })).result.reader.key, false);
