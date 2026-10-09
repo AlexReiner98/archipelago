@@ -183,20 +183,26 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .g-node.group-time .stripe { fill: var(--g-time); } .g-node.group-resources .stripe { fill: var(--g-resources); }
 .g-node.root .box { stroke-width: 2; }
 .g-node.dim, .rm-link.dim, .rm-dep.dim { opacity: 0.25; }
-/* On the scale of tokens. */
+/* On the scale of tokens. One colour for one meaning, and none used twice: green is used, amber is over the
+   estimate, blue is being worked on, red is blocked or waiting, grey is still to come. Nothing is dashed. */
 .g-axis line { stroke: var(--line); stroke-width: 1; }
 .g-axis text { fill: var(--muted); font-size: 11px; }
 .g-node.bar { cursor: pointer; }
-.g-node.bar .used { fill: var(--ok); opacity: 0.38; pointer-events: none; }
-.g-node.bar .over { fill: var(--warn); opacity: 0.6; pointer-events: none; }
-.g-node.bar.guess .box { stroke-dasharray: 4 3; }
+.g-node.bar .box, .g-node.bar.root .box, .g-node.bar.closed .box { fill: var(--panel); stroke: var(--muted); stroke-width: 1; }
+.g-node.bar.root text:not(.small) { font-weight: 600; }
+.g-node.bar .used { fill: var(--ok); opacity: 0.7; pointer-events: none; }
+.g-node.bar .over { fill: var(--warn); opacity: 0.9; pointer-events: none; }
+.g-node.bar.guess .box { stroke: var(--line); }
+.g-node.bar.guess .used { opacity: 0.35; }
+.g-node.bar.active .box { stroke: var(--accent); stroke-width: 2.5; }
 .g-node.bar.loose .box { fill: none; }
+.legend .swatch.g-est { border: 1px solid var(--muted); border-radius: 3px; width: 16px; }
+.legend .swatch.g-used { background: var(--ok); opacity: 0.7; border-radius: 3px; width: 16px; }
+.legend .swatch.g-over { background: var(--warn); border-radius: 3px; width: 16px; }
+.legend .swatch.g-guess { background: var(--ok); opacity: 0.3; border: 1px solid var(--line); border-radius: 3px; width: 16px; }
+.legend .swatch.g-active { border: 2.5px solid var(--accent); border-radius: 3px; width: 16px; }
 /* A line to what is not on the scale is there to be found, not to be read past. */
 .rm-link.faint { opacity: 0.22; }
-.legend .swatch.g-est { border: 1.5px solid var(--muted); border-radius: 3px; width: 16px; }
-.legend .swatch.g-used { background: var(--ok); opacity: 0.5; border-radius: 3px; width: 16px; }
-.legend .swatch.g-over { background: var(--warn); border-radius: 3px; width: 16px; }
-.legend .swatch.g-guess { border: 1.5px dashed var(--muted); border-radius: 3px; width: 16px; }
 .legend .stroke.dotted { border-top: 1.5px dotted var(--edge); }
 .rm-node.work circle { fill: var(--muted); }
 .rm-node.work.closed circle { fill: var(--ok); }

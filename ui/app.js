@@ -1352,8 +1352,8 @@ function graphView({ focus, key, defaults, extras } = {}) {
         'div',
         { class: 'toolbar fold-bar' },
         prefs.full && h('strong', { class: 'graph-title' }, data.nodes.find((n) => n.id === focus)?.title ?? 'The whole map'),
-        pick('kind', KIND_LABELS, 'Which relations to draw'),
-        focus && pick('steps', [[1, 'Near'], [2, '2 steps'], [3, '3 steps']], 'How far out to draw'),
+        !extras?.workOnly && pick('kind', KIND_LABELS, 'Which relations to draw'),
+        !extras?.workOnly && focus && pick('steps', [[1, 'Near'], [2, '2 steps'], [3, '3 steps']], 'How far out to draw'),
         h('span', { class: 'grow' }),
         h('button', { title: prefs.full ? 'Back to the page (Esc)' : 'Fill the window with the drawing', onclick: set({ full: !prefs.full }, false) }, prefs.full ? 'Close' : 'Full screen'),
         menu('View', [
@@ -1406,6 +1406,8 @@ function shapeGraph(data, focus, prefs, extras = {}) {
     }
     frontier = next;
   }
+  // A project's chart is one level: its features, and its work that is under none of them. A task that is part of a feature is on that feature's page.
+  if (extras.workOnly) for (const e of walk) if (e.type === 'part_of' && e.to !== focus && rank.has(e.to) && rank.has(e.from)) rank.delete(e.from);
   const nodes = [...rank.keys()].map((id) => byId.get(id));
   // What waits on what is drawn whatever the filter, among the things in sight.
   const edges = all.filter((e) => rank.has(e.from) && rank.has(e.to) && (counts(e) || BLOCKING.includes(e.type)));
@@ -1625,12 +1627,12 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const structure = KINDS.structure.includes(e.type);
     seen.waiting ||= blocking && a.open;
     seen.met ||= blocking && !a.open;
-    seen.lifted ||= Boolean(e.lifted);
+    seen.lifted ||= Boolean(e.lifted) && !axis;
     seen.other ||= !blocking && !structure;
     const phrase = relations.get(e.type)?.title ?? e.type;
     const el = s(
       'path',
-      blocking ? { class: `rm-dep${a.open ? ' waiting' : ''}${e.lifted ? ' lifted' : ''}`, 'marker-end': `url(#rm-arrow${a.open ? '-wait' : ''})` } : { class: `rm-link${structure ? '' : ' other'}${a.loose || b.loose ? ' faint' : ''}` },
+      blocking ? { class: `rm-dep${a.open ? ' waiting' : ''}${e.lifted && !axis ? ' lifted' : ''}`, 'marker-end': `url(#rm-arrow${a.open ? '-wait' : ''})` } : { class: `rm-link${structure ? '' : ' other'}${a.loose || b.loose ? ' faint' : ''}` },
       s('title', {}, document.createTextNode(`${byId.get(e.from).title} ${e.lifted ? 'waits, through their tasks, on' : phrase} ${byId.get(e.to).title}`)),
     );
     lineLayer.append(el);
@@ -1664,7 +1666,6 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
           hint,
           s('rect', { class: 'box', width: n.w, height: n.h, rx: 3 }),
           ...n.fills.map((f) => s('rect', { class: f.over ? 'over' : 'used', x: f.x, y: 1, width: Math.min(f.w, n.w - f.x), height: n.h - 2 })),
-          n.w > 14 && s('rect', { class: 'stripe', x: 0, y: 6, width: 3, height: n.h - 12, rx: 1.5 }),
           s('text', { x: n.inside ? 10 : after, y: 19 }, document.createTextNode(n.name)),
           !n.loose && s('text', { class: 'small', x: after + (n.inside ? 0 : n.name.length * CHAR + 8), y: 19 }, document.createTextNode(n.count)),
           n.loose && s('text', { class: 'small', x: after, y: 19 }, document.createTextNode(n.count)),
@@ -1725,13 +1726,13 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     axis && key('swatch g-est', 'Still to be used'),
     nodes.some((n) => n.fills?.some((f) => !f.over)) && key('swatch g-used', 'Used so far'),
     nodes.some((n) => n.fills?.some((f) => f.over)) && key('swatch g-over', 'Over its estimate'),
-    nodes.some((n) => n.guess) && key('swatch g-guess', 'No estimate yet'),
+    nodes.some((n) => n.guess) && key('swatch g-guess', 'No estimate yet: its length is a guess'),
     seen.waiting && key('stroke waits', 'Waits on something unfinished'),
     seen.met && key('stroke blocking', 'Waited on something now finished'),
     seen.lifted && key('stroke lifted', 'Through their tasks'),
     seen.other && key('stroke dotted', 'Other relation'),
-    nodes.some((n) => n.active) && key('swatch rm-active', 'Being worked on'),
-    nodes.some((n) => !n.open) && key('swatch rm-closed', 'Finished'),
+    nodes.some((n) => n.active) && key(axis ? 'swatch g-active' : 'swatch rm-active', 'Being worked on'),
+    !axis && nodes.some((n) => !n.open) && key('swatch rm-closed', 'Finished'),
     nodes.some((n) => n.blocked) && key('swatch rm-blocked', 'Blocked'),
   ].filter(Boolean);
   return h('div', { class: 'graph-body' }, h('div', { class: 'graph-scroll' }, svg), legend.length > 0 && h('div', { class: 'legend' }, legend));
@@ -2453,7 +2454,7 @@ async function roadmap(rootId) {
           data.now.length > 0 && inProgress,
           h('span', { class: 'switch' }, [['Graph', true], ['List', false]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label))),
         ),
-        !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? graphView({ focus: rootId, defaults: { kind: 'structure' }, extras: { info, edges: through, workOnly: true } }) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
+        !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? graphView({ focus: rootId, defaults: { kind: 'structure', steps: 1 }, extras: { info, edges: through, workOnly: true } }) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
         h('div', { class: 'toolbar', style: 'padding: 12px 14px; border-top: 1px solid var(--line)' }, title, h('button', { class: 'primary', onclick: add }, 'Add feature')),
       ),
       data.unplaced.length > 0 &&
