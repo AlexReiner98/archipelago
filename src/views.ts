@@ -3,7 +3,8 @@
 
 import { lastPushes, repoByName, repoName } from './github.ts';
 import { ACTIVE_HOLDS, type Entity, type Lattice } from './lattice.ts';
-import { proof } from './proof.ts';
+import { costs } from './costs.ts';
+import { changelog, proof } from './proof.ts';
 
 interface Edge {
   x: string;
@@ -1017,6 +1018,13 @@ async function gate(l: Lattice, input: { event?: string }) {
     .filter((e) => e.id !== event.id && e.is_open && isA(e, GATE_WORK) && !placed.has(e.id) && !left.has(e.id))
     .map((e) => ({ ...slim(e), stream: ((s) => (s ? { id: s.id, title: s.title } : null))(nearest(e.id)) }));
 
+  // What a user would ask of what this ships and of what holds it. Answered on the release's own build, or not answered:
+  // a release that names its version is not helped by what passed on an earlier one.
+  const asked = new Set([...from('software.ships', event.id), ...held.filter((r) => isA(byId.get(r.to_id)!, containers))].flatMap((r) => [r.to_id, ...under(r.to_id)]));
+  const version = typeof event.props.version === 'string' && event.props.version.trim() ? event.props.version.trim() : undefined;
+  const proven = asked.size ? await proof(l, { build: version }, asked) : undefined;
+  const known = proven?.proofs?.length && proven.counts ? { build: proven.build ?? null, counts: proven.counts, proofs: proven.proofs } : undefined;
+
   const rank = (i: Item) => (i.done ? 2 : i.yours ? 0 : 1);
   const out = [...streams.values()].map((s) => ({
     ...(s.head ? slim(s.head) : { id: null, type: null, title: null, status: null }),
@@ -1032,7 +1040,9 @@ async function gate(l: Lattice, input: { event?: string }) {
     event: { ...slim(event), open: event.is_open, at: (event.props.at as string | undefined) ?? null },
     counts: { holding: all.length, open: all.filter((i) => !i.done).length, yours: all.filter((i) => i.yours).length, to_sort: toSort.length, can_follow: deferred.length },
     /** Nothing it waits for is still open, and nothing is left to sort. */
-    clear: all.every((i) => i.done) && toSort.length === 0,
+    clear: all.every((i) => i.done) && toSort.length === 0 && (!known || known.counts.answered === known.counts.questions),
+    /** How we know: the proof questions of what it ships and of what holds it, on the release's build (its version) or, when it names none, the build last reported. */
+    proof: known ? { build: known.build, named: Boolean(version), counts: known.counts, questions: known.proofs.map(({ tests: _tests, ...q }) => q) } : null,
     to_sort: toSort.sort((a, b) => (a.stream?.title ?? '').localeCompare(b.stream?.title ?? '') || a.title.localeCompare(b.title)),
     streams: out,
     can_follow: deferred.map((r) => ({ ...slim(byId.get(r.to_id)!), open: byId.get(r.to_id)!.is_open, relation: r.id })),
@@ -1101,8 +1111,17 @@ export const VIEWS: Record<string, View> = {
   },
   gate: {
     description:
-      'An event as a gate (a release, a launch): what it waits for (everything it depends_on), grouped by stream (the feature or project each is part of) with progress and what the owner owes; what it goes ahead without (what it defers); and what is not yet sorted (open tasks, issues and decisions under what it ships, on neither side). Params: event (an entity id; without it, the open events that have a gate).',
+      'An event as a gate (a release, a launch): what it waits for (everything it depends_on), grouped by stream (the feature or project each is part of) with progress and what the owner owes; what it goes ahead without (what it defers); what is not yet sorted (open tasks, issues and decisions under what it ships, on neither side); and how we know (the proof questions of what it ships and of what holds it, answered or not on the release\u2019s build: its version). Params: event (an entity id; without it, the open events that have a gate).',
     run: gate,
+  },
+  changelog: {
+    description: 'What a product has to show: its features that are built or shipped, each with the release it went out in; built and not yet released first, then the newest. Planned work is not in it. Params: of (required): a project or feature.',
+    run: changelog,
+  },
+  costs: {
+    description:
+      'What the work costs: what agents spent over the last days (dollars where a run says what it cost, tokens where it does not, by where they ran), each regular payment (a cost item: hosting, a subscription) with its share of the period, the total, and the rate per month. Nothing is guessed: a payment with no amount is named as not priced. Params: days (default 30).',
+    run: costs,
   },
   proof: {
     description:

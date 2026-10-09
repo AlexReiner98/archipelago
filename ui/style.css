@@ -593,3 +593,8 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .proofs .ptile .cap { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
 .proofs .ptile:hover .cap { text-decoration: underline; }
 @media (max-width: 640px) { .proofs .ptiles { padding-left: 14px; } }
+
+/* Costs and the changelog: one line a row. */
+.rows.costs > li.row-top, .proofs .rows > li.row-top { flex-wrap: nowrap; }
+.rows.costs > li.row-top > .grow, .proofs .rows > li.row-top > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rows.costs > li.row-top > :not(.grow), .proofs .rows > li.row-top > :not(.grow) { flex: none; }

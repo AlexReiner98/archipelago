@@ -1185,7 +1185,7 @@ async function entity(id) {
   );
   if (project) roadmap(id).catch((err) => document.getElementById('roadmap')?.replaceChildren(h('div', { class: 'error' }, err.message)));
   if (gated) gate(id).catch((err) => document.getElementById('gate')?.replaceChildren(h('div', { class: 'error' }, err.message)));
-  if (proven) proofPart(id).catch((err) => document.getElementById('proof')?.replaceChildren(h('div', { class: 'error' }, err.message)));
+  if (proven) proofPart(id, project).catch((err) => document.getElementById('proof')?.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
 // ---- forms ---------------------------------------------------------------
@@ -2191,7 +2191,7 @@ async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, ownerCard(owner, workspace)),
+      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, costsCard(), ownerCard(owner, workspace)),
       h(
         'section',
         { class: 'card' },
@@ -2266,6 +2266,7 @@ async function workspace() {
     h(
       'div',
       { class: 'grid' },
+      costsCard(),
       (me.actor.admin || !info.owner) && ownerCard(info.owner, workspace),
       h(
         'section',
@@ -2471,7 +2472,7 @@ async function gate(eventId) {
   const data = await api('view', { name: 'gate', params: { event: eventId } });
   if (!main.isConnected) return;
   const { counts } = data;
-  if (!counts.holding && !counts.to_sort && !counts.can_follow) return main.replaceChildren();
+  if (!counts.holding && !counts.to_sort && !counts.can_follow && !data.proof) return main.replaceChildren();
   const change = async (ops, reason) => {
     try {
       await api('change', { ops, reason });
@@ -2521,6 +2522,34 @@ async function gate(eventId) {
       pill(x.type, x.status),
       x.relation && h('button', { class: 'quiet', title: 'The event goes ahead without this', onclick: () => across(x, 'defers') }, 'Can follow'),
     );
+  // How we know: the questions asked of what this ships, answered or not on the build that is released.
+  const asked = data.proof;
+  const unanswered = asked ? asked.counts.questions - asked.counts.answered : 0;
+  const proofRow =
+    asked &&
+    h(
+      'li',
+      {},
+      h(
+        'details',
+        { open: gateOpen.has(`${eventId}:proof`), ontoggle: (ev) => (ev.target.open ? gateOpen.add(`${eventId}:proof`) : gateOpen.delete(`${eventId}:proof`)) },
+        h(
+          'summary',
+          {},
+          h('span', { class: 'grow' }, 'How we know'),
+          asked.build && h('span', { class: 'chip', title: asked.named ? 'The build this release names as its version' : 'The release names no version: this is the build last reported' }, asked.build),
+          unanswered > 0 ? h('span', { class: 'pill warn' }, `${unanswered} unanswered`) : h('span', { class: 'pill ok' }, 'answered'),
+          h('span', { class: 'progress', title: `${asked.counts.answered} of ${asked.counts.questions} questions answered` }, h('span', { class: 'bar' }, h('span', { style: `width: ${Math.round((asked.counts.answered / asked.counts.questions) * 100)}%` })), h('span', { class: 'muted small' }, `${asked.counts.answered}/${asked.counts.questions}`)),
+        ),
+        h(
+          'ul',
+          { class: 'rows work' },
+          asked.questions.map((q) =>
+            h('li', { class: 'row-top' }, chip(q.type), h('span', { class: 'grow', title: q.title }, link(q)), q.answered ? h('span', { class: 'pill ok' }, 'answered') : q.total ? h('span', { class: `pill ${q.failed ? 'bad' : 'warn'}` }, `${q.passed}/${q.total} passed`) : h('span', { class: 'pill closed' }, 'no tests')),
+          ),
+        ),
+      ),
+    );
   const stream = (s) => {
     const key = `${eventId}:${s.id}`;
     const open = s.items.filter((x) => !x.done);
@@ -2561,7 +2590,7 @@ async function gate(eventId) {
             unsorted.length > FIRST && h('li', { class: 'more' }, h('button', { class: 'quiet', onclick: () => ((whole ? gateAll.delete(eventId) : gateAll.add(eventId)), gate(eventId)) }, whole ? 'fewer' : `${unsorted.length - FIRST} more`)),
           ),
         ),
-      counts.holding > 0 &&
+      (counts.holding > 0 || asked) &&
         h(
           'section',
           { class: 'card wide' },
@@ -2572,9 +2601,10 @@ async function gate(eventId) {
             progressBar({ done: counts.holding - counts.open, total: counts.holding }),
             counts.open > 0 && h('span', { class: 'pill' }, `${counts.open} open`),
             counts.yours > 0 && h('span', { class: 'pill warn' }, `${counts.yours} yours`),
+            unanswered > 0 && h('span', { class: 'pill warn', title: 'Proof questions not answered on the build' }, `${unanswered} unanswered`),
             data.clear && h('span', { class: 'pill ok' }, 'clear to go'),
           ),
-          h('ul', { class: 'tree top' }, data.streams.map(stream)),
+          h('ul', { class: 'tree top' }, proofRow, data.streams.map(stream)),
         ),
       data.can_follow.length > 0 &&
         h(
@@ -2585,6 +2615,58 @@ async function gate(eventId) {
         ),
     ),
   );
+}
+
+// ---- Costs ---------------------------------------------------------------
+
+/** What the work costs over thirty days: each regular payment and its share, and what agents spent by where they ran. */
+function costsCard() {
+  const c = card('Costs', { wide: true });
+  const money = (n) => `$${n.toFixed(2)}`;
+  c.fill(
+    api('view', { name: 'costs', params: { days: 30 } }),
+    (d) => {
+      const paid = d.recurring.items.map((i) =>
+        h(
+          'li',
+          { class: 'row-top' },
+          chip(i.type),
+          h('span', { class: 'grow', title: i.title }, link(i)),
+          i.vendor && h('span', { class: 'muted small' }, i.vendor),
+          i.amount === null ? h('span', { class: 'pill warn', title: 'Nobody has said what is paid' }, 'not priced') : h('span', { class: 'muted small', title: `${i.amount} ${i.currency} every ${i.every}` }, i.currency === 'USD' ? `${money(i.per_month)}/mo` : `${i.per_month} ${i.currency}/mo`),
+          i.share !== null && i.currency === 'USD' && h('strong', {}, money(i.share)),
+        ),
+      );
+      const spent = d.agents.by.map((s) =>
+        h(
+          'li',
+          { class: 'row-top' },
+          h('span', { class: 'chip' }, 'Agents'),
+          h('span', { class: 'grow' }, RAN[s.surface] ?? s.surface),
+          h('span', { class: 'muted small' }, `${s.runs} run${s.runs === 1 ? '' : 's'} \u00b7 ${tokensText(s.tokens)}`),
+          s.unpriced_tokens > 0 && s.cost_usd === 0 ? h('span', { class: 'pill closed', title: 'These runs count tokens and do not say what they cost' }, 'tokens only') : h('strong', {}, money(s.cost_usd)),
+        ),
+      );
+      const node = h(
+        'div',
+        {},
+        h(
+          'div',
+          { class: 'toolbar fold-bar usage-sums' },
+          h('span', { class: 'fact', title: 'What a month costs at this rate: the regular payments, and what agents spent scaled to a month' }, h('span', { class: 'muted' }, 'a month '), h('strong', {}, money(d.per_month))),
+          h('span', { class: 'fact', title: 'Paid to run agents through the API, where a run says what it cost' }, h('span', { class: 'muted' }, 'agents '), h('strong', {}, money(d.agents.cost_usd))),
+          h('span', { class: 'fact', title: 'Hosting, subscriptions and the like: their share of these days' }, h('span', { class: 'muted' }, 'regular '), h('strong', {}, money(d.recurring.cost_usd))),
+          d.agents.unpriced_tokens > 0 && h('span', { class: 'fact', title: 'Used by runs that count tokens and do not say what they cost, such as a session on a subscription: not in the dollars' }, h('span', { class: 'muted' }, 'not priced '), tokensText(d.agents.unpriced_tokens)),
+          h('span', { class: 'grow' }),
+          h('a', { class: 'button', href: '#/new/cost', title: 'Hosting, a subscription, a licence, a domain' }, 'Add a cost'),
+        ),
+        (paid.length > 0 || spent.length > 0) && h('ul', { class: 'rows costs' }, paid, spent),
+      );
+      return [`${money(d.total_usd)} in ${d.days} days`, node];
+    },
+    '',
+  );
+  return c.el;
 }
 
 // ---- Proof ---------------------------------------------------------------
@@ -2601,13 +2683,16 @@ const proofPictures = new Map();
  * tests passed on one build, opening to the tests as pictures. Nothing, where
  * no question has been asked.
  */
-async function proofPart(rootId) {
+async function proofPart(rootId, withLog = false) {
   const main = document.getElementById('proof');
   if (main?.dataset.root !== rootId) return;
   const data = await api('view', { name: 'proof', params: { of: rootId, build: proofBuild.get(rootId) } });
   if (!main.isConnected) return;
   const { counts } = data;
-  if (!counts.questions) return main.replaceChildren();
+  const log = withLog ? await api('view', { name: 'changelog', params: { of: rootId } }).catch(() => null) : null;
+  if (!main.isConnected) return;
+  const shown = log?.features ?? [];
+  if (!counts.questions && !shown.length) return main.replaceChildren();
   const bar = (done, total) => h('span', { class: 'progress', title: `${done} of ${total} tests passed` }, h('span', { class: 'bar' }, h('span', { style: `width: ${total ? Math.round((done / total) * 100) : 0}%` })), h('span', { class: 'muted small' }, `${done}/${total}`));
   const mark = (t) => {
     const r = t.result;
@@ -2654,11 +2739,12 @@ async function proofPart(rootId) {
       ),
     );
   };
-  const builds = data.builds.length > 1 ? menu(data.build, data.builds.map((b) => [b, () => (proofBuild.set(rootId, b), proofPart(rootId))])) : data.build && h('span', { class: 'chip', title: 'The build these results are from' }, data.build);
+  const builds = data.builds.length > 1 ? menu(data.build, data.builds.map((b) => [b, () => (proofBuild.set(rootId, b), proofPart(rootId, withLog))])) : data.build && h('span', { class: 'chip', title: 'The build these results are from' }, data.build);
   main.replaceChildren(
     h(
       'div',
       { class: 'grid proofs', style: 'margin-bottom: 14px' },
+      counts.questions > 0 &&
       h(
         'section',
         { class: 'card wide' },
@@ -2673,6 +2759,19 @@ async function proofPart(rootId) {
         ),
         h('ul', { class: 'tree top' }, data.proofs.map(question)),
       ),
+      shown.length > 0 &&
+        h(
+          'details',
+          { class: 'card wide fold', open: unfolded.get(`${rootId}:changelog`) ?? false, ontoggle: (ev) => unfolded.set(`${rootId}:changelog`, ev.target.open) },
+          h('summary', {}, h('h2', { title: 'What is built or shipped; what is only planned is not here' }, 'Changelog'), h('span', { class: 'n' }, shown.length)),
+          h(
+            'ul',
+            { class: 'rows' },
+            shown.map((f) =>
+              h('li', { class: 'row-top' }, h('span', { class: 'grow', title: f.title }, link(f)), f.release && h('a', { class: 'chip', href: `#/e/${f.release.id}`, title: f.release.title }, f.release.version ?? f.release.title), pill(f.type, f.status), ago(f.at)),
+            ),
+          ),
+        ),
     ),
   );
 }

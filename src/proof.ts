@@ -17,7 +17,7 @@ interface Link {
  * build: the one asked for, or the build last reported. Without `of`, the
  * projects that have proof questions.
  */
-export async function proof(l: Lattice, input: { of?: string; build?: string }) {
+export async function proof(l: Lattice, input: { of?: string; build?: string }, within?: Set<string>) {
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, updated_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
   const { rows: links } = await l.db.query<Link>(`select type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`, [['part_of', 'about', 'software.answers', 'produced']]);
@@ -28,7 +28,7 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }) 
   const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
   const questions = entities.filter((e) => isA(e, 'software.proof') && e.is_open);
 
-  if (!input.of) {
+  if (!input.of && !within) {
     // The project a question belongs to: the first one met going up from it.
     const projectOf = (id: string) => {
       const seen = new Set([id]);
@@ -50,10 +50,11 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }) 
     return { products: [...counts].map(([id, n]) => ({ ...slim(byId.get(id)!), questions: n })).sort((a, b) => b.questions - a.questions || a.title.localeCompare(b.title)) };
   }
 
-  const root = byId.get(input.of);
-  if (!root) throw new Error(`No entity "${input.of}"`);
-  const scope = new Set([root.id]);
-  const stack = [root.id];
+  const root = input.of ? byId.get(input.of) : undefined;
+  if (input.of && !root) throw new Error(`No entity "${input.of}"`);
+  // Asked from a gate, the scope is given: what the event ships and what holds it.
+  const scope = new Set(within ?? [root!.id]);
+  const stack = [...scope];
   while (stack.length) {
     for (const kid of into('part_of', stack.pop()!)) {
       if (scope.has(kid.id)) continue;
@@ -111,13 +112,69 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }) 
     .sort((a, b) => a.title.localeCompare(b.title));
   const sum = (key: 'total' | 'passed' | 'failed' | 'not_run') => proofs.reduce((n, p) => n + p[key], 0);
   return {
-    of: slim(root),
+    of: root ? slim(root) : null,
     build,
     builds: builds.slice(0, 10),
     counts: { questions: proofs.length, answered: proofs.filter((p) => p.answered).length, tests: sum('total'), passed: sum('passed'), failed: sum('failed'), not_run: sum('not_run') },
     proofs,
     how: 'A question is answered on a build when it has tests and every one passed there. To add a question: create a software.proof (the title is the question) that is part of the product or feature. To add a test: create a software.test and link it to the question with software.answers. Results come from test_report.',
   };
+}
+
+/**
+ * What a product has to show for itself: its features that are built or
+ * shipped, with the release each went out in. What is built and not yet
+ * released comes first, then the newest. What is only planned is not here.
+ */
+export async function changelog(l: Lattice, input: { of?: string }) {
+  if (!input.of) throw new Error('changelog needs "of": the id of a project or feature.');
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, updated_at from entity where archived_at is null`);
+  const byId = new Map(entities.map((e) => [e.id, e]));
+  const root = byId.get(input.of);
+  if (!root) throw new Error(`No entity "${input.of}"`);
+  const { rows: links } = await l.db.query<Link>(`select type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`, [['part_of', 'software.ships']]);
+  const live = links.filter((r) => byId.has(r.from_id) && byId.has(r.to_id));
+  const parents = (id: string) => live.filter((r) => r.type === 'part_of' && r.from_id === id).map((r) => r.to_id);
+  const kids = (id: string) => live.filter((r) => r.type === 'part_of' && r.to_id === id).map((r) => r.from_id);
+  const scope = new Set<string>();
+  const stack = [root.id];
+  while (stack.length) {
+    for (const kid of kids(stack.pop()!)) {
+      if (scope.has(kid)) continue;
+      scope.add(kid);
+      stack.push(kid);
+    }
+  }
+  /** The release a feature went out in: its own, or that of the feature it is part of. */
+  const releaseOf = (id: string) => {
+    const seen = new Set<string>();
+    let level = [id];
+    while (level.length) {
+      for (const at of level) {
+        const ships = live.find((r) => r.type === 'software.ships' && r.to_id === at);
+        if (ships) return byId.get(ships.from_id)!;
+        seen.add(at);
+      }
+      level = level.flatMap(parents).filter((x) => !seen.has(x));
+    }
+    return undefined;
+  };
+  const features = [...scope]
+    .map((id) => byId.get(id)!)
+    .filter((e) => l.registry.isA(e.type, 'software.feature') && (e.status === 'built' || e.status === 'shipped'))
+    .map((e) => {
+      const release = releaseOf(e.id);
+      return {
+        id: e.id,
+        type: e.type,
+        title: e.title,
+        status: e.status,
+        at: e.updated_at,
+        release: release ? { id: release.id, title: release.title, status: release.status, version: (release.props.version as string | undefined) ?? null } : null,
+      };
+    })
+    .sort((a, b) => Number(a.status === 'shipped') - Number(b.status === 'shipped') || new Date(b.at).getTime() - new Date(a.at).getTime());
+  return { of: { id: root.id, type: root.type, title: root.title, status: root.status }, counts: { built: features.filter((f) => f.status === 'built').length, shipped: features.filter((f) => f.status === 'shipped').length }, features };
 }
 
 export interface TestReport {

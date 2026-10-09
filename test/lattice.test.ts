@@ -1569,3 +1569,82 @@ test('a picture is kept for a result only when sent, travels in a backup, and go
   assert.equal(again.pictures_removed, 1);
   assert.equal((await l.db.query<{ n: number }>(`select count(*)::int as n from picture`)).rows[0].n, 0);
 });
+
+test('a release is not clear until what it ships is proven on its own build, and a changelog is only what is built', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'addin', type: 'software.feature', title: 'Add-in', status: 'built' },
+    { op: 'create', ref: 'panel', type: 'software.feature', title: 'Panel', status: 'built' },
+    { op: 'create', ref: 'old', type: 'software.feature', title: 'Presets', status: 'shipped' },
+    { op: 'create', ref: 'later', type: 'software.feature', title: 'Sheets', status: 'planned' },
+    { op: 'create', ref: 'proofs', type: 'software.feature', title: 'Public proof', status: 'built' },
+    { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
+    { op: 'create', ref: 'noaa', type: 'software.test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
+    { op: 'create', ref: 'release', type: 'software.release', title: 'Version 1.0', props: { version: '1.0.0' } },
+    { op: 'link', type: 'part_of', from: 'addin', to: 'app' },
+    { op: 'link', type: 'part_of', from: 'panel', to: 'addin' },
+    { op: 'link', type: 'part_of', from: 'old', to: 'app' },
+    { op: 'link', type: 'part_of', from: 'later', to: 'app' },
+    { op: 'link', type: 'part_of', from: 'proofs', to: 'app' },
+    { op: 'link', type: 'part_of', from: 'sun', to: 'proofs' },
+    { op: 'link', type: 'software.answers', from: 'noaa', to: 'sun' },
+    { op: 'link', type: 'software.ships', from: 'release', to: 'addin' },
+    // The questions are asked of a feature the release does not ship: it is held by it, and so they are the release's too.
+    { op: 'link', type: 'depends_on', from: 'release', to: 'proofs' },
+  ]);
+  type Gate = { clear: boolean; proof: { build: string | null; named: boolean; counts: { questions: number; answered: number }; questions: { id: string; answered: boolean }[] } | null };
+  const gate = async () => (await VIEWS.gate.run(l, { event: made.release })) as Gate;
+
+  // Passing on an earlier build does not answer for the build that is released.
+  await callTool(l, human, 'test_report', { build: '0.9.0', results: [{ test: made.noaa, passed: true }] });
+  const before = await gate();
+  assert.deepEqual([before.proof!.build, before.proof!.named, before.proof!.counts.answered, before.clear], ['1.0.0', true, 0, false]);
+  await callTool(l, human, 'test_report', { build: '1.0.0', results: [{ test: made.noaa, passed: true }] });
+  const after = await gate();
+  assert.deepEqual([after.proof!.counts.answered, after.proof!.questions[0].answered, after.clear], [1, true, true]);
+
+  // A changelog is what is built or shipped, with the release each went out in; what is only planned is not in it.
+  const log = (await VIEWS.changelog.run(l, { of: made.app })) as { counts: Record<string, number>; features: { id: string; status: string; release: { version: string | null } | null }[] };
+  assert.deepEqual(log.counts, { built: 3, shipped: 1 });
+  assert.deepEqual(log.features.map((f) => f.id).sort(), [made.addin, made.old, made.panel, made.proofs].sort());
+  assert.equal(log.features.at(-1)!.id, made.old, 'what is built and not yet released comes first');
+  assert.equal(log.features.find((f) => f.id === made.panel)!.release!.version, '1.0.0', 'a part goes out with what it is part of');
+  assert.equal(log.features.find((f) => f.id === made.old)!.release, null);
+});
+
+test('costs: dollars where a run says, tokens where it does not, and each regular payment by its share', async () => {
+  const l = await fresh();
+  const longAgo = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
+  const made = await make(l, [
+    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Repo' },
+    { op: 'create', ref: 'host', type: 'cost', title: 'Hosting', props: { amount: 25, since: longAgo, vendor: 'Render' } },
+    { op: 'create', ref: 'domain', type: 'cost', title: 'Domain', props: { amount: 120, every: 'year', since: longAgo } },
+    { op: 'create', ref: 'unknown', type: 'cost', title: 'Subscription' },
+    { op: 'create', ref: 'euro', type: 'cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: longAgo } },
+    { op: 'create', ref: 'ended', type: 'cost', title: 'Old host', status: 'ended', props: { amount: 50, since: longAgo, until: longAgo } },
+  ]);
+  await callTool(l, human, 'run_report', { repo: made.repo, title: 'Read a push', tokens: 40_000, cost_usd: 0.31, surface: 'server', link: 'https://example.com/1' });
+  await callTool(l, human, 'run_report', { repo: made.repo, title: 'Read another', tokens: 10_000, cost_usd: 0.09, surface: 'server', link: 'https://example.com/2' });
+  await callTool(l, human, 'run_report', { repo: made.repo, title: 'A session', tokens: 900_000, surface: 'claude-code', link: 'https://example.com/3' });
+
+  type Costs = {
+    total_usd: number;
+    per_month: number;
+    agents: { cost_usd: number; tokens: number; unpriced_tokens: number; by: { surface: string; runs: number; cost_usd: number }[] };
+    recurring: { cost_usd: number; per_month: number; items: { id: string; per_month: number | null; share: number | null }[]; unpriced: { id: string }[]; other_currencies: { id: string }[] };
+  };
+  const c = (await VIEWS.costs.run(l, { days: 30 })) as Costs;
+  assert.deepEqual([c.agents.cost_usd, c.agents.tokens, c.agents.unpriced_tokens], [0.4, 950_000, 900_000]);
+  assert.deepEqual(c.agents.by.map((s) => [s.surface, s.runs, s.cost_usd]), [['server', 2, 0.4], ['claude-code', 1, 0]]);
+  // A month's payment, and a twelfth of a year's, over thirty days of a month of 30.44.
+  const share = (monthly: number) => Math.round(((monthly * 30) / 30.4375) * 100) / 100;
+  assert.equal(c.recurring.items.find((i) => i.id === made.host)!.share, share(25));
+  assert.deepEqual([c.recurring.items.find((i) => i.id === made.domain)!.per_month, c.recurring.per_month], [10, 35]);
+  assert.equal(c.recurring.cost_usd, Math.round((share(25) + share(10)) * 100) / 100);
+  assert.deepEqual(c.recurring.unpriced.map((i) => i.id), [made.unknown], 'a payment nobody has priced is named, not guessed');
+  assert.deepEqual(c.recurring.other_currencies.map((i) => i.id), [made.euro], 'another currency is listed, not added to the dollars');
+  assert.ok(!c.recurring.items.some((i) => i.id === made.ended), 'what ended before the period is not in it');
+  assert.equal(c.total_usd, Math.round((0.4 + c.recurring.cost_usd) * 100) / 100);
+  assert.equal(c.per_month, Math.round((35 + (0.4 * 30.4375) / 30) * 100) / 100);
+});

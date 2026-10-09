@@ -155,6 +155,21 @@
       }
     },
     {
+      "id": "cost",
+      "title": "Cost",
+      "description": "Something paid for regularly: hosting, a subscription, a licence, a domain. What agents spend per token is not kept here: it is measured from their runs.",
+      "statuses": { "open": ["paying"], "closed": ["ended"] },
+      "fields": {
+        "amount": { "type": "number", "description": "What is paid each time, in the currency below. Left out when nobody has said: it is then shown as not priced." },
+        "currency": { "type": "string", "default": "USD" },
+        "every": { "type": "enum", "values": ["month", "year"], "default": "month" },
+        "since": { "type": "date", "description": "The first day it was paid for. Left out: the day it was written down." },
+        "until": { "type": "date", "description": "The last day it is paid for, when that is known." },
+        "vendor": { "type": "string", "description": "Who is paid." },
+        "url": { "type": "url", "description": "Where the bill or the plan can be looked at." }
+      }
+    },
+    {
       "id": "procedure",
       "title": "Procedure",
       "description": "How something is done: a checklist, playbook or rule. One a machine can run is a function.",
