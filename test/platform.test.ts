@@ -428,7 +428,7 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
     });
   const first = await run();
   assert.equal(first.code, 0, first.out);
-  assert.match(first.out, /written {4}\.mcp\.json[\s\S]*added to {3}CLAUDE\.md[\s\S]*LATTICE_AGENT_TOKEN is not set in this terminal/);
+  assert.match(first.out, /written {4}\.mcp\.json[\s\S]*added to {3}CLAUDE\.md[\s\S]*this machine has no token yet/);
   const file = (path: string) => readFileSync(join(project, path), 'utf8');
   assert.equal(JSON.parse(file('.mcp.json')).mcpServers.lattice.url, `\${LATTICE_URL:-${base}}/mcp`);
   // What was theirs is kept; the three hooks are added beside it, and call the script that was written.
@@ -445,6 +445,21 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   const again = await run();
   assert.doesNotMatch(again.out, /written|added to/);
   assert.deepEqual([file('CLAUDE.md'), file('.claude/settings.json')], before);
+  // The first time on a machine the command carries the token in and asks for it to be kept: it is, with the
+  // address, where the shell finds them, an older token replaced and nothing else there disturbed. It is not printed.
+  const profile = join(project, 'profile');
+  writeFileSync(profile, 'export PATH="$PATH:/opt/bin"\nexport LATTICE_AGENT_TOKEN="lat_default_old"\n');
+  const kept = await new Promise<string>((done) => {
+    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: 'lat_default_new', LATTICE_SETUP_SAVE: '1', LATTICE_SETUP_PROFILE: profile } });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (out += d));
+    child.on('close', () => done(out));
+  });
+  assert.match(kept, /kept {7}the server\u2019s address and the token, for this machine[\s\S]*Connected to/);
+  assert.ok(!kept.includes('lat_default_new'));
+  assert.equal(file('profile'), `export PATH="$PATH:/opt/bin"\nexport LATTICE_URL="${base}"\nexport LATTICE_AGENT_TOKEN="lat_default_new"\n`);
+
   // And the hook it wrote reaches the server from that folder.
   const hooked = await new Promise<string>((done) => {
     const child = spawn(process.execPath, ['.claude/lattice-hook.mjs', 'session-start'], { cwd: project, env: { ...process.env, LATTICE_URL: '', LATTICE_AGENT_TOKEN: '' } });

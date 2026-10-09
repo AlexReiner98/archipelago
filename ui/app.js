@@ -1880,24 +1880,32 @@ function secretBox(label, token) {
 // files can be overwritten by a running session; the machine's environment
 // cannot.
 function connectBox(made) {
-  const windows = /win/i.test(navigator.platform);
-  const set = windows
-    ? `setx LATTICE_URL "${location.origin}"\nsetx LATTICE_AGENT_TOKEN "${made.token}"`
-    : `echo 'export LATTICE_URL="${location.origin}"' >> ~/.zshenv\necho 'export LATTICE_AGENT_TOKEN="${made.token}"' >> ~/.zshenv`;
-  // One command that works in any shell with Node: it fetches the setup script from this server and runs it in the project's folder.
-  const file = `node -e "fetch('${location.origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
-  const copy = (text, label) => h('button', { onclick: (e) => navigator.clipboard.writeText(text).then(() => (e.target.textContent = 'Copied')) }, label);
-  return h(
-    'div',
-    { class: 'secret' },
-    h('div', {}, h('strong', {}, `Connect Claude Code as "${made.name}"`)),
-    h('div', { class: 'muted small' }, `1. Once on this machine, in a terminal${windows ? '' : ' (zsh; for the desktop app on a Mac also run each with "launchctl setenv NAME value")'}. Then quit Claude Code completely and open it again.`),
-    h('code', { style: 'white-space: pre-wrap' }, set),
-    h('div', { class: 'toolbar' }, copy(set, 'Copy commands'), h('span', { class: 'muted small' }, 'Shown once: they hold the token. Revoke it below to disconnect.')),
-    h('div', { class: 'muted small', style: 'margin-top: 10px' }, '2. Once in each project, in a terminal in its folder. It writes the tools, the session hooks, the friction skill and the working rules, and holds no secret, so what it writes can be committed.'),
-    h('code', { style: 'white-space: pre-wrap' }, file),
-    h('div', { class: 'toolbar' }, copy(file, 'Copy command')),
-  );
+  // One command, copied and run in the project's folder on the machine the agent will work on. It carries the
+  // address and the token in, the setup script keeps them for that machine, and the same script sets the project up.
+  const fetchIt = `node -e "fetch('${location.origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
+  const first = {
+    windows: `$env:LATTICE_URL='${location.origin}'; $env:LATTICE_AGENT_TOKEN='${made.token}'; $env:LATTICE_SETUP_SAVE='1'; ${fetchIt}`,
+    unix: `LATTICE_URL='${location.origin}' LATTICE_AGENT_TOKEN='${made.token}' LATTICE_SETUP_SAVE=1 ${fetchIt}`,
+  };
+  const copy = (text, label) => h('button', { class: 'primary', onclick: (e) => navigator.clipboard.writeText(text).then(() => (e.target.textContent = 'Copied')) }, label);
+  const box = h('div', { class: 'secret' });
+  const draw = (os) =>
+    box.replaceChildren(
+      h(
+        'div',
+        { class: 'toolbar' },
+        h('strong', { class: 'grow' }, `Connect Claude Code as "${made.name}"`),
+        h('span', { class: 'switch', title: 'The machine the agent will work on' }, [['windows', 'Windows'], ['unix', 'Mac or Linux']].map(([key, label]) => h('button', { class: os === key ? 'on' : '', onclick: () => draw(key) }, label))),
+      ),
+      h('div', { class: 'muted small' }, `1. On that machine, in ${os === 'windows' ? 'PowerShell' : 'a terminal'}, in the project's folder. Then quit Claude Code completely and open it in that folder.`),
+      h('code', { style: 'white-space: pre-wrap; word-break: break-all' }, first[os].replace(made.token, `${made.token.slice(0, 12)}…`)),
+      h('div', { class: 'toolbar' }, copy(first[os], 'Copy command'), h('span', { class: 'muted small' }, 'Shown once: it holds the token. Revoke it below to disconnect.')),
+      h('div', { class: 'muted small', style: 'margin-top: 10px' }, '2. For each other project on that machine, in its folder. It holds no secret.'),
+      h('code', { style: 'white-space: pre-wrap; word-break: break-all' }, fetchIt),
+      h('div', { class: 'toolbar' }, copy(fetchIt, 'Copy command')),
+    );
+  draw(/win/i.test(navigator.platform) ? 'windows' : 'unix');
+  return box;
 }
 
 /** A chosen file's bytes in base64, which is how a backup file is sent. */
