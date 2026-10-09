@@ -223,7 +223,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // Never from a web page, and only under a name this server answers to; with tokens on, the token says whose session it is.
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are called by Claude Code, not from a web page, and at an address this server is known by.' });
         const { lattice } = await resolve(req, res, 'agent');
-        const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; reason?: string; tokens?: number };
+        const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; remote?: string; reason?: string; tokens?: number };
         // Said in the server's log, so "did the hook run?" has an answer.
         console.log(`hook ${url.pathname.slice('/hooks/'.length)} from session ${body.session_id ?? 'unknown'}`);
         // Each time the owner sends a session a message, the session is told what

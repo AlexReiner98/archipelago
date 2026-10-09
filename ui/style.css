@@ -199,6 +199,8 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .g-node.bar.guess .used { opacity: 0.35; }
 .g-node.bar.active .box { stroke: var(--accent); stroke-width: 2.5; }
 .g-node.bar.loose .box { fill: none; }
+.g-node.bar:not(.loose):not(.gate) .box { fill: color-mix(in srgb, var(--muted) 16%, var(--panel)); }
+.rm-dep.step { stroke-width: 1.2; opacity: 0.85; }
 .g-node.bar.gate .box { fill: var(--muted); stroke: none; }
 .g-node.bar.gate.closed .box { fill: var(--ok); }
 .g-node.bar.gate.blocked .box { fill: var(--g-blocked); }

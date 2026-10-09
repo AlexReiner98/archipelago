@@ -1650,7 +1650,9 @@ function timeline(nodes, edges, byId, focus, prefs) {
   });
   const bottom = ROW.top + rows.length * (ROW.h + ROW.gap);
   const loose = nodes.filter((n) => !rows.includes(n)).sort((a, b) => a.title.localeCompare(b.title));
-  loose.forEach((n, i) => Object.assign(n, { bar: true, loose: true, x: 0, y: bottom + 12 + i * (ROW.h + ROW.gap), w: 210, h: ROW.h, fills: [] }));
+  // What has no place on the scale is set out under it, as many to a line as there is room for.
+  const across = Math.max(1, Math.floor(room / 300));
+  loose.forEach((n, i) => Object.assign(n, { bar: true, loose: true, x: (i % across) * 300, y: bottom + 12 + Math.floor(i / across) * (ROW.h + ROW.gap), w: 210, h: ROW.h, fills: [] }));
   // What a thing is part of is said by its bar spanning it, not by a line as well.
   // Nor is waiting that is over drawn: the order along the scale already says what came first.
   const over = (e) => BLOCKING.includes(e.type) && !byId.get(e.to).open;
@@ -1707,7 +1709,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const rough = axis.total / 7;
     const step = [1, 2, 5, 10].map((m) => m * 10 ** Math.floor(Math.log10(rough))).find((x) => x >= rough);
     for (let t = 0; t <= axis.total; t += step) {
-      scaleLayer.append(s('line', { x1: t * axis.scale, x2: t * axis.scale, y1: axis.top - 8, y2: axis.bottom }), s('text', { x: t * axis.scale + 4, y: 11 }, document.createTextNode(t ? tokensText(t) : '0 tokens')));
+      scaleLayer.append(s('line', { x1: t * axis.scale, x2: t * axis.scale, y1: axis.top - 8, y2: axis.bottom }), s('text', { x: t * axis.scale + 4, y: 11 }, document.createTextNode(t ? tokensText(t) : step * axis.scale < 64 ? '0' : '0 tokens')));
     }
   }
   const marker = (id, cls) => s('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: cls }));
@@ -1753,7 +1755,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const phrase = relations.get(e.type)?.title ?? e.type;
     const el = s(
       'path',
-      blocking ? { class: `rm-dep${a.open ? ' waiting' : ''}${e.lifted && !axis ? ' lifted' : ''}`, 'marker-end': `url(#rm-arrow${a.open ? '-wait' : ''})` } : { class: `rm-link${structure ? '' : ' other'}${a.loose || b.loose ? ' faint' : ''}` },
+      blocking ? { class: `rm-dep${a.open ? ' waiting' : ''}${e.lifted && !axis ? ' lifted' : ''}${axis ? ' step' : ''}`, 'marker-end': `url(#rm-arrow${a.open ? '-wait' : ''})` } : { class: `rm-link${structure ? '' : ' other'}${a.loose || b.loose ? ' faint' : ''}` },
       s('title', {}, document.createTextNode(`${byId.get(e.from).title} ${e.lifted ? 'waits, through their tasks, on' : phrase} ${byId.get(e.to).title}`)),
     );
     lineLayer.append(el);
@@ -1784,7 +1786,8 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
           s('text', { x: n.inside ? 10 : after, y: 19 }, document.createTextNode(n.name)),
           !n.loose && s('text', { class: 'small', x: after + (n.inside ? 0 : n.name.length * CHAR + 8), y: 19 }, document.createTextNode(n.count)),
           n.loose && s('text', { class: 'small', x: after, y: 19 }, document.createTextNode(n.count)),
-          n.blocked && !n.gate && s('circle', { class: 'flag', cx: n.w - 3, cy: 3, r: 4.5 }),
+          // A wait drawn into it already says it is blocked, and by what: the mark is for when nothing in sight does.
+          n.blocked && !n.gate && !lines.some((l) => l.stepped && l.b === n) && s('circle', { class: 'flag', cx: n.w - 3, cy: 3, r: 4.5 }),
         )
       : s(
           'g',

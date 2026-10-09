@@ -476,6 +476,7 @@ export const TOOLS: Record<string, Tool> = {
       task: z.string().optional().describe('Id of the entity being worked on.'),
       surface: z.string().optional().describe('Where you are running, e.g. claude-code, claude-desktop.'),
       cwd: z.string().optional().describe('Your working directory. Used to find the repository.'),
+      remote: z.string().optional().describe('The address the checkout was cloned from (git remote origin). Finds the repository on any machine; the directory is used when this is not given or not known.'),
       session_id: z.string().optional().describe('The id your surface gave this session, if you know it. Makes this call safe to repeat.'),
     },
     run: async (l, actor, input) => sessionStart(l, actor, input),

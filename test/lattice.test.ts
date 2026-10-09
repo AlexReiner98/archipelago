@@ -447,6 +447,15 @@ test('the session-start hook registers the session and hands it the repo\'s work
   await l.claim(agent, { resource: made.lane, holder: other.run, reason: 'busy' });
   assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), /does not know a repository[\s\S]*HELD by Lane holder: do not use it/);
 
+  // On another machine the folder is somewhere else: the repository is known by the address it was cloned from, however that is written.
+  await make(l, [{ op: 'update', id: repoId!, props: { remote: 'https://github.com/Acme/Aperture' } }]);
+  const far = await hookSessionStart(l, { session_id: 'far', cwd: '/home/someone/work/aperture', remote: 'git@github.com:acme/aperture.git' });
+  assert.match(far, new RegExp(`Repository: Aperture repo \\(${repoId}\\)`));
+  assert.match(far, new RegExp(`Write unit tests \\(${made.offline}\\)`));
+  assert.equal(((await VIEWS.sessions.run(l, {})) as any).open.find((r: any) => r.cwd === '/home/someone/work/aperture').repo.id, repoId);
+  assert.match(await hookSessionStart(l, { session_id: 'stranger', cwd: '/tmp/x', remote: 'https://github.com/acme/other' }), /does not know a repository for this folder \(a checkout of https:\/\/github\.com\/acme\/other\)/);
+  for (const id of ['far', 'stranger']) await hookSessionEnd(l, { session_id: id });
+
   await hookSessionEnd(l, { session_id: 'abc', reason: 'logout' });
   const open = ((await VIEWS.sessions.run(l, {})) as any).open.map((r: any) => r.title);
   assert.ok(!open.includes('Session in Aperture repo'));

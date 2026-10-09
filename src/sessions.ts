@@ -23,9 +23,15 @@ async function resolveRun(l: Lattice, key: string, openOnly = false): Promise<En
   return rows[0];
 }
 
-/** The repository whose checkout contains this directory, if the map knows one. */
-async function repoFor(l: Lattice, cwd: string): Promise<Entity | undefined> {
+/**
+ * The repository a session is in, if the map knows one: the one cloned from
+ * this address, which is the same on every machine, or failing that the one
+ * whose checkout on this machine contains the directory.
+ */
+async function repoFor(l: Lattice, cwd: string | undefined, remote?: string): Promise<Entity | undefined> {
   if (!l.registry.type('software.repo')) return undefined;
+  const named = remote ? await repoByName(l, repoName(remote)) : undefined;
+  if (named || !cwd) return named;
   const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and props ? 'path'`, [
     l.registry.family('software.repo'),
   ]);
@@ -44,7 +50,7 @@ export async function sessionBegan(l: Lattice, sessionId: string | undefined): P
 export async function sessionStart(
   l: Lattice,
   actor: Actor,
-  input: { title?: string; surface?: string; cwd?: string; session_id?: string; task?: string },
+  input: { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string },
 ) {
   // A surface may announce the same session more than once (resume, compact).
   if (input.session_id) {
@@ -56,7 +62,7 @@ export async function sessionStart(
   }
   const task = input.task ? await l.entity(input.task) : undefined;
   if (input.task && !task) throw new Error(`No entity "${input.task}" to work on`);
-  const repo = input.cwd ? await repoFor(l, input.cwd) : undefined;
+  const repo = await repoFor(l, input.cwd, input.remote);
 
   const props: Record<string, unknown> = { last_seen: now() };
   if (input.surface) props.surface = input.surface;
@@ -297,8 +303,8 @@ export async function sessionEnd(
  * A Claude Code SessionStart hook: register the session and return the text
  * to put in front of the model, so it starts knowing what the map knows.
  */
-export async function hookSessionStart(l: Lattice, input: { session_id?: string; cwd?: string }): Promise<string> {
-  const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, surface: 'claude-code' });
+export async function hookSessionStart(l: Lattice, input: { session_id?: string; cwd?: string; remote?: string }): Promise<string> {
+  const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code' });
   const lines = [`This session is registered in Lattice, the owner's map of work and dependencies, as run ${started.run}.`];
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) {
@@ -322,7 +328,7 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
     if (work.ready.length) lines.push('', 'Open work and issues here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${kind(t)}${t.title} (${t.id})${age(t)}`));
     if (work.blocked.length) lines.push('', 'Blocked work here:', ...work.blocked.slice(0, 15).map((t) => `- ${t.title} (${t.id}), waiting on: ${t.waiting_on.join('; ')}`));
   } else {
-    lines.push('Lattice does not know a repository for this folder.');
+    lines.push(`Lattice does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
   }
   const now = (await VIEWS.available_now.run(l, {})) as { held_resources: { title: string; held_by_title: string }[] };
   const { rows: exclusive } = await l.db.query<{ id: string; title: string }>(

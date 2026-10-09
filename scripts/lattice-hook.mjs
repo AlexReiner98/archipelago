@@ -7,6 +7,9 @@
 //
 //   node scripts/lattice-hook.mjs session-start | prompt | session-end
 //
+// At the start it also says which repository the folder is a checkout of (its
+// origin), so the map knows the session's repository on any machine.
+//
 // With each prompt and at the end it also says how many tokens the session
 // has used so far, counted from the session's own record on this machine
 // (the transcript Claude Code names in the hook's input): input and output,
@@ -16,6 +19,7 @@
 // It never fails the session: if the server is away it says so on stderr and
 // answers nothing.
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const name = process.argv[2];
@@ -45,7 +49,16 @@ function tokensUsed(file) {
 }
 
 let body = input.trim() || '{}';
-if (name !== 'session-start') {
+if (name === 'session-start') {
+  // Which repository this is, by the address it was cloned from: a folder is somewhere else on every machine.
+  try {
+    const said = JSON.parse(body);
+    const remote = execFileSync('git', ['-C', said.cwd || '.', 'config', '--get', 'remote.origin.url'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim();
+    if (remote) body = JSON.stringify({ ...said, remote });
+  } catch {
+    // Not a checkout, or no git here: the folder is all there is to go on.
+  }
+} else {
   try {
     const said = JSON.parse(body);
     if (said.transcript_path) body = JSON.stringify({ ...said, tokens: tokensUsed(said.transcript_path) });
