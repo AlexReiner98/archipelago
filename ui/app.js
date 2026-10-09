@@ -1306,7 +1306,8 @@ const s = (tag, attrs = {}, ...kids) => {
 // its filters (which relations, how far out, whether what is finished shows),
 // never in how it looks. It is laid out, not simulated, so it looks the same
 // every time. Where there is work in sight, across is tokens: each piece of
-// work as long as it is expected to take, with what it has used so far.
+// work as long as it is expected to take, with what it has used so far, and
+// down is the order it happens in: done, under way, to come.
 // Where there is none, what a thing belongs to or waits on is to its left
 // and what belongs to it or waits on it to its right. Anything can then be
 // dragged aside.
@@ -1358,7 +1359,7 @@ function graphView({ focus, key, defaults, extras } = {}) {
         menu('View', [
           [prefs.finished ? 'Hide what is finished' : 'Show what is finished', set({ finished: !prefs.finished })],
           [prefs.fit ? 'Actual size' : 'Fit to width', set({ fit: !prefs.fit }, false)],
-          prefs.moved.size > 0 && ['Tidy', set({})],
+          prefs.moved.size > 0 && !shaped.axis && ['Tidy', set({})],
         ]),
       ),
       shaped.nodes.length > (focus ? 1 : 0) ? drawGraph(shaped, prefs) : h('div', { class: 'empty' }, focus ? 'Nothing is linked to it this way.' : 'Nothing to draw with these filters.'),
@@ -1485,8 +1486,13 @@ function timeline(nodes, edges, byId, focus, prefs) {
   const kids = new Map();
   for (const [kid, parent] of parentOf) kids.set(parent, [...(kids.get(parent) ?? []), byId.get(kid)]);
   const waits = edges.filter((e) => BLOCKING.includes(e.type));
+  // A feature that is built is done, though it stays open until it ships.
+  const done = (n) => !n.open || n.status === 'built';
+  const under = (n) => n.active || (n.tokens?.used ?? 0) > 0 || ['doing', 'building', 'investigating'].includes(n.status);
+  const stage = (n) => (done(n) ? 0 : under(n) ? 1 : 2);
   const inOrder = (list) => {
-    const sorted = [...list].sort((a, b) => (a.place ?? a.order ?? 1e9) - (b.place ?? b.order ?? 1e9) || a.title.localeCompare(b.title));
+    // Down the page is the order things happen in: what is done, then what is under way, then what is still to come, each in its place on the roadmap.
+    const sorted = [...list].sort((a, b) => stage(a) - stage(b) || (a.place ?? a.order ?? 1e9) - (b.place ?? b.order ?? 1e9) || a.title.localeCompare(b.title));
     // What waits comes after what it waits on. A loop of waiting stops going round.
     for (let pass = 0; pass < sorted.length; pass++) {
       let moved = false;
@@ -1508,11 +1514,16 @@ function timeline(nodes, edges, byId, focus, prefs) {
     rows.push(n);
     let cursor = start;
     for (const kid of inOrder(kids.get(n.id) ?? [])) cursor = place(kid, cursor);
-    const estimated = n.tokens?.estimated ?? 0;
+    const { estimated = 0, used = 0 } = n.tokens ?? {};
+    const inside = cursor - start;
     n.guess = !(estimated > 0);
     n.t0 = start;
-    n.len = Math.max(estimated, cursor - start) || Math.max(n.tokens?.used ?? 0, middling);
-    return start + n.len;
+    // Its bar is as long as it is expected to take, and spans what is part of it.
+    n.len = Math.max(estimated, inside) || (done(n) && used) || Math.max(used, middling);
+    // What comes next starts where this really ends: what a finished thing used, more or less than
+    // expected, and no sooner than what an unfinished one has used already. An overrun pushes the rest back.
+    const really = Math.max(inside, used);
+    return start + (done(n) ? really || n.len : Math.max(n.len, really));
   };
   const roots = timed.filter((n) => !parentOf.has(n.id));
   let total = 0;
@@ -1525,8 +1536,6 @@ function timeline(nodes, edges, byId, focus, prefs) {
   const bottom = ROW.top + rows.length * (ROW.h + ROW.gap);
   const loose = nodes.filter((n) => !n.work).sort((a, b) => a.title.localeCompare(b.title));
   loose.forEach((n, i) => Object.assign(n, { bar: true, loose: true, x: 0, y: bottom + 12 + i * (ROW.h + ROW.gap), w: 210, h: ROW.h, usedW: 0, overW: 0 }));
-  // A bar can be moved up or down out of the way; where it is across is what it means.
-  for (const n of nodes) if (prefs.moved.has(n.id)) n.y = prefs.moved.get(n.id).y;
   // What a thing is part of is said by its bar spanning it, not by a line as well.
   // Nor is waiting that is over drawn: the order along the scale already says what came first.
   const over = (e) => BLOCKING.includes(e.type) && !byId.get(e.to).open;
@@ -1661,6 +1670,11 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     boxLayer.append(box);
     box.addEventListener('pointerenter', () => light(n.id));
     box.addEventListener('pointerleave', () => light());
+    // On the scale of tokens, where a bar is says when it happens and what it takes: it is not moved by hand, only followed.
+    if (axis) {
+      box.addEventListener('click', () => ((prefs.full = false), (location.hash = `#/e/${n.id}`)));
+      continue;
+    }
     // A press that moves is a drag, and the box stays where it is put; one that does not is a click, and leads to its page.
     box.addEventListener('pointerdown', (down) => {
       if (down.button !== 0) return;
@@ -1672,8 +1686,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
         const [dx, dy] = [(ev.clientX - down.clientX) * ratio, (ev.clientY - down.clientY) * ratio];
         far ||= Math.hypot(dx, dy) > 4;
         if (!far) return;
-        // On the scale of tokens, where a bar is across is what it means: it moves up and down only.
-        if (!axis) n.x = Math.max(0, from.x + dx);
+        n.x = Math.max(0, from.x + dx);
         n.y = Math.max(0, from.y + dy);
         box.setAttribute('transform', `translate(${n.x},${n.y})`);
         lines.filter((l) => l.ends.includes(n.id)).forEach(route);

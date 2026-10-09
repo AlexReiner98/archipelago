@@ -186,6 +186,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 /* On the scale of tokens. */
 .g-axis line { stroke: var(--line); stroke-width: 1; }
 .g-axis text { fill: var(--muted); font-size: 11px; }
+.g-node.bar { cursor: pointer; }
 .g-node.bar .used { fill: var(--ok); opacity: 0.38; pointer-events: none; }
 .g-node.bar .over { fill: var(--warn); opacity: 0.75; }
 .g-node.bar.guess .box { stroke-dasharray: 4 3; }
