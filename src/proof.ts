@@ -18,7 +18,7 @@ interface Link {
  * projects that have proof questions.
  */
 export async function proof(l: Lattice, input: { of?: string; build?: string }, within?: Set<string>) {
-  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, updated_at from entity where archived_at is null`);
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, visibility, props, updated_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
   const { rows: links } = await l.db.query<Link>(`select type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`, [['part_of', 'about', 'software.answers', 'produced']]);
   const live = links.filter((r) => byId.has(r.from_id) && byId.has(r.to_id));
@@ -107,7 +107,7 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }, 
         .sort((a, b) => Number(a.result?.passed ?? false) - Number(b.result?.passed ?? false) || a.title.localeCompare(b.title));
       const passed = tests.filter((t) => t.result?.passed).length;
       const failed = tests.filter((t) => t.result && !t.result.passed).length;
-      return { ...slim(q), tests, total: tests.length, passed, failed, not_run: tests.length - passed - failed, answered: tests.length > 0 && passed === tests.length };
+      return { ...slim(q), public: q.visibility === 'public', tests, total: tests.length, passed, failed, not_run: tests.length - passed - failed, answered: tests.length > 0 && passed === tests.length };
     })
     .sort((a, b) => a.title.localeCompare(b.title));
   const sum = (key: 'total' | 'passed' | 'failed' | 'not_run') => proofs.reduce((n, p) => n + p[key], 0);
@@ -117,6 +117,12 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }, 
     builds: builds.slice(0, 10),
     counts: { questions: proofs.length, answered: proofs.filter((p) => p.answered).length, tests: sum('total'), passed: sum('passed'), failed: sum('failed'), not_run: sum('not_run') },
     proofs,
+    /** Pictures of public results that are still only in their repository: send each with picture_put. */
+    to_send: proofs
+      .filter((p) => p.public)
+      .flatMap((p) => p.tests)
+      .filter((t) => t.result?.picture && !t.result.stored)
+      .map((t) => ({ result: t.result!.id, test: t.title, picture: t.result!.picture! })),
     how: 'A question is answered on a build when it has tests and every one passed there. To add a question: create a software.proof (the title is the question) that is part of the product or feature. To add a test: create a software.test and link it to the question with software.answers. Results come from test_report.',
   };
 }
@@ -126,7 +132,7 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }, 
  * shipped, with the release each went out in. What is built and not yet
  * released comes first, then the newest. What is only planned is not here.
  */
-export async function changelog(l: Lattice, input: { of?: string }) {
+export async function changelog(l: Lattice, input: { of?: string }, within?: Set<string>) {
   if (!input.of) throw new Error('changelog needs "of": the id of a project or feature.');
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, updated_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
@@ -136,8 +142,9 @@ export async function changelog(l: Lattice, input: { of?: string }) {
   const live = links.filter((r) => byId.has(r.from_id) && byId.has(r.to_id));
   const parents = (id: string) => live.filter((r) => r.type === 'part_of' && r.from_id === id).map((r) => r.to_id);
   const kids = (id: string) => live.filter((r) => r.type === 'part_of' && r.to_id === id).map((r) => r.from_id);
-  const scope = new Set<string>();
-  const stack = [root.id];
+  // Asked for the public page, the scope is given: what is public under the product, whatever lies between.
+  const scope = new Set<string>(within ?? []);
+  const stack = within ? [] : [root.id];
   while (stack.length) {
     for (const kid of kids(stack.pop()!)) {
       if (scope.has(kid)) continue;
@@ -236,7 +243,19 @@ export async function reportTests(l: Lattice, actor: Actor, input: TestReport) {
   });
   // A test that is run again loses the picture kept for it: the old one no longer shows what the test found.
   const removed = result.status === 'applied' ? await dropPictures(l, actor, [...seen], `Run again on build ${build}`) : 0;
-  return { status: result.status, build, recorded: seen.size, passed, failed, unknown, pictures_removed: removed };
+  // A public result shows its picture, and the picture is where the test ran: say which are owed.
+  const { rows: owed } =
+    result.status === 'applied'
+      ? await l.db.query<{ result: string; picture: string }>(
+          `select e.id as result, e.props->>'picture' as picture from relation r join entity e on e.id = r.to_id
+           where r.type = 'produced' and r.valid_to is null and r.from_id = any($1::text[]) and e.archived_at is null
+             and e.props->>'build' = $2 and e.props->>'picture' is not null
+             and exists (select 1 from relation a join entity q on q.id = a.to_id
+                         where a.type = 'software.answers' and a.valid_to is null and a.from_id = r.from_id and q.visibility = 'public' and q.archived_at is null)`,
+          [[...seen], build],
+        )
+      : { rows: [] };
+  return { status: result.status, build, recorded: seen.size, passed, failed, unknown, pictures_removed: removed, send_pictures: owed };
 }
 
 /** The most a kept picture may weigh. A capture of a view at screen size is well under it. */

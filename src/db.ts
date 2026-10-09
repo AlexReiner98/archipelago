@@ -184,6 +184,48 @@ $fn$;
 
 grant execute on function lattice_active_holds(boolean, text), lattice_external_dependents(text, text) to lattice_member;
 
+-- Public: a third level, for anyone, with no login. A request for a public page runs as the role below, which may
+-- read only what is public, and only some columns of it: never a note, an event, a proposal, a token or a setting.
+-- What is public: an item marked so; a test that helps answer a public proof question; and a result of such a test,
+-- so that a question is made public once and brings its proof with it.
+create or replace function lattice_is_public(target text) returns boolean
+language sql stable security definer set search_path = public as $fn$
+  select exists (
+    select 1 from entity e where e.id = target and e.archived_at is null and (
+      e.visibility = 'public'
+      or exists (select 1 from relation a join entity q on q.id = a.to_id
+                 where a.type = 'software.answers' and a.valid_to is null and a.from_id = e.id and q.visibility = 'public' and q.archived_at is null)
+      or exists (select 1 from relation p
+                 join relation a on a.from_id = p.from_id and a.type = 'software.answers' and a.valid_to is null
+                 join entity q on q.id = a.to_id
+                 where p.type = 'produced' and p.valid_to is null and p.to_id = e.id and q.visibility = 'public' and q.archived_at is null)))
+$fn$;
+
+-- The public items that belong to a public one, through whatever lies between: a public question in a feature that
+-- is not public is still its public product's. Gives ids only, and only of what is public.
+create or replace function lattice_public_under(root text) returns setof text
+language sql stable security definer set search_path = public as $fn$
+  with recursive scope(id) as (
+    select root where lattice_is_public(root)
+    union
+    select r.from_id from relation r join scope s on r.to_id = s.id where r.type in ('part_of', 'about') and r.valid_to is null
+  )
+  select id from scope where lattice_is_public(id)
+$fn$;
+
+do $$ begin create role lattice_public nologin; exception when duplicate_object then null; end $$;
+grant select (id, workspace, type, title, status, is_open, visibility, props, created_at, updated_at, archived_at) on entity to lattice_public;
+grant select (id, type, from_id, to_id, valid_to) on relation to lattice_public;
+grant select on picture to lattice_public;
+grant execute on function lattice_is_public(text), lattice_public_under(text) to lattice_public;
+
+drop policy if exists public_entity on entity;
+create policy public_entity on entity for select to lattice_public using (lattice_is_public(id));
+drop policy if exists public_relation on relation;
+create policy public_relation on relation for select to lattice_public using (lattice_is_public(from_id) and lattice_is_public(to_id));
+drop policy if exists public_picture on picture;
+create policy public_picture on picture for select to lattice_public using (lattice_is_public(entity_id));
+
 drop policy if exists member_proposal on proposal;
 create policy member_proposal on proposal for all to lattice_member
   using (private_to is null or private_to = current_setting('lattice.viewer', true))
@@ -217,6 +259,24 @@ export function scoped(db: Db, viewer: string): Db {
     await tx.query(`select set_config('lattice.viewer', $1, true)`, [viewer]);
     await tx.query(`set local role lattice_member`);
   };
+  return {
+    query: <T>(sql: string, params?: unknown[]) =>
+      db.transaction(async (tx) => {
+        await enter(tx);
+        return tx.query<T>(sql, params);
+      }),
+    transaction: <T>(fn: (tx: Q) => Promise<T>) =>
+      db.transaction(async (tx) => {
+        await enter(tx);
+        return fn(tx);
+      }),
+    close: () => db.close(),
+  };
+}
+
+/** The same database as anyone at all sees it, with no login: only what is public, and only some columns of that. */
+export function anyone(db: Db): Db {
+  const enter = (tx: Q) => tx.query(`set local role lattice_public`);
   return {
     query: <T>(sql: string, params?: unknown[]) =>
       db.transaction(async (tx) => {

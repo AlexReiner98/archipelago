@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { checkAutomation } from './automation-rules.ts';
-import { newId, scoped, type Db, type Q } from './db.ts';
+import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 
@@ -50,7 +50,7 @@ export interface CreateOp {
   body?: string;
   status?: string;
   owner?: string;
-  visibility?: 'private' | 'shared';
+  visibility?: 'private' | 'shared' | 'public';
   confidence?: number;
   props?: Props;
   /** Where this fact came from, when it differs from the change's source. */
@@ -67,7 +67,7 @@ export interface UpdateOp {
   replace?: { find: string; with: string };
   status?: string;
   owner?: string | null;
-  visibility?: 'private' | 'shared';
+  visibility?: 'private' | 'shared' | 'public';
   confidence?: number;
   props?: Props;
 }
@@ -176,6 +176,13 @@ export const BLOCKING_RELATIONS = ['depends_on', 'needs'];
 /** Active holds on resources, including ones whose holder the caller may not see. */
 export const ACTIVE_HOLDS = `lattice_active_holds(current_user = 'lattice_member', current_setting('lattice.viewer', true))`;
 
+/**
+ * What can be made public: a product, what it has built, and how we know it
+ * is correct. Nothing else, so that a slip cannot put a decision, a person or
+ * a note in front of everyone.
+ */
+export const PUBLIC_KINDS = ['project', 'software.feature', 'software.release', 'software.proof', 'software.test', 'software.test_result'];
+
 export class Lattice {
   readonly db: Db;
   readonly registry: Registry;
@@ -194,6 +201,11 @@ export class Lattice {
     this.policy = { ...DEFAULT_AGENT_POLICY, ...policy };
     this.workspace = workspace;
     this.viewer = viewer;
+  }
+
+  /** This map as anyone sees it with no login: only what is public. Ask it of the whole map, not of one person's view. */
+  forAnyone(): Lattice {
+    return new Lattice(anyone(this.db), this.registry, this.policy, this.workspace, '');
   }
 
   /** This map as one person sees it. An empty viewer sees only what is shared. */
@@ -221,7 +233,7 @@ export class Lattice {
   }
 
   /** Who a new private thing is private to: the viewer, when there is one. */
-  private privateTo(visibility: 'private' | 'shared'): string | null {
+  private privateTo(visibility: string): string | null {
     return visibility === 'private' && this.viewer ? this.viewer : null;
   }
 
@@ -243,6 +255,8 @@ export class Lattice {
       if (actor.kind === 'human') return 'auto';
       const level = this.policy[op.op];
       if (level === 'forbidden') return level;
+      // What anyone can see is the human's to decide, whatever else agents may do unreviewed: an agent proposes it.
+      if ((op.op === 'create' || op.op === 'update') && op.visibility === 'public') return 'propose';
       // An agent may always ask for a look before its change takes effect.
       if (input.hold) return 'propose';
       return chosen === 'apply' ? 'auto' : chosen === 'hold' ? 'propose' : level;
@@ -364,6 +378,7 @@ export class Lattice {
           if (op.owner) await checkOwner(op.owner, where);
           const type = reg.type(op.type);
           if (!type) break;
+          if (op.visibility === 'public' && !PUBLIC_KINDS.some((kind) => reg.isA(op.type, kind))) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${PUBLIC_KINDS.join(', ')}.`);
           if (reg.isA(op.type, 'sys.automation')) errors.push(...checkAutomation(op.props ?? {}).map((p) => `${where}: ${p}`));
           if (op.ref) {
             if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
@@ -384,6 +399,7 @@ export class Lattice {
           const target = await existing(op.id, where);
           if (!target) break;
           errors.push(...reg.check(target.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
+          if (op.visibility === 'public' && !PUBLIC_KINDS.some((kind) => reg.isA(target.type, kind))) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${PUBLIC_KINDS.join(', ')}.`);
           if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
           try {
             bodyAfter(target.body, op);
@@ -583,7 +599,7 @@ export class Lattice {
                 op.id, next.title, next.body, next.status, reg.isOpen(before.type, next.status), next.owner, next.visibility, next.confidence, JSON.stringify(props),
                 // Only an explicit change of visibility moves who it is private to.
                 op.visibility !== undefined && op.visibility !== before.visibility,
-                this.privateTo(next.visibility as 'private' | 'shared'),
+                this.privateTo(next.visibility),
               ],
             );
             await log('entity.update', op.id, { title: next.title, changes });

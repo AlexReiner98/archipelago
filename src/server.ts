@@ -46,6 +46,7 @@ import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.ts';
+import { publicPage, publicPicture } from './public.ts';
 import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
@@ -92,6 +93,8 @@ const UI_FILES: Record<string, string> = {
   '/': 'index.html',
   '/app.js': 'app.js',
   '/style.css': 'style.css',
+  '/public.js': 'public.js',
+  '/public.css': 'public.css',
 };
 const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css' };
 
@@ -184,6 +187,29 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (!hosts.includes(host)) return send(res, 404, { error: 'Not found' });
         res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
         return res.end(setupScript(`${named.includes(host) ? 'https' : 'http'}://${host}`));
+      }
+
+      // A product's public page: open to anyone, on any name this server has. It is read as the public role sees the
+      // map, so there is nothing here to guard: what is not public is not there to be found.
+      const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
+      if (pub) {
+        const [, wsId, product, what, extra] = pub;
+        const guard = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
+        if (!what) {
+          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
+          return res.end(await readFile(join(UI_DIR, 'public.html')));
+        }
+        const none = () => res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
+        if (!workspaces.has(wsId)) return none();
+        const { lattice } = await workspaces.get(wsId);
+        if (what === 'data') {
+          const page = await publicPage(lattice, product, url.searchParams.get('build') ?? undefined);
+          if (!page) return none();
+          return res.writeHead(200, { ...guard, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify(page));
+        }
+        const picture = extra ? await publicPicture(lattice, extra) : null;
+        if (!picture) return none();
+        return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
       }
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {

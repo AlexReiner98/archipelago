@@ -1036,6 +1036,8 @@ async function entity(id) {
   // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
   const project = isA(e.type, 'project');
   const gated = isA(e.type, 'event') && !e.archived_at;
+  // What can be shown to anyone: a product, what it has built, and how we know it is correct.
+  const publishable = !e.archived_at && ['project', 'software.feature', 'software.release', 'software.proof', 'software.test', 'software.test_result'].some((t) => isA(e.type, t));
   const proven = !e.archived_at && ['project', 'software.feature', 'software.proof'].some((t) => isA(e.type, t));
   const relCount = data.outgoing.length + data.incoming.length;
   // Changing relations is done rarely: the list to remove from and the form to add with open together, from the menu.
@@ -1113,7 +1115,7 @@ async function entity(id) {
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you')),
+      h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public')),
       h('h1', { style: 'margin-top: 6px' }, e.title),
     ),
     h(
@@ -1141,6 +1143,15 @@ async function entity(id) {
         workish && ['Copy session brief', copyBrief],
         workish && ['Launch a session: investigate only', () => launch('plan')],
         workish && ['Launch a session: may edit files', () => launch('acceptEdits')],
+        publishable &&
+          e.visibility !== 'public' && [
+            'Make public',
+            async () =>
+              (await ask({ title: `Make "${e.title}" public?`, message: 'Anyone will be able to see its name and state, with no login. A proof question brings its tests and their results. Notes and history stay private.', action: 'Make public', danger: true })) &&
+              change([{ op: 'update', id, visibility: 'public' }], 'Made public in the UI'),
+          ],
+        publishable && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
+        e.visibility === 'public' && (project || isA(e.type, 'software.feature')) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),
@@ -1277,7 +1288,7 @@ function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
           'select',
           { onchange: (e) => (state.visibility = e.target.value) },
           !initial.id && h('option', { value: '' }, 'Workspace default'),
-          [['private', 'Only me'], ['shared', 'Everyone in the workspace']].map(([v, label]) => h('option', { value: v, selected: v === state.visibility }, label)),
+          [['private', 'Only me'], ['shared', 'Everyone in the workspace'], ...(initial.visibility === 'public' ? [['public', 'Anyone, with no login']] : [])].map(([v, label]) => h('option', { value: v, selected: v === state.visibility }, label)),
         ),
         'Only matters when several people share a workspace.',
       ),
@@ -2730,6 +2741,7 @@ async function proofPart(rootId, withLog = false) {
           'summary',
           {},
           h('span', { class: 'grow', title: q.title }, link(q)),
+          q.public && h('span', { class: 'chip', title: 'Anyone can see this question, its tests and their results' }, 'public'),
           q.failed > 0 && h('span', { class: 'pill bad' }, `${q.failed} failed`),
           q.not_run > 0 && h('span', { class: 'pill warn' }, `${q.not_run} not run`),
           q.answered && h('span', { class: 'pill ok' }, 'answered'),
@@ -2756,6 +2768,7 @@ async function proofPart(rootId, withLog = false) {
           counts.tests > 0 && bar(counts.passed, counts.tests),
           h('span', { class: `pill${counts.answered === counts.questions ? ' ok' : ''}` }, `${counts.answered}/${counts.questions} answered`),
           counts.failed > 0 && h('span', { class: 'pill bad' }, `${counts.failed} failed`),
+          data.to_send?.length > 0 && h('span', { class: 'pill warn', title: `Public results whose picture is still only in its repository:\n${data.to_send.map((p) => p.picture).join('\n')}` }, `${data.to_send.length} picture${data.to_send.length === 1 ? '' : 's'} to send`),
         ),
         h('ul', { class: 'tree top' }, data.proofs.map(question)),
       ),

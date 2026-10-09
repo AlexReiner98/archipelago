@@ -21,7 +21,7 @@ import { getPicture, putPicture, reportTests } from './proof.ts';
 import { awaitingRecheck, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
-const visibility = z.enum(['private', 'shared']);
+const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page; only a project, feature, release, proof question, test or test result can be, and only a human makes it so (from an agent it waits as a proposal).');
 const confidence = z.number().min(0).max(1);
 const field = z.object({
   type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'url', 'enum', 'json']),
@@ -519,7 +519,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   test_report: {
     description:
-      'Say what a test run found on one build. Each result names its test by id or by its entrypoint (the name the harness knows it by) and says whether it passed, with the measured value, where the evidence is and the picture the test drew. One result is kept per test per build: reported again, it is replaced. A test the map does not know is named in the answer (unknown) and nothing is made for it: create the software.test first and link it to the proof question it helps answer. Subject to the same policy as any change.',
+      'Say what a test run found on one build. Each result names its test by id or by its entrypoint (the name the harness knows it by) and says whether it passed, with the measured value, where the evidence is and the picture the test drew. One result is kept per test per build: reported again, it is replaced. Where a test answers a public question, the answer names the pictures to send now (send_pictures: each with picture_put). A test the map does not know is named in the answer (unknown) and nothing is made for it: create the software.test first and link it to the proof question it helps answer. Subject to the same policy as any change.',
     input: {
       build: z.string().min(1).describe('The version or commit the tests ran on.'),
       results: z

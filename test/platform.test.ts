@@ -1082,3 +1082,32 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const set = ((await call('/api/events', admin, { limit: 50 })).result as any[]).filter((e) => e.action === 'workspace.set').map((e) => e.reason);
   assert.deepEqual(set, ['agent_changes set to "hold"', 'agent_changes set to "apply"'], 'and the choice itself is in the log');
 });
+
+test('a product\u2019s public page is open to anyone, and says nothing until something is made public', async () => {
+  const { call, base } = await serve('off');
+  const made = await call('/api/change', undefined, {
+    reason: 'x',
+    ops: [
+      { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'An internal note' },
+      { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
+      { op: 'link', type: 'part_of', from: 'sun', to: 'app' },
+    ],
+  });
+  const app = made.result.created.app;
+  const get = (path: string) => call(path, undefined, undefined, 'GET');
+  assert.equal((await get(`/p/default/${app}/data`)).status, 404);
+  await call('/api/change', undefined, { reason: 'x', ops: [{ op: 'update', id: app, visibility: 'public' }, { op: 'update', id: made.result.created.sun, visibility: 'public' }] });
+  const page = await get(`/p/default/${app}/data`);
+  assert.deepEqual([page.status, page.title, page.questions.map((q: any) => q.title)], [200, 'App', ['How do we know the sun is correct?']]);
+  assert.ok(!JSON.stringify(page).includes('internal note'));
+  // The page itself is a shell that asks for the data; it carries nothing of the map, and may load nothing from elsewhere.
+  const shell = await fetch(`${base}/p/default/${app}`);
+  assert.equal(shell.status, 200);
+  assert.match(shell.headers.get('content-security-policy') ?? '', /default-src 'none'/);
+  assert.match(await shell.text(), /public\.js/);
+  assert.equal((await fetch(`${base}/public.js`)).status, 200);
+  // What is not there is not there: another product, another workspace, a picture that was never kept.
+  assert.equal((await get(`/p/default/e_nothing1/data`)).status, 404);
+  assert.equal((await get(`/p/elsewhere/${app}/data`)).status, 404);
+  assert.equal((await get(`/p/default/${app}/picture/${made.result.created.sun}`)).status, 404);
+});

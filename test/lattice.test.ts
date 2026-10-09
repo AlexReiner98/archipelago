@@ -11,6 +11,7 @@ import { openDb } from '../src/db.ts';
 import { configureLauncher, launch } from '../src/launcher.ts';
 import { Lattice, type Actor, type Op } from '../src/lattice.ts';
 import { Registry } from '../src/packs.ts';
+import { publicPage, publicPicture } from '../src/public.ts';
 import { configureSecrets, isSealed, seal, unseal } from '../src/secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionEnd, sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
@@ -1647,4 +1648,87 @@ test('costs: dollars where a run says, tokens where it does not, and each regula
   assert.ok(!c.recurring.items.some((i) => i.id === made.ended), 'what ended before the period is not in it');
   assert.equal(c.total_usd, Math.round((0.4 + c.recurring.cost_usd) * 100) / 100);
   assert.equal(c.per_month, Math.round((35 + (0.4 * 30.4375) / 30) * 100) / 100);
+});
+
+test('public: only a human makes it so, only some kinds can be, and anyone then sees little of it', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'Internal plan: the secret margin' },
+    { op: 'create', ref: 'between', type: 'software.feature', title: 'Proof work', body: 'Not for anyone' },
+    { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?', body: 'An internal note' },
+    { op: 'create', ref: 'areas', type: 'software.proof', title: 'How do we know the areas are correct?' },
+    { op: 'create', ref: 'noaa', type: 'software.test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa', tolerance: 'within 0.01 degrees' } },
+    { op: 'create', ref: 'square', type: 'software.test', title: 'Area of a square', status: 'current', props: { entrypoint: 'Area.Square' } },
+    { op: 'create', ref: 'panel', type: 'software.feature', title: 'Panel', status: 'built' },
+    { op: 'create', ref: 'hidden', type: 'software.feature', title: 'Unannounced', status: 'built' },
+    { op: 'create', ref: 'choice', type: 'decision', title: 'What does it cost?' },
+    { op: 'link', type: 'part_of', from: 'between', to: 'app' },
+    { op: 'link', type: 'part_of', from: 'sun', to: 'between' },
+    { op: 'link', type: 'part_of', from: 'areas', to: 'between' },
+    { op: 'link', type: 'part_of', from: 'panel', to: 'app' },
+    { op: 'link', type: 'part_of', from: 'hidden', to: 'app' },
+    { op: 'link', type: 'part_of', from: 'choice', to: 'app' },
+    { op: 'link', type: 'software.answers', from: 'noaa', to: 'sun' },
+    { op: 'link', type: 'software.answers', from: 'square', to: 'areas' },
+  ]);
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 8, 7]);
+  const report = (await callTool(l, human, 'test_report', {
+    build: '1.0.0',
+    results: [
+      { test: 'Sun.MatchesNoaa', passed: true, value: '0.004 degrees', picture: '.proof/1.0.0/Sun.MatchesNoaa.png' },
+      { test: 'Area.Square', passed: true, picture: '.proof/1.0.0/Area.Square.png' },
+    ],
+  })) as { send_pictures: unknown[] };
+  assert.deepEqual(report.send_pictures, [], 'nothing is public yet, so no picture is asked for');
+  type View = { proofs: { id: string; public: boolean; tests: { result: { id: string } }[] }[]; to_send: { result: string; picture: string }[] };
+  const view = async () => (await VIEWS.proof.run(l, { of: made.app })) as View;
+  const results = Object.fromEntries((await view()).proofs.map((p) => [p.id, p.tests[0].result.id]));
+  for (const id of Object.values(results)) await callTool(l, human, 'picture_put', { result: id, data: png.toString('base64'), content_type: 'image/png' });
+
+  // Nothing is public until someone says so.
+  assert.equal(await publicPage(l, made.app), null);
+  assert.equal(await publicPicture(l, results[made.sun]), null);
+
+  // An agent cannot say so, even where its other changes are applied as made: it waits for the human.
+  const loose = new Lattice(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.panel, title: 'The panel' }] })).status, 'applied');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.app, visibility: 'public' }] })).status, 'proposed');
+  assert.equal(await publicPage(l, made.app), null);
+  // And not everything can be: a decision is never anyone's business but the workspace's.
+  await assert.rejects(l.change(human, { reason: 'x', ops: [{ op: 'update', id: made.choice, visibility: 'public' }] }), /cannot be public/);
+
+  await make(l, [
+    { op: 'update', id: made.app, visibility: 'public' },
+    { op: 'update', id: made.sun, visibility: 'public' },
+    { op: 'update', id: made.panel, visibility: 'public' },
+  ]);
+  const page = (await publicPage(l, made.app))!;
+  assert.equal(page.title, 'App');
+  // A public question brings its tests and results, though the feature it sits in is not public; the other question stays out.
+  assert.deepEqual(page.questions.map((q) => q.id), [made.sun]);
+  assert.deepEqual([page.questions[0].answered, page.questions[0].tests[0].title, page.questions[0].tests[0].result!.value, page.questions[0].tests[0].result!.picture], [true, 'Sun position against NOAA', '0.004 degrees', results[made.sun]]);
+  assert.deepEqual(page.changelog.map((f) => f.title), ['The panel']);
+  const said = JSON.stringify(page);
+  for (const hiddenText of ['secret margin', 'internal note', 'Not for anyone', 'Unannounced', 'areas are correct', 'What does it cost', 'Area of a square']) assert.ok(!said.includes(hiddenText), `"${hiddenText}" is not given away`);
+  assert.ok((await publicPicture(l, results[made.sun]))!.bytes.equals(png));
+  assert.equal(await publicPicture(l, results[made.areas]), null, 'a picture is as public as its result, and no more');
+
+  // The database itself holds the line, whatever is asked of it.
+  const anyoneDb = l.forAnyone().db;
+  const seen = (await anyoneDb.query<{ title: string }>(`select title from entity order by title`)).rows.map((r) => r.title);
+  assert.deepEqual(seen, ['1.0.0: Sun position against NOAA', 'App', 'How do we know the sun is correct?', 'Sun position against NOAA', 'The panel']);
+  await assert.rejects(anyoneDb.query(`select body from entity`), /permission denied/);
+  await assert.rejects(anyoneDb.query(`select * from event`), /permission denied/);
+  await assert.rejects(anyoneDb.query(`select * from setting`), /permission denied/);
+  await assert.rejects(anyoneDb.query(`update entity set title = 'x'`), /permission denied/);
+  assert.equal((await anyoneDb.query<{ n: number }>(`select count(*)::int as n from picture`)).rows[0].n, 1);
+
+  // Once a question is public, a run says which pictures to send, and the view lists what is still owed.
+  const next = (await callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: 'Sun.MatchesNoaa', passed: true, picture: '.proof/1.0.1/Sun.MatchesNoaa.png' }] })) as { send_pictures: { picture: string }[]; pictures_removed: number };
+  assert.deepEqual([next.pictures_removed, next.send_pictures.map((p) => p.picture)], [1, ['.proof/1.0.1/Sun.MatchesNoaa.png']]);
+  assert.deepEqual((await view()).to_send.map((p) => p.picture), ['.proof/1.0.1/Sun.MatchesNoaa.png']);
+
+  // Taken back, it is gone from the page at once.
+  await make(l, [{ op: 'update', id: made.sun, visibility: 'private' }]);
+  assert.deepEqual((await publicPage(l, made.app))!.questions, []);
 });
