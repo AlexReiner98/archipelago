@@ -44,7 +44,7 @@ import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
-import { hasReaderKey, readable, readPush, recheck } from './reader.ts';
+import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.ts';
 import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
@@ -453,6 +453,23 @@ If that process is not a lattice server, delete ${lock}.`);
   const rechecks = setInterval(() => void recheckAll(), 3600_000);
   rechecks.unref();
   setTimeout(() => void recheckAll(), 120_000).unref();
+  // A push whose reading was cut off when the last server stopped is read by this one, soon after it is up.
+  const readLeftUnread = async () => {
+    for (const { id } of workspaces.list()) {
+      const installation = githubApp.installationOf(id);
+      if (!installation) continue;
+      const release = workspaces.hold(id);
+      try {
+        const { lattice } = await workspaces.get(id);
+        for (const r of await readUnread(lattice, githubApp, installation.id)) console.log(`reader: caught up on ${r.repo} ${r.branch} (${r.after.slice(0, 7)})`);
+      } catch (err) {
+        console.error(`reader: catching up in ${id} failed: ${(err as Error).message}`);
+      } finally {
+        release();
+      }
+    }
+  };
+  setTimeout(() => void readLeftUnread(), 20_000).unref();
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {

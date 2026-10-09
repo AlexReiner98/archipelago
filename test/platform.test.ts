@@ -13,7 +13,7 @@ import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
 import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
 import { GithubApp } from '../src/github-app.ts';
-import { configureReader } from '../src/reader.ts';
+import { configureReader, readUnread } from '../src/reader.ts';
 import { createHttpServer } from '../src/server.ts';
 import { configureRestart } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
@@ -795,6 +795,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
     if (req.url === '/app/installations/42') return isApp() ? say(200, { account: { login: 'acme' } }) : say(401, { message: 'Bad credentials' });
     if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
     if (req.url?.startsWith('/repos/Acme/Tools/compare/')) return bearer === 'ghs_forty-two' ? say(200, { commits: [{ sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools\n\nThe whetstone still needs oiling.', author: { name: 'sam' } } }], files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1 }] }) : say(401, { message: 'Bad credentials' });
+    if (req.url === '/repos/Acme/Tools') return say(200, { default_branch: 'main' });
     if (req.url?.startsWith('/installation/repositories')) return bearer === 'ghs_forty-two' ? say(200, { repositories: [{ full_name: 'Acme/Site' }, { full_name: 'Acme/Tools' }] }) : say(401, { message: 'Bad credentials' });
     say(404, { message: 'Not Found' });
   });
@@ -802,7 +803,8 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   closers.push(async () => void hub.close());
   const hubAt = `http://127.0.0.1:${(hub.address() as AddressInfo).port}`;
 
-  const { workspaces, call, base } = await serve('tokens', (origin) => new GithubApp({ dir: null, origin, api: hubAt, web: 'https://github.test' }));
+  let theApp: GithubApp | undefined;
+  const { workspaces, call, base } = await serve('tokens', (origin) => (theApp ??= new GithubApp({ dir: null, origin, api: hubAt, web: 'https://github.test' })));
   const db = (await workspaces.get('default')).lattice.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
@@ -896,6 +898,18 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.deepEqual(held.map((p: any) => [p.actor, p.ops[0].title]), [['agent:reader', 'Oil the whetstone']]);
   // The same push said twice (a webhook left in the repository beside the app) is taken in once, and read once.
   assert.deepEqual((await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result.recorded, false);
+  // A push recorded while its reading was cut off (the server stopped) has no run: the next server reads it, with any
+  // pushed before it that were not read either, as one. What was read, even badly, is not read again.
+  const whole = (await workspaces.get('default')).lattice;
+  const app = (await call('/api/github_app', admin)).result;
+  assert.equal(app.installation.id, '42');
+  await whole.log(whole.db, { actor: 'github:sam', action: 'repo.push', target: heard.repo.id, origin: 'github', reason: '1 commit to main: Hone', detail: { repo: 'acme/tools', branch: 'main', before: 'b'.repeat(40), after: 'c'.repeat(40), commits: [{ sha: 'ccccccc' }] } });
+  await whole.log(whole.db, { actor: 'github:sam', action: 'repo.push', target: heard.repo.id, origin: 'github', reason: '1 commit to main: Strop', detail: { repo: 'acme/tools', branch: 'main', before: 'c'.repeat(40), after: 'd'.repeat(40), commits: [{ sha: 'ddddddd' }] } });
+  script.push({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Nothing needed changing.' }] });
+  assert.deepEqual(await readUnread(whole, theApp!, '42'), [{ repo: 'Acme/Tools', branch: 'main', after: 'd'.repeat(40) }]);
+  assert.match(asks.at(-1).messages[0].content, new RegExp(`${'b'.repeat(40)}\\.\\.${'d'.repeat(40)}`), 'from the last push that was read to the newest');
+  assert.deepEqual(await readUnread(whole, theApp!, '42'), [], 'and once');
+
   // The key is never given back, and removing it stops the reading.
   assert.ok(!JSON.stringify((await call('/api/github_app', admin)).result).includes('sk-ant-'));
   assert.equal((await call('/api/github_app', admin, { forget_key: true })).result.reader.key, false);

@@ -292,7 +292,7 @@ export function readPush(l: Lattice, app: GithubApp, repo: Repo, push: { branch:
   const fresh = /^0+$/.test(push.before);
   const task = `A push has just landed on the branch "${push.branch}" of ${repo.name} (default branch: "${push.default_branch}"). In the map the repository is "${repo.entity.title}" (${repo.entity.id}).
 ${fresh ? `The branch is new: read the commits on it that are not on the default branch (commits with base "${push.default_branch}" and head "${push.after}").` : `The new commits are ${push.before}..${push.after} (commits with that base and head).`}`;
-  return run(l, app, repo, push.after, ON_PUSH, task, `Read the push to ${push.branch} (${push.after.slice(0, 7)})`, `https://github.com/${repo.name}/commit/${push.after}`);
+  return run(l, app, repo, push.after, ON_PUSH, task, `Read the push to ${push.branch} (${push.after.slice(0, 7)})`, commitLink(repo, push.after));
 }
 
 /** Ask whether a re-check of a repository is due, and do it if it is. */
@@ -304,6 +304,47 @@ export async function recheck(l: Lattice, app: GithubApp, repo: Repo, branch: st
   const done = await run(l, app, repo, branch, ON_RECHECK, task, 'Scheduled re-check', `https://github.com/${repo.name}#recheck-${new Date().toISOString().slice(0, 10)}`);
   // The wait starts again whether or not the run got as far as saying so: a run that broke is not tried again every hour.
   if (done.ran) await callTool(l, { kind: 'agent', name: 'reader', person: me }, 'rechecked', { repo: repo.entity.id, summary: done.ok ? undefined : 'The re-check did not finish.' }).catch(() => undefined);
+  return done;
+}
+
+const commitLink = (repo: Repo, sha: string) => `https://github.com/${repo.name}/commit/${sha}`;
+
+/**
+ * Read the pushes that were recorded and never read: a run is cut off when
+ * the server stops (a deploy of Lattice itself follows every push to its own
+ * repository by half a minute), and a run that never ended left no record.
+ * For each branch pushed to lately, everything since the last push that was
+ * read is read as one, up to the newest. A push whose run ended, well or
+ * badly, is not read again.
+ */
+export async function readUnread(l: Lattice, app: GithubApp, installation: string, withinMinutes = 180): Promise<{ repo: string; branch: string; after: string }[]> {
+  if (!(await hasReaderKey(l))) return [];
+  const done: { repo: string; branch: string; after: string }[] = [];
+  for (const repo of await readable(l, app, installation)) {
+    const { rows } = await l.db.query<{ detail: { branch: string; before?: string; after?: string; commits?: unknown[] } }>(
+      `select detail from event where action = 'repo.push' and target_id = $1 and ts > now() - make_interval(mins => $2::int)
+         and coalesce(detail->>'branch', '') <> '' and detail->>'deleted' is null and detail->>'after' is not null order by seq desc limit 40`,
+      [repo.entity.id, withinMinutes],
+    );
+    const settled = new Set<string>();
+    let fallback: string | undefined;
+    for (const { detail } of rows) {
+      if (settled.has(detail.branch)) continue;
+      settled.add(detail.branch);
+      // Newest first on this branch, back to the last one that was read.
+      const unread = [];
+      for (const push of rows.filter((r) => r.detail.branch === detail.branch).map((r) => r.detail)) {
+        const { rows: read } = await l.db.query(`select 1 from entity where type = any($1::text[]) and props->>'link' = $2 limit 1`, [l.registry.family('sys.run'), commitLink(repo, push.after!)]);
+        if (read.length) break;
+        unread.push(push);
+      }
+      if (!unread.length || !unread.some((p) => p.commits?.length)) continue;
+      fallback ??= ((await app.asInstallation(installation, `/repos/${repo.name}`)) as { default_branch?: string }).default_branch ?? detail.branch;
+      const push = { branch: detail.branch, default_branch: fallback, before: unread.at(-1)!.before ?? '0', after: unread[0].after! };
+      await readPush(l, app, repo, push);
+      done.push({ repo: repo.name, branch: push.branch, after: push.after });
+    }
+  }
   return done;
 }
 
