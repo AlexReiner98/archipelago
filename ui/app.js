@@ -1036,6 +1036,7 @@ async function entity(id) {
   // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
   const project = isA(e.type, 'project');
   const gated = isA(e.type, 'event') && !e.archived_at;
+  const proven = !e.archived_at && ['project', 'software.feature', 'software.proof'].some((t) => isA(e.type, t));
   const relCount = data.outgoing.length + data.incoming.length;
   // Changing relations is done rarely: the list to remove from and the form to add with open together, from the menu.
   const editor = h('section', { class: 'card', hidden: true, style: 'margin-bottom: 14px' }, h('table', { class: 'list' }, h('tbody', {}, relRows(data.outgoing, 'out'), relRows(data.incoming, 'in'))), adder);
@@ -1150,6 +1151,8 @@ async function entity(id) {
     project ? h('div', { id: 'roadmap', 'data-root': id }) : '',
     // An event is a gate first: what it waits for, and what is still to be put on one side of it or the other.
     gated ? h('div', { id: 'gate', 'data-root': id }) : '',
+    // How we know it is correct, where questions have been asked of this.
+    proven ? h('div', { id: 'proof', 'data-root': id }) : '',
     h(
       'div',
       { class: 'grid' },
@@ -1182,6 +1185,7 @@ async function entity(id) {
   );
   if (project) roadmap(id).catch((err) => document.getElementById('roadmap')?.replaceChildren(h('div', { class: 'error' }, err.message)));
   if (gated) gate(id).catch((err) => document.getElementById('gate')?.replaceChildren(h('div', { class: 'error' }, err.message)));
+  if (proven) proofPart(id).catch((err) => document.getElementById('proof')?.replaceChildren(h('div', { class: 'error' }, err.message)));
 }
 
 // ---- forms ---------------------------------------------------------------
@@ -2579,6 +2583,86 @@ async function gate(eventId) {
           h('summary', {}, h('h2', { title: 'What the event goes ahead without' }, 'Can follow'), h('span', { class: 'n' }, data.can_follow.length)),
           h('ul', { class: 'rows' }, data.can_follow.map((x) => h('li', { class: `row-top${x.open ? '' : ' finished'}` }, chip(x.type), h('span', { class: 'grow', title: x.title }, link(x)), pill(x.type, x.status), h('button', { class: 'quiet', title: 'The event waits for this after all', onclick: () => across(x, 'depends_on') }, 'Holds it')))),
         ),
+    ),
+  );
+}
+
+// ---- Proof ---------------------------------------------------------------
+
+// Which questions are unfolded, and which build each page is looking at.
+const proofOpen = new Set();
+const proofBuild = new Map();
+
+/**
+ * How we know it is correct, on the page of whatever the questions belong to
+ * (a project, a feature, or one question): each question with how many of its
+ * tests passed on one build, opening to the tests as pictures. Nothing, where
+ * no question has been asked.
+ */
+async function proofPart(rootId) {
+  const main = document.getElementById('proof');
+  if (main?.dataset.root !== rootId) return;
+  const data = await api('view', { name: 'proof', params: { of: rootId, build: proofBuild.get(rootId) } });
+  if (!main.isConnected) return;
+  const { counts } = data;
+  if (!counts.questions) return main.replaceChildren();
+  const bar = (done, total) => h('span', { class: 'progress', title: `${done} of ${total} tests passed` }, h('span', { class: 'bar' }, h('span', { style: `width: ${total ? Math.round((done / total) * 100) : 0}%` })), h('span', { class: 'muted small' }, `${done}/${total}`));
+  const mark = (t) => {
+    const r = t.result;
+    const limit = t.tolerance ? `Must be ${t.tolerance}` : '';
+    if (r?.passed) return h('span', { class: 'pill ok', title: limit }, r.value ?? 'passed');
+    if (r) return h('span', { class: 'pill bad', title: limit }, r.value ?? 'failed');
+    if (t.status === 'draft') return h('span', { class: 'pill closed', title: 'Wanted, not yet written' }, 'not written');
+    return h('span', { class: 'pill warn', title: t.before ? `Last run on ${t.before.build}: ${t.before.passed ? 'passed' : 'failed'}` : 'Never run' }, 'not run');
+  };
+  const tile = (t) =>
+    h(
+      'a',
+      { class: 'ptile', href: `#/e/${t.id}`, title: [t.title, t.compares, t.environment].filter(Boolean).join('\n') },
+      t.result?.picture ? h('img', { src: t.result.picture, alt: '', loading: 'lazy' }) : h('span', { class: 'shot muted small' }, 'no picture'),
+      h('span', { class: 'cap' }, t.title),
+      mark(t),
+    );
+  const question = (q) => {
+    const key = `${rootId}:${q.id}`;
+    return h(
+      'li',
+      {},
+      h(
+        'details',
+        { open: proofOpen.has(key), ontoggle: (ev) => (ev.target.open ? proofOpen.add(key) : proofOpen.delete(key)) },
+        h(
+          'summary',
+          {},
+          h('span', { class: 'grow', title: q.title }, link(q)),
+          q.failed > 0 && h('span', { class: 'pill bad' }, `${q.failed} failed`),
+          q.not_run > 0 && h('span', { class: 'pill warn' }, `${q.not_run} not run`),
+          q.answered && h('span', { class: 'pill ok' }, 'answered'),
+          q.total > 0 ? bar(q.passed, q.total) : h('span', { class: 'muted small nowrap' }, 'no tests'),
+        ),
+        q.total > 0 && h('div', { class: 'ptiles' }, q.tests.map(tile)),
+      ),
+    );
+  };
+  const builds = data.builds.length > 1 ? menu(data.build, data.builds.map((b) => [b, () => (proofBuild.set(rootId, b), proofPart(rootId))])) : data.build && h('span', { class: 'chip', title: 'The build these results are from' }, data.build);
+  main.replaceChildren(
+    h(
+      'div',
+      { class: 'grid proofs', style: 'margin-bottom: 14px' },
+      h(
+        'section',
+        { class: 'card wide' },
+        h(
+          'header',
+          { class: 'bar' },
+          h('h2', { title: 'What a user would ask before trusting it, and the tests that answer each' }, 'How we know'),
+          builds,
+          counts.tests > 0 && bar(counts.passed, counts.tests),
+          h('span', { class: `pill${counts.answered === counts.questions ? ' ok' : ''}` }, `${counts.answered}/${counts.questions} answered`),
+          counts.failed > 0 && h('span', { class: 'pill bad' }, `${counts.failed} failed`),
+        ),
+        h('ul', { class: 'tree top' }, data.proofs.map(question)),
+      ),
     ),
   );
 }

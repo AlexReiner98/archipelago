@@ -582,3 +582,14 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .gated .rows button, .gated .tree summary button { padding: 2px 9px; font-size: 12.5px; }
 .gated .chip.stream { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 640px) { .gated .chip.stream, .gated .rows > li.row-top > .chip:first-of-type { display: none; } }
+
+/* How we know: a question is one line; its tests are pictures. */
+.proofs .tree summary { flex-wrap: nowrap; }
+.proofs .tree summary > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proofs .tree summary > :not(.grow) { flex: none; }
+.proofs .ptiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; padding: 4px 14px 14px 40px; }
+.proofs .ptile { display: grid; gap: 4px; justify-items: start; color: var(--text); text-decoration: none; min-width: 0; }
+.proofs .ptile img, .proofs .ptile .shot { width: 100%; aspect-ratio: 16 / 10; border-radius: 7px; border: 1px solid var(--line); background: var(--closed-soft); object-fit: cover; display: flex; align-items: center; justify-content: center; }
+.proofs .ptile .cap { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.proofs .ptile:hover .cap { text-decoration: underline; }
+@media (max-width: 640px) { .proofs .ptiles { padding-left: 14px; } }
