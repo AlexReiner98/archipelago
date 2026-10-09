@@ -9,6 +9,9 @@
 //   POST /github/<workspace>  GitHub's webhook: pushes, signed with the
 //                      workspace's secret
 //   GET  /whoami       which workspace and identity a request resolves to
+//   GET  /connect/setup.mjs  a script that connects the project it is run in
+//                      to this server: tools, hooks, the friction skill and
+//                      the working rules (no secret in it)
 //   /operator/workspaces  list and create workspaces (empty, or from a backup
 //                      file), and issue a workspace a new owner token
 //                      (operator secret)
@@ -33,6 +36,7 @@ import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { backupAll, newestBackup, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
+import { setupScript } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
@@ -154,6 +158,15 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const url = new URL(req.url ?? '/', 'http://localhost');
 
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'lattice', ...running });
+
+      // What a project needs to work with this server, as one script to run in its folder. It holds no secret,
+      // so it needs no token; it is given only under a name this server answers to, which it then writes down.
+      if (req.method === 'GET' && url.pathname === '/connect/setup.mjs') {
+        const host = req.headers.host ?? '';
+        if (!hosts.includes(host)) return send(res, 404, { error: 'Not found' });
+        res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+        return res.end(setupScript(`${named.includes(host) ? 'https' : 'http'}://${host}`));
+      }
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname];

@@ -1882,7 +1882,8 @@ function connectBox(made) {
   const set = windows
     ? `setx LATTICE_URL "${location.origin}"\nsetx LATTICE_AGENT_TOKEN "${made.token}"`
     : `echo 'export LATTICE_URL="${location.origin}"' >> ~/.zshenv\necho 'export LATTICE_AGENT_TOKEN="${made.token}"' >> ~/.zshenv`;
-  const file = `{\n  "mcpServers": {\n    "lattice": {\n      "type": "http",\n      "url": "\${LATTICE_URL:-http://127.0.0.1:3100}/mcp",\n      "headers": { "Authorization": "Bearer \${LATTICE_AGENT_TOKEN:-none}" }\n    }\n  }\n}`;
+  // One command that works in any shell with Node: it fetches the setup script from this server and runs it in the project's folder.
+  const file = `node -e "fetch('${location.origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
   const copy = (text, label) => h('button', { onclick: (e) => navigator.clipboard.writeText(text).then(() => (e.target.textContent = 'Copied')) }, label);
   return h(
     'div',
@@ -1891,9 +1892,9 @@ function connectBox(made) {
     h('div', { class: 'muted small' }, `1. Once on this machine, in a terminal${windows ? '' : ' (zsh; for the desktop app on a Mac also run each with "launchctl setenv NAME value")'}. Then quit Claude Code completely and open it again.`),
     h('code', { style: 'white-space: pre-wrap' }, set),
     h('div', { class: 'toolbar' }, copy(set, 'Copy commands'), h('span', { class: 'muted small' }, 'Shown once: they hold the token. Revoke it below to disconnect.')),
-    h('div', { class: 'muted small', style: 'margin-top: 10px' }, '2. Once in each project: a file named .mcp.json in its folder with this in it. It holds no secret, so it can be committed.'),
+    h('div', { class: 'muted small', style: 'margin-top: 10px' }, '2. Once in each project, in a terminal in its folder. It writes the tools, the session hooks, the friction skill and the working rules, and holds no secret, so what it writes can be committed.'),
     h('code', { style: 'white-space: pre-wrap' }, file),
-    h('div', { class: 'toolbar' }, copy(file, 'Copy file')),
+    h('div', { class: 'toolbar' }, copy(file, 'Copy command')),
   );
 }
 

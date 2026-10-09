@@ -409,6 +409,51 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   assert.deepEqual(await later('/hooks/prompt', undefined, { session_id: 'after' }), { status: 200 }, 'a session that began on this server is not told');
 });
 
+test('a project with nothing of Lattice\'s in it is connected by one command, which adds to what is there and can be run again', async () => {
+  const { base } = await serve('tokens');
+  const project = mkdtempSync(join(tmpdir(), 'lattice-customer-'));
+  writeFileSync(join(project, 'CLAUDE.md'), '# Their project\n\nTheir own rules.\n');
+  mkdirSync(join(project, '.claude'));
+  writeFileSync(join(project, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm test)'] }, hooks: { SessionEnd: [{ hooks: [{ type: 'command', command: 'echo bye' }] }] } }));
+  // The command the Workspace screen gives: no token is asked for, since the script holds no secret.
+  const run = () =>
+    new Promise<{ out: string; code: number | null }>((done) => {
+      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: '' } });
+      let out = '';
+      child.stdout.on('data', (d) => (out += d));
+      child.stderr.on('data', (d) => (out += d));
+      child.on('close', (code) => done({ out, code }));
+    });
+  const first = await run();
+  assert.equal(first.code, 0, first.out);
+  assert.match(first.out, /written {4}\.mcp\.json[\s\S]*added to {3}CLAUDE\.md[\s\S]*LATTICE_AGENT_TOKEN is not set in this terminal/);
+  const file = (path: string) => readFileSync(join(project, path), 'utf8');
+  assert.equal(JSON.parse(file('.mcp.json')).mcpServers.lattice.url, `\${LATTICE_URL:-${base}}/mcp`);
+  // What was theirs is kept; the three hooks are added beside it, and call the script that was written.
+  const settings = JSON.parse(file('.claude/settings.json'));
+  assert.deepEqual(settings.permissions, { allow: ['Bash(npm test)'] });
+  assert.deepEqual(settings.hooks.SessionEnd.map((h: any) => h.hooks[0].command), ['echo bye', 'node .claude/lattice-hook.mjs session-end']);
+  assert.equal(settings.hooks.SessionStart[0].hooks[0].command, 'node .claude/lattice-hook.mjs session-start');
+  assert.ok(file('.claude/lattice-hook.mjs').includes(`process.env.LATTICE_URL || "${base}"`), 'the hook falls back on the server that handed it out');
+  assert.match(file('.claude/skills/lattice-bump/SKILL.md'), /^---\nname: lattice-bump/);
+  assert.match(file('.claude/lattice.md'), /view` with name `handoff`/);
+  assert.match(file('CLAUDE.md'), /^# Their project\n\nTheir own rules\.\n\n## Lattice\n[\s\S]*@\.claude\/lattice\.md\n$/);
+  // Run again, it changes nothing.
+  const before = [file('CLAUDE.md'), file('.claude/settings.json')];
+  const again = await run();
+  assert.doesNotMatch(again.out, /written|added to/);
+  assert.deepEqual([file('CLAUDE.md'), file('.claude/settings.json')], before);
+  // And the hook it wrote reaches the server from that folder.
+  const hooked = await new Promise<string>((done) => {
+    const child = spawn(process.execPath, ['.claude/lattice-hook.mjs', 'session-start'], { cwd: project, env: { ...process.env, LATTICE_URL: '', LATTICE_AGENT_TOKEN: '' } });
+    let err = '';
+    child.stderr.on('data', (d) => (err += d));
+    child.on('close', () => done(err));
+    child.stdin.end(JSON.stringify({ session_id: 'c1', cwd: project }));
+  });
+  assert.match(hooked, new RegExp(`${base.replace(/[.:/]/g, '\\$&')} answered 401`), 'it called this server, which wants the token the machine does not have yet');
+});
+
 test('the hook script takes a Claude Code hook to whichever server the machine is connected to, with its token', async () => {
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).lattice.db;

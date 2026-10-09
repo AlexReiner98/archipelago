@@ -179,7 +179,17 @@ at once; they are the session's own state, not facts about the world.
   on start and closes on end, and starts with what the map knows about that
   repository: the open work nothing blocks, the blocked work and what it waits
   on, and whether each exclusive resource is free. The repository is matched
-  by the `path` on a `software.repo` entity.
+  by the address the checkout was cloned from (the `remote` on a
+  `software.repo` entity), which is the same on every machine, and failing
+  that by its `path`.
+- **A project with nothing of Lattice's in it** is connected by one command,
+  given under "Connect an agent" on the Workspace screen and run in the
+  project's folder. It fetches `GET /connect/setup.mjs` from the server and
+  runs it: that writes `.mcp.json`, the hook script and the three hooks that
+  call it, the friction skill, and the working rules
+  ([examples/working-rules.md](examples/working-rules.md)), which it reads
+  into the project's `CLAUDE.md`. It adds to what is there, holds no secret,
+  and can be run again.
 - **From a script:** `POST /agent/<tool>` takes the same tools as plain JSON
   with agent authority.
 
