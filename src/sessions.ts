@@ -35,6 +35,12 @@ async function repoFor(l: Lattice, cwd: string): Promise<Entity | undefined> {
     .sort((a, b) => (b.props.path as string).length - (a.props.path as string).length)[0];
 }
 
+/** When a surface's session registered here, if it did and is still open. */
+export async function sessionBegan(l: Lattice, sessionId: string | undefined): Promise<Date | undefined> {
+  const run = sessionId ? await resolveRun(l, sessionId, true) : undefined;
+  return run && new Date(run.created_at);
+}
+
 export async function sessionStart(
   l: Lattice,
   actor: Actor,

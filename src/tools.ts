@@ -394,7 +394,7 @@ export const TOOLS: Record<string, Tool> = {
   change: {
     description:
       'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type) with the reason. ' +
-      'Creates can carry a ref so later ops in the same change can link to them. Give the source the facts came from. ' +
+      'Creates can carry a ref so later ops in the same change can link to them, and a title or note in the same change can name what it makes: write {ref} and it becomes that item\u2019s id. Give the source the facts came from. ' +
       'To add to a note or change one passage of it, send append or replace on the update, not the whole body again. ' +
       'An update that changes nothing (only the id) says you checked the item and it is still true as written: it records when it was last known true. ' +
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
@@ -411,6 +411,7 @@ export const TOOLS: Record<string, Tool> = {
         })
         .optional()
         .describe('On whose authority this change is made. Kept on every event it logs. Left out, it is recorded as your own judgment; settling a decision or hypothesis needs it said.'),
+      hold: z.boolean().optional().describe('true to have this change wait for the human even where agents\u2019 changes are applied as made: for something you want looked at before it takes effect.'),
     },
     run: async (l, actor, input) => {
       const result = await l.change(actor, input);
@@ -526,7 +527,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   rechecked: {
     description:
-      'Say that the scheduled re-check of a repository has been done: each project there that was waiting for one starts its interval again (its recheck_days). Call it once, after you have changed or confirmed the items the recheck view gave you. Takes effect at once.',
+      'Say that the scheduled re-check of a repository has been done: each project (or feature living there on its own) that was waiting for one starts its interval again (its recheck_days). Call it once, after you have changed or confirmed the items the recheck view gave you. Takes effect at once.',
     input: {
       repo: z.string().describe('The repository: its id, its GitHub name "owner/name", or its title.'),
       summary: z.string().optional().describe('What was checked and what was found.'),

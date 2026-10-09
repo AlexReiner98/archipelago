@@ -11,6 +11,7 @@
 #
 # Each Claude run tells the map what it used when it is over (tokens, cost,
 # turns), so the repository's page in Lattice shows what keeping it true costs.
+# A run that stops before Claude starts is reported too, as a run that failed.
 #
 # Copy to .github/workflows/lattice.yml and set in the repository's settings:
 #   variable LATTICE_URL            the server, e.g. https://lattice.example.com
@@ -156,13 +157,19 @@ jobs:
       # counted as a session on a machine is. It never fails the run.
       - name: Tell Lattice what the run used
         if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
           TITLE="Read the push to $BRANCH (${AFTER:0:7})"
           TITLE="$TITLE" node -e '
             const fs = require("fs");
-            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, JOB_STATUS, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
             let out;
-            try { out = JSON.parse(fs.readFileSync(RUNNER_TEMP + "/claude.json", "utf8")); } catch { console.log("Claude did not run, so there is nothing to report."); process.exit(0); }
+            try { out = JSON.parse(fs.readFileSync(RUNNER_TEMP + "/claude.json", "utf8")); } catch {
+              // A run that stopped before Claude started (a secret not set, the server not coming back) is said too, as a run that failed.
+              if (JOB_STATUS !== "failure") { console.log("Claude did not run, so there is nothing to report."); process.exit(0); }
+              out = { is_error: true, result: "The run stopped before Claude started. Its log says why." };
+            }
             const used = out.usage || {};
             const report = {
               actor: "claude-code:lattice-sync",
@@ -311,13 +318,19 @@ jobs:
       # counted as a session on a machine is. It never fails the run.
       - name: Tell Lattice what the run used
         if: always() && steps.due.outputs.due == 'true'
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
           if [ "$NOW" = "true" ]; then TITLE="Re-check asked for by hand"; else TITLE="Scheduled re-check"; fi
           TITLE="$TITLE" node -e '
             const fs = require("fs");
-            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, JOB_STATUS, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
             let out;
-            try { out = JSON.parse(fs.readFileSync(RUNNER_TEMP + "/claude.json", "utf8")); } catch { console.log("Claude did not run, so there is nothing to report."); process.exit(0); }
+            try { out = JSON.parse(fs.readFileSync(RUNNER_TEMP + "/claude.json", "utf8")); } catch {
+              // A run that stopped before Claude started (a secret not set, the server not coming back) is said too, as a run that failed.
+              if (JOB_STATUS !== "failure") { console.log("Claude did not run, so there is nothing to report."); process.exit(0); }
+              out = { is_error: true, result: "The run stopped before Claude started. Its log says why." };
+            }
             const used = out.usage || {};
             const report = {
               actor: "claude-code:lattice-sync",

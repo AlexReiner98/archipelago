@@ -37,7 +37,7 @@ import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
-import { hookSessionEnd, hookSessionStart, recordUsage } from './sessions.ts';
+import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan } from './sessions.ts';
 import { callTool, configureBackup, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
@@ -236,9 +236,17 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           const heard = heardUpTo.get(key);
           const changes = heard === undefined ? [] : await humanChanges(lattice, heard);
           heardUpTo.set(key, changes.at(-1)?.seq ?? heard ?? (await latestSeq(lattice)));
-          if (!changes.length) return send(res, 200, {});
-          const additionalContext = `Since you last heard from Lattice, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${describeChanges(changes)}`;
-          return send(res, 200, { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext } });
+          const told: string[] = [];
+          // A session this server has no memory of, though it began before the server did, has lived through a
+          // restart: after a deploy its client still holds the tools as they were when it connected. Said once.
+          const began = heard === undefined ? await sessionBegan(lattice, body.session_id) : undefined;
+          if (began && began.getTime() < Date.parse(running.started))
+            told.push(
+              `The Lattice server has restarted since this session began (at ${running.started}${running.commit ? `, now running commit ${running.commit.slice(0, 7)}` : ''}). If that was a deploy, its tools may have changed, and your client still holds the list from when it connected: a tool or an input that CLAUDE.md or a tool's answer names, but your list lacks, is there on the server. Ask the owner to reconnect the lattice MCP server, or until then call the tool as plain JSON: POST /agent/<tool> on the same server with the same token.`,
+            );
+          if (changes.length) told.push(`Since you last heard from Lattice, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${describeChanges(changes)}`);
+          if (!told.length) return send(res, 200, {});
+          return send(res, 200, { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } });
         }
         if (url.pathname === '/hooks/session-start') {
           heardUpTo.set(body.session_id ?? '', await latestSeq(lattice));

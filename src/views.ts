@@ -496,22 +496,42 @@ async function oldest(l: Lattice, input: { days?: number; repo?: string; project
 /** How often a project's oldest items are re-checked when the project does not say: weekly. */
 const RECHECK_DAYS = 7;
 
-/** A project's own answer to how often, and whether it has waited that long since the last time. */
-function recheckOf(project: Entity, now = Date.now()) {
-  const every = typeof project.props.recheck_days === 'number' ? project.props.recheck_days : RECHECK_DAYS;
+/**
+ * How often, and whether it has waited that long since the last time. A
+ * project says how often itself; a feature living in a repository on its own
+ * takes the answer of the project it is part of.
+ */
+async function recheckOf(l: Lattice, project: Entity, now = Date.now()) {
+  let every = RECHECK_DAYS;
+  for (let at: Entity | undefined = project, depth = 0; at && depth < 6; depth++) {
+    if (typeof at.props.recheck_days === 'number') {
+      every = at.props.recheck_days;
+      break;
+    }
+    const up: { rows: Entity[] } = await l.db.query<Entity>(`select e.* from relation r join entity e on e.id = r.to_id where r.type = 'part_of' and r.from_id = $1 and r.valid_to is null and e.archived_at is null limit 1`, [at.id]);
+    at = up.rows[0];
+  }
   const last = project.props.rechecked_at as string | undefined;
   // Two hours of grace, so a daily asker that comes a little early one day does not wait another.
   const waited = every > 0 && (!last || now - Date.parse(last) >= every * 86_400_000 - 7_200_000);
   return { every, last: last ?? null, waited };
 }
 
-/** The open projects that live in a repository. */
+/**
+ * The open projects that live in a repository, and the features that live
+ * there on their own: a repository may hold one feature of a project that
+ * lives elsewhere, and its work goes stale like any other. A feature whose
+ * project lives here too is that project's, and is not listed twice.
+ */
 export async function projectsIn(l: Lattice, repo: string): Promise<Entity[]> {
   const { rows } = await l.db.query<Entity>(
     `select p.* from relation r join entity p on p.id = r.from_id
      where r.type = 'software.lives_in' and r.to_id = $1 and r.valid_to is null and p.type = any($2::text[]) and p.is_open and p.archived_at is null
+       and not exists (
+         select 1 from relation up join relation there on there.from_id = up.to_id and there.type = 'software.lives_in' and there.to_id = $1 and there.valid_to is null
+         where up.type = 'part_of' and up.from_id = p.id and up.valid_to is null)
      order by p.created_at`,
-    [repo, l.registry.family('project')],
+    [repo, [...l.registry.family('project'), ...(l.registry.type('software.feature') ? l.registry.family('software.feature') : [])]],
   );
   return rows;
 }
@@ -521,29 +541,35 @@ export async function projectsIn(l: Lattice, repo: string): Promise<Entity[]> {
  * project there that has waited as long as it asks between re-checks, its
  * open items nobody has changed or confirmed in that time, oldest first. The
  * list is long on purpose: the oldest are often chores no repository can
- * settle, and the one re-checking has to be able to get past them.
+ * settle, and the one re-checking has to be able to get past them. What is
+ * said to wait on a person is left out: the code cannot tell, and that has
+ * been recorded.
  */
 async function recheck(l: Lattice, input: { repo?: string; limit?: number; now?: boolean }) {
   const repo = await findRepo(l, input.repo, 'recheck');
   const projects = [];
+  const graph = await blockGraph(l);
   for (const p of await projectsIn(l, repo.id)) {
-    const { every, last, waited } = recheckOf(p);
+    const { every, last, waited } = await recheckOf(l, p);
     // Asked for now, the interval and the items' age are set aside: whatever is oldest is looked at.
-    const items = input.now || waited ? (await oldest(l, { project: p.id, days: input.now ? 0 : every, limit: input.limit ?? 25 })).items : [];
+    const old = input.now || waited ? (await oldest(l, { project: p.id, days: input.now ? 0 : every, limit: (input.limit ?? 25) + 25 })).items : [];
+    const items = old.filter((i) => !graph.waitsOnSomeone(i.id)).slice(0, input.limit ?? 25);
     projects.push({ id: p.id, title: p.title, every_days: every, rechecked_at: last, due: items.length > 0, items });
   }
   return {
     repo: { id: repo.id, title: repo.title },
     due: projects.some((p) => p.due),
     projects,
-    note: 'For each item of a project that is due: check it against the repository. If it is done or no longer as written, change it. If it is still true as written, send an update for it that changes nothing. When you are done, call rechecked for the repository.',
+    note: 'For each item of a project that is due: check it against the repository. If it is done or no longer as written, change it. If it is still true as written, send an update for it that changes nothing. If the repository cannot tell because it is waiting on a person to answer or act, link it to them with waits_on (what for in props.for): it is then theirs to say, and is not asked of a re-check again. When you are done, call rechecked for the repository.',
   };
 }
 
 /** Projects in a repository that have waited out their interval, whether or not anything in them is old. */
 export async function awaitingRecheck(l: Lattice, repoKey: string): Promise<Entity[]> {
   const repo = await findRepo(l, repoKey, 'rechecked');
-  return (await projectsIn(l, repo.id)).filter((p) => recheckOf(p).waited);
+  const waiting = [];
+  for (const p of await projectsIn(l, repo.id)) if ((await recheckOf(l, p)).waited) waiting.push(p);
+  return waiting;
 }
 
 /**
@@ -961,7 +987,7 @@ export const VIEWS: Record<string, View> = {
   },
   recheck: {
     description:
-      'What is due for a scheduled re-check in a repository: each project living there says how often its oldest items are re-checked (its recheck_days; weekly when not set, 0 for never), and for each that has waited that long, its open items nobody has changed or confirmed in that time, oldest first. Params: repo (required): its id, GitHub name or title, limit (items per project, default 25), now (true to be given the oldest items of every project there, whatever its interval and however new they are).',
+      'What is due for a scheduled re-check in a repository: each project living there says how often its oldest items are re-checked (its recheck_days; weekly when not set, 0 for never; a feature living there on its own takes its project\u2019s), and for each that has waited that long, its open items nobody has changed or confirmed in that time, oldest first, leaving out what waits on a person. Params: repo (required): its id, GitHub name or title, limit (items per project, default 25), now (true to be given the oldest items of every project there, whatever its interval and however new they are).',
     run: recheck,
   },
   available_now: {

@@ -128,6 +128,8 @@ export interface ChangeInput {
   source?: SourceSpec;
   /** From an agent: whether this is a human's word or its own judgment. A human's own change is theirs. */
   authority?: Pick<Authority, 'of' | 'basis'>;
+  /** From an agent: have this change wait for a human even where agents' changes are applied as made. */
+  hold?: boolean;
 }
 
 export interface Entity {
@@ -238,6 +240,8 @@ export class Lattice {
       if (actor.kind === 'human') return 'auto';
       const level = this.policy[op.op];
       if (level === 'forbidden') return level;
+      // An agent may always ask for a look before its change takes effect.
+      if (input.hold) return 'propose';
       return chosen === 'apply' ? 'auto' : chosen === 'hold' ? 'propose' : level;
     });
     const forbidden = input.ops.filter((_, i) => levels[i] === 'forbidden').map((op) => op.op);
@@ -513,6 +517,11 @@ export class Lattice {
       const defaultSource = input.source ? await this.ensureSource(tx, actor, input.source, changeset) : null;
       const sourceOf = async (op: { source?: SourceSpec }) => (op.source ? this.ensureSource(tx, actor, op.source, changeset) : defaultSource);
       const resolve = (key: string) => created[key] ?? key;
+      // What this change makes has its id from the start, so a title or note in the same change can name it:
+      // {ref} becomes the id of the item made under that ref. Braces around anything else are left alone.
+      for (const [i, op] of ops.entries()) if (op.op === 'create') created[op.ref ?? `#${i + 1}`] = newId('e');
+      const refs = new Set(ops.flatMap((op) => (op.op === 'create' && op.ref ? [op.ref] : [])));
+      const named = <T extends string | undefined>(text: T): T => (text === undefined ? text : (text.replace(/\{([^{}\s]+)\}/g, (whole, ref: string) => (refs.has(ref) ? created[ref] : whole)) as T));
       const log = (action: string, target: string, detail: Props) =>
         this.log(tx, { actor, action, target, changeset, reason: input.reason, detail: { ...detail, ...extra } });
 
@@ -520,7 +529,7 @@ export class Lattice {
         switch (op.op) {
           case 'create': {
             const type = reg.type(op.type)!;
-            const id = newId('e');
+            const id = created[op.ref ?? `#${i + 1}`];
             const status = op.status ?? type.statuses.open[0];
             await tx.query(
               `insert into entity (id, type, title, body, status, is_open, owner, visibility, confidence, props, source_id, private_to)
@@ -528,8 +537,8 @@ export class Lattice {
               [
                 id,
                 op.type,
-                op.title.trim(),
-                op.body ?? '',
+                named(op.title.trim()),
+                named(op.body) ?? '',
                 status,
                 reg.isOpen(op.type, status),
                 op.owner ? resolve(op.owner) : null,
@@ -540,8 +549,7 @@ export class Lattice {
                 this.privateTo(op.visibility ?? fallback),
               ],
             );
-            created[op.ref ?? `#${i + 1}`] = id;
-            await log('entity.create', id, { type: op.type, title: op.title.trim(), status });
+            await log('entity.create', id, { type: op.type, title: named(op.title.trim()), status });
             break;
           }
           case 'update': {
@@ -554,8 +562,8 @@ export class Lattice {
               else props[key] = value;
             }
             const next = {
-              title: op.title?.trim() ?? before.title,
-              body: bodyAfter(before.body, op),
+              title: named(op.title)?.trim() ?? before.title,
+              body: bodyAfter(before.body, { ...op, body: named(op.body), append: named(op.append), replace: op.replace && { find: op.replace.find, with: named(op.replace.with) } }),
               status: op.status ?? before.status,
               owner: op.owner === undefined ? before.owner : op.owner,
               visibility: op.visibility ?? before.visibility,

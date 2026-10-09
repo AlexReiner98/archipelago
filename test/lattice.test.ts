@@ -623,6 +623,66 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   assert.equal(((await VIEWS.handoff.run(l, { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() })) as any).since_then.settled.length, 0);
 });
 
+test('a note can name what the same change makes, and an agent can ask for its change to be held', async () => {
+  const l = await fresh();
+  const { note } = await make(l, [{ op: 'create', ref: 'note', type: 'note', title: 'Handoff', body: 'Open: nothing.' }]);
+  const made = await make(l, [
+    { op: 'update', id: note, append: 'Next: {t}, as {t} says. Not a ref: {x} and { t }.' },
+    { op: 'create', ref: 't', type: 'task', title: 'Connect the repository', body: 'Written up in {t} itself.' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Before {t}?' },
+  ]);
+  assert.match(made.t, /^e_\w{8}$/);
+  // The id is there though the note was written before the item it names, and other braces are left as they were.
+  assert.equal((await l.entity(note))!.body, `Open: nothing.\n\nNext: ${made.t}, as ${made.t} says. Not a ref: {x} and { t }.`);
+  assert.equal((await l.entity(made.t))!.body, `Written up in ${made.t} itself.`);
+  assert.equal((await l.entity(made.q))!.title, `Before ${made.t}?`);
+  // Held, a change keeps its refs as written, and they become ids when it is applied.
+  const held = (await l.change(agent, { ops: [{ op: 'create', ref: 'n', type: 'note', title: 'Later', body: 'This is {n}.' }], reason: 'test' })) as any;
+  const applied = (await l.decide(human, { proposal: held.proposal, approve: true })) as any;
+  assert.equal((await l.entity(applied.created.n))!.body, `This is ${applied.created.n}.`);
+
+  // Where agents' changes are applied as made, one that asks to be held waits for the human all the same.
+  const free = new Lattice(l.db, l.registry, { create: 'auto', update: 'auto' });
+  assert.equal((await free.change(agent, { ops: [{ op: 'update', id: made.t, status: 'doing' }], reason: 'test' })).status, 'applied');
+  const asked = await free.change(agent, { ops: [{ op: 'update', id: made.t, status: 'done' }], reason: 'Have a look first', hold: true });
+  assert.equal(asked.status, 'proposed');
+  assert.equal((await l.entity(made.t))!.status, 'doing');
+  assert.equal((await free.change(human, { ops: [{ op: 'update', id: made.t, status: 'done' }], reason: 'test', hold: true })).status, 'applied', 'a human\'s own change is never held');
+});
+
+test('a re-check takes a feature that lives in a repository on its own, at its project\'s interval, and leaves out what waits on a person', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'home', type: 'software.repo', title: 'Main repo', props: { path: 'C:\\code\\main' } },
+    { op: 'create', ref: 'side', type: 'software.repo', title: 'Add-in repo', props: { path: 'C:\\code\\addin' } },
+    { op: 'create', ref: 'proj', type: 'project', title: 'Product', props: { recheck_days: 3 } },
+    { op: 'create', ref: 'inside', type: 'software.feature', title: 'Core' },
+    { op: 'create', ref: 'addin', type: 'software.feature', title: 'The add-in' },
+    { op: 'create', ref: 'old', type: 'task', title: 'Port the ribbon' },
+    { op: 'create', ref: 'chore', type: 'task', title: 'Ask for the certificate' },
+    { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
+    { op: 'link', type: 'software.lives_in', from: 'proj', to: 'home' },
+    { op: 'link', type: 'software.lives_in', from: 'inside', to: 'home' },
+    { op: 'link', type: 'software.lives_in', from: 'addin', to: 'side' },
+    { op: 'link', type: 'part_of', from: 'inside', to: 'proj' },
+    { op: 'link', type: 'part_of', from: 'addin', to: 'proj' },
+    { op: 'link', type: 'part_of', from: 'old', to: 'addin' },
+    { op: 'link', type: 'part_of', from: 'chore', to: 'addin' },
+  ]);
+  await l.db.query(`update entity set updated_at = now() - interval '5 days' where id = any($1::text[])`, [[made.old, made.chore]]);
+  // In the repository where only the feature lives, it is what is re-checked, as often as its project says.
+  let due = (await VIEWS.recheck.run(l, { repo: made.side })) as any;
+  assert.deepEqual(due.projects.map((p: any) => [p.title, p.every_days, p.items.map((i: any) => i.title).sort()]), [['The add-in', 3, ['Ask for the certificate', 'Port the ribbon']]]);
+  // Where its project lives too, a feature is that project's and is not listed beside it.
+  assert.deepEqual(((await VIEWS.recheck.run(l, { repo: made.home })) as any).projects.map((p: any) => p.title), ['Product']);
+  // What the code cannot tell is said to wait on someone, and is not asked of a re-check again.
+  await make(l, [{ op: 'link', type: 'waits_on', from: made.chore, to: made.me, props: { for: 'the certificate' } }]);
+  due = (await VIEWS.recheck.run(l, { repo: made.side })) as any;
+  assert.deepEqual(due.projects[0].items.map((i: any) => i.title), ['Port the ribbon']);
+  assert.deepEqual(((await callTool(l, agent, 'rechecked', { repo: made.side })) as any).rechecked.map((p: any) => p.title), ['The add-in']);
+  assert.equal(((await VIEWS.recheck.run(l, { repo: made.side })) as any).due, false);
+});
+
 test('launching runs a headless session on a task, holding the lane and recording the outcome', async () => {
   const l = await fresh();
   const dir = mkdtempSync(join(tmpdir(), 'lattice-launch-'));

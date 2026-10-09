@@ -397,6 +397,16 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   const told = await call('/hooks/prompt', undefined, { session_id: 's1' });
   assert.match(told.hookSpecificOutput.additionalContext, /entity\.update decision "Which\?".*props\.outcome: nothing -> "This one"/s);
   assert.deepEqual(await call('/hooks/prompt', undefined, { session_id: 's1' }), { status: 200 }, 'told once');
+
+  // A session that began before this server did has lived through a restart: it is told, once, that its tools may be old.
+  const { workspaces: ws, call: later } = await serve('off');
+  const old = (await later('/agent/session_start', undefined, { session_id: 'before', title: 'Began before the deploy' })).result.run;
+  await (await ws.get('default')).lattice.db.query(`update entity set created_at = now() - interval '1 hour' where id = $1`, [old]);
+  const restarted = await later('/hooks/prompt', undefined, { session_id: 'before' });
+  assert.match(restarted.hookSpecificOutput.additionalContext, /server has restarted since this session began .*now running commit [0-9a-f]{7}\).*POST \/agent\/<tool>/s);
+  assert.deepEqual(await later('/hooks/prompt', undefined, { session_id: 'before' }), { status: 200 }, 'told once');
+  await later('/hooks/session-start', undefined, { session_id: 'after', cwd: '/nowhere' });
+  assert.deepEqual(await later('/hooks/prompt', undefined, { session_id: 'after' }), { status: 200 }, 'a session that began on this server is not told');
 });
 
 test('the hook script takes a Claude Code hook to whichever server the machine is connected to, with its token', async () => {

@@ -237,6 +237,11 @@ other work that has to be closed first; `waits_on` is a person, company or
 agent who has to answer or act (say what for in the relation's `props.for`,
 and remove the link once they have); `needs` is a resource.
 
+In a change, a title or note can name an item the same change makes: `{ref}`
+becomes that item's id when the change is applied. An agent can ask for its
+own change to wait for a human with `hold: true`, even where agents' changes
+are applied as made.
+
 A handoff is mostly read off the map, so it does not go stale between
 sessions: the last push, what is open, and what has happened since the
 handoff note was written (pushes, what was settled or opened, the sessions

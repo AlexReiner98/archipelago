@@ -79,7 +79,17 @@ settled, with what was chosen and why.
   3100), and keep the owner's screen with you when they have it open there:
   `show` before each step worth seeing (a change you make already moves it). Say in the reason that it is a test, and undo what you
   made when you are done (`undo` with the change set). Drive a browser only
-  when you need to click, and then a visible one on that same server.
+  when you need to click, and then a visible one on that same server. To see
+  how a held change looks there, send it with `hold: true`; it leaves the
+  queue by itself when the same change is then sent unheld.
+- **Name what a change makes by its ref.** A title or note in the same change
+  as a new item names it as `{ref}`, which becomes the item's id when the
+  change is applied. Do not write an id you have not been given.
+- **After a deploy your tool list is old.** The client keeps the tools as
+  they were when it connected; the prompt hook says when the server has
+  restarted under the session. A tool or input the server has and your list
+  lacks can be called as plain JSON (`POST /agent/<tool>` with the agent
+  token from the environment, never printed), or the owner can reconnect.
 - **Say who is waited on with a relation, not a sentence.** Work that cannot
   move until a person answers or acts gets a `waits_on` link to that person
   (what for goes in the link's `props.for`), and the link is removed once
