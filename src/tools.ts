@@ -17,7 +17,7 @@ import type { TypeDef } from './packs.ts';
 import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
-import { reportTests } from './proof.ts';
+import { getPicture, putPicture, reportTests } from './proof.ts';
 import { awaitingRecheck, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
@@ -529,13 +529,28 @@ export const TOOLS: Record<string, Tool> = {
             passed: z.boolean(),
             value: z.string().optional().describe('The headline number or outcome, e.g. "0.004 degrees".'),
             evidence: z.string().optional().describe('Where the proof is: a path, URL or commit.'),
-            picture: z.string().optional().describe('The address of the picture the test drew.'),
+            picture: z.string().optional().describe('Where the picture the test drew is: a path in the repository, under its .proof folder (which git ignores), e.g. ".proof/1.0.0/Sun.MatchesNoaa.png". The file is not sent here.'),
           }),
         )
         .min(1),
       link: z.string().optional().describe('Where the run can be looked at.'),
     },
     run: async (l, actor, input) => reportTests(l, actor, input),
+  },
+  picture_put: {
+    description:
+      'Keep the picture a test drew, for one test result. Only for a result that is shown in public: until then the picture stays in the repository it was made in, and the result says where (its picture field). One picture per result, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when the test is run again (test_report) what was kept for it is removed. Takes effect at once.',
+    input: {
+      result: z.string().describe('The id of the test result.'),
+      data: z.string().min(1).describe('The file, as base64.'),
+      content_type: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+    },
+    run: async (l, actor, input) => putPicture(l, actor, input),
+  },
+  picture: {
+    description: 'The picture kept for a test result, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored).',
+    input: { result: z.string().describe('The id of the test result.') },
+    run: async (l, _actor, input) => getPicture(l, input),
   },
   session_end: {
     description:

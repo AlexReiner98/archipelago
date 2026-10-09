@@ -3,7 +3,7 @@
 // question is answered is worked out from the results every time; nothing
 // says so that could go stale.
 
-import type { Actor, Entity, Lattice, Op } from './lattice.ts';
+import { actorId, type Actor, type Entity, type Lattice, type Op } from './lattice.ts';
 
 interface Link {
   type: string;
@@ -65,6 +65,7 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }) 
   const testsOf = (q: Entity) => into('software.answers', q.id).filter((t) => t.is_open);
   const resultsOf = (t: Entity) => out('produced', t.id).filter((r) => isA(r, 'software.test_result'));
   const at = (e: Entity) => new Date(e.updated_at).getTime();
+  const kept = new Set((await l.db.query<{ entity_id: string }>(`select entity_id from picture`)).rows.map((r) => r.entity_id));
 
   // Builds, newest report first. The page shows one build: a question is answered there or it is not.
   const reported = mine.flatMap(testsOf).flatMap(resultsOf).sort((a, b) => at(b) - at(a));
@@ -76,7 +77,10 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }) 
     build: String(r.props.build ?? ''),
     passed: r.props.passed === true,
     value: (r.props.value as string | undefined) ?? null,
+    /** Where the picture is in the repository the test ran in. */
     picture: (r.props.picture as string | undefined) ?? null,
+    /** Whether the picture itself is kept here, to be had with the picture tool. */
+    stored: kept.has(r.id),
     evidence: (r.props.evidence as string | undefined) ?? null,
     at: r.updated_at,
   });
@@ -173,5 +177,48 @@ export async function reportTests(l: Lattice, actor: Actor, input: TestReport) {
     reason: `Test results for build ${build}: ${passed} passed, ${failed} failed`,
     authority: { of: 'agent', basis: `Reported by a test run${input.link ? ` (${input.link})` : ''}` },
   });
-  return { status: result.status, build, recorded: seen.size, passed, failed, unknown };
+  // A test that is run again loses the picture kept for it: the old one no longer shows what the test found.
+  const removed = result.status === 'applied' ? await dropPictures(l, actor, [...seen], `Run again on build ${build}`) : 0;
+  return { status: result.status, build, recorded: seen.size, passed, failed, unknown, pictures_removed: removed };
+}
+
+/** The most a kept picture may weigh. A capture of a view at screen size is well under it. */
+export const PICTURE_MAX = 1_000_000;
+const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+/** Remove the kept pictures of every result of these tests. */
+async function dropPictures(l: Lattice, actor: Actor, tests: string[], reason: string): Promise<number> {
+  const { rows } = await l.db.query<{ entity_id: string }>(
+    `delete from picture where entity_id in (select to_id from relation where type = 'produced' and valid_to is null and from_id = any($1::text[])) returning entity_id`,
+    [tests],
+  );
+  for (const row of rows) await l.log(l.db, { actor: actorId(actor), action: 'picture.removed', target: row.entity_id, reason });
+  return rows.length;
+}
+
+/**
+ * Keep the picture a test drew, for one result. Meant for a result that is
+ * shown in public: until then the picture stays in the repository it was made
+ * in. There is one per result; sent again, it replaces what was kept.
+ */
+export async function putPicture(l: Lattice, actor: Actor, input: { result: string; data: string; content_type: string }) {
+  const result = await l.entity(input.result);
+  if (!result || !l.registry.isA(result.type, 'software.test_result')) throw new Error(`picture_put: "${input.result}" is not a test result.`);
+  if (!PICTURE_TYPES.includes(input.content_type)) throw new Error(`picture_put: the picture must be one of ${PICTURE_TYPES.join(', ')}, not ${input.content_type}.`);
+  const bytes = Buffer.from(input.data, 'base64');
+  if (!bytes.length) throw new Error('picture_put: "data" is empty. Send the file as base64.');
+  if (bytes.length > PICTURE_MAX) throw new Error(`picture_put: the picture is ${bytes.length} bytes; the most kept is ${PICTURE_MAX}. Make it smaller.`);
+  await l.db.query(
+    `insert into picture (entity_id, content_type, bytes, size) values ($1, $2, decode($3, 'base64'), $4)
+     on conflict (entity_id) do update set content_type = excluded.content_type, bytes = excluded.bytes, size = excluded.size, created_at = now()`,
+    [result.id, input.content_type, bytes.toString('base64'), bytes.length],
+  );
+  await l.log(l.db, { actor: actorId(actor), action: 'picture.stored', target: result.id, reason: `Picture kept for "${result.title}"`, detail: { size: bytes.length, content_type: input.content_type } });
+  return { result: result.id, size: bytes.length, content_type: input.content_type };
+}
+
+/** The picture kept for a result, as base64, or null when none is. */
+export async function getPicture(l: Lattice, input: { result: string }) {
+  const { rows } = await l.db.query<{ content_type: string; data: string; size: number }>(`select content_type, encode(bytes, 'base64') as data, size from picture where entity_id = $1`, [input.result]);
+  return rows[0] ? { result: input.result, content_type: rows[0].content_type, size: rows[0].size, data: rows[0].data.replaceAll('\n', '') } : null;
 }

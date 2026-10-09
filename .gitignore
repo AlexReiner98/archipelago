@@ -6,3 +6,4 @@ workspaces/
 data.lock
 data-damaged/
 backups/
+.proof/

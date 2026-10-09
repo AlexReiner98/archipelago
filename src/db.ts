@@ -98,6 +98,17 @@ create table if not exists setting (
   key   text primary key,
   value jsonb not null
 );
+
+-- The picture a test drew, kept only for a result that is shown in public: until then it stays in the
+-- repository it was made in. One for each result; a test that is run again loses its old one.
+create table if not exists picture (
+  entity_id    text primary key references entity(id),
+  workspace    text not null default 'default',
+  content_type text not null,
+  bytes        bytea not null,
+  size         int not null,
+  created_at   timestamptz not null default now()
+);
 `;
 
 // Who may see what, enforced by the database itself. A request made on behalf
@@ -132,6 +143,14 @@ drop policy if exists member_relation on relation;
 create policy member_relation on relation for all to lattice_member
   using (from_id in (select id from entity) and to_id in (select id from entity))
   with check (from_id in (select id from entity) and to_id in (select id from entity));
+
+-- A picture is seen by whoever may see the result it is of.
+grant select, insert, update, delete on picture to lattice_member;
+alter table picture enable row level security;
+drop policy if exists member_picture on picture;
+create policy member_picture on picture for all to lattice_member
+  using (entity_id in (select id from entity))
+  with check (entity_id in (select id from entity));
 
 drop policy if exists member_event on event;
 create policy member_event on event for all to lattice_member

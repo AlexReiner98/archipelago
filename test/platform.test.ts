@@ -207,6 +207,14 @@ test('inside a workspace, private things are hidden from other members by the da
   assert.match((await call('/api/change', sam, { reason: 'x', ops: [{ op: 'update', id: mine.created.x, title: 'Hijacked' }] })).error, /no entity/);
   assert.match((await call('/api/change', sam, { reason: 'x', ops: [{ op: 'link', type: 'depends_on', from: mine.created.s, to: mine.created.x }] })).error, /no entity or ref/);
 
+  // A picture is as private as the result it is of.
+  const shot = await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'r', type: 'software.test_result', title: 'Alex private result' }] });
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]).toString('base64');
+  await api(alex, 'picture_put', { result: shot.created.r, data: png, content_type: 'image/png' });
+  assert.equal((await api(alex, 'picture', { result: shot.created.r })).data, png);
+  assert.equal(await api(sam, 'picture', { result: shot.created.r }), null);
+  assert.match((await call('/api/picture_put', sam, { result: shot.created.r, data: png, content_type: 'image/png' })).error, /not a test result/);
+
   // Each person's views are their own.
   assert.deepEqual((await api(sam, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title), ['Sam private']);
   assert.deepEqual((await api(alex, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title).sort(), ['Alex private', 'Shared task']);

@@ -1486,7 +1486,7 @@ test('a proof question is answered on a build when every test of it passed there
   const first = (await callTool(l, human, 'test_report', {
     build: '1.0.0',
     results: [
-      { test: 'Sun.MatchesNoaa', passed: true, value: '0.004 degrees', picture: 'https://example.com/noaa.png' },
+      { test: 'Sun.MatchesNoaa', passed: true, value: '0.004 degrees', picture: '.proof/1.0.0/noaa.png' },
       { test: made.pole, passed: false, value: '3 mm out' },
       { test: 'Sun.Nobody', passed: true },
     ],
@@ -1497,7 +1497,7 @@ test('a proof question is answered on a build when every test of it passed there
   const sun = one.proofs.find((p) => p.id === made.sun)!;
   assert.deepEqual({ answered: sun.answered, passed: sun.passed, failed: sun.failed }, { answered: false, passed: 1, failed: 1 });
   assert.equal(sun.tests[0].id, made.pole, 'what failed comes first');
-  assert.equal(sun.tests[1].result!.picture, 'https://example.com/noaa.png');
+  assert.equal(sun.tests[1].result!.picture, '.proof/1.0.0/noaa.png');
 
   // Reported again on the same build, a result is replaced, not added to; what the new run does not say is cleared.
   await callTool(l, human, 'test_report', { build: '1.0.0', results: [{ test: made.pole, passed: true }] });
@@ -1523,4 +1523,49 @@ test('a proof question is answered on a build when every test of it passed there
   const listed = (await VIEWS.proof.run(l, {})) as { products: { id: string; questions: number }[] };
   assert.deepEqual(listed.products.map((p) => [p.id, p.questions]), [[made.app, 2]]);
   await assert.rejects(callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: made.noaa, passed: true }, { test: 'Sun.MatchesNoaa', passed: true }] }), /reported twice/);
+});
+
+test('a picture is kept for a result only when sent, travels in a backup, and goes when the test is run again', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
+    { op: 'create', ref: 'noaa', type: 'software.test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
+    { op: 'link', type: 'part_of', from: 'sun', to: 'app' },
+    { op: 'link', type: 'software.answers', from: 'noaa', to: 'sun' },
+  ]);
+  type Found = { id: string; picture: string | null; stored: boolean };
+  const found = async () => ((await VIEWS.proof.run(l, { of: made.app })) as { proofs: { tests: { result: Found | null }[] }[] }).proofs[0].tests[0].result!;
+
+  // A report says where the picture is in the repository; the file stays there.
+  await callTool(l, human, 'test_report', { build: '1.0.0', results: [{ test: 'Sun.MatchesNoaa', passed: true, picture: '.proof/1.0.0/Sun.MatchesNoaa.png' }] });
+  const first = await found();
+  assert.deepEqual([first.picture, first.stored], ['.proof/1.0.0/Sun.MatchesNoaa.png', false]);
+  assert.equal(await callTool(l, human, 'picture', { result: first.id }), null);
+
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const put = (data: Buffer, content_type = 'image/png', result = first.id) => callTool(l, human, 'picture_put', { result, data: data.toString('base64'), content_type });
+  await put(png);
+  assert.equal((await found()).stored, true);
+  const back = (await callTool(l, human, 'picture', { result: first.id })) as { content_type: string; size: number; data: string };
+  assert.deepEqual([back.content_type, back.size, Buffer.from(back.data, 'base64').equals(png)], ['image/png', png.length, true]);
+
+  // Sent again it replaces what was kept: one picture for one result.
+  await put(Buffer.concat([png, png]));
+  assert.equal((await l.db.query<{ n: number; size: number }>(`select count(*)::int as n, max(size)::int as size from picture`)).rows[0].size, png.length * 2);
+  await assert.rejects(put(Buffer.alloc(1_000_001)), /the most kept is/);
+  await assert.rejects(callTool(l, human, 'picture_put', { result: first.id, data: png.toString('base64'), content_type: 'image/svg+xml' }), /Invalid input|must be one of/);
+  await assert.rejects(put(png, 'image/png', made.noaa), /not a test result/);
+
+  // A backup carries the picture, byte for byte.
+  const copy = new Lattice(await openDb(), l.registry);
+  const counts = await restore(copy.db, JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))));
+  assert.equal(counts.picture, 1);
+  const restored = (await callTool(copy, human, 'picture', { result: first.id })) as { data: string };
+  assert.ok(Buffer.from(restored.data, 'base64').equals(Buffer.concat([png, png])));
+
+  // Run again, on this build or a later one, the test loses the picture kept for it: it no longer shows what the test found.
+  const again = (await callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: made.noaa, passed: true }] })) as { pictures_removed: number };
+  assert.equal(again.pictures_removed, 1);
+  assert.equal((await l.db.query<{ n: number }>(`select count(*)::int as n from picture`)).rows[0].n, 0);
 });

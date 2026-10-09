@@ -2592,6 +2592,8 @@ async function gate(eventId) {
 // Which questions are unfolded, and which build each page is looking at.
 const proofOpen = new Set();
 const proofBuild = new Map();
+// Pictures already fetched, by result and when it was reported.
+const proofPictures = new Map();
 
 /**
  * How we know it is correct, on the page of whatever the questions belong to
@@ -2615,11 +2617,19 @@ async function proofPart(rootId) {
     if (t.status === 'draft') return h('span', { class: 'pill closed', title: 'Wanted, not yet written' }, 'not written');
     return h('span', { class: 'pill warn', title: t.before ? `Last run on ${t.before.build}: ${t.before.passed ? 'passed' : 'failed'}` : 'Never run' }, 'not run');
   };
+  // A picture kept here is asked for with the page's own token, which an image address cannot carry.
+  const kept = (r) => {
+    const img = h('img', { alt: '' });
+    const key = `${r.id}:${r.at}`;
+    if (!proofPictures.has(key)) proofPictures.set(key, api('picture', { result: r.id }).then((p) => (p ? `data:${p.content_type};base64,${p.data}` : '')));
+    proofPictures.get(key).then((src) => src && (img.src = src), () => {});
+    return img;
+  };
   const tile = (t) =>
     h(
       'a',
       { class: 'ptile', href: `#/e/${t.id}`, title: [t.title, t.compares, t.environment].filter(Boolean).join('\n') },
-      t.result?.picture ? h('img', { src: t.result.picture, alt: '', loading: 'lazy' }) : h('span', { class: 'shot muted small' }, 'no picture'),
+      t.result?.stored ? kept(t.result) : t.result?.picture ? h('span', { class: 'shot muted small', title: `In the repository, not sent here: ${t.result.picture}` }, 'on disk') : h('span', { class: 'shot muted small' }, 'no picture'),
       h('span', { class: 'cap' }, t.title),
       mark(t),
     );
