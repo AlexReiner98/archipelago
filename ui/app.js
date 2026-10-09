@@ -1343,13 +1343,17 @@ function graphView({ focus, defaults, extras } = {}) {
     };
     const pick = (key, options, title) => h('span', { class: 'switch', title }, options.map(([value, label]) => h('button', { class: prefs[key] === value ? 'on' : '', onclick: set({ [key]: value }) }, label)));
     const shaped = shapeGraph(data, focus, prefs, extras);
+    // Filling the window, it says what it is a drawing of, since the page's own head is behind it.
+    host.classList.toggle('full', Boolean(prefs.full));
     host.replaceChildren(
       h(
         'div',
         { class: 'toolbar fold-bar' },
+        prefs.full && h('strong', { class: 'graph-title' }, data.nodes.find((n) => n.id === focus)?.title ?? 'The whole map'),
         pick('kind', KIND_LABELS, 'Which relations to draw'),
         focus && pick('steps', [[1, 'Near'], [2, '2 steps'], [3, '3 steps']], 'How far out to draw'),
         h('span', { class: 'grow' }),
+        h('button', { title: prefs.full ? 'Back to the page (Esc)' : 'Fill the window with the drawing', onclick: set({ full: !prefs.full }, false) }, prefs.full ? 'Close' : 'Full screen'),
         menu('View', [
           [prefs.finished ? 'Hide what is finished' : 'Show what is finished', set({ finished: !prefs.finished })],
           [prefs.fit ? 'Actual size' : 'Fit to width', set({ fit: !prefs.fit }, false)],
@@ -1359,6 +1363,14 @@ function graphView({ focus, defaults, extras } = {}) {
       shaped.nodes.length > (focus ? 1 : 0) ? drawGraph(shaped, prefs) : h('div', { class: 'empty' }, focus ? 'Nothing is linked to it this way.' : 'Nothing to draw with these filters.'),
     );
   };
+  // Esc leaves the full window, while this drawing is the one on the page.
+  const leave = (ev) => {
+    if (!host.isConnected) return document.removeEventListener('keydown', leave);
+    if (ev.key !== 'Escape' || !prefs.full) return;
+    prefs.full = false;
+    draw();
+  };
+  document.addEventListener('keydown', leave);
   draw();
   return host;
 }
@@ -1462,8 +1474,11 @@ const tokensText = (t) => (t >= 1e6 ? `${+(t / 1e6).toFixed(1)}M` : t >= 1000 ? 
 function timeline(nodes, edges, byId, focus, prefs) {
   const ROW = { h: 30, gap: 10, top: 28 };
   const timed = nodes.filter((n) => n.work);
+  // What a thing is part of. Part of two things in sight (a feature and its project), it sits under the nearer: the one that is itself part of something.
+  const parts = edges.filter((e) => e.type === 'part_of' && byId.get(e.from).work && byId.get(e.to).work);
+  const inner = new Set(parts.map((e) => e.from));
   const parentOf = new Map();
-  for (const e of edges) if (e.type === 'part_of' && byId.get(e.from).work && byId.get(e.to).work && !parentOf.has(e.from)) parentOf.set(e.from, e.to);
+  for (const e of parts) if (!parentOf.has(e.from) || (inner.has(e.to) && !inner.has(parentOf.get(e.from)))) parentOf.set(e.from, e.to);
   const kids = new Map();
   for (const [kid, parent] of parentOf) kids.set(parent, [...(kids.get(parent) ?? []), byId.get(kid)]);
   const waits = edges.filter((e) => BLOCKING.includes(e.type));
@@ -1512,7 +1527,7 @@ function timeline(nodes, edges, byId, focus, prefs) {
   // What a thing is part of is said by its bar spanning it, not by a line as well.
   // Nor is waiting that is over drawn: the order along the scale already says what came first.
   const over = (e) => BLOCKING.includes(e.type) && !byId.get(e.to).open;
-  return { axis: { scale, total: total || middling, top: ROW.top, bottom }, drawn: edges.filter((e) => !(e.type === 'part_of' && parentOf.get(e.from) === e.to) && !over(e)) };
+  return { axis: { scale, total: total || middling, top: ROW.top, bottom }, drawn: edges.filter((e) => !parts.includes(e) && !over(e)) };
 }
 
 /** The drawing itself: boxes joined by lines, each box leading to its page and free to be dragged. */
@@ -1664,7 +1679,8 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
         box.removeEventListener('pointermove', move);
         box.removeEventListener('pointerup', up);
         if (far) prefs.moved.set(n.id, { x: n.x, y: n.y });
-        else location.hash = `#/e/${n.id}`;
+        // Following a box leaves the drawing, and so the full window.
+        else ((prefs.full = false), (location.hash = `#/e/${n.id}`));
       };
       box.addEventListener('pointermove', move);
       box.addEventListener('pointerup', up);
@@ -1685,7 +1701,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     nodes.some((n) => !n.open) && key('swatch rm-closed', 'Finished'),
     nodes.some((n) => n.blocked) && key('swatch rm-blocked', 'Blocked'),
   ].filter(Boolean);
-  return h('div', {}, h('div', { class: 'graph-scroll' }, svg), legend.length > 0 && h('div', { class: 'legend' }, legend));
+  return h('div', { class: 'graph-body' }, h('div', { class: 'graph-scroll' }, svg), legend.length > 0 && h('div', { class: 'legend' }, legend));
 }
 
 /** The whole map, as the same drawing with no one thing at its centre. */

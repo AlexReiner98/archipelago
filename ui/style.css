@@ -168,6 +168,11 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .rm-node .fill { fill: var(--ok); }
 .rm-node .flag { fill: var(--g-blocked); }
 /* The one graph. */
+.graph-view.full { position: fixed; inset: 0; z-index: 40; background: var(--panel); display: flex; flex-direction: column; }
+.graph-view.full > .fold-bar { padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }
+.graph-view.full .graph-title { font-size: 15px; margin-right: 6px; }
+.graph-view.full > .graph-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.graph-view.full .graph-scroll { flex: 1; max-height: none; }
 .graph-scroll { overflow: auto; max-height: 620px; scrollbar-color: var(--line) transparent; }
 .graph-scroll svg { display: block; touch-action: none; user-select: none; }
 .rm-link.other { stroke-dasharray: 2 4; }
