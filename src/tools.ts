@@ -17,6 +17,7 @@ import type { TypeDef } from './packs.ts';
 import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
+import { reportTests } from './proof.ts';
 import { awaitingRecheck, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
@@ -515,6 +516,26 @@ export const TOOLS: Record<string, Tool> = {
       surface: z.string().optional().describe('Where it ran. Left out: github-actions.'),
     },
     run: async (l, actor, input) => recordRun(l, actor, input),
+  },
+  test_report: {
+    description:
+      'Say what a test run found on one build. Each result names its test by id or by its entrypoint (the name the harness knows it by) and says whether it passed, with the measured value, where the evidence is and the picture the test drew. One result is kept per test per build: reported again, it is replaced. A test the map does not know is named in the answer (unknown) and nothing is made for it: create the software.test first and link it to the proof question it helps answer. Subject to the same policy as any change.',
+    input: {
+      build: z.string().min(1).describe('The version or commit the tests ran on.'),
+      results: z
+        .array(
+          z.object({
+            test: z.string().describe('The test: its id, or its entrypoint.'),
+            passed: z.boolean(),
+            value: z.string().optional().describe('The headline number or outcome, e.g. "0.004 degrees".'),
+            evidence: z.string().optional().describe('Where the proof is: a path, URL or commit.'),
+            picture: z.string().optional().describe('The address of the picture the test drew.'),
+          }),
+        )
+        .min(1),
+      link: z.string().optional().describe('Where the run can be looked at.'),
+    },
+    run: async (l, actor, input) => reportTests(l, actor, input),
   },
   session_end: {
     description:

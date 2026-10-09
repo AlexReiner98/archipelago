@@ -3,6 +3,7 @@
 
 import { lastPushes, repoByName, repoName } from './github.ts';
 import { ACTIVE_HOLDS, type Entity, type Lattice } from './lattice.ts';
+import { proof } from './proof.ts';
 
 interface Edge {
   x: string;
@@ -1102,6 +1103,11 @@ export const VIEWS: Record<string, View> = {
     description:
       'An event as a gate (a release, a launch): what it waits for (everything it depends_on), grouped by stream (the feature or project each is part of) with progress and what the owner owes; what it goes ahead without (what it defers); and what is not yet sorted (open tasks, issues and decisions under what it ships, on neither side). Params: event (an entity id; without it, the open events that have a gate).',
     run: gate,
+  },
+  proof: {
+    description:
+      'How we know the software is correct: the proof questions of a product (a project or feature; a question is a software.proof that is part of it or about it), each with the tests that help answer it and what every test found on one build, with its picture. A question is answered on a build when all its tests passed there. Params: of (an entity id; without it, the projects that have proof questions), build (a version or commit; without it, the build last reported).',
+    run: proof,
   },
   notifications: {
     description: 'Unread notifications for the human, newest first.',
