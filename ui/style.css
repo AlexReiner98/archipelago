@@ -573,3 +573,12 @@ a.button:hover { border-color: var(--muted); text-decoration: none; }
 /* A count that opens the names behind it. */
 details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var(--warn); color: var(--warn); border-radius: 10px; }
 .card > header.bar details.menu > .menu-items { font-weight: 400; }
+
+/* An event's gate: every row is one line, at any width. */
+.gated .rows > li.row-top, .gated .tree summary { flex-wrap: nowrap; }
+.gated .rows > li.row-top > .grow, .gated .tree summary > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gated .rows > li.row-top > :not(.grow), .gated .tree summary > :not(.grow) { flex: none; }
+.gated .rows > li.row-top { align-items: center; }
+.gated .rows button, .gated .tree summary button { padding: 2px 9px; font-size: 12.5px; }
+.gated .chip.stream { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .gated .chip.stream, .gated .rows > li.row-top > .chip:first-of-type { display: none; } }

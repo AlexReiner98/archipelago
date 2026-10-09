@@ -902,6 +902,143 @@ async function questions(l: Lattice, input: { project?: string }) {
   return { project: slim(root), open, settled };
 }
 
+/** What is sorted and counted behind a gate: things that get done, settled or decided. */
+const GATE_WORK = ['task', 'issue', 'decision'];
+
+/**
+ * An event as a gate: the work it waits for (what it depends on), by stream;
+ * what it was planned to go ahead without (what it defers); and what nobody
+ * has yet put on either side (open work under what it ships). A stream is not
+ * stored: it is the feature or project a held item is part of, or the held
+ * item itself when that is a feature or project, which then brings all its
+ * work. Without an event, the open events there are.
+ */
+async function gate(l: Lattice, input: { event?: string }) {
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, owner, props, created_at from entity where archived_at is null`);
+  const byId = new Map(entities.map((e) => [e.id, e]));
+  const { rows: links } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(
+    `select id, type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`,
+    [['part_of', 'depends_on', 'defers', 'software.ships']],
+  );
+  const live = links.filter((r) => byId.has(r.from_id) && byId.has(r.to_id));
+  const from = (type: string, id: string) => live.filter((r) => r.type === type && r.from_id === id);
+  if (!input.event) {
+    const events = entities.filter((e) => l.registry.isA(e.type, 'event') && e.is_open && (from('depends_on', e.id).length || from('defers', e.id).length || from('software.ships', e.id).length));
+    return { events: events.map((e) => ({ id: e.id, type: e.type, title: e.title, status: e.status, at: (e.props.at as string | undefined) ?? null, holding: from('depends_on', e.id).length })) };
+  }
+  const event = byId.get(input.event);
+  if (!event) throw new Error(`No entity "${input.event}"`);
+  if (!l.registry.isA(event.type, 'event')) throw new Error(`gate needs an event (a release, a launch, a deadline); "${event.title}" is a ${event.type}`);
+
+  const kids = new Map<string, string[]>();
+  const parents = new Map<string, string[]>();
+  for (const r of live.filter((x) => x.type === 'part_of')) {
+    kids.set(r.to_id, [...(kids.get(r.to_id) ?? []), r.from_id]);
+    parents.set(r.from_id, [...(parents.get(r.from_id) ?? []), r.to_id]);
+  }
+  const isA = (e: Entity, kinds: string[]) => kinds.some((kind) => l.registry.isA(e.type, kind));
+  // What holds work together: a project, and whatever a pack's tree is made of (a feature).
+  const containers = ['project', ...[...l.registry.trees.values()].flatMap((t) => t.branches)];
+  const under = (id: string) => {
+    const seen = new Set<string>();
+    const stack = [id];
+    while (stack.length) {
+      for (const kid of kids.get(stack.pop()!) ?? []) {
+        if (seen.has(kid)) continue;
+        seen.add(kid);
+        stack.push(kid);
+      }
+    }
+    return seen;
+  };
+  /** The nearest feature or project an item is part of. */
+  const nearest = (id: string) => {
+    const seen = new Set([id]);
+    let level = [id];
+    while (level.length) {
+      const up = level.flatMap((x) => parents.get(x) ?? []).filter((x) => !seen.has(x));
+      const found = up.find((x) => isA(byId.get(x)!, containers));
+      if (found) return byId.get(found)!;
+      for (const x of up) seen.add(x);
+      level = up;
+    }
+    return undefined;
+  };
+
+  const graph = await blockGraph(l);
+  const me = await person(l).catch(() => undefined);
+  const mine = (id: string) => id === me || (byId.get(id)?.owner === me && isA(byId.get(id)!, ['decision']) && byId.get(id)!.is_open);
+  // A feature that is built is ready for a release, though it stays open until it ships.
+  const done = (e: Entity) => !e.is_open || e.status === 'built';
+  const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
+  const item = (e: Entity, relation?: string) => {
+    const roots = done(e) ? [] : graph.roots(e.id);
+    return {
+      ...slim(e),
+      done: done(e),
+      blocked: !done(e) && graph.isBlocked(e.id),
+      /** The owner has to answer, act or decide before this can move. */
+      yours: !done(e) && Boolean(me) && (mine(e.id) || roots.some(mine)),
+      waiting_on: roots.map((id) => byId.get(id)).filter((r) => r !== undefined).map(slim),
+      /** The link that makes it hold the event, when it does so itself and not through its stream. */
+      relation,
+    };
+  };
+  type Item = ReturnType<typeof item>;
+
+  const held = from('depends_on', event.id);
+  const streams = new Map<string, { head: Entity | undefined; relation?: string; items: Item[] }>();
+  const placed = new Set<string>();
+  // A feature or project that holds the event brings its work with it.
+  for (const r of held) {
+    const head = byId.get(r.to_id)!;
+    if (!isA(head, containers)) continue;
+    const work = [...under(head.id)].map((id) => byId.get(id)!).filter((e) => isA(e, GATE_WORK) && !placed.has(e.id));
+    for (const w of work) placed.add(w.id);
+    placed.add(head.id);
+    streams.set(head.id, { head, relation: r.id, items: work.length ? work.map((w) => item(w)) : [item(head)] });
+  }
+  for (const r of held) {
+    const e = byId.get(r.to_id)!;
+    if (placed.has(e.id)) continue;
+    placed.add(e.id);
+    const head = nearest(e.id);
+    const stream = streams.get(head?.id ?? '') ?? { head, items: [] };
+    stream.items.push(item(e, r.id));
+    streams.set(head?.id ?? '', stream);
+  }
+
+  const deferred = from('defers', event.id);
+  const left = new Set(deferred.flatMap((r) => [r.to_id, ...under(r.to_id)]));
+  const scope = new Set(from('software.ships', event.id).flatMap((r) => [r.to_id, ...under(r.to_id)]));
+  const toSort = [...scope]
+    .map((id) => byId.get(id)!)
+    .filter((e) => e.id !== event.id && e.is_open && isA(e, GATE_WORK) && !placed.has(e.id) && !left.has(e.id))
+    .map((e) => ({ ...slim(e), stream: ((s) => (s ? { id: s.id, title: s.title } : null))(nearest(e.id)) }));
+
+  const rank = (i: Item) => (i.done ? 2 : i.yours ? 0 : 1);
+  const out = [...streams.values()].map((s) => ({
+    ...(s.head ? slim(s.head) : { id: null, type: null, title: null, status: null }),
+    relation: s.relation,
+    progress: { done: s.items.filter((i) => i.done).length, total: s.items.length },
+    yours: s.items.filter((i) => i.yours).length,
+    items: s.items.sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title)),
+  }));
+  const open = (s: (typeof out)[number]) => s.progress.total - s.progress.done;
+  out.sort((a, b) => Number(open(a) === 0) - Number(open(b) === 0) || b.yours - a.yours || open(b) - open(a) || (a.title ?? '').localeCompare(b.title ?? ''));
+  const all = out.flatMap((s) => s.items);
+  return {
+    event: { ...slim(event), open: event.is_open, at: (event.props.at as string | undefined) ?? null },
+    counts: { holding: all.length, open: all.filter((i) => !i.done).length, yours: all.filter((i) => i.yours).length, to_sort: toSort.length, can_follow: deferred.length },
+    /** Nothing it waits for is still open, and nothing is left to sort. */
+    clear: all.every((i) => i.done) && toSort.length === 0,
+    to_sort: toSort.sort((a, b) => (a.stream?.title ?? '').localeCompare(b.stream?.title ?? '') || a.title.localeCompare(b.title)),
+    streams: out,
+    can_follow: deferred.map((r) => ({ ...slim(byId.get(r.to_id)!), open: byId.get(r.to_id)!.is_open, relation: r.id })),
+    how: 'To sort an item: link the event to it with depends_on (the event waits for it) or defers (it can follow). To move one across, unlink the relation given here and link the other.',
+  };
+}
+
 async function notifications(l: Lattice) {
   const { rows } = await l.db.query(
     `select n.id, n.title, n.body, n.props->>'level' as level, n.props->>'from' as from, n.created_at,
@@ -960,6 +1097,11 @@ export const VIEWS: Record<string, View> = {
     description:
       'A project\'s open questions: decisions not yet made and hypotheses not yet settled, most-blocking first, each with what waits on it, its options, what is testing it, and anything the owner has asked an agent to look into first (`asks`: do those, write what you found into the notes or options of the question, and mark the ask done); then the ones settled lately with their outcome. Params: project (an entity id; without it, the projects and how many open questions each has).',
     run: questions,
+  },
+  gate: {
+    description:
+      'An event as a gate (a release, a launch): what it waits for (everything it depends_on), grouped by stream (the feature or project each is part of) with progress and what the owner owes; what it goes ahead without (what it defers); and what is not yet sorted (open tasks, issues and decisions under what it ships, on neither side). Params: event (an entity id; without it, the open events that have a gate).',
+    run: gate,
   },
   notifications: {
     description: 'Unread notifications for the human, newest first.',
