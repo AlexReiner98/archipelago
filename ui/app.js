@@ -1128,8 +1128,8 @@ async function entity(id) {
         long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
         e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       ),
-      // Where it sits, as the one graph: a project's is its features, drawn in its roadmap above.
-      !project && fold('relations', 'Relations', relCount, true, graphView({ focus: id })),
+      // Where it sits, as the one graph. A project's work is drawn in its roadmap above, so here is what else it is linked to.
+      fold('relations', 'Relations', project ? 0 : relCount, !project, graphView(project ? { focus: id, key: `${id}:rest`, extras: { restOnly: true } } : { focus: id })),
       fold('history', 'History', lines.length, false, lines),
     ),
   );
@@ -1325,8 +1325,9 @@ const prefsOf = (key, defaults = {}) => {
  * item (`info`: progress, place in an order, whether it is being worked on)
  * and edges to add (a feature waiting on another through their tasks).
  */
-function graphView({ focus, defaults, extras } = {}) {
-  const prefs = prefsOf(focus ?? '', defaults);
+function graphView({ focus, key, defaults, extras } = {}) {
+  // Two drawings around one thing (a project's work, and what else it is linked to) keep their own filters.
+  const prefs = prefsOf(key ?? focus ?? '', defaults);
   const host = h('div', { class: 'graph-view' }, h('div', { class: 'empty' }, 'Loading…'));
   const draw = async () => {
     let data;
@@ -1379,7 +1380,9 @@ function graphView({ focus, defaults, extras } = {}) {
 function shapeGraph(data, focus, prefs, extras = {}) {
   const BOX = { w: 224, h: 56, col: 292, gap: 12 };
   const info = extras.info ?? new Map();
-  const byId = new Map(data.nodes.filter((n) => n.id === focus || prefs.finished || n.open).map((n) => [n.id, { ...n, ...info.get(n.id) }]));
+  // A drawing of work alone (a project's features) leaves out what takes no tokens: people, repositories, notes.
+  // Those are the project's other drawing, which leaves out the work.
+  const byId = new Map(data.nodes.filter((n) => n.id === focus || ((prefs.finished || n.open) && (!extras.workOnly || n.work) && (!extras.restOnly || !n.work))).map((n) => [n.id, { ...n, ...info.get(n.id) }]));
   const seen = new Set();
   const all = [...data.edges, ...(extras.edges ?? [])].filter((e) => byId.has(e.from) && byId.has(e.to) && !seen.has(e.id) && seen.add(e.id));
   const counts = (e) => !KINDS[prefs.kind] || KINDS[prefs.kind].includes(e.type);
@@ -2420,7 +2423,7 @@ async function roadmap(rootId) {
           data.now.length > 0 && inProgress,
           h('span', { class: 'switch' }, [['Graph', true], ['List', false]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label))),
         ),
-        !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? graphView({ focus: rootId, defaults: { kind: 'structure' }, extras: { info, edges: through } }) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
+        !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? graphView({ focus: rootId, defaults: { kind: 'structure' }, extras: { info, edges: through, workOnly: true } }) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
         h('div', { class: 'toolbar', style: 'padding: 12px 14px; border-top: 1px solid var(--line)' }, title, h('button', { class: 'primary', onclick: add }, 'Add feature')),
       ),
       data.unplaced.length > 0 &&
