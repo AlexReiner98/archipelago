@@ -648,6 +648,13 @@ test('a note can name what the same change makes, and an agent can ask for its c
   assert.equal(asked.status, 'proposed');
   assert.equal((await l.entity(made.t))!.status, 'doing');
   assert.equal((await free.change(human, { ops: [{ op: 'update', id: made.t, status: 'done' }], reason: 'test', hold: true })).status, 'applied', 'a human\'s own change is never held');
+
+  // An agent names a thing in a few words: a sentence for a title is refused, on a new thing or an old one. A person names as they like.
+  const sentence = 'A session finds its repository by its GitHub address, not by a folder path on one machine';
+  await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: sentence }] }), /op 1 \(create\): the title is 89 characters\. A title is a name, not a sentence: 60 at most/);
+  await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: made.t, title: sentence }] }), /op 1 \(update\): the title is 89 characters/);
+  assert.equal(((await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Find a repository by its remote' }] })) as any).status, 'proposed');
+  assert.equal(((await callTool(l, human, 'change', { reason: 'test', ops: [{ op: 'update', id: made.t, title: sentence }] })) as any).status, 'applied');
 });
 
 test('a re-check takes a feature that lives in a repository on its own, at its project\'s interval, and leaves out what waits on a person', async () => {

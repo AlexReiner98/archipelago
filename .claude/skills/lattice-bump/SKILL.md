@@ -48,9 +48,11 @@ prevented it cheaply, it counts.
    reopen it and say so.
 
 4. **If it is new, create an issue**, part of the friction feature:
-   - **Title**: what is wrong, as a plain sentence a person would nod at.
-     "Changing one line of a long note means sending the whole note again",
-     not "body update UX".
+   - **Title**: what is wrong, named in a few plain words a person would nod
+     at, 60 characters at most (the server refuses longer from an agent).
+     "A long note is re-sent whole to change a line", not "body update UX"
+     and not a full sentence with its consequence: that is the note's first
+     line.
    - **Body**, short, in this shape:
 
      ```

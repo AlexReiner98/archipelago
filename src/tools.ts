@@ -34,12 +34,16 @@ const source = z.object({
 });
 const opSource = source.optional().describe('Where this one fact came from, when it differs from the source of the whole change.');
 
+/** The longest name an agent may give a thing. A name is read in a row, a box and a tooltip; a sentence does not fit any of them. */
+export const TITLE_MAX = 60;
+const NAME = `A name, not a sentence: ${TITLE_MAX} characters at most. What else there is to say goes in the note.`;
+
 const op = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('create'),
     ref: z.string().optional().describe('A name for this new entity that later ops in the same change can use in place of an id.'),
     type: z.string(),
-    title: z.string(),
+    title: z.string().describe(NAME),
     body: z.string().optional(),
     status: z.string().optional(),
     owner: z.string().optional().describe('Id or ref of a person or agent.'),
@@ -51,7 +55,7 @@ const op = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('update'),
     id: z.string(),
-    title: z.string().optional(),
+    title: z.string().optional().describe(NAME),
     body: z.string().optional().describe('The whole note, replacing what is there. To change part of a note, use append or replace instead.'),
     append: z.string().optional().describe('Added to the end of the note after a blank line; the rest is left as it is. For an outcome, a new sighting, a further finding.'),
     replace: z
@@ -414,6 +418,16 @@ export const TOOLS: Record<string, Tool> = {
       hold: z.boolean().optional().describe('true to have this change wait for the human even where agents\u2019 changes are applied as made: for something you want looked at before it takes effect.'),
     },
     run: async (l, actor, input) => {
+      // Agents write sentences where a name is wanted, and every row and box then has to cut them. Held to a length here,
+      // where an agent names things; a person may name a thing as they like, and an undo puts back what was there.
+      if (actor.kind === 'agent') {
+        const long = (input.ops as { op: string; title?: string }[]).flatMap((o, i) =>
+          (o.op === 'create' || o.op === 'update') && o.title && o.title.trim().length > TITLE_MAX
+            ? [`op ${i + 1} (${o.op}): the title is ${o.title.trim().length} characters. A title is a name, not a sentence: ${TITLE_MAX} at most. Name the thing in a few words and put the rest in its note.`]
+            : [],
+        );
+        if (long.length) throw new Error(`Change rejected:\n- ${long.join('\n- ')}`);
+      }
       const result = await l.change(actor, input);
       // A question an agent settled is not left for the human to come across.
       if ('answered' in result) for (const a of result.answered) await notify(l, actor, { title: `${actor.name} settled "${a.title}": ${a.outcome ?? a.status}`, body: `${a.authority.of === 'human' ? `On a human\u2019s word, as the agent reports it: ${a.authority.basis}` : `On the agent\u2019s own judgment${a.authority.basis ? `: ${a.authority.basis}` : ''}`}\n\n${input.reason}`, about: a.id });

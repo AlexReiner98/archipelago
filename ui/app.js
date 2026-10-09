@@ -1375,7 +1375,8 @@ function graphView({ focus, key, defaults, extras } = {}) {
   const draw = async () => {
     let data;
     try {
-      data = await api('view', { name: 'graph', params: { focus, depth: focus ? prefs.steps : undefined, relations: 'all', include_closed: true } });
+      // One step further than is drawn is asked for: what a thing in sight waits on is shown with it.
+      data = await api('view', { name: 'graph', params: { focus, depth: focus ? Math.min(prefs.steps + 1, 4) : undefined, relations: 'all', include_closed: true } });
     } catch (err) {
       return host.replaceChildren(h('div', { class: 'error' }, err.message));
     }
@@ -1386,6 +1387,8 @@ function graphView({ focus, key, defaults, extras } = {}) {
       draw();
     };
     const pick = (key, options, title) => h('span', { class: 'switch', title }, options.map(([value, label]) => h('button', { class: prefs[key] === value ? 'on' : '', onclick: set({ [key]: value }) }, label)));
+    // The scale of tokens is cut to the room there is, so a chart opens whole and is not scrolled across.
+    prefs.width = prefs.full ? window.innerWidth - 66 : Math.max(520, (host.clientWidth || (document.querySelector('main')?.clientWidth ?? 1060) - 30) - 50);
     const shaped = shapeGraph(data, focus, prefs, extras);
     // Filling the window, it says what it is a drawing of, since the page's own head is behind it.
     host.classList.toggle('full', Boolean(prefs.full));
@@ -1448,6 +1451,8 @@ function shapeGraph(data, focus, prefs, extras = {}) {
     }
     frontier = next;
   }
+  // What a thing in sight waits on is in sight too, though it is a step further out: a thing marked as blocked shows what by.
+  if (focus) for (const e of all) if (BLOCKING.includes(e.type) && rank.has(e.from) && !rank.has(e.to)) rank.set(e.to, rank.get(e.from) - 1);
   // A project's chart is one level: its features, and its work that is under none of them. A task that is part of a feature is on that feature's page.
   if (extras.workOnly) for (const e of walk) if (e.type === 'part_of' && e.to !== focus && rank.has(e.to) && rank.has(e.from)) rank.delete(e.from);
   const nodes = [...rank.keys()].map((id) => byId.get(id));
@@ -1522,22 +1527,61 @@ const tokensText = (t) => (t >= 1e6 ? `${+(t / 1e6).toFixed(1)}M` : t >= 1000 ? 
  */
 function timeline(nodes, edges, byId, focus, prefs) {
   const ROW = { h: 30, gap: 10, top: 28 };
-  const timed = nodes.filter((n) => n.work);
   // What a thing is part of. Part of two things in sight (a feature and its project), it sits under the nearer: the one that is itself part of something.
   const parts = edges.filter((e) => e.type === 'part_of' && byId.get(e.from).work && byId.get(e.to).work);
   const inner = new Set(parts.map((e) => e.from));
   const parentOf = new Map();
   for (const e of parts) if (!parentOf.has(e.from) || (inner.has(e.to) && !inner.has(parentOf.get(e.from)))) parentOf.set(e.from, e.to);
+  const waits = edges.filter((e) => BLOCKING.includes(e.type));
+  // Around one piece of work the scale is that work's own: it, and what is part of it, have a length. What it is
+  // itself part of, and work that belongs elsewhere, do not: the first would only be a bar across everything.
+  const within = (id) => {
+    for (let at = id, far = 0; at && far < 8; at = parentOf.get(at), far++) if (at === focus) return true;
+    return false;
+  };
+  const scaled = new Set(nodes.filter((n) => n.work && (!focus || within(n.id))).map((n) => n.id));
+  // What that work waits on from outside it, or what waits on it (a decision, a person, work that belongs
+  // elsewhere), takes none of the scale: it is a mark in the order, where it falls.
+  const gates = new Set();
+  for (let grew = Boolean(focus); grew; ) {
+    grew = false;
+    for (const e of waits) {
+      for (const [id, other] of [[e.from, e.to], [e.to, e.from]]) {
+        if (scaled.has(id) || gates.has(id) || !(scaled.has(other) || gates.has(other))) continue;
+        gates.add(id);
+        grew = true;
+      }
+    }
+  }
+  for (const id of gates) {
+    byId.get(id).gate = true;
+    parentOf.set(id, focus);
+  }
+  for (const id of [...parentOf.keys()]) if (!scaled.has(id) && !gates.has(id)) parentOf.delete(id);
+  if (focus) parentOf.delete(focus);
+  const timed = nodes.filter((n) => scaled.has(n.id));
   const kids = new Map();
   for (const [kid, parent] of parentOf) kids.set(parent, [...(kids.get(parent) ?? []), byId.get(kid)]);
-  const waits = edges.filter((e) => BLOCKING.includes(e.type));
   // A feature that is built is done, though it stays open until it ships.
   const done = (n) => !n.open || n.status === 'built';
   const under = (n) => n.active || (n.tokens?.used ?? 0) > 0 || ['doing', 'building', 'investigating'].includes(n.status);
   const stage = (n) => (done(n) ? 0 : under(n) ? 1 : 2);
+  // How long a chain of waiting ends in a thing: nothing for what can start now, one more than the deepest thing it waits on otherwise.
+  const depths = new Map();
+  const depth = (id, trail = new Set()) => {
+    if (depths.has(id)) return depths.get(id);
+    if (trail.has(id)) return 0; // a loop of waiting: stop going round
+    trail.add(id);
+    const d = Math.max(0, ...waits.filter((e) => e.from === id && byId.get(e.to).open).map((e) => depth(e.to, trail) + 1));
+    trail.delete(id);
+    depths.set(id, d);
+    return d;
+  };
   const inOrder = (list) => {
     // Down the page is the order things happen in: what is done, then what is under way, then what is still to come, each in its place on the roadmap.
-    const sorted = [...list].sort((a, b) => stage(a) - stage(b) || (a.place ?? a.order ?? 1e9) - (b.place ?? b.order ?? 1e9) || a.title.localeCompare(b.title));
+    // Among those with no place, what can start now comes before what waits, and what waits on more comes later.
+    // Where nothing else says, the order things were written down in: it is usually the order they were thought of in.
+    const sorted = [...list].sort((a, b) => stage(a) - stage(b) || (a.place ?? a.order ?? 1e9) - (b.place ?? b.order ?? 1e9) || depth(a.id) - depth(b.id) || String(a.created ?? '').localeCompare(String(b.created ?? '')) || a.title.localeCompare(b.title));
     // What waits comes after what it waits on. A loop of waiting stops going round.
     for (let pass = 0; pass < sorted.length; pass++) {
       let moved = false;
@@ -1561,6 +1605,7 @@ function timeline(nodes, edges, byId, focus, prefs) {
   const place = (n, start) => {
     if (rows.includes(n)) return start; // a loop of belonging: stop going round
     rows.push(n);
+    if (n.gate) return Object.assign(n, { t0: start, len: 0, fills: [], guess: false }), start;
     let cursor = start;
     let within = 0;
     const fills = [];
@@ -1592,17 +1637,41 @@ function timeline(nodes, edges, byId, focus, prefs) {
   const roots = timed.filter((n) => !parentOf.has(n.id));
   let total = 0;
   for (const n of [...roots.filter((x) => x.id === focus), ...inOrder(roots.filter((x) => x.id !== focus))]) total = place(n, total);
-  const scale = 1000 / (total || middling);
+  // The scale is as long as the room allows once every bar's name, written after it where it does not fit inside, is in sight too.
+  const room = prefs.width ?? 1000;
+  const written = (n, w) => {
+    const name = Math.min((n.place ? 4 : 0) + n.title.length, 46) * 6.7;
+    return 8 + (name + 20 <= w ? 0 : name + 8) + 96;
+  };
+  let scale = room / (total || middling);
+  for (let pass = 0; pass < 4; pass++) scale = Math.min(scale, ...rows.filter((n) => n.t0 + n.len > 0).map((n) => Math.max(room - written(n, n.len * scale), 240) / (n.t0 + n.len)));
   rows.forEach((n, i) => {
-    Object.assign(n, { bar: true, x: n.t0 * scale, y: ROW.top + i * (ROW.h + ROW.gap), w: Math.max(n.len * scale, 6), h: ROW.h, fills: n.fills.map((f) => ({ x: (f.t0 - n.t0) * scale, w: (f.t1 - f.t0) * scale, over: f.over })) });
+    Object.assign(n, { bar: true, x: n.t0 * scale, y: ROW.top + i * (ROW.h + ROW.gap), w: n.gate ? 14 : Math.max(n.len * scale, 6), h: ROW.h, fills: n.fills.map((f) => ({ x: (f.t0 - n.t0) * scale, w: (f.t1 - f.t0) * scale, over: f.over })) });
   });
   const bottom = ROW.top + rows.length * (ROW.h + ROW.gap);
-  const loose = nodes.filter((n) => !n.work).sort((a, b) => a.title.localeCompare(b.title));
+  const loose = nodes.filter((n) => !rows.includes(n)).sort((a, b) => a.title.localeCompare(b.title));
   loose.forEach((n, i) => Object.assign(n, { bar: true, loose: true, x: 0, y: bottom + 12 + i * (ROW.h + ROW.gap), w: 210, h: ROW.h, fills: [] }));
   // What a thing is part of is said by its bar spanning it, not by a line as well.
   // Nor is waiting that is over drawn: the order along the scale already says what came first.
   const over = (e) => BLOCKING.includes(e.type) && !byId.get(e.to).open;
-  return { axis: { scale, total: total || middling, top: ROW.top, bottom }, drawn: edges.filter((e) => !parts.includes(e) && !over(e)) };
+  const belongs = (e) => parts.includes(e) || (e.type === 'part_of' && rows.includes(byId.get(e.from)) && rows.includes(byId.get(e.to)));
+  // Nor a wait that another already says: if it waits on B, and B on A, the line to A adds nothing but a crossing.
+  const on = new Map();
+  for (const e of waits) on.set(e.from, [...(on.get(e.from) ?? []), e.to]);
+  const said = (e) => {
+    if (!waits.includes(e)) return false;
+    const seen = new Set([e.from]);
+    const stack = (on.get(e.from) ?? []).filter((id) => id !== e.to);
+    while (stack.length) {
+      const at = stack.pop();
+      if (at === e.to) return true;
+      if (seen.has(at)) continue;
+      seen.add(at);
+      stack.push(...(on.get(at) ?? []));
+    }
+    return false;
+  };
+  return { axis: { scale, total: total || middling, top: ROW.top, bottom }, drawn: edges.filter((e) => !belongs(e) && !over(e) && !said(e)) };
 }
 
 /** The drawing itself: boxes joined by lines, each box leading to its page and free to be dragged. */
@@ -1624,7 +1693,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
   for (const n of nodes.filter((x) => x.bar)) {
     n.name = cut(n.place ? `${n.place}. ${n.title}` : n.title, 46);
     const { estimated = 0, used = 0 } = n.tokens ?? {};
-    n.count = n.loose ? typeTitle(n.type) : used > 0 || !n.guess ? `${n.tokens?.assumed ? '~' : ''}${tokensText(used)} / ${n.guess ? '?' : tokensText(estimated)}${!n.guess && (n.tokens?.partial || n.len > estimated) ? '+' : ''}` : 'no estimate';
+    n.count = n.loose ? typeTitle(n.type) : n.gate ? `${typeTitle(n.type)}, ${n.status}` : used > 0 || !n.guess ? `${n.tokens?.assumed ? '~' : ''}${tokensText(used)} / ${n.guess ? '?' : tokensText(estimated)}${!n.guess && (n.tokens?.partial || n.len > estimated) ? '+' : ''}` : 'no estimate';
     n.inside = n.loose || n.name.length * CHAR + 20 <= n.w;
     n.reach = n.w + 8 + (n.inside ? 0 : n.name.length * CHAR + 8) + (n.loose ? 0 : n.count.length * 6 + 8);
   }
@@ -1662,6 +1731,15 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const [x1, x2] = ar <= b.x + 4 ? [ar, b.x - 2] : [a.x, br + 2];
     return `M${x1},${my(a)} C${(x1 + x2) / 2},${my(a)} ${(x1 + x2) / 2},${my(b)} ${x2},${my(b)}`;
   };
+  // Along the scale a wait is a step: down from the end of what is waited on, then across into what waits. It
+  // never runs through a name, which is written after its bar on the bar's own line.
+  const step = (a, b) => {
+    const x0 = a.x + Math.max(a.w - 14, a.w / 2);
+    const down = b.y > a.y;
+    const [y0, yb] = [down ? a.y + a.h : a.y, b.y + b.h / 2];
+    if (b.x - 2 < x0 + 8) return `M${x0},${y0} V${down ? b.y - 2 : b.y + b.h + 2}`;
+    return `M${x0},${y0} V${yb - (down ? 6 : -6)} Q${x0},${yb} ${x0 + 6},${yb} H${b.x - 2}`;
+  };
   const seen = { waiting: false, met: false, lifted: false, other: false };
   const lines = edges.map((e) => {
     const blocking = BLOCKING.includes(e.type);
@@ -1679,9 +1757,9 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
       s('title', {}, document.createTextNode(`${byId.get(e.from).title} ${e.lifted ? 'waits, through their tasks, on' : phrase} ${byId.get(e.to).title}`)),
     );
     lineLayer.append(el);
-    return { el, a, b, ends: [e.from, e.to] };
+    return { el, a, b, ends: [e.from, e.to], stepped: Boolean(axis) && blocking && !a.loose && !b.loose };
   });
-  const route = (l) => l.el.setAttribute('d', path(l.a, l.b));
+  const route = (l) => l.el.setAttribute('d', l.stepped ? step(l.a, l.b) : path(l.a, l.b));
   lines.forEach(route);
 
   for (const n of nodes) {
@@ -1699,14 +1777,14 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const box = n.bar
       ? s(
           'g',
-          { class: `rm-node g-node bar group-${groupOf(n.root).key}${state}${n.guess ? ' guess' : ''}${n.loose ? ' loose' : ''}`, transform: `translate(${n.x},${n.y})` },
+          { class: `rm-node g-node bar group-${groupOf(n.root).key}${state}${n.guess ? ' guess' : ''}${n.loose ? ' loose' : ''}${n.gate ? ' gate' : ''}`, transform: `translate(${n.x},${n.y})` },
           hint,
-          s('rect', { class: 'box', width: n.w, height: n.h, rx: 3 }),
+          n.gate ? s('path', { class: 'box', d: `M0,${n.h / 2} L7,${n.h / 2 - 7} L14,${n.h / 2} L7,${n.h / 2 + 7} z` }) : s('rect', { class: 'box', width: n.w, height: n.h, rx: 3 }),
           ...n.fills.map((f) => s('rect', { class: f.over ? 'over' : 'used', x: f.x, y: 1, width: Math.min(f.w, n.w - f.x), height: n.h - 2 })),
           s('text', { x: n.inside ? 10 : after, y: 19 }, document.createTextNode(n.name)),
           !n.loose && s('text', { class: 'small', x: after + (n.inside ? 0 : n.name.length * CHAR + 8), y: 19 }, document.createTextNode(n.count)),
           n.loose && s('text', { class: 'small', x: after, y: 19 }, document.createTextNode(n.count)),
-          n.blocked && s('circle', { class: 'flag', cx: n.w - 3, cy: 3, r: 4.5 }),
+          n.blocked && !n.gate && s('circle', { class: 'flag', cx: n.w - 3, cy: 3, r: 4.5 }),
         )
       : s(
           'g',
@@ -1761,6 +1839,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     nodes.some((n) => n.fills?.some((f) => !f.over)) && key('swatch g-used', 'Used so far'),
     nodes.some((n) => n.fills?.some((f) => f.over)) && key('swatch g-over', 'Over its estimate'),
     nodes.some((n) => n.guess) && key('swatch g-guess', 'No estimate yet: its length is a guess'),
+    nodes.some((n) => n.gate) && key('swatch g-gate', 'Waited on from outside this work'),
     seen.waiting && key('stroke waits', 'Waits on something unfinished'),
     seen.met && key('stroke blocking', 'Waited on something now finished'),
     seen.lifted && key('stroke lifted', 'Through their tasks'),

@@ -157,6 +157,11 @@ spatial where it can be):
 - **Draw it when it has a shape.** Structure, order and neighbourhood are
   pictures (the roadmap, the graph, an item's relations), with the list as
   the second view.
+- **A name is a few words.** An item's title is read in a row, in a box on a
+  chart and in a tooltip: name the thing, in 60 characters at most (the
+  server refuses longer from an agent), and say the rest in the first line
+  of its note. "Find a repository by its remote", not "A session finds its
+  repository by its GitHub address, not by a folder path on one machine".
 - **No explaining sentences on the page.** What a control is for is its
   tooltip.
 

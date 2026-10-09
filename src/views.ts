@@ -624,7 +624,7 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
   const preset = input.relations ?? (input.focus ? 'all' : 'blocking');
   if (!(preset in GRAPH_PRESETS)) throw new Error(`relations must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
   const only = GRAPH_PRESETS[preset];
-  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props from entity where archived_at is null`);
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, created_at from entity where archived_at is null`);
   const system = (type: string) => type.startsWith('sys.') && !l.registry.isA(type, 'resource');
   const eligible = new Map(
     entities.filter((e) => e.id === input.focus || ((input.include_closed || e.is_open) && (input.include_system || !system(e.type)))).map((e) => [e.id, e]),
@@ -710,6 +710,7 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
         title: e.title,
         status: e.status,
         open: e.is_open,
+        created: e.created_at,
         blocked: blocked.isBlocked(id),
         ...(work(e.type) && { work: true, tokens: tokens(id), estimated: e.props.tokens_estimated != null, order: e.props.order as number | undefined }),
       };

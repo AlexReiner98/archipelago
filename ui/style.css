@@ -199,6 +199,11 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .g-node.bar.guess .used { opacity: 0.35; }
 .g-node.bar.active .box { stroke: var(--accent); stroke-width: 2.5; }
 .g-node.bar.loose .box { fill: none; }
+.g-node.bar.gate .box { fill: var(--muted); stroke: none; }
+.g-node.bar.gate.closed .box { fill: var(--ok); }
+.g-node.bar.gate.blocked .box { fill: var(--g-blocked); }
+.g-node.bar.gate text:not(.small) { fill: var(--muted); }
+.legend .swatch.g-gate { background: var(--muted); border-radius: 0; width: 8px; height: 8px; transform: rotate(45deg); }
 .legend .swatch.g-est { border: 1px solid var(--muted); border-radius: 3px; width: 16px; }
 .legend .swatch.g-used { background: var(--ok); opacity: 0.7; border-radius: 3px; width: 16px; }
 .legend .swatch.g-over { background: var(--warn); border-radius: 3px; width: 16px; }
