@@ -860,7 +860,11 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   configureReader((key) => async (params) => {
     asks.push({ key, ...params, messages: structuredClone(params.messages) }); // as they stood when asked: the run goes on adding to them
     return { id: `msg_${asks.length}`, type: 'message', role: 'assistant', model: params.model, usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 5000, cache_creation_input_tokens: 0 }, ...script[asks.length - 1] } as any;
-  });
+  }, async (key) => !key.includes('revoked'));
+  // A key is tried when it is given: one Anthropic will not take is not saved, and a sign-in token is told from an API key.
+  assert.match((await call('/api/github_app', admin, { key: 'sk-ant-api03-revoked-' + 'x'.repeat(20) })).error, /Anthropic refused that key, so it was not saved/);
+  assert.match((await call('/api/github_app', admin, { key: 'sk-ant-oat01-' + 'x'.repeat(30) })).error, /sign-in token[\s\S]*needs an API key/);
+  assert.equal((await call('/api/github_app', admin)).result.reader.key, false);
   assert.equal((await call('/api/github_app', admin, { key: 'sk-ant-' + 'x'.repeat(30) })).result.reader.key, true);
   // The key is sealed where it is stored, so neither the database nor a backup of it holds it; nor does the log of its being set.
   const kept = (await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value;

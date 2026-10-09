@@ -670,10 +670,10 @@ export const TOOLS: Record<string, Tool> = {
       if (!app) throw new Error('This server cannot have a GitHub App: it has nowhere to keep one.');
       needAdmin(actor, 'connect GitHub');
       if (input.key || input.forget_key) {
-        await setReaderKey(whole, input.forget_key ? undefined : input.key);
+        const { checked } = await setReaderKey(whole, input.forget_key ? undefined : input.key);
         // The log says that it was set, and by whom: never the key.
         await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: input.forget_key ? 'Anthropic key removed' : 'Anthropic key set' });
-        return status();
+        return { ...(await status()), ...(input.key && { note: checked ? 'Anthropic took the key.' : 'Saved, but Anthropic could not be reached to try it: the first push will tell.' }) };
       }
       if (input.create) {
         if (l.workspace !== 'default') throw new Error('The GitHub App belongs to the whole server: it is created from the default workspace, by its admin.');

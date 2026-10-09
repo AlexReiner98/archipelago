@@ -25,8 +25,20 @@ let asking: (key: string) => Ask = (key) => {
   const client = new Anthropic({ apiKey: key });
   return (params) => client.beta.messages.create(params);
 };
-export function configureReader(make: ((key: string) => Ask) | undefined): void {
-  if (make) asking = make;
+/** Whether Anthropic takes a key, asked by listing one model: it costs nothing. Undefined when Anthropic could not be reached to ask. */
+let taken: (key: string) => Promise<boolean | undefined> = async (key) => {
+  try {
+    await new Anthropic({ apiKey: key, maxRetries: 1, timeout: 15_000 }).models.list({ limit: 1 });
+    return true;
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) return false;
+    return undefined;
+  }
+};
+export function configureReader(make: ((key: string) => Ask) | undefined, check: (key: string) => Promise<boolean | undefined> = async () => true): void {
+  if (!make) return;
+  asking = make;
+  taken = check;
 }
 
 /** The setting that holds a workspace's Anthropic key: sealed, since it has to be sent with every request and so cannot be kept as a hash. */
@@ -44,9 +56,22 @@ export async function hasReaderKey(l: Lattice): Promise<boolean> {
   return Boolean(await l.secret(KEY));
 }
 
-/** Set, or with nothing clear, the key runs are paid for with. It is never read back out. */
-export async function setReaderKey(l: Lattice, key: string | undefined): Promise<void> {
-  await l.setSecret(KEY, key?.trim());
+/**
+ * Set, or with nothing clear, the key runs are paid for with. It is never read
+ * back out. A key Anthropic will not take is refused here, when it is given,
+ * and not found out by the first push that goes unread.
+ */
+export async function setReaderKey(l: Lattice, key: string | undefined): Promise<{ checked: boolean }> {
+  const given = key?.trim();
+  if (given) {
+    if (/^sk-ant-oat/.test(given)) throw new Error('That is a Claude sign-in token (it starts sk-ant-oat), which signs a person in to Claude Code. The server needs an API key: make one at console.anthropic.com, under API keys.');
+    const ok = await taken(given);
+    if (ok === false) throw new Error('Anthropic refused that key, so it was not saved. Check that it was copied whole and has not been revoked, or make a new one at console.anthropic.com, under API keys.');
+    await l.setSecret(KEY, given);
+    return { checked: ok === true };
+  }
+  await l.setSecret(KEY, undefined);
+  return { checked: false };
 }
 
 interface Repo {
