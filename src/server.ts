@@ -45,6 +45,7 @@ import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hasReaderKey, readable, readPush, recheck } from './reader.ts';
+import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
@@ -396,6 +397,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 if (import.meta.main) {
   const config = loadConfig();
   const rootDir = join(config.dataDir, '..', 'workspaces');
+  // Before anything reads a secret: where the key they are sealed with is kept.
+  configureSecrets(rootDir);
   const workspaces = new Workspaces({ dataDir: config.dataDir, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy, runAutomations: true });
   if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 

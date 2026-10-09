@@ -30,7 +30,8 @@ function h(tag, attrs, ...kids) {
 // when dismissed; otherwise true, or the text typed when `input` is given.
 function ask({ title, message, input, action = 'OK', cancel = 'Cancel', danger = false }) {
   return new Promise((resolve) => {
-    const field = input && h('textarea', { rows: 3, placeholder: input.placeholder ?? '' });
+    // A secret is typed into a field that does not show it, and that the browser is asked not to remember.
+    const field = input && (input.secret ? h('input', { type: 'password', autocomplete: 'off', spellcheck: false, placeholder: input.placeholder ?? '', style: 'width: 100%' }) : h('textarea', { rows: 3, placeholder: input.placeholder ?? '' }));
     const dialog = h(
       'dialog',
       { class: 'ask' },
@@ -1988,7 +1989,7 @@ function githubCard() {
     };
     // What reads the pushes: the agent on this server, once the workspace has given it a key to run on.
     const setKey = async () => {
-      const key = await ask({ title: 'Anthropic key', message: 'The agent on this server reads each push against the map, and re-checks old items, on this key. It is kept on the server and never shown again.', input: { placeholder: 'sk-ant-\u2026' }, action: 'Save' });
+      const key = await ask({ title: 'Anthropic key', message: 'The agent on this server reads each push against the map, and re-checks old items, on this key. It is kept on the server and never shown again.', input: { placeholder: 'sk-ant-\u2026', secret: true }, action: 'Save' });
       if (key) api('github_app', { key }).then(() => draw()).catch(fail);
     };
     const reading =

@@ -862,6 +862,15 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
     return { id: `msg_${asks.length}`, type: 'message', role: 'assistant', model: params.model, usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 5000, cache_creation_input_tokens: 0 }, ...script[asks.length - 1] } as any;
   });
   assert.equal((await call('/api/github_app', admin, { key: 'sk-ant-' + 'x'.repeat(30) })).result.reader.key, true);
+  // The key is sealed where it is stored, so neither the database nor a backup of it holds it; nor does the log of its being set.
+  const kept = (await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value;
+  assert.match(kept, /^sealed:v1:/);
+  assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
+  // One stored before secrets were sealed leaves in a backup sealed all the same, and is sealed where it lies once it is read.
+  await db.query(`update setting set value = $1::jsonb where key = 'anthropic_key'`, [JSON.stringify('sk-ant-' + 'x'.repeat(30))]);
+  assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
+  assert.equal((await call('/api/github_app', admin)).result.reader.key, true);
+  assert.match((await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value, /^sealed:v1:/);
   const read = (await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result;
   assert.deepEqual([read.recorded, read.reading], [true, true]);
   let runs: any[] = [];

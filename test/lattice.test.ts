@@ -11,6 +11,7 @@ import { openDb } from '../src/db.ts';
 import { configureLauncher, launch } from '../src/launcher.ts';
 import { Lattice, type Actor, type Op } from '../src/lattice.ts';
 import { Registry } from '../src/packs.ts';
+import { configureSecrets, isSealed, seal, unseal } from '../src/secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionEnd, sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
@@ -697,6 +698,37 @@ test('a re-check takes a feature that lives in a repository on its own, at its p
   assert.deepEqual(due.projects[0].items.map((i: any) => i.title), ['Port the ribbon']);
   assert.deepEqual(((await callTool(l, agent, 'rechecked', { repo: made.side })) as any).rechecked.map((p: any) => p.title), ['The add-in']);
   assert.equal(((await VIEWS.recheck.run(l, { repo: made.side })) as any).due, false);
+});
+
+test('a secret is sealed with a key that is not in the database, and without that key it reads as not set', async () => {
+  const l = await fresh();
+  const dir = mkdtempSync(join(tmpdir(), 'lattice-secrets-'));
+  configureSecrets(dir);
+  await l.setSecret('github_secret', 'whsec-of-the-first-server');
+  const stored = (await l.setting<string>('github_secret'))!;
+  assert.ok(isSealed(stored) && !stored.includes('whsec'));
+  assert.equal(await l.secret('github_secret'), 'whsec-of-the-first-server');
+  assert.notEqual(seal('the same words'), seal('the same words'), 'sealed twice, the same secret does not look the same');
+  // The key is a file beside the workspaces, made on first use, and is what opens it after a restart.
+  assert.equal(Buffer.from(readFileSync(join(dir, 'secrets.key'), 'utf8').trim(), 'base64').length, 32);
+  configureSecrets(dir);
+  assert.equal(await l.secret('github_secret'), 'whsec-of-the-first-server');
+  // A key given in the environment is used for what is sealed from then on; what the file sealed still opens.
+  process.env.LATTICE_SECRETS_KEY = Buffer.alloc(32, 7).toString('base64');
+  await l.setSecret('anthropic_key', 'sk-ant-kept-out-of-the-disk');
+  assert.equal(await l.secret('anthropic_key'), 'sk-ant-kept-out-of-the-disk');
+  assert.equal(await l.secret('github_secret'), 'whsec-of-the-first-server');
+  // On a server with neither key (a backup restored somewhere else), it cannot be opened: it reads as not set, and nothing is given away.
+  delete process.env.LATTICE_SECRETS_KEY;
+  configureSecrets(mkdtempSync(join(tmpdir(), 'lattice-elsewhere-')));
+  assert.equal(await l.secret('anthropic_key'), undefined);
+  assert.equal(await l.secret('github_secret'), undefined);
+  // Tampered with, a sealed value does not open either.
+  configureSecrets(dir);
+  assert.equal(unseal(stored.slice(0, -4) + 'AAAA'), undefined);
+  await l.setSecret('github_secret', undefined);
+  assert.equal(await l.setting('github_secret'), undefined);
+  configureSecrets(null);
 });
 
 test('launching runs a headless session on a task, holding the lane and recording the outcome', async () => {

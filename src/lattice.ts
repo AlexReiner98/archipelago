@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { checkAutomation } from './automation-rules.ts';
 import { newId, scoped, type Db, type Q } from './db.ts';
 import type { Registry, TypeDef } from './packs.ts';
+import { isSealed, seal, unseal } from './secrets.ts';
 
 export interface Actor {
   kind: 'human' | 'agent';
@@ -837,6 +838,24 @@ export class Lattice {
   async setting<T>(key: string): Promise<T | undefined> {
     const { rows } = await this.db.query<{ value: T }>(`select value from setting where key = $1`, [key]);
     return rows[0]?.value;
+  }
+
+  /**
+   * A setting that is a secret the server has to use (a key, a signing
+   * secret): stored sealed, so the database and its backups do not hold it.
+   * One stored before secrets were sealed is sealed the first time it is
+   * read. One that cannot be opened here reads as not set.
+   */
+  async secret(key: string): Promise<string | undefined> {
+    const stored = await this.setting<string>(key);
+    if (typeof stored !== 'string' || !stored) return undefined;
+    if (!isSealed(stored)) await this.setSecret(key, stored);
+    return unseal(stored);
+  }
+
+  async setSecret(key: string, value: string | undefined): Promise<void> {
+    if (!value) await this.db.query(`delete from setting where key = $1`, [key]);
+    else await this.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(seal(value))]);
   }
 
   /** Create (or find) the person this workspace belongs to and make them the default for views. */

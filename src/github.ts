@@ -10,7 +10,7 @@ import { newSecret } from './auth.ts';
 import type { Entity, Lattice } from './lattice.ts';
 import { notify } from './notify.ts';
 
-/** The setting that holds a workspace's webhook secret. GitHub signs with it, so it is kept as it is, not as a hash. */
+/** The setting that holds a workspace's webhook secret. GitHub signs with it, so it cannot be kept as a hash: it is sealed. */
 const SECRET = 'github_secret';
 
 /**
@@ -46,7 +46,7 @@ export async function githubStatus(l: Lattice) {
   const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null order by title`, [l.registry.family('software.repo')]);
   const pushes = await lastPushes(l);
   return {
-    connected: Boolean(await l.setting<string>(SECRET)),
+    connected: Boolean(await l.secret(SECRET)),
     webhook_path: `/github/${l.workspace}`,
     repos: rows.map((r) => ({ id: r.id, title: r.title, github: repoName(r.props.remote as string) ?? null, last_push: pushes.get(r.id) ?? null })),
   };
@@ -55,13 +55,13 @@ export async function githubStatus(l: Lattice) {
 /** Make (or replace) the secret GitHub signs its deliveries with. Returned once. */
 export async function newGithubSecret(l: Lattice): Promise<string> {
   const secret = newSecret('latgh');
-  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [SECRET, JSON.stringify(secret)]);
+  await l.setSecret(SECRET, secret);
   return secret;
 }
 
 /** Whether a delivery was signed with this workspace's secret (the X-Hub-Signature-256 header). */
 export async function signedByGithub(l: Lattice, body: Buffer, header: string | string[] | undefined): Promise<boolean> {
-  const secret = await l.setting<string>(SECRET);
+  const secret = await l.secret(SECRET);
   if (!secret || typeof header !== 'string') return false;
   const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`);
   const given = Buffer.from(header);

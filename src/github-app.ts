@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoByName } from './github.ts';
 import type { Lattice } from './lattice.ts';
+import { isSealed, seal, unseal } from './secrets.ts';
 
 interface Credentials {
   id: number;
@@ -63,6 +64,18 @@ export class GithubApp {
     this.options = options;
     const file = this.file();
     this.kept = file && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { installations: {} };
+    // On disk the app's key and signing secret are sealed; here they are open. A file written before that is sealed now.
+    if (this.kept.app) {
+      const { pem, webhook_secret } = this.kept.app;
+      const open = { pem: unseal(pem), webhook_secret: unseal(webhook_secret) };
+      if (!open.pem || !open.webhook_secret) {
+        console.error('The GitHub App\u2019s key cannot be opened with the sealing key this server has (LATTICE_SECRETS_KEY or secrets.key). The app has to be created again.');
+        this.kept.app = undefined;
+      } else {
+        Object.assign(this.kept.app, open);
+        if (!isSealed(pem) || !isSealed(webhook_secret)) this.save();
+      }
+    }
     // An app registered by hand comes in through the environment instead.
     const { LATTICE_GITHUB_APP_ID: id, LATTICE_GITHUB_APP_KEY: pem, LATTICE_GITHUB_APP_SECRET: secret, LATTICE_GITHUB_APP_SLUG: slug } = process.env;
     if (!this.kept.app && id && pem && secret && slug) this.kept.app = { id: Number(id), slug, name: slug, pem: pem.replaceAll('\\n', '\n'), webhook_secret: secret };
@@ -77,7 +90,8 @@ export class GithubApp {
     if (!file) return;
     mkdirSync(this.options.dir!, { recursive: true });
     // It holds the app's key: for the server's own eyes.
-    writeFileSync(file, JSON.stringify(this.kept, null, 2) + '\n', { mode: 0o600 });
+    const app = this.kept.app && { ...this.kept.app, pem: seal(this.kept.app.pem), webhook_secret: seal(this.kept.app.webhook_secret) };
+    writeFileSync(file, JSON.stringify({ ...this.kept, app }, null, 2) + '\n', { mode: 0o600 });
   }
 
   private get api(): string {

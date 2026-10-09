@@ -29,7 +29,7 @@ export function configureReader(make: ((key: string) => Ask) | undefined): void 
   if (make) asking = make;
 }
 
-/** The setting that holds a workspace's Anthropic key. Kept as it is: it is sent with every request. */
+/** The setting that holds a workspace's Anthropic key: sealed, since it has to be sent with every request and so cannot be kept as a hash. */
 const KEY = 'anthropic_key';
 export const READER_MODEL = process.env.LATTICE_READER_MODEL || 'claude-sonnet-5-5';
 /** Dollars for a million tokens of the model above: what a run is said to have cost. */
@@ -41,13 +41,12 @@ const MAX_TOKENS_USED = 600_000;
 const MAX_RESULT = 60_000;
 
 export async function hasReaderKey(l: Lattice): Promise<boolean> {
-  return Boolean(await l.setting<string>(KEY));
+  return Boolean(await l.secret(KEY));
 }
 
 /** Set, or with nothing clear, the key runs are paid for with. It is never read back out. */
 export async function setReaderKey(l: Lattice, key: string | undefined): Promise<void> {
-  if (!key) await l.db.query(`delete from setting where key = $1`, [KEY]);
-  else await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [KEY, JSON.stringify(key.trim())]);
+  await l.setSecret(KEY, key?.trim());
 }
 
 interface Repo {
@@ -185,7 +184,7 @@ Finish with two or three lines saying what you sent.`;
  * recorded as a run in the repository whether it ended well or not.
  */
 async function run(l: Lattice, app: GithubApp, repo: Repo, ref: string, system: string, task: string, title: string, link: string) {
-  const key = await l.setting<string>(KEY);
+  const key = await l.secret(KEY);
   if (!key) return { ran: false as const, reason: 'This workspace has no Anthropic key, so nothing reads its pushes. Its admin sets one on the Workspace screen.' };
   const me = await l.setting<string>('me');
   // It acts for the workspace's owner, as an agent's token does: it sees what they see, and what it makes is theirs.

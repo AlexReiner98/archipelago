@@ -6,6 +6,7 @@
 // Restore, with the server stopped, into a data folder that does not exist yet:
 //   node src/backup.ts restore <backup file> <new data folder>
 
+import { isSealed, seal, SECRET_SETTINGS } from './secrets.ts';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
@@ -32,6 +33,8 @@ export async function dump(db: Db, workspace: { id: string; name: string }, loca
     await tx.query(`set transaction isolation level repeatable read`);
     for (const table of TABLES) tables[table] = (await tx.query<{ row: Record<string, unknown> }>(`select to_jsonb(t) as row from ${table} t`)).rows.map((r) => r.row);
   });
+  // A secret stored before secrets were sealed has not been read since, and so is still as it was typed: it does not leave like that.
+  for (const row of tables.setting ?? []) if (SECRET_SETTINGS.includes(row.key as string) && typeof row.value === 'string' && !isSealed(row.value)) row.value = seal(row.value);
   return { format: 1, taken: new Date().toISOString(), workspace, local_pack: localPack ?? null, tables };
 }
 

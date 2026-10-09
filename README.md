@@ -389,6 +389,29 @@ whatever the interval.
 The `oldest` view shows the same thing to anyone who asks: what has gone
 longest without a change or a confirmation.
 
+## Secrets
+
+What the server knows and must not give up is of two kinds.
+
+- **What it only has to recognise is kept as a hash:** every token, and the
+  operator secret. Each is shown once, when it is made, and cannot be read
+  back out of the server or a backup.
+- **What it has to use is sealed** (AES-256-GCM, `src/secrets.ts`): a
+  workspace's Anthropic key, the secret a GitHub webhook signs with, and the
+  GitHub App's key and signing secret. The sealing key is
+  `LATTICE_SECRETS_KEY` (32 bytes, base64) when that is set, and otherwise a
+  file the server makes beside the workspaces (`secrets.key`). It is never in
+  a database or a backup, so a backup file, or the copy of it sent off the
+  server, gives up none of these. A backup restored on another server reads
+  them as not set, and they are set again there.
+
+No tool gives a sealed secret back, to a person or an agent: the Workspace
+screen says only whether one is set. A key is typed into a field that does
+not show it. The agent that reads pushes never has the key in what it reads,
+and can only read repositories and change the map; what it reads in a
+repository is someone else's text, though, so its changes are an agent's like
+any other, and are held for review where the workspace holds agents' changes.
+
 ## Backups
 
 Every 6 hours the server writes each workspace out as one file of plain rows,
