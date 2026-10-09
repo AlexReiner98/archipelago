@@ -110,6 +110,9 @@ alter table entity   add column if not exists private_to text;
 alter table proposal add column if not exists private_to text;
 alter table event    add column if not exists private_to text;
 alter table token    add column if not exists admin boolean not null default false;
+-- What an agent's token is limited to changing (repository ids; null is everything), and where it has been used from.
+alter table token    add column if not exists repos jsonb;
+alter table token    add column if not exists seen jsonb;
 
 do $$ begin create role lattice_member nologin; exception when duplicate_object then null; end $$;
 grant select, insert, update on entity, relation, event, proposal, setting, token to lattice_member;

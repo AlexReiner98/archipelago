@@ -2201,7 +2201,8 @@ async function workspace() {
         'div',
         { class: 'row-top' },
         h('span', { class: 'chip' }, t.kind),
-        h('span', { class: 'grow' }, h('strong', {}, t.name), t.admin && [' ', h('span', { class: 'pill' }, 'admin')], t.id === me.actor.token && [' ', h('span', { class: 'pill ok' }, 'this session')]),
+        h('span', { class: 'grow' }, h('strong', {}, t.name), t.admin && [' ', h('span', { class: 'pill' }, 'admin')], t.id === me.actor.token && [' ', h('span', { class: 'pill ok' }, 'this session')], t.repos?.length && [' ', h('span', { class: 'pill', title: `It can change only the work of: ${t.repos.map((id) => named(id)).join(', ')}` }, `${t.repos.length === 1 ? named(t.repos[0]) : `${t.repos.length} repositories`} only`)]),
+        t.kind === 'agent' && h('span', { class: 'muted small', title: [t.last_used ? `Last used ${when(t.last_used)}` : 'Never used', t.seen?.length ? `from ${t.seen.length} place${t.seen.length === 1 ? '' : 's'}: ${t.seen.join(', ')}` : ''].filter(Boolean).join(', ') }, t.expires_at ? `expires ${when(t.expires_at)}` : 'never expires'),
         h(
           'button',
           {
@@ -2217,6 +2218,27 @@ async function workspace() {
     );
 
   const agentName = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1; min-width: 180px' });
+  // A new agent token ends by itself unless it is said not to, and can be held to the repositories it is for.
+  const agentLife = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
+  const repoList = await api('search', { type: 'software.repo', limit: 100 }).catch(() => []);
+  for (const r of repoList) titles.set(r.id, r.title);
+  const agentRepos = new Set();
+  const limitLabel = h('summary', { title: 'What the token may change. Limited, it reads the map as you do and changes only those repositories\u2019 work.' }, 'Any repository');
+  const agentLimit =
+    repoList.length > 0 &&
+    h(
+      'details',
+      { class: 'menu' },
+      limitLabel,
+      h(
+        'div',
+        { class: 'menu-items' },
+        repoList.map((r) =>
+          h('label', { style: 'display: flex; gap: 8px; padding: 5px 12px; white-space: nowrap; cursor: pointer' }, h('input', { type: 'checkbox', onchange: (ev) => (ev.target.checked ? agentRepos.add(r.id) : agentRepos.delete(r.id), (limitLabel.textContent = agentRepos.size ? `${agentRepos.size} repositor${agentRepos.size === 1 ? 'y' : 'ies'} only` : 'Any repository')) }), r.title),
+        ),
+      ),
+    );
+  const agentToken = (fallback) => ({ kind: 'agent', name: agentName.value.trim() || fallback, ...(Number(agentLife.value) > 0 && { expires_days: Number(agentLife.value) }), ...(agentRepos.size > 0 && { repos: [...agentRepos] }) });
   const memberName = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: 160px' });
   const memberEmail = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: 160px' });
   const memberAdmin = h('input', { type: 'checkbox' });
@@ -2238,12 +2260,14 @@ async function workspace() {
           'div',
           { class: 'toolbar', style: 'padding: 12px 14px' },
           agentName,
+          agentLimit,
+          agentLife,
           h(
             'button',
             {
               class: 'primary',
               onclick: () =>
-                api('token_create', { kind: 'agent', name: agentName.value.trim() || 'claude-code' })
+                api('token_create', agentToken('claude-code'))
                   .then((made) => workspace().then(() => main.children[1].replaceChildren(connectBox(made))))
                   .catch(fail),
             },
@@ -2254,7 +2278,7 @@ async function workspace() {
             {
               title: 'For an agent that is not Claude Code: the bare token, to send as Authorization: Bearer',
               onclick: () =>
-                api('token_create', { kind: 'agent', name: agentName.value.trim() || 'agent' })
+                api('token_create', agentToken('agent'))
                   .then((made) => workspace().then(() => main.children[1].replaceChildren(secretBox(`Token for ${made.name}`, made.token))))
                   .catch(fail),
             },

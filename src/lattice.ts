@@ -17,6 +17,8 @@ export interface Actor {
   admin?: boolean;
   /** Id of the token in use, when there is one. */
   token?: string;
+  /** The repositories this identity's changes are limited to (their ids). Absent: no such limit. */
+  repos?: string[];
 }
 
 export type Level = 'auto' | 'propose' | 'forbidden';

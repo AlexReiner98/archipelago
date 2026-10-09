@@ -369,6 +369,12 @@ const REPO_SCOPE = `with recursive scope(id) as (
        select r.from_id from relation r join scope s on r.to_id = s.id where r.type in ('part_of', 'about') and r.valid_to is null
      )`;
 
+/** The ids of everything that is a repository's: the repository, what lives in it, and all that is part of that or about it. */
+export async function repoScope(l: Lattice, repo: string): Promise<Set<string>> {
+  const { rows } = await l.db.query<{ id: string }>(`${REPO_SCOPE} select id from scope`, [repo]);
+  return new Set([repo, ...rows.map((r) => r.id)]);
+}
+
 /** An item and all that is part of it or about it, as a query over $1; everything, when $1 is null. */
 const UNDER = `with recursive scope(id) as (
        select $1::text

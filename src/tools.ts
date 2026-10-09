@@ -14,6 +14,7 @@ import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
+import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
 import { awaitingRecheck, VIEWS } from './views.ts';
@@ -602,7 +603,8 @@ export const TOOLS: Record<string, Tool> = {
   },
   token_create: {
     description:
-      'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once.',
+      'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once. ' +
+      'An agent\u2019s token can be limited to some repositories (repos): it then reads the map as before, and can change only what is theirs (what lives in them, and all that is part of that or about it). Give it an expiry (expires_days) unless there is a reason not to.',
     humanOnly: true,
     input: {
       kind: z.enum(['human', 'agent']),
@@ -610,10 +612,16 @@ export const TOOLS: Record<string, Tool> = {
       entity: z.string().optional().describe('Id of the person this token is, or acts for. Defaults to you.'),
       admin: z.boolean().optional(),
       expires_days: z.number().int().positive().optional(),
+      repos: z.array(z.string()).optional().describe('Ids of the repositories an agent\u2019s token is limited to changing. Left out: no such limit.'),
     },
     run: async (l, actor, input) => {
       const entity = input.entity ?? actor.person;
       if (input.kind === 'human' || input.admin || entity !== actor.person) needAdmin(actor, 'make a token for anyone but an agent acting for yourself');
+      for (const id of input.repos ?? []) {
+        const repo = await l.entity(id);
+        if (!repo || !l.registry.isA(repo.type, 'software.repo')) throw new Error(`"${id}" is not a repository in this map, so a token cannot be limited to it.`);
+      }
+      if (input.repos?.length && input.kind !== 'agent') throw new Error('Only an agent\u2019s token can be limited to repositories.');
       return createToken(l.db, l.workspace, { ...input, entity });
     },
   },
@@ -786,5 +794,7 @@ export async function callTool(l: Lattice, actor: Actor, name: string, input: un
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
   const parsed = z.strictObject(tool.input).safeParse(input ?? {});
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);
+  // An agent whose token is limited to some repositories is held to them here, whatever the tool.
+  if (actor.kind === 'agent' && actor.repos?.length) await withinScope(l, actor, name, parsed.data as Record<string, unknown>);
   return tool.run(l, actor, parsed.data);
 }

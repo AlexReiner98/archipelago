@@ -853,10 +853,13 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.deepEqual((await call('/api/github_app', admin)).result.reader, { key: false, model: 'claude-sonnet-5-5' });
   assert.equal(heard.reading, false, 'without a key a push is recorded and not read');
   assert.match((await call('/agent/github_app', robot, { key: 'sk-ant-' + 'x'.repeat(30) })).error, /humans only/);
+  // Something that is not this repository's: the reader is held to the repository it reads, whatever it is told there.
+  const outside = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Pay the invoice' }] })).result.created['#1'];
   const asks: any[] = [];
   const script = [
     { stop_reason: 'tool_use', content: [{ type: 'text', text: 'Reading the push.' }, { type: 'tool_use', id: 'tu_1', name: 'commits', input: { base: 'a'.repeat(40), head: 'b'.repeat(40) } }, { type: 'tool_use', id: 'tu_2', name: 'view', input: { name: 'repo_work', params: { repo: 'acme/tools' } } }, { type: 'tool_use', id: 'tu_3', name: 'no_such_tool', input: {} }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', type: 'task', title: 'Oil the whetstone' }] } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }, { op: 'update', id: outside, title: 'Steered by a file in the repository' }] } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }] } }] },
     { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Made one task: Oil the whetstone.' }] },
   ];
   configureReader((key) => async (params) => {
@@ -884,7 +887,11 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
     await new Promise((r) => setTimeout(r, 100));
     runs = (await call('/api/view', admin, { name: 'agent_usage', params: { repo: 'acme/tools' } })).result.runs;
   }
-  assert.deepEqual([runs[0].title, runs[0].surface, runs[0].status, runs[0].tokens, runs[0].turns], ['Read the push to main (bbbbbbb)', 'server', 'finished', 3600, 3]);
+  assert.deepEqual([runs[0].title, runs[0].surface, runs[0].status, runs[0].tokens, runs[0].turns], ['Read the push to main (bbbbbbb)', 'server', 'finished', 4800, 4]);
+  // A change that reached outside the repository was refused whole, and the reader was told why; nothing outside was touched.
+  assert.match(asks[2].messages.at(-1).content[0].content, /limited to the work of Tools repo\. "Pay the invoice" is not part of it/);
+  assert.equal(asks[2].messages.at(-1).content[0].is_error, true);
+  assert.equal((await call('/api/get', admin, { id: outside })).result.entity.title, 'Pay the invoice');
   // It asked with the workspace's key, on the model chosen, with the map's tools and the repository's beside them.
   assert.deepEqual([asks[0].key, asks[0].model, asks[0].fallbacks], ['sk-ant-' + 'x'.repeat(30), 'claude-sonnet-5-5', 'default']);
   assert.ok(['view', 'change', 'commits', 'diff', 'file'].every((name) => asks[0].tools.some((t: any) => t.name === name)));
@@ -926,6 +933,67 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.equal((await deliver('installation', { action: 'deleted', installation: { id: 42 } })).result.forgotten, 42);
   assert.equal((await call('/api/github_app', admin)).result.installation, null);
   assert.equal((await deliver('push', push(42))).result.recorded, false);
+});
+
+test('an agent\'s token can be limited to some repositories, and its owner hears when a token is used from a new place', async () => {
+  const { workspaces, call, base } = await serve('tokens');
+  const db = (await workspaces.get('default')).lattice.db;
+  const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const made = (
+    await call('/api/change', admin, {
+      reason: 'x',
+      ops: [
+        { op: 'create', ref: 'r', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site' } },
+        { op: 'create', ref: 'other', type: 'software.repo', title: 'Books repo', props: { remote: 'https://github.com/acme/books' } },
+        { op: 'create', ref: 'p', type: 'project', title: 'Site' },
+        { op: 'create', ref: 't', type: 'task', title: 'Fix the footer' },
+        { op: 'create', ref: 'o', type: 'task', title: 'Close the year' },
+        { op: 'link', type: 'software.lives_in', from: 'p', to: 'r' },
+        { op: 'link', type: 'part_of', from: 't', to: 'p' },
+      ],
+    })
+  ).result.created;
+  // Its owner makes it for one repository, with an end. Only a repository can be the limit, and only an agent limited.
+  assert.match((await call('/api/token_create', admin, { kind: 'agent', name: 'x', repos: [made.t] })).error, /not a repository/);
+  assert.match((await call('/api/token_create', admin, { kind: 'human', name: 'x', repos: [made.r] })).error, /Only an agent/);
+  const site = (await call('/api/token_create', admin, { kind: 'agent', name: 'site-machine', repos: [made.r], expires_days: 90 })).result.token;
+  const free = (await call('/api/token_create', admin, { kind: 'agent', name: 'everywhere' })).result.token;
+  const listed = (await call('/api/token_list', admin)).result.find((t: any) => t.name === 'site-machine');
+  assert.deepEqual([listed.repos, Math.round((Date.parse(listed.expires_at) - Date.now()) / 86_400_000)], [[made.r], 90]);
+
+  const change = (token: string, ops: unknown[]) => call('/agent/change', token, { reason: 'test', ops });
+  // What is the repository's it can change; what is not, it cannot, though it can read it.
+  assert.equal((await change(site, [{ op: 'update', id: made.t, status: 'doing' }])).result.status, 'proposed');
+  assert.match((await change(site, [{ op: 'update', id: made.o, status: 'done' }])).error, /limited to the work of Site repo\. "Close the year" is not part of it, so this token cannot change it/);
+  assert.equal((await call('/agent/get', site, { id: made.o })).result.entity.title, 'Close the year');
+  assert.equal((await change(free, [{ op: 'update', id: made.o, status: 'doing' }])).result.status, 'proposed', 'a token with no limit is as before');
+  // What it makes has to be tied into that work in the same change; then it may be.
+  assert.match((await change(site, [{ op: 'create', type: 'task', title: 'Loose' }])).error, /made without being tied to anything there/);
+  assert.equal((await change(site, [{ op: 'create', ref: 'n', type: 'task', title: 'Test the footer' }, { op: 'create', ref: 'q', type: 'decision', title: 'Which footer?' }, { op: 'link', type: 'part_of', from: 'n', to: made.p }, { op: 'link', type: 'depends_on', from: 'n', to: 'q' }])).result.status, 'proposed');
+  // It may say its work waits on something outside, but not hang anything on what is outside, nor merge, archive or retype the map.
+  assert.equal((await change(site, [{ op: 'link', type: 'depends_on', from: made.t, to: made.o }])).result.status, 'proposed');
+  assert.match((await change(site, [{ op: 'link', type: 'depends_on', from: made.o, to: made.t }])).error, /cannot change what it is linked to/);
+  assert.match((await change(site, [{ op: 'archive', id: made.o }])).error, /cannot archive it/);
+  assert.match((await change(site, [{ op: 'merge', keep: made.t, drop: made.o }])).error, /cannot merge it/);
+  assert.match((await change(site, [{ op: 'define_type', type: { id: 'local.x', title: 'X', description: 'x' } }])).error, /cannot define a type/);
+  // Nor speak for another repository, or take on work that is not its own.
+  assert.match((await call('/agent/rechecked', site, { repo: 'acme/books' })).error, /cannot speak for another repository/);
+  assert.equal((await call('/agent/rechecked', site, { repo: 'acme/site' })).status, 200);
+  const run = (await call('/agent/session_start', site, { title: 'On the site' })).result.run;
+  assert.match((await call('/agent/session_update', site, { run, task: made.o })).error, /cannot take it on/);
+  assert.equal((await call('/agent/session_update', site, { run, task: made.t })).status, 200);
+
+  // Used from a network it has not been used from, its owner is told, once for that network. The first place is not news.
+  const from = (address: string) => fetch(`${base}/agent/search`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${site}`, 'x-forwarded-for': address }, body: '{}' });
+  const notices = async () => (await call('/api/view', admin, { name: 'notifications' })).result.filter((n: any) => /new place/.test(n.title));
+  assert.equal((await notices()).length, 0);
+  await from('203.0.113.9');
+  assert.deepEqual((await notices()).map((n: any) => [n.title, /203\.0\.113\.x/.test(n.body)]), [['The token "site-machine" was used from a new place', true]]);
+  await from('203.0.113.200, 10.0.0.1');
+  assert.equal((await notices()).length, 1, 'the same network is the same place');
+  await from('198.51.100.7');
+  assert.equal((await notices()).length, 2);
+  assert.equal((await call('/api/token_list', admin)).result.find((t: any) => t.name === 'site-machine').seen.length, 3);
 });
 
 test('a workspace chooses whether agents’ changes are applied as made or held, the answer to a question with them', async () => {

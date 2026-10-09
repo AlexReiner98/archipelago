@@ -36,6 +36,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
+import { notify } from './notify.ts';
 import { backupAll, newestBackup, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { setupScript } from './connect.ts';
@@ -134,8 +135,18 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     // The workspace stays open for as long as this request lasts, however long that is.
     res.once('close', workspaces.hold(id));
     const ws = await workspaces.get(id);
-    const identity = await verifyToken(ws.lattice.db, token);
+    // Where the request came from, as the proxy in front of the server says, or the connection itself. It is a help
+    // in noticing a token used somewhere new, not a control: a caller can claim to come from anywhere.
+    const forwarded = req.headers['x-forwarded-for'];
+    const from = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0].trim() || req.socket.remoteAddress;
+    const identity = await verifyToken(ws.lattice.db, token, from);
     if (!identity) throw denied;
+    if (identity.newPlace)
+      await notify(ws.lattice, { kind: 'agent', name: 'lattice' }, {
+        title: `The token "${identity.actor.name}" was used from a new place`,
+        body: `It was used from ${identity.newPlace}, where it had not been used before. A machine that has moved networks does this. If it is not one of yours, revoke the token on the Workspace screen: whoever has it can act as that ${identity.actor.kind}.`,
+        level: 'warning',
+      }).catch((err) => console.error(`notify: ${(err as Error).message}`));
     // A token's identity is fixed; an agent may add a label to say which session it is.
     return {
       ws,

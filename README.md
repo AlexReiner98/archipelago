@@ -405,6 +405,24 @@ What the server knows and must not give up is of two kinds.
   server, gives up none of these. A backup restored on another server reads
   them as not set, and they are set again there.
 
+**An agent's token is the secret that lives on other machines,** in the
+environment of whoever runs the agent, where any program running as that
+person can read it. Three things limit what a copied one is worth:
+
+- **It ends.** "Connect an agent" makes a token that expires in 90 days
+  unless told otherwise; the token's row says when.
+- **It can be limited to some repositories.** Such a token reads the map as
+  its person does and can change only what is those repositories': what
+  lives in them and all that is part of that or about it (`src/scope.ts`).
+  What it makes has to be tied into that work in the same change. It cannot
+  archive, merge or re-link anything else, define a type, or speak for
+  another repository. The agent that reads pushes on the server is held to
+  the repository it is reading in the same way.
+- **Its owner hears of a new place.** Each token keeps the networks it has
+  been used from. Used from one it has not been, a warning goes to the
+  owner; the first place a token is used is not news. This notices, it does
+  not prevent: the address is what the proxy in front of the server reports.
+
 No tool gives a sealed secret back, to a person or an agent: the Workspace
 screen says only whether one is set. A key is typed into a field that does
 not show it. The agent that reads pushes never has the key in what it reads,

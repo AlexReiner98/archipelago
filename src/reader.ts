@@ -214,7 +214,9 @@ async function run(l: Lattice, app: GithubApp, repo: Repo, ref: string, system: 
   const me = await l.setting<string>('me');
   // It acts for the workspace's owner, as an agent's token does: it sees what they see, and what it makes is theirs.
   const mine = me ? l.as(me) : l;
-  const actor: Actor = { kind: 'agent', name: 'reader', person: me };
+  // And it is held to the one repository it is reading: what it reads there is someone else's text, and a file
+  // that tried to steer it could reach nothing but that repository's own work.
+  const actor: Actor = { kind: 'agent', name: 'reader', person: me, repos: [repo.entity.id] };
   const ask = asking(key);
   const kit = tools(app, repo, ref);
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: task }];
