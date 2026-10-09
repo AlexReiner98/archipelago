@@ -8,6 +8,7 @@ import { actorId, type Actor, type Lattice } from './lattice.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
+import type { GithubApp } from './github-app.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
@@ -106,6 +107,12 @@ export interface Tool {
   /** Exists only when the server runs in dev mode. */
   devOnly?: boolean;
   run(l: Lattice, actor: Actor, input: any): Promise<unknown>;
+}
+
+/** The server's GitHub App, when it can have one. Set by the server. */
+let githubApp: GithubApp | undefined;
+export function configureGithubApp(app: GithubApp | undefined): void {
+  githubApp = app;
 }
 
 let backUp: (() => Promise<unknown>) | undefined;
@@ -644,6 +651,32 @@ export const TOOLS: Record<string, Tool> = {
       const whole = await wholeMap(l);
       const secret = await newGithubSecret(whole);
       return { ...(await githubStatus(whole)), secret, note: 'Keep this secret now: it is shown once. A secret made earlier no longer works.' };
+    },
+  },
+  github_app: {
+    description:
+      'This workspace and the server\u2019s GitHub App: whether the server has its app, and whether this workspace has connected it (and as which GitHub account). ' +
+      'create: where to go to create the app, once for the whole server (an admin of the default workspace only). connect: where to go to choose repositories on GitHub; each one chosen is put in the map and its pushes are heard from then on. ' +
+      'disconnect: stop hearing from GitHub here (the app stays installed on GitHub until it is removed there). Admins only for those three.',
+    humanOnly: true,
+    input: { create: z.boolean().optional(), connect: z.boolean().optional(), disconnect: z.boolean().optional() },
+    run: async (l, actor, input) => {
+      const app = githubApp;
+      const status = () => ({ available: Boolean(app), app: app?.app ?? null, can_create: Boolean(app) && !app!.app && Boolean(actor.admin) && l.workspace === 'default', installation: app?.installationOf(l.workspace) ?? null });
+      if (!input.create && !input.connect && !input.disconnect) return status();
+      if (!app) throw new Error('This server cannot have a GitHub App: it has nowhere to keep one.');
+      needAdmin(actor, 'connect GitHub');
+      if (input.create) {
+        if (l.workspace !== 'default') throw new Error('The GitHub App belongs to the whole server: it is created from the default workspace, by its admin.');
+        return { ...status(), url: app.startCreate(l.workspace) };
+      }
+      if (input.connect) return { ...status(), url: app.startConnect(l.workspace) };
+      const mine = app.installationOf(l.workspace);
+      if (mine) {
+        app.forget(mine.id);
+        await l.log(l.db, { actor: actorId(actor), action: 'github.disconnect', reason: `Stopped hearing from GitHub (${mine.account})` });
+      }
+      return status();
     },
   },
   workspace_info: {

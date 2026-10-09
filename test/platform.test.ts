@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { createHmac } from 'node:crypto';
+import { createHmac, createVerify, generateKeyPairSync } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { request } from 'node:http';
+import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +12,7 @@ import { createToken, OPERATOR_RESET_FILE, workspaceOf } from '../src/auth.ts';
 import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
 import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
+import { GithubApp } from '../src/github-app.ts';
 import { createHttpServer } from '../src/server.ts';
 import { configureRestart } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
@@ -22,7 +23,7 @@ after(async () => {
 });
 
 /** A server on its own port with in-memory databases and its own copy of the packs. */
-async function serve(auth: 'off' | 'tokens') {
+async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp) {
   const root = mkdtempSync(join(tmpdir(), 'lattice-platform-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
@@ -31,7 +32,7 @@ async function serve(auth: 'off' | 'tokens') {
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));
   const port = (probe.address() as AddressInfo).port;
   await new Promise((r) => probe.close(r));
-  const server = createHttpServer(workspaces, port, { auth });
+  const server = createHttpServer(workspaces, port, { auth, github: github?.(`http://127.0.0.1:${port}`) });
   await new Promise<void>((r) => server.listen(port, '127.0.0.1', r));
   closers.push(async () => {
     server.close();
@@ -774,6 +775,82 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   const again = (await call('/api/github', admin, { new_secret: true })).result.secret as string;
   assert.equal((await deliver(push('main', 'x'))).status, 401, 'a replaced secret no longer works');
   assert.equal((await deliver(push('main', 'x'), { secret: again })).status, 200);
+});
+
+test('the GitHub App: the server\'s owner creates it once, a workspace connects by choosing repositories, and pushes arrive at one address', async () => {
+  // A stand-in for GitHub: it hands over the app for a code, and answers the app and its installation only when each proves who it is.
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }) as string;
+  const asked: string[] = [];
+  const hub = createServer((req, res) => {
+    const say = (status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+    const bearer = (req.headers.authorization ?? '').replace('Bearer ', '');
+    const isApp = () => {
+      const [head, body, sig] = bearer.split('.');
+      return Boolean(sig) && createVerify('RSA-SHA256').update(`${head}.${body}`).verify(publicKey, sig, 'base64url') && JSON.parse(Buffer.from(body, 'base64url').toString()).iss === '7';
+    };
+    asked.push(`${req.method} ${req.url}`);
+    if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return say(201, { id: 7, slug: 'lattice-test', name: 'Lattice (test)', pem, webhook_secret: 'whsec' });
+    if (req.url === '/app/installations/42') return isApp() ? say(200, { account: { login: 'acme' } }) : say(401, { message: 'Bad credentials' });
+    if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
+    if (req.url?.startsWith('/installation/repositories')) return bearer === 'ghs_forty-two' ? say(200, { repositories: [{ full_name: 'Acme/Site' }, { full_name: 'Acme/Tools' }] }) : say(401, { message: 'Bad credentials' });
+    say(404, { message: 'Not Found' });
+  });
+  await new Promise<void>((r) => hub.listen(0, '127.0.0.1', r));
+  closers.push(async () => void hub.close());
+  const hubAt = `http://127.0.0.1:${(hub.address() as AddressInfo).port}`;
+
+  const { workspaces, call, base } = await serve('tokens', (origin) => new GithubApp({ dir: null, origin, api: hubAt, web: 'https://github.test' }));
+  const db = (await workspaces.get('default')).lattice.db;
+  const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site.git' } }] });
+  const page = (path: string) => fetch(base + path, { redirect: 'manual' });
+
+  // 1. The server has no app until its owner creates one. An agent cannot.
+  assert.deepEqual((await call('/api/github_app', admin)).result, { available: true, app: null, can_create: true, installation: null });
+  assert.match((await call('/agent/github_app', robot, { create: true })).error, /humans only/);
+  assert.match((await call('/api/github_app', admin, { connect: true })).error, /no GitHub App yet/);
+  const create = (await call('/api/github_app', admin, { create: true })).result.url as string;
+  const form = await (await page(create.slice(base.length))).text();
+  const state = /settings\/apps\/new\?state=([0-9a-f]+)/.exec(form)![1];
+  assert.ok(form.includes('action="https://github.test/settings/apps/new?state='), 'the page sends its reader to GitHub with the manifest');
+  const manifest = JSON.parse(/name="manifest" value="([^"]+)"/.exec(form)![1].replaceAll('&quot;', '"').replaceAll('&amp;', '&'));
+  assert.deepEqual([manifest.hook_attributes.url, manifest.setup_url, manifest.default_permissions, manifest.default_events], [`${base}/github/app/hook`, `${base}/github/app/installed`, { contents: 'read', metadata: 'read' }, ['push']]);
+  assert.equal((await page('/github/app/created?code=thecode&state=not-ours')).status, 400, 'a code is taken only from someone who started here');
+  assert.equal((await page(`/github/app/created?code=thecode&state=${state}`)).status, 302);
+  assert.equal((await page(`/github/app/created?code=thecode&state=${state}`)).status, 400, 'and once');
+  assert.deepEqual((await call('/api/github_app', admin)).result.app, { slug: 'lattice-test', name: 'Lattice (test)' });
+
+  // 2. A workspace connects: its admin is sent to choose repositories, and comes back with the installation.
+  const connect = (await call('/api/github_app', admin, { connect: true })).result.url as string;
+  assert.match(connect, /^https:\/\/github\.test\/apps\/lattice-test\/installations\/new\?state=[0-9a-f]+$/);
+  assert.equal((await page('/github/app/installed?installation_id=42&state=guessed')).status, 400);
+  assert.equal((await page(`/github/app/installed?installation_id=42&${connect.split('?')[1]}`)).status, 302);
+  assert.deepEqual((await call('/api/github_app', admin)).result.installation, { id: '42', account: 'acme' });
+  assert.ok(asked.includes('GET /app/installations/42'), 'the installation was asked of GitHub, as the app');
+  // Each repository chosen is in the map: the one it knew is left alone, the other is made with its address.
+  const repos = (await call('/api/github', admin)).result.repos.map((r: any) => [r.title, r.github]).sort();
+  assert.deepEqual(repos, [['Site repo', 'acme/site'], ['Tools repo', 'acme/tools']]);
+
+  // 3. Pushes arrive at one address, signed with the app's secret; the installation says whose map they are for.
+  const deliver = async (event: string, payload: unknown, secret = 'whsec') => {
+    const body = JSON.stringify(payload);
+    const res = await fetch(`${base}/github/app/hook`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-github-event': event, 'x-hub-signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}` }, body });
+    return { status: res.status, ...((await res.json()) as any) };
+  };
+  const push = (installation: number) => ({ ref: 'refs/heads/main', before: '0'.repeat(40), after: 'a'.repeat(40), installation: { id: installation }, repository: { full_name: 'Acme/Tools', default_branch: 'main' }, pusher: { name: 'sam' }, commits: [{ id: 'a'.repeat(40), message: 'Sharpen the tools' }] });
+  assert.equal((await deliver('push', push(42), 'someone-elses')).status, 401);
+  const heard = (await deliver('push', push(42))).result;
+  assert.deepEqual([heard.recorded, heard.repo.title, heard.commits], [true, 'Tools repo', 1]);
+  assert.equal((await deliver('push', push(99))).result.recorded, false, 'an installation no workspace connected is not anyone\'s');
+  assert.deepEqual((await deliver('installation_repositories', { action: 'added', installation: { id: 42, account: { login: 'acme' } }, repositories_added: [{ full_name: 'Acme/Docs' }] })).result, { added: ['Acme/Docs'], known: [] });
+  // Chosen again on GitHub later, they come back with no word: the installation is known, and the map is brought up to date.
+  assert.equal((await page('/github/app/installed?installation_id=42&setup_action=update')).status, 302);
+  // Removed on GitHub, it is forgotten here.
+  assert.equal((await deliver('installation', { action: 'deleted', installation: { id: 42 } })).result.forgotten, 42);
+  assert.equal((await call('/api/github_app', admin)).result.installation, null);
+  assert.equal((await deliver('push', push(42))).result.recorded, false);
 });
 
 test('a workspace chooses whether agents’ changes are applied as made or held, the answer to a question with them', async () => {

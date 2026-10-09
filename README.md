@@ -314,7 +314,22 @@ at the platform.
 A push is the moment reality moved, whoever did the work. Two things act on
 it.
 
-**The server hears the push.** On the Workspace screen, **GitHub** makes a
+**The GitHub App is the short way to connect.** One app serves the whole
+server, and may only read (contents and metadata):
+
+1. The server's owner creates it once: Workspace, GitHub, **Create the GitHub
+   App**, in the default workspace. Lattice sends GitHub a manifest, GitHub
+   asks for a name, and hands the server the app's id, key and signing secret
+   (kept in `github-app.json` beside the workspaces; or given by hand as
+   `LATTICE_GITHUB_APP_ID`, `_KEY`, `_SECRET` and `_SLUG`).
+2. A workspace's admin presses **Connect GitHub** and chooses repositories on
+   GitHub. Each one chosen is put in the map with its address, and the
+   installation is tied to that workspace.
+3. Every push to a chosen repository arrives at `/github/app/hook`, signed
+   with the app's secret, and is taken in exactly as below. Nothing is set up
+   in the repository itself.
+
+**Or the server hears the push through a webhook added by hand.** On the Workspace screen, **GitHub** makes a
 secret and shows the address to give GitHub (`/github/<workspace>`): in each
 repository, Settings, Webhooks, Add webhook, content type `application/json`,
 that secret, push events only. A repository is matched to the one in the map

@@ -8,6 +8,8 @@
 //                      is handed what the map knows about its repository
 //   POST /github/<workspace>  GitHub's webhook: pushes, signed with the
 //                      workspace's secret
+//   /github/app/...    the server's GitHub App: created once, connected by
+//                      each workspace, and every push delivered to /hook
 //   GET  /whoami       which workspace and identity a request resolves to
 //   GET  /connect/setup.mjs  a script that connects the project it is run in
 //                      to this server: tools, hooks, the friction skill and
@@ -38,11 +40,12 @@ import { backupAll, newestBackup, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { setupScript } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
+import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan } from './sessions.ts';
-import { callTool, configureBackup, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
+import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 const actorField = {
@@ -97,7 +100,7 @@ class Refused extends Error {
   }
 }
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[] } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   const named = options.publicHosts ?? [];
@@ -105,6 +108,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`)];
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => (workspaces.has(id) ? (await workspaces.get(id)).lattice : undefined));
+  const github = options.github;
+  configureGithubApp(github);
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };
@@ -211,6 +216,60 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         } catch (err) {
           return send(res, 400, { error: (err as Error).message });
         }
+      }
+
+      // The GitHub App. Someone is sent to GitHub and comes back to one of these three; what proves they
+      // started here is the one-time word they carry (state), so no token is asked for.
+      if (github && req.method === 'GET' && url.pathname.startsWith('/github/app/')) {
+        const q = url.searchParams;
+        const page = (status: number, html: string) => res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }).end(html);
+        const back = () => res.writeHead(302, { location: '/#/workspace' }).end();
+        try {
+          if (url.pathname === '/github/app/new') return page(200, github.createPage(q.get('state')));
+          if (url.pathname === '/github/app/created') {
+            await github.created(q.get('code'), q.get('state'));
+            return back();
+          }
+          if (url.pathname === '/github/app/installed') {
+            // Sent back after choosing repositories: the first time with the word that says whose workspace it is
+            // for, later (the choice changed on GitHub) without one, when the installation is known already.
+            const id = q.get('installation_id');
+            const known = id ? github.workspaceOf(id) : undefined;
+            const workspace = q.get('state') || !known ? (await github.installed(id, q.get('state'))).workspace : known;
+            const release = workspaces.hold(workspace);
+            try {
+              const { lattice } = await workspaces.get(workspace);
+              await addRepositories(lattice, await github.repositories(id!), github.installationOf(workspace)?.account ?? '');
+            } finally {
+              release();
+            }
+            return back();
+          }
+        } catch (err) {
+          return page(400, `<!doctype html><meta charset="utf-8"><body style="font: 15px system-ui; padding: 40px"><p>${(err as Error).message.replaceAll('<', '&lt;')}</p><p><a href="/#/workspace">Back to Lattice</a></p>`);
+        }
+      }
+      // Everything the app's installations do arrives here, signed with the app's secret; the installation says whose workspace it is for.
+      if (github && req.method === 'POST' && url.pathname === '/github/app/hook') {
+        const body = await readBody(req);
+        if (!github.signed(body, req.headers['x-hub-signature-256'])) return send(res, 401, { error: 'Not a delivery signed by this server\u2019s GitHub App.' });
+        const event = req.headers['x-github-event'];
+        const payload = deliveryPayload(body, req.headers['content-type']) as (ReturnType<typeof deliveryPayload> & { action?: string; installation?: { id?: number; account?: { login?: string } }; repositories_added?: { full_name: string }[] }) | undefined;
+        if (!payload) return send(res, 400, { error: 'The delivery is not JSON.' });
+        const installation = payload.installation?.id;
+        const workspace = github.workspaceOf(installation);
+        if (event === 'ping') return send(res, 200, { result: { recorded: false, reason: 'pong' } });
+        if (event === 'installation' && payload.action === 'deleted' && installation !== undefined) {
+          github.forget(installation);
+          return send(res, 200, { result: { recorded: true, forgotten: installation } });
+        }
+        if (!workspace || !workspaces.has(workspace)) return send(res, 200, { result: { recorded: false, reason: 'No workspace here has connected this installation. Connect GitHub from the Workspace screen.' } });
+        res.once('close', workspaces.hold(workspace));
+        const { lattice } = await workspaces.get(workspace);
+        if (event === 'installation_repositories') return send(res, 200, { result: await addRepositories(lattice, (payload.repositories_added ?? []).map((r) => r.full_name), payload.installation?.account?.login ?? '') });
+        if (event !== 'push') return send(res, 200, { result: { recorded: false, reason: `Only pushes are taken in, not "${event}".` } });
+        const deliveryId = req.headers['x-github-delivery'];
+        return send(res, 200, { result: await receivePush(lattice, payload, typeof deliveryId === 'string' ? deliveryId : undefined) });
       }
 
       // GitHub's deliveries carry no token: the signature over the body is who
@@ -350,7 +409,9 @@ If that process is not a lattice server, delete ${lock}.`);
     process.exit(1);
   }
 
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts });
+  // The GitHub App is told this server's address: the name it is reached by from outside, when it has one.
+  const origin = config.publicHosts[0] ? `https://${config.publicHosts[0]}` : `http://127.0.0.1:${config.port}`;
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: new GithubApp({ dir: rootDir, origin }) });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {

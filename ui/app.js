@@ -1976,12 +1976,30 @@ function githubCard() {
   const body = h('div', {}, h('div', { class: 'empty' }, 'Loading\u2026'));
   const draw = async (made) => {
     const s = made ?? (await api('github'));
+    // The app, where the server can have one: repositories are chosen on GitHub and nothing is set up in them.
+    const app = await api('github_app').catch(() => ({ available: false }));
+    const go = (what) => () =>
+      api('github_app', { [what]: true })
+        .then((to) => (location.href = to.url))
+        .catch(fail);
+    const unhook = async () => {
+      if (!(await ask({ title: 'Stop hearing from GitHub?', message: 'Pushes to the repositories chosen there no longer reach this map. The app stays installed on GitHub until it is removed there.', action: 'Disconnect', danger: true }))) return;
+      api('github_app', { disconnect: true }).then(() => draw()).catch(fail);
+    };
+    const appBar =
+      app.available &&
+      (app.installation
+        ? h('div', { class: 'toolbar', style: 'padding: 12px 14px 0' }, h('span', { class: 'pill ok' }, 'connected'), h('span', { class: 'grow' }, app.installation.account || app.app.name), h('button', { title: 'Choose on GitHub which repositories this map hears from', onclick: go('connect') }, 'Choose repositories'), menu('More', [!s.connected && ['Use a webhook as well', () => fresh()], ['Disconnect', unhook, 'danger']]))
+        : app.app
+          ? h('div', { class: 'toolbar', style: 'padding: 12px 14px 0' }, h('span', { class: 'grow muted' }, app.app.name), h('button', { class: 'primary', title: 'Choose repositories on GitHub; each is put in the map and its pushes are heard', onclick: go('connect') }, 'Connect GitHub'), !s.connected && menu('More', [['Use a webhook instead', () => fresh()]]))
+          : app.can_create && h('div', { class: 'toolbar', style: 'padding: 12px 14px 0' }, h('span', { class: 'grow' }), h('button', { class: 'primary', title: 'Once for this server: GitHub asks for a name, and the server then has its app', onclick: go('create') }, 'Create the GitHub App'), !s.connected && menu('More', [['Use a webhook instead', () => fresh()]])));
     const url = location.origin + s.webhook_path;
     const fresh = async () => {
       if (s.connected && !(await ask({ title: 'Make a new secret?', message: 'The one GitHub has now stops working until you replace it in each repository\'s webhook.', action: 'New secret', danger: true }))) return;
       draw(await api('github', { new_secret: true })).catch(fail);
     };
     body.replaceChildren(
+      appBar || '',
       made?.secret
         ? h(
             'div',
@@ -2008,7 +2026,8 @@ function githubCard() {
           ),
         ),
       ),
-      h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, s.connected && h('code', { class: 'grow' }, url), h('button', { class: s.connected ? '' : 'primary', onclick: fresh }, s.connected ? 'New secret' : 'Connect GitHub')),
+      (s.connected || !appBar) && h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, s.connected && h('code', { class: 'grow' }, url), h('button', { title: 'A webhook added by hand in each repository, signed with a secret made here', class: s.connected ? '' : 'primary', onclick: fresh }, s.connected ? 'New secret' : 'Connect GitHub')),
+      appBar && !s.connected && h('div', { style: 'height: 12px' }),
     );
   };
   const fail = (err) => body.replaceChildren(h('div', { class: 'error' }, err.message));
