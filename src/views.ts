@@ -522,8 +522,11 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
   const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null`);
   const partsOf = new Map<string, string[]>();
   for (const p of parts) if (all.has(p.from_id)) partsOf.set(p.to_id, [...(partsOf.get(p.to_id) ?? []), p.from_id]);
-  const totals = new Map<string, { estimated: number; used: number }>();
-  const tokens = (id: string, trail = new Set<string>()): { estimated: number; used: number } => {
+  type Tokens = { estimated: number; used: number; assumed?: boolean };
+  const totals = new Map<string, Tokens>();
+  // A feature that is built is done, though it stays open until it ships.
+  const done = (e: Entity | undefined) => Boolean(e) && (!e!.is_open || e!.status === 'built');
+  const tokens = (id: string, trail = new Set<string>()): Tokens => {
     const known = totals.get(id);
     if (known) return known;
     if (trail.has(id)) return { estimated: 0, used: 0 }; // a loop of belonging: stop going round
@@ -531,7 +534,10 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
     const inside = (partsOf.get(id) ?? []).map((part) => tokens(part, trail));
     trail.delete(id);
     const own = all.get(id)?.props ?? {};
-    const sum = { estimated: Math.max(Number(own.tokens_estimated ?? 0), inside.reduce((n, t) => n + t.estimated, 0)), used: Number(own.tokens_used ?? 0) + inside.reduce((n, t) => n + t.used, 0) };
+    const sum: Tokens = { estimated: Math.max(Number(own.tokens_estimated ?? 0), inside.reduce((n, t) => n + t.estimated, 0)), used: Number(own.tokens_used ?? 0) + inside.reduce((n, t) => n + t.used, 0) };
+    // What is finished has been paid for. Where nothing measured it, it is taken to have used what it was expected to.
+    if (done(all.get(id)) && !sum.used && sum.estimated) Object.assign(sum, { used: sum.estimated, assumed: true });
+    else if (inside.some((t) => t.assumed)) sum.assumed = true;
     totals.set(id, sum);
     return sum;
   };

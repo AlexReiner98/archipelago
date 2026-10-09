@@ -1531,7 +1531,7 @@ function timeline(nodes, edges, byId, focus, prefs) {
   const scale = 1000 / (total || middling);
   rows.forEach((n, i) => {
     const used = n.tokens?.used ?? 0;
-    Object.assign(n, { bar: true, x: n.t0 * scale, y: ROW.top + i * (ROW.h + ROW.gap), w: Math.max(n.len * scale, 6), h: ROW.h, usedW: Math.min(used, n.len) * scale, overW: Math.max(used - n.len, 0) * scale });
+    Object.assign(n, { bar: true, x: n.t0 * scale, y: ROW.top + i * (ROW.h + ROW.gap), w: Math.max(n.len * scale, 6), h: ROW.h, usedW: (done(n) && !used ? n.len : Math.min(used, n.len)) * scale, overW: Math.max(used - n.len, 0) * scale });
   });
   const bottom = ROW.top + rows.length * (ROW.h + ROW.gap);
   const loose = nodes.filter((n) => !n.work).sort((a, b) => a.title.localeCompare(b.title));
@@ -1561,7 +1561,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
   for (const n of nodes.filter((x) => x.bar)) {
     n.name = cut(n.place ? `${n.place}. ${n.title}` : n.title, 46);
     const { estimated = 0, used = 0 } = n.tokens ?? {};
-    n.count = n.loose ? typeTitle(n.type) : used > 0 || !n.guess ? `${tokensText(used)} / ${n.guess ? '?' : tokensText(estimated)}${!n.guess && n.len > estimated ? '+' : ''}` : 'no estimate';
+    n.count = n.loose ? typeTitle(n.type) : used > 0 || !n.guess ? `${n.tokens?.assumed ? '~' : ''}${tokensText(used)} / ${n.guess ? '?' : tokensText(estimated)}${!n.guess && n.len > estimated ? '+' : ''}` : 'no estimate';
     n.inside = n.loose || n.name.length * CHAR + 20 <= n.w;
     n.reach = n.w + n.overW + 8 + (n.inside ? 0 : n.name.length * CHAR + 8) + (n.loose ? 0 : n.count.length * 6 + 8);
   }
@@ -1635,7 +1635,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
       'title',
       {},
       document.createTextNode(
-        `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}${n.work ? `\n${n.guess ? 'No estimate' : `Estimated ${tokensText(estimated)} tokens`}, ${tokensText(used)} used` : ''}`,
+        `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}${n.work ? `\n${n.guess ? 'No estimate' : `Estimated ${tokensText(estimated)} tokens`}, ${tokensText(used)} used${n.tokens?.assumed ? ' (finished work that was not measured is counted at its estimate)' : ''}` : ''}`,
       ),
     );
     const after = n.w + (n.overW ?? 0) + 8;
