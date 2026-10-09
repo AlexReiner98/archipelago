@@ -56,6 +56,27 @@ export const RESTART_EXIT = 75;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+/**
+ * The commit this server was started from: the one the hosting platform built
+ * (Render says which), or the checkout's HEAD at the moment it started. Asked
+ * of /health, it is how "is the new code live yet?" becomes one comparison.
+ */
+export function startedFrom(): string | undefined {
+  const given = process.env.LATTICE_COMMIT ?? process.env.RENDER_GIT_COMMIT;
+  if (given?.trim()) return given.trim();
+  try {
+    const git = join(ROOT, '.git');
+    const head = readFileSync(join(git, 'HEAD'), 'utf8').trim();
+    if (!head.startsWith('ref: ')) return head;
+    const ref = head.slice('ref: '.length);
+    if (existsSync(join(git, ref))) return readFileSync(join(git, ref), 'utf8').trim();
+    const packed = readFileSync(join(git, 'packed-refs'), 'utf8').split('\n').find((line) => line.endsWith(` ${ref}`));
+    return packed?.split(' ')[0];
+  } catch {
+    return undefined; // not a checkout: nothing to say
+  }
+}
+
 /** Defaults, overridden by lattice.config.json, overridden by the LATTICE_* environment variables. */
 export function loadConfig(): Config {
   const file = join(ROOT, 'lattice.config.json');

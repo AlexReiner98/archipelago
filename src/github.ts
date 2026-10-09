@@ -32,14 +32,14 @@ export async function repoByName(l: Lattice, name: string | undefined): Promise<
 }
 
 /** When each repository was last pushed to, as GitHub told us. */
-export async function lastPushes(l: Lattice): Promise<Map<string, { at: string; branch: string; subject: string }>> {
-  const { rows } = await l.db.query<{ target_id: string; ts: string; reason: string; detail: { branch?: string } }>(
+export async function lastPushes(l: Lattice): Promise<Map<string, { at: string; branch: string; head?: string; subject: string }>> {
+  const { rows } = await l.db.query<{ target_id: string; ts: string; reason: string; detail: { branch?: string; after?: string } }>(
     // A tag, or a branch that was deleted, is heard but is not a push of work to a branch.
     `select distinct on (target_id) target_id, ts, reason, detail from event
      where action = 'repo.push' and target_id is not null and coalesce(detail->>'branch', '') <> '' and detail->>'deleted' is null
      order by target_id, seq desc`,
   );
-  return new Map(rows.map((r) => [r.target_id, { at: r.ts, branch: r.detail?.branch ?? '', subject: r.reason }]));
+  return new Map(rows.map((r) => [r.target_id, { at: r.ts, branch: r.detail?.branch ?? '', head: r.detail?.after?.slice(0, 7), subject: r.reason }]));
 }
 
 export async function githubStatus(l: Lattice) {

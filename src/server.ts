@@ -32,7 +32,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { backupAll, newestBackup, parseBackup } from './backup.ts';
-import { loadConfig, RESTART_EXIT } from './config.ts';
+import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
@@ -102,6 +102,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => (workspaces.has(id) ? (await workspaces.get(id)).lattice : undefined));
 
+  // Which code this is and since when: after a push the old server goes on answering until the new one is up.
+  const running = { commit: startedFrom(), started: new Date().toISOString() };
+
   /** Per Claude Code session: the last event it has been told about by the prompt hook. */
   const heardUpTo = new Map<string, number>();
 
@@ -150,7 +153,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
 
-      if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'lattice' });
+      if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'lattice', ...running });
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname];

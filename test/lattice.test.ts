@@ -259,6 +259,8 @@ test('merge moves relations to the kept entity and archives the other', async ()
     { op: 'create', ref: 'co', type: 'company', title: 'Acme' },
     { op: 'create', ref: 't', type: 'task', title: 'Reply to Sam', owner: 's2' },
     { op: 'link', type: 'works_at', from: 's2', to: 'co' },
+    // Both are said to work at the same place: the kept one is linked to it once, not twice.
+    { op: 'link', type: 'works_at', from: 's1', to: 'co' },
   ]);
   await make(l, [{ op: 'merge', keep: made.s1, drop: made.s2 }]);
   const sam = await l.get(made.s1);
@@ -538,6 +540,87 @@ test('a session that finishes says where the repository\'s open work stands', as
   assert.equal(((await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: third.run, outcome: 'cancelled' })) as any).status, 'cancelled');
   const fourth = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture' });
   assert.equal(((await callTool(l, agent, 'session_end', { run: fourth.run, outcome: 'failed' })) as any).status, 'failed');
+});
+
+test('work that waits on a person is blocked by them, needs them, and is not asked of a session; a session can say it cannot tell', async () => {
+  const l = await fresh();
+  const made = await laneSetup(l);
+  const { me, sam } = await make(l, [
+    { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
+    { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
+  ]);
+  await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb)`, [JSON.stringify(me)]);
+  // Only a person, company or agent can be waited on: other work is depended on.
+  await assert.rejects(l.change(human, { ops: [{ op: 'link', type: 'waits_on', from: made.offline, to: made.live }], reason: 'test' }), /waits_on/);
+  await make(l, [
+    { op: 'update', id: made.offline, status: 'waiting', owner: sam },
+    { op: 'link', type: 'waits_on', from: made.offline, to: me, props: { for: 'saying which framework' } },
+  ]);
+
+  // It is blocked, by the person; it needs them though it is not theirs; and its owner is waiting on them.
+  const blocked = ((await VIEWS.blockers.run(l, {})) as any[]).find((b) => b.entity.id === made.offline);
+  assert.deepEqual(blocked.blocked_by.map((b: any) => [b.why, b.entity.title]), [['waits_on', 'Owner']]);
+  assert.deepEqual(((await VIEWS.needs_me.run(l, {})) as any).actionable.map((e: any) => e.title), ['Write unit tests']);
+  assert.deepEqual(((await VIEWS.waiting_on.run(l, { person: sam })) as any).blocked_by_others.map((r: any) => r.waiting_on[0].title), ['Owner']);
+  assert.ok(!((await VIEWS.available_now.run(l, {})) as any).waiting_on_resource.some((t: any) => t.id === made.offline), 'a person is not a resource');
+  const work = (await VIEWS.repo_work.run(l, { repo: made.repo })) as any;
+  assert.deepEqual(work.blocked.find((b: any) => b.id === made.offline).waiting_on, ['Owner']);
+
+  // A session ending there is not asked about it: nothing it did could have settled it.
+  const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture', session_id: 'w1' });
+  const asked = (await callTool(l, agent, 'session_end', { run })) as any;
+  assert.deepEqual(asked.unreconciled.map((i: any) => i.title).sort(), ['Capture probe', 'Tune the solver']);
+  // What it never looked at it says it cannot tell: that ends it, and the item is left as it was, not marked as checked.
+  const before = (await l.entity(made.gated))!.updated_at;
+  const ended = (await callTool(l, agent, 'session_end', { run, summary: 'Probe looked at', still_true: [made.live], cannot_tell: [made.gated] })) as any;
+  assert.equal(ended.status, 'finished');
+  assert.match((await l.entity(run))!.body, /Said still true: Capture probe .*\nCould not tell from here, left as found: Tune the solver/);
+  assert.deepEqual((await l.proposals()).at(-1)!.ops, [{ op: 'update', id: made.live }], 'only what was vouched for is said to be checked');
+  assert.deepEqual((await l.entity(made.gated))!.updated_at, before);
+
+  // Once they have answered, the link is removed and the work is free again.
+  const link = (await l.get(made.offline)).outgoing.find((r: any) => r.type === 'waits_on') as any;
+  await make(l, [{ op: 'unlink', relation: link.relation }]);
+  assert.ok(((await VIEWS.repo_work.run(l, { repo: made.repo })) as any).ready.some((i: any) => i.id === made.offline));
+});
+
+test('a handoff is read off the map: the note an agent wrote, and what has happened since it was written', async () => {
+  const l = await fresh();
+  const made = await laneSetup(l);
+  // With no note, it looks back a week, and says there is none.
+  const bare = (await VIEWS.handoff.run(l, { repo: made.repo })) as any;
+  assert.equal(bare.note, null);
+  assert.deepEqual(bare.open.ready.map((i: any) => i.title).sort(), ['Capture probe', 'Write unit tests']);
+  assert.deepEqual(bare.open.blocked.map((i: any) => [i.title, i.waiting_on]), [['Tune the solver', ['Which target?']]]);
+  assert.match(await hookSessionStart(l, { session_id: 'h0', cwd: 'C:\\code\\Aperture' }), /Where things stand: view "handoff" with repo e_\w+\. Nobody has written a handoff note here/);
+
+  const { note } = await make(l, [
+    { op: 'create', ref: 'note', type: 'software.handoff', title: 'Aperture handoff', body: 'Not seen\nThe probe has not been run on a real model.' },
+    { op: 'link', type: 'part_of', from: 'note', to: made.proj },
+  ]);
+  // Everything from here on happened after the note was written.
+  await l.db.query(`update entity set updated_at = now() - interval '1 hour', created_at = now() - interval '2 hours' where id = $1`, [note]);
+  await l.db.query(`update entity set created_at = now() - interval '2 hours' where id = any($1::text[])`, [[made.live, made.offline, made.gated]]);
+  await l.log(l.db, { actor: 'github:someone', action: 'repo.push', target: made.repo, origin: 'github', reason: '1 commit to main: Tests for the solver', detail: { branch: 'main', after: 'abcdef0123456789' } });
+  await make(l, [
+    { op: 'update', id: made.offline, status: 'done' },
+    { op: 'create', ref: 'new', type: 'issue', title: 'The solver diverges on thin walls' },
+    { op: 'link', type: 'about', from: 'new', to: made.proj },
+  ]);
+  await hookSessionEnd(l, { session_id: 'h0', reason: 'exit' });
+
+  const stand = (await VIEWS.handoff.run(l, { repo: 'aperture repo' })) as any;
+  assert.deepEqual([stand.note.id, stand.note.body], [note, 'Not seen\nThe probe has not been run on a real model.']);
+  assert.deepEqual(stand.last_push.head, 'abcdef0');
+  assert.deepEqual(stand.since_then.pushes.map((p: any) => [p.branch, p.head, p.subject]), [['main', 'abcdef0', '1 commit to main: Tests for the solver']]);
+  assert.deepEqual(stand.since_then.settled.map((i: any) => [i.title, i.status]), [['Write unit tests', 'done']]);
+  assert.deepEqual(stand.since_then.opened.map((i: any) => i.title), ['The solver diverges on thin walls']);
+  assert.deepEqual(stand.since_then.sessions.map((s: any) => [s.status, /^finished: Session ended \(exit\)/.test(s.said) || /Not reconciled/.test(s.said)]), [['finished', true]]);
+  assert.ok(!stand.open.ready.some((i: any) => i.title === 'Write unit tests'), 'what is open is as the map has it now, whatever the note says');
+  // The next session is told how far the note is behind.
+  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: 'C:\\code\\Aperture' }), /Its note, "Aperture handoff" \(e_\w+\), was written \d{4}-\d\d-\d\d; since then: 1 push, 1 item settled, 1 item opened, 1 session ended\./);
+  // Counted from another moment when asked.
+  assert.equal(((await VIEWS.handoff.run(l, { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() })) as any).since_then.settled.length, 0);
 });
 
 test('launching runs a headless session on a task, holding the lane and recording the outcome', async () => {

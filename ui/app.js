@@ -384,7 +384,7 @@ function card(title, { wide } = {}) {
   };
 }
 
-const WHY = { depends_on: 'depends on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
+const WHY = { depends_on: 'depends on', waits_on: 'waits on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
 
 // The count beside Changes: what that page holds for the owner, the changes
 // held for them and what there is to read. A count sits only beside the page
@@ -1099,6 +1099,13 @@ async function entity(id) {
     }
   };
 
+  const note = h(
+    'section',
+    { class: 'card wide note' },
+    long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
+    e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
+  );
+
   main.replaceChildren(
     h(
       'div',
@@ -1135,16 +1142,13 @@ async function entity(id) {
       ]),
     ),
     editor,
+    // What a project is comes before its chart: said under the chart, it reads as a caption to it.
+    project ? h('div', { class: 'grid', style: 'margin-bottom: 14px' }, note) : '',
     project ? h('div', { id: 'roadmap', 'data-root': id }) : '',
     h(
       'div',
       { class: 'grid' },
-      h(
-        'section',
-        { class: 'card wide note' },
-        long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
-        e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
-      ),
+      !project && note,
       used?.runs.length > 0 &&
         fold('usage', 'Tokens used here', `${tokensText(Object.values(used.month).reduce((sum, u) => sum + u.tokens, 0))} in 30 days`, false, [
           h(
@@ -1330,7 +1334,7 @@ const GROUPS = [
   { key: 'system', label: 'System records', roots: [] },
 ];
 const groupOf = (root) => GROUPS.find((g) => g.roots.includes(root)) ?? GROUPS.at(-1);
-const BLOCKING = ['depends_on', 'needs', 'holds'];
+const BLOCKING = ['depends_on', 'waits_on', 'needs', 'holds'];
 const SVG = 'http://www.w3.org/2000/svg';
 const s = (tag, attrs = {}, ...kids) => {
   const el = document.createElementNS(SVG, tag);

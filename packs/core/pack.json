@@ -189,6 +189,7 @@
   ],
   "relations": [
     { "id": "depends_on", "title": "depends on", "inverse": "blocks", "from": ["*"], "to": ["*"], "description": "The source cannot finish until the target is closed. Drives the blockers view." },
+    { "id": "waits_on", "title": "waits on", "inverse": "is waited on by", "from": ["*"], "to": ["person", "company", "agent"], "description": "The source cannot move until this person, company or agent has answered or acted. Say what is awaited in the relation's props.for. Drives the blockers view; remove the link once they have." },
     { "id": "part_of", "title": "is part of", "inverse": "contains", "from": ["*"], "to": ["*"], "description": "Hierarchy: a task in a project, a project in an area." },
     { "id": "serves", "title": "serves", "inverse": "is served by", "from": ["*"], "to": ["goal", "area"], "description": "Why the work exists." },
     { "id": "owed_to", "title": "is owed to", "inverse": "is owed", "from": ["task"], "to": ["person", "company"], "description": "Makes a task a commitment to someone." },

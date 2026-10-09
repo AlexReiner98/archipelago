@@ -26,13 +26,17 @@ are two servers, and they are not the same thing:
 
 At the start of a session:
 
-1. With the lattice MCP tools: `view` with name `repo_work` and `repo` (the
-   id the session hook gave, or `AlexReiner98/lattice`) for this repo's open
-   work, and `search` for type `software.handoff` to read the latest handoff
-   note.
+1. With the lattice MCP tools: `view` with name `handoff` and `repo` (the id
+   the session hook gave, or `AlexReiner98/lattice`). One answer holds the
+   last push, the handoff note, what has happened since it was written, and
+   this repo's open work. Where the note and the lists disagree, the lists
+   are right: they are read off the map as it is now.
 2. The session hook has registered the session (it gives the run id; call
    `session_start` only if it did not). Say what you take on with
-   `session_update`, and propose a new handoff note before you finish.
+   `session_update`. Before you finish, bring the handoff note up to date
+   with `append` or `replace`: only what the map cannot know (what nobody has
+   seen working, what bites when working here, what you would do next and
+   why). Do not repeat the open work, the last push or what was settled.
 3. Make sure the local server is running before you change code
    (`npm run dev`; port 3100).
 4. When you take on a task, issue or feature that has no estimate, give it
@@ -65,7 +69,10 @@ settled, with what was chosen and why.
   under `src/` or `packs/`, run `npm test` and `npm run typecheck`, then
   restart it and wait for `GET /health`: with the `restart` tool if your
   lattice tools are the local server's, otherwise
-  `curl -X POST http://127.0.0.1:3100/agent/restart -H "content-type: application/json" -d "{}"`. If it does not come back, the
+  `curl -X POST http://127.0.0.1:3100/agent/restart -H "content-type: application/json" -d "{}"`. `/health` says which commit the
+  server was started from and when (`commit`, `started`): after a push, the
+  new code is live on the hosted server when its `commit` is the one you
+  pushed (`git rev-parse HEAD`), not merely when it answers. If it does not come back, the
   reason is in `runs/dev-server.log`; fix the code and it starts again on the
   next file change. Without dev mode (no `restart` tool), ask the owner.
 - **Test where the owner can watch.** Try things on the local server (port
@@ -73,6 +80,10 @@ settled, with what was chosen and why.
   `show` before each step worth seeing (a change you make already moves it). Say in the reason that it is a test, and undo what you
   made when you are done (`undo` with the change set). Drive a browser only
   when you need to click, and then a visible one on that same server.
+- **Say who is waited on with a relation, not a sentence.** Work that cannot
+  move until a person answers or acts gets a `waits_on` link to that person
+  (what for goes in the link's `props.for`), and the link is removed once
+  they have. Other work is `depends_on`, a resource is `needs`.
 - **Listen for the owner.** What they do in the web UI (a decision made, an
   edit, an approval) is addressed to you as much as a chat message is. The
   `watch` tool answers the moment they change something: call it once for

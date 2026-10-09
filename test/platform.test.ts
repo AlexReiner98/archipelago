@@ -77,7 +77,11 @@ test('with tokens on, nothing but the UI files and health answers without one', 
     assert.equal((await call(path, 'lat_default_' + '0'.repeat(40), {}, method)).status, 401, `${path} rejects an unknown token`);
     assert.equal((await call(path, 'lat_nowhere_' + '0'.repeat(40), {}, method)).status, 401, `${path} gives nothing away about workspaces`);
   }
-  assert.equal((await call('/health', undefined, undefined, 'GET')).status, 200);
+  // Health also says which code is answering and since when, so a deploy can be told from the server it replaces.
+  const health = await call('/health', undefined, undefined, 'GET');
+  assert.equal(health.status, 200);
+  assert.match(health.commit, /^[0-9a-f]{40}$/);
+  assert.ok(!Number.isNaN(Date.parse(health.started)));
   assert.equal((await call('/', undefined, undefined, 'GET')).status, 200);
 });
 

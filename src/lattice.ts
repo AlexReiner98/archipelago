@@ -618,6 +618,13 @@ export class Lattice {
             await tx.query(`update relation set from_id = $1 where from_id = $2`, [op.keep, op.drop]);
             await tx.query(`update relation set to_id = $1 where to_id = $2`, [op.keep, op.drop]);
             await tx.query(`update relation set valid_to = now() where from_id = to_id and valid_to is null`);
+            // Where both said the same thing (each was part of the same project), the kept one now says it twice: the older stays.
+            await tx.query(
+              `update relation set valid_to = now() where valid_to is null and (from_id = $1 or to_id = $1) and id not in (
+                 select distinct on (type, from_id, to_id) id from relation where valid_to is null and (from_id = $1 or to_id = $1)
+                 order by type, from_id, to_id, valid_from, id)`,
+              [op.keep],
+            );
             await tx.query(`update entity set owner = $1 where owner = $2`, [op.keep, op.drop]);
             const body = [keep.body, drop.body].filter(Boolean).join('\n\n');
             await tx.query(`update entity set props = $2::jsonb, body = $3, updated_at = now() where id = $1`, [

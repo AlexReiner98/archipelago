@@ -7,7 +7,7 @@ import { ACTIVE_HOLDS, type Entity, type Lattice } from './lattice.ts';
 interface Edge {
   x: string;
   y: string;
-  why: 'depends_on' | 'resource_unavailable' | 'resource_held';
+  why: 'depends_on' | 'waits_on' | 'resource_unavailable' | 'resource_held';
 }
 
 interface Brief {
@@ -19,14 +19,20 @@ interface Brief {
   due: string | null;
 }
 
-// x is blocked by y when: x depends on something still open; x needs a
-// resource that is unavailable; or x needs an exclusive resource someone else
-// holds (unless it is held for x).
+// x is blocked by y when: x depends on something still open; x waits on a
+// person, company or agent to answer or act (until the link is removed); x
+// needs a resource that is unavailable; or x needs an exclusive resource
+// someone else holds (unless it is held for x).
 const EDGES = `
   select r.from_id as x, r.to_id as y, 'depends_on' as why
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
    where r.type = 'depends_on' and r.valid_to is null
      and x.is_open and x.archived_at is null and y.is_open and y.archived_at is null
+  union all
+  select r.from_id, r.to_id, 'waits_on'
+    from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
+   where r.type = 'waits_on' and r.valid_to is null
+     and x.is_open and x.archived_at is null and y.archived_at is null
   union all
   select r.from_id, r.to_id, 'resource_unavailable'
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
@@ -51,6 +57,11 @@ class BlockGraph {
 
   isBlocked(id: string): boolean {
     return this.direct.has(id);
+  }
+
+  /** Whether what it waits on is someone's answer or act, which no work in a repository can supply. */
+  waitsOnSomeone(id: string): boolean {
+    return (this.direct.get(id) ?? []).some((e) => e.why === 'waits_on');
   }
 
   /** The things at the end of every chain from id: what actually has to move first. */
@@ -118,7 +129,7 @@ async function availableNow(l: Lattice, input: { owner?: string }) {
     `select res.id as resource, res.title, h.from_id as held_by, h.holder_title as held_by_title, h.props->>'for' as held_for, h.valid_from as since
      from ${ACTIVE_HOLDS} h join entity res on res.id = h.to_id`,
   );
-  const resourceOnly = (id: string) => graph.direct.get(id)!.every((e) => e.why !== 'depends_on');
+  const resourceOnly = (id: string) => graph.direct.get(id)!.every((e) => e.why.startsWith('resource'));
   const names = await briefs(l, [...graph.direct.values()].flat().map((e) => e.y));
   return {
     ready: tasks.filter((t) => !graph.isBlocked(t.id)),
@@ -138,9 +149,17 @@ async function needsMe(l: Lattice, input: { person?: string }) {
      order by props->>'due' nulls last, updated_at desc`,
     [me, [...l.registry.family('task'), ...l.registry.family('decision')]],
   );
+  // What waits on me is mine to move, whoever owns it.
+  const { rows: asked } = await l.db.query<Brief>(
+    `select x.id, x.type, x.title, x.status, x.owner, x.props->>'due' as due from relation r join entity x on x.id = r.from_id
+     where r.type = 'waits_on' and r.to_id = $1 and r.valid_to is null and x.is_open and x.archived_at is null
+     order by x.props->>'due' nulls last, x.updated_at desc`,
+    [me],
+  );
   const pending = await l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending'`);
+  const mine = rows.filter((r) => !graph.isBlocked(r.id) && !asked.some((a) => a.id === r.id));
   return {
-    actionable: rows.filter((r) => !graph.isBlocked(r.id)),
+    actionable: [...asked, ...mine],
     proposals_awaiting_review: pending.rows[0].n,
   };
 }
@@ -167,7 +186,7 @@ async function waitingOn(l: Lattice, input: { person?: string }) {
   const all = await briefs(l, [...ids, ...[...rootsOf.values()].flat()]);
   const blocked = ids
     .filter((id) => all.get(id)?.owner === me)
-    .map((id) => ({ entity: all.get(id), waiting_on: rootsOf.get(id)!.map((r) => all.get(r)).filter((r) => r?.owner !== me) }))
+    .map((id) => ({ entity: all.get(id), waiting_on: rootsOf.get(id)!.map((r) => all.get(r)).filter((r) => r?.owner !== me && r?.id !== me) }))
     .filter((row) => row.waiting_on.length);
   const { rows: owed } = await l.db.query<Brief>(
     `select t.id, t.type, t.title, t.status, t.owner, t.props->>'due' as due
@@ -385,6 +404,68 @@ export const UNCONFIRMED_DAYS = 14;
 /** The kinds of thing that are true or not of the world, and so go stale: work, questions and problems. */
 const GOES_STALE = ['task', 'decision', 'issue', 'hypothesis', 'experiment', 'software.feature'];
 
+/** How far back a handoff looks when nobody has written a note to count from. */
+const HANDOFF_DAYS = 7;
+
+/**
+ * Where a repository's work stands, for whoever picks it up next. Nearly all
+ * of it is read off the map, so it cannot go stale: the last push, what is
+ * open, and what has happened since the note was written (pushes, what was
+ * settled or opened, the sessions that ended and what each said). The note is
+ * the one part an agent writes, and holds only what the map cannot know.
+ */
+export async function handoff(l: Lattice, input: { repo?: string; since?: string }) {
+  const repo = await findRepo(l, input.repo, 'handoff');
+  if (input.since && Number.isNaN(Date.parse(input.since))) throw new Error('handoff: "since" must be an ISO date or date-time');
+  const work = await repoWork(l, { repo: repo.id });
+  const { rows: notes } = await l.db.query<Entity>(
+    `${REPO_SCOPE}
+     select e.* from entity e join scope s on s.id = e.id
+     where e.type = any($2::text[]) and e.is_open and e.archived_at is null order by e.updated_at desc limit 1`,
+    [repo.id, l.registry.family('software.handoff')],
+  );
+  const note = notes[0] as Entity | undefined;
+  const since = input.since ? new Date(input.since) : note ? new Date(note.updated_at) : new Date(Date.now() - HANDOFF_DAYS * 86_400_000);
+  const { rows: pushes } = await l.db.query<{ ts: Date; reason: string; detail: { branch?: string; after?: string } }>(
+    `select ts, reason, detail from event
+     where action = 'repo.push' and target_id = $1 and ts > $2::timestamptz and coalesce(detail->>'branch', '') <> '' and detail->>'deleted' is null
+     order by seq desc limit 20`,
+    [repo.id, since.toISOString()],
+  );
+  const moved = async (which: string) =>
+    (
+      await l.db.query<{ id: string; type: string; title: string; status: string }>(
+        `${REPO_SCOPE}
+         select e.id, e.type, e.title, e.status from entity e join scope s on s.id = e.id
+         where e.archived_at is null and e.type = any($2::text[]) and ${which} order by e.updated_at desc limit 40`,
+        [repo.id, GOES_STALE.flatMap((t) => l.registry.family(t)), since.toISOString()],
+      )
+    ).rows;
+  const { rows: ended } = await l.db.query<Entity>(
+    `select e.* from entity e join relation r on r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null
+     where r.to_id = $1 and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and e.updated_at > $3::timestamptz
+     order by e.updated_at desc limit 10`,
+    [repo.id, l.registry.family('sys.run'), since.toISOString()],
+  );
+  const slim = ({ id, type, title, status }: { id: string; type: string; title: string; status: string }) => ({ id, type, title, status });
+  // What a session said when it ended is the last thing it was heard to say: the line that opens with the time.
+  const said = (body: string) => (body.split('\n').findLast((line) => /^\[\d{4}-/.test(line)) ?? '').replace(/^\[[^\]]*\]\s*/, '').slice(0, 400);
+  return {
+    repo: work.repo,
+    last_push: work.last_push,
+    note: note ? { id: note.id, title: note.title, written: note.updated_at, body: note.body } : null,
+    since,
+    since_then: {
+      pushes: pushes.map((p) => ({ at: p.ts, branch: p.detail?.branch, head: p.detail?.after?.slice(0, 7), subject: p.reason })),
+      settled: await moved('not e.is_open and e.updated_at > $3::timestamptz'),
+      opened: await moved('e.is_open and e.created_at > $3::timestamptz'),
+      sessions: ended.map((r) => ({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said(r.body) })),
+    },
+    open: { ready: work.ready.map(slim), blocked: work.blocked.map((b) => ({ ...slim(b), waiting_on: b.waiting_on })) },
+    how: 'Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why), a few lines under short titles, with append or replace. Do not repeat the open work, the last push or what was settled: they are here.',
+  };
+}
+
 /**
  * Open work nobody has changed, or said is still true, for longest. An item's
  * last change is when it was last known true: an update that changes nothing
@@ -506,7 +587,7 @@ async function agentUsage(l: Lattice, input: { repo?: string; limit?: number }) 
 
 /** Which relations each preset draws. */
 const GRAPH_PRESETS: Record<string, string[] | undefined> = {
-  blocking: ['depends_on', 'needs', 'holds'],
+  blocking: ['depends_on', 'waits_on', 'needs', 'holds'],
   structure: ['part_of', 'serves', 'software.lives_in', 'works_at'],
   all: undefined,
 };
@@ -809,7 +890,7 @@ export interface View {
 
 export const VIEWS: Record<string, View> = {
   needs_me: {
-    description: 'What needs me now: my open tasks and decisions that nothing is blocking. Params: person (defaults to the workspace owner).',
+    description: 'What needs me now: what is waiting on me to answer or act (whoever owns it), then my open tasks and decisions that nothing is blocking. Params: person (defaults to the workspace owner).',
     run: needsMe,
   },
   blocked_on_me: {
@@ -817,7 +898,7 @@ export const VIEWS: Record<string, View> = {
     run: blockedOnMe,
   },
   waiting_on: {
-    description: 'What I am waiting on: my items blocked by someone else, and tasks others owe me. Params: person.',
+    description: 'What I am waiting on: my items blocked by someone else’s work or waiting on someone else’s answer, and tasks others owe me. Params: person.',
     run: waitingOn,
   },
   changed_since: {
@@ -829,7 +910,7 @@ export const VIEWS: Record<string, View> = {
     run: atRisk,
   },
   blockers: {
-    description: 'Every blocked item, what directly blocks it, and the root blockers that have to move first. Params: owner.',
+    description: 'Every blocked item, what directly blocks it (work it depends on, a person it waits on, a resource it needs), and the root blockers that have to move first. Params: owner.',
     run: blockers,
   },
   graph: {
@@ -863,6 +944,11 @@ export const VIEWS: Record<string, View> = {
   brief: {
     description: 'Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required).',
     run: brief,
+  },
+  handoff: {
+    description:
+      'Where a repository’s work stands, for the session picking it up: the last push, the handoff note (the part an agent wrote: what the map cannot know), what has happened since that note was written (pushes, what was settled, what was opened, the sessions that ended and what each said), and the open work, ready and blocked. Read this first. Params: repo (required): its id, GitHub name or title; since (an ISO date-time to count from, instead of when the note was written).',
+    run: handoff,
   },
   repo_work: {
     description: 'Open tasks, decisions and issues belonging to whatever lives in a repository, split into ready and blocked, and when GitHub last reported a push to it. Params: repo (required): its id, its GitHub name "owner/name", or its title.',

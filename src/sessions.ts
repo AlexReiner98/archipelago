@@ -6,7 +6,7 @@
 
 import { repoByName, repoName } from './github.ts';
 import { actorId, type Actor, type Entity, type Lattice, type Op } from './lattice.ts';
-import { UNCONFIRMED_DAYS, VIEWS } from './views.ts';
+import { blockGraph, handoff, UNCONFIRMED_DAYS, VIEWS } from './views.ts';
 
 const now = () => new Date().toISOString();
 const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
@@ -211,13 +211,16 @@ type Item = { id: string; type: string; title: string; status: string };
 /**
  * What a session has left unsaid: the open work of the repository it ran in
  * that nobody has changed since it began. A session that settled something
- * says so by changing it; what it leaves as it found it, it has to vouch for.
+ * says so by changing it; what it leaves as it found it, it has to vouch for,
+ * or say it could not tell. What waits on a person's answer is not asked
+ * about: no work in the repository settles it.
  */
 async function unreconciled(l: Lattice, run: Entity): Promise<Item[]> {
   const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'software.lives_in' and from_id = $1 and valid_to is null`, [run.id]);
   if (!repos.length) return [];
   const work = (await VIEWS.repo_work.run(l, { repo: repos[0].to_id })) as { ready: Item[]; blocked: Item[] };
-  const open = [...work.ready, ...work.blocked];
+  const graph = await blockGraph(l);
+  const open = [...work.ready, ...work.blocked].filter((i) => !graph.waitsOnSomeone(i.id));
   const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
   return open.filter((i) => untouched.some((u) => u.id === i.id)).map(({ id, type, title, status }) => ({ id, type, title, status }));
 }
@@ -231,6 +234,8 @@ export async function sessionEnd(
     summary?: string;
     /** Open items the session vouches for as it found them. */
     still_true?: string[];
+    /** Open items the session had nothing to do with and cannot check from where it is. */
+    cannot_tell?: string[];
     /** Ask the session about the repository's open work before letting it finish. */
     reconcile?: boolean;
   },
@@ -241,18 +246,21 @@ export async function sessionEnd(
   const outcome = input.outcome ?? 'finished';
   const unsaid = outcome === 'finished' ? await unreconciled(l, run) : [];
   const vouched = unsaid.filter((i) => input.still_true?.includes(i.id));
-  const left = unsaid.filter((i) => !vouched.includes(i));
+  // "Cannot tell" is an answer too: the item is left exactly as it was, last known true when it was, and the run says so.
+  const unknown = unsaid.filter((i) => !vouched.includes(i) && input.cannot_tell?.includes(i.id));
+  const left = unsaid.filter((i) => !vouched.includes(i) && !unknown.includes(i));
   if (input.reconcile && left.length) {
     return {
       run: run.id,
       status: run.status,
       ended: false,
       unreconciled: left,
-      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with the change tool; if it is still true as written, name its id in still_true. Then call session_end again.',
+      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with the change tool; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell, and do not vouch for what you did not look at. Then call session_end again.',
     };
   }
   const said = [
     vouched.length && `Said still true: ${vouched.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
+    unknown.length && `Could not tell from here, left as found: ${unknown.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
     left.length && `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
   ].filter(Boolean);
   const summary = [input.summary, ...said].filter(Boolean).join('\n');
@@ -293,6 +301,12 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
       blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[];
     };
     lines.push(`Repository: ${repo.title} (${repo.id}).`);
+    // Where things stand is read off the map; the session is told how much has moved since someone last wrote it down.
+    const stand = await handoff(l, { repo: repo.id });
+    const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+    const then = stand.since_then;
+    const from = stand.note ? `Its note, "${stand.note.title}" (${stand.note.id}), was written ${new Date(stand.note.written).toISOString().slice(0, 10)}; since then` : 'Nobody has written a handoff note here; in the last week';
+    lines.push(`Where things stand: view "handoff" with repo ${repo.id}. ${from}: ${n(then.pushes.length, 'push', 'pushes')}, ${n(then.settled.length, 'item')} settled, ${n(then.opened.length, 'item')} opened, ${n(then.sessions.length, 'session')} ended.`);
     const kind = (t: { type: string }) => (l.registry.isA(t.type, 'issue') ? 'Issue: ' : '');
     // What nobody has touched for a while is said to be so: it may no longer be true.
     const age = (t: { last_confirmed: string | Date }) => {
@@ -315,7 +329,7 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
   lines.push(
     '',
     'When you take on a task that has no estimate, give it one: how many tokens you expect it to take (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.',
-    'If the lattice MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each or say it is still true. A session that ends without it is closed for you and recorded as not reconciled.',
+    'If the lattice MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.',
     'When Lattice itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.',
     'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm unless this workspace applies agents’ changes as made, so send the answer with what was chosen and why.',
   );

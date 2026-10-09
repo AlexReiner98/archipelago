@@ -167,8 +167,10 @@ at once; they are the session's own state, not facts about the world.
 - **From an agent:** the `session_start`, `session_update` and `session_end`
   tools. An agent that finishes a session in a repository is first shown that
   repository's open work nobody has changed since the session began, and has
-  to change each item or say it is still true; a session closed without that
-  (by the hook, or a crash) is recorded as not reconciled.
+  to change each item, say it is still true, or say it cannot tell from where
+  it is (the item is then left as it was, and the run says it was not
+  checked); what waits on a person's answer is not asked about. A session
+  closed without that (by the hook, or a crash) is recorded as not reconciled.
 - **Automatically, from Claude Code:** merge
   [examples/claude-code-hooks.json](examples/claude-code-hooks.json) into a
   project's `.claude/settings.json` (that file calls a server on the same
@@ -227,9 +229,20 @@ The questions the map exists to answer. `npm run lattice -- view` lists them.
 | `sessions` | Which agent sessions are open, on what, holding what? |
 | `brief` | What does a session need to know to start on this task? |
 | `repo_work` | What open work belongs to this repository? |
+| `handoff` | Where does this repository's work stand for whoever picks it up? |
 
-Blockers are never stored. They are derived each time from `depends_on` and
-`needs` relations, so they cannot go stale.
+Blockers are never stored. They are derived each time from `depends_on`,
+`waits_on` and `needs` relations, so they cannot go stale. `depends_on` is
+other work that has to be closed first; `waits_on` is a person, company or
+agent who has to answer or act (say what for in the relation's `props.for`,
+and remove the link once they have); `needs` is a resource.
+
+A handoff is mostly read off the map, so it does not go stale between
+sessions: the last push, what is open, and what has happened since the
+handoff note was written (pushes, what was settled or opened, the sessions
+that ended and what each said). The note (`software.handoff`) is the one part
+an agent writes, and holds only what the map cannot know: what nobody has
+seen working, what bites when working here, what to do next and why.
 
 ## Packs and flavours
 
