@@ -1509,33 +1509,51 @@ function timeline(nodes, edges, byId, focus, prefs) {
   const known = timed.filter((n) => n.tokens?.estimated > 0 && !kids.get(n.id)?.length).map((n) => n.tokens.estimated).sort((a, b) => a - b);
   const middling = known.length ? known[Math.floor(known.length / 2)] : 50_000;
   const rows = [];
+  // Every bar is exactly the stretch of the scale it takes, so no two that follow each other overlap and a
+  // bar spans exactly what is part of it. A finished thing takes what it used; one under way, what it is
+  // expected to or what it has used already if that is more; one to come, what it is expected to. What is
+  // filled in is what has been used, and the part of that beyond the estimate is marked as over.
   const place = (n, start) => {
     if (rows.includes(n)) return start; // a loop of belonging: stop going round
     rows.push(n);
     let cursor = start;
-    for (const kid of inOrder(kids.get(n.id) ?? [])) cursor = place(kid, cursor);
+    let within = 0;
+    const fills = [];
+    for (const kid of inOrder(kids.get(n.id) ?? [])) {
+      cursor = place(kid, cursor);
+      fills.push(...kid.fills);
+      within += kid.tokens?.used ?? 0;
+    }
     const { estimated = 0, used = 0 } = n.tokens ?? {};
-    const inside = cursor - start;
     n.guess = !(estimated > 0);
     n.t0 = start;
-    // Its bar is as long as it is expected to take, and spans what is part of it.
-    n.len = Math.max(estimated, inside) || (done(n) && used) || Math.max(used, middling);
-    // What comes next starts where this really ends: what a finished thing used, more or less than
-    // expected, and no sooner than what an unfinished one has used already. An overrun pushes the rest back.
-    const really = Math.max(inside, used);
-    return start + (done(n) ? really || n.len : Math.max(n.len, really));
+    if (cursor > start) {
+      // Over its parts it is filled where they are, and then by what was spent on it directly.
+      const own = Math.max(used - within, 0);
+      if (own > 0) fills.push({ t0: cursor, t1: cursor + own });
+      n.len = cursor + own - start;
+      if (!done(n)) n.len = Math.max(n.len, estimated);
+    } else {
+      const expected = estimated || (done(n) && used) || Math.max(used, middling);
+      n.len = done(n) ? used || expected : Math.max(expected, used);
+      const filled = done(n) ? n.len : Math.min(used, n.len);
+      const expectedPart = estimated > 0 ? Math.min(estimated, filled) : filled;
+      if (expectedPart > 0) fills.push({ t0: start, t1: start + expectedPart });
+      if (filled > expectedPart) fills.push({ t0: start + expectedPart, t1: start + filled, over: true });
+    }
+    n.fills = fills;
+    return start + n.len;
   };
   const roots = timed.filter((n) => !parentOf.has(n.id));
   let total = 0;
   for (const n of [...roots.filter((x) => x.id === focus), ...inOrder(roots.filter((x) => x.id !== focus))]) total = place(n, total);
   const scale = 1000 / (total || middling);
   rows.forEach((n, i) => {
-    const used = n.tokens?.used ?? 0;
-    Object.assign(n, { bar: true, x: n.t0 * scale, y: ROW.top + i * (ROW.h + ROW.gap), w: Math.max(n.len * scale, 6), h: ROW.h, usedW: (done(n) && !used ? n.len : Math.min(used, n.len)) * scale, overW: Math.max(used - n.len, 0) * scale });
+    Object.assign(n, { bar: true, x: n.t0 * scale, y: ROW.top + i * (ROW.h + ROW.gap), w: Math.max(n.len * scale, 6), h: ROW.h, fills: n.fills.map((f) => ({ x: (f.t0 - n.t0) * scale, w: (f.t1 - f.t0) * scale, over: f.over })) });
   });
   const bottom = ROW.top + rows.length * (ROW.h + ROW.gap);
   const loose = nodes.filter((n) => !n.work).sort((a, b) => a.title.localeCompare(b.title));
-  loose.forEach((n, i) => Object.assign(n, { bar: true, loose: true, x: 0, y: bottom + 12 + i * (ROW.h + ROW.gap), w: 210, h: ROW.h, usedW: 0, overW: 0 }));
+  loose.forEach((n, i) => Object.assign(n, { bar: true, loose: true, x: 0, y: bottom + 12 + i * (ROW.h + ROW.gap), w: 210, h: ROW.h, fills: [] }));
   // What a thing is part of is said by its bar spanning it, not by a line as well.
   // Nor is waiting that is over drawn: the order along the scale already says what came first.
   const over = (e) => BLOCKING.includes(e.type) && !byId.get(e.to).open;
@@ -1563,7 +1581,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const { estimated = 0, used = 0 } = n.tokens ?? {};
     n.count = n.loose ? typeTitle(n.type) : used > 0 || !n.guess ? `${n.tokens?.assumed ? '~' : ''}${tokensText(used)} / ${n.guess ? '?' : tokensText(estimated)}${!n.guess && n.len > estimated ? '+' : ''}` : 'no estimate';
     n.inside = n.loose || n.name.length * CHAR + 20 <= n.w;
-    n.reach = n.w + n.overW + 8 + (n.inside ? 0 : n.name.length * CHAR + 8) + (n.loose ? 0 : n.count.length * 6 + 8);
+    n.reach = n.w + 8 + (n.inside ? 0 : n.name.length * CHAR + 8) + (n.loose ? 0 : n.count.length * 6 + 8);
   }
   const width = Math.max(...nodes.map((n) => n.x + (n.reach ?? n.w))) + pad * 2;
   const height = Math.max(...nodes.map((n) => n.y + n.h)) + pad * 2;
@@ -1638,15 +1656,14 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
         `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}${n.work ? `\n${n.guess ? 'No estimate' : `Estimated ${tokensText(estimated)} tokens`}, ${tokensText(used)} used${n.tokens?.assumed ? ' (finished work that was not measured is counted at its estimate)' : ''}` : ''}`,
       ),
     );
-    const after = n.w + (n.overW ?? 0) + 8;
+    const after = n.w + 8;
     const box = n.bar
       ? s(
           'g',
           { class: `rm-node g-node bar group-${groupOf(n.root).key}${state}${n.guess ? ' guess' : ''}${n.loose ? ' loose' : ''}`, transform: `translate(${n.x},${n.y})` },
           hint,
-          s('rect', { class: 'box', width: n.w, height: n.h, rx: 5 }),
-          n.usedW > 0 && s('rect', { class: 'used', width: n.usedW, height: n.h, rx: 5 }),
-          n.overW > 0 && s('rect', { class: 'over', x: n.w, y: 4, width: n.overW, height: n.h - 8, rx: 3 }),
+          s('rect', { class: 'box', width: n.w, height: n.h, rx: 3 }),
+          ...n.fills.map((f) => s('rect', { class: f.over ? 'over' : 'used', x: f.x, y: 1, width: Math.min(f.w, n.w - f.x), height: n.h - 2 })),
           n.w > 14 && s('rect', { class: 'stripe', x: 0, y: 6, width: 3, height: n.h - 12, rx: 1.5 }),
           s('text', { x: n.inside ? 10 : after, y: 19 }, document.createTextNode(n.name)),
           !n.loose && s('text', { class: 'small', x: after + (n.inside ? 0 : n.name.length * CHAR + 8), y: 19 }, document.createTextNode(n.count)),
@@ -1705,9 +1722,9 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
 
   const key = (cls, text) => h('span', { class: 'key' }, h('span', { class: cls }), text);
   const legend = [
-    axis && key('swatch g-est', 'As long as it is expected to take'),
-    nodes.some((n) => n.usedW > 0) && key('swatch g-used', 'Used so far'),
-    nodes.some((n) => n.overW > 0) && key('swatch g-over', 'Over its estimate'),
+    axis && key('swatch g-est', 'Still to be used'),
+    nodes.some((n) => n.fills?.some((f) => !f.over)) && key('swatch g-used', 'Used so far'),
+    nodes.some((n) => n.fills?.some((f) => f.over)) && key('swatch g-over', 'Over its estimate'),
     nodes.some((n) => n.guess) && key('swatch g-guess', 'No estimate yet'),
     seen.waiting && key('stroke waits', 'Waits on something unfinished'),
     seen.met && key('stroke blocking', 'Waited on something now finished'),
