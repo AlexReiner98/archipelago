@@ -634,14 +634,17 @@ test('tokens: an estimate is asked for, what a session uses goes to its work, an
 
   const nodes = new Map(((await VIEWS.graph.run(l, { focus: made.p, depth: 1, relations: 'all', include_closed: true })) as any).nodes.map((n: any) => [n.title, n]));
   const of = (title: string) => nodes.get(title) as any;
-  assert.deepEqual(of('Proj').tokens, { estimated: 100_000, used: 40_000 }, 'a project is what is part of it, in sight or not');
-  assert.deepEqual([of('Feature').tokens, of('Feature').estimated], [{ estimated: 100_000, used: 40_000 }, true], 'an estimate of its own stands until its parts add up to more');
+  assert.deepEqual(of('Proj').tokens, { estimated: 80_000, used: 40_000, partial: true }, 'a project is what is part of it, in sight or not');
+  assert.deepEqual([of('Feature').tokens, of('Feature').estimated], [{ estimated: 80_000, used: 40_000, partial: true }, true], 'a feature is the sum of its tasks, and says when some of them have no estimate');
   assert.deepEqual([of('A note').work, of('A note').tokens], [undefined, undefined], 'what is not work has no tokens');
   // What is finished counts as used: by its estimate when no session was measured on it, and its feature and project with it.
   const { c } = await make(l, [{ op: 'create', ref: 'c', type: 'task', title: 'Task C', status: 'done', props: { tokens_estimated: 30_000 } }, { op: 'link', type: 'part_of', from: 'c', to: made.f }]);
   const again = ((await VIEWS.graph.run(l, { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
   assert.deepEqual(again.find((n: any) => n.id === c).tokens, { estimated: 30_000, used: 30_000, assumed: true });
-  assert.deepEqual(again.find((n: any) => n.id === made.f).tokens, { estimated: 110_000, used: 70_000, assumed: true });
+  assert.deepEqual(again.find((n: any) => n.id === made.f).tokens, { estimated: 110_000, used: 70_000, assumed: true, partial: true });
+  // Its own estimate stands only while none of its tasks has one.
+  const { g } = await make(l, [{ op: 'create', ref: 'g', type: 'software.feature', title: 'Bare', props: { tokens_estimated: 50_000 } }, { op: 'create', ref: 'x', type: 'task', title: 'Unsized' }, { op: 'link', type: 'part_of', from: 'x', to: 'g' }]);
+  assert.deepEqual(((await VIEWS.graph.run(l, { focus: g, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === g).tokens, { estimated: 50_000, used: 0 });
   await make(l, [{ op: 'archive', id: c }]);
   await make(l, [{ op: 'update', id: made.b, props: { tokens_estimated: 70_000 } }]);
   assert.equal(((await VIEWS.graph.run(l, { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === made.f).tokens.estimated, 150_000);

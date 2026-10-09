@@ -1581,7 +1581,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
   for (const n of nodes.filter((x) => x.bar)) {
     n.name = cut(n.place ? `${n.place}. ${n.title}` : n.title, 46);
     const { estimated = 0, used = 0 } = n.tokens ?? {};
-    n.count = n.loose ? typeTitle(n.type) : used > 0 || !n.guess ? `${n.tokens?.assumed ? '~' : ''}${tokensText(used)} / ${n.guess ? '?' : tokensText(estimated)}${!n.guess && n.len > estimated ? '+' : ''}` : 'no estimate';
+    n.count = n.loose ? typeTitle(n.type) : used > 0 || !n.guess ? `${n.tokens?.assumed ? '~' : ''}${tokensText(used)} / ${n.guess ? '?' : tokensText(estimated)}${!n.guess && (n.tokens?.partial || n.len > estimated) ? '+' : ''}` : 'no estimate';
     n.inside = n.loose || n.name.length * CHAR + 20 <= n.w;
     n.reach = n.w + 8 + (n.inside ? 0 : n.name.length * CHAR + 8) + (n.loose ? 0 : n.count.length * 6 + 8);
   }
@@ -1655,7 +1655,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
       'title',
       {},
       document.createTextNode(
-        `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}${n.work ? `\n${n.guess ? 'No estimate' : `Estimated ${tokensText(estimated)} tokens`}, ${tokensText(used)} used${n.tokens?.assumed ? ' (finished work that was not measured is counted at its estimate)' : ''}` : ''}`,
+        `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.blocked ? ', blocked' : ''}${n.sessions?.length ? ', session open' : ''}${n.work ? `\n${n.guess ? 'No estimate' : `Estimated ${tokensText(estimated)} tokens`}, ${tokensText(used)} used${n.tokens?.assumed ? ' (finished work that was not measured is counted at its estimate)' : ''}${n.tokens?.partial ? '\nSome of what is part of it has no estimate yet, so it will take more' : ''}` : ''}`,
       ),
     );
     const after = n.w + 8;

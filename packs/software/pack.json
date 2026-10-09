@@ -30,7 +30,7 @@
       "statuses": { "open": ["planned", "building", "built"], "closed": ["shipped", "dropped"] },
       "fields": {
         "order": { "type": "number", "description": "Position on the roadmap among its siblings. Lower comes first." },
-        "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects this to take in all: input and output, not counting cached re-reads. It stands until the tasks that are part of it add up to more." },
+        "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects this to take in all: input and output, not counting cached re-reads. It stands only while none of the tasks that are part of it has an estimate: after that the feature is the sum of its tasks." },
         "tokens_used": { "type": "number", "description": "Tokens spent on it directly, measured from the sessions that worked on it. What its tasks used is added when it is shown.", "system": true }
       }
     },

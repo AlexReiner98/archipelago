@@ -517,12 +517,13 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
   edges = edges.filter((e) => keep.has(e.from_id) && keep.has(e.to_id));
 
   // Tokens: what each thing is expected to take and has taken, with everything that is part of it, in sight or not.
-  // An estimate of its own stands until its parts add up to more.
+  // A thing with parts is expected to take the sum of what they are; its own estimate stands only while none of its
+  // parts has one. Where some parts have an estimate and some have not, the sum is short, and says so (`partial`).
   const all = new Map(entities.map((e) => [e.id, e]));
   const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null`);
   const partsOf = new Map<string, string[]>();
   for (const p of parts) if (all.has(p.from_id)) partsOf.set(p.to_id, [...(partsOf.get(p.to_id) ?? []), p.from_id]);
-  type Tokens = { estimated: number; used: number; assumed?: boolean };
+  type Tokens = { estimated: number; used: number; assumed?: boolean; partial?: boolean };
   const totals = new Map<string, Tokens>();
   // A feature that is built is done, though it stays open until it ships.
   const done = (e: Entity | undefined) => Boolean(e) && (!e!.is_open || e!.status === 'built');
@@ -534,7 +535,9 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
     const inside = (partsOf.get(id) ?? []).map((part) => tokens(part, trail));
     trail.delete(id);
     const own = all.get(id)?.props ?? {};
-    const sum: Tokens = { estimated: Math.max(Number(own.tokens_estimated ?? 0), inside.reduce((n, t) => n + t.estimated, 0)), used: Number(own.tokens_used ?? 0) + inside.reduce((n, t) => n + t.used, 0) };
+    const ofParts = inside.reduce((n, t) => n + t.estimated, 0);
+    const sum: Tokens = { estimated: ofParts || Number(own.tokens_estimated ?? 0), used: Number(own.tokens_used ?? 0) + inside.reduce((n, t) => n + t.used, 0) };
+    if (ofParts && inside.some((t) => !t.estimated || t.partial)) sum.partial = true;
     // What is finished has been paid for. Where nothing measured it, it is taken to have used what it was expected to.
     if (done(all.get(id)) && !sum.used && sum.estimated) Object.assign(sum, { used: sum.estimated, assumed: true });
     else if (inside.some((t) => t.assumed)) sum.assumed = true;
