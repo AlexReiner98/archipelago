@@ -179,3 +179,9 @@ npm run typecheck
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/app.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
+
+## Lattice
+
+This project's work is kept in Lattice (https://lattice.aperture.tools). How to work with it:
+
+@.claude/lattice.md
