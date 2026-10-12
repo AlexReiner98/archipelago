@@ -22,6 +22,9 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+// Which hand-out of Lattice's files this project has: the setup writes it in, and the server says when it is behind.
+const SETUP = '';
+
 const name = process.argv[2];
 const base = (process.env.LATTICE_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
 const token = process.env.LATTICE_AGENT_TOKEN;
@@ -65,6 +68,12 @@ if (name === 'session-start') {
   } catch {
     // No count this time; what the hook is for still goes through.
   }
+}
+
+try {
+  body = JSON.stringify({ ...JSON.parse(body), setup: SETUP });
+} catch {
+  // Not JSON: it goes as it came.
 }
 
 try {

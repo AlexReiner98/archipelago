@@ -1901,6 +1901,7 @@ function secretBox(label, token) {
 function connectBox(made) {
   // One command, copied and run in the project's folder on the machine the agent will work on. It carries the
   // address and the token in, the setup script keeps them for that machine, and the same script sets the project up.
+  // The same command the server gives a session whose project is behind (setupCommand in src/connect.ts).
   const fetchIt = `node -e "fetch('${location.origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
   const first = {
     windows: `$env:LATTICE_URL='${location.origin}'; $env:LATTICE_AGENT_TOKEN='${made.token}'; $env:LATTICE_SETUP_SAVE='1'; ${fetchIt}`,

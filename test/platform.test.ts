@@ -497,6 +497,13 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
 
   const started = await hook('session-start', { session_id: 'desk-1', cwd: '/nowhere' }, { LATTICE_AGENT_TOKEN: robot });
   assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, /registered in Lattice/, 'the server\u2019s answer comes back for Claude Code to read');
+  // A project whose files are not the ones the server now hands out is told so, with the command that brings them up to date.
+  const { SETUP_VERSION, setupScript } = await import('../src/connect.ts');
+  const behind = /Lattice files \(hooks, working rules, the bump skill\) are older than the server\u2019s|are older than the server's[^]*connect\/setup\.mjs/;
+  assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, behind, 'the script in this repository is not a hand-out: it says no version');
+  const current = (await call('/hooks/session-start', robot, { session_id: 'desk-1', cwd: '/nowhere', setup: SETUP_VERSION })).hookSpecificOutput.additionalContext;
+  assert.doesNotMatch(current, /older than the server/);
+  assert.ok(setupScript(base).includes(`const SETUP = '${SETUP_VERSION}';`), 'the hook a project is given says which hand-out it is');
   const open = (await call('/agent/view', robot, { name: 'sessions' })).result.open;
   assert.deepEqual(open.map((s: any) => s.surface), ['claude-code'], 'and the session is on that server\u2019s map');
   // At the end of a turn the session's count so far goes to its run: one long turn is not a session without tokens.

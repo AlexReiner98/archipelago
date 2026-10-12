@@ -257,7 +257,22 @@ function forAgent(name: string, answer: unknown): unknown {
   const out = bare(answer) as Record<string, unknown>;
   if (name === 'blockers' && Array.isArray(out)) {
     // What blocks an item at the root is named; it is in the list in full where it is itself blocked, or one get away.
-    return (out as { root_blockers?: { id: string; title: string }[] }[]).map((b) => ({ ...b, root_blockers: b.root_blockers?.map((r) => ({ id: r.id, title: r.title })) }));
+    return (out as { blocked_by?: { why: string; entity: Record<string, unknown> }[]; root_blockers?: { id: string; title: string }[] }[]).map(({ root_blockers, blocked_by, ...b }) => {
+      const direct = new Set(blocked_by?.map((d) => d.entity.id));
+      const further = root_blockers?.filter((r) => !direct.has(r.id)).map((r) => ({ id: r.id, title: r.title })) ?? [];
+      return { ...b, blocked_by: blocked_by?.map((d) => ({ why: d.why, ...d.entity })), ...(further.length && { root_blockers: further }) };
+    });
+  }
+  if (name === 'tree' && Array.isArray(out?.branches)) {
+    // A branch as an agent reads it: what is open under it by name, what is finished by count, and a mark only when it is set.
+    type Node = Record<string, unknown> & { branches?: Node[]; work?: (Record<string, unknown> & { open?: boolean })[] };
+    const light = ({ sessions, active, blocked, ...node }: Node): Node => ({ ...node, ...(blocked ? { blocked } : {}), ...(active ? { active } : {}), ...(Array.isArray(sessions) && sessions.length ? { sessions } : {}) });
+    const prune = (node: Node): Node => {
+      const work = node.work ?? [];
+      const open = work.filter((w) => w.open !== false);
+      return { ...light(node), ...(node.branches && { branches: node.branches.map(prune) }), ...(node.work && { work: open.map((w) => light(w)), ...(work.length > open.length && { finished_work: work.length - open.length }) }) };
+    };
+    out.branches = (out.branches as Node[]).map(prune);
   }
   if (name === 'questions' && Array.isArray(out?.settled)) {
     const cut = (s: unknown) => (typeof s === 'string' && s.length > 200 ? `${s.slice(0, 200)}…` : s);

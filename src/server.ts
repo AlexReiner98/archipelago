@@ -39,7 +39,7 @@ import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './
 import { notify } from './notify.ts';
 import { backupAll, newestBackup, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
-import { setupScript } from './connect.ts';
+import { SETUP_VERSION, setupCommand, setupScript } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
@@ -364,7 +364,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // Never from a web page, and only under a name this server answers to; with tokens on, the token says whose session it is.
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are called by Claude Code, not from a web page, and at an address this server is known by.' });
         const { lattice } = await resolve(req, res, 'agent');
-        const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; remote?: string; reason?: string; tokens?: number };
+        const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; remote?: string; reason?: string; tokens?: number; setup?: string };
         // Said in the server's log, so "did the hook run?" has an answer.
         console.log(`hook ${url.pathname.slice('/hooks/'.length)} from session ${body.session_id ?? 'unknown'}`);
         // Each time the owner sends a session a message, the session is told what
@@ -392,7 +392,13 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         }
         if (url.pathname === '/hooks/session-start') {
           heardUpTo.set(body.session_id ?? '', await latestSeq(lattice));
-          const additionalContext = await hookSessionStart(lattice, body);
+          let additionalContext = await hookSessionStart(lattice, body);
+          // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
+          // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
+          if (body.setup !== SETUP_VERSION) {
+            const host = req.headers.host ?? '';
+            additionalContext += `\n\nThis folder's Lattice files (hooks, working rules, the bump skill) are older than the server's. Tell the owner in your first reply, and with their yes bring them up to date by running this in the folder (it holds no secret, and only adds to what is there): ${setupCommand(`${named.includes(host) ? 'https' : 'http'}://${host}`)} . What it changes takes effect in the next session.`;
+          }
           return send(res, 200, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext } });
         }
         if (url.pathname === '/hooks/session-end') {

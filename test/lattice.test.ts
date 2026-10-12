@@ -640,7 +640,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   assert.deepEqual([forPerson.ready[0].due, 'due' in forAgent.ready[0], forAgent.ready[0].id], [null, false, forPerson.ready[0].id]);
   assert.equal(((await callTool(l, agent, 'view', { name: 'repo_work', params: { repo: made.repo, full: true } })) as any).ready[0].due, null, 'whole when asked');
   const blocked = (await callTool(l, agent, 'view', { name: 'blockers' })) as any[];
-  assert.deepEqual(Object.keys(blocked[0].root_blockers[0]), ['id', 'title']);
+  assert.deepEqual([typeof blocked[0].blocked_by[0].why, typeof blocked[0].blocked_by[0].id, 'root_blockers' in blocked[0]], ['string', 'string', false], 'what blocks it directly is the root: said once');
   const told = (await callTool(l, agent, 'view', { name: 'handoff', params: { repo: made.repo } })) as any;
   assert.deepEqual([told.note.id, told.open.ready.length, 'ready_count' in told.open], [note, stand.open.ready.length, false], 'a short list is given whole');
   assert.deepEqual(stand.last_push.head, 'abcdef0');
