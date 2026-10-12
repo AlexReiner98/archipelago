@@ -648,10 +648,10 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   const part = 'Next, and why\n' + 'Run the probe on a real model. '.repeat(40);
   const grow = () => callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
   for (let i = 0; i < 4; i++) await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
-  await assert.rejects(grow(), /the handoff note would be \d+ characters: 6000 at most[^]*Rewrite it whole/);
+  await assert.rejects(grow(), /the handoff note would be \d+ characters: 3000 at most[^]*Rewrite it whole/);
   await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part.repeat(2) }] });
-  assert.match(((await VIEWS.handoff.run(l, { repo: made.repo })) as any).how, /^The note is \d+ characters, and may be 6000 at most/);
-  await assert.rejects(grow(), /6000 at most/);
+  assert.match(((await VIEWS.handoff.run(l, { repo: made.repo })) as any).how, /^The note is \d+ characters, and may be 3000 at most/);
+  await assert.rejects(grow(), /3000 at most/);
   // Over its length already, it can always be made shorter.
   const shorter = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, body: 'Next, and why\nRun the probe on a real model.' }] })) as any;
   assert.ok(['applied', 'proposed'].includes(shorter.status));

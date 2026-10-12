@@ -239,7 +239,7 @@ async function atRisk(l: Lattice, input: { days?: number }) {
 }
 
 /** The longest a handoff note may grow to from an agent: one of each part, rewritten, not a part added by every session. */
-export const HANDOFF_MAX = 6000;
+export const HANDOFF_MAX = 3000;
 
 /**
  * Questions agents have settled since the owner last looked, or last answered

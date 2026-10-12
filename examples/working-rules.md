@@ -48,7 +48,7 @@ true as you go; do not keep a second record in files or in the chat.
 1. Bring the handoff note up to date: only what the map cannot know (what
    nobody has seen working, what bites when working here, what you would do
    next and why), one of each part. Replace what is there, do not add a
-   second "next" beside the first: the note is 6,000 characters at most.
+   second "next" beside the first: the note is 3,000 characters at most.
 2. `session_end` with a summary. It lists what is still open here that nobody
    changed: change each, name it in `still_true` if you checked it, or in
    `cannot_tell` if you had nothing to do with it (`cannot_tell_rest: true`
