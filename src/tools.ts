@@ -217,17 +217,31 @@ function point(l: Lattice, actor: Actor, hash: string, note?: string): Focus {
 /**
  * History as an agent reads it: a long value before or after an edit (a note,
  * mostly) is cut to its start and its length, so an item edited ten times does
- * not answer with its note twenty times over. `full` asks for all of it.
+ * not answer with its note twenty times over. A change set logs one event for
+ * each thing it touched, all with the same reason and authority: those are
+ * said on the first of them only. `full` asks for all of it.
  */
 function shortHistory<T>(events: T[]): T[] {
   const cut = (v: unknown) => (typeof v === 'string' && v.length > 300 ? `${v.slice(0, 200)}… (${v.length} characters; ask again with full: true for all of it)` : v);
+  const said = new Set<string>();
   return events.map((ev) => {
-    const detail = (ev as { detail?: { changes?: Record<string, { from: unknown; to: unknown }> } | null }).detail;
-    if (!detail?.changes) return ev;
-    return { ...ev, detail: { ...detail, changes: Object.fromEntries(Object.entries(detail.changes).map(([key, c]) => [key, { from: cut(c.from), to: cut(c.to) }])) } };
+    const { changeset, detail } = ev as { changeset?: string | null; detail?: { changes?: Record<string, { from: unknown; to: unknown }>; authority?: unknown } | null };
+    const again = Boolean(changeset && said.has(changeset));
+    if (changeset) said.add(changeset);
+    if (!again && !detail?.changes) return ev;
+    const changes = detail?.changes && Object.fromEntries(Object.entries(detail.changes).map(([key, c]) => [key, { from: cut(c.from), to: cut(c.to) }]));
+    return { ...ev, ...(again && { reason: undefined }), detail: detail && { ...detail, ...(changes && { changes }), ...(again && { authority: undefined }) } };
   });
 }
-const FULL = z.boolean().optional().describe('true to be given long notes in the history whole. Left out, an agent is given the start of each and its length.');
+const FULL = z.boolean().optional().describe('true to be given the history whole: long notes, and the reason and authority on every event of a change set. Left out, an agent is given the start of each note and its length, and a change set’s reason and authority on the first of its events only.');
+
+/**
+ * Changes an agent sent that were refused, kept for a few minutes so that
+ * correcting one op does not mean writing seventy out again. In memory, like
+ * the focus: it is a convenience, and means nothing after a restart.
+ */
+const REFUSED_MINUTES = 10;
+const refused = new Map<string, { at: number; who: string; input: Record<string, unknown> & { ops: unknown[] } }>();
 
 export const TOOLS: Record<string, Tool> = {
   schema: {
@@ -250,11 +264,14 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => l.search(input),
   },
   get: {
-    description: 'One entity in full: its fields, the source it came from, its relations in both directions, and its recent history.',
-    input: { id: z.string(), full: FULL },
+    description: 'One entity in full: its fields, the source it came from and its relations in both directions. Its recent history too, when asked for with history: true.',
+    input: { id: z.string(), history: z.boolean().optional().describe('true to be given the last changes to it as well (recent_events).'), full: FULL },
     run: async (l, actor, input) => {
       const found = await l.get(input.id);
-      return actor.kind === 'human' || input.full ? found : { ...found, recent_events: shortHistory(found.recent_events) };
+      if (actor.kind === 'human' || input.full) return found;
+      // An agent mostly wants the item; its history is several times the size, so it is given when asked for.
+      const { recent_events, ...item } = found;
+      return input.history ? { ...item, recent_events: shortHistory(recent_events) } : item;
     },
   },
   view: {
@@ -267,15 +284,18 @@ export const TOOLS: Record<string, Tool> = {
       name: z.string().optional(),
       params: props.optional(),
     },
-    run: async (l, _actor, input) => {
+    run: async (l, actor, input) => {
       if (!input.name) return Object.fromEntries(Object.entries(VIEWS).map(([name, v]) => [name, v.description]));
       const view = VIEWS[input.name];
       if (!view) throw new Error(`No view "${input.name}". Views: ${Object.keys(VIEWS).join(', ')}`);
-      return view.run(l, input.params ?? {});
+      const answer = await view.run(l, input.params ?? {});
+      // A view that answers with events (changed_since) is history, and is cut for an agent as history is.
+      const events = (answer as { events?: unknown } | null)?.events;
+      return actor.kind === 'agent' && Array.isArray(events) && !input.params?.full ? { ...(answer as object), events: shortHistory(events) } : answer;
     },
   },
   events: {
-    description: 'The activity log, newest first: every change to the map and every imported external tool call, with who did it and why.',
+    description: 'The activity log, newest first: every change to the map and every imported external tool call, with who did it and why. A change set logs an event for each thing it touched; its reason and authority are on the first of them.',
     input: {
       since: z.string().optional().describe('ISO date-time.'),
       target: z.string().optional().describe('An entity id.'),
@@ -412,11 +432,17 @@ export const TOOLS: Record<string, Tool> = {
       'To add to a note or change one passage of it, send append or replace on the update, not the whole body again. ' +
       'An update that changes nothing (only the id) says you checked the item and it is still true as written: it records when it was last known true. ' +
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
+      'A change that is refused is kept for a few minutes under a name the refusal gives: correct it with retry and fixes (the ops that were wrong, by number) instead of sending it all again. ' +
       'Keep the map true as you work: when what you did or found settles something that is still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, instead of leaving it open with a note. ' +
       'Closing a decision or a hypothesis is held for the human to confirm, so propose the answer freely: it costs them one click. Only in a workspace set to apply agents\u2019 changes does it take effect at once: then a decision must carry what was chosen (props.outcome) and why (props.rationale), the human is notified, and it is yours to get right. Settle what the work or the owner has in fact settled; a choice that is still the owner\u2019s to make stays open.',
     input: {
-      ops: z.array(op).min(1),
-      reason: z.string().min(1).describe('Why this change is being made. Shown in the activity log.'),
+      ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
+      reason: z.string().min(1).optional().describe('Why this change is being made. Shown in the activity log. Needed, except with retry.'),
+      retry: z.string().optional().describe('The name a refused change was kept under (the refusal gives it). The change is sent again as it was, with fixes put in: send only retry and fixes.'),
+      fixes: z
+        .array(z.object({ at: z.number().int().positive().describe('The op’s number as the refusal counted it, from 1.'), op: op.nullable().describe('The whole op as it should be; null to leave it out.') }))
+        .optional()
+        .describe('With retry: the ops to put in place of the ones that were wrong.'),
       source: source.optional().describe('Where these facts came from. Individual ops can override it.'),
       authority: z
         .object({
@@ -427,18 +453,47 @@ export const TOOLS: Record<string, Tool> = {
         .describe('On whose authority this change is made. Kept on every event it logs. Left out, it is recorded as your own judgment; settling a decision or hypothesis needs it said.'),
       hold: z.boolean().optional().describe('true to have this change wait for the human even where agents\u2019 changes are applied as made: for something you want looked at before it takes effect.'),
     },
-    run: async (l, actor, input) => {
-      // Agents write sentences where a name is wanted, and every row and box then has to cut them. Held to a length here,
-      // where an agent names things; a person may name a thing as they like, and an undo puts back what was there.
-      if (actor.kind === 'agent') {
-        const long = (input.ops as { op: string; title?: string }[]).flatMap((o, i) =>
-          (o.op === 'create' || o.op === 'update') && o.title && o.title.trim().length > TITLE_MAX
-            ? [`op ${i + 1} (${o.op}): the title is ${o.title.trim().length} characters. A title is a name, not a sentence: ${TITLE_MAX} at most. Name the thing in a few words and put the rest in its note.`]
-            : [],
-        );
-        if (long.length) throw new Error(`Change rejected:\n- ${long.join('\n- ')}`);
+    run: async (l, actor, { retry, fixes, ...given }) => {
+      const who = `${l.workspace}:${actor.name}`;
+      let input = given;
+      if (retry) {
+        const kept = refused.get(retry);
+        if (!kept || kept.who !== who || Date.now() - kept.at > REFUSED_MINUTES * 60_000) throw new Error(`No refused change is kept as "${retry}": one is kept for ${REFUSED_MINUTES} minutes, and not across a restart. Send the change whole.`);
+        const ops = [...kept.input.ops];
+        for (const fix of fixes ?? []) {
+          if (fix.at > ops.length) throw new Error(`Change rejected:\n- fixes: the change kept as "${retry}" has ${ops.length} ops, so there is no op ${fix.at}.`);
+          ops[fix.at - 1] = fix.op;
+        }
+        // What is said again (a reason, an authority) stands in for what was kept.
+        input = { ...kept.input, ...Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)), ops: ops.filter(Boolean) };
       }
-      const result = await l.change(actor, input);
+      if (!input.ops?.length) throw new Error('A change needs ops, or retry with the name a refused change was kept under.');
+      if (!input.reason) throw new Error('Every change needs a reason.');
+      let result;
+      try {
+        // Agents write sentences where a name is wanted, and every row and box then has to cut them. Held to a length here,
+        // where an agent names things; a person may name a thing as they like, and an undo puts back what was there.
+        if (actor.kind === 'agent') {
+          const long = (input.ops as { op: string; title?: string }[]).flatMap((o, i) =>
+            (o.op === 'create' || o.op === 'update') && o.title && o.title.trim().length > TITLE_MAX
+              ? [`op ${i + 1} (${o.op}): the title is ${o.title.trim().length} characters. A title is a name, not a sentence: ${TITLE_MAX} at most. Name the thing in a few words and put the rest in its note.`]
+              : [],
+          );
+          if (long.length) throw new Error(`Change rejected:\n- ${long.join('\n- ')}`);
+        }
+        result = await l.change(actor, input);
+      } catch (err) {
+        const message = (err as Error).message;
+        if (actor.kind !== 'agent' || !message.startsWith('Change rejected')) throw err;
+        // A refused change is kept, so that what is wrong with one op is all that has to be sent again.
+        for (const [name, old] of refused) if (Date.now() - old.at > REFUSED_MINUTES * 60_000) refused.delete(name);
+        const name = retry ?? `k_${Math.random().toString(36).slice(2, 10)}`;
+        refused.set(name, { at: Date.now(), who, input });
+        throw new Error(
+          `${message}\nNothing was changed. The change is kept for ${REFUSED_MINUTES} minutes as "${name}": to correct it, send change with only retry: "${name}" and fixes: [{ at: <the op’s number>, op: <the whole op as it should be> }]. Every other op is sent as it was.`,
+        );
+      }
+      if (retry) refused.delete(retry);
       // A question an agent settled is not left for the human to come across.
       if ('answered' in result) for (const a of result.answered) await notify(l, actor, { title: `${actor.name} settled "${a.title}": ${a.outcome ?? a.status}`, body: `${a.authority.of === 'human' ? `On a human\u2019s word, as the agent reports it: ${a.authority.basis}` : `On the agent\u2019s own judgment${a.authority.basis ? `: ${a.authority.basis}` : ''}`}\n\n${input.reason}`, about: a.id });
       // The human's screen follows an agent's change: to Review when it waits
@@ -554,13 +609,14 @@ export const TOOLS: Record<string, Tool> = {
   },
   session_end: {
     description:
-      'Close a registered session with its outcome and a summary. Everything it held is released. A session that finishes in a repository is first shown that repository\'s open work nobody has changed since it began (answer: ended false, with the list): change what is done or no longer as written, name what you checked and found still true in still_true, name what this session had nothing to do with and cannot check in cannot_tell, and call again. What waits on a person’s answer (waits_on) is not asked about.',
+      'Close a registered session with its outcome and a summary. Everything it held is released. A session that finishes in a repository is first shown that repository\'s open work nobody has changed since it began (answer: ended false, with the list): change what is done or no longer as written, name what you checked and found still true in still_true, name what this session had nothing to do with and cannot check in cannot_tell (cannot_tell_rest: true for all the rest), and call again. What waits on a person’s answer (waits_on), or has a change of its own waiting for the human, is not asked about.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
       outcome: z.enum(['finished', 'failed', 'cancelled']).optional(),
       summary: z.string().optional().describe('What was done and what is left.'),
       still_true: z.array(z.string()).optional().describe('Ids of open items you have checked and found still true as written.'),
       cannot_tell: z.array(z.string()).optional().describe('Ids of open items this session had nothing to do with and cannot check from where it is. They are left as they were, and the session says it did not check them.'),
+      cannot_tell_rest: z.boolean().optional().describe('true when every open item you have not changed or named is one this session had nothing to do with: all of them are left as they were, and the session says how many it did not look at.'),
     },
     run: async (l, actor, input) => {
       // An agent says where the repository's work stands; the human ending a session from the UI is not asked.

@@ -589,6 +589,14 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   assert.deepEqual((await l.proposals()).at(-1)!.ops, [{ op: 'update', id: made.live }], 'only what was vouched for is said to be checked');
   assert.deepEqual((await l.entity(made.gated))!.updated_at, before);
 
+  // The next session is not asked about what has a change waiting for the owner (the vouching above is one, held),
+  // and answers for all it never looked at in one word.
+  const next = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture', session_id: 'w2' });
+  const again = (await callTool(l, agent, 'session_end', { run: next.run })) as any;
+  assert.deepEqual(again.unreconciled.map((i: any) => i.title), ['Tune the solver']);
+  assert.equal(((await callTool(l, agent, 'session_end', { run: next.run, cannot_tell_rest: true })) as any).status, 'finished');
+  assert.match((await l.entity(next.run))!.body, /Could not tell from here, left as found: 1 item it did not look at\./);
+
   // Once they have answered, the link is removed and the work is free again.
   const link = (await l.get(made.offline)).outgoing.find((r: any) => r.type === 'waits_on') as any;
   await make(l, [{ op: 'unlink', relation: link.relation }]);
@@ -601,6 +609,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   // With no note, it looks back a week, and says there is none.
   const bare = (await VIEWS.handoff.run(l, { repo: made.repo })) as any;
   assert.equal(bare.note, null);
+  assert.match(bare.how, new RegExp(`^Nobody has written a handoff note for this repository\\. To write the first, create a software\\.handoff and link it software\\.lives_in to ${made.repo}`));
   assert.deepEqual(bare.open.ready.map((i: any) => i.title).sort(), ['Capture probe', 'Write unit tests']);
   assert.deepEqual(bare.open.blocked.map((i: any) => [i.title, i.waiting_on]), [['Tune the solver', ['Which target?']]]);
   assert.match(await hookSessionStart(l, { session_id: 'h0', cwd: 'C:\\code\\Aperture' }), /Where things stand: view "handoff" with repo e_\w+\. Nobody has written a handoff note here/);
@@ -622,6 +631,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
 
   const stand = (await VIEWS.handoff.run(l, { repo: 'aperture repo' })) as any;
   assert.deepEqual([stand.note.id, stand.note.body], [note, 'Not seen\nThe probe has not been run on a real model.']);
+  assert.match(stand.how, /^Everything but the note/);
   assert.deepEqual(stand.last_push.head, 'abcdef0');
   assert.deepEqual(stand.since_then.pushes.map((p: any) => [p.branch, p.head, p.subject]), [['main', 'abcdef0', '1 commit to main: Tests for the solver']]);
   assert.deepEqual(stand.since_then.settled.map((i: any) => [i.title, i.status]), [['Write unit tests', 'done']]);
@@ -977,12 +987,58 @@ test('a note is added to, or one passage of it replaced, without sending it agai
   await make(l, [{ op: 'update', id: t, body: long }]);
   const to = (answer: any) => (answer.recent_events ?? answer)[0].detail.changes.body.to as string;
   for (const tool of ['get', 'events']) {
-    const input = tool === 'get' ? { id: t } : { target: t };
+    const input = tool === 'get' ? { id: t, history: true } : { target: t };
     assert.match(to(await callTool(l, agent, tool, input)), /^A long note\. .{180,200}… \(1300 characters; ask again with full: true/, tool);
     assert.equal(to(await callTool(l, agent, tool, { ...input, full: true })), long, `${tool}, in full`);
     assert.equal(to(await callTool(l, human, tool, input)), long, `${tool}, for a person`);
   }
   assert.equal(((await callTool(l, agent, 'get', { id: t })) as any).entity.body, long, 'the note itself is always whole');
+  // An agent that asks for an item is given the item: its history comes when asked for.
+  assert.equal(((await callTool(l, agent, 'get', { id: t })) as any).recent_events, undefined);
+  assert.ok(((await callTool(l, human, 'get', { id: t })) as any).recent_events.length);
+});
+
+test('a refused change is kept and corrected by its one wrong op; history says a change set’s reason once', async () => {
+  const l = await fresh();
+  const ops = [
+    { op: 'create', ref: 'a', type: 'task', title: 'Draw the plan' },
+    { op: 'create', ref: 'b', type: 'issue', title: 'The plan is drawn twice', props: { repro: 'Open it twice' } },
+    { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
+  ];
+  // The refusal names the flavour that has the field, and the name the change is kept under.
+  const said = await callTool(l, agent, 'change', { ops, reason: 'A plan to draw' }).then(
+    () => assert.fail('an issue has no repro'),
+    (e: Error) => e.message,
+  );
+  assert.match(said, /op 2 \(create\): issue has no field "repro".*software\.bug, a flavour of issue, has it/);
+  const name = /kept for 10 minutes as "(k_\w+)"/.exec(said)![1];
+  // A fix that is wrong again is refused again, under the same name.
+  await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], title: 'x'.repeat(61) } }] }), new RegExp(`the title is 61 characters[^]*as "${name}"`));
+  await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 9, op: null }] }), /no op 9/);
+  const sent = (await callTool(l, agent, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'software.bug' } }] })) as any;
+  assert.equal(sent.status, 'proposed');
+  const held = (await l.proposals()).at(-1)!;
+  assert.equal(held.reason, 'A plan to draw');
+  assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'software.bug', 'depends_on']);
+  // Once it has gone through it is no longer kept; nor is it anyone else's to send.
+  await assert.rejects(callTool(l, agent, 'change', { retry: name }), /No refused change is kept/);
+  await assert.rejects(callTool(l, agent, 'change', { reason: 'nothing' }), /needs ops/);
+
+  // What changed since: one change set says its reason and authority on the first of its events, and long notes are cut.
+  const long = 'A long note. '.repeat(100);
+  const made = await make(l, [
+    { op: 'create', ref: 'x', type: 'task', title: 'First', body: long },
+    { op: 'create', ref: 'y', type: 'task', title: 'Second' },
+  ]);
+  await make(l, [{ op: 'update', id: made.x, body: `${long}More.` }]);
+  const since = { name: 'changed_since', params: { since: '2000-01-01' } };
+  const events = ((await callTool(l, agent, 'view', since)) as any).events as any[];
+  assert.match(events[0].detail.changes.body.to, /ask again with full: true/);
+  const set = events.filter((e) => e.changeset === events.at(-1).changeset || e.target_id === made.y || e.target_id === made.x).filter((e) => e.action === 'entity.create');
+  assert.deepEqual(set.map((e) => typeof e.reason), ['string', 'undefined'], 'the reason once');
+  const whole = ((await callTool(l, agent, 'view', { ...since, params: { ...since.params, full: true } })) as any).events as any[];
+  assert.ok(whole.every((e) => typeof e.reason === 'string'));
+  assert.equal(whole[0].detail.changes.body.to, `${long}More.`);
 });
 
 test('undo reverses a change set as a new change, and leaves later edits alone', async () => {

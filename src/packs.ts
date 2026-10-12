@@ -235,7 +235,10 @@ export class Registry {
       const field = type.fields[key];
       if (!field) {
         const known = Object.keys(type.fields).join(', ') || 'none';
-        problems.push(`${typeId} has no field "${key}" (fields: ${known}). Put free-form detail in body.`);
+        // The field may be one a flavour of the type has: an issue has no "repro", a software.bug does.
+        const flavour = [...this.types.values()].find((t) => t.id !== typeId && t.lineage.includes(typeId) && t.fields[key]);
+        const instead = flavour ? `${flavour.id}, a flavour of ${typeId}, has it: make it that type, or put free-form detail in body.` : 'Put free-form detail in body.';
+        problems.push(`${typeId} has no field "${key}" (fields: ${known}). ${instead}`);
         continue;
       }
       if (value === null) continue; // null clears a field on update

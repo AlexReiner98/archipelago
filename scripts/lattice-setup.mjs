@@ -97,6 +97,18 @@ else {
 }
 
 console.log(did.join('\n'));
+
+// Claude Code runs a folder's hooks and finds its skills only in a session opened in that folder. Set up in a
+// folder that holds several repositories, a session in one of them reads the rules and is given nothing else.
+let top = '';
+try {
+  top = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: here, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch { /* not in a repository, or no git */ }
+const same = (a, b) => a.replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase() === b.replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase();
+if (!top || !same(top, here))
+  console.log(
+    `\nMind: ${here} is not the top folder of a git repository${top ? ` (that is ${top})` : ''}. A session reports to Lattice only when Claude Code is opened in the folder this was run in: run it in each repository's own folder.`,
+  );
 console.log(
   process.env.LATTICE_AGENT_TOKEN
     ? `\nConnected to ${ORIGIN}. Quit Claude Code completely${process.platform === 'win32' ? ' (from the system tray too)' : ''}, open it again in this folder, and the session will say it is registered in Lattice.`

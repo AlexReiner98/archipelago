@@ -203,10 +203,16 @@ async function waitingOn(l: Lattice, input: { person?: string }) {
 
 async function changedSince(l: Lattice, input: { since?: string; limit?: number }) {
   if (!input.since || Number.isNaN(Date.parse(input.since))) throw new Error('changed_since needs "since" as an ISO date or date-time');
-  const events = (await l.events({ since: input.since, limit: input.limit ?? 200 })) as { action: string }[];
-  const counts: Record<string, number> = {};
-  for (const e of events) counts[e.action] = (counts[e.action] ?? 0) + 1;
-  return { since: input.since, counts, events };
+  // The counts are of everything since; the events are the newest of them, few enough to read.
+  const events = await l.events({ since: input.since, limit: input.limit ?? 50 });
+  const { rows } = await l.db.query<{ action: string; n: number }>(`select action, count(*)::int as n from event where ts >= $1::timestamptz group by action order by n desc`, [input.since]);
+  const total = rows.reduce((sum, r) => sum + r.n, 0);
+  return {
+    since: input.since,
+    counts: Object.fromEntries(rows.map((r) => [r.action, r.n])),
+    events,
+    ...(total > events.length && { more: `The newest ${events.length} of ${total} events. Ask with a higher limit (500 at most) or a later since for the rest.` }),
+  };
 }
 
 async function atRisk(l: Lattice, input: { days?: number }) {
@@ -470,7 +476,9 @@ export async function handoff(l: Lattice, input: { repo?: string; since?: string
       sessions: ended.map((r) => ({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said(r.body) })),
     },
     open: { ready: work.ready.map(slim), blocked: work.blocked.map((b) => ({ ...slim(b), waiting_on: b.waiting_on })) },
-    how: 'Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why), a few lines under short titles, with append or replace. Do not repeat the open work, the last push or what was settled: they are here.',
+    how:
+      (note ? '' : `Nobody has written a handoff note for this repository. To write the first, create a software.handoff and link it software.lives_in to ${repo.id} in the same change; this view finds it from then on. `) +
+      'Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why), a few lines under short titles, with append or replace. Do not repeat the open work, the last push or what was settled: they are here.',
   };
 }
 
@@ -1083,7 +1091,7 @@ export const VIEWS: Record<string, View> = {
     run: waitingOn,
   },
   changed_since: {
-    description: 'What changed since a moment in time. Params: since (ISO date-time, required), limit.',
+    description: 'What changed since a moment in time: how many events of each kind, and the newest of them. Long notes are cut to their start, and a change set says its reason once. Params: since (ISO date-time, required), limit (events listed, default 50), full (true for everything whole).',
     run: changedSince,
   },
   at_risk: {

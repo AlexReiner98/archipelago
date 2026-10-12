@@ -225,14 +225,17 @@ type Item = { id: string; type: string; title: string; status: string };
  * that nobody has changed since it began. A session that settled something
  * says so by changing it; what it leaves as it found it, it has to vouch for,
  * or say it could not tell. What waits on a person's answer is not asked
- * about: no work in the repository settles it.
+ * about: no work in the repository settles it. Nor is what has a change
+ * waiting for the human: what was found has been said, and is theirs to confirm.
  */
 async function unreconciled(l: Lattice, run: Entity): Promise<Item[]> {
   const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'software.lives_in' and from_id = $1 and valid_to is null`, [run.id]);
   if (!repos.length) return [];
   const work = (await VIEWS.repo_work.run(l, { repo: repos[0].to_id })) as { ready: Item[]; blocked: Item[] };
   const graph = await blockGraph(l);
-  const open = [...work.ready, ...work.blocked].filter((i) => !graph.waitsOnSomeone(i.id));
+  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending'`);
+  const proposed = new Set(held.flatMap((p) => p.ops.flatMap((o) => ('id' in o && o.id ? [o.id] : []))));
+  const open = [...work.ready, ...work.blocked].filter((i) => !graph.waitsOnSomeone(i.id) && !proposed.has(i.id));
   const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
   return open.filter((i) => untouched.some((u) => u.id === i.id)).map(({ id, type, title, status }) => ({ id, type, title, status }));
 }
@@ -248,6 +251,8 @@ export async function sessionEnd(
     still_true?: string[];
     /** Open items the session had nothing to do with and cannot check from where it is. */
     cannot_tell?: string[];
+    /** Every open item not otherwise named is one the session cannot tell about. */
+    cannot_tell_rest?: boolean;
     /** Ask the session about the repository's open work before letting it finish. */
     reconcile?: boolean;
   },
@@ -259,7 +264,10 @@ export async function sessionEnd(
   const unsaid = outcome === 'finished' ? await unreconciled(l, run) : [];
   const vouched = unsaid.filter((i) => input.still_true?.includes(i.id));
   // "Cannot tell" is an answer too: the item is left exactly as it was, last known true when it was, and the run says so.
-  const unknown = unsaid.filter((i) => !vouched.includes(i) && input.cannot_tell?.includes(i.id));
+  const named = unsaid.filter((i) => !vouched.includes(i) && input.cannot_tell?.includes(i.id));
+  const unknown = input.cannot_tell_rest ? unsaid.filter((i) => !vouched.includes(i)) : named;
+  // The rest are counted, not listed: a session that never looked at thirty items has nothing to say of each.
+  const rest = unknown.length - named.length;
   const left = unsaid.filter((i) => !vouched.includes(i) && !unknown.includes(i));
   if (input.reconcile && left.length) {
     return {
@@ -267,12 +275,12 @@ export async function sessionEnd(
       status: run.status,
       ended: false,
       unreconciled: left,
-      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with the change tool; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell, and do not vouch for what you did not look at. Then call session_end again.',
+      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with the change tool; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named), and do not vouch for what you did not look at. Then call session_end again.',
     };
   }
   const said = [
     vouched.length && `Said still true: ${vouched.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
-    unknown.length && `Could not tell from here, left as found: ${unknown.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
+    unknown.length && `Could not tell from here, left as found: ${[...named.map((i) => `${i.title} (${i.id})`), ...(rest ? [`${rest} ${named.length ? 'more' : rest === 1 ? 'item' : 'items'} it did not look at`] : [])].join('; ')}.`,
     left.length && `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
   ].filter(Boolean);
   const summary = [input.summary, ...said].filter(Boolean).join('\n');
