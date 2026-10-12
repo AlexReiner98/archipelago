@@ -632,6 +632,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   const stand = (await VIEWS.handoff.run(l, { repo: 'aperture repo' })) as any;
   assert.deepEqual([stand.note.id, stand.note.body], [note, 'Not seen\nThe probe has not been run on a real model.']);
   assert.match(stand.how, /^Everything but the note/);
+  assert.equal(stand.note.characters, stand.note.body.length);
   assert.deepEqual(stand.last_push.head, 'abcdef0');
   assert.deepEqual(stand.since_then.pushes.map((p: any) => [p.branch, p.head, p.subject]), [['main', 'abcdef0', '1 commit to main: Tests for the solver']]);
   assert.deepEqual(stand.since_then.settled.map((i: any) => [i.title, i.status]), [['Write unit tests', 'done']]);
@@ -642,6 +643,18 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: 'C:\\code\\Aperture' }), /Its note, "Aperture handoff" \(e_\w+\), was written \d{4}-\d\d-\d\d; since then: 1 push, 1 item settled, 1 item opened, 1 session ended\./);
   // Counted from another moment when asked.
   assert.equal(((await VIEWS.handoff.run(l, { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() })) as any).since_then.settled.length, 0);
+
+  // A note every session adds to is read by every session after: an agent cannot grow it past its length, only rewrite it.
+  const part = 'Next, and why\n' + 'Run the probe on a real model. '.repeat(40);
+  const grow = () => callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
+  for (let i = 0; i < 4; i++) await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
+  await assert.rejects(grow(), /the handoff note would be \d+ characters: 6000 at most[^]*Rewrite it whole/);
+  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part.repeat(2) }] });
+  assert.match(((await VIEWS.handoff.run(l, { repo: made.repo })) as any).how, /^The note is \d+ characters, and may be 6000 at most/);
+  await assert.rejects(grow(), /6000 at most/);
+  // Over its length already, it can always be made shorter.
+  const shorter = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, body: 'Next, and why\nRun the probe on a real model.' }] })) as any;
+  assert.ok(['applied', 'proposed'].includes(shorter.status));
 });
 
 test('a note can name what the same change makes, and an agent can ask for its change to be held', async () => {
@@ -887,7 +900,11 @@ test('an agent can notify the human; a stale session raises one notification', a
   const lane = (await make(l, [{ op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' }])).lane;
   const { run } = await sessionStart(l, agent, { title: 'Quiet one' });
   await l.claim(agent, { resource: lane, holder: run, reason: 'busy' });
-  await l.db.query(`update entity set props = props || '{"last_seen":"2020-01-01T00:00:00Z"}' where id = $1`, [run]);
+  const silent = (id: string, hours: number) => l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text) where id = $1`, [id, new Date(Date.now() - hours * 3_600_000).toISOString()]);
+  await silent(run, 1);
+  // One that holds nothing is not worth a notice: it ends by itself.
+  const idle = (await sessionStart(l, agent, { title: 'Idle one' })).run;
+  await silent(idle, 1);
   const autos = new Automations(l);
   await autos.tick();
   await autos.tick();
@@ -900,11 +917,19 @@ test('an agent can notify the human; a stale session raises one notification', a
   const quiet = async () => ((await VIEWS.notifications.run(l, {})) as any[]).filter((n) => n.title.includes('gone quiet')).length;
   await sessionUpdate(l, agent, { run });
   assert.equal(await quiet(), 0, 'withdrawn when the session reports in');
-  await l.db.query(`update entity set props = props || '{"last_seen":"2020-01-01T00:00:00Z"}' where id = $1`, [run]);
+  await silent(run, 1);
   await autos.tick();
   assert.equal(await quiet(), 1, 'told again when it goes quiet again');
-  await sessionEnd(l, human, { run, outcome: 'cancelled' });
+  // Half a day without a word, a session is ended for it: the notice goes, and what it held is given back.
+  assert.equal((await l.entity(idle))!.is_open, true, 'an hour is not half a day');
+  await silent(run, 13);
+  await silent(idle, 13);
+  await autos.tick();
+  const gone = (await l.entity(run))!;
+  assert.deepEqual([gone.status, (await l.entity(idle))!.status], ['finished', 'finished']);
+  assert.match(gone.body, /Not heard from for over 12 hours: ended for it/);
   assert.equal(await quiet(), 0, 'withdrawn when the session ends');
+  assert.equal(((await VIEWS.available_now.run(l, {})) as any).held_resources.length, 0, 'the lane is free');
   assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, 1, 'other notifications are left alone');
 });
 

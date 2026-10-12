@@ -4,7 +4,7 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { actorId, type Actor, type Lattice } from './lattice.ts';
+import { actorId, bodyAfter, type Actor, type Lattice } from './lattice.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
@@ -18,7 +18,7 @@ import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
 import { getPicture, putPicture, reportTests } from './proof.ts';
-import { awaitingRecheck, VIEWS } from './views.ts';
+import { awaitingRecheck, HANDOFF_MAX, toConfirm, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page; only a project, feature, release, proof question, test or test result can be, and only a human makes it so (from an agent it waits as a proposal).');
@@ -300,12 +300,14 @@ export const TOOLS: Record<string, Tool> = {
       since: z.string().optional().describe('ISO date-time.'),
       target: z.string().optional().describe('An entity id.'),
       actor: z.string().optional().describe('e.g. "agent:claude" or "human:local".'),
+      by: z.string().optional().describe('Only what this actor did, e.g. "agent:reader" or "human:owner". For an agent, whose own name travels as actor, this is the filter.'),
+      before: z.number().int().positive().optional().describe('Only events older than this seq: the seq of the oldest event of the answer before, to read the log back a page at a time.'),
       origin: z.enum(['lattice', 'external', 'github']).optional(),
       limit: z.number().int().positive().optional(),
       full: FULL,
     },
-    run: async (l, actor, { full, ...input }) => {
-      const events = await l.events(input);
+    run: async (l, actor, { full, by, ...input }) => {
+      const events = await l.events({ ...input, ...(by && { actor: by }) });
       return actor.kind === 'human' || full ? events : shortHistory(events);
     },
   },
@@ -434,7 +436,7 @@ export const TOOLS: Record<string, Tool> = {
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
       'A change that is refused is kept for a few minutes under a name the refusal gives: correct it with retry and fixes (the ops that were wrong, by number) instead of sending it all again. ' +
       'Keep the map true as you work: when what you did or found settles something that is still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, instead of leaving it open with a note. ' +
-      'Closing a decision or a hypothesis is held for the human to confirm, so propose the answer freely: it costs them one click. Only in a workspace set to apply agents\u2019 changes does it take effect at once: then a decision must carry what was chosen (props.outcome) and why (props.rationale), the human is notified, and it is yours to get right. Settle what the work or the owner has in fact settled; a choice that is still the owner\u2019s to make stays open.',
+      'Closing a decision or a hypothesis is held for the human to confirm, so propose the answer freely: it costs them one click. Only in a workspace set to apply agents\u2019 changes does it take effect at once: then a decision must carry what was chosen (props.outcome) and why (props.rationale), it is put to the owner by the next session they talk to (the view to_confirm), and it is yours to get right. Settle what the work or the owner has in fact settled; a choice that is still the owner\u2019s to make stays open.',
     input: {
       ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
       reason: z.string().min(1).optional().describe('Why this change is being made. Shown in the activity log. Needed, except with retry.'),
@@ -479,6 +481,25 @@ export const TOOLS: Record<string, Tool> = {
               ? [`op ${i + 1} (${o.op}): the title is ${o.title.trim().length} characters. A title is a name, not a sentence: ${TITLE_MAX} at most. Name the thing in a few words and put the rest in its note.`]
               : [],
           );
+          // A handoff note every session adds to is read whole by every session after it. It is held to a length an
+          // agent can only keep by rewriting it; one that is already over may always be made shorter.
+          for (const [i, o] of (input.ops as { op: string; type?: string; id?: string; body?: string; append?: string; replace?: { find: string; with: string } }[]).entries()) {
+            let before = 0;
+            let after = 0;
+            if (o.op === 'create' && l.registry.isA(o.type ?? '', 'software.handoff')) after = o.body?.length ?? 0;
+            else if (o.op === 'update' && (o.body !== undefined || o.append !== undefined || o.replace)) {
+              const target = await l.entity(o.id!);
+              if (!target || !l.registry.isA(target.type, 'software.handoff')) continue;
+              before = target.body.length;
+              try {
+                after = bodyAfter(target.body, o as Parameters<typeof bodyAfter>[1]).length;
+              } catch {
+                continue; // what is wrong with the op is said by the change itself
+              }
+            }
+            if (after > HANDOFF_MAX && after > before)
+              long.push(`op ${i + 1} (${o.op}): the handoff note would be ${after} characters: ${HANDOFF_MAX} at most. It holds one of each part (not seen working, what bites here, next and why). Rewrite it whole with body: keep what is still so, drop what later work settled, and put what is true of one item in that item's note.`);
+          }
           if (long.length) throw new Error(`Change rejected:\n- ${long.join('\n- ')}`);
         }
         result = await l.change(actor, input);
@@ -494,8 +515,8 @@ export const TOOLS: Record<string, Tool> = {
         );
       }
       if (retry) refused.delete(retry);
-      // A question an agent settled is not left for the human to come across.
-      if ('answered' in result) for (const a of result.answered) await notify(l, actor, { title: `${actor.name} settled "${a.title}": ${a.outcome ?? a.status}`, body: `${a.authority.of === 'human' ? `On a human\u2019s word, as the agent reports it: ${a.authority.basis}` : `On the agent\u2019s own judgment${a.authority.basis ? `: ${a.authority.basis}` : ''}`}\n\n${input.reason}`, about: a.id });
+      // A question an agent settled is not left for the human to come across: it is put to them by the next session
+      // they talk to (the view to_confirm, and the handoff), all of them in one list, not a notification for each.
       // The human's screen follows an agent's change: to Review when it waits
       // there, otherwise to the first thing it made or touched.
       if (actor.kind === 'agent') {
@@ -839,6 +860,27 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       await l.log(l.db, { actor: actorId(actor), action: 'changes.seen', reason: 'Looked at what agents changed', detail: { upto: input.upto } });
       return { seen_upto: input.upto };
+    },
+  },
+  confirmed: {
+    description:
+      'Record what the owner said, in chat, about the questions agents settled (the view to_confirm, or for_owner in the handoff): that they have been put to the owner and answered, up to an event. It is the owner\u2019s word as you report it, logged as that, and never the mark that a human looked. Change or reopen what they corrected with change, on their authority, before or after.',
+    input: {
+      upto: z.number().int().nonnegative().describe('The upto the list gave: the newest settling the owner was shown.'),
+      basis: z.string().min(1).describe('What the owner said and where, in their words: "Owner in chat, 12 Oct: all fine but the pricing one".'),
+    },
+    run: async (l, actor, input) => {
+      const asked = await toConfirm(l, { limit: 500 });
+      const answered = asked.questions.filter((q) => q.seq <= input.upto).map((q) => q.id);
+      await l.log(l.db, { actor: actorId(actor), action: 'questions.confirmed', reason: input.basis, detail: { upto: input.upto, questions: answered.length, authority: actor.kind === 'human' ? { of: 'human', who: actorId(actor) } : { of: 'human', basis: input.basis, stated_by: actorId(actor) } } });
+      // The notices that said each one was settled have been answered with them.
+      const { rows } = await l.db.query<{ id: string }>(
+        `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
+         where r.to_id = any($1::text[]) and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.title like '% settled "%'`,
+        [answered],
+      );
+      if (rows.length) await l.apply('agent:lattice', { ops: rows.map((n) => ({ op: 'update' as const, id: n.id, status: 'read' })), reason: 'Put to the owner and answered in chat' });
+      return { confirmed_upto: input.upto, questions: answered.length, left: (await toConfirm(l)).count };
     },
   },
   restart: {

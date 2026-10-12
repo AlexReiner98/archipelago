@@ -281,7 +281,7 @@ const VERBS = {
   'entity.create': 'created', 'entity.update': 'changed', 'entity.archive': 'archived', 'entity.restore': 'restored', 'entity.merge': 'merged',
   'relation.link': 'linked', 'relation.unlink': 'unlinked', 'type.define': 'new type',
   'proposal.create': 'held', 'proposal.approve': 'applied', 'proposal.reject': 'declined', 'proposal.supersede': 'overtaken',
-  'changeset.undo': 'undid', 'changes.seen': 'marked seen', 'repo.push': 'push', 'recheck.done': 're-checked',
+  'changeset.undo': 'undid', 'changes.seen': 'marked seen', 'questions.confirmed': 'owner answered', 'repo.push': 'push', 'recheck.done': 're-checked',
   'automation.fire': 'automation', 'run.stale': 'went quiet', 'connection.check': 'connection', 'resource.claim': 'took', 'resource.release': 'gave back',
 };
 const verb = (ev) => (ev.action === 'entity.update' && !Object.keys(ev.detail?.changes ?? {}).length ? 'confirmed' : (VERBS[ev.action] ?? ev.action));

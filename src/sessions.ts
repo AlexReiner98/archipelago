@@ -6,7 +6,7 @@
 
 import { repoByName, repoName } from './github.ts';
 import { actorId, type Actor, type Entity, type Lattice, type Op } from './lattice.ts';
-import { blockGraph, handoff, UNCONFIRMED_DAYS, VIEWS } from './views.ts';
+import { blockGraph, handoff, toConfirm, UNCONFIRMED_DAYS, VIEWS } from './views.ts';
 
 const now = () => new Date().toISOString();
 const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
@@ -126,6 +126,14 @@ async function heard(l: Lattice, run: Entity, why: string): Promise<void> {
     [run.id],
   );
   if (rows.length) await l.apply('agent:lattice', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });
+}
+
+/** A surface's session was heard from (a prompt, say): it is not quiet, whether or not it reports in itself. */
+export async function sessionHeard(l: Lattice, sessionId: string | undefined): Promise<void> {
+  const run = sessionId ? await resolveRun(l, sessionId, true) : undefined;
+  if (!run) return;
+  await touch(l, run.id);
+  await heard(l, run, `Session "${run.title}" was heard from again`);
 }
 
 /**
@@ -281,7 +289,8 @@ export async function sessionEnd(
   const said = [
     vouched.length && `Said still true: ${vouched.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
     unknown.length && `Could not tell from here, left as found: ${[...named.map((i) => `${i.title} (${i.id})`), ...(rest ? [`${rest} ${named.length ? 'more' : rest === 1 ? 'item' : 'items'} it did not look at`] : [])].join('; ')}.`,
-    left.length && `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
+    // A session closed for it has said nothing of anything: past a few, the count says as much as the list.
+    left.length && (left.length > 8 ? `Not reconciled: ${left.length} open items left unsaid.` : `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`),
   ].filter(Boolean);
   const summary = [input.summary, ...said].filter(Boolean).join('\n');
   // Vouching is said on the items too: an update that changes nothing marks each as checked now.
@@ -338,6 +347,15 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
   } else {
     lines.push(`Lattice does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
   }
+  // The owner is here, in chat, and mostly nowhere else: what agents settled since they last answered is put to them now.
+  const ask = await toConfirm(l, { limit: 15 });
+  if (ask.count)
+    lines.push(
+      '',
+      `For the owner, in your first reply: agents have settled ${ask.count} ${ask.count === 1 ? 'question' : 'questions'} since they last looked. Show them the list, a line for each, and ask them to confirm or correct. When they have answered, call confirmed with upto ${ask.upto} and what they said; change or reopen what they correct.`,
+      ...ask.questions.map((q) => `- ${q.title}: ${q.answer} (on ${q.on}; ${q.id})`),
+      ...(ask.count > ask.questions.length ? [`- and ${ask.count - ask.questions.length} more: view "to_confirm".`] : []),
+    );
   const now = (await VIEWS.available_now.run(l, {})) as { held_resources: { title: string; held_by_title: string }[] };
   const { rows: exclusive } = await l.db.query<{ id: string; title: string }>(
     `select id, title from entity where type = 'resource' and is_open and archived_at is null and coalesce((props->>'exclusive')::boolean, true)`,

@@ -238,6 +238,45 @@ async function atRisk(l: Lattice, input: { days?: number }) {
   };
 }
 
+/** The longest a handoff note may grow to from an agent: one of each part, rewritten, not a part added by every session. */
+export const HANDOFF_MAX = 6000;
+
+/**
+ * Questions agents have settled since the owner last looked, or last answered
+ * for them: each decision or hypothesis an agent closed, with what was chosen
+ * and on what it rests. The owner mostly meets the map through an agent in
+ * chat, so this is what the next session shows them, in one list, in place of
+ * a notification for each.
+ */
+export async function toConfirm(l: Lattice, input: { limit?: number } = {}) {
+  const { rows: marks } = await l.db.query<{ upto: number | null }>(`select max((detail->>'upto')::int) as upto from event where action in ('changes.seen', 'questions.confirmed')`);
+  const since = marks[0]?.upto ?? 0;
+  const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; outcome: string | null; seq: number; ts: Date; actor: string; authority: { of?: string; basis?: string } | null }>(
+    `select distinct on (e.id) e.id, e.type, e.title, e.status, e.props->>'outcome' as outcome, ev.seq::int as seq, ev.ts, ev.actor, ev.detail->'authority' as authority
+     from event ev join entity e on e.id = ev.target_id
+     where ev.seq > $1 and ev.action = 'entity.update' and ev.actor not like 'human:%' and coalesce(ev.detail->'authority'->>'who', '') not like 'human:%'
+       and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and ev.detail->'changes'->'status'->>'to' = e.status
+     order by e.id, ev.seq desc`,
+    [since, [...l.registry.family('decision'), ...l.registry.family('hypothesis')]],
+  );
+  const newest = rows.sort((a, b) => b.seq - a.seq);
+  return {
+    count: newest.length,
+    upto: newest[0]?.seq ?? since,
+    questions: newest.slice(0, input.limit ?? 40).map((q) => ({
+      id: q.id,
+      title: q.title,
+      answer: q.outcome ?? q.status,
+      settled: q.ts,
+      seq: q.seq,
+      by: q.actor,
+      on: q.authority?.of === 'human' ? 'the owner\u2019s word, as the agent reports it' : 'the agent\u2019s own judgment',
+      basis: q.authority?.basis,
+    })),
+    how: 'Show the owner this list in your reply, a line for each, and ask them to confirm or correct. When they have answered, call confirmed with upto and what they said; change or reopen whatever they correct, on their authority.',
+  };
+}
+
 /** Minutes without a report before an open session is shown as stale. */
 const STALE_MINUTES = 30;
 
@@ -462,12 +501,15 @@ export async function handoff(l: Lattice, input: { repo?: string; since?: string
     [repo.id, l.registry.family('sys.run'), since.toISOString()],
   );
   const slim = ({ id, type, title, status }: { id: string; type: string; title: string; status: string }) => ({ id, type, title, status });
+  const unconfirmed = await toConfirm(l, { limit: 15 });
   // What a session said when it ended is the last thing it was heard to say: the line that opens with the time.
   const said = (body: string) => (body.split('\n').findLast((line) => /^\[\d{4}-/.test(line)) ?? '').replace(/^\[[^\]]*\]\s*/, '').slice(0, 400);
   return {
     repo: work.repo,
     last_push: work.last_push,
-    note: note ? { id: note.id, title: note.title, written: note.updated_at, body: note.body } : null,
+    note: note ? { id: note.id, title: note.title, written: note.updated_at, characters: note.body.length, body: note.body } : null,
+    // The owner is met in chat: what agents settled and they have not answered for comes with where things stand.
+    ...(unconfirmed.count > 0 && { for_owner: unconfirmed }),
     since,
     since_then: {
       pushes: pushes.map((p) => ({ at: p.ts, branch: p.detail?.branch, head: p.detail?.after?.slice(0, 7), subject: p.reason })),
@@ -478,7 +520,8 @@ export async function handoff(l: Lattice, input: { repo?: string; since?: string
     open: { ready: work.ready.map(slim), blocked: work.blocked.map((b) => ({ ...slim(b), waiting_on: b.waiting_on })) },
     how:
       (note ? '' : `Nobody has written a handoff note for this repository. To write the first, create a software.handoff and link it software.lives_in to ${repo.id} in the same change; this view finds it from then on. `) +
-      'Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why), a few lines under short titles, with append or replace. Do not repeat the open work, the last push or what was settled: they are here.',
+      (note && note.body.length > HANDOFF_MAX ? `The note is ${note.body.length} characters, and may be ${HANDOFF_MAX} at most: sessions have added to it and none has taken away. Before you finish, rewrite it whole (body), with one of each part. ` : '') +
+      `Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be ${HANDOFF_MAX} characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.`,
   };
 }
 
@@ -1144,6 +1187,10 @@ export const VIEWS: Record<string, View> = {
     description:
       'What agents have used in a repository: each run there that counted its tokens (a session on a machine, the sync agent in GitHub Actions), newest first, and the sum by where they ran over the last 7 and 30 days. Params: repo (required): its id, GitHub name or title; limit (runs listed, default 20).',
     run: agentUsage,
+  },
+  to_confirm: {
+    description: 'What agents settled that the owner has not confirmed: each decision or hypothesis an agent closed since the owner last looked or last answered, with what was chosen and on what it rests. Show it to the owner and record their answer with the confirmed tool. Params: limit (default 40).',
+    run: toConfirm,
   },
   sessions: {
     description: 'Agent sessions and automation runs: what each open one is working on and holding, whether it has gone quiet, and the last ten that ended.',

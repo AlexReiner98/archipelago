@@ -48,7 +48,7 @@ import { configureOutbox } from './outbox.ts';
 import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.ts';
 import { publicPage, publicPicture } from './public.ts';
 import { configureSecrets } from './secrets.ts';
-import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan } from './sessions.ts';
+import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
@@ -354,6 +354,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
         if (url.pathname !== '/hooks/session-start') await recordUsage(lattice, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
         if (url.pathname === '/hooks/prompt') {
+          await sessionHeard(lattice, body.session_id).catch((err) => console.error(`hook heard: ${(err as Error).message}`));
           const key = body.session_id ?? '';
           const heard = heardUpTo.get(key);
           const changes = heard === undefined ? [] : await humanChanges(lattice, heard);

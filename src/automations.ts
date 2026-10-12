@@ -9,6 +9,7 @@ import { notImported } from './backup.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Lattice } from './lattice.ts';
 import { notify } from './notify.ts';
+import { sessionEnd } from './sessions.ts';
 import { callTool } from './tools.ts';
 import { VIEWS } from './views.ts';
 
@@ -22,6 +23,9 @@ interface LoggedEvent {
 }
 
 const CURSOR = 'automation_cursor';
+
+/** Hours without a word before an open session is taken to be gone, and ended for it. */
+export const QUIET_HOURS = 12;
 
 const fill = (template: string, values: Record<string, string>) => template.replace(/\{(\w+)\}/g, (whole, key) => values[key] ?? whole);
 
@@ -147,21 +151,24 @@ export class Automations {
   /** Tell the human, once, about each open session that has stopped reporting. */
   private async flagStaleSessions(): Promise<void> {
     if (!this.l.registry.type('sys.notification')) return;
-    const view = (await VIEWS.sessions.run(this.l, {})) as { stale_after_minutes: number; open: { id: string; title: string; stale: boolean; holds: { title: string }[] }[] };
+    const view = (await VIEWS.sessions.run(this.l, {})) as { stale_after_minutes: number; open: { id: string; title: string; stale: boolean; last_seen: string; holds: { title: string }[] }[] };
     for (const run of view.open.filter((r) => r.stale)) {
+      // Half a day without a word: its window was shut, or its machine was. It is ended for it, as its end hook
+      // would have ended it, and what it held is given back.
+      if (Date.now() - Date.parse(run.last_seen) > QUIET_HOURS * 3_600_000) {
+        await sessionEnd(this.l, { kind: 'agent', name: 'lattice' }, { run: run.id, outcome: 'finished', summary: `Not heard from for over ${QUIET_HOURS} hours: ended for it` });
+        continue;
+      }
       const entity = await this.l.entity(run.id);
       if (entity?.props.stale_flagged) continue;
       await this.l.db.query(`update entity set props = props || '{"stale_flagged": true}' where id = $1`, [run.id]);
       await this.l.log(this.l.db, { actor: 'agent:lattice', action: 'run.stale', target: run.id, reason: `No report for over ${view.stale_after_minutes} minutes` });
+      // Worth a person's attention only when it keeps something from everyone else: the rest end by themselves.
+      if (!run.holds.length) continue;
       await notify(
         this.l,
         { kind: 'agent', name: 'lattice' },
-        {
-          title: `Session "${run.title}" has gone quiet`,
-          body: run.holds.length ? `It still holds: ${run.holds.map((h) => h.title).join(', ')}. End it from its page to release them.` : 'End it from its page if it is no longer running.',
-          level: run.holds.length ? 'warning' : 'info',
-          about: run.id,
-        },
+        { title: `Session "${run.title}" has gone quiet`, body: `It still holds: ${run.holds.map((h) => h.title).join(', ')}. End it from its page to release them; left alone, it is ended after ${QUIET_HOURS} hours.`, level: 'warning', about: run.id },
       );
     }
   }

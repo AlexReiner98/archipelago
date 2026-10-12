@@ -958,7 +958,7 @@ export class Lattice {
     };
   }
 
-  async events(input: { since?: string; target?: string; actor?: string; origin?: string; limit?: number }) {
+  async events(input: { since?: string; before?: number; target?: string; actor?: string; origin?: string; limit?: number }) {
     const where: string[] = [];
     const params: unknown[] = [];
     const add = (sql: string, value: unknown) => {
@@ -966,6 +966,7 @@ export class Lattice {
       where.push(sql.replace('?', `$${params.length}`));
     };
     if (input.since) add(`ev.ts >= ?::timestamptz`, input.since);
+    if (input.before) add(`ev.seq < ?`, input.before);
     if (input.target) add(`ev.target_id = ?`, input.target);
     if (input.actor) add(`ev.actor = ?`, input.actor);
     if (input.origin) add(`ev.origin = ?`, input.origin);
@@ -998,7 +999,7 @@ export class Lattice {
  * there with one passage replaced and a paragraph added, so a long note is
  * changed without being sent again. Throws saying what is wrong with the op.
  */
-function bodyAfter(before: string, op: UpdateOp): string {
+export function bodyAfter(before: string, op: UpdateOp): string {
   if (op.body !== undefined && (op.append !== undefined || op.replace)) throw new Error('send body (the whole note) or append and replace (parts of it), not both');
   let body = op.body ?? before;
   if (op.replace) {

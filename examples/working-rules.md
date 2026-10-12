@@ -10,7 +10,10 @@ true as you go; do not keep a second record in files or in the chat.
 1. `view` with name `handoff` and `repo` (the id the session hook gave). One
    answer holds the last push, the handoff note, what has happened since it
    was written, and the open work. Where the note and the lists disagree, the
-   lists are right. If the session opened with no word from Lattice, the
+   lists are right. If it has `for_owner` (questions agents settled that the
+   owner has not answered for), show the owner that list in your first reply
+   and ask them to confirm or correct; record their answer with `confirmed`.
+   If the session opened with no word from Lattice, the
    hooks did not run here (the setup was run in another folder): call
    `session_start` with `cwd` and the repository's `remote` yourself, and
    tell the owner to run the setup in this repository's own folder.
@@ -42,9 +45,10 @@ true as you go; do not keep a second record in files or in the chat.
 
 ## Before you finish
 
-1. Bring the handoff note up to date with `append` or `replace`: only what the
-   map cannot know (what nobody has seen working, what bites when working
-   here, what you would do next and why).
+1. Bring the handoff note up to date: only what the map cannot know (what
+   nobody has seen working, what bites when working here, what you would do
+   next and why), one of each part. Replace what is there, do not add a
+   second "next" beside the first: the note is 6,000 characters at most.
 2. `session_end` with a summary. It lists what is still open here that nobody
    changed: change each, name it in `still_true` if you checked it, or in
    `cannot_tell` if you had nothing to do with it (`cannot_tell_rest: true`
