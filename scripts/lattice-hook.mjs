@@ -57,7 +57,8 @@ if (name === 'session-start') {
   try {
     const said = JSON.parse(body);
     const remote = execFileSync('git', ['-C', said.cwd || '.', 'config', '--get', 'remote.origin.url'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim();
-    if (remote) body = JSON.stringify({ ...said, remote });
+    // An address can carry a name and a password for the host (https://name:secret@host/...): those stay here.
+    if (remote) body = JSON.stringify({ ...said, remote: remote.replace(/^([a-z][a-z0-9+.-]*:[/][/])[^/@]*@/i, '$1') });
   } catch {
     // Not a checkout, or no git here: the folder is all there is to go on.
   }

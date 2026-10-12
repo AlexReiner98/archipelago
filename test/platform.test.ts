@@ -13,7 +13,7 @@ import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
 import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
 import { GithubApp } from '../src/github-app.ts';
-import { configureReader, readUnread } from '../src/reader.ts';
+import { configureReader, readUnread, sought, within } from '../src/reader.ts';
 import { limiter, type Limit } from '../src/limit.ts';
 import { createHttpServer, lenient } from '../src/server.ts';
 import { configureRestart } from '../src/tools.ts';
@@ -1209,4 +1209,43 @@ test('a request larger than any honest one is refused, before it is known who se
   assert.equal(await send({ 'content-length': '33000000' }, 0, false), 413);
   assert.ok([413, 'ended'].includes(await send({}, 33)));
   assert.equal(await send({}, 1), 401, 'one that is not too large is refused for the reason it would have been: it is not signed');
+});
+
+test('the reader asks GitHub only about the one repository, whatever the text it read there tells it to ask', () => {
+  // A path or a ref is part of an address under the repository: a step up would land in another one.
+  assert.equal(within('src/a file.ts'), 'src/a%20file.ts');
+  assert.equal(within('feature/x'), 'feature/x');
+  assert.equal(within(undefined), '');
+  for (const path of ['../../other/contents/secrets.txt', 'src/../../../other', './x', '..']) assert.throws(() => within(path), /steps outside the repository/);
+  // An encoded step is a name like any other to GitHub, and stays encoded.
+  assert.equal(within('%2e%2e/x'), '%252e%252e/x');
+  // A search is of this repository: words that say where to search are dropped.
+  assert.equal(sought('api key repo:someone/private'), 'api key');
+  assert.equal(sought('ORG:acme user: me token'), 'token');
+  assert.equal(sought('reporter: is a word'), 'reporter: is a word');
+});
+
+test('the hook says which repository a session is in without the name and password its address may carry', async () => {
+  // A server that only keeps what it is sent.
+  const heard: { remote?: string }[] = [];
+  const listener = createServer((req, res) => {
+    let body = '';
+    req.on('data', (d) => (body += d));
+    req.on('end', () => {
+      heard.push(JSON.parse(body));
+      res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
+    });
+  });
+  await new Promise<void>((r) => listener.listen(0, '127.0.0.1', r));
+  closers.push(async () => void listener.close());
+  const project = mkdtempSync(join(tmpdir(), 'lattice-checkout-'));
+  const git = (...args: string[]) => new Promise<void>((done, fail) => spawn('git', ['-C', project, ...args], { stdio: 'ignore' }).on('close', (code) => (code === 0 ? done() : fail(new Error(`git ${args[0]} failed`)))).on('error', fail));
+  await git('init', '--quiet');
+  await git('remote', 'add', 'origin', 'https://someone:ghp_notforanyone@github.com/acme/site.git');
+  await new Promise<void>((done) => {
+    const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'lattice-hook.mjs'), 'session-start'], { env: { ...process.env, LATTICE_URL: `http://127.0.0.1:${(listener.address() as AddressInfo).port}`, LATTICE_AGENT_TOKEN: '' }, stdio: ['pipe', 'ignore', 'ignore'] });
+    child.on('close', () => done());
+    child.stdin!.end(JSON.stringify({ session_id: 'desk-2', cwd: project }));
+  });
+  assert.deepEqual(heard.map((h) => h.remote), ['https://github.com/acme/site.git']);
 });

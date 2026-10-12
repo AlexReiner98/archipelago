@@ -81,6 +81,20 @@ interface Repo {
   entity: { id: string; title: string };
 }
 
+/**
+ * A path or a ref the model gave, as part of an address under the one repository. A step up ("..") would be
+ * resolved by the request into another repository the installation can read, so it is refused: what the reader
+ * was told to ask for comes from text it read there.
+ */
+export function within(path: unknown): string {
+  const parts = String(path ?? '').split('/');
+  if (parts.some((part) => part === '.' || part === '..')) throw new Error(`"${path}" steps outside the repository: give a path inside it, without "." or ".." as a part.`);
+  return parts.map(encodeURIComponent).join('/');
+}
+
+/** What to search the one repository for: a query that names where to search (repo:, org:, user:) would widen it, so those words are dropped. */
+export const sought = (query: unknown): string => String(query ?? '').replace(/\b(?:repo|org|user|owner)\s*:\s*\S*/gi, ' ').replace(/\s+/g, ' ').trim();
+
 const LATTICE_TOOLS = ['view', 'search', 'get', 'events', 'schema', 'proposals', 'change', 'notify', 'rechecked'];
 
 /** What the reader can do: the map's own tools, and reading the one repository through the app. */
@@ -99,7 +113,7 @@ function tools(app: GithubApp, repo: Repo, ref: string): { defs: Anthropic.Beta.
   hub('find', 'Search the repository’s code on its default branch for words or an exact phrase. Answers with the files that match and the lines around each match.', { query: text }, ['query']);
 
   const at = (path: string) => app.asInstallation(repo.installation, `/repos/${repo.name}${path}`);
-  const enc = (path: unknown) => String(path ?? '').split('/').map(encodeURIComponent).join('/');
+  const enc = within;
   const changed = (files: { filename: string; status: string; additions: number; deletions: number; patch?: string }[] | undefined, patches: boolean) =>
     (files ?? []).map((f) => ({ file: f.filename, status: f.status, added: f.additions, removed: f.deletions, ...(patches && { patch: f.patch ?? '(no text diff: binary or too large)' }) }));
   const hubTools: Record<string, (input: Record<string, unknown>) => Promise<unknown>> = {
@@ -127,7 +141,7 @@ function tools(app: GithubApp, repo: Repo, ref: string): { defs: Anthropic.Beta.
       return list.map((c) => `${c.sha.slice(0, 10)} ${c.commit.author?.date?.slice(0, 10) ?? ''} ${c.commit.message.split('\n')[0]}`);
     },
     find: async ({ query }) => {
-      const found = (await app.asInstallation(repo.installation, `/search/code?per_page=20&q=${encodeURIComponent(`${String(query)} repo:${repo.name}`)}`)) as { items?: { path: string }[] };
+      const found = (await app.asInstallation(repo.installation, `/search/code?per_page=20&q=${encodeURIComponent(`${sought(query)} repo:${repo.name}`)}`)) as { items?: { path: string }[] };
       return (found.items ?? []).map((i) => i.path);
     },
   };

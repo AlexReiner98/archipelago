@@ -964,6 +964,14 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
     { op: 'create', ref: 'review', type: 'sys.automation', title: 'New proposal', status: 'enabled', props: { trigger: 'event', on_action: 'proposal.create', action: 'notify', message: 'Proposal from {actor}: {reason}', level: 'warning' } },
     { op: 'create', ref: 'any', type: 'sys.automation', title: 'Everything', status: 'paused', props: { trigger: 'event', on_action: 'entity.*', action: 'notify' } },
   ]);
+  // Nor where agents' other changes are applied as made: an automation acts later with a human's authority, so
+  // making one, changing one or bringing one back waits for the human.
+  const loose = new Lattice(l.db, l.registry, { create: 'auto', update: 'auto', archive: 'auto', restore: 'auto', link: 'auto' });
+  const launches = { trigger: 'every', every_minutes: 1, action: 'launch', input: { task: made.hourly, mode: 'acceptEdits', instructions: 'anything' } };
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'An ordinary thing' }] })).status, 'applied');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'sys.automation', title: 'Launches', status: 'enabled', props: launches }] })).status, 'proposed');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.morning, props: launches }] })).status, 'proposed');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.any, status: 'enabled' }] })).status, 'proposed');
   const autos = new Automations(l);
   const at = (h: number, m = 0) => new Date(2026, 9, 7, h, m);
   const fired = async (when: Date) => (await autos.tick(when)).map((f) => f.automation).sort();

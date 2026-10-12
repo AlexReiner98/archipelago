@@ -259,10 +259,20 @@ export class Lattice {
     // The workspace's own choice, when it has made one, stands in for the
     // server's policy on everything the policy does not forbid outright.
     const chosen = actor.kind === 'human' ? undefined : await this.setting<string>(AGENT_CHANGES);
+    // An automation acts later with the authority of the human who approved it, and can launch a session: making
+    // one, changing one or bringing one back is the human's, whatever else agents may do unreviewed.
+    const automations = new Set<string>();
+    if (actor.kind !== 'human' && this.registry.type('sys.automation')) {
+      const ids = input.ops.flatMap((op) => (op.op === 'update' || op.op === 'restore' ? [op.id] : []));
+      const kinds = this.registry.family('sys.automation');
+      if (ids.length) for (const row of (await this.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and type = any($2::text[])`, [ids, kinds])).rows) automations.add(row.id);
+    }
     const levels = input.ops.map((op): Level => {
       if (actor.kind === 'human') return 'auto';
       const level = this.policy[op.op];
       if (level === 'forbidden') return level;
+      if (op.op === 'create' && this.registry.isA(op.type, 'sys.automation')) return 'propose';
+      if ((op.op === 'update' || op.op === 'restore') && automations.has(op.id)) return 'propose';
       // What anyone can see is the human's to decide, whatever else agents may do unreviewed: an agent proposes it.
       if ((op.op === 'create' || op.op === 'update') && op.visibility === 'public') return 'propose';
       // An agent may always ask for a look before its change takes effect.
