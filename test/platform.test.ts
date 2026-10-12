@@ -14,6 +14,7 @@ import { loadConfig } from '../src/config.ts';
 import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
 import { GithubApp } from '../src/github-app.ts';
 import { configureReader, readUnread } from '../src/reader.ts';
+import { limiter, type Limit } from '../src/limit.ts';
 import { createHttpServer, lenient } from '../src/server.ts';
 import { configureRestart } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
@@ -24,7 +25,7 @@ after(async () => {
 });
 
 /** A server on its own port with in-memory databases and its own copy of the packs. */
-async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp) {
+async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp, limits?: { open?: Limit; deliveries?: Limit }) {
   const root = mkdtempSync(join(tmpdir(), 'lattice-platform-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
@@ -33,7 +34,7 @@ async function serve(auth: 'off' | 'tokens', github?: (origin: string) => Github
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));
   const port = (probe.address() as AddressInfo).port;
   await new Promise((r) => probe.close(r));
-  const server = createHttpServer(workspaces, port, { auth, github: github?.(`http://127.0.0.1:${port}`) });
+  const server = createHttpServer(workspaces, port, { auth, github: github?.(`http://127.0.0.1:${port}`), limits });
   await new Promise<void>((r) => server.listen(port, '127.0.0.1', r));
   closers.push(async () => {
     server.close();
@@ -1150,4 +1151,40 @@ test('a product\u2019s public page is open to anyone, and says nothing until som
   assert.equal((await get(`/p/default/e_nothing1/data`)).status, 404);
   assert.equal((await get(`/p/elsewhere/${app}/data`)).status, 404);
   assert.equal((await get(`/p/default/${app}/picture/${made.result.created.sun}`)).status, 404);
+});
+
+test('what answers without a token is asked only so often: by one address, and by all together', async () => {
+  // The count itself: so many a minute for each address, and the minute starts again.
+  let clock = 0;
+  const count = limiter({ each: 2, all: 3 }, () => clock);
+  assert.deepEqual([count.take('a'), count.take('a'), count.take('a')], [0, 0, 60]);
+  clock = 30_000;
+  assert.deepEqual([count.take('b'), count.take('b'), count.take('c')], [0, 30, 30], 'a third address is stopped by what all have asked together');
+  clock = 60_000;
+  assert.equal(count.take('a'), 0);
+
+  const { base, call } = await serve('tokens', undefined, { open: { each: 3, all: 5 }, deliveries: { each: 2 } });
+  const get = (path: string, address: string) => fetch(base + path, { headers: { 'x-forwarded-for': address } });
+  const statuses = async (path: string, address: string, times: number) => {
+    const seen: number[] = [];
+    for (let i = 0; i < times; i++) seen.push((await get(path, address)).status);
+    return seen;
+  };
+  // Nothing is public here, so a page's data is not found; asked a fourth time, it is refused instead, and says for how long.
+  assert.deepEqual(await statuses('/p/default/e_nothing1/data', '198.51.100.1', 3), [404, 404, 404]);
+  const refused = await get('/p/default/e_nothing1/data', '198.51.100.1');
+  assert.equal(refused.status, 429);
+  assert.ok(Number(refused.headers.get('retry-after')) >= 1 && Number(refused.headers.get('retry-after')) <= 60);
+  assert.match(((await refused.json()) as { error: string }).error, /too often/);
+  // The page, its pictures and the setup script are counted together.
+  assert.deepEqual([(await get('/p/default/e_nothing1', '198.51.100.1')).status, (await get('/connect/setup.mjs', '198.51.100.1')).status], [429, 429]);
+  // Another address is not held up by the first, until all together have asked as much as all may.
+  assert.deepEqual(await statuses('/connect/setup.mjs', '198.51.100.2', 2), [200, 200]);
+  assert.equal((await get('/connect/setup.mjs', '198.51.100.3')).status, 429);
+  // Deliveries are counted apart, and an unsigned one is refused as unsigned until it is asked too often.
+  const deliver = async () => (await fetch(base + '/github/default', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.1' }, body: '{}' })).status;
+  assert.deepEqual([await deliver(), await deliver(), await deliver()], [401, 401, 429]);
+  // What needs a token, and health, are not counted.
+  assert.equal((await get('/health', '198.51.100.1')).status, 200);
+  assert.equal((await call('/api/search', undefined, {})).status, 401);
 });

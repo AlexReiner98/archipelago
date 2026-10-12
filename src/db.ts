@@ -185,7 +185,8 @@ $fn$;
 grant execute on function lattice_active_holds(boolean, text), lattice_external_dependents(text, text) to lattice_member;
 
 -- Public: a third level, for anyone, with no login. A request for a public page runs as the role below, which may
--- read only what is public, and only some columns of it: never a note, an event, a proposal, a token or a setting.
+-- read only what is public, and only some columns of it: never a note, an event, a proposal, a token or a setting,
+-- and of an item's fields only the few named below.
 -- What is public: an item marked so; a test that helps answer a public proof question; and a result of such a test,
 -- so that a question is made public once and brings its proof with it.
 create or replace function lattice_is_public(target text) returns boolean
@@ -213,11 +214,22 @@ language sql stable security definer set search_path = public as $fn$
   select id from scope where lattice_is_public(id)
 $fn$;
 
+-- Of a public item's fields, the ones its page shows and no others: what a test compares and found, and a release's
+-- version. Where a result's evidence or picture lies in its repository, or anything else kept on the item, is not given.
+create or replace function lattice_public_props(target text) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select coalesce((select jsonb_object_agg(f.key, f.value) from jsonb_each(e.props) f
+                   where f.key in ('build', 'passed', 'value', 'compares', 'tolerance', 'environment', 'version')), '{}'::jsonb)
+  from entity e where e.id = target and lattice_is_public(target)
+$fn$;
+
 do $$ begin create role lattice_public nologin; exception when duplicate_object then null; end $$;
-grant select (id, workspace, type, title, status, is_open, visibility, props, created_at, updated_at, archived_at) on entity to lattice_public;
+grant select (id, workspace, type, title, status, is_open, visibility, created_at, updated_at, archived_at) on entity to lattice_public;
+-- A database made before 12 Oct 2026 gave the role every field.
+revoke select (props) on entity from lattice_public;
 grant select (id, type, from_id, to_id, valid_to) on relation to lattice_public;
 grant select on picture to lattice_public;
-grant execute on function lattice_is_public(text), lattice_public_under(text) to lattice_public;
+grant execute on function lattice_is_public(text), lattice_public_under(text), lattice_public_props(text) to lattice_public;
 
 drop policy if exists public_entity on entity;
 create policy public_entity on entity for select to lattice_public using (lattice_is_public(id));

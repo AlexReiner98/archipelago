@@ -18,7 +18,7 @@ interface Link {
  * projects that have proof questions.
  */
 export async function proof(l: Lattice, input: { of?: string; build?: string }, within?: Set<string>) {
-  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, visibility, props, updated_at from entity where archived_at is null`);
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, visibility, ${l.props}, updated_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
   const { rows: links } = await l.db.query<Link>(`select type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`, [['part_of', 'about', 'software.answers', 'produced']]);
   const live = links.filter((r) => byId.has(r.from_id) && byId.has(r.to_id));
@@ -134,7 +134,7 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }, 
  */
 export async function changelog(l: Lattice, input: { of?: string }, within?: Set<string>) {
   if (!input.of) throw new Error('changelog needs "of": the id of a project or feature.');
-  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, updated_at from entity where archived_at is null`);
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, ${l.props}, updated_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
   const root = byId.get(input.of);
   if (!root) throw new Error(`No entity "${input.of}"`);

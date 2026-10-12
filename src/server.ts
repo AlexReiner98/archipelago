@@ -46,6 +46,7 @@ import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.ts';
+import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, type Limit } from './limit.ts';
 import { publicPage, publicPicture } from './public.ts';
 import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
@@ -125,7 +126,7 @@ class Refused extends Error {
   }
 }
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit } } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   const named = options.publicHosts ?? [];
@@ -138,6 +139,21 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };
+
+  // What answers without a token is counted by address: the public pages and the setup script, and GitHub's deliveries.
+  const open = limiter(options.limits?.open ?? PUBLIC_LIMIT);
+  const deliveries = limiter(options.limits?.deliveries ?? DELIVERY_LIMIT);
+  /** Where a request came from, as the proxy in front of the server says, or the connection itself. A caller can claim to come from anywhere. */
+  const addressOf = (req: IncomingMessage) => {
+    const forwarded = req.headers['x-forwarded-for'];
+    return (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0].trim() || req.socket.remoteAddress || '';
+  };
+  /** True, and the request answered, when its address has asked too often. */
+  const tooOften = (req: IncomingMessage, res: ServerResponse, count: ReturnType<typeof limiter>) => {
+    const wait = count.take(addressOf(req));
+    if (wait) res.writeHead(429, { 'content-type': 'application/json', 'retry-after': String(wait) }).end(JSON.stringify({ error: `Asked too often. Try again in ${wait} seconds.` }));
+    return wait > 0;
+  };
 
   /** Per Claude Code session: the last event it has been told about by the prompt hook. */
   const heardUpTo = new Map<string, number>();
@@ -157,11 +173,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     // The workspace stays open for as long as this request lasts, however long that is.
     res.once('close', workspaces.hold(id));
     const ws = await workspaces.get(id);
-    // Where the request came from, as the proxy in front of the server says, or the connection itself. It is a help
-    // in noticing a token used somewhere new, not a control: a caller can claim to come from anywhere.
-    const forwarded = req.headers['x-forwarded-for'];
-    const from = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0].trim() || req.socket.remoteAddress;
-    const identity = await verifyToken(ws.lattice.db, token, from);
+    // Where the request came from is a help in noticing a token used somewhere new, not a control.
+    const identity = await verifyToken(ws.lattice.db, token, addressOf(req) || undefined);
     if (!identity) throw denied;
     if (identity.newPlace)
       await notify(ws.lattice, { kind: 'agent', name: 'lattice' }, {
@@ -204,6 +217,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'GET' && url.pathname === '/connect/setup.mjs') {
         const host = req.headers.host ?? '';
         if (!hosts.includes(host)) return send(res, 404, { error: 'Not found' });
+        if (tooOften(req, res, open)) return;
         res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
         return res.end(setupScript(`${named.includes(host) ? 'https' : 'http'}://${host}`));
       }
@@ -212,6 +226,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // map, so there is nothing here to guard: what is not public is not there to be found.
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
       if (pub) {
+        if (tooOften(req, res, open)) return;
         const [, wsId, product, what, extra] = pub;
         const guard = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
         if (!what) {
@@ -279,6 +294,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // The GitHub App. Someone is sent to GitHub and comes back to one of these three; what proves they
       // started here is the one-time word they carry (state), so no token is asked for.
       if (github && req.method === 'GET' && url.pathname.startsWith('/github/app/')) {
+        if (tooOften(req, res, open)) return;
         const q = url.searchParams;
         const page = (status: number, html: string) => res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }).end(html);
         const back = () => res.writeHead(302, { location: '/#/workspace' }).end();
@@ -309,6 +325,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       }
       // Everything the app's installations do arrives here, signed with the app's secret; the installation says whose workspace it is for.
       if (github && req.method === 'POST' && url.pathname === '/github/app/hook') {
+        if (tooOften(req, res, deliveries)) return;
         const body = await readBody(req);
         if (!github.signed(body, req.headers['x-hub-signature-256'])) return send(res, 401, { error: 'Not a delivery signed by this server\u2019s GitHub App.' });
         const event = req.headers['x-github-event'];
@@ -345,6 +362,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // they are from, made with the secret this workspace gave GitHub.
       const delivery = req.method === 'POST' ? /^\/github\/([^/]+)$/.exec(url.pathname) : null;
       if (delivery) {
+        if (tooOften(req, res, deliveries)) return;
         const id = decodeURIComponent(delivery[1]);
         const body = await readBody(req);
         const refused = () => send(res, 401, { error: 'Not a delivery signed for this workspace.' });

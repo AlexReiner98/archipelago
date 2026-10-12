@@ -1811,6 +1811,11 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   const seen = (await anyoneDb.query<{ title: string }>(`select title from entity order by title`)).rows.map((r) => r.title);
   assert.deepEqual(seen, ['1.0.0: Sun position against NOAA', 'App', 'How do we know the sun is correct?', 'Sun position against NOAA', 'The panel']);
   await assert.rejects(anyoneDb.query(`select body from entity`), /permission denied/);
+  // Of an item's fields, only what the page shows: not where a result's picture lies in its repository.
+  await assert.rejects(anyoneDb.query(`select props from entity`), /permission denied/);
+  const fields = async (id: string) => (await anyoneDb.query<{ props: Record<string, unknown> | null }>(`select lattice_public_props($1) as props`, [id])).rows[0].props;
+  assert.deepEqual(await fields(results[made.sun]), { build: '1.0.0', passed: true, value: '0.004 degrees' });
+  assert.equal(await fields(results[made.areas]), null, 'and of what is not public, none');
   await assert.rejects(anyoneDb.query(`select * from event`), /permission denied/);
   await assert.rejects(anyoneDb.query(`select * from setting`), /permission denied/);
   await assert.rejects(anyoneDb.query(`update entity set title = 'x'`), /permission denied/);

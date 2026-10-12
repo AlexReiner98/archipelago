@@ -195,17 +195,25 @@ export class Lattice {
    */
   readonly viewer: string | undefined;
 
-  constructor(db: Db, registry: Registry, policy: Partial<Policy> = {}, workspace = 'default', viewer?: string) {
+  /**
+   * An item's fields as this view may select them from entity. Anyone with
+   * no login may not read the column: the database gives them the few fields
+   * the public page shows.
+   */
+  readonly props: string;
+
+  constructor(db: Db, registry: Registry, policy: Partial<Policy> = {}, workspace = 'default', viewer?: string, props = 'props') {
     this.db = db;
     this.registry = registry;
     this.policy = { ...DEFAULT_AGENT_POLICY, ...policy };
     this.workspace = workspace;
     this.viewer = viewer;
+    this.props = props;
   }
 
   /** This map as anyone sees it with no login: only what is public. Ask it of the whole map, not of one person's view. */
   forAnyone(): Lattice {
-    return new Lattice(anyone(this.db), this.registry, this.policy, this.workspace, '');
+    return new Lattice(anyone(this.db), this.registry, this.policy, this.workspace, '', 'lattice_public_props(id) as props');
   }
 
   /** This map as one person sees it. An empty viewer sees only what is shared. */

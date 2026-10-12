@@ -1,5 +1,7 @@
 # Lattice
 
+[![Tests](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml)
+
 A typed, extensible map of people, work and dependencies, built to be used by a
 human and by AI agents through the same tools.
 
@@ -306,6 +308,12 @@ at the platform.
   with an enabled automation or an open session stays open.
 - A hosted server does not launch sessions: launching starts Claude Code in a
   repository on the server's own machine.
+- What answers without a token is asked only so often (`src/limit.ts`): a
+  product's public page and the setup script, 120 requests a minute from one
+  address and 1,200 from all together; GitHub's deliveries, 300 a minute from
+  one address. Beyond that the answer is 429 with `Retry-After`. The address
+  is what the proxy reports, so the count for all together is the one that
+  holds against a caller who claims a new address each time.
 - Not done yet: the first deployment, and a copy of the backups off the
   server has not been tried against a real bucket (see Backups).
 
