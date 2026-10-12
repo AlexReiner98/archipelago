@@ -1059,7 +1059,13 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   assert.match((await call('/agent/confirmed', robot, { upto: asked.upto })).error, /basis/);
   const said = (await call('/agent/confirmed', robot, { upto: asked.upto, basis: 'Alex, in chat on 9 Oct: "yes, green"' })).result;
   assert.deepEqual([said.questions, said.left], [1, 0]);
-  const relayed = ((await call('/agent/events', robot, { limit: 3 })).result as any[]).find((e) => e.action === 'questions.confirmed');
+  // What an agent settled on its own judgment comes first and is counted apart: it is what the owner has not seen.
+  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
+  await change(robot, [{ op: 'update', id: guessed.d, status: 'decided', props: { outcome: 'The wide one', rationale: 'It is the one we have.' } }], word);
+  await change(robot, [{ op: 'update', id: guessed.h, status: 'refuted' }], { of: 'agent', basis: 'A month of photos' });
+  await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }]);
+  const sorted = (await call('/agent/view', robot, { name: 'to_confirm' })).result;
+  assert.deepEqual([sorted.on_agents_judgment, sorted.on_owners_word, sorted.questions.map((q: any) => q.title)], [1, 1, ['Green fades', 'Which brush?']]);  const relayed = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).find((e) => e.action === 'questions.confirmed');
   assert.deepEqual(relayed.detail.authority, { of: 'human', basis: 'Alex, in chat on 9 Oct: "yes, green"', stated_by: 'agent:robot/script' });
   // An agent reads what one actor did by naming them, and reads the log back by page.
   const byRobot = (await call('/agent/events', robot, { by: 'agent:robot/script', limit: 50 })).result as any[];

@@ -10,9 +10,9 @@ true as you go; do not keep a second record in files or in the chat.
 1. `view` with name `handoff` and `repo` (the id the session hook gave). One
    answer holds the last push, the handoff note, what has happened since it
    was written, and the open work. Where the note and the lists disagree, the
-   lists are right. If it has `for_owner` (questions agents settled that the
-   owner has not answered for), show the owner that list in your first reply
-   and ask them to confirm or correct; record their answer with `confirmed`.
+   lists are right. If it has `for_owner` with questions settled on an
+   agent's own judgment, show the owner those in your first reply and ask
+   them to confirm or correct; record their answer with `confirmed`.
    If the session opened with no word from Lattice, the
    hooks did not run here (the setup was run in another folder): call
    `session_start` with `cwd` and the repository's `remote` yourself, and

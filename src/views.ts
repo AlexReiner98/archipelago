@@ -259,10 +259,16 @@ export async function toConfirm(l: Lattice, input: { limit?: number } = {}) {
      order by e.id, ev.seq desc`,
     [since, [...l.registry.family('decision'), ...l.registry.family('hypothesis')]],
   );
-  const newest = rows.sort((a, b) => b.seq - a.seq);
+  // What an agent settled on its own judgment is what the owner has not seen; what it settled on their word they
+  // chose themselves, in chat. The first are listed first, and counted apart.
+  const own = (q: { authority: { of?: string } | null }) => q.authority?.of !== 'human';
+  const newest = rows.sort((a, b) => Number(own(b)) - Number(own(a)) || b.seq - a.seq);
+  const short = (s: string | undefined) => (s && s.length > 240 ? `${s.slice(0, 240)}…` : s);
   return {
     count: newest.length,
-    upto: newest[0]?.seq ?? since,
+    on_agents_judgment: newest.filter(own).length,
+    on_owners_word: newest.filter((q) => !own(q)).length,
+    upto: newest.reduce((max, q) => Math.max(max, q.seq), since),
     questions: newest.slice(0, input.limit ?? 40).map((q) => ({
       id: q.id,
       title: q.title,
@@ -270,10 +276,10 @@ export async function toConfirm(l: Lattice, input: { limit?: number } = {}) {
       settled: q.ts,
       seq: q.seq,
       by: q.actor,
-      on: q.authority?.of === 'human' ? 'the owner\u2019s word, as the agent reports it' : 'the agent\u2019s own judgment',
-      basis: q.authority?.basis,
+      on: own(q) ? 'the agent\u2019s own judgment' : 'the owner\u2019s word, as the agent reports it',
+      basis: short(q.authority?.basis),
     })),
-    how: 'Show the owner this list in your reply, a line for each, and ask them to confirm or correct. When they have answered, call confirmed with upto and what they said; change or reopen whatever they correct, on their authority.',
+    how: 'Show the owner, in your reply, a line for each question settled on an agent\u2019s own judgment, and ask them to confirm or correct; of those recorded on their own word, say how many there are and list them only if asked. When they have answered, call confirmed with upto and what they said; change or reopen whatever they correct, on their authority.',
   };
 }
 
@@ -1189,7 +1195,7 @@ export const VIEWS: Record<string, View> = {
     run: agentUsage,
   },
   to_confirm: {
-    description: 'What agents settled that the owner has not confirmed: each decision or hypothesis an agent closed since the owner last looked or last answered, with what was chosen and on what it rests. Show it to the owner and record their answer with the confirmed tool. Params: limit (default 40).',
+    description: 'What agents settled that the owner has not confirmed: each decision or hypothesis an agent closed since the owner last looked or last answered, with what was chosen and on what it rests; those settled on an agent\u2019s own judgment first, then those recorded on the owner\u2019s word. Show the first to the owner and record their answer with the confirmed tool. Params: limit (default 40).',
     run: toConfirm,
   },
   sessions: {

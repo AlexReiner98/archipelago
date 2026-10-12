@@ -349,12 +349,13 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
   }
   // The owner is here, in chat, and mostly nowhere else: what agents settled since they last answered is put to them now.
   const ask = await toConfirm(l, { limit: 15 });
-  if (ask.count)
+  const judged = ask.questions.filter((q) => !q.on.startsWith('the owner'));
+  if (ask.on_agents_judgment)
     lines.push(
       '',
-      `For the owner, in your first reply: agents have settled ${ask.count} ${ask.count === 1 ? 'question' : 'questions'} since they last looked. Show them the list, a line for each, and ask them to confirm or correct. When they have answered, call confirmed with upto ${ask.upto} and what they said; change or reopen what they correct.`,
-      ...ask.questions.map((q) => `- ${q.title}: ${q.answer} (on ${q.on}; ${q.id})`),
-      ...(ask.count > ask.questions.length ? [`- and ${ask.count - ask.questions.length} more: view "to_confirm".`] : []),
+      `For the owner, in your first reply: since they last looked, agents have settled ${ask.on_agents_judgment} ${ask.on_agents_judgment === 1 ? 'question' : 'questions'} on their own judgment${ask.on_owners_word ? ` (and recorded ${ask.on_owners_word} more as the owner's own answers in chat: say how many, and list them only if asked, with view "to_confirm")` : ''}. Show them these, a line for each, and ask them to confirm or correct. When they have answered, call confirmed with upto ${ask.upto} and what they said; change or reopen what they correct.`,
+      ...judged.map((q) => `- ${q.title}: ${q.answer} (${q.id})`),
+      ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: view "to_confirm".`] : []),
     );
   const now = (await VIEWS.available_now.run(l, {})) as { held_resources: { title: string; held_by_title: string }[] };
   const { rows: exclusive } = await l.db.query<{ id: string; title: string }>(
