@@ -14,7 +14,7 @@ import { loadConfig } from '../src/config.ts';
 import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
 import { GithubApp } from '../src/github-app.ts';
 import { configureReader, readUnread } from '../src/reader.ts';
-import { createHttpServer } from '../src/server.ts';
+import { createHttpServer, lenient } from '../src/server.ts';
 import { configureRestart } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
 
@@ -444,6 +444,7 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   assert.deepEqual(settings.permissions, { allow: ['Bash(npm test)'] });
   assert.deepEqual(settings.hooks.SessionEnd.map((h: any) => h.hooks[0].command), ['echo bye', 'node .claude/lattice-hook.mjs session-end']);
   assert.equal(settings.hooks.SessionStart[0].hooks[0].command, 'node .claude/lattice-hook.mjs session-start');
+  assert.equal(settings.hooks.Stop[0].hooks[0].command, 'node .claude/lattice-hook.mjs stop', 'the end of a turn is heard too');
   assert.ok(file('.claude/lattice-hook.mjs').includes(`process.env.LATTICE_URL || "${base}"`), 'the hook falls back on the server that handed it out');
   assert.match(file('.claude/skills/lattice-bump/SKILL.md'), /^---\nname: lattice-bump/);
   assert.match(file('.claude/lattice.md'), /view` with name `handoff`/);
@@ -498,8 +499,22 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
   assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, /registered in Lattice/, 'the server\u2019s answer comes back for Claude Code to read');
   const open = (await call('/agent/view', robot, { name: 'sessions' })).result.open;
   assert.deepEqual(open.map((s: any) => s.surface), ['claude-code'], 'and the session is on that server\u2019s map');
+  // At the end of a turn the session's count so far goes to its run: one long turn is not a session without tokens.
+  const transcript = join(mkdtempSync(join(tmpdir(), 'lattice-transcript-')), 'desk-1.jsonl');
+  writeFileSync(transcript, JSON.stringify({ type: 'assistant', uuid: 'a1', message: { id: 'm1', usage: { input_tokens: 1200, output_tokens: 300 } } }) + '\n');
+  assert.deepEqual([(await hook('stop', { session_id: 'desk-1', transcript_path: transcript }, { LATTICE_AGENT_TOKEN: robot })).out, open.length], ['{}', 1]);
+  assert.equal((await call('/agent/get', robot, { id: open[0].id })).result.entity.props.tokens_used, 1500);
   await hook('session-end', { session_id: 'desk-1', reason: 'exit' }, { LATTICE_AGENT_TOKEN: robot });
   assert.equal((await call('/agent/view', robot, { name: 'sessions' })).result.open.length, 0, 'and is closed there');
+
+  // A client with an old tool list sends an input it does not know as a string: it is taken as what it spells.
+  const { z } = await import('zod');
+  assert.equal(lenient(z.boolean().optional()).parse('true'), true);
+  assert.deepEqual(lenient(z.array(z.string()).optional()).parse('["e_1","e_2"]'), ['e_1', 'e_2']);
+  assert.deepEqual(lenient(z.array(z.object({ at: z.number() }))).parse('[{"at":2}]'), [{ at: 2 }]);
+  assert.equal(lenient(z.string()).parse('true'), 'true', 'a string stays a string');
+  assert.equal(lenient(z.number().optional()).parse(undefined), undefined);
+  assert.throws(() => lenient(z.boolean()).parse('maybe'));
 
   // Refused or unreachable, it says so and still lets the session go on.
   const refused = await hook('prompt', { session_id: 'desk-1' }, {});

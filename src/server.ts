@@ -56,11 +56,30 @@ const actorField = {
   actor: z.string().optional().describe('Who you are, e.g. "claude-code:aperture". Recorded against everything you do.'),
 };
 
+/**
+ * A client keeps the tool list it was given when it connected. An input added
+ * since is one it does not know the type of, and it sends it as a string:
+ * "true", "[...]". Where an input is not a string and what arrived is one
+ * that spells a value the input takes, it is taken as that value.
+ */
+export function lenient<T extends z.ZodType>(schema: T) {
+  return z.preprocess((value) => {
+    if (typeof value !== 'string' || schema.safeParse(value).success) return value;
+    try {
+      const spelt = JSON.parse(value);
+      return schema.safeParse(spelt).success ? spelt : value;
+    } catch {
+      return value;
+    }
+  }, schema);
+}
+
 function buildMcp(lattice: Lattice, actorFor: (label?: string) => Actor): McpServer {
   const mcp = new McpServer({ name: 'lattice', version: '0.1.0' });
   for (const [name, tool] of Object.entries(TOOLS)) {
     if (tool.humanOnly || (tool.devOnly && !devMode())) continue;
-    mcp.registerTool(name, { description: tool.description, inputSchema: { ...tool.input, ...actorField } }, async (args: Record<string, unknown>) => {
+    const inputSchema = { ...Object.fromEntries(Object.entries(tool.input).map(([key, schema]) => [key, lenient(schema as z.ZodType)])), ...actorField };
+    mcp.registerTool(name, { description: tool.description, inputSchema }, async (args: Record<string, unknown>) => {
       const { actor, ...input } = args;
       try {
         const result = await callTool(lattice, actorFor(actor as string | undefined), name, input);
@@ -378,6 +397,12 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         }
         if (url.pathname === '/hooks/session-end') {
           await hookSessionEnd(lattice, body);
+          return send(res, 200, {});
+        }
+        // The end of a turn: nothing to say back, but the session was heard from and its count (taken above) is
+        // up to date, so one long turn does not go a whole session without its tokens.
+        if (url.pathname === '/hooks/stop') {
+          await sessionHeard(lattice, body.session_id).catch((err) => console.error(`hook heard: ${(err as Error).message}`));
           return send(res, 200, {});
         }
       }

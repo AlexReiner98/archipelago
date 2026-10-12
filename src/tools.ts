@@ -233,6 +233,48 @@ function shortHistory<T>(events: T[]): T[] {
     return { ...ev, ...(again && { reason: undefined }), detail: detail && { ...detail, ...(changes && { changes }), ...(again && { authority: undefined }) } };
   });
 }
+/** How many of a repository's open items the handoff lists for an agent before it says how many more there are. */
+const HANDOFF_LISTED = 25;
+
+/**
+ * A view as an agent reads it. The answer is drawn for a screen, where a row
+ * says its owner and its due date even when it has neither and a blocked item
+ * repeats what blocks it in full; an agent pays for every character of that
+ * on every call. It is given the same facts without the empty fields, a
+ * project's settled questions by their answer only, and of a repository's
+ * open work in a handoff the first few and the count. `full: true` in the
+ * params asks for the answer as the screen has it.
+ */
+function forAgent(name: string, answer: unknown): unknown {
+  const bare = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(bare);
+    if (!value || typeof value !== 'object' || value instanceof Date) return value;
+    const row = value as Record<string, unknown>;
+    // An empty field is left out of a row that is an item (it has an id); elsewhere null may be the answer itself.
+    const entries = Object.entries(row).filter(([, v]) => !('id' in row && v === null));
+    return Object.fromEntries(entries.map(([k, v]) => [k, bare(v)]));
+  };
+  const out = bare(answer) as Record<string, unknown>;
+  if (name === 'blockers' && Array.isArray(out)) {
+    // What blocks an item at the root is named; it is in the list in full where it is itself blocked, or one get away.
+    return (out as { root_blockers?: { id: string; title: string }[] }[]).map((b) => ({ ...b, root_blockers: b.root_blockers?.map((r) => ({ id: r.id, title: r.title })) }));
+  }
+  if (name === 'questions' && Array.isArray(out?.settled)) {
+    const cut = (s: unknown) => (typeof s === 'string' && s.length > 200 ? `${s.slice(0, 200)}…` : s);
+    out.settled = (out.settled as Record<string, unknown>[]).map((q) => ({ id: q.id, title: q.title, status: q.status, outcome: cut(q.outcome), decided_on: q.decided_on }));
+  }
+  if (name === 'handoff' && out?.open) {
+    const open = out.open as { ready: unknown[]; blocked: unknown[] };
+    const cut = open.ready.length > HANDOFF_LISTED || open.blocked.length > HANDOFF_LISTED;
+    out.open = {
+      ready: open.ready.slice(0, HANDOFF_LISTED),
+      blocked: open.blocked.slice(0, HANDOFF_LISTED),
+      ...(cut && { ready_count: open.ready.length, blocked_count: open.blocked.length, more: `The first ${HANDOFF_LISTED} of each: view repo_work has them all.` }),
+    };
+  }
+  return out;
+}
+
 const FULL = z.boolean().optional().describe('true to be given the history whole: long notes, and the reason and authority on every event of a change set. Left out, an agent is given the start of each note and its length, and a change set’s reason and authority on the first of its events only.');
 
 /**
@@ -276,7 +318,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   view: {
     description:
-      'Answer one of the standing questions. Call with no name to list them. ' +
+      'Answer one of the standing questions. Call with no name to list them. An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ' +
       Object.entries(VIEWS)
         .map(([name, v]) => `${name}: ${v.description}`)
         .join(' '),
@@ -289,9 +331,10 @@ export const TOOLS: Record<string, Tool> = {
       const view = VIEWS[input.name];
       if (!view) throw new Error(`No view "${input.name}". Views: ${Object.keys(VIEWS).join(', ')}`);
       const answer = await view.run(l, input.params ?? {});
+      if (actor.kind !== 'agent' || input.params?.full) return answer;
       // A view that answers with events (changed_since) is history, and is cut for an agent as history is.
       const events = (answer as { events?: unknown } | null)?.events;
-      return actor.kind === 'agent' && Array.isArray(events) && !input.params?.full ? { ...(answer as object), events: shortHistory(events) } : answer;
+      return forAgent(input.name, Array.isArray(events) ? { ...(answer as object), events: shortHistory(events) } : answer);
     },
   },
   events: {

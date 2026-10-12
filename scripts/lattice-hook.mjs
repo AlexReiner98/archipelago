@@ -5,12 +5,12 @@
 // the same two that .mcp.json reads), or to the one on this machine when
 // those are not set.
 //
-//   node scripts/lattice-hook.mjs session-start | prompt | session-end
+//   node scripts/lattice-hook.mjs session-start | prompt | stop | session-end
 //
 // At the start it also says which repository the folder is a checkout of (its
 // origin), so the map knows the session's repository on any machine.
 //
-// With each prompt and at the end it also says how many tokens the session
+// With each prompt, at the end of each turn (stop) and at the end it also says how many tokens the session
 // has used so far, counted from the session's own record on this machine
 // (the transcript Claude Code names in the hook's input): input and output,
 // not counting cached re-reads. Lattice gives what is new to the work the

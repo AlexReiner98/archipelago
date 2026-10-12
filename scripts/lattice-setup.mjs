@@ -9,7 +9,7 @@
 //
 //   .mcp.json                         the lattice tools, for Claude Code
 //   .claude/lattice-hook.mjs          tells Lattice a session started, was prompted, ended
-//   .claude/settings.json             the three hooks that run it
+//   .claude/settings.json             the four hooks that run it
 //   .claude/skills/lattice-bump/      how to record friction with Lattice
 //   .claude/lattice.md                how to work with the map, read through CLAUDE.md
 
@@ -51,7 +51,7 @@ json('.mcp.json', (config) => {
 write('.claude/lattice-hook.mjs', FILES.hook);
 json('.claude/settings.json', (config) => {
   config.hooks ??= {};
-  for (const [event, name, matcher] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['SessionEnd', 'session-end']]) {
+  for (const [event, name, matcher] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end']]) {
     const list = (config.hooks[event] ??= []);
     if (JSON.stringify(list).includes('lattice-hook.mjs')) continue;
     list.push({ ...(matcher && { matcher }), hooks: [{ type: 'command', command: `node .claude/lattice-hook.mjs ${name}` }] });

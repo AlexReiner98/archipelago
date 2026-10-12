@@ -633,6 +633,16 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   assert.deepEqual([stand.note.id, stand.note.body], [note, 'Not seen\nThe probe has not been run on a real model.']);
   assert.match(stand.how, /^Everything but the note/);
   assert.equal(stand.note.characters, stand.note.body.length);
+
+  // An agent is given a view without what it does not read: no empty fields on a row, and what blocks at the root by name.
+  const forPerson = (await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
+  const forAgent = (await callTool(l, agent, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
+  assert.deepEqual([forPerson.ready[0].due, 'due' in forAgent.ready[0], forAgent.ready[0].id], [null, false, forPerson.ready[0].id]);
+  assert.equal(((await callTool(l, agent, 'view', { name: 'repo_work', params: { repo: made.repo, full: true } })) as any).ready[0].due, null, 'whole when asked');
+  const blocked = (await callTool(l, agent, 'view', { name: 'blockers' })) as any[];
+  assert.deepEqual(Object.keys(blocked[0].root_blockers[0]), ['id', 'title']);
+  const told = (await callTool(l, agent, 'view', { name: 'handoff', params: { repo: made.repo } })) as any;
+  assert.deepEqual([told.note.id, told.open.ready.length, 'ready_count' in told.open], [note, stand.open.ready.length, false], 'a short list is given whole');
   assert.deepEqual(stand.last_push.head, 'abcdef0');
   assert.deepEqual(stand.since_then.pushes.map((p: any) => [p.branch, p.head, p.subject]), [['main', 'abcdef0', '1 commit to main: Tests for the solver']]);
   assert.deepEqual(stand.since_then.settled.map((i: any) => [i.title, i.status]), [['Write unit tests', 'done']]);
@@ -649,6 +659,8 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   const grow = () => callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
   for (let i = 0; i < 4; i++) await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
   await assert.rejects(grow(), /the handoff note would be \d+ characters: 3000 at most[^]*Rewrite it whole/);
+  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, body: 'x'.repeat(2500) }] });
+  assert.match(((await VIEWS.handoff.run(l, { repo: made.repo })) as any).how, /^The note is 2500 of the 3000 characters it may be: there is no room to add to it/);
   await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part.repeat(2) }] });
   assert.match(((await VIEWS.handoff.run(l, { repo: made.repo })) as any).how, /^The note is \d+ characters, and may be 3000 at most/);
   await assert.rejects(grow(), /3000 at most/);

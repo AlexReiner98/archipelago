@@ -526,7 +526,11 @@ export async function handoff(l: Lattice, input: { repo?: string; since?: string
     open: { ready: work.ready.map(slim), blocked: work.blocked.map((b) => ({ ...slim(b), waiting_on: b.waiting_on })) },
     how:
       (note ? '' : `Nobody has written a handoff note for this repository. To write the first, create a software.handoff and link it software.lives_in to ${repo.id} in the same change; this view finds it from then on. `) +
-      (note && note.body.length > HANDOFF_MAX ? `The note is ${note.body.length} characters, and may be ${HANDOFF_MAX} at most: sessions have added to it and none has taken away. Before you finish, rewrite it whole (body), with one of each part. ` : '') +
+      (note && note.body.length > HANDOFF_MAX
+        ? `The note is ${note.body.length} characters, and may be ${HANDOFF_MAX} at most: sessions have added to it and none has taken away. Before you finish, rewrite it whole (body), with one of each part. `
+        : note && note.body.length > HANDOFF_MAX * 0.8
+          ? `The note is ${note.body.length} of the ${HANDOFF_MAX} characters it may be: there is no room to add to it, so replace its parts. `
+          : '') +
       `Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be ${HANDOFF_MAX} characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.`,
   };
 }
