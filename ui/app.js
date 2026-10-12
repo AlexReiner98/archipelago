@@ -1137,7 +1137,8 @@ async function entity(id) {
       menu('More', [
         !e.archived_at && phrases.length > 0 && ['Edit relations', () => ((editor.hidden = false), openAdder(), editor.scrollIntoView({ block: 'nearest' }))],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
-        e.props.link && ['Open where it ran', () => window.open(e.props.link, '_blank', 'noopener')],
+        // Only an address on the web: what an agent wrote there is opened by the owner's click.
+        /^https?:[/][/]/i.test(e.props.link ?? '') &&['Open where it ran', () => window.open(e.props.link, '_blank', 'noopener')],
         isA(e.type, 'software.repo') && !e.archived_at && e.props.remote && ['Re-check its oldest items now', () => api('github_app', { recheck: id }).then(() => tell('The re-check has started', 'An agent on the server is checking this repository\u2019s oldest open items against its code. Its run shows here, under Tokens used, in a few minutes.'), (err) => tell('The re-check did not start', err.message))],
         data.source && [`Source: ${data.source.title.replace(/\b[a-z]_[a-z0-9]{8}\b/g, (found) => titles.get(found) ?? 'a session')}`, () => (location.hash = `#/e/${data.source.id}`)],
         workish && ['Copy session brief', copyBrief],

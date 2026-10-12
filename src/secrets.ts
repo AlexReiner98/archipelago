@@ -69,6 +69,8 @@ export function unseal(stored: string | undefined | null): string | undefined {
   if (!stored) return undefined;
   if (!isSealed(stored)) return stored;
   const [iv, tag, body] = stored.slice(MARK.length).split(':').map((part) => Buffer.from(part, 'base64'));
+  // A whole tag or none: a shorter one would be taken as good, and is far easier to make up.
+  if (tag?.length !== 16) return undefined;
   for (const key of [fromEnv(), fromFile(false)]) {
     if (!key) continue;
     try {

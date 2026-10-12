@@ -93,9 +93,20 @@ function buildMcp(lattice: Lattice, actorFor: (label?: string) => Actor): McpSer
   return mcp;
 }
 
+/** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
+const BODY_MAX = 32_000_000;
+
+/** A request's body, refused once it is larger than any honest one: some routes read it before they know who sent it. */
 async function readBody(req: IncomingMessage): Promise<Buffer> {
+  const tooLarge = () => new Refused(413, `A request may carry ${BODY_MAX / 1_000_000} MB at most.`);
+  if (Number(req.headers['content-length'] ?? 0) > BODY_MAX) throw tooLarge();
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > BODY_MAX) throw tooLarge();
+    chunks.push(chunk as Buffer);
+  }
   return Buffer.concat(chunks);
 }
 
@@ -287,6 +298,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           const { actor: label, ...input } = body;
           return send(res, 200, { result: await callTool(lattice, actor((label as string) || 'script'), name, input) });
         } catch (err) {
+          if (err instanceof Refused) throw err;
           return send(res, 400, { error: (err as Error).message });
         }
       }
@@ -475,7 +487,16 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       send(res, 404, { error: 'Not found' });
     } catch (err) {
       if (res.headersSent) return void res.end();
-      if (err instanceof Refused) return send(res, err.status, { error: err.message });
+      if (err instanceof Refused) {
+        // The rest of a body that was too large is let go by, kept nowhere, for the second it takes the answer to
+        // be read; then the connection is ended.
+        if (err.status === 413) {
+          req.resume();
+          const socket = req.socket as IncomingMessage['socket'] | null; // gone already when the sender has hung up
+          res.once('finish', () => setTimeout(() => socket?.destroy(), 1000).unref());
+        }
+        return send(res, err.status, { error: err.message });
+      }
       send(res, 500, { error: (err as Error).message });
     }
   });

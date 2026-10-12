@@ -762,6 +762,9 @@ test('a secret is sealed with a key that is not in the database, and without tha
   // Tampered with, a sealed value does not open either.
   configureSecrets(dir);
   assert.equal(unseal(stored.slice(0, -4) + 'AAAA'), undefined);
+  // Nor with part of its tag: the first four bytes of the right one are not the right one.
+  const [iv, tag, sealedBody] = stored.slice('sealed:v1:'.length).split(':');
+  assert.equal(unseal(`sealed:v1:${iv}:${Buffer.from(tag, 'base64').subarray(0, 4).toString('base64')}:${sealedBody}`), undefined);
   await l.setSecret('github_secret', undefined);
   assert.equal(await l.setting('github_secret'), undefined);
   configureSecrets(null);

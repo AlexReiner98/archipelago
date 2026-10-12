@@ -1188,3 +1188,25 @@ test('what answers without a token is asked only so often: by one address, and b
   assert.equal((await get('/health', '198.51.100.1')).status, 200);
   assert.equal((await call('/api/search', undefined, {})).status, 401);
 });
+
+test('a request larger than any honest one is refused, before it is known who sent it', async () => {
+  const { base } = await serve('tokens');
+  const send = (headers: Record<string, string>, megabytes: number, whole = true) =>
+    new Promise<number | 'ended'>((resolve, reject) => {
+      const req = request(base + '/github/default', { method: 'POST', agent: false, headers: { 'content-type': 'application/json', ...headers } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+        if (!whole) req.destroy();
+      });
+      // The server answers while the body is still on its way and ends the connection, so the answer can be lost to the sender.
+      req.on('error', (err: NodeJS.ErrnoException) => (err.code === 'ECONNRESET' || err.code === 'EPIPE' ? resolve('ended') : reject(err)));
+      req.flushHeaders();
+      const piece = Buffer.alloc(1_000_000, 0x20);
+      for (let i = 0; i < megabytes; i++) req.write(piece);
+      if (whole) req.end();
+    });
+  // By what it says it carries, and by what arrives when it does not say.
+  assert.equal(await send({ 'content-length': '33000000' }, 0, false), 413);
+  assert.ok([413, 'ended'].includes(await send({}, 33)));
+  assert.equal(await send({}, 1), 401, 'one that is not too large is refused for the reason it would have been: it is not signed');
+});
