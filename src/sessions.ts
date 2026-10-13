@@ -41,6 +41,21 @@ async function repoFor(l: Lattice, cwd: string | undefined, remote?: string): Pr
     .sort((a, b) => (b.props.path as string).length - (a.props.path as string).length)[0];
 }
 
+/**
+ * Whether a hook may speak for the session it names, when the token it came with is limited to some repositories:
+ * a session that is starting has to be in one of them, and any other has to be one that was registered there.
+ */
+export async function hookWithin(l: Lattice, repos: string[], input: { session_id?: string; cwd?: string; remote?: string }, starting: boolean): Promise<boolean> {
+  if (starting) {
+    const repo = await repoFor(l, input.cwd, typeof input.remote === 'string' ? input.remote : undefined);
+    return Boolean(repo && repos.includes(repo.id));
+  }
+  const run = input.session_id ? await resolveRun(l, input.session_id, true) : undefined;
+  if (!run) return true; // nothing to speak for: the hook does nothing either way
+  const { rows } = await l.db.query(`select 1 from relation where type = 'software.lives_in' and from_id = $1 and to_id = any($2::text[]) and valid_to is null`, [run.id, repos]);
+  return rows.length > 0;
+}
+
 /** When a surface's session registered here, if it did and is still open. */
 export async function sessionBegan(l: Lattice, sessionId: string | undefined): Promise<Date | undefined> {
   const run = sessionId ? await resolveRun(l, sessionId, true) : undefined;

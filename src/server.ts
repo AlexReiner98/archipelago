@@ -50,7 +50,7 @@ import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
 import { publicPage, publicPicture } from './public.ts';
 import { configureSecrets } from './secrets.ts';
-import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
+import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
@@ -407,8 +407,14 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {
         // Never from a web page, and only under a name this server answers to; with tokens on, the token says whose session it is.
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are called by Claude Code, not from a web page, and at an address this server is known by.' });
-        const { lattice } = await resolve(req, res, 'agent');
+        const { lattice, actor } = await resolve(req, res, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; remote?: string; reason?: string; tokens?: number; setup?: string };
+        // A token limited to some repositories registers and speaks for sessions in those, and for no others.
+        const limitedTo = actor().repos ?? [];
+        if (limitedTo.length && !(await hookWithin(lattice, limitedTo, body, url.pathname === '/hooks/session-start'))) {
+          if (url.pathname !== '/hooks/session-start') return send(res, 200, {});
+          return send(res, 200, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'This machine’s Lattice token is limited to some repositories, and this folder is not a checkout of one of them: the session is not registered in Lattice, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made on the Workspace screen.' } });
+        }
         // Said in the server's log, so "did the hook run?" has an answer.
         console.log(`hook ${url.pathname.slice('/hooks/'.length)} from session ${body.session_id ?? 'unknown'}`);
         // Each time the owner sends a session a message, the session is told what

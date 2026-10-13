@@ -53,8 +53,12 @@ json('.claude/settings.json', (config) => {
   config.hooks ??= {};
   for (const [event, name, matcher] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end']]) {
     const list = (config.hooks[event] ??= []);
+    const command = `node .claude/lattice-hook.mjs ${name}`;
+    // A hook registered at another place (an older setup, or Lattice's own repository running the script it
+    // hands out) is pointed at the one written here: the other does not say which hand-out it is.
+    for (const entry of list) for (const hook of entry.hooks ?? []) if (typeof hook.command === 'string' && hook.command.includes('lattice-hook.mjs')) hook.command = command;
     if (JSON.stringify(list).includes('lattice-hook.mjs')) continue;
-    list.push({ ...(matcher && { matcher }), hooks: [{ type: 'command', command: `node .claude/lattice-hook.mjs ${name}` }] });
+    list.push({ ...(matcher && { matcher }), hooks: [{ type: 'command', command }] });
   }
   return config;
 });

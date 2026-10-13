@@ -426,7 +426,7 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   const project = mkdtempSync(join(tmpdir(), 'lattice-customer-'));
   writeFileSync(join(project, 'CLAUDE.md'), '# Their project\n\nTheir own rules.\n');
   mkdirSync(join(project, '.claude'));
-  writeFileSync(join(project, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm test)'] }, hooks: { SessionEnd: [{ hooks: [{ type: 'command', command: 'echo bye' }] }] } }));
+  writeFileSync(join(project, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm test)'] }, hooks: { SessionEnd: [{ hooks: [{ type: 'command', command: 'echo bye' }] }], UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'node scripts/lattice-hook.mjs prompt' }] }] } }));
   // The command the Workspace screen gives: no token is asked for, since the script holds no secret.
   const run = () =>
     new Promise<{ out: string; code: number | null }>((done) => {
@@ -445,6 +445,7 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   const settings = JSON.parse(file('.claude/settings.json'));
   assert.deepEqual(settings.permissions, { allow: ['Bash(npm test)'] });
   assert.deepEqual(settings.hooks.SessionEnd.map((h: any) => h.hooks[0].command), ['echo bye', 'node .claude/lattice-hook.mjs session-end']);
+  assert.deepEqual(settings.hooks.UserPromptSubmit.map((h: any) => h.hooks[0].command), ['node .claude/lattice-hook.mjs prompt'], 'a hook registered at another place is pointed at the one the setup wrote');
   assert.equal(settings.hooks.SessionStart[0].hooks[0].command, 'node .claude/lattice-hook.mjs session-start');
   assert.equal(settings.hooks.Stop[0].hooks[0].command, 'node .claude/lattice-hook.mjs stop', 'the end of a turn is heard too');
   assert.ok(file('.claude/lattice-hook.mjs').includes(`process.env.LATTICE_URL || "${base}"`), 'the hook falls back on the server that handed it out');
@@ -1076,6 +1077,22 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
   assert.match((await call('/agent/notify', site, { title: 'Look', about: made.o })).error, /cannot send a notification about it/);
   assert.equal((await call('/agent/notify', site, { title: 'Look', about: made.t })).status, 200);
   assert.equal((await call('/agent/check_connections', free, {})).status, 200, 'a token with no limit calls what it could');
+
+  // The hooks of a machine with such a token register and speak for sessions in its repositories, and no others.
+  const sessions = async () => (await call('/agent/view', free, { name: 'sessions' })).result.open.map((s: any) => s.title);
+  const before = await sessions();
+  const elsewhere = await call('/hooks/session-start', site, { session_id: 'desk-books', cwd: '/x', remote: 'https://github.com/acme/books.git' });
+  assert.match(elsewhere.hookSpecificOutput.additionalContext, /limited to some repositories[^]*not registered in Lattice/);
+  assert.deepEqual(await sessions(), before, 'nothing was registered');
+  const here = await call('/hooks/session-start', site, { session_id: 'desk-site', cwd: '/x', remote: 'https://github.com/acme/site.git' });
+  assert.match(here.hookSpecificOutput.additionalContext, /registered in Lattice[^]*Site repo/);
+  // A session another token registered in another repository is not ended, or counted for, by this one.
+  await call('/hooks/session-start', free, { session_id: 'desk-other', cwd: '/x', remote: 'https://github.com/acme/books.git' });
+  assert.equal((await sessions()).length, before.length + 2);
+  await call('/hooks/session-end', site, { session_id: 'desk-other', reason: 'exit' });
+  assert.equal((await sessions()).length, before.length + 2, 'still open');
+  await call('/hooks/session-end', site, { session_id: 'desk-site', reason: 'exit' });
+  assert.equal((await sessions()).length, before.length + 1, 'its own is ended');
 
   // Used from a network it has not been used from, its owner is told, once for that network. The first place is not news.
   const from = (address: string) => fetch(`${base}/agent/search`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${site}`, 'x-forwarded-for': address }, body: '{}' });
