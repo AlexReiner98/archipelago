@@ -1,7 +1,8 @@
 # Contributing to Lattice
 
-Issues and changes from others are both welcome. Lattice is built by one
-person and their agents, so an answer is not always quick.
+Lattice is published as it is, with no promise of answers or fixes. It is
+built by one person and their agents. You may open an issue or propose a
+change, and either may go unanswered.
 
 ## Reporting a problem
 

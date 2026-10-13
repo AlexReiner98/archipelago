@@ -95,8 +95,8 @@ draws what it depends on.
   A push is recorded, and an agent reads it against what was open.
 - **Add your own kinds of thing:** [Packs and flavours](#packs-and-flavours).
 - **Work on Lattice itself:** [CONTRIBUTING.md](CONTRIBUTING.md),
-  [Dev mode](#dev-mode) and [Tests](#tests). Issues and changes from others
-  are welcome.
+  [Dev mode](#dev-mode) and [Tests](#tests). It is published as it is, with
+  no promise of answers or fixes.
 - **Report a security problem:** in private, as [SECURITY.md](SECURITY.md)
   says.
 
