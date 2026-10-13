@@ -245,6 +245,9 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .lb-leaves.dot .lb-name, .lb-leaves.dot .lb-mark { display: none; }
 .lb-leaves.dot .lb-dot { width: 11px; height: 11px; }
 .lb-box.dim > header, .lb-leaf.dim { opacity: 0.28; }
+/* Space: the same picture in three dimensions. */
+.lens-frame { display: block; width: 100%; height: min(calc(100vh - 190px), 820px); min-height: 380px; border: 0; background: var(--ln-sea); }
+.lens-view .lens-error { padding: 8px 14px; color: var(--bad); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* The one graph. */
 .graph-view.full { position: fixed; inset: 0; z-index: 40; background: var(--panel); display: flex; flex-direction: column; }
 .graph-view.full > .fold-bar { padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }

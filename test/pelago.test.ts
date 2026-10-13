@@ -1277,6 +1277,16 @@ test('a lens answers with one shape of data: what is inside what, the same count
   assert.equal((await run({ from: made.p, far: 0 })).lens.far, 0, 'what is asked for the moment weighs most');
   assert.equal((await run({ style: drawn.spare })).style.shape, 'nest', 'a style named outright is used, retired or not');
   await assert.rejects(run({ style: 'e_nothing0' }), /No style/);
+  // Code in a style runs in the browser of whoever looks: an agent that writes it proposes it, whatever else agents may do unreviewed.
+  const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', merge: 'auto' });
+  const plain = await free.change(agent, { reason: 'a colour', ops: [{ op: 'update', id: drawn.ws, props: { radius: 4 } }] });
+  const coded = await free.change(agent, { reason: 'a drawing', ops: [{ op: 'update', id: drawn.ws, props: { code: 'export default () => {}' } }] });
+  const born = await free.change(agent, { reason: 'a drawing', ops: [{ op: 'create', type: 'style', title: 'Mine', props: { code: 'export default () => {}' } }] });
+  const folded = await free.change(agent, { reason: 'fold', ops: [{ op: 'merge', keep: drawn.ws, drop: drawn.spare }] });
+  assert.deepEqual([plain.status, coded.status, born.status, folded.status], ['applied', 'proposed', 'proposed', 'proposed']);
+  assert.equal((await run()).style.code, undefined, 'and until the human approves it, the picture is drawn without it');
+  assert.equal((await free.change(human, { reason: 'mine', ops: [{ op: 'update', id: drawn.ws, props: { code: 'export default () => {}' } }] })).status, 'applied');
+  await make(l, [{ op: 'update', id: drawn.ws, props: { code: null, radius: null } }]);
   assert.deepEqual([await pictureOf(l, drawn.ps), await pictureOf(l, drawn.ws), await pictureOf(l, made.a)], [`graph?from=${made.p}`, 'graph?lens', undefined], 'a style is seen at work in the picture it is about');
 });
 

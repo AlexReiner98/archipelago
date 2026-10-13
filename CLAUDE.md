@@ -93,7 +93,18 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 9 Oct 2026
   `@anthropic-ai/sdk`, for the agent on the server that reads pushes) unless
-  the owner agrees to another.
+  the owner agrees to another. One library is kept as a file, not a
+  dependency: `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
+  2026 at the owner's asking), offered to a style's own drawing code and
+  loaded only when one asks for it. The app's own pages do not use it.
+- **A style's code runs behind two walls, and only there.** A style item may
+  carry a drawing module (`code`). It runs in a worker inside the sandboxed
+  frame `ui/draw.html`, never in the app's page; an agent that writes one
+  proposes it, whatever the workspace lets agents do unreviewed. Do not give
+  that code a page to touch, a way to the network, or anything typed. After
+  changing `ui/draw.js`, `ui/draw.html` or the frame's policy in
+  `src/server.ts`, run a hostile style against it in a real browser (the
+  browser pane will not load a sandboxed frame).
 
 ## UI rules
 

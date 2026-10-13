@@ -267,10 +267,19 @@ export class Archipelago {
       const kinds = this.registry.family('sys.automation');
       if (ids.length) for (const row of (await this.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and type = any($2::text[])`, [ids, kinds])).rows) automations.add(row.id);
     }
+    // A style may carry code that runs in the browser of whoever looks at the picture. That it runs is the human's
+    // to allow: an agent that writes such code, or folds one style into another, proposes it.
+    const styles = new Set<string>();
+    if (actor.kind !== 'human' && this.registry.type('style')) {
+      const ids = input.ops.flatMap((op) => (op.op === 'merge' ? [op.keep, op.drop] : []));
+      if (ids.length) for (const row of (await this.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and type = any($2::text[])`, [ids, this.registry.family('style')])).rows) styles.add(row.id);
+    }
     const levels = input.ops.map((op): Level => {
       if (actor.kind === 'human') return 'auto';
       const level = this.policy[op.op];
       if (level === 'forbidden') return level;
+      if ((op.op === 'create' || op.op === 'update') && typeof op.props?.code === 'string' && op.props.code.trim()) return 'propose';
+      if (op.op === 'merge' && (styles.has(op.keep) || styles.has(op.drop))) return 'propose';
       if (op.op === 'create' && this.registry.isA(op.type, 'sys.automation')) return 'propose';
       if ((op.op === 'update' || op.op === 'restore') && automations.has(op.id)) return 'propose';
       // What anyone can see is the human's to decide, whatever else agents may do unreviewed: an agent proposes it.

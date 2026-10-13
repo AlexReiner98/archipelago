@@ -1957,7 +1957,8 @@ function lensView({ lens = {}, style = {}, key = lens.from ?? 'map' } = {}) {
     dress(host, chosen);
     // What was opened and where the picture stood outlive a redraw: the map changes under an open page.
     if (!lensPlace.has(key)) lensPlace.set(key, { opened: new Map() });
-    (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest)(host, answer, chosen, keep, lensPlace.get(key));
+    // A style with code of its own is the drawing; without, one of those that come built in.
+    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest))(host, answer, chosen, keep, lensPlace.get(key));
   })();
   return host;
 }
@@ -2296,6 +2297,45 @@ function drawNest(host, answer, style, keep, kept) {
     aim ? zoomTo(aim, false) : frame();
   }).observe(svg);
 }
+/**
+ * A style that carries its own code is the drawing: the page runs it in a
+ * frame that is sandboxed (an origin of its own, nothing loaded from outside,
+ * nothing sent anywhere), hands it the lens answer, the style's fields and the
+ * page's colours, and listens for two things: open this item, and what went
+ * wrong. A new frame for each picture, so nothing of the last is left running.
+ */
+function drawCode(host, answer, style, keep) {
+  const { code, ...fields } = style;
+  const { style: _kept, ...data } = answer;
+  const error = h('div', { class: 'lens-error', hidden: true });
+  const stage = h('div');
+  const colours = () => Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(host).getPropertyValue(`--ln-${name}`).trim()]));
+  let frame;
+  const draw = () => {
+    error.hidden = true;
+    frame = h('iframe', { class: 'lens-frame', sandbox: 'allow-scripts', src: '/draw.html', title: 'The map, drawn by this style' });
+    stage.replaceChildren(frame);
+    // A frame that never says it is ready was not let in by the browser: say so, not a blank.
+    const mine = frame;
+    setTimeout(() => mine === frame && !mine.ready && host.isConnected && ((error.textContent = 'This style has code of its own, and the browser did not start the frame it runs in.'), (error.hidden = false)), 5000);
+  };
+  const hear = (ev) => {
+    if (!host.isConnected) return void (frame && window.removeEventListener('message', hear));
+    if (ev.source !== frame?.contentWindow) return;
+    const said = ev.data ?? {};
+    // The frame has no origin to name, so it is spoken to by its window alone; what goes in is only what it is to draw.
+    if (said.type === 'ready') frame.ready = true;
+    if (said.type === 'ready') frame.contentWindow.postMessage({ type: 'draw', code, answer: data, style: fields, theme: { ...colours(), dark: matchMedia('(prefers-color-scheme: dark)').matches } }, '*');
+    // It may ask for an item's page and nothing else: an id is the only address taken from it.
+    else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
+    // The first thing that went wrong is the one to read: what follows is usually its echo.
+    else if (said.type === 'error' && error.hidden) ((error.textContent =`This style's code stopped: ${String(said.message).slice(0, 300)}`), (error.title = error.textContent), (error.hidden = false));
+  };
+  window.addEventListener('message', hear);
+  host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), litSwitch(answer.viewer, style, (change) => (keep(change), Object.assign(fields, change)), draw)), error, stage);
+  draw();
+}
+
 const LENS_SHAPES = { nest: drawNest, boxes: drawBoxes };
 
 /**

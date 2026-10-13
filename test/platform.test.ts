@@ -1573,4 +1573,10 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.match(page.headers.get('content-security-policy') ?? '', /default-src 'none'; script-src 'self'; style-src 'self';.*frame-ancestors 'none'/);
   assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
   assert.equal((await fetch(base + '/app.js')).headers.get('x-content-type-options'), 'nosniff');
+  // A style's own code is drawn in a frame of the page's own, which is sandboxed, may reach nothing outside itself, and may be framed only here.
+  assert.match(page.headers.get('content-security-policy') ?? '', /frame-src 'self'/);
+  const frame = await fetch(base + '/draw.html');
+  assert.match(frame.headers.get('content-security-policy') ?? '', /^sandbox allow-scripts; default-src 'none'; script-src 'self' blob: data:; worker-src blob: data:;.*connect-src 'none'; webrtc 'block';/);
+  assert.equal((await fetch(base + '/draw.js')).headers.get('access-control-allow-origin'), '*');
+  assert.equal((await fetch(base + '/app.js')).headers.get('access-control-allow-origin'), null, 'and nothing else here is given to strangers');
 });

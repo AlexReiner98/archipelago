@@ -127,7 +127,18 @@ const UI_FILES: Record<string, string> = {
   '/style.css': 'style.css',
   '/public.js': 'public.js',
   '/public.css': 'public.css',
+  // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
+  '/draw.html': 'draw.html',
+  '/draw.js': 'draw.js',
+  // three.js as its authors build it (MIT), offered to a style's code; loaded only when one asks for it.
+  '/three.js': 'three.module.min.js',
 };
+// The page itself: its own script and stylesheet, this server, and the one frame a style's code is drawn in.
+const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+// The frame a style's code runs in. `sandbox` gives it an origin of its own, so it has no way to the page's token or storage, cannot open
+// windows or move the page, and `connect-src 'none'` with no outside source for anything leaves it nowhere to send what it is shown.
+// It does not say who may frame it: sandboxed, it has no origin for 'self' to match, and framed by a stranger it is an empty page that can reach nothing.
+const DRAW_POLICY = "sandbox allow-scripts; default-src 'none'; script-src 'self' blob: data:; worker-src blob: data:; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; webrtc 'block'; base-uri 'none'; form-action 'none'";
 const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css' };
 
 class Refused extends Error {
@@ -269,10 +280,13 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.
         res.writeHead(200, {
           'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
-          'cache-control': 'no-store',
+          'cache-control': file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
           'x-content-type-options': 'nosniff',
           'referrer-policy': 'no-referrer',
-          ...(file === 'index.html' && { 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" }),
+          ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
+          ...(file === 'draw.html' && { 'content-security-policy': DRAW_POLICY }),
+          // The frame has an origin of its own, so what it loads from here it loads as a stranger.
+          ...((file === 'draw.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
         return res.end(await readFile(join(UI_DIR, file)));
       }
