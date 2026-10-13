@@ -85,6 +85,10 @@ settled, with what was chosen and why.
 - **Name what a change makes by its ref.** A title or note in the same change
   as a new item names it as `{ref}`, which becomes the item's id when the
   change is applied. Do not write an id you have not been given.
+- **A push restarts the hosted server under every open session.** For a
+  minute or more their tool calls fail, each failure a whole error page in
+  their context. Gather what is ready into one push; do not push each small
+  commit as it is made.
 - **After a deploy your tool list is old.** The client keeps the tools as
   they were when it connected; the prompt hook says when the server has
   restarted under the session. A tool or input the server has and your list

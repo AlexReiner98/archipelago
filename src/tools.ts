@@ -514,7 +514,8 @@ export const TOOLS: Record<string, Tool> = {
       hold: z.boolean().optional().describe('true to have this change wait for the human even where agents\u2019 changes are applied as made: for something you want looked at before it takes effect.'),
     },
     run: async (l, actor, { retry, fixes, ...given }) => {
-      const who = `${l.workspace}:${actor.name}`;
+      // Whose it is: the token's, not the name a session gives itself, which it may leave out the second time.
+      const who = `${l.workspace}:${actor.token ?? ''}`;
       let input = given;
       if (retry) {
         const kept = refused.get(retry);

@@ -40,6 +40,11 @@ true as you go; do not keep a second record in files or in the chat.
   the id of the item the same change makes.
 - **Correct a refused change, do not resend it.** The refusal gives a name:
   send `change` with `retry` and `fixes` for the ops that were wrong.
+- **If a lattice tool answers with a web page or "502",** the server is
+  restarting. Do not send the call again through MCP: each such answer is a
+  whole page in your context. Wait until `GET /health` on the server answers,
+  then send it as plain JSON (`POST /agent/<tool>` with the agent token from
+  the environment, never printed).
 - **When Lattice gets in your way,** record it with the `lattice-bump` skill
   when it happens. That is how it gets fixed.
 

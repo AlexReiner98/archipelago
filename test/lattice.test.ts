@@ -1063,7 +1063,8 @@ test('a refused change is kept and corrected by its one wrong op; history says a
   // A fix that is wrong again is refused again, under the same name.
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], title: 'x'.repeat(61) } }] }), new RegExp(`the title is 61 characters[^]*as "${name}"`));
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 9, op: null }] }), /no op 9/);
-  const sent = (await callTool(l, agent, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'software.bug' } }] })) as any;
+  // The name finds it, whatever the session calls itself this time.
+  const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'software.bug' } }] })) as any;
   assert.equal(sent.status, 'proposed');
   const held = (await l.proposals()).at(-1)!;
   assert.equal(held.reason, 'A plan to draw');
