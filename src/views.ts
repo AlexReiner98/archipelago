@@ -4,6 +4,7 @@
 import { lastPushes, repoByName, repoName } from './github.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 import { costs } from './costs.ts';
+import { lens } from './lens.ts';
 import { changelog, proof } from './proof.ts';
 
 interface Edge {
@@ -1159,6 +1160,11 @@ export const VIEWS: Record<string, View> = {
     description:
       'Nodes and edges for drawing the map. Params: relations (blocking, structure or all), focus (an entity id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system.',
     run: graph,
+  },
+  lens: {
+    description:
+      'What is in a picture, as data of one fixed shape, whatever is asked: `lens` (the lens as it was read), `items` (each with what it is `inside`, its `place` among those beside it, its `size`, its `state`: blocked, who it waits on, sessions at work; and `within`: the same counted over everything inside it, sent or not), `links` (kind, from, to, and how many each stands for: a link whose end was not sent is moved up to the nearest thing that was) and `rest` (how many items were left out, by reason). How it looks is not said here. Params, each optional: from (an entity id; without it, the whole map), kinds (types to keep, or "work"; with a leading "-", to leave out), by (the kind of link that says what is inside what; part_of), over (the kinds of link sent along, or "all"; depends_on and waits_on), far (steps down from the start), lanes (stage, link or person: what each item is filed under, as `lane`), order (the number field that orders things beside each other; order), measure (work or tokens), fold (what to leave out, of: closed, system, unlinked; all three).',
+    run: lens,
   },
   tree: {
     description:

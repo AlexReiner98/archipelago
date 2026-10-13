@@ -1188,6 +1188,75 @@ test('the graph view returns a preset of the whole map, or one entity\'s neighbo
   await assert.rejects(VIEWS.graph.run(l, { relations: 'everything' }), /must be one of/);
 });
 
+test('a lens answers with one shape of data: what is inside what, the same counts at every depth, links moved up, and what was left out', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'P' },
+    { op: 'create', ref: 'q', type: 'project', title: 'Q' },
+    { op: 'create', ref: 'late', type: 'software.feature', title: 'Late', props: { order: 2 } },
+    { op: 'create', ref: 'early', type: 'software.feature', title: 'Early', status: 'building', props: { order: 1 } },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
+    { op: 'create', ref: 'c', type: 'task', title: 'C' },
+    { op: 'create', ref: 'd', type: 'task', title: 'D' },
+    { op: 'create', ref: 'e', type: 'task', title: 'E', status: 'done' },
+    { op: 'create', ref: 'x', type: 'task', title: 'X' },
+    { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
+    { op: 'link', type: 'part_of', from: 'early', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'late', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'early' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'early' },
+    { op: 'link', type: 'part_of', from: 'e', to: 'early' },
+    { op: 'link', type: 'part_of', from: 'c', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'x', to: 'q' },
+    { op: 'link', type: 'depends_on', from: 'a', to: 'c' },
+    { op: 'link', type: 'depends_on', from: 'x', to: 'a' },
+    { op: 'link', type: 'waits_on', from: 'b', to: 'sam' },
+  ]);
+  const run = async (params: Record<string, unknown> = {}) => (await VIEWS.lens.run(l, params)) as any;
+  const titles = (answer: any) => answer.items.map((i: any) => i.title).sort();
+  const item = (answer: any, title: string) => answer.items.find((i: any) => i.title === title);
+  const name = (answer: any, id: string) => answer.items.find((i: any) => i.id === id)?.title;
+  const links = (answer: any) => answer.links.map((k: any) => `${name(answer, k.from)} ${k.kind} ${name(answer, k.to)} x${k.n}`).sort();
+
+  // The whole map, as it opens: what is finished and what the organising link does not touch are counted, not sent.
+  const whole = await run();
+  assert.deepEqual(titles(whole), ['A', 'B', 'C', 'Early', 'Late', 'P', 'Q', 'X']);
+  assert.deepEqual([whole.rest.closed, whole.rest.unlinked], [1, 2], 'E is finished; D and Sam are part of nothing');
+  assert.deepEqual([whole.lens.by, whole.lens.over, whole.lens.fold], ['part_of', ['depends_on', 'waits_on'], ['closed', 'system', 'unlinked']], 'the lens as it was read comes back');
+  assert.deepEqual(Object.keys(item(whole, 'P')), Object.keys(item(whole, 'A')), 'a thing with parts carries the same keys as one without');
+  assert.deepEqual(Object.keys(item(whole, 'P').within), Object.keys(item(whole, 'A').within));
+  assert.deepEqual([item(whole, 'P').inside, item(whole, 'Early').inside, item(whole, 'A').inside], [null, made.p, made.early]);
+  const inP = item(whole, 'P').within;
+  assert.deepEqual([inP.items, inP.blocked, inP.waiting, inP.waits_on, inP.not_sent], [5, 2, 1, { [made.sam]: 1 }, 0], 'what is inside it, counted as each says of itself');
+  assert.deepEqual([item(whole, 'A').state.blocked, item(whole, 'B').state.waits_on, item(whole, 'C').state.blocked], [true, [made.sam], false]);
+  assert.deepEqual(['Early', 'Late', 'C'].map((t) => item(whole, t).place), [1, 2, 3], 'beside each other by the ordering field, then as written down');
+  assert.deepEqual(links(whole), ['A depends_on C x1', 'X depends_on A x1'], 'a link to what was not sent is not sent');
+
+  // One step down: what was cut is still counted, and its links are moved up to what stands for it.
+  const near = await run({ far: 1 });
+  assert.deepEqual(titles(near), ['C', 'Early', 'Late', 'P', 'Q', 'X']);
+  assert.equal(near.rest.far, 2);
+  assert.deepEqual([item(near, 'Early').within.items, item(near, 'Early').within.not_sent, item(near, 'Early').within.blocked], [2, 2, 2]);
+  assert.deepEqual(links(near), ['Early depends_on C x1', 'X depends_on Early x1']);
+
+  // Around one item: what is inside it, and whatever any kind of link ties to those, filed by the link that ties it to the start.
+  const around = await run({ from: made.early, over: 'all', lanes: 'link' });
+  assert.deepEqual(titles(around), ['A', 'B', 'C', 'Early', 'P', 'Sam', 'X']);
+  assert.deepEqual(['A', 'P', 'C'].map((t) => item(around, t).lane), ['part_of', 'part_of', null]);
+  assert.deepEqual(links(around), ['A depends_on C x1', 'B waits_on Sam x1', 'X depends_on A x1'], 'what is inside what is said by inside, not by a link as well');
+
+  // Lanes by stage, with what is finished unfolded; and kinds.
+  const staged = await run({ from: made.p, lanes: 'stage', fold: [] });
+  assert.deepEqual(['Early', 'Late', 'E'].map((t) => item(staged, t).lane), ['under_way', 'to_come', 'done']);
+  const tasks = await run({ kinds: ['task'], fold: ['closed', 'system'] });
+  assert.deepEqual([titles(tasks), tasks.rest.kinds], [['A', 'B', 'C', 'D', 'X'], 5]);
+
+  await assert.rejects(run({ by: 'nope' }), /unknown kind of link/);
+  await assert.rejects(run({ fold: ['everything'] }), /fold must be of/);
+  await assert.rejects(run({ from: 'e_nothing0' }), /No entity/);
+});
+
 test('the roadmap tree orders a project\'s features, rolls up progress, and shows where work is happening', async () => {
   const l = await fresh();
   const made = await make(l, [
