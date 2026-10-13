@@ -463,6 +463,7 @@ test('the session-start hook registers the session and hands it the repo\'s work
   assert.match(text, /registered in Archipelago/);
   const repoId = /Repository: Aperture repo \((e_\w+)\)/.exec(text)?.[1];
   assert.ok(repoId, 'the repository comes with its id');
+  assert.match(await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Aperture' }), new RegExp(`Repository: Aperture repo \\(${repoId}\\)`), 'a session that is resumed is told its repository again');
   // What the session was told is enough to ask for the repository's work; asked for none, the view says which there are.
   for (const repo of [repoId, 'aperture repo']) assert.equal(((await VIEWS.repo_work.run(l, { repo })) as any).repo.id, repoId);
   await assert.rejects(async () => VIEWS.repo_work.run(l, {}), new RegExp(`repo_work needs "repo".*Repositories here: Aperture repo \\(${repoId}\\)`));

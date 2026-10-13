@@ -72,7 +72,8 @@ export async function sessionStart(
     const existing = await resolveRun(l, input.session_id, true);
     if (existing) {
       await touch(l, existing.id);
-      return { run: existing.id, status: existing.status, resumed: true };
+      // Its repository is said again: the hook tells a resumed session where things stand, as it told it at first.
+      return { run: existing.id, status: existing.status, resumed: true, repo: (await repoFor(l, input.cwd, input.remote)) ?? undefined };
     }
   }
   const task = input.task ? await l.entity(input.task) : undefined;
