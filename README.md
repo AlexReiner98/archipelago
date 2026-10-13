@@ -58,9 +58,11 @@ node -e "fetch('http://127.0.0.1:3100/connect/setup.mjs').then(r=>r.text()).then
 It writes a few files into that project and holds no secret: the connection
 to the map (`.mcp.json`), hooks that register each session and count its
 tokens, and working rules that it adds to the project's `CLAUDE.md`. It adds
-to what is there and can be run again. On a server on your own machine no
-token is needed, whatever its last line says. Quit Claude Code completely and
-open it again in that folder.
+to what is there and can be run again. It lists what it will change and asks
+before it writes; add ` -- --dry-run` to the end of the command to see the
+list and write nothing, and ` -- --remove` to take it all out again. On a
+server on your own machine no token is needed, whatever its last line says.
+Quit Claude Code completely and open it again in that folder.
 
 ## A first session
 
@@ -271,6 +273,18 @@ at once; they are the session's own state, not facts about the world.
   ([examples/working-rules.md](examples/working-rules.md)), which it reads
   into the project's `CLAUDE.md`. It adds to what is there, holds no secret,
   and can be run again.
+- **What the setup changes is shown first.** At a terminal it lists each
+  file it will write or change and asks before it does. A file of yours
+  that it changes (`.mcp.json`, `.claude/settings.json`, `CLAUDE.md`, the
+  shell's start-up file where it keeps the token) is copied beside itself
+  first, once, as `<name>.lattice-backup`: keep those out of git. Options go
+  after `--` at the end of the command: `-- --dry-run` shows the plan and
+  writes nothing, `-- --yes` writes without asking, `-- --remove` takes out
+  what the setup wrote and nothing else (with `--machine`, also the address
+  and token kept for the machine). To read the script before running it,
+  open `/connect/setup.mjs` on the server. With no terminal to ask at and no
+  `--yes` (an agent running it), it brings up to date only what Lattice
+  wrote there before and refuses a first setup.
 - **From a script:** `POST /agent/<tool>` takes the same tools as plain JSON
   with agent authority.
 

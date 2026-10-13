@@ -447,7 +447,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
           if (body.setup !== SETUP_VERSION) {
             const host = req.headers.host ?? '';
-            additionalContext += `\n\nThis folder's Lattice files (hooks, working rules, the bump skill) are older than the server's. Tell the owner in your first reply, and with their yes bring them up to date by running this in the folder (it holds no secret, and only adds to what is there): ${setupCommand(`${named.includes(host) ? 'https' : 'http'}://${host}`)} . What it changes takes effect in the next session.`;
+            additionalContext += `\n\nThis folder's Lattice files (hooks, working rules, the bump skill) are older than the server's. Tell the owner in your first reply, and with their yes bring them up to date by running this in the folder (it holds no secret, and with nobody at a terminal it renews only what Lattice wrote there before):${setupCommand(`${named.includes(host) ? 'https' : 'http'}://${host}`)} . What it changes takes effect in the next session.`;
           }
           return send(res, 200, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext } });
         }

@@ -1923,7 +1923,18 @@ function connectBox(made) {
       h('div', { class: 'toolbar' }, copy(first[os], 'Copy command'), h('span', { class: 'muted small' }, 'Shown once: it holds the token. Revoke it below to disconnect.')),
       h('div', { class: 'muted small', style: 'margin-top: 10px' }, '2. For each other project on that machine, in its folder. It holds no secret.'),
       h('code', { style: 'white-space: pre-wrap; word-break: break-all' }, fetchIt),
-      h('div', { class: 'toolbar' }, copy(fetchIt, 'Copy command')),
+      h(
+        'div',
+        { class: 'toolbar' },
+        copy(fetchIt, 'Copy command'),
+        // The command fetches a script and runs it: it shows what it will change and asks first. These are the ways
+        // to look before that, and to take it out again.
+        h('a', { href: '/connect/setup.mjs', target: '_blank', title: 'The script the command fetches and runs. It shows what it will change and asks before it writes.' }, 'Read it first'),
+        menu('More', [
+          ['Copy the dry run', () => navigator.clipboard.writeText(`${fetchIt} -- --dry-run`)],
+          ['Copy the removal', () => navigator.clipboard.writeText(`${fetchIt} -- --remove`)],
+        ]),
+      ),
     );
   draw(/win/i.test(navigator.platform) ? 'windows' : 'unix');
   return box;

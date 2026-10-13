@@ -16,4 +16,6 @@ backups/
 .claude/lattice-hook.mjs
 .claude/lattice.md
 .claude/skills/lattice-bump/references/home.md
+.claude/lattice-setup.json
+*.lattice-backup
 CLAUDE.local.md

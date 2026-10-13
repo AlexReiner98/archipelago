@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHmac, createVerify, generateKeyPairSync } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -430,7 +430,7 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   // The command the Workspace screen gives: no token is asked for, since the script holds no secret.
   const run = () =>
     new Promise<{ out: string; code: number | null }>((done) => {
-      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: '' } });
+      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: '' } });
       let out = '';
       child.stdout.on('data', (d) => (out += d));
       child.stderr.on('data', (d) => (out += d));
@@ -462,7 +462,7 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   const profile = join(project, 'profile');
   writeFileSync(profile, 'export PATH="$PATH:/opt/bin"\nexport LATTICE_AGENT_TOKEN="lat_default_old"\n');
   const kept = await new Promise<string>((done) => {
-    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: 'lat_default_new', LATTICE_SETUP_SAVE: '1', LATTICE_SETUP_PROFILE: profile } });
+    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: 'lat_default_new', LATTICE_SETUP_SAVE: '1', LATTICE_SETUP_PROFILE: profile } });
     let out = '';
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (out += d));
@@ -500,6 +500,102 @@ test('a project whose settings file is not JSON is left as it was: the setup wri
   // .mcp.json and the hook come before the settings file in the setup: neither is there.
   assert.deepEqual([existsSync(join(project, '.mcp.json')), existsSync(join(project, '.claude', 'lattice-hook.mjs')), existsSync(join(project, 'CLAUDE.md'))], [false, false, false]);
   assert.equal(readFileSync(join(project, '.claude', 'settings.json'), 'utf8'), '{ "hooks": ');
+});
+
+test('the setup shows what it will change and waits for a yes, keeps a copy of what it changes, and can be taken out again', async () => {
+  const { base } = await serve('tokens');
+  const project = mkdtempSync(join(tmpdir(), 'lattice-careful-'));
+  const at = (path: string) => join(project, path);
+  const file = (path: string) => readFileSync(at(path), 'utf8');
+  // A project with its own MCP server, its own hook and its own rules, and a machine with its own start-up file.
+  const theirs = {
+    '.mcp.json': JSON.stringify({ mcpServers: { other: { type: 'http', url: 'https://example.test/mcp' } } }),
+    '.claude/settings.json': JSON.stringify({ permissions: { allow: ['Bash(npm test)'] }, hooks: { SessionEnd: [{ hooks: [{ type: 'command', command: 'echo bye' }] }] } }),
+    'CLAUDE.md': '# Their project\n\nTheir own rules.\n',
+    profile: 'export PATH="$PATH:/opt/bin"\n',
+  };
+  mkdirSync(at('.claude'));
+  for (const [path, text] of Object.entries(theirs)) writeFileSync(at(path), text);
+  const untouched = () => assert.deepEqual(Object.fromEntries(Object.keys(theirs).map((path) => [path, file(path)])), theirs);
+  const setup = (flags: string[] = [], env: Record<string, string> = {}) =>
+    new Promise<{ out: string; code: number | null }>((done) => {
+      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, ...(flags.length ? ['--', ...flags] : [])], {
+        cwd: project,
+        env: { ...process.env, LATTICE_AGENT_TOKEN: '', LATTICE_SETUP_PROFILE: at('profile'), ...env },
+      });
+      let out = '';
+      child.stdout.on('data', (d) => (out += d));
+      child.stderr.on('data', (d) => (out += d));
+      child.on('close', (code) => done({ out, code }));
+    });
+  const first = { LATTICE_AGENT_TOKEN: 'lat_default_secret', LATTICE_SETUP_SAVE: '1' };
+
+  // With nobody to ask and no yes, a first setup is shown and refused.
+  const refused = await setup();
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.out, /this would:[\s\S]*change {5}\.mcp\.json {2}\(adds the lattice tools\) {2}\(a copy is kept: \.mcp\.json\.lattice-backup\)[\s\S]*write {6}\.claude\/lattice-hook\.mjs[\s\S]*add to {5}CLAUDE\.md[\s\S]*Nothing was written[\s\S]*-- --yes/);
+  untouched();
+  assert.ok(!existsSync(at('.claude/lattice-hook.mjs')));
+
+  // A dry run names what it would keep for the machine, and where, without the token and without writing.
+  const dry = await setup(['--dry-run'], first);
+  assert.equal(dry.code, 0, dry.out);
+  assert.ok(dry.out.includes(`keep       LATTICE_URL and LATTICE_AGENT_TOKEN in ${at('profile')}, outside this folder`), dry.out);
+  assert.match(dry.out, /Nothing was written \(--dry-run\)/);
+  assert.ok(!dry.out.includes('lat_default_secret'));
+  untouched();
+  assert.equal((await setup(['--force'])).code, 1, 'an option it does not know stops it');
+  untouched();
+
+  // With a yes it writes, and what it changed of theirs has a copy beside it holding what was there.
+  const done = await setup(['--yes'], first);
+  assert.equal(done.code, 0, done.out);
+  assert.ok(!done.out.includes('lat_default_secret'));
+  for (const path of Object.keys(theirs)) assert.equal(file(`${path}.lattice-backup`), theirs[path as keyof typeof theirs], `${path} is copied as it was`);
+  assert.ok(JSON.parse(file('.mcp.json')).mcpServers.lattice && JSON.parse(file('.mcp.json')).mcpServers.other);
+  assert.deepEqual(Object.keys(JSON.parse(file('.claude/lattice-setup.json')).files).sort(), ['.claude/lattice-hook.mjs', '.claude/lattice.md', '.claude/skills/lattice-bump/SKILL.md', '.claude/skills/lattice-bump/references/home.md']);
+
+  // Later, with nobody to ask: what Lattice wrote is brought up to date; what is theirs is left, and said.
+  writeFileSync(at('.claude/lattice.md'), 'rules as an older server handed them out\n');
+  writeFileSync(at('.mcp.json'), theirs['.mcp.json']);
+  const renewed = await setup();
+  assert.equal(renewed.code, 0, renewed.out);
+  assert.match(renewed.out, /not done {3}\.mcp\.json {2}\(it needs a yes\)[\s\S]*written {4}\.claude\/lattice\.md[\s\S]*Some of it was left/);
+  assert.match(file('.claude/lattice.md'), /view` with name `handoff`/);
+  assert.equal(file('.mcp.json'), theirs['.mcp.json']);
+  assert.equal((await setup(['--yes'])).code, 0);
+  assert.ok(JSON.parse(file('.mcp.json')).mcpServers.lattice);
+  assert.equal(file('.mcp.json.lattice-backup'), theirs['.mcp.json'], 'the first copy is not written over');
+
+  // Taking it out needs a yes too. A file of Lattice's that was changed by hand is kept, and named.
+  writeFileSync(at('.claude/skills/lattice-bump/SKILL.md'), file('.claude/skills/lattice-bump/SKILL.md') + '\nOur own note.\n');
+  assert.equal((await setup(['--remove'])).code, 1);
+  assert.equal((await setup(['--remove', '--dry-run'])).code, 0);
+  assert.ok(existsSync(at('.claude/lattice-hook.mjs')), 'neither took anything out');
+  const out = await setup(['--remove', '--yes']);
+  assert.equal(out.code, 0, out.out);
+  assert.match(out.out, /kept {7}\.claude\/skills\/lattice-bump\/SKILL\.md {2}\(changed since the setup wrote it\)[\s\S]*Lattice is out of[\s\S]*add --machine/);
+  assert.deepEqual(JSON.parse(file('.mcp.json')), JSON.parse(theirs['.mcp.json']));
+  assert.deepEqual(JSON.parse(file('.claude/settings.json')), JSON.parse(theirs['.claude/settings.json']));
+  assert.equal(file('CLAUDE.md'), theirs['CLAUDE.md']);
+  assert.deepEqual(readdirSync(at('.claude')).sort(), ['settings.json', 'settings.json.lattice-backup', 'skills']);
+  assert.deepEqual(readdirSync(at('.claude/skills/lattice-bump')), ['SKILL.md']);
+  assert.match(file('profile'), /LATTICE_AGENT_TOKEN/, 'what is kept for the machine is left unless asked');
+  const forgot = await setup(['--remove', '--machine', '--yes']);
+  assert.match(forgot.out, /forgot {5}the server’s address and the token, on this machine/);
+  assert.equal(file('profile'), theirs.profile);
+
+  // A folder that held nothing before the setup holds nothing after it is taken out.
+  const empty = mkdtempSync(join(tmpdir(), 'lattice-empty-'));
+  const inEmpty = (flags: string[]) =>
+    new Promise<number | null>((done) => {
+      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', ...flags], { cwd: empty, env: { ...process.env, LATTICE_AGENT_TOKEN: '' } });
+      child.on('close', done);
+    });
+  assert.equal(await inEmpty(['--yes']), 0);
+  assert.ok(readdirSync(empty).length >= 3);
+  assert.equal(await inEmpty(['--remove', '--yes']), 0);
+  assert.deepEqual(readdirSync(empty), []);
 });
 
 test('the hook script takes a Claude Code hook to whichever server the machine is connected to, with its token', async () => {
