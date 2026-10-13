@@ -483,6 +483,25 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   assert.match(hooked, new RegExp(`${base.replace(/[.:/]/g, '\\$&')} answered 401`), 'it called this server, which wants the token the machine does not have yet');
 });
 
+test('a project whose settings file is not JSON is left as it was: the setup writes nothing at all', async () => {
+  const { base } = await serve('tokens');
+  const project = mkdtempSync(join(tmpdir(), 'lattice-broken-'));
+  mkdirSync(join(project, '.claude'));
+  writeFileSync(join(project, '.claude', 'settings.json'), '{ "hooks": ');
+  const { out, code } = await new Promise<{ out: string; code: number | null }>((done) => {
+    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: '' } });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (out += d));
+    child.on('close', (code) => done({ out, code }));
+  });
+  assert.equal(code, 1, out);
+  assert.match(out, /settings\.json is there but is not JSON[\s\S]*Nothing was written/);
+  // .mcp.json and the hook come before the settings file in the setup: neither is there.
+  assert.deepEqual([existsSync(join(project, '.mcp.json')), existsSync(join(project, '.claude', 'lattice-hook.mjs')), existsSync(join(project, 'CLAUDE.md'))], [false, false, false]);
+  assert.equal(readFileSync(join(project, '.claude', 'settings.json'), 'utf8'), '{ "hooks": ');
+});
+
 test('the hook script takes a Claude Code hook to whichever server the machine is connected to, with its token', async () => {
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).lattice.db;

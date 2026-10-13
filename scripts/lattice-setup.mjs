@@ -19,14 +19,23 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const here = process.cwd();
+// Every change is worked out first and made only once all of them are known: a file that cannot be read stops
+// the run with nothing written. A step is what is said of one change and, where there is one to make, how.
+const plan = [];
 const did = [];
 
 function write(path, text) {
   const file = join(here, path);
-  mkdirSync(dirname(file), { recursive: true });
   const same = existsSync(file) && readFileSync(file, 'utf8') === text;
-  if (!same) writeFileSync(file, text);
-  did.push(`${same ? 'as it was' : 'written  '}  ${path}`);
+  plan.push({
+    say: `${same ? 'as it was' : 'written  '}  ${path}`,
+    make: same
+      ? null
+      : () => {
+          mkdirSync(dirname(file), { recursive: true });
+          writeFileSync(file, text);
+        },
+  });
 }
 
 function json(path, change) {
@@ -36,7 +45,7 @@ function json(path, change) {
     try {
       was = JSON.parse(readFileSync(file, 'utf8'));
     } catch {
-      console.error(`${path} is there but is not JSON. Fix or remove it, then run this again. Nothing after it was written.`);
+      console.error(`${path} is there but is not JSON. Fix or remove it, then run this again. Nothing was written.`);
       process.exit(1);
     }
   }
@@ -70,24 +79,37 @@ write('.claude/lattice.md', FILES.rules);
 // (LATTICE_SETUP_SAVE): the address and the token are then stored for this person on this machine, where Claude
 // Code and the hook find them from then on. On Windows that is the user's environment; elsewhere, the shell's
 // start-up file, and on a Mac also what apps opened from the Dock are given. The token is never printed.
+const notKept = (err) => console.error(`The address and token could not be kept for this machine (${err.message}). Set LATTICE_URL and LATTICE_AGENT_TOKEN yourself, then run this again.`);
 if (process.env.LATTICE_SETUP_SAVE && process.env.LATTICE_AGENT_TOKEN) {
   const keep = { LATTICE_URL: ORIGIN, LATTICE_AGENT_TOKEN: process.env.LATTICE_AGENT_TOKEN };
-  try {
-    const profile = process.env.LATTICE_SETUP_PROFILE;
-    if (process.platform === 'win32' && !profile) {
-      for (const [name, value] of Object.entries(keep)) execFileSync('setx', [name, value], { stdio: 'ignore' });
-    } else {
+  const say = 'kept       the server’s address and the token, for this machine';
+  const profile = process.env.LATTICE_SETUP_PROFILE;
+  if (process.platform === 'win32' && !profile) {
+    plan.push({
+      say,
+      machine: true,
+      make: () => {
+        for (const [name, value] of Object.entries(keep)) execFileSync('setx', [name, value], { stdio: 'ignore' });
+      },
+    });
+  } else {
+    try {
       const file = profile || join(homedir(), process.platform === 'darwin' || (process.env.SHELL ?? '').endsWith('zsh') ? '.zshenv' : '.profile');
       const lines = existsSync(file) ? readFileSync(file, 'utf8').split('\n') : [];
       // A value kept before (an older token) is replaced, not left beside the new one.
       const rest = lines.filter((line) => !/^export LATTICE_(URL|AGENT_TOKEN)=/.test(line));
       while (rest.length && rest.at(-1) === '') rest.pop();
-      writeFileSync(file, [...rest, ...Object.entries(keep).map(([name, value]) => `export ${name}="${value}"`), ''].join('\n'), { mode: 0o600 });
-      if (process.platform === 'darwin' && !profile) for (const [name, value] of Object.entries(keep)) try { execFileSync('launchctl', ['setenv', name, value], { stdio: 'ignore' }); } catch { /* only apps opened from the Dock miss it */ }
+      plan.push({
+        say,
+        machine: true,
+        make: () => {
+          writeFileSync(file, [...rest, ...Object.entries(keep).map(([name, value]) => `export ${name}="${value}"`), ''].join('\n'), { mode: 0o600 });
+          if (process.platform === 'darwin' && !profile) for (const [name, value] of Object.entries(keep)) try { execFileSync('launchctl', ['setenv', name, value], { stdio: 'ignore' }); } catch { /* only apps opened from the Dock miss it */ }
+        },
+      });
+    } catch (err) {
+      notKept(err);
     }
-    did.push('kept       the server\u2019s address and the token, for this machine');
-  } catch (err) {
-    console.error(`The address and token could not be kept for this machine (${err.message}). Set LATTICE_URL and LATTICE_AGENT_TOKEN yourself, then run this again.`);
   }
 }
 
@@ -97,10 +119,22 @@ const had = existsSync(claude) ? readFileSync(claude, 'utf8') : '';
 // A project that keeps its own setup out of git reads the rules in from CLAUDE.local.md instead.
 const localRules = join(here, 'CLAUDE.local.md');
 const reads = (text) => text.includes('@.claude/lattice.md');
-if (reads(had) || (existsSync(localRules) && reads(readFileSync(localRules, 'utf8')))) did.push('as it was  CLAUDE.md');
-else {
-  writeFileSync(claude, `${had ? had.trimEnd() + '\n\n' : ''}## Lattice\n\nThis project's work is kept in Lattice (${ORIGIN}). How to work with it:\n\n@.claude/lattice.md\n`);
-  did.push(`${had ? 'added to ' : 'written  '}  CLAUDE.md`);
+if (reads(had) || (existsSync(localRules) && reads(readFileSync(localRules, 'utf8')))) plan.push({ say: 'as it was  CLAUDE.md', make: null });
+else
+  plan.push({
+    say: `${had ? 'added to ' : 'written  '}  CLAUDE.md`,
+    make: () => writeFileSync(claude, `${had ? had.trimEnd() + '\n\n' : ''}## Lattice\n\nThis project's work is kept in Lattice (${ORIGIN}). How to work with it:\n\n@.claude/lattice.md\n`),
+  });
+
+// Only now is anything written. Keeping the token is the one step that may fail and leave the rest standing.
+for (const step of plan) {
+  try {
+    step.make?.();
+    did.push(step.say);
+  } catch (err) {
+    if (!step.machine) throw err;
+    notKept(err);
+  }
 }
 
 console.log(did.join('\n'));
