@@ -180,6 +180,19 @@ export class GithubApp {
     this.save();
   }
 
+  /**
+   * The app's owner can rename it on GitHub, and the address a workspace is sent to to connect follows its
+   * name: GitHub is asked what the app is called now, and what is kept here is brought into line.
+   */
+  async refresh(): Promise<void> {
+    const app = this.kept.app;
+    if (!app) return;
+    const now = (await this.asApp('/app')) as { slug?: string; name?: string };
+    if (!now.slug || (now.slug === app.slug && (now.name ?? app.name) === app.name)) return;
+    Object.assign(app, { slug: now.slug, name: now.name ?? now.slug });
+    this.save();
+  }
+
   // ---- 2. connecting a workspace ----------------------------------------
 
   /** Where to send a workspace's admin to choose repositories. */

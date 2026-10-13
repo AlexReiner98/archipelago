@@ -1015,6 +1015,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }) as string;
   const asked: string[] = [];
+  let renamed = false;
   const hub = createServer((req, res) => {
     const say = (status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
     const bearer = (req.headers.authorization ?? '').replace('Bearer ', '');
@@ -1023,6 +1024,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
       return Boolean(sig) && createVerify('RSA-SHA256').update(`${head}.${body}`).verify(publicKey, sig, 'base64url') && JSON.parse(Buffer.from(body, 'base64url').toString()).iss === '7';
     };
     asked.push(`${req.method} ${req.url}`);
+    if (req.url === '/app') return isApp() ? say(200, renamed ? { slug: 'pelago-renamed', name: 'Archipelago (renamed)' } : { slug: 'pelago-test', name: 'Archipelago (test)' }) : say(401, { message: 'Bad credentials' });
     if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return say(201, { id: 7, slug: 'pelago-test', name: 'Archipelago (test)', pem, webhook_secret: 'whsec' });
     if (req.url === '/app/installations/42') return isApp() ? say(200, { account: { login: 'acme' } }) : say(401, { message: 'Bad credentials' });
     if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
@@ -1148,6 +1150,14 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.deepEqual(await readUnread(whole, theApp!, '42'), [{ repo: 'Acme/Tools', branch: 'main', after: 'd'.repeat(40) }]);
   assert.match(asks.at(-1).messages[0].content, new RegExp(`${'b'.repeat(40)}\\.\\.${'d'.repeat(40)}`), 'from the last push that was read to the newest');
   assert.deepEqual(await readUnread(whole, theApp!, '42'), [], 'and once');
+
+  // Renamed on GitHub by its owner, the app is asked its name, and a workspace is sent to where it now is.
+  await theApp!.refresh();
+  assert.equal(theApp!.app?.slug, 'pelago-test', 'asked, and as it was');
+  renamed = true;
+  await theApp!.refresh();
+  assert.deepEqual(theApp!.app, { slug: 'pelago-renamed', name: 'Archipelago (renamed)' });
+  assert.match(theApp!.startConnect('default'), /^https:\/\/github\.test\/apps\/pelago-renamed\/installations\/new\?state=/);
 
   // Its admin can ask for a re-check of a repository now; only of one the app was given, and no agent can.
   assert.match((await call('/agent/github_app', robot, { recheck: heard.repo.id })).error, /humans only/);

@@ -560,6 +560,8 @@ If that process is not a pelago server, delete ${lock}.`);
   // re-check is due (each project says how often); the agent on this server does the ones that are. An hour when
   // nothing is due costs no run. Asked that often because a server that is deployed daily never sees a whole day.
   const recheckAll = async () => {
+    // The same hour, and so at every start: what the app is called on GitHub now.
+    await githubApp.refresh().catch((err) => console.error(`The GitHub App could not be asked its name: ${(err as Error).message}`));
     for (const { id } of workspaces.list()) {
       const installation = githubApp.installationOf(id);
       if (!installation) continue;
