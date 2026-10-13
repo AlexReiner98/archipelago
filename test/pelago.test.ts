@@ -1244,14 +1244,18 @@ test('a lens answers with one shape of data: what is inside what, the same count
   // Around one item: what is inside it, and whatever any kind of link ties to those, filed by the link that ties it to the start.
   const around = await run({ from: made.early, over: 'all', lanes: 'link' });
   assert.deepEqual(titles(around), ['A', 'B', 'C', 'Early', 'P', 'Sam', 'X']);
-  assert.deepEqual(['A', 'P', 'C'].map((t) => item(around, t).lane), ['part_of', 'part_of', null]);
+  assert.deepEqual(['A', 'P', 'C'].map((t) => item(around, t).lane), ['part_of:in', 'part_of', null], 'the kind of link and which way it runs');
+  const asItOpens = await run({ from: made.early });
+  assert.deepEqual([asItOpens.lens.over, asItOpens.lens.lanes, titles(asItOpens)], ['all', 'link', titles(around)], 'around one item, every kind of link and lanes by link are what it opens on');
+  await make(l, [{ op: 'create', ref: 'n', type: 'note', title: 'About A' }, { op: 'link', type: 'about', from: 'n', to: made.a }, { op: 'create', ref: 'm', type: 'note', title: 'About Early' }, { op: 'link', type: 'about', from: 'm', to: made.early }]);
+  assert.deepEqual(titles(await run({ from: made.early })).filter((t: string) => t.startsWith('About')), ['About Early'], 'what is linked to the start is brought in; what is only linked to something inside it is not');
   assert.deepEqual(links(around), ['A depends_on C x1', 'B waits_on Sam x1', 'X depends_on A x1'], 'what is inside what is said by inside, not by a link as well');
 
   // Lanes by stage, with what is finished unfolded; and kinds.
   const staged = await run({ from: made.p, lanes: 'stage', fold: [] });
   assert.deepEqual(['Early', 'Late', 'E'].map((t) => item(staged, t).lane), ['under_way', 'to_come', 'done']);
   const tasks = await run({ kinds: ['task'], fold: ['closed', 'system'] });
-  assert.deepEqual([titles(tasks), tasks.rest.kinds], [['A', 'B', 'C', 'D', 'X'], 5]);
+  assert.deepEqual([titles(tasks), tasks.rest.kinds], [['A', 'B', 'C', 'D', 'X'], 7], 'the two projects, two features, Sam and the two notes are not tasks');
 
   await assert.rejects(run({ by: 'nope' }), /unknown kind of link/);
   await assert.rejects(run({ fold: ['everything'] }), /fold must be of/);

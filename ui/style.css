@@ -245,6 +245,10 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .lb-leaves.dot .lb-name, .lb-leaves.dot .lb-mark { display: none; }
 .lb-leaves.dot .lb-dot { width: 11px; height: 11px; }
 .lb-box.dim > header, .lb-leaf.dim { opacity: 0.28; }
+.lb-leaf.here { background: var(--ln-sea); }
+.lb-leaf.here .lb-name { font-weight: 600; }
+.lb-box.lane > header { padding-left: 12px; border-bottom: 1px solid var(--ln-line); }
+.lb-box.lane > header .lb-name { font-weight: 400; color: var(--ln-muted); }
 /* Space: the same picture in three dimensions. */
 .lens-frame { display: block; width: 100%; height: min(calc(100vh - 190px), 820px); min-height: 380px; border: 0; background: var(--ln-sea); }
 .lens-view .lens-error { padding: 8px 14px; color: var(--bad); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -845,6 +845,7 @@ function map() {
       h('input', { type: 'search', placeholder: 'Search titles and text', value: mapState.q, oninput: set('q'), autofocus: true, style: 'flex: 1; min-width: 200px' }),
       h('select', { onchange: set('type') }, h('option', { value: '' }, 'All types'), schema.types.map((t) => h('option', { value: t.id, selected: t.id === mapState.type }, `${t.title}${t.pack === 'core' ? '' : ` (${t.pack})`}`))),
       h('button', { onclick: () => (location.hash = `#/new/${mapState.type || 'task'}`) }, 'New'),
+      h('button', { title: 'The whole map as a picture', onclick: () => (location.hash = '#/graph') }, 'Map'),
       h('select', { onchange: set('open') }, ['open', 'closed', 'all'].map((v) => h('option', { value: v, selected: v === mapState.open }, v === 'open' ? 'Unfinished' : v === 'closed' ? 'Finished' : 'Both'))),
     ),
     rest,
@@ -1169,6 +1170,8 @@ async function entity(id) {
       ]),
     ),
     editor,
+    // Where it sits and what it holds, as a picture: the lens and the style kept for it, or the ones every item opens on. It takes no room when there is nothing to draw.
+    h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true })),
     // What a project is comes before its chart: said under the chart, it reads as a caption to it.
     project ? h('div', { class: 'grid', style: 'margin-bottom: 14px' }, note) : '',
     project ? h('div', { id: 'roadmap', 'data-root': id }) : '',
@@ -1201,8 +1204,6 @@ async function entity(id) {
             ),
           ),
         ]),
-      // Where it sits, as the one graph. A project's work is drawn in its roadmap above, so here is what else it is linked to.
-      fold('relations', 'Relations', project ? 0 : relCount, !project, graphView(project ? { focus: id, key: `${id}:rest`, extras: { restOnly: true } } : { focus: id })),
       fold('history', 'History', lines.length, false, lines),
     ),
   );
@@ -1933,7 +1934,7 @@ const keptStyle = (key) => {
  * The picture a lens gives, drawn in a style. `style` is what the page or an
  * address asks for this one look, over what the person chose before.
  */
-function lensView({ lens = {}, style = {}, key = lens.from ?? 'map' } = {}) {
+function lensView({ lens = {}, style = {}, key = lens.from ?? 'map', quiet = false } = {}) {
   const chosen = { ...LENS_STYLE };
   const host = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
   const keep = (change) => {
@@ -1951,7 +1952,7 @@ function lensView({ lens = {}, style = {}, key = lens.from ?? 'map' } = {}) {
     } catch (err) {
       return host.replaceChildren(h('div', { class: 'error' }, err.message));
     }
-    if (answer.items.length < 2) return host.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw here.'));
+    if (answer.items.length < 2) return quiet ? void ((host.closest('.lens-card') ?? host).hidden = true) : host.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw here.'));
     // Nearest wins, field by field: built in, what the map keeps for this picture, what this person chose, what the address asks.
     Object.assign(chosen, answer.style, keptStyle(key), style);
     dress(host, chosen);
@@ -2015,6 +2016,11 @@ function drawBoxes(host, answer, style, keep, kept) {
   const show = new Set(Array.isArray(style.show) ? style.show : ['you', 'blocked', 'count']);
   const levels = Number.isFinite(style.open) ? style.open : 1;
   const { opened } = kept;
+  // Around one item, what it sits in is open down to it, and how far things open is counted from it.
+  const here = byId.get(answer.lens.from);
+  const above = new Set();
+  for (let n = here?.up; n && n !== root; n = n.up) above.add(n.id);
+  const base = here?.depth ?? 0;
   // What each thing waits on, by name, for its tooltip.
   const waits = new Map();
   for (const link of answer.links) if (BLOCKING.includes(link.kind) && byId.has(link.to)) waits.set(link.from, [...(waits.get(link.from) ?? []), byId.get(link.to).title]);
@@ -2031,9 +2037,9 @@ function drawBoxes(host, answer, style, keep, kept) {
     show.has('status') && mark('word', n.status, 'Its status'),
   ];
   const thing = (n) => {
-    const state = `${count(n) ? '' : ' dim'}${n.open ? '' : ' closed'}${n.state.blocked ? ' blocked' : ''}${me && n.state.waits_on.includes(me) ? ' you' : ''}`;
+    const state = `${count(n) ? '' : ' dim'}${n.open ? '' : ' closed'}${n.state.blocked ? ' blocked' : ''}${me && n.state.waits_on.includes(me) ? ' you' : ''}${n === here ? ' here' : ''}`;
     if (n.all === 1) return h('a', { class: `lb-leaf${state}`, href: `#/e/${n.id}`, title: hint(n) }, h('span', { class: 'lb-dot' }), h('span', { class: 'lb-name' }, n.title), ...marks(n).slice(2));
-    const open = n.kids.length > 0 && (opened.get(n.id) ?? n.depth < levels);
+    const open = n.kids.length > 0 && (opened.get(n.id) ?? (above.has(n.id) || n.depth - base < levels));
     const leaves = n.kids.filter((kid) => kid.all === 1);
     const boxes = n.kids.filter((kid) => kid.all > 1);
     return h(
@@ -2051,7 +2057,23 @@ function drawBoxes(host, answer, style, keep, kept) {
       open && boxes.length > 0 && h('div', { class: 'lb-kids' }, boxes.map(thing)),
     );
   };
-  const draw = () => body.replaceChildren(...root.kids.map(thing));
+  // Around one item its neighbours are gathered under the link that ties each to it, said as that item would say it.
+  const start = answer.lens.from;
+  const said = (lane) => {
+    const [kind, inward] = String(lane).split(':');
+    const phrase = lane == null ? 'near it' : ((inward ? relations.get(kind)?.inverse : relations.get(kind)?.title) ?? kind);
+    return phrase[0].toUpperCase() + phrase.slice(1);
+  };
+  const draw = () => {
+    const loose = start && answer.lens.lanes === 'link' ? root.kids.filter((n) => n.all === 1 && n.id !== start) : [];
+    const lanes = new Map();
+    for (const n of loose) lanes.set(n.lane ?? null, [...(lanes.get(n.lane ?? null) ?? []), n]);
+    body.replaceChildren(
+      // The item the page is about is not drawn again as a line of its own.
+      ...root.kids.filter((n) => !loose.includes(n) && !(n.id === start && n.all === 1)).map(thing),
+      ...[...lanes].map(([lane, things]) => h('section', { class: 'lb-box lane' }, h('header', {}, h('span', { class: 'lb-name' }, said(lane)), h('span', { class: 'lb-mark lb-count' }, String(things.length))), h('div', { class: 'lb-leaves row' }, things.map(thing)))),
+    );
+  };
   host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), litSwitch(me, style, keep, draw)), body);
   draw();
 }
@@ -2339,12 +2361,10 @@ function drawCode(host, answer, style, keep) {
 const LENS_SHAPES = { nest: drawNest, boxes: drawBoxes };
 
 /**
- * The map as a picture. With a lens in its address (anything after a ?), the
- * lens drawn in its style; without, the drawing there was before, which stays
- * until the owner takes a style to open on.
+ * The map as a picture: the lens its address names (what follows a ?), or
+ * the whole map as it opens, drawn in the style kept for it.
  */
 async function graph(query = '') {
-  if (!query) return part('graph').replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Graph')), h('section', { class: 'card' }, graphView({ defaults: { kind: 'structure' } })));
   const { lens, style } = readLens(query);
   const view = lensView({ lens, style });
   // One already there stays until the new one is drawn: the map changing under it does not blank the page.
@@ -3723,7 +3743,7 @@ async function route(pulse = false) {
   if (name === 'projects' || name === 'today') return void (location.hash = '#/map');
   // Automations are found like any other kind of item.
   // The graph around an item is its relations, drawn further out, on its own page.
-  if (name === 'graph' && arg) return void ((prefsOf(arg).steps = Math.max(prefsOf(arg).steps, 2)), unfolded.set(`${arg}:relations`, true), (location.hash = `#/e/${arg}`));
+  if (name === 'graph' && arg) return void (location.hash = `#/graph?from=${arg}`);
   if (name === 'automations') return void ((mapState.type = 'sys.automation'), (location.hash = '#/map'));
   // A project's roadmap and its questions are on the project's own page.
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/map');

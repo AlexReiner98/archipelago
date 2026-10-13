@@ -35,6 +35,8 @@ const FOLDS = ['closed', 'system', 'unlinked'];
 const LANES = ['stage', 'link', 'person'];
 /** The most items one answer sends: the deepest are cut first, and `rest` says how many. */
 export const LENS_LIMIT = 2000;
+/** The kinds of link that say one thing cannot move until another has. */
+const WAITS = ['depends_on', 'waits_on', 'needs'];
 /** Statuses that mean someone is on it now. */
 const UNDER_WAY = ['doing', 'building', 'investigating'];
 
@@ -127,7 +129,8 @@ export async function pictureOf(l: Archipelago, id: string): Promise<string | un
 export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const from = input.from === undefined ? undefined : String(input.from);
   const [lenses, styles] = [await kept(l, 'lens', from, input.lens), await kept(l, 'style', from, input.style)];
-  let under = LENS_DEFAULT;
+  // Around one item the picture is its neighbourhood: every kind of link, each neighbour filed under the link that ties it.
+  let under: Lens = from === undefined ? LENS_DEFAULT : { ...LENS_DEFAULT, over: 'all', lanes: 'link' };
   for (const one of lenses) {
     try {
       under = readLens(l, Object.fromEntries(Object.entries(one.props).filter(([key, value]) => key in LENS_KEPT && value != null)), under);
@@ -202,8 +205,10 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     };
     reach(asked.from, 0);
     const tree = new Set(sent);
+    // Brought in: whatever a link ties to the start itself, and what blocks or is blocked by anything inside it.
+    // Not every neighbour of everything inside: a project's picture is not its whole surroundings.
     for (const r of live) {
-      if (!along(r.type)) continue;
+      if (!along(r.type) || !(r.from_id === asked.from || r.to_id === asked.from || WAITS.includes(r.type))) continue;
       if (tree.has(r.from_id)) sent.add(r.to_id);
       // Not what is inside one of them, though: that is what `far` cut.
       if (tree.has(r.to_id) && r.type !== asked.by) sent.add(r.from_id);
@@ -271,7 +276,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
 
   // What it is filed under, when the lens has lanes.
   const tied = new Map<string, string>();
-  if (asked.lanes === 'link' && asked.from) for (const r of live) for (const [a, b] of [[r.from_id, r.to_id], [r.to_id, r.from_id]]) if (a === asked.from && !tied.has(b)) tied.set(b, r.type);
+  // The kind of link, and which way it runs: "depends_on" where the start depends on it, "depends_on:in" where it depends on the start.
+  if (asked.lanes === 'link' && asked.from) for (const r of live) for (const [a, b, way] of [[r.from_id, r.to_id, ''], [r.to_id, r.from_id, ':in']]) if (a === asked.from && !tied.has(b)) tied.set(b, r.type + way);
   const lane = (e: Row): string | null => {
     if (asked.lanes === 'person') return e.owner;
     if (asked.lanes === 'link') return tied.get(e.id) ?? null;
