@@ -6,53 +6,20 @@ is how to work on it.
 
 ## Where things stand
 
-The state of this build is kept in Lattice itself, not in this file. There
-are two servers, and they are not the same thing:
+The state of this build is kept in a Lattice map, not in this file. Which map
+that is belongs to whoever is working: the maintainer's sessions keep theirs
+on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
 
-- **The map of record is the owner's workspace on the hosted server**
-  (https://lattice.aperture.tools). The owner decided this on 8 Oct 2026. The
-  lattice MCP tools in this folder point there when the machine has the
-  environment variables `LATTICE_URL` and `LATTICE_AGENT_TOKEN` (set once
-  from "Connect an agent" on the Workspace screen; `.mcp.json` reads them).
-  Check before you rely on it: print `LATTICE_URL` (`echo $LATTICE_URL`; in
-  PowerShell, `$env:LATTICE_URL`), and if it is empty you have the local one.
-  Do not run `claude mcp get lattice` to find out: it prints the agent token
-  in full, into your transcript. What you write there shows to the owner on Changes;
-  there is no dev mode and no `restart` tool.
+- **If your lattice tools are connected to a map that tracks this
+  repository,** start with `view`, name `handoff`, and the repository. One
+  answer holds the last push, the handoff note, what has happened since, and
+  the open work. Say what you take on with `session_update`, keep the map
+  true as you go, and bring the handoff note up to date before you finish.
 - **The local server on port 3100 (`npm run dev`) is where the code is
   tried.** Its map is a scratch copy: do not record the state of the work
-  there. If your lattice tools still point at it, tell the owner, and they
-  can import a backup of it into the hosted workspace.
-
-At the start of a session:
-
-1. With the lattice MCP tools: `view` with name `handoff` and `repo` (the id
-   the session hook gave, or `AlexReiner98/lattice`). One answer holds the
-   last push, the handoff note, what has happened since it was written, and
-   this repo's open work. Where the note and the lists disagree, the lists
-   are right: they are read off the map as it is now.
-2. The session hook has registered the session (it gives the run id; call
-   `session_start` only if it did not). Say what you take on with
-   `session_update`. Before you finish, bring the handoff note up to date
-   with `append` or `replace`: only what the map cannot know (what nobody has
-   seen working, what bites when working here, what you would do next and
-   why). Do not repeat the open work, the last push or what was settled.
-3. Make sure the local server is running before you change code
-   (`npm run dev`; port 3100).
-4. When you take on a task, issue or feature that has no estimate, give it
-   one: `tokens_estimated` in its props (input and output, not counting
-   cached re-reads). What the session actually uses is measured by the
-   session hook and added to what the session is working on, so name your
-   task with `session_update` before you start, and again when you move on.
-
-Keep the map true as you go: when what you did or found settles something
-that is still open (a task, an experiment, a decision made in practice),
-change its status with the outcome and the evidence. Do not leave it open
-with a note. Closing a decision or hypothesis is held for the owner to
-confirm, so propose the answer; where the workspace applies agents' changes
-as made (the hosted one does, since 8 Oct 2026) it takes effect at once and
-the owner is notified, so settle only what the work or the owner has in fact
-settled, with what was chosen and why.
+  there. Make sure it is running before you change code.
+- **Never print the agent token.** `claude mcp get lattice` prints it in
+  full; to see which server a session uses, print `LATTICE_URL` instead.
 
 ## Rules
 
@@ -183,9 +150,3 @@ npm run typecheck
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/app.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
-
-## Lattice
-
-This project's work is kept in Lattice (https://lattice.aperture.tools). How to work with it:
-
-@.claude/lattice.md

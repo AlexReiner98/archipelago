@@ -238,6 +238,27 @@ create policy public_relation on relation for select to lattice_public using (la
 drop policy if exists public_picture on picture;
 create policy public_picture on picture for select to lattice_public using (lattice_is_public(entity_id));
 
+-- Tokens and settings. A member sees and changes the tokens that are their own; an admin, all of them. Of the
+-- settings a member reads the few every request needs (who the owner is, whether new things are private, whether
+-- agents' changes are held) and keeps the place it has read a connection's log up to; the rest, the sealed secrets
+-- among them, is an admin's. Whether the viewer is an admin is said with the viewer, by the server, from the token.
+alter table token   enable row level security;
+alter table setting enable row level security;
+grant delete on setting to lattice_member;
+
+drop policy if exists member_token on token;
+create policy member_token on token for all to lattice_member
+  using (current_setting('lattice.admin', true) = '1' or entity_id = current_setting('lattice.viewer', true))
+  with check (current_setting('lattice.admin', true) = '1' or entity_id = current_setting('lattice.viewer', true));
+
+drop policy if exists member_setting_read on setting;
+create policy member_setting_read on setting for select to lattice_member
+  using (key in ('me', 'default_visibility', 'agent_changes'));
+drop policy if exists member_setting on setting;
+create policy member_setting on setting for all to lattice_member
+  using (current_setting('lattice.admin', true) = '1' or key like 'audit_cursor:%')
+  with check (current_setting('lattice.admin', true) = '1' or key like 'audit_cursor:%');
+
 drop policy if exists member_proposal on proposal;
 create policy member_proposal on proposal for all to lattice_member
   using (private_to is null or private_to = current_setting('lattice.viewer', true))
@@ -263,12 +284,13 @@ export async function openDb(dataDir?: string): Promise<PGlite> {
 
 /**
  * The same database as one person sees it. Every statement runs inside a
- * transaction that first drops to the member role and names the viewer, so
- * the setting cannot leak between requests sharing the connection.
+ * transaction that first drops to the member role and names the viewer (and
+ * whether they are an admin of the workspace), so neither can leak between
+ * requests sharing the connection.
  */
-export function scoped(db: Db, viewer: string): Db {
+export function scoped(db: Db, viewer: string, admin = false): Db {
   const enter = async (tx: Q) => {
-    await tx.query(`select set_config('lattice.viewer', $1, true)`, [viewer]);
+    await tx.query(`select set_config('lattice.viewer', $1, true), set_config('lattice.admin', $2, true)`, [viewer, admin ? '1' : '']);
     await tx.query(`set local role lattice_member`);
   };
   return {

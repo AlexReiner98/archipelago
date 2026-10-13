@@ -216,9 +216,9 @@ export class Lattice {
     return new Lattice(anyone(this.db), this.registry, this.policy, this.workspace, '', 'lattice_public_props(id) as props');
   }
 
-  /** This map as one person sees it. An empty viewer sees only what is shared. */
-  as(viewer: string): Lattice {
-    return new Lattice(scoped(this.db, viewer), this.registry, this.policy, this.workspace, viewer);
+  /** This map as one person sees it. An empty viewer sees only what is shared; an admin also sees every token and setting. */
+  as(viewer: string, admin = false): Lattice {
+    return new Lattice(scoped(this.db, viewer, admin), this.registry, this.policy, this.workspace, viewer);
   }
 
   /** Whether new things are private to their author unless they say otherwise. */

@@ -2,16 +2,29 @@
 
 [![Tests](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml)
 
-Lattice is a map of your work that you and your AI agents keep together:
-projects, tasks, decisions, people, and what waits on what. You look at it in
-a web page. Your agents read and change it through the same tools you use, and
-what an agent changes either waits for your yes or is applied, logged and one
-click to undo.
+**A shared workspace for your people and your AI agents.**
 
-It is for someone who runs several agent sessions across several
-repositories and has lost track of where things stand. Each session starts by
-reading the map, says what it takes on, and leaves the map true when it ends,
-so the next session, or you, can pick up without being told.
+If your business uses AI, where do the agents and the people work together?
+Usually nowhere: each agent session starts from nothing, what it learned
+stays in a chat, and nobody can say where a project stands without asking.
+
+Lattice is that shared place, and the memory of your projects. It is a map of
+the work: projects, tasks, decisions, people, and what waits on what. People
+look at it in a web page. Agents read and change it through the same tools,
+and what an agent changes either waits for a person's yes or is applied,
+logged and one click to undo.
+
+- **Your own kinds of thing.** A project type, a deliverable, a test result:
+  types are files, and one type can be a flavour of another.
+- **Dependencies that cannot go stale.** What blocks what is worked out each
+  time from what depends on what, who is waited on and which resource is
+  taken. Nobody maintains a status board.
+- **Connected to where the work happens.** A push to GitHub is read against
+  what was open; an agent's session registers itself, says what it takes on
+  and leaves the map true when it ends.
+- **A team, not one person.** Each member sees what is shared and what is
+  their own, each agent acts for the person whose token it carries, and each
+  customer's workspace is its own database.
 
 ![You and your agents use the same tools on one map](docs/overview.svg)
 
@@ -81,8 +94,13 @@ draws what it depends on.
 - **Have the map follow your code:** [GitHub](#github-pushes-keep-the-map-current).
   A push is recorded, and an agent reads it against what was open.
 - **Add your own kinds of thing:** [Packs and flavours](#packs-and-flavours).
-- **Work on Lattice itself:** [Dev mode](#dev-mode), [Tests](#tests) and
-  `CLAUDE.md`.
+- **Work on Lattice itself:** [CONTRIBUTING.md](CONTRIBUTING.md),
+  [Dev mode](#dev-mode) and [Tests](#tests). Issues and changes from others
+  are welcome.
+- **Report a security problem:** in private, as [SECURITY.md](SECURITY.md)
+  says.
+
+Lattice is licensed under [Apache-2.0](LICENSE).
 
 # Reference
 
@@ -117,7 +135,7 @@ Approving, launching and tokens stay with you. Dev mode refuses to start with
 
 | Surface | Who | How |
 |---|---|---|
-| MCP at `/mcp` | Agents | `.mcp.json` in this repo connects Claude Code. Copy the `lattice` entry into any other project's `.mcp.json` to use the map from there. |
+| MCP at `/mcp` | Agents | A project's `.mcp.json` connects Claude Code: the setup command writes it (see Connect Claude Code above). |
 | Web UI | You | Open `http://127.0.0.1:3100` while the server is running |
 | CLI | You | `npm run lattice -- <command>` (run with no command for the list) |
 
@@ -162,7 +180,7 @@ you. An agent waiting in the `watch` tool is answered the moment you decide,
 edit, approve or reject something, and the menu shows "An agent is listening"
 while one waits. A Claude Code session in this repository is also told, with
 your next message, what you did since it last heard (the `UserPromptSubmit`
-hook in `.claude/settings.json`).
+hook the setup writes into `.claude/settings.json`).
 
 The graph on an item's page shows its neighbourhood, one to four steps out:
 what blocks what, what belongs to what, or every relation. A dashed red ring
@@ -235,11 +253,10 @@ at once; they are the session's own state, not facts about the world.
   it is (the item is then left as it was, and the run says it was not
   checked); what waits on a person's answer is not asked about. A session
   closed without that (by the hook, or a crash) is recorded as not reconciled.
-- **Automatically, from Claude Code:** merge
-  [examples/claude-code-hooks.json](examples/claude-code-hooks.json) into a
-  project's `.claude/settings.json` (that file calls a server on the same
-  machine; for a hosted one, copy [scripts/lattice-hook.mjs](scripts/lattice-hook.mjs)
-  and this repository's own `.claude/settings.json`, which send the token). Each session opened there then registers
+- **Automatically, from Claude Code:** the setup command (below) writes the
+  hooks into a project's `.claude/settings.json`; by hand, merge
+  [examples/claude-code-hooks.json](examples/claude-code-hooks.json), which
+  calls a server on the same machine. Each session opened there then registers
   on start and closes on end, and starts with what the map knows about that
   repository: the open work nothing blocks, the blocked work and what it waits
   on, and whether each exclusive resource is free. The repository is matched
@@ -583,8 +600,8 @@ change that:
   commands that put the server's address and the token into the environment
   variables `LATTICE_URL` and `LATTICE_AGENT_TOKEN` (on Windows, `setx`).
   Run them, then quit Claude Code completely and open it again. Every project
-  whose `.mcp.json` reads those variables is then connected as you; this
-  repository's does, and the same file works in any other:
+  whose `.mcp.json` reads those variables is then connected as you; the one
+  the setup writes does, and the same file works in any project:
 
   ```json
   {
@@ -606,7 +623,7 @@ change that:
   on purpose: an entry added with `claude mcp add --scope local` lives in
   Claude Code's own settings file, and was lost once when a running session
   wrote that file back. The hooks in `.claude/settings.json` follow the
-  same two variables: each runs `scripts/lattice-hook.mjs`, which passes the
+  same two variables: each runs `.claude/lattice-hook.mjs`, which passes the
   hook on to that server with the token, or to the server on this machine
   when the variables are not set. So a session registers, hears what the
   owner did and closes on the same map its tools write to.

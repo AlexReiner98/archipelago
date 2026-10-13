@@ -94,7 +94,10 @@ if (process.env.LATTICE_SETUP_SAVE && process.env.LATTICE_AGENT_TOKEN) {
 // CLAUDE.md is the project's own: one section is added to it, once, that reads the rules in.
 const claude = join(here, 'CLAUDE.md');
 const had = existsSync(claude) ? readFileSync(claude, 'utf8') : '';
-if (had.includes('@.claude/lattice.md')) did.push('as it was  CLAUDE.md');
+// A project that keeps its own setup out of git reads the rules in from CLAUDE.local.md instead.
+const localRules = join(here, 'CLAUDE.local.md');
+const reads = (text) => text.includes('@.claude/lattice.md');
+if (reads(had) || (existsSync(localRules) && reads(readFileSync(localRules, 'utf8')))) did.push('as it was  CLAUDE.md');
 else {
   writeFileSync(claude, `${had ? had.trimEnd() + '\n\n' : ''}## Lattice\n\nThis project's work is kept in Lattice (${ORIGIN}). How to work with it:\n\n@.claude/lattice.md\n`);
   did.push(`${had ? 'added to ' : 'written  '}  CLAUDE.md`);

@@ -205,7 +205,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       ws,
       // Everything this request reads or writes goes through the database as
       // this person sees it. A token tied to nobody sees only what is shared.
-      lattice: ws.lattice.as(identity.actor.person ?? ''),
+      lattice: ws.lattice.as(identity.actor.person ?? '', Boolean(identity.actor.admin)),
       actor: (label) => (label && identity.actor.kind === 'agent' ? { ...identity.actor, name: `${identity.actor.name}/${label}` } : identity.actor),
     };
   }

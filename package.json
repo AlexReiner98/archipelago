@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A typed, extensible map of people, work and dependencies, built for humans and AI agents alike.",
+  "description": "A shared workspace for people and AI agents: a typed map of work, decisions and what waits on what.",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=24"
   },

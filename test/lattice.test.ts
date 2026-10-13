@@ -1842,3 +1842,42 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   await make(l, [{ op: 'update', id: made.sun, visibility: 'private' }]);
   assert.deepEqual((await publicPage(l, made.app))!.questions, []);
 });
+
+test('a member sees their own tokens and the few settings every request needs; the rest is an admin’s, by the database', async () => {
+  const { createToken, listTokens } = await import('../src/auth.ts');
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
+    { op: 'create', ref: 'bo', type: 'person', title: 'Bo' },
+  ]);
+  await createToken(l.db, 'default', { kind: 'human', name: 'ann', entity: made.ann, admin: true });
+  await createToken(l.db, 'default', { kind: 'human', name: 'bo', entity: made.bo });
+  const set = (key: string, value: unknown) => l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
+  await set('me', made.ann);
+  await set('default_visibility', 'shared');
+  await set('accepts_from', ['elsewhere']);
+  await l.setSecret('github_secret', 'latgh_notforbo');
+
+  const bo = l.as(made.bo);
+  const ann = l.as(made.ann, true);
+  // Tokens: a member's own, and one they make for an agent of theirs; not another's, to read, revoke or make.
+  assert.deepEqual((await listTokens(bo.db)).map((t) => t.name), ['bo']);
+  assert.deepEqual((await listTokens(ann.db)).map((t) => t.name).sort(), ['ann', 'bo']);
+  await createToken(bo.db, 'default', { kind: 'agent', name: 'bo’s agent', entity: made.bo });
+  await assert.rejects(createToken(bo.db, 'default', { kind: 'agent', name: 'as ann', entity: made.ann }), /row-level security/);
+  assert.equal((await bo.db.query(`update token set revoked_at = now() where name = 'ann' returning id`)).rows.length, 0);
+
+  // Settings: who the owner is and how the workspace is set, and nothing else. A secret is not there to be read, sealed or not.
+  assert.equal(await bo.setting('me'), made.ann);
+  assert.equal(await bo.defaultVisibility(), 'shared');
+  assert.deepEqual((await bo.db.query<{ key: string }>(`select key from setting order by key`)).rows.map((r) => r.key), ['default_visibility', 'me']);
+  assert.equal(await bo.secret('github_secret'), undefined);
+  assert.equal(await ann.secret('github_secret'), 'latgh_notforbo');
+  assert.deepEqual(await ann.setting('accepts_from'), ['elsewhere']);
+  // Nor is a setting a member's to change, but for the place a connection's log has been read up to.
+  await assert.rejects(bo.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"')`), /row-level security/);
+  assert.equal((await bo.db.query(`update setting set value = '"private"' where key = 'default_visibility' returning key`)).rows.length, 0);
+  await bo.db.query(`insert into setting (key, value) values ('audit_cursor:e_conn0001', '"2026-10-13"')`);
+  await ann.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"') on conflict (key) do update set value = excluded.value`);
+  assert.equal(await bo.agentChanges(), 'apply');
+});
