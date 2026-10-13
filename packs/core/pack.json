@@ -200,6 +200,41 @@
       "title": "Note",
       "description": "Free-form knowledge that does not fit another type.",
       "statuses": { "open": ["current"], "closed": ["stale"] }
+    },
+    {
+      "id": "lens",
+      "title": "Lens",
+      "description": "What is in a picture of the map. About a project or item, it is that thing's picture; about nothing, the workspace's. A field left empty comes from the level above. Read by the lens view.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "kinds": { "type": "json", "description": "Types to keep, as a list: a type (flavours included) or \"work\"; with a leading \"-\", to leave out." },
+        "by": { "type": "string", "description": "The kind of link that says what is inside what, e.g. part_of." },
+        "over": { "type": "json", "description": "The kinds of link sent along as links, as a list, or \"all\"." },
+        "far": { "type": "number", "description": "How many steps down from the start." },
+        "lanes": { "type": "enum", "values": ["stage", "link", "person"], "description": "What each item is filed under." },
+        "order": { "type": "string", "description": "The number field that orders things beside each other." },
+        "measure": { "type": "enum", "values": ["work", "tokens"], "description": "What size counts." },
+        "fold": { "type": "json", "description": "What is left out, as a list of: closed, system, unlinked." }
+      }
+    },
+    {
+      "id": "style",
+      "title": "Style",
+      "description": "How a picture of the map is drawn. About a project or item, it is how that thing's picture looks; about nothing, the workspace's. A field left empty comes from the level above. Read only by the page that draws.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "shape": { "type": "enum", "values": ["nest", "boxes"], "description": "nest: circles in circles, opened by zooming. boxes: titled boxes in boxes, each thing one line." },
+        "lit": { "type": "enum", "values": ["all", "you", "blocked"], "description": "What stays lit as it opens." },
+        "open": { "type": "number", "description": "How many levels are open as it first draws." },
+        "show": { "type": "json", "description": "What a thing says beside its name, as a list of: count, blocked, you, sessions, status, type, bar." },
+        "leaf": { "type": "enum", "values": ["row", "chip", "dot"], "description": "How a thing with nothing inside it is drawn in boxes." },
+        "column": { "type": "number", "description": "The least width of a box, in pixels." },
+        "text": { "type": "number", "description": "The size of names, in pixels." },
+        "radius": { "type": "number", "description": "How round corners are, in pixels." },
+        "gap": { "type": "number", "description": "The room between things, in pixels." },
+        "lines": { "type": "boolean", "description": "Whether links are drawn as lines." },
+        "colors": { "type": "json", "description": "Colours by name, each a hex colour: sea, land, inner, line, text, muted, blocked, you, session, done." }
+      }
     }
   ],
   "relations": [

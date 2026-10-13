@@ -1910,6 +1910,8 @@ function readLens(query) {
   const style = {};
   for (const [key, value] of new URLSearchParams(query)) {
     if (key === 'lit' || key === 'shape') style[key] = value;
+    // A lens or a style kept on the map, named outright: the server reads it.
+    else if ((key === 'lens' || key === 'style') && value) lens[key] = value;
     else if (!(key in LENS_FIELDS)) continue;
     else if (key === 'far') lens.far = Number(value);
     else if (key === 'over' && value === 'all') lens.over = 'all';
@@ -1932,7 +1934,7 @@ const keptStyle = (key) => {
  * address asks for this one look, over what the person chose before.
  */
 function lensView({ lens = {}, style = {}, key = lens.from ?? 'map' } = {}) {
-  const chosen = { ...LENS_STYLE, ...keptStyle(key), ...style };
+  const chosen = { ...LENS_STYLE };
   const host = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
   const keep = (change) => {
     Object.assign(chosen, change);
@@ -1942,7 +1944,7 @@ function lensView({ lens = {}, style = {}, key = lens.from ?? 'map' } = {}) {
       // Without storage the choice lasts until the page is reloaded.
     }
   };
-  (async () => {
+  host.ready = (async () => {
     let answer;
     try {
       answer = await api('view', { name: 'lens', params: lens });
@@ -1950,18 +1952,40 @@ function lensView({ lens = {}, style = {}, key = lens.from ?? 'map' } = {}) {
       return host.replaceChildren(h('div', { class: 'error' }, err.message));
     }
     if (answer.items.length < 2) return host.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw here.'));
-    (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest)(host, answer, chosen, keep);
+    // Nearest wins, field by field: built in, what the map keeps for this picture, what this person chose, what the address asks.
+    Object.assign(chosen, answer.style, keptStyle(key), style);
+    dress(host, chosen);
+    // What was opened and where the picture stood outlive a redraw: the map changes under an open page.
+    if (!lensPlace.has(key)) lensPlace.set(key, { opened: new Map() });
+    (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest)(host, answer, chosen, keep, lensPlace.get(key));
   })();
   return host;
 }
 
-/** The nest: circles in circles, opened by zooming. Reads only what a lens answers with. */
-function drawNest(host, answer, style, keep) {
+const lensPlace = new Map();
+
+/** A style's colours and sizes, by the name the stylesheet knows each by, with the range a size may take. */
+const STYLE_COLORS = ['sea', 'land', 'inner', 'line', 'text', 'muted', 'blocked', 'you', 'session', 'done'];
+const STYLE_SIZES = { text: [9, 22], radius: [0, 40], gap: [0, 40], column: [140, 640] };
+/** A style's colours and sizes are handed to the stylesheet. Only a plain hex colour or a number in range is: a style is written by anyone who can change the map. */
+function dress(host, style) {
+  for (const name of STYLE_COLORS) {
+    const colour = style.colors?.[name];
+    if (typeof colour === 'string' && /^#[0-9a-f]{3,8}$/i.test(colour)) host.style.setProperty(`--ln-${name}`, colour);
+    else host.style.removeProperty(`--ln-${name}`);
+  }
+  for (const [name, [least, most]] of Object.entries(STYLE_SIZES)) {
+    if (Number.isFinite(style[name])) host.style.setProperty(`--ln-${name}-size`, `${Math.max(least, Math.min(most, style[name]))}px`);
+    else host.style.removeProperty(`--ln-${name}-size`);
+  }
+}
+
+/** A lens answer as a tree, each thing with what it says of itself and of all that is inside it: the same numbers at every depth. */
+function lensTree(answer) {
   const me = answer.viewer;
   const byId = new Map(answer.items.map((item) => [item.id, { ...item, kids: [] }]));
   const root = { kids: [], depth: -1, x: 0, y: 0, title: 'Everything' };
   for (const n of byId.values()) (byId.get(n.inside) ?? root).kids.push(Object.assign(n, { up: byId.get(n.inside) ?? root }));
-  // What a thing says of itself and of all that is inside it, in the same three numbers at every depth.
   for (const n of byId.values()) {
     n.all = 1 + n.within.items;
     n.you = (me && n.state.waits_on.includes(me) ? 1 : 0) + ((me && n.within.waits_on[me]) || 0);
@@ -1969,6 +1993,71 @@ function drawNest(host, answer, style, keep) {
     n.work = n.size.work + n.within.work;
     n.at = n.state.sessions + n.within.sessions;
   }
+  const deepen = (n, depth) => ((n.depth = depth), n.kids.sort((a, b) => a.place - b.place).forEach((kid) => deepen(kid, depth + 1)));
+  deepen(root, -1);
+  return { me, byId, root };
+}
+
+/** The switch for what stays lit, the same in every shape. */
+function litSwitch(me, style, keep, redraw) {
+  const lit = h('span', { class: 'switch' });
+  for (const [value, label, title] of LIT) {
+    if (value === 'you' && !me) continue;
+    lit.append(h('button', { class: style.lit === value ? 'on' : '', title, onclick: (ev) => (keep({ lit: value }), [...lit.children].forEach((b) => b.classList.toggle('on', b === ev.currentTarget)), redraw()) }, label));
+  }
+  return lit;
+}
+
+/** Boxes: a thing is a titled box, what is inside it is in it, and a thing with nothing inside is one line. Reads only what a lens answers with. */
+function drawBoxes(host, answer, style, keep, kept) {
+  const { me, byId, root } = lensTree(answer);
+  const show = new Set(Array.isArray(style.show) ? style.show : ['you', 'blocked', 'count']);
+  const levels = Number.isFinite(style.open) ? style.open : 1;
+  const { opened } = kept;
+  // What each thing waits on, by name, for its tooltip.
+  const waits = new Map();
+  for (const link of answer.links) if (BLOCKING.includes(link.kind) && byId.has(link.to)) waits.set(link.from, [...(waits.get(link.from) ?? []), byId.get(link.to).title]);
+  const body = h('div', { class: 'lb-top' });
+  const count = (n) => (style.lit === 'you' ? n.you : style.lit === 'blocked' ? n.blk : 1);
+  const hint = (n) => `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.all > 1 ? `\n${n.work} open, ${n.blk} blocked${me ? `, ${n.you} need you` : ''}` : n.state.blocked ? ', blocked' : ''}${waits.has(n.id) ? `\nWaits on: ${waits.get(n.id).join('; ')}` : ''}${n.at ? '\nA session is at work here' : ''}`;
+  const mark = (cls, text, title) => h('span', { class: `lb-mark lb-${cls}`, title }, text);
+  const marks = (n) => [
+    show.has('you') && n.you > 0 && mark('you', n.all > 1 ? String(n.you) : '', n.all > 1 ? `${n.you} need you` : 'Waits on you'),
+    show.has('blocked') && n.blk > 0 && mark('blocked', n.all > 1 ? String(n.blk) : '', n.all > 1 ? `${n.blk} blocked` : 'Blocked'),
+    show.has('sessions') && n.at > 0 && mark('at', '', 'A session is at work here'),
+    show.has('count') && n.all > 1 && mark('count', String(n.work), `${n.work} open`),
+    show.has('type') && mark('word', typeTitle(n.type), 'What kind of thing it is'),
+    show.has('status') && mark('word', n.status, 'Its status'),
+  ];
+  const thing = (n) => {
+    const state = `${count(n) ? '' : ' dim'}${n.open ? '' : ' closed'}${n.state.blocked ? ' blocked' : ''}${me && n.state.waits_on.includes(me) ? ' you' : ''}`;
+    if (n.all === 1) return h('a', { class: `lb-leaf${state}`, href: `#/e/${n.id}`, title: hint(n) }, h('span', { class: 'lb-dot' }), h('span', { class: 'lb-name' }, n.title), ...marks(n).slice(2));
+    const open = n.kids.length > 0 && (opened.get(n.id) ?? n.depth < levels);
+    const leaves = n.kids.filter((kid) => kid.all === 1);
+    const boxes = n.kids.filter((kid) => kid.all > 1);
+    return h(
+      'section',
+      { class: `lb-box${state}${open ? ' open' : ''}${n.depth % 2 ? ' odd' : ''}` },
+      h(
+        'header',
+        { title: hint(n) },
+        n.kids.length > 0 && h('button', { class: 'lb-fold', title: open ? 'Close it' : 'Open it', onclick: () => (opened.set(n.id, !open), draw()) }, open ? '▾' : '▸'),
+        h('a', { class: 'lb-name', href: `#/e/${n.id}` }, n.title),
+        ...marks(n),
+      ),
+      show.has('bar') && h('div', { class: 'lb-bar', title: `${n.you} need you, ${n.blk} blocked, of ${n.all}` }, h('span', { class: 'lb-you', style: `width:${(100 * n.you) / n.all}%` }), h('span', { class: 'lb-blocked', style: `width:${(100 * n.blk) / n.all}%` })),
+      open && leaves.length > 0 && h('div', { class: `lb-leaves ${['row', 'chip', 'dot'].includes(style.leaf) ? style.leaf : 'row'}` }, leaves.map(thing)),
+      open && boxes.length > 0 && h('div', { class: 'lb-kids' }, boxes.map(thing)),
+    );
+  };
+  const draw = () => body.replaceChildren(...root.kids.map(thing));
+  host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), litSwitch(me, style, keep, draw)), body);
+  draw();
+}
+
+/** The nest: circles in circles, opened by zooming. Reads only what a lens answers with. */
+function drawNest(host, answer, style, keep, kept) {
+  const { me, byId, root } = lensTree(answer);
 
   // Sizes and places. A thing with nothing sent inside it is as big as what it stands for; one with parts, as big as they are packed.
   const pack = (n, depth) => {
@@ -2017,7 +2106,7 @@ function drawNest(host, answer, style, keep) {
   root.kids.forEach(make);
 
   const trail = h('span', { class: 'lens-trail' });
-  const lit = h('span', { class: 'switch' });
+  const lit = litSwitch(me, style, keep, () => frame());
   const page = h('button', { title: 'Open its page' }, 'Open');
   host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, trail, h('span', { class: 'grow' }), page, lit), svg);
 
@@ -2134,9 +2223,10 @@ function drawNest(host, answer, style, keep) {
 
   let moving;
   // What was last gone to, until the picture is moved by hand: it is fitted again when the room changes.
-  let aim = root;
+  let aim = byId.get(kept.aim) ?? root;
   const zoomTo = (n, glide = true) => {
     aim = n;
+    kept.aim = n.id;
     const [from, to, t0] = [{ ...view }, fit(n), performance.now()];
     cancelAnimationFrame(moving);
     if (!glide) return void (Object.assign(view, to), frame());
@@ -2149,11 +2239,6 @@ function drawNest(host, answer, style, keep) {
     };
     moving = requestAnimationFrame(step);
   };
-
-  for (const [value, label, title] of LIT) {
-    if (value === 'you' && !me) continue;
-    lit.append(h('button', { class: style.lit === value ? 'on' : '', title, onclick: (ev) => (keep({ lit: value }), [...lit.children].forEach((b) => b.classList.toggle('on', b === ev.currentTarget)), frame()) }, label));
-  }
 
   // A press that moves drags the picture; one that does not is a click: into a closed thing, to the page of one that holds nothing, out from the sea.
   svg.addEventListener('pointerdown', (down) => {
@@ -2211,7 +2296,7 @@ function drawNest(host, answer, style, keep) {
     aim ? zoomTo(aim, false) : frame();
   }).observe(svg);
 }
-const LENS_SHAPES = { nest: drawNest };
+const LENS_SHAPES = { nest: drawNest, boxes: drawBoxes };
 
 /**
  * The map as a picture. With a lens in its address (anything after a ?), the
@@ -2221,7 +2306,10 @@ const LENS_SHAPES = { nest: drawNest };
 async function graph(query = '') {
   if (!query) return part('graph').replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Graph')), h('section', { class: 'card' }, graphView({ defaults: { kind: 'structure' } })));
   const { lens, style } = readLens(query);
-  part('graph').replaceChildren(h('section', { class: 'card lens-card' }, lensView({ lens, style })));
+  const view = lensView({ lens, style });
+  // One already there stays until the new one is drawn: the map changing under it does not blank the page.
+  if (part('graph').querySelector('.lens-view')) await view.ready;
+  part('graph').replaceChildren(h('section', { class: 'card lens-card' }, view));
 }
 
 // ---- Workspace -----------------------------------------------------------
@@ -3628,7 +3716,7 @@ async function route(pulse = false) {
       if (!draw[p]) return el.replaceChildren();
       // The graph is as someone has arranged it: a change elsewhere does not draw it again.
       // The whole map is as someone has arranged it: a change elsewhere does not draw it again.
-      if (pulse && el.childElementCount && p === 'graph') return;
+      if (pulse && el.childElementCount && p === 'graph' && !query) return;
       try {
         await draw[p]();
       } catch (err) {

@@ -29,6 +29,8 @@ export interface Lens {
 }
 
 export const LENS_DEFAULT: Lens = { by: 'part_of', over: ['depends_on', 'waits_on'], order: 'order', measure: 'work', fold: ['closed', 'system', 'unlinked'] };
+/** The fields a lens kept on the map may name: all but where it starts, which is what it is about. */
+const LENS_KEPT = { kinds: 1, by: 1, over: 1, far: 1, lanes: 1, order: 1, measure: 1, fold: 1 };
 const FOLDS = ['closed', 'system', 'unlinked'];
 const LANES = ['stage', 'link', 'person'];
 /** The most items one answer sends: the deepest are cut first, and `rest` says how many. */
@@ -61,8 +63,8 @@ interface Counts {
 }
 
 /** The lens asked for, over the built-in one: a field that is named replaces it whole. */
-export function readLens(l: Archipelago, input: Record<string, unknown>): Lens {
-  const lens: Lens = { ...LENS_DEFAULT };
+export function readLens(l: Archipelago, input: Record<string, unknown>, under: Lens = LENS_DEFAULT): Lens {
+  const lens: Lens = { ...under };
   const known = (kind: unknown, field: string) => {
     if (typeof kind !== 'string' || !l.registry.relations.has(kind)) throw new Error(`${field}: unknown kind of link "${kind}". Known: ${[...l.registry.relations.keys()].join(', ')}`);
     return kind;
@@ -96,16 +98,55 @@ export function readLens(l: Archipelago, input: Record<string, unknown>): Lens {
   return lens;
 }
 
+/**
+ * The lenses and styles kept on the map for a picture, each level under the
+ * next: the workspace's (about nothing), then those about what the picture
+ * starts from, then one named outright. Within a level the last changed wins.
+ */
+async function kept(l: Archipelago, type: 'lens' | 'style', from: string | undefined, named: unknown) {
+  const { rows } = await l.db.query<{ id: string; title: string; props: Record<string, unknown> }>(
+    `select id, title, ${l.props} from entity where type = any($1::text[]) and archived_at is null and (is_open or id = $2) order by updated_at, id`,
+    [l.registry.family(type), typeof named === 'string' ? named : null],
+  );
+  if (typeof named === 'string' && !rows.some((r) => r.id === named)) throw new Error(`No ${type} "${named}"`);
+  const { rows: links } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'about' and valid_to is null and from_id = any($1::text[])`, [rows.map((r) => r.id)]);
+  const about = (id: string) => links.filter((link) => link.from_id === id).map((link) => link.to_id);
+  const level = (id: string) => (id === named ? 2 : !about(id).length ? 0 : from !== undefined && about(id).includes(from) ? 1 : -1);
+  return rows.filter((r) => level(r.id) >= 0).sort((a, b) => level(a.id) - level(b.id));
+}
+
+/** Where on the page a lens or a style is seen at work: the picture of what it is about, or of the whole map. Nothing for any other item. */
+export async function pictureOf(l: Archipelago, id: string): Promise<string | undefined> {
+  const item = await l.entity(id);
+  if (!item || !(l.registry.isA(item.type, 'lens') || l.registry.isA(item.type, 'style'))) return undefined;
+  const { rows } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'about' and from_id = $1 and valid_to is null order by id limit 1`, [id]);
+  return rows.length ? `graph?from=${rows[0].to_id}` : 'graph?lens';
+}
+
 /** What a lens answers with: the lens as read, the items, the links between them, and what was left out. */
 export async function lens(l: Archipelago, input: Record<string, unknown>) {
-  const asked = readLens(l, input);
+  const from = input.from === undefined ? undefined : String(input.from);
+  const [lenses, styles] = [await kept(l, 'lens', from, input.lens), await kept(l, 'style', from, input.style)];
+  let under = LENS_DEFAULT;
+  for (const one of lenses) {
+    try {
+      under = readLens(l, Object.fromEntries(Object.entries(one.props).filter(([key, value]) => key in LENS_KEPT && value != null)), under);
+    } catch (err) {
+      throw new Error(`The lens "${one.title}" cannot be read: ${(err as Error).message}`);
+    }
+  }
+  const asked = readLens(l, input, under);
+  // A style is passed on as it is kept: only the page that draws reads it.
+  const style: Record<string, unknown> = {};
+  for (const one of styles) for (const [key, value] of Object.entries(one.props)) if (value != null) style[key] = value;
   const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at from entity where archived_at is null`);
   const all = new Map(entities.map((e) => [e.id, e]));
   if (asked.from && !all.has(asked.from)) throw new Error(`No entity "${asked.from}"`);
   const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(`select id, type, from_id, to_id from relation where valid_to is null order by id`);
 
   const isA = (type: string, kind: string) => l.registry.isA(type, kind);
-  const system = (type: string) => type.startsWith('sys.') && !isA(type, 'resource');
+  // A lens and a style are how the map is looked at, not part of what is seen.
+  const system = (type: string) => (type.startsWith('sys.') && !isA(type, 'resource')) || isA(type, 'lens') || isA(type, 'style');
   // What is work: what can be estimated, and what such things are part of.
   const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || isA(type, 'project');
   const wanted = (asked.kinds ?? []).filter((k) => !k.startsWith('-'));
@@ -258,6 +299,9 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
 
   return {
     lens: asked,
+    style,
+    // Which lenses and styles kept on the map went into those two, the one that weighs most last.
+    kept: { lens: lenses.map(({ id, title }) => ({ id, title })), style: styles.map(({ id, title }) => ({ id, title })) },
     // Who it was answered for, so a style can light what waits on them.
     viewer: l.viewer || (await l.setting<string>('me')) || null,
     items:[...sent].map((id) => {

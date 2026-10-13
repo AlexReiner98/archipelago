@@ -18,7 +18,7 @@ import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
 import { getPicture, putPicture, reportTests } from './proof.ts';
-import { readLens } from './lens.ts';
+import { pictureOf, readLens } from './lens.ts';
 import { awaitingRecheck, HANDOFF_MAX, toConfirm, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
@@ -484,9 +484,13 @@ export const TOOLS: Record<string, Tool> = {
         .optional()
         .describe('A picture of the map, drawn on the graph screen for this one look: the params of the lens view (from, kinds, by, over, far, lanes, order, measure, fold). {} is the whole map as it opens.'),
       style: z
-        .object({ lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.') })
+        .object({
+          lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
+          shape: z.enum(['nest', 'boxes']).optional().describe('nest: circles in circles, opened by zooming. boxes: titled boxes in boxes, each thing one line.'),
+          id: z.string().optional().describe('A style kept on the map (an item of type style), drawn with for this one look.'),
+        })
         .optional()
-        .describe('With lens: how the picture is drawn.'),
+        .describe('How the picture is drawn, for this one look. The style a picture opens in is kept on the map: an item of type style, about the project or item it is for, or about nothing for the whole workspace; change it with change.'),
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
     },
     run: async (l, actor, input) => {
@@ -495,8 +499,10 @@ export const TOOLS: Record<string, Tool> = {
         const asked = readLens(l, input.lens ?? {});
         if (asked.from && !(await l.entity(asked.from))) throw new Error(`No entity "${asked.from}"`);
         const query = new URLSearchParams();
-        for (const [key, value] of Object.entries(input.lens ?? {})) if (key in asked) query.set(key, Array.isArray(value) ? value.join(',') : String(value));
+        for (const [key, value] of Object.entries(input.lens ?? {})) if (key in asked || key === 'lens') query.set(key, Array.isArray(value) ? value.join(',') : String(value));
         if (input.style?.lit) query.set('lit', input.style.lit);
+        if (input.style?.shape) query.set('shape', input.style.shape);
+        if (input.style?.id) query.set('style', input.style.id);
         // The address always says it is a lens: the graph screen without one is still the old drawing.
         return point(l, actor, `graph?${query.size ? query : 'lens'}`, input.note);
       }
@@ -601,7 +607,9 @@ export const TOOLS: Record<string, Tool> = {
         const made = 'created' in result ? Object.values(result.created as Record<string, string>)[0] : undefined;
         const touched = (input.ops as { id?: string }[]).find((o) => o.id)?.id;
         const target = made ?? touched;
-        point(l, actor, result.status === 'proposed' ? 'review' : target ? `e/${target}` : 'activity', input.reason);
+        // A lens or a style that was changed is seen in the picture it changes, not on its own page.
+        const picture = result.status !== 'proposed' && target ? await pictureOf(l, target) : undefined;
+        point(l, actor, result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason);
       }
       return result;
     },
