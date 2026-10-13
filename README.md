@@ -1,4 +1,4 @@
-# Lattice
+# Archipelago
 
 [![Tests](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml)
 
@@ -8,7 +8,7 @@ If your business uses AI, where do the agents and the people work together?
 Usually nowhere: each agent session starts from nothing, what it learned
 stays in a chat, and nobody can say where a project stands without asking.
 
-Lattice is that shared place, and the memory of your projects. It is a map of
+Archipelago is that shared place, and the memory of your projects. It is a map of
 the work: projects, tasks, decisions, people, and what waits on what. People
 look at it in a web page. Agents read and change it through the same tools,
 and what an agent changes either waits for a person's yes or is applied,
@@ -35,7 +35,7 @@ is embedded and lives in a `data/` folder beside the code.
 
 ```bash
 git clone https://github.com/AlexReiner98/lattice.git
-cd lattice
+cd pelago
 npm install
 npm start
 ```
@@ -68,7 +68,7 @@ Quit Claude Code completely and open it again in that folder.
 
 Open Claude Code in the connected project and ask it for something:
 
-> Put this repository in Lattice as a project, with the three things I am
+> Put this repository in Archipelago as a project, with the three things I am
 > working on as tasks, and tell me what you would do first.
 
 What happens:
@@ -96,13 +96,13 @@ draws what it depends on.
 - **Have the map follow your code:** [GitHub](#github-pushes-keep-the-map-current).
   A push is recorded, and an agent reads it against what was open.
 - **Add your own kinds of thing:** [Packs and flavours](#packs-and-flavours).
-- **Work on Lattice itself:** [CONTRIBUTING.md](CONTRIBUTING.md),
+- **Work on Archipelago itself:** [CONTRIBUTING.md](CONTRIBUTING.md),
   [Dev mode](#dev-mode) and [Tests](#tests). It is published as it is, with
   no promise of answers or fixes.
 - **Report a security problem:** in private, as [SECURITY.md](SECURITY.md)
   says.
 
-Lattice is licensed under [Apache-2.0](LICENSE).
+Archipelago is licensed under [Apache-2.0](LICENSE).
 
 # Reference
 
@@ -119,11 +119,11 @@ the folder, and a second one refuses to start.
 npm run dev
 ```
 
-For working on Lattice itself, one person on one machine. It differs from
+For working on Archipelago itself, one person on one machine. It differs from
 `npm start` in two ways:
 
 - **Agent changes are not reviewed.** Every op applies at once unless
-  `policy` in `lattice.config.json` says otherwise. Undo on the Changes screen
+  `policy` in `pelago.config.json` says otherwise. Undo on the Changes screen
   still reverses a change set.
 - **Agents can restart the server** with the `restart` tool, to run code they
   have just changed. The server is kept running by [src/dev.ts](src/dev.ts):
@@ -139,7 +139,7 @@ Approving, launching and tokens stay with you. Dev mode refuses to start with
 |---|---|---|
 | MCP at `/mcp` | Agents | A project's `.mcp.json` connects Claude Code: the setup command writes it (see Connect Claude Code above). |
 | Web UI | You | Open `http://127.0.0.1:3100` while the server is running |
-| CLI | You | `npm run lattice -- <command>` (run with no command for the list) |
+| CLI | You | `npm run pelago -- <command>` (run with no command for the list) |
 
 All three call the tools in [src/tools.ts](src/tools.ts). The web UI and CLI
 have human authority; the MCP endpoint does not, and two tools (`decide`,
@@ -203,7 +203,7 @@ reason and a source.
    (unless the workspace itself has chosen otherwise, below):
    the agent proposes the answer and you confirm it on the Changes
    screen. By default agents
-   propose everything. Loosen it per op in `lattice.config.json`:
+   propose everything. Loosen it per op in `pelago.config.json`:
    `{ "policy": { "create": "auto", "link": "auto" } }`.
    A workspace can make the choice for itself, on its Workspace screen under
    Settings ("What agents change"): held until you have looked, or taking
@@ -215,10 +215,10 @@ reason and a source.
    screen or from the CLI (where the words are still approve and reject):
 
 ```bash
-npm run lattice -- review
-npm run lattice -- approve <id>
-npm run lattice -- approve <id> --except some_ref,#12
-npm run lattice -- reject <id> "why"
+npm run pelago -- review
+npm run pelago -- approve <id>
+npm run pelago -- approve <id> --except some_ref,#12
+npm run pelago -- reject <id> "why"
 ```
 
    A held change that asks only for what a later change has already made
@@ -265,7 +265,7 @@ at once; they are the session's own state, not facts about the world.
   by the address the checkout was cloned from (the `remote` on a
   `software.repo` entity), which is the same on every machine, and failing
   that by its `path`.
-- **A project with nothing of Lattice's in it** is connected by one command,
+- **A project with nothing of Archipelago's in it** is connected by one command,
   given under "Connect an agent" on the Workspace screen and run in the
   project's folder. It fetches `GET /connect/setup.mjs` from the server and
   runs it: that writes `.mcp.json`, the hook script and the four hooks that
@@ -277,13 +277,13 @@ at once; they are the session's own state, not facts about the world.
   file it will write or change and asks before it does. A file of yours
   that it changes (`.mcp.json`, `.claude/settings.json`, `CLAUDE.md`, the
   shell's start-up file where it keeps the token) is copied beside itself
-  first, once, as `<name>.lattice-backup`: keep those out of git. Options go
+  first, once, as `<name>.pelago-backup`: keep those out of git. Options go
   after `--` at the end of the command: `-- --dry-run` shows the plan and
   writes nothing, `-- --yes` writes without asking, `-- --remove` takes out
   what the setup wrote and nothing else (with `--machine`, also the address
   and token kept for the machine). To read the script before running it,
   open `/connect/setup.mjs` on the server. With no terminal to ask at and no
-  `--yes` (an agent running it), it brings up to date only what Lattice
+  `--yes` (an agent running it), it brings up to date only what Archipelago
   wrote there before and refuses a first setup.
 - **From a script:** `POST /agent/<tool>` takes the same tools as plain JSON
   with agent authority.
@@ -320,7 +320,7 @@ rules that govern them, as text to start a session with.
 
 ## Views
 
-The questions the map exists to answer. `npm run lattice -- view` lists them.
+The questions the map exists to answer. `npm run pelago -- view` lists them.
 
 | View | Question |
 |---|---|
@@ -384,25 +384,25 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 
 ## Hosting
 
-A hosted Lattice is one server running everything, with the embedded
+A hosted Archipelago is one server running everything, with the embedded
 database on a persistent disk, on Render ([render.yaml](render.yaml)). TLS ends
 at the platform.
 
-- `LATTICE_HOST=0.0.0.0` makes the server listen beyond this machine. It
-  refuses to start that way without `LATTICE_AUTH=tokens`, and never in dev
+- `PELAGO_HOST=0.0.0.0` makes the server listen beyond this machine. It
+  refuses to start that way without `PELAGO_AUTH=tokens`, and never in dev
   mode.
-- `LATTICE_PUBLIC_HOST=lattice.example.com` names what it is reached by.
+- `PELAGO_PUBLIC_HOST=pelago.example.com` names what it is reached by.
   Requests for any other host name are refused.
-- `LATTICE_TRUSTED_PROXIES` names the proxies in front of the server whose
+- `PELAGO_TRUSTED_PROXIES` names the proxies in front of the server whose
   word is taken for where a request came from: networks as CIDR, comma
   separated, or `cloudflare` (set in `render.yaml`, since Render is reached
   through Cloudflare). Private networks are always trusted. The caller is
   the last address in `x-forwarded-for` that is not a trusted proxy; what
   stands before it he could have written himself (`src/address.ts`).
-- `PORT` is honoured when `LATTICE_PORT` is not set.
+- `PORT` is honoured when `PELAGO_PORT` is not set.
 - Each workspace is its own database and costs about 200 MB of memory while
   open, on top of about 350 MB for the server. A workspace nobody has used for
-  30 minutes (`LATTICE_IDLE_MINUTES`; 0 for never) is closed and opens again
+  30 minutes (`PELAGO_IDLE_MINUTES`; 0 for never) is closed and opens again
   on the next request, in under half a second. So 2 GB holds roughly eight
   customers working at the same moment, and more than that in all. A workspace
   with an enabled automation or an open session stays open.
@@ -413,7 +413,7 @@ at the platform.
   address and 1,200 from all together; GitHub's deliveries, 300 a minute from
   one address. Beyond that the answer is 429 with `Retry-After`. The count
   for all together is what holds if the proxies are not named
-  (`LATTICE_TRUSTED_PROXIES`) and a caller's address cannot be told.
+  (`PELAGO_TRUSTED_PROXIES`) and a caller's address cannot be told.
 
 ## GitHub: pushes keep the map current
 
@@ -424,10 +424,10 @@ it.
 server, and may only read (contents and metadata):
 
 1. The server's owner creates it once: Workspace, GitHub, **Create the GitHub
-   App**, in the default workspace. Lattice sends GitHub a manifest, GitHub
+   App**, in the default workspace. Archipelago sends GitHub a manifest, GitHub
    asks for a name, and hands the server the app's id, key and signing secret
    (kept in `github-app.json` beside the workspaces; or given by hand as
-   `LATTICE_GITHUB_APP_ID`, `_KEY`, `_SECRET` and `_SLUG`).
+   `PELAGO_GITHUB_APP_ID`, `_KEY`, `_SECRET` and `_SLUG`).
 2. A workspace's admin presses **Connect GitHub** and chooses repositories on
    GitHub. Each one chosen is put in the map with its address, and the
    installation is tied to that workspace.
@@ -439,13 +439,13 @@ server, and may only read (contents and metadata):
 Once the workspace's admin has given it an Anthropic key (the GitHub card,
 **Set Anthropic key**; kept on the server, never shown again), every push of
 commits to a branch is read against the repository's open items by an agent
-that runs on the Lattice server (`src/reader.ts`), and every hour it asks
+that runs on the Archipelago server (`src/reader.ts`), and every hour it asks
 whether a re-check of old items is due. It has no checkout: it reads commits,
 diffs, files and history through the app, which may only read. It does what
 the workflow below does, sends its changes as any agent does (held or applied
 as the workspace says), stops at 40 turns or 600k tokens, and records each run
 in the repository with what it used. The model is `claude-sonnet-5-5`
-(`LATTICE_READER_MODEL` changes it). Without a key, pushes are recorded and
+(`PELAGO_READER_MODEL` changes it). Without a key, pushes are recorded and
 not read. A repository connected both ways hears each push once.
 
 **Or the server hears the push through a webhook added by hand.** On the Workspace screen, **GitHub** makes a
@@ -463,19 +463,19 @@ whose `remote` is its GitHub address. From then on:
   Decisions and hypotheses are left alone; a commit cannot say what was
   decided.
 
-**An agent reads the push.** [examples/github/lattice.yml](examples/github/lattice.yml)
+**An agent reads the push.** [examples/github/pelago.yml](examples/github/pelago.yml)
 is a GitHub Actions workflow: on every push it runs Claude in the repository,
 connected to the workspace with an agent token, to read the new commits
 against the repository's open items and propose what they change. Copy it to
 `.github/workflows/` and set, in the repository's settings:
 
-- variable `LATTICE_URL`: the server's address, e.g. `https://lattice.example.com`;
-- secret `LATTICE_AGENT_TOKEN`: an agent token ("Token only" on the Workspace
+- variable `PELAGO_URL`: the server's address, e.g. `https://pelago.example.com`;
+- secret `PELAGO_AGENT_TOKEN`: an agent token ("Token only" on the Workspace
   screen);
 - secret `ANTHROPIC_API_KEY`, or `CLAUDE_CODE_OAUTH_TOKEN` for a Claude
   subscription.
 
-It does nothing until `LATTICE_URL` is set. Each push is billed as a Claude
+It does nothing until `PELAGO_URL` is set. Each push is billed as a Claude
 run, stopped at 2 dollars. It installs the Claude Code CLI and runs that (the
 `claude-code-action` wrapper does not take push events). What it sends is held
 for you or takes effect at once, as the workspace is set, like any agent's
@@ -505,7 +505,7 @@ What the server knows and must not give up is of two kinds.
 - **What it has to use is sealed** (AES-256-GCM, `src/secrets.ts`): a
   workspace's Anthropic key, the secret a GitHub webhook signs with, and the
   GitHub App's key and signing secret. The sealing key is
-  `LATTICE_SECRETS_KEY` (32 bytes, base64) when that is set, and otherwise a
+  `PELAGO_SECRETS_KEY` (32 bytes, base64) when that is set, and otherwise a
   file the server makes beside the workspaces (`secrets.key`). It is never in
   a database or a backup, so a backup file, or the copy of it sent off the
   server, gives up none of these. A backup restored on another server reads
@@ -545,8 +545,8 @@ any other, and are held for review where the workspace holds agents' changes.
 Every 6 hours the server writes each workspace out as one file of plain rows,
 `backups/<workspace>/<time>.json.gz`, and keeps the newest 28 (a week). It goes
 by the newest file, so restarting neither skips a backup nor piles them up.
-`"backup": false` in `lattice.config.json` turns it off, `"backup": { "dir",
-"everyHours", "keep" }` changes it, and `LATTICE_BACKUP_DIR` moves it.
+`"backup": false` in `pelago.config.json` turns it off, `"backup": { "dir",
+"everyHours", "keep" }` changes it, and `PELAGO_BACKUP_DIR` moves it.
 
 A backup holds everything in the workspace, private things and token hashes
 included, so treat the files like the data. A copy of the `data/` folder is not
@@ -582,7 +582,7 @@ either direction:
   activity log.
 
 The backups sit on the same disk as the data. To send a copy of each one off
-the server, set `LATTICE_BACKUP_UPLOAD_URL` and `LATTICE_BACKUP_UPLOAD_KEY`:
+the server, set `PELAGO_BACKUP_UPLOAD_URL` and `PELAGO_BACKUP_UPLOAD_KEY`:
 any address that takes a file by POST with a bearer key. For Supabase Storage
 that is `https://<project>.supabase.co/storage/v1/object/<private bucket>` and
 a key allowed to write to it. A copy that fails is reported in the server's
@@ -593,10 +593,10 @@ output and the backup itself still stands. Copies sent away are not pruned.
 By default the server is for one person on one machine: there is one workspace,
 and which endpoint you call decides whether you are the human or an agent.
 
-Set `"auth": "tokens"` in `lattice.config.json` (or `LATTICE_AUTH=tokens`) to
+Set `"auth": "tokens"` in `pelago.config.json` (or `PELAGO_AUTH=tokens`) to
 change that:
 
-- **Every request carries a token** (`Authorization: Bearer lat_...`). The
+- **Every request carries a token** (`Authorization: Bearer pel_...`). The
   token says which workspace it belongs to and whether it is a human's or an
   agent's. A human token can approve, launch and manage tokens; an agent token
   cannot, on any endpoint.
@@ -607,12 +607,12 @@ change that:
   session gets its own agent token, valid for a day and revoked when it ends.
 - **Several workspaces in one browser:** the UI remembers each workspace you
   sign in to and switches between them from the menu's bottom corner; the
-  workspace's name is shown under "Lattice" and on the tab. Signing out
+  workspace's name is shown under "Archipelago" and on the tab. Signing out
   forgets that one.
 - **Connecting Claude Code:** done once per machine. On the Workspace
   screen, press **Connect an agent**. It makes an agent token and shows two
   commands that put the server's address and the token into the environment
-  variables `LATTICE_URL` and `LATTICE_AGENT_TOKEN` (on Windows, `setx`).
+  variables `PELAGO_URL` and `PELAGO_AGENT_TOKEN` (on Windows, `setx`).
   Run them, then quit Claude Code completely and open it again. Every project
   whose `.mcp.json` reads those variables is then connected as you; the one
   the setup writes does, and the same file works in any project:
@@ -620,31 +620,31 @@ change that:
   ```json
   {
     "mcpServers": {
-      "lattice": {
+      "pelago": {
         "type": "http",
-        "url": "${LATTICE_URL:-http://127.0.0.1:3100}/mcp",
-        "headers": { "Authorization": "Bearer ${LATTICE_AGENT_TOKEN:-none}" }
+        "url": "${PELAGO_URL:-http://127.0.0.1:3100}/mcp",
+        "headers": { "Authorization": "Bearer ${PELAGO_AGENT_TOKEN:-none}" }
       }
     }
   }
   ```
 
   With the variables unset it falls back to a server on this machine.
-  Printing `LATTICE_URL` (`echo $LATTICE_URL`; in PowerShell,
-  `$env:LATTICE_URL`) says which server a session will use. `claude mcp get
-  lattice` says it too, but prints the token in full with it: keep that out
+  Printing `PELAGO_URL` (`echo $PELAGO_URL`; in PowerShell,
+  `$env:PELAGO_URL`) says which server a session will use. `claude mcp get
+  pelago` says it too, but prints the token in full with it: keep that out
   of an agent's session and off a shared screen. The connection is kept in the machine's environment
   on purpose: an entry added with `claude mcp add --scope local` lives in
   Claude Code's own settings file, and was lost once when a running session
   wrote that file back. The hooks in `.claude/settings.json` follow the
-  same two variables: each runs `.claude/lattice-hook.mjs`, which passes the
+  same two variables: each runs `.claude/pelago-hook.mjs`, which passes the
   hook on to that server with the token, or to the server on this machine
   when the variables are not set. So a session registers, hears what the
   owner did and closes on the same map its tools write to.
 - **Using a token:** paste it into the web UI's sign-in screen; set
-  `LATTICE_TOKEN` for the CLI; for Claude Code by hand, add
-  `"headers": { "Authorization": "Bearer ${LATTICE_AGENT_TOKEN}" }` to the
-  `lattice` entry in `.mcp.json`, and the same header to each hook.
+  `PELAGO_TOKEN` for the CLI; for Claude Code by hand, add
+  `"headers": { "Authorization": "Bearer ${PELAGO_AGENT_TOKEN}" }` to the
+  `pelago` entry in `.mcp.json`, and the same header to each hook.
 - **Workspaces: one database per customer.** Each workspace has its own
   database, its own locally defined types and its own automation runner.
   Nothing is shared, so there is no filter to get wrong. The operator creates
@@ -676,7 +676,7 @@ change that:
 
   It prints a new secret once and the old one stops working. What it proves
   is that you can write on the server's disk, so it needs the same
-  `LATTICE_DATA` and port settings as the server.
+  `PELAGO_DATA` and port settings as the server.
 
 - **Several people in one workspace.** An admin adds people with
   `member_add`, which creates their person entity and their token. From then

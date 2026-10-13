@@ -9,7 +9,7 @@ import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceI
 import { Automations } from './automations.ts';
 import { restore, type Dump } from './backup.ts';
 import { openDb } from './db.ts';
-import { Lattice, type Policy } from './lattice.ts';
+import { Archipelago, type Policy } from './pelago.ts';
 import { Registry } from './packs.ts';
 
 export const DEFAULT_WORKSPACE = 'default';
@@ -17,7 +17,7 @@ export const DEFAULT_WORKSPACE = 'default';
 export interface Workspace {
   id: string;
   name: string;
-  lattice: Lattice;
+  pelago: Archipelago;
   automations: Automations;
 }
 
@@ -111,15 +111,15 @@ export class Workspaces {
     if (!opening || id === DEFAULT_WORKSPACE || this.config.dataDir === null || this.held.get(id)) return false;
     const ws = await opening.catch(() => undefined);
     if (!ws) return false;
-    const { rows } = await ws.lattice.db.query<{ busy: boolean }>(
+    const { rows } = await ws.pelago.db.query<{ busy: boolean }>(
       `select exists(select 1 from entity where archived_at is null and ((type = any($1::text[]) and status = 'enabled') or (type = any($2::text[]) and is_open))) as busy`,
-      [ws.lattice.registry.family('sys.automation'), ws.lattice.registry.family('sys.run')],
+      [ws.pelago.registry.family('sys.automation'), ws.pelago.registry.family('sys.run')],
     );
     // Asked again after waiting: a request may have arrived meanwhile.
     if (rows[0].busy || this.held.get(id) || this.open.get(id) !== opening) return false;
     this.open.delete(id);
     ws.automations.stop();
-    const closing = ws.lattice.db.close().finally(() => this.closing.delete(id));
+    const closing = ws.pelago.db.close().finally(() => this.closing.delete(id));
     this.closing.set(id, closing);
     await closing;
     return true;
@@ -147,10 +147,10 @@ export class Workspaces {
         throw err;
       });
     }
-    const lattice = new Lattice(db, new Registry(packsDir, packs, localPack), policy, id);
-    const automations = new Automations(lattice);
+    const pelago = new Archipelago(db, new Registry(packsDir, packs, localPack), policy, id);
+    const automations = new Automations(pelago);
     if (this.config.runAutomations) automations.start();
-    return { id, name: this.list().find((w) => w.id === id)!.name, lattice, automations };
+    return { id, name: this.list().find((w) => w.id === id)!.name, pelago, automations };
   }
 
   /**
@@ -221,7 +221,7 @@ export class Workspaces {
     for (const opening of this.open.values()) {
       const ws = await opening.catch(() => undefined);
       ws?.automations.stop();
-      await ws?.lattice.db.close();
+      await ws?.pelago.db.close();
     }
     this.open.clear();
   }

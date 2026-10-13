@@ -1,4 +1,4 @@
-// The lattice web UI. No framework and no build step: it calls the same
+// The pelago web UI. No framework and no build step: it calls the same
 // tools as the CLI through /api/<tool>.
 
 const main = document.getElementById('main');
@@ -58,11 +58,22 @@ function ask({ title, message, input, action = 'OK', cancel = 'Cancel', danger =
 }
 const tell = (title, message) => ask({ title, message, cancel: null });
 
+// What this browser kept while this was called Lattice (the token, the workspaces, two choices) is carried over.
+try {
+  for (const key of ['token', 'workspaces', 'roadmap-as', 'follow']) {
+    const was = localStorage.getItem(`lattice-${key}`);
+    if (was !== null && localStorage.getItem(`pelago-${key}`) === null) localStorage.setItem(`pelago-${key}`, was);
+    localStorage.removeItem(`lattice-${key}`);
+  }
+} catch {
+  // Storage can be blocked: then nothing was kept to carry.
+}
+
 // The token, when the server wants one. Kept for this browser only.
 const store = {
   get token() {
     try {
-      return localStorage.getItem('lattice-token') ?? '';
+      return localStorage.getItem('pelago-token') ?? '';
     } catch {
       return this.memory ?? '';
     }
@@ -70,8 +81,8 @@ const store = {
   set token(value) {
     this.memory = value;
     try {
-      if (value) localStorage.setItem('lattice-token', value);
-      else localStorage.removeItem('lattice-token');
+      if (value) localStorage.setItem('pelago-token', value);
+      else localStorage.removeItem('pelago-token');
     } catch {
       // Storage can be blocked; the token then lasts until the page is closed.
     }
@@ -84,14 +95,14 @@ const authHeaders = () => (store.token ? { authorization: `Bearer ${store.token}
 const known = {
   all() {
     try {
-      return JSON.parse(localStorage.getItem('lattice-workspaces') ?? '{}');
+      return JSON.parse(localStorage.getItem('pelago-workspaces') ?? '{}');
     } catch {
       return {};
     }
   },
   save(map) {
     try {
-      localStorage.setItem('lattice-workspaces', JSON.stringify(map));
+      localStorage.setItem('pelago-workspaces', JSON.stringify(map));
     } catch {
       // Without storage there is only the workspace signed in to now.
     }
@@ -127,7 +138,7 @@ async function api(tool, input = {}) {
 }
 
 function signIn(message) {
-  const input = h('input', { type: 'text', placeholder: 'lat_…', style: 'flex: 1; min-width: 260px', autocomplete: 'off' });
+  const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: 260px', autocomplete: 'off' });
   const error = h('div', { class: 'error', style: 'padding: 0 14px 14px' }, message ?? '');
   const submit = async () => {
     store.token = input.value.trim();
@@ -141,8 +152,8 @@ function signIn(message) {
   };
   input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
   const others = Object.entries(known.all());
-  document.querySelector('#nav .brand').replaceChildren('Lattice');
-  document.title = 'Lattice';
+  document.querySelector('#nav .brand').replaceChildren('Archipelago');
+  document.title = 'Archipelago';
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, 'Sign in'), h('p', { class: 'muted' }, 'This server asks for a token. It decides which workspace you see and what you may do.')),
     h(
@@ -165,8 +176,8 @@ async function showIdentity() {
     if (me.auth !== 'tokens') return slot.replaceChildren();
     known.remember(me.workspace);
     // Which workspace this is, where it cannot be missed: under the name at the top, and on the tab.
-    document.querySelector('#nav .brand').replaceChildren('Lattice', h('div', { class: 'workspace-name' }, me.workspace.name));
-    document.title = `${me.workspace.name} · Lattice`;
+    document.querySelector('#nav .brand').replaceChildren('Archipelago', h('div', { class: 'workspace-name' }, me.workspace.name));
+    document.title = `${me.workspace.name} · Archipelago`;
     const others = Object.entries(known.all()).filter(([id]) => id !== me.workspace.id);
     slot.replaceChildren(
       h('div', {}, h('strong', {}, me.workspace.name)),
@@ -252,7 +263,7 @@ const ago = (ts) => {
   return h('span', { class: 'ago', title: when(ts) }, text);
 };
 
-/** An actor as a person would name it; what the log holds ("agent:claude-code/claude-code:lattice") is the tooltip. */
+/** An actor as a person would name it; what the log holds ("agent:claude-code/claude-code:pelago") is the tooltip. */
 function who(actor) {
   const raw = actor ?? '';
   const [kind, ...rest] = raw.split(':');
@@ -261,7 +272,7 @@ function who(actor) {
     kind === 'human' ? (name === 'local' || name === 'owner' ? 'You' : name)
     : kind === 'github' ? 'GitHub'
     : name.startsWith('automation:') ? 'Automation'
-    : name === 'lattice' && !raw.includes('/') && !raw.includes('claude') ? 'Lattice'
+    : (name === 'pelago' || name === 'lattice') && !raw.includes('/') && !raw.includes('claude') ? 'Archipelago'
     : name.split(':').at(-1) || raw;
   return h('span', { class: `who who-${kind === 'human' ? 'human' : kind === 'github' ? 'github' : 'agent'}`, title: raw }, label);
 }
@@ -1905,8 +1916,8 @@ function connectBox(made) {
   // The same command the server gives a session whose project is behind (setupCommand in src/connect.ts).
   const fetchIt = `node -e "fetch('${location.origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
   const first = {
-    windows: `$env:LATTICE_URL='${location.origin}'; $env:LATTICE_AGENT_TOKEN='${made.token}'; $env:LATTICE_SETUP_SAVE='1'; ${fetchIt}`,
-    unix: `LATTICE_URL='${location.origin}' LATTICE_AGENT_TOKEN='${made.token}' LATTICE_SETUP_SAVE=1 ${fetchIt}`,
+    windows: `$env:PELAGO_URL='${location.origin}'; $env:PELAGO_AGENT_TOKEN='${made.token}'; $env:PELAGO_SETUP_SAVE='1'; ${fetchIt}`,
+    unix: `PELAGO_URL='${location.origin}' PELAGO_AGENT_TOKEN='${made.token}' PELAGO_SETUP_SAVE=1 ${fetchIt}`,
   };
   const copy = (text, label) => h('button', { class: 'primary', onclick: (e) => navigator.clipboard.writeText(text).then(() => (e.target.textContent = 'Copied')) }, label);
   const box = h('div', { class: 'secret' });
@@ -2222,7 +2233,7 @@ async function workspace() {
         h(
           'div',
           { class: 'empty' },
-          h('strong', {}, 'Single user'), h('span', { class: 'muted', title: 'One workspace, no sign-in; everything done here is done as its owner. To share it, set "auth": "tokens" in lattice.config.json and restart: the first start prints your token.' }, ' \u00b7 no sign-in on this server'),
+          h('strong', {}, 'Single user'), h('span', { class: 'muted', title: 'One workspace, no sign-in; everything done here is done as its owner. To share it, set "auth": "tokens" in pelago.config.json and restart: the first start prints your token.' }, ' \u00b7 no sign-in on this server'),
         ),
       ),
     );
@@ -2822,14 +2833,14 @@ function progressBar({ done, total }) {
 const roadmapState = {
   get graph() {
     try {
-      return localStorage.getItem('lattice-roadmap-as') !== 'list';
+      return localStorage.getItem('pelago-roadmap-as') !== 'list';
     } catch {
       return true;
     }
   },
   set graph(value) {
     try {
-      localStorage.setItem('lattice-roadmap-as', value ? 'graph' : 'list');
+      localStorage.setItem('pelago-roadmap-as', value ? 'graph' : 'list');
     } catch {
       // Without storage the graph is shown each time.
     }
@@ -3148,14 +3159,14 @@ main.addEventListener('input', (e) => {
 const following = {
   get on() {
     try {
-      return localStorage.getItem('lattice-follow') !== 'off';
+      return localStorage.getItem('pelago-follow') !== 'off';
     } catch {
       return true;
     }
   },
   set on(value) {
     try {
-      localStorage.setItem('lattice-follow', value ? 'on' : 'off');
+      localStorage.setItem('pelago-follow', value ? 'on' : 'off');
     } catch {
       // Without storage the choice lasts until the page is reloaded.
     }
@@ -3202,7 +3213,7 @@ async function checkPulse() {
     if (uiFiles !== undefined && beat.ui !== uiFiles) {
       if (!dirty && !document.querySelector('dialog[open]')) return location.reload();
       outdated = true;
-      stale.firstChild.textContent = 'Lattice has been updated.';
+      stale.firstChild.textContent = 'Archipelago has been updated.';
       stale.hidden = false;
     }
     uiFiles ??= beat.ui;

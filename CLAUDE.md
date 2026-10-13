@@ -1,16 +1,16 @@
-# Lattice: working rules for agent sessions
+# Archipelago: working rules for agent sessions
 
-Lattice is a typed map of people, work and dependencies, used by a human and by
+Archipelago is a typed map of people, work and dependencies, used by a human and by
 AI agents through the same tools. README.md describes what it does; this file
 is how to work on it.
 
 ## Where things stand
 
-The state of this build is kept in a Lattice map, not in this file. Which map
+The state of this build is kept in an Archipelago map, not in this file. Which map
 that is belongs to whoever is working: the maintainer's sessions keep theirs
 on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
 
-- **If your lattice tools are connected to a map that tracks this
+- **If your pelago tools are connected to a map that tracks this
   repository,** start with `view`, name `handoff`, and the repository. One
   answer holds the last push, the handoff note, what has happened since, and
   the open work. Say what you take on with `session_update`, keep the map
@@ -18,8 +18,8 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
 - **The local server on port 3100 (`npm run dev`) is where the code is
   tried.** Its map is a scratch copy: do not record the state of the work
   there. Make sure it is running before you change code.
-- **Never print the agent token.** `claude mcp get lattice` prints it in
-  full; to see which server a session uses, print `LATTICE_URL` instead.
+- **Never print the agent token.** `claude mcp get pelago` prints it in
+  full; to see which server a session uses, print `PELAGO_URL` instead.
 
 ## Rules
 
@@ -35,7 +35,7 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
 - **Restart the local server yourself in dev mode.** After changing anything
   under `src/` or `packs/`, run `npm test` and `npm run typecheck`, then
   restart it and wait for `GET /health`: with the `restart` tool if your
-  lattice tools are the local server's, otherwise
+  pelago tools are the local server's, otherwise
   `curl -X POST http://127.0.0.1:3100/agent/restart -H "content-type: application/json" -d "{}"`. `/health` says which commit the
   server was started from and when (`commit`, `started`): after a push, the
   new code is live on the hosted server when its `commit` is the one you
@@ -74,15 +74,15 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
 - **A throwaway server is for what the live one cannot take:** token identity,
   schema changes, launches, and anything that destroys or floods data. Always
   give it its own data folder:
-  `LATTICE_PORT=3199 LATTICE_DATA=<temp folder>/data node src/server.ts`
-  (add `LATTICE_AUTH=tokens` to test identity). Delete it afterwards. Never
+  `PELAGO_PORT=3199 PELAGO_DATA=<temp folder>/data node src/server.ts`
+  (add `PELAGO_AUTH=tokens` to test identity). Delete it afterwards. Never
   point a second server at `data/`; the lock refuses it.
 - **Before changing the database schema, take a backup** with the `backup`
   tool (the server also writes one every 6 hours, to `backups/default/`), then
   confirm the entity and event counts are unchanged after the restart. Never copy `data/` while the
   server runs and call it a backup.
 - **One write path.** Every change to entities and relations goes through
-  `Lattice.change` / `apply`. Sessions, claims and notifications are the only
+  `Archipelago.change` / `apply`. Sessions, claims and notifications are the only
   writes that skip approval, because they are operational state.
 - **Visibility is enforced by the database** (row level security in
   `src/db.ts`). Do not add application-side visibility filters; if something

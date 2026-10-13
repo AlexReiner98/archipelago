@@ -1,4 +1,4 @@
-# Keep the Lattice map true to this repository: on every push, an agent reads
+# Keep the Archipelago map true to this repository: on every push, an agent reads
 # the new commits against the repository's open items in the map and sends
 # what they change. Whether that is held for the owner or takes effect as it
 # is sent is the workspace's own setting ("What agents change").
@@ -10,16 +10,17 @@
 # settle, oldest first. A day when nothing is due costs no Claude run.
 #
 # Each Claude run tells the map what it used when it is over (tokens, cost,
-# turns), so the repository's page in Lattice shows what keeping it true costs.
+# turns), so the repository's page in Archipelago shows what keeping it true costs.
 # A run that stops before Claude starts is reported too, as a run that failed.
 #
-# Copy to .github/workflows/lattice.yml and set in the repository's settings:
-#   variable LATTICE_URL            the server, e.g. https://lattice.example.com
-#   secret   LATTICE_AGENT_TOKEN    an agent token from the Workspace screen
+# Copy to .github/workflows/pelago.yml and set in the repository's settings:
+#   variable PELAGO_URL            the server, e.g. https://pelago.example.com
+#   secret   PELAGO_AGENT_TOKEN    an agent token from the Workspace screen
 #   secret   ANTHROPIC_API_KEY      or CLAUDE_CODE_OAUTH_TOKEN, used below
-# It does nothing until LATTICE_URL is set.
+# It does nothing until PELAGO_URL is set. A repository connected while this
+# was called Lattice has LATTICE_URL and LATTICE_AGENT_TOKEN: those are read too.
 
-name: Lattice
+name: Archipelago
 
 on:
   push:
@@ -36,14 +37,14 @@ permissions:
 
 jobs:
   reconcile:
-    if: ${{ github.event_name == 'push' && vars.LATTICE_URL != '' && !github.event.deleted }}
+    if: ${{ github.event_name == 'push' && (vars.PELAGO_URL || vars.LATTICE_URL) != '' && !github.event.deleted }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Everything the steps need from the event comes in through the
     # environment, so a branch name is never read as part of a command.
     env:
-      LATTICE_URL: ${{ vars.LATTICE_URL }}
-      LATTICE_AGENT_TOKEN: ${{ secrets.LATTICE_AGENT_TOKEN }}
+      PELAGO_URL: ${{ vars.PELAGO_URL || vars.LATTICE_URL }}
+      PELAGO_AGENT_TOKEN: ${{ secrets.PELAGO_AGENT_TOKEN || secrets.LATTICE_AGENT_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       REPO: ${{ github.repository }}
@@ -64,13 +65,13 @@ jobs:
       - run: npm install --global @anthropic-ai/claude-code
 
       # The token goes into a file the CLI reads, not onto a command line.
-      - name: Connect to Lattice
+      - name: Connect to Archipelago
         run: |
           node -e '
-            const { LATTICE_URL, LATTICE_AGENT_TOKEN, RUNNER_TEMP } = process.env;
-            if (!LATTICE_AGENT_TOKEN) { console.log("::error::The repository secret LATTICE_AGENT_TOKEN is not set."); process.exit(1); }
-            const lattice = { type: "http", url: LATTICE_URL.replace(/\/$/, "") + "/mcp", headers: { Authorization: "Bearer " + LATTICE_AGENT_TOKEN } };
-            require("fs").writeFileSync(RUNNER_TEMP + "/lattice-mcp.json", JSON.stringify({ mcpServers: { lattice } }), { mode: 0o600 });
+            const { PELAGO_URL, PELAGO_AGENT_TOKEN, RUNNER_TEMP } = process.env;
+            if (!PELAGO_AGENT_TOKEN) { console.log("::error::The repository secret PELAGO_AGENT_TOKEN is not set."); process.exit(1); }
+            const pelago = { type: "http", url: PELAGO_URL.replace(/\/$/, "") + "/mcp", headers: { Authorization: "Bearer " + PELAGO_AGENT_TOKEN } };
+            require("fs").writeFileSync(RUNNER_TEMP + "/pelago-mcp.json", JSON.stringify({ mcpServers: { pelago } }), { mode: 0o600 });
           '
 
       # A server that deploys from this same push is away for a minute or so
@@ -79,11 +80,11 @@ jobs:
         run: |
           steady=0
           for attempt in $(seq 1 72); do
-            if curl --silent --fail --max-time 5 --output /dev/null "${LATTICE_URL%/}/health"; then steady=$((steady + 1)); else steady=0; fi
+            if curl --silent --fail --max-time 5 --output /dev/null "${PELAGO_URL%/}/health"; then steady=$((steady + 1)); else steady=0; fi
             if [ "$steady" -ge 12 ]; then exit 0; fi
             sleep 5
           done
-          echo "::error::The Lattice server at $LATTICE_URL did not stay up for a minute within six minutes."
+          echo "::error::The Archipelago server at $PELAGO_URL did not stay up for a minute within six minutes."
           exit 1
 
       - name: Read the push against the map
@@ -102,17 +103,17 @@ jobs:
           EOF
           cat >> "$RUNNER_TEMP/prompt.txt" <<'EOF'
 
-          Your one job is to make the Lattice map true again for this repository. Lattice is the owner's map of
-          work: projects, features, tasks, issues, decisions. You reach it through the lattice tools. Change no
+          Your one job is to make the Archipelago map true again for this repository. Archipelago is the owner's map of
+          work: projects, features, tasks, issues, decisions. You reach it through the pelago tools. Change no
           files here. Depending on the workspace, what you send is held for the owner or takes effect at once,
           so send only what the commits show.
 
           1. Read what changed: `git log` and `git diff --stat` over that range, and the diffs that matter.
-          2. Read what the map believes: the lattice `view` tool with name "repo_work" and the repository as
+          2. Read what the map believes: the pelago `view` tool with name "repo_work" and the repository as
              params.repo; `search` for anything else these commits touch; `get` an item before you change it.
              Call `schema` once: every type has its own statuses, and you must use the ones the item's type has
              (a task is done, a feature is built and later shipped, an issue is resolved).
-          3. Lattice itself has already read this push: where a commit on the default branch says "fixes",
+          3. Archipelago itself has already read this push: where a commit on the default branch says "fixes",
              "closes" or "resolves" with an item's id (e_ and eight characters), that item has been closed, or
              a change closing it is held (`proposals` lists what is held). Do not send those again. If `get`
              shows an item already in the state you would give it, leave it.
@@ -139,9 +140,9 @@ jobs:
           EOF
           # Not the repository's own Claude settings: its hooks are for a person's machine, not for this runner.
           claude --print "$(cat "$RUNNER_TEMP/prompt.txt")" \
-            --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
+            --mcp-config "$RUNNER_TEMP/pelago-mcp.json" --strict-mcp-config \
             --setting-sources user \
-            --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
+            --allowedTools "mcp__pelago__view,mcp__pelago__search,mcp__pelago__get,mcp__pelago__events,mcp__pelago__schema,mcp__pelago__proposals,mcp__pelago__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
             --max-budget-usd 2 --output-format json > "$RUNNER_TEMP/claude.json" || status=$?
           # What it said goes in this run's log; what it used is in the same answer, for the step below.
           node -e '
@@ -155,7 +156,7 @@ jobs:
 
       # What the run used, said to the map once it is over: tokens are input and output, not cached re-reads,
       # counted as a session on a machine is. It never fails the run.
-      - name: Tell Lattice what the run used
+      - name: Tell Archipelago what the run used
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
@@ -163,7 +164,7 @@ jobs:
           TITLE="Read the push to $BRANCH (${AFTER:0:7})"
           TITLE="$TITLE" node -e '
             const fs = require("fs");
-            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, JOB_STATUS, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+            const { PELAGO_URL, PELAGO_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, JOB_STATUS, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
             let out;
             try { out = JSON.parse(fs.readFileSync(RUNNER_TEMP + "/claude.json", "utf8")); } catch {
               // A run that stopped before Claude started (a secret not set, the server not coming back) is said too, as a run that failed.
@@ -172,7 +173,7 @@ jobs:
             }
             const used = out.usage || {};
             const report = {
-              actor: "claude-code:lattice-sync",
+              actor: "claude-code:pelago-sync",
               repo: REPO,
               title: TITLE,
               ok: !out.is_error,
@@ -182,18 +183,18 @@ jobs:
               link: GITHUB_SERVER_URL + "/" + GITHUB_REPOSITORY + "/actions/runs/" + GITHUB_RUN_ID,
               summary: String(out.result || "").slice(0, 2000),
             };
-            fetch(LATTICE_URL.replace(/\/$/, "") + "/agent/run_report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + LATTICE_AGENT_TOKEN }, body: JSON.stringify(report) })
-              .then(async (res) => console.log(res.ok ? "Told Lattice: " + report.tokens + " tokens." : "::warning::Lattice did not take the report: " + res.status + " " + (await res.text()).slice(0, 200)))
-              .catch((err) => console.log("::warning::Could not tell Lattice what the run used: " + err.message));
+            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/run_report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + PELAGO_AGENT_TOKEN }, body: JSON.stringify(report) })
+              .then(async (res) => console.log(res.ok ? "Told Archipelago: " + report.tokens + " tokens." : "::warning::Archipelago did not take the report: " + res.status + " " + (await res.text()).slice(0, 200)))
+              .catch((err) => console.log("::warning::Could not tell Archipelago what the run used: " + err.message));
           '
 
   recheck:
-    if: ${{ github.event_name != 'push' && vars.LATTICE_URL != '' }}
+    if: ${{ github.event_name != 'push' && (vars.PELAGO_URL || vars.LATTICE_URL) != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      LATTICE_URL: ${{ vars.LATTICE_URL }}
-      LATTICE_AGENT_TOKEN: ${{ secrets.LATTICE_AGENT_TOKEN }}
+      PELAGO_URL: ${{ vars.PELAGO_URL || vars.LATTICE_URL }}
+      PELAGO_AGENT_TOKEN: ${{ secrets.PELAGO_AGENT_TOKEN || secrets.LATTICE_AGENT_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       REPO: ${{ github.repository }}
@@ -201,17 +202,17 @@ jobs:
       NOW: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       # Asked before anything is installed: most days the answer is no, and the run ends here.
-      - name: Ask Lattice what is due
+      - name: Ask Archipelago what is due
         id: due
         run: |
-          if [ -z "$LATTICE_AGENT_TOKEN" ]; then echo "::error::The repository secret LATTICE_AGENT_TOKEN is not set."; exit 1; fi
+          if [ -z "$PELAGO_AGENT_TOKEN" ]; then echo "::error::The repository secret PELAGO_AGENT_TOKEN is not set."; exit 1; fi
           node -e '
-            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, NOW, RUNNER_TEMP, GITHUB_OUTPUT } = process.env;
+            const { PELAGO_URL, PELAGO_AGENT_TOKEN, REPO, NOW, RUNNER_TEMP, GITHUB_OUTPUT } = process.env;
             const fs = require("fs");
-            fetch(LATTICE_URL.replace(/\/$/, "") + "/agent/view", {
+            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/view", {
               method: "POST",
-              headers: { "content-type": "application/json", authorization: "Bearer " + LATTICE_AGENT_TOKEN },
-              body: JSON.stringify({ name: "recheck", params: { repo: REPO, now: NOW === "true" }, actor: "claude-code:lattice-recheck" }),
+              headers: { "content-type": "application/json", authorization: "Bearer " + PELAGO_AGENT_TOKEN },
+              body: JSON.stringify({ name: "recheck", params: { repo: REPO, now: NOW === "true" }, actor: "claude-code:pelago-recheck" }),
             })
               .then(async (res) => {
                 const answer = await res.json().catch(() => ({}));
@@ -221,7 +222,7 @@ jobs:
                 fs.appendFileSync(GITHUB_OUTPUT, "due=" + (due.length > 0) + "\n");
                 console.log(due.length ? "Due: " + due.map((p) => p.title + " (" + p.items.length + " items)").join(", ") : "Nothing is due for a re-check.");
               })
-              .catch((err) => { console.log("::error::Could not ask Lattice what is due: " + err.message); process.exit(1); });
+              .catch((err) => { console.log("::error::Could not ask Archipelago what is due: " + err.message); process.exit(1); });
           '
 
       - uses: actions/checkout@v4
@@ -237,13 +238,13 @@ jobs:
       - run: npm install --global @anthropic-ai/claude-code
         if: steps.due.outputs.due == 'true'
 
-      - name: Connect to Lattice
+      - name: Connect to Archipelago
         if: steps.due.outputs.due == 'true'
         run: |
           node -e '
-            const { LATTICE_URL, LATTICE_AGENT_TOKEN, RUNNER_TEMP } = process.env;
-            const lattice = { type: "http", url: LATTICE_URL.replace(/\/$/, "") + "/mcp", headers: { Authorization: "Bearer " + LATTICE_AGENT_TOKEN } };
-            require("fs").writeFileSync(RUNNER_TEMP + "/lattice-mcp.json", JSON.stringify({ mcpServers: { lattice } }), { mode: 0o600 });
+            const { PELAGO_URL, PELAGO_AGENT_TOKEN, RUNNER_TEMP } = process.env;
+            const pelago = { type: "http", url: PELAGO_URL.replace(/\/$/, "") + "/mcp", headers: { Authorization: "Bearer " + PELAGO_AGENT_TOKEN } };
+            require("fs").writeFileSync(RUNNER_TEMP + "/pelago-mcp.json", JSON.stringify({ mcpServers: { pelago } }), { mode: 0o600 });
           '
 
       - name: Check the oldest items against the repository
@@ -256,12 +257,12 @@ jobs:
             exit 1
           fi
           cat > "$RUNNER_TEMP/prompt.txt" <<EOF
-          This is the scheduled re-check of the Lattice map for the repository $REPO.
+          This is the scheduled re-check of the Archipelago map for the repository $REPO.
           EOF
           cat >> "$RUNNER_TEMP/prompt.txt" <<'EOF'
 
-          Lattice is the owner's map of work: projects, features, tasks, issues, decisions. You reach it through
-          the lattice tools. Below, as JSON, are the projects in this repository that are due, each with its open
+          Archipelago is the owner's map of work: projects, features, tasks, issues, decisions. You reach it through
+          the pelago tools. Below, as JSON, are the projects in this repository that are due, each with its open
           items nobody has changed or confirmed for longest, oldest first. An item that old may no longer be true.
           Your one job is to find out, from what is in this repository, and say so in the map. Change no files here.
           The list is longer than you can check in one run, and many of the oldest will be things no repository can
@@ -300,9 +301,9 @@ jobs:
           EOF
           cat "$RUNNER_TEMP/due.json" >> "$RUNNER_TEMP/prompt.txt"
           claude --print "$(cat "$RUNNER_TEMP/prompt.txt")" \
-            --mcp-config "$RUNNER_TEMP/lattice-mcp.json" --strict-mcp-config \
+            --mcp-config "$RUNNER_TEMP/pelago-mcp.json" --strict-mcp-config \
             --setting-sources user \
-            --allowedTools "mcp__lattice__view,mcp__lattice__search,mcp__lattice__get,mcp__lattice__events,mcp__lattice__schema,mcp__lattice__proposals,mcp__lattice__change,mcp__lattice__notify,mcp__lattice__rechecked,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
+            --allowedTools "mcp__pelago__view,mcp__pelago__search,mcp__pelago__get,mcp__pelago__events,mcp__pelago__schema,mcp__pelago__proposals,mcp__pelago__change,mcp__pelago__notify,mcp__pelago__rechecked,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
             --max-budget-usd 2 --output-format json > "$RUNNER_TEMP/claude.json" || status=$?
           # What it said goes in this run's log; what it used is in the same answer, for the step below.
           node -e '
@@ -316,7 +317,7 @@ jobs:
 
       # What the run used, said to the map once it is over: tokens are input and output, not cached re-reads,
       # counted as a session on a machine is. It never fails the run.
-      - name: Tell Lattice what the run used
+      - name: Tell Archipelago what the run used
         if: always() && steps.due.outputs.due == 'true'
         env:
           JOB_STATUS: ${{ job.status }}
@@ -324,7 +325,7 @@ jobs:
           if [ "$NOW" = "true" ]; then TITLE="Re-check asked for by hand"; else TITLE="Scheduled re-check"; fi
           TITLE="$TITLE" node -e '
             const fs = require("fs");
-            const { LATTICE_URL, LATTICE_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, JOB_STATUS, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+            const { PELAGO_URL, PELAGO_AGENT_TOKEN, REPO, RUNNER_TEMP, TITLE, JOB_STATUS, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
             let out;
             try { out = JSON.parse(fs.readFileSync(RUNNER_TEMP + "/claude.json", "utf8")); } catch {
               // A run that stopped before Claude started (a secret not set, the server not coming back) is said too, as a run that failed.
@@ -333,7 +334,7 @@ jobs:
             }
             const used = out.usage || {};
             const report = {
-              actor: "claude-code:lattice-sync",
+              actor: "claude-code:pelago-sync",
               repo: REPO,
               title: TITLE,
               ok: !out.is_error,
@@ -343,7 +344,7 @@ jobs:
               link: GITHUB_SERVER_URL + "/" + GITHUB_REPOSITORY + "/actions/runs/" + GITHUB_RUN_ID,
               summary: String(out.result || "").slice(0, 2000),
             };
-            fetch(LATTICE_URL.replace(/\/$/, "") + "/agent/run_report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + LATTICE_AGENT_TOKEN }, body: JSON.stringify(report) })
-              .then(async (res) => console.log(res.ok ? "Told Lattice: " + report.tokens + " tokens." : "::warning::Lattice did not take the report: " + res.status + " " + (await res.text()).slice(0, 200)))
-              .catch((err) => console.log("::warning::Could not tell Lattice what the run used: " + err.message));
+            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/run_report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + PELAGO_AGENT_TOKEN }, body: JSON.stringify(report) })
+              .then(async (res) => console.log(res.ok ? "Told Archipelago: " + report.tokens + " tokens." : "::warning::Archipelago did not take the report: " + res.status + " " + (await res.text()).slice(0, 200)))
+              .catch((err) => console.log("::warning::Could not tell Archipelago what the run used: " + err.message));
           '

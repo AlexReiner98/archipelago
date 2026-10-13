@@ -4,7 +4,7 @@
 // to be read. What this file adds is restraint in what it passes on of what
 // is there: names, states and what the tests found, and nothing else.
 
-import type { Entity, Lattice } from './lattice.ts';
+import type { Entity, Archipelago } from './pelago.ts';
 import { changelog, proof } from './proof.ts';
 
 /**
@@ -12,13 +12,13 @@ import { changelog, proof } from './proof.ts';
  * questions asked of it with their tests and what each found on one build,
  * and its changelog. Null when there is no such public product.
  */
-export async function publicPage(l: Lattice, product: string, build?: string) {
+export async function publicPage(l: Archipelago, product: string, build?: string) {
   const pub = l.forAnyone();
   const { rows } = await pub.db.query<Entity>(`select id, type, title, status from entity where id = $1 and visibility = 'public' and archived_at is null`, [product]);
   const root = rows[0];
   if (!root || !['project', 'software.feature'].some((kind) => l.registry.isA(root.type, kind))) return null;
   // Everything public that belongs to it, through whatever lies between that is not.
-  const under = new Set([root.id, ...(await pub.db.query<{ id: string }>(`select lattice_public_under($1) as id`, [root.id])).rows.map((r) => r.id)]);
+  const under = new Set([root.id, ...(await pub.db.query<{ id: string }>(`select pelago_public_under($1) as id`, [root.id])).rows.map((r) => r.id)]);
   const proven = await proof(pub, { build }, under);
   const log = await changelog(pub, { of: root.id }, under);
   return {
@@ -50,7 +50,7 @@ export async function publicPage(l: Lattice, product: string, build?: string) {
 }
 
 /** The picture kept for a public result, or null: one that is not public is not there for this to find. */
-export async function publicPicture(l: Lattice, result: string): Promise<{ content_type: string; bytes: Buffer } | null> {
+export async function publicPicture(l: Archipelago, result: string): Promise<{ content_type: string; bytes: Buffer } | null> {
   const { rows } = await l.forAnyone().db.query<{ content_type: string; data: string }>(`select content_type, encode(bytes, 'base64') as data from picture where entity_id = $1`, [result]);
   return rows[0] ? { content_type: rows[0].content_type, bytes: Buffer.from(rows[0].data, 'base64') } : null;
 }

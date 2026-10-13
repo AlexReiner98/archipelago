@@ -3,7 +3,7 @@
 // each repository, no workflow file, no secrets pasted into its settings.
 //
 // There are three moments:
-//   1. The server's owner creates the app, once. Lattice sends GitHub a
+//   1. The server's owner creates the app, once. Archipelago sends GitHub a
 //      manifest saying what the app is and may do; GitHub answers with its
 //      id, its key and the secret it signs with, and they are kept here.
 //   2. A workspace's admin connects GitHub: they choose repositories on
@@ -18,7 +18,8 @@ import { createHmac, createSign, randomBytes, timingSafeEqual } from 'node:crypt
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoByName } from './github.ts';
-import type { Lattice } from './lattice.ts';
+import { env } from './env.ts';
+import type { Archipelago } from './pelago.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 
 interface Credentials {
@@ -69,7 +70,7 @@ export class GithubApp {
       const { pem, webhook_secret } = this.kept.app;
       const open = { pem: unseal(pem), webhook_secret: unseal(webhook_secret) };
       if (!open.pem || !open.webhook_secret) {
-        console.error('The GitHub App\u2019s key cannot be opened with the sealing key this server has (LATTICE_SECRETS_KEY or secrets.key). The app has to be created again.');
+        console.error('The GitHub App\u2019s key cannot be opened with the sealing key this server has (PELAGO_SECRETS_KEY or secrets.key). The app has to be created again.');
         this.kept.app = undefined;
       } else {
         Object.assign(this.kept.app, open);
@@ -77,7 +78,7 @@ export class GithubApp {
       }
     }
     // An app registered by hand comes in through the environment instead.
-    const { LATTICE_GITHUB_APP_ID: id, LATTICE_GITHUB_APP_KEY: pem, LATTICE_GITHUB_APP_SECRET: secret, LATTICE_GITHUB_APP_SLUG: slug } = process.env;
+    const [id, pem, secret, slug] = ['ID', 'KEY', 'SECRET', 'SLUG'].map((name) => env(`GITHUB_APP_${name}`));
     if (!this.kept.app && id && pem && secret && slug) this.kept.app = { id: Number(id), slug, name: slug, pem: pem.replaceAll('\\n', '\n'), webhook_secret: secret };
   }
 
@@ -128,7 +129,7 @@ export class GithubApp {
   private finish(kind: Pending['kind'], state: string | null): Pending {
     const found = state ? this.pending.get(state) : undefined;
     if (state) this.pending.delete(state);
-    if (!found || found.kind !== kind || found.expires < Date.now()) throw new Error('This was not started from Lattice, or was started too long ago. Start again from the Workspace screen.');
+    if (!found || found.kind !== kind || found.expires < Date.now()) throw new Error('This was not started from Archipelago, or was started too long ago. Start again from the Workspace screen.');
     return found;
   }
 
@@ -142,12 +143,12 @@ export class GithubApp {
 
   /** The page that hands GitHub the manifest: a form that sends itself. */
   createPage(state: string | null): string {
-    if (!state || this.pending.get(state)?.kind !== 'create') throw new Error('This was not started from Lattice. Start again from the Workspace screen.');
+    if (!state || this.pending.get(state)?.kind !== 'create') throw new Error('This was not started from Archipelago. Start again from the Workspace screen.');
     const { origin } = this.options;
     const manifest = {
-      name: `Lattice (${new URL(origin).host})`.slice(0, 34),
+      name: `Archipelago (${new URL(origin).host})`.slice(0, 34),
       url: origin,
-      description: 'Keeps a Lattice map true to the repositories it is connected to: every push is read against the open work.',
+      description: 'Keeps an Archipelago map true to the repositories it is connected to: every push is read against the open work.',
       hook_attributes: { url: `${origin}/github/app/hook` },
       redirect_url: `${origin}/github/app/created`,
       setup_url: `${origin}/github/app/installed`,
@@ -158,7 +159,7 @@ export class GithubApp {
       default_events: ['push'],
     };
     const attr = (text: string) => text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
-    return `<!doctype html><meta charset="utf-8"><title>Lattice</title>
+    return `<!doctype html><meta charset="utf-8"><title>Archipelago</title>
 <body style="font: 15px system-ui; padding: 40px">
 <p>Taking you to GitHub to create the app…</p>
 <form method="post" action="${attr(`${this.web}/settings/apps/new?state=${state}`)}">
@@ -229,7 +230,7 @@ export class GithubApp {
   }
 
   private async ask(path: string, authorization: string, method = 'GET'): Promise<unknown> {
-    const res = await fetch(path.startsWith('http') ? path : `${this.api}${path}`, { method, headers: { accept: 'application/vnd.github+json', authorization, 'x-github-api-version': '2022-11-28', 'user-agent': 'lattice' }, signal: AbortSignal.timeout(20_000) });
+    const res = await fetch(path.startsWith('http') ? path : `${this.api}${path}`, { method, headers: { accept: 'application/vnd.github+json', authorization, 'x-github-api-version': '2022-11-28', 'user-agent': 'pelago' }, signal: AbortSignal.timeout(20_000) });
     const answer = (await res.json().catch(() => ({}))) as { message?: string };
     if (!res.ok) throw new Error(`GitHub answered ${res.status}${answer.message ? `: ${answer.message}` : ''} to ${method} ${path}`);
     return answer;
@@ -268,7 +269,7 @@ export class GithubApp {
  * address. One it knows already is left as it is. It follows from what the
  * workspace's admin chose on GitHub, so it is not held for review.
  */
-export async function addRepositories(l: Lattice, names: string[], account: string): Promise<{ added: string[]; known: string[] }> {
+export async function addRepositories(l: Archipelago, names: string[], account: string): Promise<{ added: string[]; known: string[] }> {
   const added: string[] = [];
   const known: string[] = [];
   for (const name of names) ((await repoByName(l, name.toLowerCase())) ? known : added).push(name);

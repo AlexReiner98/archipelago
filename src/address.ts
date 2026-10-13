@@ -7,10 +7,11 @@
 //
 // Trusted without being told: this machine and private networks, which is
 // where a hosting platform's own balancer reaches the server from. Beyond
-// that the server is told (LATTICE_TRUSTED_PROXIES): networks as CIDR, or the
+// that the server is told (PELAGO_TRUSTED_PROXIES): networks as CIDR, or the
 // word "cloudflare" for Cloudflare's published ones.
 
 import { BlockList, isIP } from 'node:net';
+import { env } from './env.ts';
 
 const PRIVATE = ['127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '169.254.0.0/16', '::1/128', 'fc00::/7', 'fe80::/10'];
 /** https://www.cloudflare.com/ips/ as read on 13 Oct 2026. */
@@ -34,7 +35,7 @@ export function trustedProxies(named?: string): BlockList {
   const given = (named ?? '').split(',').map((part) => part.trim()).filter(Boolean);
   for (const part of [...PRIVATE, ...given.flatMap((g) => (g.toLowerCase() === 'cloudflare' ? CLOUDFLARE : [g]))]) {
     const [address, bits] = part.split('/');
-    if (!isIP(address) || (bits !== undefined && !/^\d+$/.test(bits))) throw new Error(`LATTICE_TRUSTED_PROXIES: "${part}" is not an address, a network as CIDR (203.0.113.0/24) or "cloudflare".`);
+    if (!isIP(address) || (bits !== undefined && !/^\d+$/.test(bits))) throw new Error(`PELAGO_TRUSTED_PROXIES: "${part}" is not an address, a network as CIDR (203.0.113.0/24) or "cloudflare".`);
     if (bits === undefined) list.addAddress(address, family(address));
     else list.addSubnet(address, Number(bits), family(address));
   }

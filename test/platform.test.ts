@@ -12,13 +12,17 @@ import { clientAddress, trustedProxies } from '../src/address.ts';
 import { createToken, OPERATOR_RESET_FILE, workspaceOf } from '../src/auth.ts';
 import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
-import { DEFAULT_AGENT_POLICY } from '../src/lattice.ts';
+import { DEFAULT_AGENT_POLICY } from '../src/pelago.ts';
 import { GithubApp } from '../src/github-app.ts';
 import { configureReader, readUnread, sought, within } from '../src/reader.ts';
 import { limiter, type Limit } from '../src/limit.ts';
 import { createHttpServer, lenient } from '../src/server.ts';
 import { configureRestart } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
+
+// What this machine keeps for its own sessions stays out of the tests: a setup run here would take it for a
+// machine connected before, and keep it again under the new names.
+for (const name of ['PELAGO_URL', 'PELAGO_AGENT_TOKEN', 'LATTICE_URL', 'LATTICE_AGENT_TOKEN']) delete process.env[name];
 
 const closers: (() => Promise<void>)[] = [];
 after(async () => {
@@ -27,7 +31,7 @@ after(async () => {
 
 /** A server on its own port with in-memory databases and its own copy of the packs. */
 async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp, limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }) {
-  const root = mkdtempSync(join(tmpdir(), 'lattice-platform-'));
+  const root = mkdtempSync(join(tmpdir(), 'pelago-platform-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
   // The server checks the Host header against its port, so the port must be known first.
@@ -78,8 +82,8 @@ test('with tokens on, nothing but the UI files and health answers without one', 
   const { call } = await serve('tokens');
   for (const [path, method] of [['/api/search', 'POST'], ['/agent/search', 'POST'], ['/mcp', 'POST'], ['/hooks/session-start', 'POST'], ['/whoami', 'GET']]) {
     assert.equal((await call(path, undefined, {}, method)).status, 401, `${path} needs a token`);
-    assert.equal((await call(path, 'lat_default_' + '0'.repeat(40), {}, method)).status, 401, `${path} rejects an unknown token`);
-    assert.equal((await call(path, 'lat_nowhere_' + '0'.repeat(40), {}, method)).status, 401, `${path} gives nothing away about workspaces`);
+    assert.equal((await call(path, 'pel_default_' + '0'.repeat(40), {}, method)).status, 401, `${path} rejects an unknown token`);
+    assert.equal((await call(path, 'pel_nowhere_' + '0'.repeat(40), {}, method)).status, 401, `${path} gives nothing away about workspaces`);
   }
   // Health also says which code is answering and since when, so a deploy can be told from the server it replaces.
   const health = await call('/health', undefined, undefined, 'GET');
@@ -91,7 +95,7 @@ test('with tokens on, nothing but the UI files and health answers without one', 
 
 test('a token fixes identity and authority, whichever surface is used', async () => {
   const { workspaces, call, base } = await serve('tokens');
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const owner = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
 
   const who = await call('/whoami', owner, undefined, 'GET');
@@ -140,7 +144,7 @@ test('each workspace is its own database: tokens, data and local types do not cr
   const { workspaces, call } = await serve('tokens');
   const operator = workspaces.ensureOperator()!;
   assert.equal(workspaces.ensureOperator(), undefined, 'the operator secret is made once');
-  const mine = (await createToken((await workspaces.get('default')).lattice.db, 'default', { kind: 'human', name: 'alex' })).token;
+  const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex' })).token;
 
   assert.equal((await call('/operator/workspaces', mine, { id: 'acme', name: 'Acme' })).status, 401, 'a workspace token is not the operator');
   assert.match((await call('/operator/workspaces', operator, { id: 'Bad Id', name: 'x' })).error, /lowercase letters/);
@@ -159,7 +163,7 @@ test('each workspace is its own database: tokens, data and local types do not cr
   assert.equal((await call('/whoami', theirs, undefined, 'GET')).workspace.name, 'Acme Architects');
 
   // A token is only good in the workspace that issued it, whatever its prefix says.
-  const forged = theirs.replace('lat_acme_', 'lat_default_');
+  const forged = theirs.replace('pel_acme_', 'pel_default_');
   assert.equal((await call('/api/search', forged)).status, 401);
 
   // A type one workspace defines is not offered to another.
@@ -171,7 +175,7 @@ test('each workspace is its own database: tokens, data and local types do not cr
 
 test('inside a workspace, private things are hidden from other members by the database', async () => {
   const { workspaces, call } = await serve('tokens');
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const api = async (token: string, tool: string, body: unknown = {}) => {
     const r = await call(`/api/${tool}`, token, body);
@@ -258,7 +262,7 @@ test('inside a workspace, private things are hidden from other members by the da
 
 test('nothing can depend on a private item from outside it, and a held resource is held for everyone', async () => {
   const { workspaces, call } = await serve('tokens');
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const api = async (token: string, tool: string, body: unknown = {}) => {
     const r = await call(`/api/${tool}`, token, body);
@@ -318,7 +322,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
 test('a workspace receives notifications only from workspaces its admin accepts', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = workspaces.ensureOperator()!;
-  const mine = (await createToken((await workspaces.get('default')).lattice.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
   const send = (token: string, workspace: string) => call('/api/notify_workspace', token, { workspace, title: 'The shadow study is ready', level: 'warning' });
 
@@ -353,21 +357,21 @@ test('dev mode turns review off and offers agents a restart; without it neither 
   assert.equal(restarts, 1);
   assert.equal((await call('/whoami', undefined, undefined, 'GET')).dev, true);
 
-  const before = [process.env.LATTICE_DEV, process.env.LATTICE_AUTH];
+  const before = [process.env.PELAGO_DEV, process.env.PELAGO_AUTH];
   after(() => {
-    for (const [i, key] of ['LATTICE_DEV', 'LATTICE_AUTH'].entries()) {
+    for (const [i, key] of ['PELAGO_DEV', 'PELAGO_AUTH'].entries()) {
       if (before[i] === undefined) delete process.env[key];
       else process.env[key] = before[i];
     }
   });
-  process.env.LATTICE_DEV = '1';
-  delete process.env.LATTICE_AUTH;
+  process.env.PELAGO_DEV = '1';
+  delete process.env.PELAGO_AUTH;
   const dev = loadConfig();
   assert.equal(dev.dev, true);
   assert.ok(Object.values({ ...DEFAULT_AGENT_POLICY, ...dev.policy }).every((level) => level === 'auto'), 'every op applies without review');
-  process.env.LATTICE_AUTH = 'tokens';
+  process.env.PELAGO_AUTH = 'tokens';
   assert.throws(() => loadConfig(), /does not run with auth "tokens"/);
-  process.env.LATTICE_DEV = '0';
+  process.env.PELAGO_DEV = '0';
   assert.equal(loadConfig().dev, false);
 });
 
@@ -413,7 +417,7 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   // A session that began before this server did has lived through a restart: it is told, once, that its tools may be old.
   const { workspaces: ws, call: later } = await serve('off');
   const old = (await later('/agent/session_start', undefined, { session_id: 'before', title: 'Began before the deploy' })).result.run;
-  await (await ws.get('default')).lattice.db.query(`update entity set created_at = now() - interval '1 hour' where id = $1`, [old]);
+  await (await ws.get('default')).pelago.db.query(`update entity set created_at = now() - interval '1 hour' where id = $1`, [old]);
   const restarted = await later('/hooks/prompt', undefined, { session_id: 'before' });
   assert.match(restarted.hookSpecificOutput.additionalContext, /server has restarted since this session began .*now running commit [0-9a-f]{7}\).*POST \/agent\/<tool>/s);
   assert.deepEqual(await later('/hooks/prompt', undefined, { session_id: 'before' }), { status: 200 }, 'told once');
@@ -421,16 +425,16 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   assert.deepEqual(await later('/hooks/prompt', undefined, { session_id: 'after' }), { status: 200 }, 'a session that began on this server is not told');
 });
 
-test('a project with nothing of Lattice\'s in it is connected by one command, which adds to what is there and can be run again', async () => {
+test('a project with nothing of Archipelago\'s in it is connected by one command, which adds to what is there and can be run again', async () => {
   const { base } = await serve('tokens');
-  const project = mkdtempSync(join(tmpdir(), 'lattice-customer-'));
+  const project = mkdtempSync(join(tmpdir(), 'pelago-customer-'));
   writeFileSync(join(project, 'CLAUDE.md'), '# Their project\n\nTheir own rules.\n');
   mkdirSync(join(project, '.claude'));
-  writeFileSync(join(project, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm test)'] }, hooks: { SessionEnd: [{ hooks: [{ type: 'command', command: 'echo bye' }] }], UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'node scripts/lattice-hook.mjs prompt' }] }] } }));
+  writeFileSync(join(project, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm test)'] }, hooks: { SessionEnd: [{ hooks: [{ type: 'command', command: 'echo bye' }] }], UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'node scripts/pelago-hook.mjs prompt' }] }] } }));
   // The command the Workspace screen gives: no token is asked for, since the script holds no secret.
   const run = () =>
     new Promise<{ out: string; code: number | null }>((done) => {
-      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: '' } });
+      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, PELAGO_AGENT_TOKEN: '' } });
       let out = '';
       child.stdout.on('data', (d) => (out += d));
       child.stderr.on('data', (d) => (out += d));
@@ -440,18 +444,18 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   assert.equal(first.code, 0, first.out);
   assert.match(first.out, /written {4}\.mcp\.json[\s\S]*added to {3}CLAUDE\.md[\s\S]*this machine has no token yet/);
   const file = (path: string) => readFileSync(join(project, path), 'utf8');
-  assert.equal(JSON.parse(file('.mcp.json')).mcpServers.lattice.url, `\${LATTICE_URL:-${base}}/mcp`);
+  assert.equal(JSON.parse(file('.mcp.json')).mcpServers.pelago.url, `\${PELAGO_URL:-${base}}/mcp`);
   // What was theirs is kept; the three hooks are added beside it, and call the script that was written.
   const settings = JSON.parse(file('.claude/settings.json'));
   assert.deepEqual(settings.permissions, { allow: ['Bash(npm test)'] });
-  assert.deepEqual(settings.hooks.SessionEnd.map((h: any) => h.hooks[0].command), ['echo bye', 'node .claude/lattice-hook.mjs session-end']);
-  assert.deepEqual(settings.hooks.UserPromptSubmit.map((h: any) => h.hooks[0].command), ['node .claude/lattice-hook.mjs prompt'], 'a hook registered at another place is pointed at the one the setup wrote');
-  assert.equal(settings.hooks.SessionStart[0].hooks[0].command, 'node .claude/lattice-hook.mjs session-start');
-  assert.equal(settings.hooks.Stop[0].hooks[0].command, 'node .claude/lattice-hook.mjs stop', 'the end of a turn is heard too');
-  assert.ok(file('.claude/lattice-hook.mjs').includes(`process.env.LATTICE_URL || "${base}"`), 'the hook falls back on the server that handed it out');
-  assert.match(file('.claude/skills/lattice-bump/SKILL.md'), /^---\nname: lattice-bump/);
-  assert.match(file('.claude/lattice.md'), /view` with name `handoff`/);
-  assert.match(file('CLAUDE.md'), /^# Their project\n\nTheir own rules\.\n\n## Lattice\n[\s\S]*@\.claude\/lattice\.md\n$/);
+  assert.deepEqual(settings.hooks.SessionEnd.map((h: any) => h.hooks[0].command), ['echo bye', 'node .claude/pelago-hook.mjs session-end']);
+  assert.deepEqual(settings.hooks.UserPromptSubmit.map((h: any) => h.hooks[0].command), ['node .claude/pelago-hook.mjs prompt'], 'a hook registered at another place is pointed at the one the setup wrote');
+  assert.equal(settings.hooks.SessionStart[0].hooks[0].command, 'node .claude/pelago-hook.mjs session-start');
+  assert.equal(settings.hooks.Stop[0].hooks[0].command, 'node .claude/pelago-hook.mjs stop', 'the end of a turn is heard too');
+  assert.ok(file('.claude/pelago-hook.mjs').includes(`process.env.PELAGO_URL || process.env.LATTICE_URL || "${base}"`), 'the hook falls back on the server that handed it out');
+  assert.match(file('.claude/skills/pelago-bump/SKILL.md'), /^---\nname: pelago-bump/);
+  assert.match(file('.claude/pelago.md'), /view` with name `handoff`/);
+  assert.match(file('CLAUDE.md'), /^# Their project\n\nTheir own rules\.\n\n## Archipelago\n[\s\S]*@\.claude\/pelago\.md\n$/);
   // Run again, it changes nothing.
   const before = [file('CLAUDE.md'), file('.claude/settings.json')];
   const again = await run();
@@ -460,9 +464,9 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   // The first time on a machine the command carries the token in and asks for it to be kept: it is, with the
   // address, where the shell finds them, an older token replaced and nothing else there disturbed. It is not printed.
   const profile = join(project, 'profile');
-  writeFileSync(profile, 'export PATH="$PATH:/opt/bin"\nexport LATTICE_AGENT_TOKEN="lat_default_old"\n');
+  writeFileSync(profile, 'export PATH="$PATH:/opt/bin"\nexport PELAGO_AGENT_TOKEN="lat_default_old"\n');
   const kept = await new Promise<string>((done) => {
-    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: 'lat_default_new', LATTICE_SETUP_SAVE: '1', LATTICE_SETUP_PROFILE: profile } });
+    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, PELAGO_AGENT_TOKEN: 'lat_default_new', PELAGO_SETUP_SAVE: '1', PELAGO_SETUP_PROFILE: profile } });
     let out = '';
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (out += d));
@@ -470,11 +474,11 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   });
   assert.match(kept, /kept {7}the server\u2019s address and the token, for this machine[\s\S]*Connected to/);
   assert.ok(!kept.includes('lat_default_new'));
-  assert.equal(file('profile'), `export PATH="$PATH:/opt/bin"\nexport LATTICE_URL="${base}"\nexport LATTICE_AGENT_TOKEN="lat_default_new"\n`);
+  assert.equal(file('profile'), `export PATH="$PATH:/opt/bin"\nexport PELAGO_URL="${base}"\nexport PELAGO_AGENT_TOKEN="lat_default_new"\n`);
 
   // And the hook it wrote reaches the server from that folder.
   const hooked = await new Promise<string>((done) => {
-    const child = spawn(process.execPath, ['.claude/lattice-hook.mjs', 'session-start'], { cwd: project, env: { ...process.env, LATTICE_URL: '', LATTICE_AGENT_TOKEN: '' } });
+    const child = spawn(process.execPath, ['.claude/pelago-hook.mjs', 'session-start'], { cwd: project, env: { ...process.env, PELAGO_URL: '', PELAGO_AGENT_TOKEN: '' } });
     let err = '';
     child.stderr.on('data', (d) => (err += d));
     child.on('close', () => done(err));
@@ -483,13 +487,72 @@ test('a project with nothing of Lattice\'s in it is connected by one command, wh
   assert.match(hooked, new RegExp(`${base.replace(/[.:/]/g, '\\$&')} answered 401`), 'it called this server, which wants the token the machine does not have yet');
 });
 
+test('a project connected while this was called Lattice is moved over by the setup, with nobody to ask', async () => {
+  const { base } = await serve('tokens');
+  const project = mkdtempSync(join(tmpdir(), 'pelago-before-'));
+  const at = (path: string) => join(project, path);
+  const file = (path: string) => readFileSync(at(path), 'utf8');
+  // As a setup left it then: the tools, the hook and its four entries, the rules, the skill, and one section.
+  const old = {
+    '.mcp.json': JSON.stringify({ mcpServers: { other: { type: 'http', url: 'https://example.test/mcp' }, lattice: { type: 'http', url: `\${LATTICE_URL:-${base}}/mcp`, headers: { Authorization: 'Bearer ${LATTICE_AGENT_TOKEN:-none}' } } } }),
+    '.claude/settings.json': JSON.stringify({ hooks: { SessionStart: [{ matcher: 'startup|resume|clear', hooks: [{ type: 'command', command: 'node .claude/lattice-hook.mjs session-start' }] }], UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'node .claude/lattice-hook.mjs prompt' }] }], Stop: [{ hooks: [{ type: 'command', command: 'node .claude/lattice-hook.mjs stop' }] }], SessionEnd: [{ hooks: [{ type: 'command', command: 'echo bye' }] }, { hooks: [{ type: 'command', command: 'node .claude/lattice-hook.mjs session-end' }] }] } }),
+    '.claude/lattice-hook.mjs': '// the hook as it was\n',
+    '.claude/lattice.md': '# Working with Lattice in this project\n',
+    '.claude/skills/lattice-bump/SKILL.md': '---\nname: lattice-bump\n---\n',
+    '.claude/skills/lattice-bump/references/home.md': 'where the map is\n',
+    'CLAUDE.md': `# Their project\n\nTheir own rules.\n\n## Lattice\n\nThis project's work is kept in Lattice (${base}). How to work with it:\n\n@.claude/lattice.md\n`,
+    'CLAUDE.local.md': 'Mine alone.\n\n@.claude/lattice.md\n',
+    profile: 'export PATH="$PATH:/opt/bin"\nexport LATTICE_URL="https://old.example.test"\nexport LATTICE_AGENT_TOKEN="lat_default_kept"\n',
+  };
+  mkdirSync(at('.claude/skills/lattice-bump/references'), { recursive: true });
+  for (const [path, text] of Object.entries(old)) writeFileSync(at(path), text);
+  const setup = (flags: string[], env: Record<string, string>) =>
+    new Promise<{ out: string; code: number | null }>((done) => {
+      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, ...(flags.length ? ['--', ...flags] : [])], { cwd: project, env: { ...process.env, PELAGO_SETUP_PROFILE: at('profile'), ...env } });
+      let out = '';
+      child.stdout.on('data', (d) => (out += d));
+      child.stderr.on('data', (d) => (out += d));
+      child.on('close', (code) => done({ out, code }));
+    });
+
+  // The machine still has its token under the old name, as a session opened before the move does.
+  const moved = await setup([], { LATTICE_URL: 'https://old.example.test', LATTICE_AGENT_TOKEN: 'lat_default_kept' });
+  assert.equal(moved.code, 0, moved.out);
+  assert.ok(!moved.out.includes('lat_default_kept'));
+  assert.doesNotMatch(moved.out, /not done|needs a yes/, 'all of it was the setup’s own');
+  assert.match(moved.out, /run this once more/);
+  for (const path of ['.claude/lattice-hook.mjs', '.claude/lattice.md', '.claude/skills/lattice-bump']) assert.ok(!existsSync(at(path)), `${path} is gone`);
+  assert.match(file('.claude/skills/pelago-bump/SKILL.md'), /^---\nname: pelago-bump/);
+  const mcp = JSON.parse(file('.mcp.json')).mcpServers;
+  assert.deepEqual(Object.keys(mcp).sort(), ['other', 'pelago']);
+  assert.equal(mcp.pelago.headers.Authorization, 'Bearer ${LATTICE_AGENT_TOKEN:-none}', 'until Claude Code is opened again it has the token under the old name only');
+  const hooks = JSON.parse(file('.claude/settings.json')).hooks;
+  assert.deepEqual(hooks.SessionEnd.map((h: any) => h.hooks[0].command), ['echo bye', 'node .claude/pelago-hook.mjs session-end']);
+  assert.deepEqual([hooks.SessionStart, hooks.UserPromptSubmit, hooks.Stop].map((list) => list.map((h: any) => h.hooks[0].command)), [['node .claude/pelago-hook.mjs session-start'], ['node .claude/pelago-hook.mjs prompt'], ['node .claude/pelago-hook.mjs stop']]);
+  assert.match(file('CLAUDE.md'), /^# Their project\n\nTheir own rules\.\n\n## Archipelago\n\nThis project's work is kept in Archipelago [\s\S]*@\.claude\/pelago\.md\n$/);
+  assert.equal(file('CLAUDE.local.md'), 'Mine alone.\n\n@.claude/pelago.md\n');
+  assert.equal(file('profile'), `${old.profile}export PELAGO_URL="https://old.example.test"\nexport PELAGO_AGENT_TOKEN="lat_default_kept"\n`);
+
+  // Opened again, the machine has the token under the new name, and the tools read that.
+  const settled = await setup([], { PELAGO_AGENT_TOKEN: 'lat_default_kept', LATTICE_AGENT_TOKEN: 'lat_default_kept' });
+  assert.equal(settled.code, 0, settled.out);
+  assert.equal(JSON.parse(file('.mcp.json')).mcpServers.pelago.headers.Authorization, 'Bearer ${PELAGO_AGENT_TOKEN:-none}');
+  assert.doesNotMatch((await setup([], { PELAGO_AGENT_TOKEN: 'lat_default_kept' })).out, /written|changed|deleted/);
+
+  // Taken out, neither name is left on the machine.
+  const out = await setup(['--remove', '--machine', '--yes'], {});
+  assert.equal(out.code, 0, out.out);
+  assert.equal(file('profile'), 'export PATH="$PATH:/opt/bin"\n');
+  assert.deepEqual(Object.keys(JSON.parse(file('.mcp.json')).mcpServers), ['other']);
+});
+
 test('a project whose settings file is not JSON is left as it was: the setup writes nothing at all', async () => {
   const { base } = await serve('tokens');
-  const project = mkdtempSync(join(tmpdir(), 'lattice-broken-'));
+  const project = mkdtempSync(join(tmpdir(), 'pelago-broken-'));
   mkdirSync(join(project, '.claude'));
   writeFileSync(join(project, '.claude', 'settings.json'), '{ "hooks": ');
   const { out, code } = await new Promise<{ out: string; code: number | null }>((done) => {
-    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`], { cwd: project, env: { ...process.env, LATTICE_AGENT_TOKEN: '' } });
+    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`], { cwd: project, env: { ...process.env, PELAGO_AGENT_TOKEN: '' } });
     let out = '';
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (out += d));
@@ -498,13 +561,13 @@ test('a project whose settings file is not JSON is left as it was: the setup wri
   assert.equal(code, 1, out);
   assert.match(out, /settings\.json is there but is not JSON[\s\S]*Nothing was written/);
   // .mcp.json and the hook come before the settings file in the setup: neither is there.
-  assert.deepEqual([existsSync(join(project, '.mcp.json')), existsSync(join(project, '.claude', 'lattice-hook.mjs')), existsSync(join(project, 'CLAUDE.md'))], [false, false, false]);
+  assert.deepEqual([existsSync(join(project, '.mcp.json')), existsSync(join(project, '.claude', 'pelago-hook.mjs')), existsSync(join(project, 'CLAUDE.md'))], [false, false, false]);
   assert.equal(readFileSync(join(project, '.claude', 'settings.json'), 'utf8'), '{ "hooks": ');
 });
 
 test('the setup shows what it will change and waits for a yes, keeps a copy of what it changes, and can be taken out again', async () => {
   const { base } = await serve('tokens');
-  const project = mkdtempSync(join(tmpdir(), 'lattice-careful-'));
+  const project = mkdtempSync(join(tmpdir(), 'pelago-careful-'));
   const at = (path: string) => join(project, path);
   const file = (path: string) => readFileSync(at(path), 'utf8');
   // A project with its own MCP server, its own hook and its own rules, and a machine with its own start-up file.
@@ -521,26 +584,26 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
     new Promise<{ out: string; code: number | null }>((done) => {
       const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, ...(flags.length ? ['--', ...flags] : [])], {
         cwd: project,
-        env: { ...process.env, LATTICE_AGENT_TOKEN: '', LATTICE_SETUP_PROFILE: at('profile'), ...env },
+        env: { ...process.env, PELAGO_AGENT_TOKEN: '', PELAGO_SETUP_PROFILE: at('profile'), ...env },
       });
       let out = '';
       child.stdout.on('data', (d) => (out += d));
       child.stderr.on('data', (d) => (out += d));
       child.on('close', (code) => done({ out, code }));
     });
-  const first = { LATTICE_AGENT_TOKEN: 'lat_default_secret', LATTICE_SETUP_SAVE: '1' };
+  const first = { PELAGO_AGENT_TOKEN: 'lat_default_secret', PELAGO_SETUP_SAVE: '1' };
 
   // With nobody to ask and no yes, a first setup is shown and refused.
   const refused = await setup();
   assert.equal(refused.code, 1, refused.out);
-  assert.match(refused.out, /this would:[\s\S]*change {5}\.mcp\.json {2}\(adds the lattice tools\) {2}\(a copy is kept: \.mcp\.json\.lattice-backup\)[\s\S]*write {6}\.claude\/lattice-hook\.mjs[\s\S]*add to {5}CLAUDE\.md[\s\S]*Nothing was written[\s\S]*-- --yes/);
+  assert.match(refused.out, /this would:[\s\S]*change {5}\.mcp\.json {2}\(adds the pelago tools\) {2}\(a copy is kept: \.mcp\.json\.pelago-backup\)[\s\S]*write {6}\.claude\/pelago-hook\.mjs[\s\S]*add to {5}CLAUDE\.md[\s\S]*Nothing was written[\s\S]*-- --yes/);
   untouched();
-  assert.ok(!existsSync(at('.claude/lattice-hook.mjs')));
+  assert.ok(!existsSync(at('.claude/pelago-hook.mjs')));
 
   // A dry run names what it would keep for the machine, and where, without the token and without writing.
   const dry = await setup(['--dry-run'], first);
   assert.equal(dry.code, 0, dry.out);
-  assert.ok(dry.out.includes(`keep       LATTICE_URL and LATTICE_AGENT_TOKEN in ${at('profile')}, outside this folder`), dry.out);
+  assert.ok(dry.out.includes(`keep       PELAGO_URL and PELAGO_AGENT_TOKEN in ${at('profile')}, outside this folder`), dry.out);
   assert.match(dry.out, /Nothing was written \(--dry-run\)/);
   assert.ok(!dry.out.includes('lat_default_secret'));
   untouched();
@@ -551,45 +614,45 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
   const done = await setup(['--yes'], first);
   assert.equal(done.code, 0, done.out);
   assert.ok(!done.out.includes('lat_default_secret'));
-  for (const path of Object.keys(theirs)) assert.equal(file(`${path}.lattice-backup`), theirs[path as keyof typeof theirs], `${path} is copied as it was`);
-  assert.ok(JSON.parse(file('.mcp.json')).mcpServers.lattice && JSON.parse(file('.mcp.json')).mcpServers.other);
-  assert.deepEqual(Object.keys(JSON.parse(file('.claude/lattice-setup.json')).files).sort(), ['.claude/lattice-hook.mjs', '.claude/lattice.md', '.claude/skills/lattice-bump/SKILL.md', '.claude/skills/lattice-bump/references/home.md']);
+  for (const path of Object.keys(theirs)) assert.equal(file(`${path}.pelago-backup`), theirs[path as keyof typeof theirs], `${path} is copied as it was`);
+  assert.ok(JSON.parse(file('.mcp.json')).mcpServers.pelago && JSON.parse(file('.mcp.json')).mcpServers.other);
+  assert.deepEqual(Object.keys(JSON.parse(file('.claude/pelago-setup.json')).files).sort(), ['.claude/pelago-hook.mjs', '.claude/pelago.md', '.claude/skills/pelago-bump/SKILL.md', '.claude/skills/pelago-bump/references/home.md']);
 
-  // Later, with nobody to ask: what Lattice wrote is brought up to date; what is theirs is left, and said.
-  writeFileSync(at('.claude/lattice.md'), 'rules as an older server handed them out\n');
+  // Later, with nobody to ask: what Archipelago wrote is brought up to date; what is theirs is left, and said.
+  writeFileSync(at('.claude/pelago.md'), 'rules as an older server handed them out\n');
   writeFileSync(at('.mcp.json'), theirs['.mcp.json']);
   const renewed = await setup();
   assert.equal(renewed.code, 0, renewed.out);
-  assert.match(renewed.out, /not done {3}\.mcp\.json {2}\(it needs a yes\)[\s\S]*written {4}\.claude\/lattice\.md[\s\S]*Some of it was left/);
-  assert.match(file('.claude/lattice.md'), /view` with name `handoff`/);
+  assert.match(renewed.out, /not done {3}\.mcp\.json {2}\(it needs a yes\)[\s\S]*written {4}\.claude\/pelago\.md[\s\S]*Some of it was left/);
+  assert.match(file('.claude/pelago.md'), /view` with name `handoff`/);
   assert.equal(file('.mcp.json'), theirs['.mcp.json']);
   assert.equal((await setup(['--yes'])).code, 0);
-  assert.ok(JSON.parse(file('.mcp.json')).mcpServers.lattice);
-  assert.equal(file('.mcp.json.lattice-backup'), theirs['.mcp.json'], 'the first copy is not written over');
+  assert.ok(JSON.parse(file('.mcp.json')).mcpServers.pelago);
+  assert.equal(file('.mcp.json.pelago-backup'), theirs['.mcp.json'], 'the first copy is not written over');
 
-  // Taking it out needs a yes too. A file of Lattice's that was changed by hand is kept, and named.
-  writeFileSync(at('.claude/skills/lattice-bump/SKILL.md'), file('.claude/skills/lattice-bump/SKILL.md') + '\nOur own note.\n');
+  // Taking it out needs a yes too. A file of Archipelago's that was changed by hand is kept, and named.
+  writeFileSync(at('.claude/skills/pelago-bump/SKILL.md'), file('.claude/skills/pelago-bump/SKILL.md') + '\nOur own note.\n');
   assert.equal((await setup(['--remove'])).code, 1);
   assert.equal((await setup(['--remove', '--dry-run'])).code, 0);
-  assert.ok(existsSync(at('.claude/lattice-hook.mjs')), 'neither took anything out');
+  assert.ok(existsSync(at('.claude/pelago-hook.mjs')), 'neither took anything out');
   const out = await setup(['--remove', '--yes']);
   assert.equal(out.code, 0, out.out);
-  assert.match(out.out, /kept {7}\.claude\/skills\/lattice-bump\/SKILL\.md {2}\(changed since the setup wrote it\)[\s\S]*Lattice is out of[\s\S]*add --machine/);
+  assert.match(out.out, /kept {7}\.claude\/skills\/pelago-bump\/SKILL\.md {2}\(changed since the setup wrote it\)[\s\S]*Archipelago is out of[\s\S]*add --machine/);
   assert.deepEqual(JSON.parse(file('.mcp.json')), JSON.parse(theirs['.mcp.json']));
   assert.deepEqual(JSON.parse(file('.claude/settings.json')), JSON.parse(theirs['.claude/settings.json']));
   assert.equal(file('CLAUDE.md'), theirs['CLAUDE.md']);
-  assert.deepEqual(readdirSync(at('.claude')).sort(), ['settings.json', 'settings.json.lattice-backup', 'skills']);
-  assert.deepEqual(readdirSync(at('.claude/skills/lattice-bump')), ['SKILL.md']);
-  assert.match(file('profile'), /LATTICE_AGENT_TOKEN/, 'what is kept for the machine is left unless asked');
+  assert.deepEqual(readdirSync(at('.claude')).sort(), ['settings.json', 'settings.json.pelago-backup', 'skills']);
+  assert.deepEqual(readdirSync(at('.claude/skills/pelago-bump')), ['SKILL.md']);
+  assert.match(file('profile'), /PELAGO_AGENT_TOKEN/, 'what is kept for the machine is left unless asked');
   const forgot = await setup(['--remove', '--machine', '--yes']);
   assert.match(forgot.out, /forgot {5}the server’s address and the token, on this machine/);
   assert.equal(file('profile'), theirs.profile);
 
   // A folder that held nothing before the setup holds nothing after it is taken out.
-  const empty = mkdtempSync(join(tmpdir(), 'lattice-empty-'));
+  const empty = mkdtempSync(join(tmpdir(), 'pelago-empty-'));
   const inEmpty = (flags: string[]) =>
     new Promise<number | null>((done) => {
-      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', ...flags], { cwd: empty, env: { ...process.env, LATTICE_AGENT_TOKEN: '' } });
+      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', ...flags], { cwd: empty, env: { ...process.env, PELAGO_AGENT_TOKEN: '' } });
       child.on('close', done);
     });
   assert.equal(await inEmpty(['--yes']), 0);
@@ -600,11 +663,11 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
 
 test('the hook script takes a Claude Code hook to whichever server the machine is connected to, with its token', async () => {
   const { workspaces, call, base } = await serve('tokens');
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
   const hook = (name: string, input: unknown, env: Record<string, string>) =>
     new Promise<{ out: string; err: string; code: number | null }>((done) => {
-      const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'lattice-hook.mjs'), name], { env: { ...process.env, LATTICE_URL: base, LATTICE_AGENT_TOKEN: '', ...env } });
+      const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'pelago-hook.mjs'), name], { env: { ...process.env, PELAGO_URL: base, PELAGO_AGENT_TOKEN: '', ...env } });
       let out = '';
       let err = '';
       child.stdout.on('data', (d) => (out += d));
@@ -613,11 +676,11 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
       child.stdin.end(JSON.stringify(input));
     });
 
-  const started = await hook('session-start', { session_id: 'desk-1', cwd: '/nowhere' }, { LATTICE_AGENT_TOKEN: robot });
-  assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, /registered in Lattice/, 'the server\u2019s answer comes back for Claude Code to read');
+  const started = await hook('session-start', { session_id: 'desk-1', cwd: '/nowhere' }, { PELAGO_AGENT_TOKEN: robot });
+  assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, /registered in Archipelago/, 'the server\u2019s answer comes back for Claude Code to read');
   // A project whose files are not the ones the server now hands out is told so, with the command that brings them up to date.
   const { SETUP_VERSION, setupScript } = await import('../src/connect.ts');
-  const behind = /Lattice files \(hooks, working rules, the bump skill\) are older than the server\u2019s|are older than the server's[^]*connect\/setup\.mjs/;
+  const behind = /Archipelago files \(hooks, working rules, the bump skill\) are older than the server\u2019s|are older than the server's[^]*connect\/setup\.mjs/;
   assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, behind, 'the script in this repository is not a hand-out: it says no version');
   const current = (await call('/hooks/session-start', robot, { session_id: 'desk-1', cwd: '/nowhere', setup: SETUP_VERSION })).hookSpecificOutput.additionalContext;
   assert.doesNotMatch(current, /older than the server/);
@@ -625,11 +688,11 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
   const open = (await call('/agent/view', robot, { name: 'sessions' })).result.open;
   assert.deepEqual(open.map((s: any) => s.surface), ['claude-code'], 'and the session is on that server\u2019s map');
   // At the end of a turn the session's count so far goes to its run: one long turn is not a session without tokens.
-  const transcript = join(mkdtempSync(join(tmpdir(), 'lattice-transcript-')), 'desk-1.jsonl');
+  const transcript = join(mkdtempSync(join(tmpdir(), 'pelago-transcript-')), 'desk-1.jsonl');
   writeFileSync(transcript, JSON.stringify({ type: 'assistant', uuid: 'a1', message: { id: 'm1', usage: { input_tokens: 1200, output_tokens: 300 } } }) + '\n');
-  assert.deepEqual([(await hook('stop', { session_id: 'desk-1', transcript_path: transcript }, { LATTICE_AGENT_TOKEN: robot })).out, open.length], ['{}', 1]);
+  assert.deepEqual([(await hook('stop', { session_id: 'desk-1', transcript_path: transcript }, { PELAGO_AGENT_TOKEN: robot })).out, open.length], ['{}', 1]);
   assert.equal((await call('/agent/get', robot, { id: open[0].id })).result.entity.props.tokens_used, 1500);
-  await hook('session-end', { session_id: 'desk-1', reason: 'exit' }, { LATTICE_AGENT_TOKEN: robot });
+  await hook('session-end', { session_id: 'desk-1', reason: 'exit' }, { PELAGO_AGENT_TOKEN: robot });
   assert.equal((await call('/agent/view', robot, { name: 'sessions' })).result.open.length, 0, 'and is closed there');
 
   // A client with an old tool list sends an input it does not know as a string: it is taken as what it spells.
@@ -644,28 +707,34 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
   // Refused or unreachable, it says so and still lets the session go on.
   const refused = await hook('prompt', { session_id: 'desk-1' }, {});
   assert.deepEqual([refused.code, refused.out, /answered 401/.test(refused.err)], [0, '', true]);
-  const away = await hook('prompt', { session_id: 'desk-1' }, { LATTICE_URL: 'http://127.0.0.1:9' });
+  const away = await hook('prompt', { session_id: 'desk-1' }, { PELAGO_URL: 'http://127.0.0.1:9' });
   assert.deepEqual([away.code, away.out, /did not answer/.test(away.err)], [0, '', true]);
 });
 
 test('beyond this machine the server needs tokens, and answers only to the names it is given', async () => {
   const before = { ...process.env };
   after(() => {
-    for (const key of ['LATTICE_HOST', 'LATTICE_AUTH', 'LATTICE_DEV', 'LATTICE_PUBLIC_HOST', 'PORT', 'LATTICE_PORT']) {
+    for (const key of ['PELAGO_HOST', 'PELAGO_AUTH', 'PELAGO_DEV', 'PELAGO_PUBLIC_HOST', 'PORT', 'PELAGO_PORT', 'LATTICE_HOST', 'LATTICE_AUTH']) {
       if (before[key] === undefined) delete process.env[key];
       else process.env[key] = before[key];
     }
   });
-  for (const key of ['LATTICE_AUTH', 'LATTICE_DEV', 'LATTICE_PORT']) delete process.env[key];
+  for (const key of ['PELAGO_AUTH', 'PELAGO_DEV', 'PELAGO_PORT']) delete process.env[key];
+  // A server set up while this was called Lattice is still started with those names, and they are still read.
   process.env.LATTICE_HOST = '0.0.0.0';
   assert.throws(() => loadConfig(), /needs auth "tokens"/);
   process.env.LATTICE_AUTH = 'tokens';
-  process.env.LATTICE_PUBLIC_HOST = 'Lattice.Example.com, other.example.com';
+  assert.deepEqual([loadConfig().host, loadConfig().auth], ['0.0.0.0', 'tokens']);
+  for (const key of ['LATTICE_HOST', 'LATTICE_AUTH']) delete process.env[key];
+  process.env.PELAGO_HOST = '0.0.0.0';
+  assert.throws(() => loadConfig(), /needs auth "tokens"/);
+  process.env.PELAGO_AUTH = 'tokens';
+  process.env.PELAGO_PUBLIC_HOST = 'Pelago.Example.com, other.example.com';
   process.env.PORT = '10000';
   const hosted = loadConfig();
-  assert.deepEqual([hosted.host, hosted.port, hosted.publicHosts, hosted.launch], ['0.0.0.0', 10000, ['lattice.example.com', 'other.example.com'], false], 'and it does not launch sessions');
+  assert.deepEqual([hosted.host, hosted.port, hosted.publicHosts, hosted.launch], ['0.0.0.0', 10000, ['pelago.example.com', 'other.example.com'], false], 'and it does not launch sessions');
 
-  const workspaces = new Workspaces({ dataDir: null, rootDir: join(mkdtempSync(join(tmpdir(), 'lattice-public-')), 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
+  const workspaces = new Workspaces({ dataDir: null, rootDir: join(mkdtempSync(join(tmpdir(), 'pelago-public-')), 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
   const server = createHttpServer(workspaces, 0, { auth: 'tokens', publicHosts: hosted.publicHosts });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   closers.push(async () => {
@@ -673,7 +742,7 @@ test('beyond this machine the server needs tokens, and answers only to the names
     await workspaces.closeAll();
   });
   const port = (server.address() as AddressInfo).port;
-  const owner = await createToken((await workspaces.get('default')).lattice.db, 'default', { kind: 'human', name: 'owner', admin: true });
+  const owner = await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'owner', admin: true });
   const ask = (host: string) =>
     new Promise<number>((done) => {
       const req = request({ port, host: '127.0.0.1', path: '/api/schema', method: 'POST', headers: { host, 'content-type': 'application/json', authorization: `Bearer ${owner.token}` } }, (res) => {
@@ -682,7 +751,7 @@ test('beyond this machine the server needs tokens, and answers only to the names
       });
       req.end('{}');
     });
-  assert.equal(await ask('lattice.example.com'), 200, 'its public name');
+  assert.equal(await ask('pelago.example.com'), 200, 'its public name');
   assert.equal(await ask('evil.example.net'), 403, 'any other name');
 });
 
@@ -703,15 +772,15 @@ test('the operator can create a workspace from a backup file: the map, its types
   const { workspaces, call } = await serve('tokens');
   const operator = workspaces.ensureOperator()!;
   const main = await workspaces.get('default');
-  const old = (await createToken(main.lattice.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const old = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const me = (await call('/api/init', old, { name: 'Alex' })).result.me as string;
   await call('/api/change', old, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
   await call('/api/change', old, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }] });
 
-  const taken = await dump(main.lattice.db, { id: 'default', name: 'Default' }, JSON.parse(readFileSync(join(workspaces.config.packsDir, 'local', 'pack.json'), 'utf8')));
+  const taken = await dump(main.pelago.db, { id: 'default', name: 'Default' }, JSON.parse(readFileSync(join(workspaces.config.packsDir, 'local', 'pack.json'), 'utf8')));
   const backup = gzipSync(JSON.stringify(taken)).toString('base64');
   assert.equal((await call('/operator/workspaces', old, { id: 'moved', backup })).status, 401, 'only the operator');
-  assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: 'bm90IGEgYmFja3Vw' })).error, /not a Lattice backup/);
+  assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: 'bm90IGEgYmFja3Vw' })).error, /not an Archipelago backup/);
   assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: gzipSync(JSON.stringify({ ...taken, tables: { ...taken.tables, relation: [{ id: 'r_x', type: 'part_of', from_id: 'e_nobody', to_id: 'e_nowhere' }] } })).toString('base64') })).error, /./, 'a backup that does not go in');
   assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.map((w: any) => w.id), ['default'], 'a failed one leaves no workspace behind');
   assert.equal(existsSync(join(workspaces.config.rootDir, 'moved')), false);
@@ -723,7 +792,7 @@ test('the operator can create a workspace from a backup file: the map, its types
   assert.equal((await call('/api/workspace_info', made.owner_token)).result.owner.title, 'Alex');
   const found = (await call('/api/search', made.owner_token, { type: 'local.site_visit' })).result as any[];
   assert.deepEqual(found.map((e) => e.title), ['Visit the quarry'], 'with the types it defined for itself');
-  assert.equal((await call('/whoami', old.replace('lat_default_', 'lat_moved_'), undefined, 'GET')).status, 401, 'tokens from where it came from do not work here');
+  assert.equal((await call('/whoami', old.replace('pel_default_', 'pel_moved_'), undefined, 'GET')).status, 401, 'tokens from where it came from do not work here');
   const tokens = (await call('/api/token_list', made.owner_token)).result as any[];
   assert.deepEqual(tokens.filter((t) => !t.revoked_at).map((t) => t.name), ['owner']);
 
@@ -762,17 +831,17 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'task', title: 'Order the stone' }] });
   const laptop = await workspaces.get('laptop');
-  const taken = await dump(laptop.lattice.db, { id: 'laptop', name: 'Laptop' }, JSON.parse(readFileSync(join(workspaces.config.rootDir, 'laptop', 'local-pack', 'pack.json'), 'utf8')));
+  const taken = await dump(laptop.pelago.db, { id: 'laptop', name: 'Laptop' }, JSON.parse(readFileSync(join(workspaces.config.rootDir, 'laptop', 'local-pack', 'pack.json'), 'utf8')));
   const backup = gzipSync(JSON.stringify(taken)).toString('base64');
 
   const main = await workspaces.get('default');
-  const admin = (await createToken(main.lattice.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const admin = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const member = (await call('/api/member_add', admin, { name: 'Sam' })).result.token as string;
-  const robot = (await createToken(main.lattice.db, 'default', { kind: 'agent', name: 'robot' })).token;
+  const robot = (await createToken(main.pelago.db, 'default', { kind: 'agent', name: 'robot' })).token;
   await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Already here', visibility: 'shared' }] });
   assert.match((await call('/api/import_backup', member, { backup })).error, /Only a workspace admin/);
   assert.match((await call('/agent/import_backup', robot, { backup })).error, /humans only/);
-  assert.match((await call('/api/import_backup', admin, { backup: 'bm90IGEgYmFja3Vw' })).error, /not a Lattice backup/);
+  assert.match((await call('/api/import_backup', admin, { backup: 'bm90IGEgYmFja3Vw' })).error, /not an Archipelago backup/);
 
   const { latest } = (await call('/agent/watch', robot)).result;
   const preview = (await call('/api/import_backup', admin, { backup })).result;
@@ -795,9 +864,9 @@ test('an import can make the owner in the file and the owner here one person, an
   const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
   const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'From the laptop', owner: theirs }] });
-  const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).lattice.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');
+  const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).pelago.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');
 
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const mine = (await call('/api/init', alex, { name: 'Alex R' })).result.me as string;
   await call('/api/change', alex, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Mine alone' }] });
@@ -822,7 +891,7 @@ test('an import can make the owner in the file and the owner here one person, an
 
 test('GitHub tells the map of a push: it is recorded against its repository, and what a commit says it finished is proposed closed', async () => {
   const { workspaces, call, base } = await serve('tokens');
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
   const made = (
@@ -954,7 +1023,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
       return Boolean(sig) && createVerify('RSA-SHA256').update(`${head}.${body}`).verify(publicKey, sig, 'base64url') && JSON.parse(Buffer.from(body, 'base64url').toString()).iss === '7';
     };
     asked.push(`${req.method} ${req.url}`);
-    if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return say(201, { id: 7, slug: 'lattice-test', name: 'Lattice (test)', pem, webhook_secret: 'whsec' });
+    if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return say(201, { id: 7, slug: 'pelago-test', name: 'Archipelago (test)', pem, webhook_secret: 'whsec' });
     if (req.url === '/app/installations/42') return isApp() ? say(200, { account: { login: 'acme' } }) : say(401, { message: 'Bad credentials' });
     if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
     if (req.url?.startsWith('/repos/Acme/Tools/compare/')) return bearer === 'ghs_forty-two' ? say(200, { commits: [{ sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools\n\nThe whetstone still needs oiling.', author: { name: 'sam' } } }], files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1 }] }) : say(401, { message: 'Bad credentials' });
@@ -968,7 +1037,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
 
   let theApp: GithubApp | undefined;
   const { workspaces, call, base } = await serve('tokens', (origin) => (theApp ??= new GithubApp({ dir: null, origin, api: hubAt, web: 'https://github.test' })));
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
   await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site.git' } }] });
@@ -987,11 +1056,11 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.equal((await page('/github/app/created?code=thecode&state=not-ours')).status, 400, 'a code is taken only from someone who started here');
   assert.equal((await page(`/github/app/created?code=thecode&state=${state}`)).status, 302);
   assert.equal((await page(`/github/app/created?code=thecode&state=${state}`)).status, 400, 'and once');
-  assert.deepEqual((await call('/api/github_app', admin)).result.app, { slug: 'lattice-test', name: 'Lattice (test)' });
+  assert.deepEqual((await call('/api/github_app', admin)).result.app, { slug: 'pelago-test', name: 'Archipelago (test)' });
 
   // 2. A workspace connects: its admin is sent to choose repositories, and comes back with the installation.
   const connect = (await call('/api/github_app', admin, { connect: true })).result.url as string;
-  assert.match(connect, /^https:\/\/github\.test\/apps\/lattice-test\/installations\/new\?state=[0-9a-f]+$/);
+  assert.match(connect, /^https:\/\/github\.test\/apps\/pelago-test\/installations\/new\?state=[0-9a-f]+$/);
   assert.equal((await page('/github/app/installed?installation_id=42&state=guessed')).status, 400);
   assert.equal((await page(`/github/app/installed?installation_id=42&${connect.split('?')[1]}`)).status, 302);
   assert.deepEqual((await call('/api/github_app', admin)).result.installation, { id: '42', account: 'acme' });
@@ -1070,7 +1139,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.deepEqual((await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result.recorded, false);
   // A push recorded while its reading was cut off (the server stopped) has no run: the next server reads it, with any
   // pushed before it that were not read either, as one. What was read, even badly, is not read again.
-  const whole = (await workspaces.get('default')).lattice;
+  const whole = (await workspaces.get('default')).pelago;
   const app = (await call('/api/github_app', admin)).result;
   assert.equal(app.installation.id, '42');
   await whole.log(whole.db, { actor: 'github:sam', action: 'repo.push', target: heard.repo.id, origin: 'github', reason: '1 commit to main: Hone', detail: { repo: 'acme/tools', branch: 'main', before: 'b'.repeat(40), after: 'c'.repeat(40), commits: [{ sha: 'ccccccc' }] } });
@@ -1100,7 +1169,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
 
 test('an agent\'s token can be limited to some repositories, and its owner hears when a token is used from a new place', async () => {
   const { workspaces, call, base } = await serve('tokens');
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const made = (
     await call('/api/change', admin, {
@@ -1197,10 +1266,10 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
   const sessions = async () => (await call('/agent/view', free, { name: 'sessions' })).result.open.map((s: any) => s.title);
   const before = await sessions();
   const elsewhere = await call('/hooks/session-start', site, { session_id: 'desk-books', cwd: '/x', remote: 'https://github.com/acme/books.git' });
-  assert.match(elsewhere.hookSpecificOutput.additionalContext, /limited to some repositories[^]*not registered in Lattice/);
+  assert.match(elsewhere.hookSpecificOutput.additionalContext, /limited to some repositories[^]*not registered in Archipelago/);
   assert.deepEqual(await sessions(), before, 'nothing was registered');
   const here = await call('/hooks/session-start', site, { session_id: 'desk-site', cwd: '/x', remote: 'https://github.com/acme/site.git' });
-  assert.match(here.hookSpecificOutput.additionalContext, /registered in Lattice[^]*Site repo/);
+  assert.match(here.hookSpecificOutput.additionalContext, /registered in Archipelago[^]*Site repo/);
   // A session another token registered in another repository is not ended, or counted for, by this one.
   await call('/hooks/session-start', free, { session_id: 'desk-other', cwd: '/x', remote: 'https://github.com/acme/books.git' });
   assert.equal((await sessions()).length, before.length + 2);
@@ -1224,7 +1293,7 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
 
 test('a workspace chooses whether agents’ changes are applied as made or held, the answer to a question with them', async () => {
   const { workspaces, call } = await serve('tokens');
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const member = (await createToken(db, 'default', { kind: 'human', name: 'sam' })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
@@ -1418,12 +1487,12 @@ test('the hook says which repository a session is in without the name and passwo
   });
   await new Promise<void>((r) => listener.listen(0, '127.0.0.1', r));
   closers.push(async () => void listener.close());
-  const project = mkdtempSync(join(tmpdir(), 'lattice-checkout-'));
+  const project = mkdtempSync(join(tmpdir(), 'pelago-checkout-'));
   const git = (...args: string[]) => new Promise<void>((done, fail) => spawn('git', ['-C', project, ...args], { stdio: 'ignore' }).on('close', (code) => (code === 0 ? done() : fail(new Error(`git ${args[0]} failed`)))).on('error', fail));
   await git('init', '--quiet');
   await git('remote', 'add', 'origin', 'https://someone:ghp_notforanyone@github.com/acme/site.git');
   await new Promise<void>((done) => {
-    const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'lattice-hook.mjs'), 'session-start'], { env: { ...process.env, LATTICE_URL: `http://127.0.0.1:${(listener.address() as AddressInfo).port}`, LATTICE_AGENT_TOKEN: '' }, stdio: ['pipe', 'ignore', 'ignore'] });
+    const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'pelago-hook.mjs'), 'session-start'], { env: { ...process.env, PELAGO_URL: `http://127.0.0.1:${(listener.address() as AddressInfo).port}`, PELAGO_AGENT_TOKEN: '' }, stdio: ['pipe', 'ignore', 'ignore'] });
     child.on('close', () => done());
     child.stdin!.end(JSON.stringify({ session_id: 'desk-2', cwd: project }));
   });
@@ -1452,7 +1521,7 @@ test('where a request came from is what the trusted proxies say, not what the ca
   assert.equal(clientAddress(undefined, undefined, bare), '');
   // Other proxies are named as networks; what is not one is refused when the server starts.
   assert.equal(clientAddress('198.51.100.7, 192.0.2.9', '10.0.3.4', trustedProxies('192.0.2.0/24, 2001:db8:1::/48')), '198.51.100.7');
-  assert.throws(() => trustedProxies('cloudfront'), /LATTICE_TRUSTED_PROXIES: "cloudfront" is not an address/);
+  assert.throws(() => trustedProxies('cloudfront'), /PELAGO_TRUSTED_PROXIES: "cloudfront" is not an address/);
 
   // On a server: a caller who claims a new address with every request is still one caller.
   const { base } = await serve('tokens', undefined, { open: { each: 3 } });
@@ -1464,9 +1533,9 @@ test('where a request came from is what the trusted proxies say, not what the ca
 
 test('refused tokens are counted by address, a backup unpacks only so far, and the UI comes with a policy for what it may load', async () => {
   const { base, call, workspaces } = await serve('tokens', undefined, { refused: { each: 3 } });
-  const db = (await workspaces.get('default')).lattice.db;
+  const db = (await workspaces.get('default')).pelago.db;
   const good = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
-  const wrong = `lat_default_${'0'.repeat(40)}`;
+  const wrong = `pel_default_${'0'.repeat(40)}`;
   const from = (token: string | undefined, address: string) =>
     fetch(`${base}/agent/search`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': address, ...(token && { authorization: `Bearer ${token}` }) }, body: '{}' }).then((r) => r.status);
   // Three refusals from one address, and the fourth request is not looked at, whatever token it carries.
@@ -1479,7 +1548,7 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   // A file that unpacks to more than a backup is taken to be is refused before it is read.
   const { parseBackup } = await import('../src/backup.ts');
   assert.throws(() => parseBackup(gzipSync(Buffer.alloc(257_000_000, 0x20))), /unpacks to more than 256 MB/);
-  assert.throws(() => parseBackup(Buffer.from('not a backup')), /not a Lattice backup file/);
+  assert.throws(() => parseBackup(Buffer.from('not a backup')), /not an Archipelago backup file/);
 
   // The page may load its own script and stylesheet and talk to this server; the public page has its own, stricter still.
   const page = await fetch(base + '/');

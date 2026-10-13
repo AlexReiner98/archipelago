@@ -4,7 +4,7 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { newId, type Q } from './db.ts';
-import type { Actor } from './lattice.ts';
+import type { Actor } from './pelago.ts';
 
 export interface Identity {
   /** Carries the token's person, admin flag and id along with kind and name. */
@@ -47,9 +47,9 @@ export const validWorkspaceId = (id: string) => WORKSPACE_ID.test(id);
 
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 
-/** Which workspace a token claims to be for. Says nothing about whether it is valid. */
+/** Which workspace a token claims to be for. Says nothing about whether it is valid. One made while this was called Lattice begins lat_. */
 export function workspaceOf(token: string): string | undefined {
-  const match = /^lat_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}$/.exec(token);
+  const match = /^(?:pel|lat)_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}$/.exec(token);
   return match?.[1];
 }
 
@@ -61,7 +61,7 @@ export function bearer(header: string | undefined): string | undefined {
 export async function createToken(db: Q, workspace: string, input: { kind: 'human' | 'agent'; name: string; entity?: string; expires_days?: number; admin?: boolean; repos?: string[] }) {
   if (!validWorkspaceId(workspace)) throw new Error(`Invalid workspace id "${workspace}"`);
   if (!input.name.trim()) throw new Error('A token needs a name: who or what will use it.');
-  const token = `lat_${workspace}_${randomBytes(20).toString('hex')}`;
+  const token = `pel_${workspace}_${randomBytes(20).toString('hex')}`;
   const id = newId('k');
   await db.query(
     `insert into token (id, hash, hint, kind, name, entity_id, admin, expires_at, repos)
@@ -121,7 +121,7 @@ export async function hasHumanToken(db: Q): Promise<boolean> {
 
 /** For the one secret kept outside any workspace: the operator's. */
 export const hashSecret = hash;
-/** Written by `lattice operator-reset`, in the folder that holds the workspaces. */
+/** Written by `pelago operator-reset`, in the folder that holds the workspaces. */
 export const OPERATOR_RESET_FILE = 'operator-reset';
 export const newSecret = (prefix: string) => `${prefix}_${randomBytes(24).toString('hex')}`;
 export function sameSecret(given: string, expectedHash: string): boolean {

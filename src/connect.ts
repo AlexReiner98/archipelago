@@ -1,7 +1,7 @@
-// What a machine with no Lattice checkout needs to work with this server: the
+// What a machine with no Archipelago checkout needs to work with this server: the
 // hook script, the friction skill and the working rules are files in this
 // repository, so the server hands them out, wrapped in one script that puts
-// each where Claude Code looks for it (scripts/lattice-setup.mjs). Nothing in
+// each where Claude Code looks for it (scripts/pelago-setup.mjs). Nothing in
 // it is secret: the token stays in the machine's environment.
 
 import { createHash } from 'node:crypto';
@@ -18,7 +18,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
  * says it with every call, so a session can be told its project is behind.
  */
 export const SETUP_VERSION = createHash('sha256')
-  .update(['scripts/lattice-hook.mjs', '.claude/skills/lattice-bump/SKILL.md', 'examples/working-rules.md', 'scripts/lattice-setup.mjs'].map(read).join('\n'))
+  .update(['scripts/pelago-hook.mjs', '.claude/skills/pelago-bump/SKILL.md', 'examples/working-rules.md', 'scripts/pelago-setup.mjs'].map(read).join('\n'))
   .digest('hex')
   .slice(0, 12);
 
@@ -29,10 +29,10 @@ export const setupCommand = (origin: string) => `node -e "fetch('${origin}/conne
 export function setupScript(origin: string): string {
   const files = {
     // Away from this repository the hook has no local server to fall back on: it calls the one that handed it out.
-    hook: read('scripts/lattice-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin)).replace(`const SETUP = '';`, `const SETUP = '${SETUP_VERSION}';`),
-    skill: read('.claude/skills/lattice-bump/SKILL.md'),
-    home: `# Where bumps live\n\nWorkspace: ${origin}.\n\nFind the feature that gathers friction with Lattice by search (type \`software.feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Lattice itself.\n`,
+    hook: read('scripts/pelago-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin)).replace(`const SETUP = '';`, `const SETUP = '${SETUP_VERSION}';`),
+    skill: read('.claude/skills/pelago-bump/SKILL.md'),
+    home: `# Where bumps live\n\nWorkspace: ${origin}.\n\nFind the feature that gathers friction with Archipelago by search (type \`software.feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,
     rules: read('examples/working-rules.md'),
   };
-  return `const ORIGIN = ${JSON.stringify(origin)};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/lattice-setup.mjs')}`;
+  return `const ORIGIN = ${JSON.stringify(origin)};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-setup.mjs')}`;
 }

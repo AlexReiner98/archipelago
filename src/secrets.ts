@@ -4,7 +4,7 @@
 // key that is never in a database or a backup, so a backup file, a copy of it
 // off the server, or a database read on its own gives up none of them.
 //
-// The sealing key is LATTICE_SECRETS_KEY when that is set (32 bytes, base64:
+// The sealing key is PELAGO_SECRETS_KEY when that is set (32 bytes, base64:
 // the stronger arrangement, since the key is then not on the server's disk at
 // all), and otherwise a file made on first use beside the workspaces
 // (secrets.key, for the server's own eyes). A value sealed with either can be
@@ -15,6 +15,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { env } from './env.ts';
 
 const MARK = 'sealed:v1:';
 let dir: string | null = null;
@@ -27,10 +28,10 @@ export function configureSecrets(folder: string | null): void {
 }
 
 function fromEnv(): Buffer | undefined {
-  const given = process.env.LATTICE_SECRETS_KEY?.trim();
+  const given = env('SECRETS_KEY')?.trim();
   if (!given) return undefined;
   const key = Buffer.from(given, 'base64');
-  if (key.length !== 32) throw new Error('LATTICE_SECRETS_KEY must be 32 bytes in base64 (for example: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))").');
+  if (key.length !== 32) throw new Error('PELAGO_SECRETS_KEY must be 32 bytes in base64 (for example: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))").');
   return key;
 }
 

@@ -4,7 +4,7 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { actorId, bodyAfter, type Actor, type Lattice } from './lattice.ts';
+import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
@@ -109,7 +109,7 @@ export interface Tool {
   humanOnly?: boolean;
   /** Exists only when the server runs in dev mode. */
   devOnly?: boolean;
-  run(l: Lattice, actor: Actor, input: any): Promise<unknown>;
+  run(l: Archipelago, actor: Actor, input: any): Promise<unknown>;
 }
 
 /** The server's GitHub App, when it can have one. Set by the server. */
@@ -147,13 +147,13 @@ export interface HumanChange {
   changes?: unknown;
 }
 
-export async function latestSeq(l: Lattice): Promise<number> {
+export async function latestSeq(l: Archipelago): Promise<number> {
   const { rows } = await l.db.query<{ seq: number }>(`select coalesce(max(seq), 0)::int as seq from event`);
   return rows[0].seq;
 }
 
 /** What humans have done since an event, oldest first: their edits, decisions, approvals and rejections. Reading a notification is not news. */
-export async function humanChanges(l: Lattice, after: number): Promise<HumanChange[]> {
+export async function humanChanges(l: Archipelago, after: number): Promise<HumanChange[]> {
   const { rows } = await l.db.query<{ seq: number; ts: string; actor: string; action: string; target_id: string | null; type: string | null; title: string | null; reason: string | null; detail: Record<string, unknown> | null }>(
     `select e.seq::int as seq, e.ts, e.actor, e.action, e.target_id, t.type, t.title, e.reason, e.detail
      from event e left join entity t on t.id = e.target_id
@@ -207,8 +207,8 @@ interface Focus {
 // Kept in memory, per workspace and per person: it is where to look right now,
 // not a fact about the map, and it means nothing after a restart.
 const focus = new Map<string, Focus>();
-const focusKey = (l: Lattice) => `${l.workspace}:${l.viewer ?? ''}`;
-function point(l: Lattice, actor: Actor, hash: string, note?: string): Focus {
+const focusKey = (l: Archipelago) => `${l.workspace}:${l.viewer ?? ''}`;
+function point(l: Archipelago, actor: Actor, hash: string, note?: string): Focus {
   const next = { at: Date.now(), hash, actor: actor.name, note };
   focus.set(focusKey(l), next);
   return next;
@@ -360,7 +360,7 @@ export const TOOLS: Record<string, Tool> = {
       actor: z.string().optional().describe('e.g. "agent:claude" or "human:local".'),
       by: z.string().optional().describe('Only what this actor did, e.g. "agent:reader" or "human:owner". For an agent, whose own name travels as actor, this is the filter.'),
       before: z.number().int().positive().optional().describe('Only events older than this seq: the seq of the oldest event of the answer before, to read the log back a page at a time.'),
-      origin: z.enum(['lattice', 'external', 'github']).optional(),
+      origin: z.enum(['pelago', 'external', 'github']).optional(),
       limit: z.number().int().positive().optional(),
       full: FULL,
     },
@@ -638,7 +638,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   run_report: {
     description:
-      'Record a run that happened where Lattice cannot watch it, once it is over: the agent in GitHub Actions that read a push or re-checked the map says what it was, how it ended and what it used. Kept as a run that has ended, in its repository. Takes effect at once.',
+      'Record a run that happened where Archipelago cannot watch it, once it is over: the agent in GitHub Actions that read a push or re-checked the map says what it was, how it ended and what it used. Kept as a run that has ended, in its repository. Takes effect at once.',
     input: {
       repo: z.string().describe('The repository it ran for: its id or its GitHub name "owner/name".'),
       title: z.string().min(1).describe('What the run was, in a few words.'),
@@ -938,7 +938,7 @@ export const TOOLS: Record<string, Tool> = {
          where r.to_id = any($1::text[]) and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.title like '% settled "%'`,
         [answered],
       );
-      if (rows.length) await l.apply('agent:lattice', { ops: rows.map((n) => ({ op: 'update' as const, id: n.id, status: 'read' })), reason: 'Put to the owner and answered in chat' });
+      if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n) => ({ op: 'update' as const, id: n.id, status: 'read' })), reason: 'Put to the owner and answered in chat' });
       return { confirmed_upto: input.upto, questions: answered.length, left: (await toConfirm(l)).count };
     },
   },
@@ -980,7 +980,7 @@ export const TOOLS: Record<string, Tool> = {
 };
 
 /** Validate input and run a tool. */
-export async function callTool(l: Lattice, actor: Actor, name: string, input: unknown): Promise<unknown> {
+export async function callTool(l: Archipelago, actor: Actor, name: string, input: unknown): Promise<unknown> {
   const tool = TOOLS[name];
   if (!tool) throw new Error(`No tool "${name}". Tools: ${Object.keys(TOOLS).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);

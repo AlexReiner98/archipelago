@@ -7,7 +7,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { newSecret } from './auth.ts';
-import type { Entity, Lattice } from './lattice.ts';
+import type { Entity, Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
 
 /** The setting that holds a workspace's webhook secret. GitHub signs with it, so it cannot be kept as a hash: it is sealed. */
@@ -25,14 +25,14 @@ export function repoName(remote: string | undefined): string | undefined {
 }
 
 /** The repository in the map whose remote is this GitHub repository. */
-export async function repoByName(l: Lattice, name: string | undefined): Promise<Entity | undefined> {
+export async function repoByName(l: Archipelago, name: string | undefined): Promise<Entity | undefined> {
   if (!name || !l.registry.type('software.repo')) return undefined;
   const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and props ? 'remote'`, [l.registry.family('software.repo')]);
   return rows.find((r) => repoName(r.props.remote as string) === name.toLowerCase());
 }
 
 /** When each repository was last pushed to, as GitHub told us. */
-export async function lastPushes(l: Lattice): Promise<Map<string, { at: string; branch: string; head?: string; subject: string }>> {
+export async function lastPushes(l: Archipelago): Promise<Map<string, { at: string; branch: string; head?: string; subject: string }>> {
   const { rows } = await l.db.query<{ target_id: string; ts: string; reason: string; detail: { branch?: string; after?: string } }>(
     // A tag, or a branch that was deleted, is heard but is not a push of work to a branch.
     `select distinct on (target_id) target_id, ts, reason, detail from event
@@ -42,7 +42,7 @@ export async function lastPushes(l: Lattice): Promise<Map<string, { at: string; 
   return new Map(rows.map((r) => [r.target_id, { at: r.ts, branch: r.detail?.branch ?? '', head: r.detail?.after?.slice(0, 7), subject: r.reason }]));
 }
 
-export async function githubStatus(l: Lattice) {
+export async function githubStatus(l: Archipelago) {
   const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null order by title`, [l.registry.family('software.repo')]);
   const pushes = await lastPushes(l);
   return {
@@ -53,14 +53,14 @@ export async function githubStatus(l: Lattice) {
 }
 
 /** Make (or replace) the secret GitHub signs its deliveries with. Returned once. */
-export async function newGithubSecret(l: Lattice): Promise<string> {
+export async function newGithubSecret(l: Archipelago): Promise<string> {
   const secret = newSecret('latgh');
   await l.setSecret(SECRET, secret);
   return secret;
 }
 
 /** Whether a delivery was signed with this workspace's secret (the X-Hub-Signature-256 header). */
-export async function signedByGithub(l: Lattice, body: Buffer, header: string | string[] | undefined): Promise<boolean> {
+export async function signedByGithub(l: Archipelago, body: Buffer, header: string | string[] | undefined): Promise<boolean> {
   const secret = await l.secret(SECRET);
   if (!secret || typeof header !== 'string') return false;
   const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`);
@@ -132,7 +132,7 @@ export function finishedBy(message: string): string[] {
  * recorded with the push and the human is told, so the commits in it can be
  * read; it cannot be filled in from here.
  */
-export async function receivePush(l: Lattice, payload: PushPayload, delivery?: string) {
+export async function receivePush(l: Archipelago, payload: PushPayload, delivery?: string) {
   const name = payload.repository?.full_name?.toLowerCase();
   const repo = await repoByName(l, name);
   if (!repo) return { recorded: false, reason: `No repository in this map has the remote github.com/${name}. Give one that address and pushes to it will be recorded.` };

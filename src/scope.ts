@@ -7,10 +7,10 @@
 // read are named, and anything else is refused.
 
 import { repoByName, repoName } from './github.ts';
-import type { Actor, Lattice, Op } from './lattice.ts';
+import type { Actor, Archipelago, Op } from './pelago.ts';
 import { repoScope } from './views.ts';
 
-export async function withinScope(l: Lattice, actor: Actor, tool: string, input: Record<string, unknown>): Promise<void> {
+export async function withinScope(l: Archipelago, actor: Actor, tool: string, input: Record<string, unknown>): Promise<void> {
   const repos = actor.repos ?? [];
   if (!repos.length) return;
   const scope = new Set<string>();
@@ -115,7 +115,7 @@ export async function withinScope(l: Lattice, actor: Actor, tool: string, input:
 const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show'];
 
 /** The tests of some work: those in it, and those that help answer a proof question in it. */
-async function testsOf(l: Lattice, scope: Set<string>): Promise<Set<string>> {
+async function testsOf(l: Archipelago, scope: Set<string>): Promise<Set<string>> {
   const { rows } = await l.db.query<{ id: string; question: string | null }>(
     `select e.id, a.to_id as question from entity e left join relation a on a.from_id = e.id and a.type = 'software.answers' and a.valid_to is null
      where e.type = any($1::text[]) and e.archived_at is null`,

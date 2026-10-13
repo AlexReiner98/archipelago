@@ -76,7 +76,7 @@
       "fields": {
         "build": { "type": "string", "description": "The version or commit the test ran on." },
         "passed": { "type": "boolean" },
-        "picture": { "type": "string", "description": "Where the picture the test drew is: a path in the repository it ran in, under its .proof folder, which git ignores. The file itself is sent to Lattice (picture_put) only when the result is shown in public." }
+        "picture": { "type": "string", "description": "Where the picture the test drew is: a path in the repository it ran in, under its .proof folder, which git ignores. The file itself is sent to Archipelago (picture_put) only when the result is shown in public." }
       }
     },
     {

@@ -9,7 +9,7 @@ import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createToken, revokeToken } from './auth.ts';
-import type { Actor, Lattice } from './lattice.ts';
+import type { Actor, Archipelago } from './pelago.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { VIEWS } from './views.ts';
 
@@ -22,12 +22,12 @@ const MODE_NOTE: Record<LaunchMode, string> = {
     'You are running unattended and may edit files in this repository. Do not commit, push or delete anything. Do not use a live application unless this brief says its resource is claimed for you. Finish with a summary of what you changed and what is left.',
 };
 
-// The lattice tools a launched session may call unprompted. `change` is safe
+// The pelago tools a launched session may call unprompted. `change` is safe
 // here because agent changes are held as proposals.
-const ALLOWED_TOOLS = ['session_update', 'schema', 'search', 'get', 'view', 'events', 'change', 'claim', 'release', 'notify'].map((t) => `mcp__lattice__${t}`).join(',');
+const ALLOWED_TOOLS = ['session_update', 'schema', 'search', 'get', 'view', 'events', 'change', 'claim', 'release', 'notify'].map((t) => `mcp__pelago__${t}`).join(',');
 
 interface LauncherConfig {
-  /** The lattice MCP endpoint to give the session. */
+  /** The pelago MCP endpoint to give the session. */
   mcpUrl: string;
   /** Where transcripts and the MCP config file are written. */
   dir: string;
@@ -44,7 +44,7 @@ export function configureLauncher(next: LauncherConfig): void {
   config = next;
 }
 
-export async function launch(l: Lattice, actor: Actor, input: { task: string; mode?: LaunchMode; instructions?: string }) {
+export async function launch(l: Archipelago, actor: Actor, input: { task: string; mode?: LaunchMode; instructions?: string }) {
   if (actor.kind !== 'human') throw new Error('Only a human can launch a session.');
   if (!config) throw new Error('Launching is off on this server. It starts Claude Code in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
   const mode = input.mode ?? 'plan';
@@ -73,14 +73,14 @@ export async function launch(l: Lattice, actor: Actor, input: { task: string; mo
   // revoked the moment it ends.
   const key = config.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined }) : undefined;
   const mcpFile = join(config.dir, `${run}.mcp.json`);
-  writeFileSync(mcpFile, JSON.stringify({ mcpServers: { lattice: { type: 'http', url: config.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
+  writeFileSync(mcpFile, JSON.stringify({ mcpServers: { pelago: { type: 'http', url: config.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
   const transcript = join(config.dir, `${run}.jsonl`);
   const prompt = [
     brief.text,
     '',
     '## How you are running',
     MODE_NOTE[mode],
-    `Your Lattice run id is ${run}; it is already registered and will be closed for you. Use the lattice session_update tool (run ${run}) for anything the owner should know along the way.`,
+    `Your Archipelago run id is ${run}; it is already registered and will be closed for you. Use the pelago session_update tool (run ${run}) for anything the owner should know along the way.`,
     input.instructions ? `\n## Instructions from the owner\n${input.instructions}` : '',
   ].join('\n');
 

@@ -25,7 +25,7 @@ export type Level = 'auto' | 'propose' | 'forbidden';
 export type OpKind = 'create' | 'update' | 'link' | 'unlink' | 'archive' | 'restore' | 'merge' | 'define_type';
 export type Policy = Record<OpKind, Level>;
 
-/** Agents propose everything until trust is built; loosen per op in lattice.config.json. */
+/** Agents propose everything until trust is built; loosen per op in pelago.config.json. */
 export const DEFAULT_AGENT_POLICY: Policy = {
   create: 'propose',
   update: 'propose',
@@ -174,7 +174,7 @@ export const actorId = (actor: Actor) => `${actor.kind}:${actor.name}`;
 export const BLOCKING_RELATIONS = ['depends_on', 'needs'];
 
 /** Active holds on resources, including ones whose holder the caller may not see. */
-export const ACTIVE_HOLDS = `lattice_active_holds(current_user = 'lattice_member', current_setting('lattice.viewer', true))`;
+export const ACTIVE_HOLDS = `pelago_active_holds(current_user = 'pelago_member', current_setting('pelago.viewer', true))`;
 
 /**
  * What can be made public: a product, what it has built, and how we know it
@@ -183,7 +183,7 @@ export const ACTIVE_HOLDS = `lattice_active_holds(current_user = 'lattice_member
  */
 export const PUBLIC_KINDS = ['project', 'software.feature', 'software.release', 'software.proof', 'software.test', 'software.test_result'];
 
-export class Lattice {
+export class Archipelago {
   readonly db: Db;
   readonly registry: Registry;
   readonly policy: Policy;
@@ -212,13 +212,13 @@ export class Lattice {
   }
 
   /** This map as anyone sees it with no login: only what is public. Ask it of the whole map, not of one person's view. */
-  forAnyone(): Lattice {
-    return new Lattice(anyone(this.db), this.registry, this.policy, this.workspace, '', 'lattice_public_props(id) as props');
+  forAnyone(): Archipelago {
+    return new Archipelago(anyone(this.db), this.registry, this.policy, this.workspace, '', 'pelago_public_props(id) as props');
   }
 
   /** This map as one person sees it. An empty viewer sees only what is shared; an admin also sees every token and setting. */
-  as(viewer: string, admin = false): Lattice {
-    return new Lattice(scoped(this.db, viewer, admin), this.registry, this.policy, this.workspace, viewer);
+  as(viewer: string, admin = false): Archipelago {
+    return new Archipelago(scoped(this.db, viewer, admin), this.registry, this.policy, this.workspace, viewer);
   }
 
   /** Whether new things are private to their author unless they say otherwise. */
@@ -333,7 +333,7 @@ export class Lattice {
     if (!proposal) throw new Error(`No proposal "${input.proposal}"`);
     if (proposal.status !== 'pending') throw new Error(`Proposal ${proposal.id} is already ${proposal.status}`);
 
-    let result: Awaited<ReturnType<Lattice['apply']>> | undefined;
+    let result: Awaited<ReturnType<Archipelago['apply']>> | undefined;
     if (input.approve) {
       result = await this.apply(
         proposal.actor,
@@ -513,7 +513,7 @@ export class Lattice {
            where r.to_id = $1 and r.valid_to is null and r.type = any($2::text[]) and s.archived_at is null and s.private_to is null`,
           [op.id, BLOCKING_RELATIONS],
         );
-        const { rows: all } = await this.db.query<{ n: number }>(`select lattice_external_dependents($1, $2) as n`, [op.id, this.viewer]);
+        const { rows: all } = await this.db.query<{ n: number }>(`select pelago_external_dependents($1, $2) as n`, [op.id, this.viewer]);
         const staying = seen.filter((s) => after.get(s.id) !== true);
         const hidden = all[0].n - seen.length;
         if (staying.length || hidden > 0) {
@@ -712,8 +712,8 @@ export class Lattice {
         if (!moot) break;
       }
       if (!moot) continue;
-      const done = await this.db.query(`update proposal set status = 'superseded', decided_by = 'agent:lattice', decided_at = now(), note = $2 where id = $1 and status = 'pending' returning id`, [p.id, `Already so since ${changeset}`]);
-      if (done.rows.length) await this.log(this.db, { actor: 'agent:lattice', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
+      const done = await this.db.query(`update proposal set status = 'superseded', decided_by = 'agent:pelago', decided_at = now(), note = $2 where id = $1 and status = 'pending' returning id`, [p.id, `Already so since ${changeset}`]);
+      if (done.rows.length) await this.log(this.db, { actor: 'agent:pelago', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
     }
   }
 
@@ -743,7 +743,7 @@ export class Lattice {
        values ($1, $2, $3, $4, $5, $6::jsonb, $7, coalesce($8::timestamptz, now()), $9)`,
       // An event about an entity is as visible as that entity. One with no
       // target (a proposal, an undo) is private to whoever caused it.
-      [e.actor, e.action, e.target ?? null, e.changeset ?? null, e.reason ?? '', JSON.stringify(e.detail ?? {}), e.origin ?? 'lattice', e.ts ?? null, e.target ? null : this.viewer || null],
+      [e.actor, e.action, e.target ?? null, e.changeset ?? null, e.reason ?? '', JSON.stringify(e.detail ?? {}), e.origin ?? 'pelago', e.ts ?? null, e.target ? null : this.viewer || null],
     );
   }
 

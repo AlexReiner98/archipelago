@@ -195,7 +195,7 @@ async function upload(file: string, workspace: string, target: UploadTarget): Pr
 }
 
 const localPackOf = (ws: Workspace) => {
-  const { registry } = ws.lattice;
+  const { registry } = ws.pelago;
   const file = registry.localDir ? join(registry.localDir, 'pack.json') : join(registry.dir, LOCAL_PACK, 'pack.json');
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined;
 };
@@ -220,7 +220,7 @@ export async function backupAll(
     const release = workspaces.hold(id);
     try {
       const ws = await workspaces.get(id);
-      const taken = await dump(ws.lattice.db, { id, name }, localPackOf(ws));
+      const taken = await dump(ws.pelago.db, { id, name }, localPackOf(ws));
       const folder = join(dir, id);
       mkdirSync(folder, { recursive: true });
       const file = join(folder, `${taken.taken.replaceAll(':', '-')}.json.gz`);
@@ -260,12 +260,15 @@ export function parseBackup(bytes: Uint8Array): Dump {
     text = gunzipSync(bytes, { maxOutputLength: BACKUP_MAX }).toString('utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') throw new Error(`That file unpacks to more than ${BACKUP_MAX / 1_000_000} MB, which is more than a backup is taken to be.`);
-    throw new Error('That is not a Lattice backup file (a .json.gz written by the server).');
+    throw new Error('That is not an Archipelago backup file (a .json.gz written by the server).');
   }
   try {
-    return JSON.parse(text) as Dump;
+    const dump = JSON.parse(text) as Dump;
+    // A backup written while this was called Lattice says so on each event of its own.
+    for (const event of dump.tables?.event ?? []) if (event.origin === 'lattice') event.origin = 'pelago';
+    return dump;
   } catch {
-    throw new Error('That is not a Lattice backup file (a .json.gz written by the server).');
+    throw new Error('That is not an Archipelago backup file (a .json.gz written by the server).');
   }
 }
 

@@ -9,7 +9,7 @@ import { Automations } from '../src/automations.ts';
 import { backupAll, dump, merge, newestBackup, readBackup, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
 import { configureLauncher, launch } from '../src/launcher.ts';
-import { Lattice, type Actor, type Op } from '../src/lattice.ts';
+import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { publicPage, publicPicture } from '../src/public.ts';
 import { configureSecrets, isSealed, seal, unseal } from '../src/secrets.ts';
@@ -23,16 +23,41 @@ const agent: Actor = { kind: 'agent', name: 'test' };
 
 /** A fresh in-memory map with its own copy of the packs, so tests can define types. */
 async function fresh() {
-  const packs = mkdtempSync(join(tmpdir(), 'lattice-packs-'));
+  const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  return new Lattice(await openDb(), new Registry(packs));
+  return new Archipelago(await openDb(), new Registry(packs));
 }
 
-async function make(l: Lattice, ops: Op[]) {
+async function make(l: Archipelago, ops: Op[]) {
   const result = await l.change(human, { ops, reason: 'test' });
   assert.equal(result.status, 'applied');
   return (result as { created: Record<string, string> }).created;
 }
+
+test('a database made while this was called Lattice is opened under the new names, with nothing lost', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-before-'));
+  const made = await openDb(dir);
+  // As it stood then: the two roles with what they were granted, a function of that name, and events said to be Lattice's own.
+  await made.exec(`
+    create role lattice_member nologin; grant select, insert, update on entity, event to lattice_member;
+    create role lattice_public nologin; grant select (id, title) on entity to lattice_public;
+    create function lattice_is_public(target text) returns boolean language sql stable as $fn$ select false $fn$;
+    grant execute on function lattice_is_public(text) to lattice_public;
+    insert into event (origin, actor, action) values ('lattice', 'agent:lattice', 'run.stale'), ('github', 'github:push', 'push');
+  `);
+  await made.close();
+  const db = await openDb(dir);
+  assert.deepEqual((await db.query<{ rolname: string }>(`select rolname from pg_roles where rolname like 'lattice%' or rolname like 'pelago%' order by 1`)).rows.map((r) => r.rolname), ['pelago_member', 'pelago_public']);
+  assert.deepEqual((await db.query<{ proname: string }>(`select proname from pg_proc where proname like 'lattice%'`)).rows, []);
+  assert.deepEqual((await db.query<{ origin: string }>(`select origin from event order by seq`)).rows.map((r) => r.origin), ['pelago', 'github']);
+  // And a member still sees through the role that took the old one's place.
+  const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
+  const l = new Archipelago(db, new Registry(packs));
+  await make(l, [{ op: 'create', type: 'task', title: 'Seen after the move' }]);
+  assert.equal((await l.as('nobody').db.query(`select 1 from entity where title = 'Seen after the move'`)).rows.length, 1);
+  await db.close();
+});
 
 test('flavours inherit fields and statuses, and are found through the parent', async () => {
   const l = await fresh();
@@ -143,7 +168,7 @@ test('the pulse moves when a change is proposed, decided or applied, and not oth
 
 test('policy can let agents apply some ops directly, or forbid them', async () => {
   const l = await fresh();
-  const loose = new Lattice(l.db, l.registry, { create: 'auto', merge: 'forbidden' });
+  const loose = new Archipelago(l.db, l.registry, { create: 'auto', merge: 'forbidden' });
   const made = await loose.change(agent, { ops: [{ op: 'create', ref: 'x', type: 'note', title: 'X' }], reason: 'test' });
   assert.equal(made.status, 'applied');
   const x = (made as { created: Record<string, string> }).created.x;
@@ -192,7 +217,7 @@ test('blockers are derived, and roots are what has to move first', async () => {
   await make(l, [{ op: 'update', id: made.cert, status: 'decided', props: { outcome: 'EV cert' } }]);
   const after = (await VIEWS.needs_me.run(l, { person: made.me })) as any;
   assert.deepEqual(after.actionable.map((t: any) => t.title).sort(), ['Sign installer', 'Write notes']);
-  await assert.rejects(VIEWS.needs_me.run(l, {}), /lattice init/);
+  await assert.rejects(VIEWS.needs_me.run(l, {}), /pelago init/);
 });
 
 test('a dependency cycle does not hang the views', async () => {
@@ -289,7 +314,7 @@ test('an approved type proposal becomes a flavour in the local pack', async () =
 
 test('a connection\'s tool-call log is imported once into the activity log', async () => {
   const l = await fresh();
-  const log = join(mkdtempSync(join(tmpdir(), 'lattice-audit-')), 'audit.jsonl');
+  const log = join(mkdtempSync(join(tmpdir(), 'pelago-audit-')), 'audit.jsonl');
   const line = (ts: string, tool: string) => JSON.stringify({ ts, tool, params: { n: 1 }, durationMs: 12, ok: true, error: null });
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), 'not json', line('2026-10-01T10:00:05.000Z', 'run_command')].join('\n'));
   const made = await make(l, [{ op: 'create', ref: 'c', type: 'sys.connection', title: 'Aperture', props: { audit_log: log } }]);
@@ -351,7 +376,7 @@ test('a reviewer can correct a proposal while approving it', async () => {
 });
 
 /** A project in a repo, with one task that needs the live lane and one that does not. */
-async function laneSetup(l: Lattice) {
+async function laneSetup(l: Archipelago) {
   return make(l, [
     { op: 'create', ref: 'repo', type: 'software.repo', title: 'Aperture repo', props: { path: 'C:\\code\\Aperture' } },
     { op: 'create', ref: 'proj', type: 'project', title: 'Aperture' },
@@ -435,7 +460,7 @@ test('the session-start hook registers the session and hands it the repo\'s work
   const l = await fresh();
   const made = await laneSetup(l);
   const text = await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Aperture' });
-  assert.match(text, /registered in Lattice/);
+  assert.match(text, /registered in Archipelago/);
   const repoId = /Repository: Aperture repo \((e_\w+)\)/.exec(text)?.[1];
   assert.ok(repoId, 'the repository comes with its id');
   // What the session was told is enough to ask for the repository's work; asked for none, the view says which there are.
@@ -688,7 +713,7 @@ test('a note can name what the same change makes, and an agent can ask for its c
   assert.equal((await l.entity(applied.created.n))!.body, `This is ${applied.created.n}.`);
 
   // Where agents' changes are applied as made, one that asks to be held waits for the human all the same.
-  const free = new Lattice(l.db, l.registry, { create: 'auto', update: 'auto' });
+  const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto' });
   assert.equal((await free.change(agent, { ops: [{ op: 'update', id: made.t, status: 'doing' }], reason: 'test' })).status, 'applied');
   const asked = await free.change(agent, { ops: [{ op: 'update', id: made.t, status: 'done' }], reason: 'Have a look first', hold: true });
   assert.equal(asked.status, 'proposed');
@@ -738,7 +763,7 @@ test('a re-check takes a feature that lives in a repository on its own, at its p
 
 test('a secret is sealed with a key that is not in the database, and without that key it reads as not set', async () => {
   const l = await fresh();
-  const dir = mkdtempSync(join(tmpdir(), 'lattice-secrets-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-secrets-'));
   configureSecrets(dir);
   await l.setSecret('github_secret', 'whsec-of-the-first-server');
   const stored = (await l.setting<string>('github_secret'))!;
@@ -750,13 +775,13 @@ test('a secret is sealed with a key that is not in the database, and without tha
   configureSecrets(dir);
   assert.equal(await l.secret('github_secret'), 'whsec-of-the-first-server');
   // A key given in the environment is used for what is sealed from then on; what the file sealed still opens.
-  process.env.LATTICE_SECRETS_KEY = Buffer.alloc(32, 7).toString('base64');
+  process.env.PELAGO_SECRETS_KEY = Buffer.alloc(32, 7).toString('base64');
   await l.setSecret('anthropic_key', 'sk-ant-kept-out-of-the-disk');
   assert.equal(await l.secret('anthropic_key'), 'sk-ant-kept-out-of-the-disk');
   assert.equal(await l.secret('github_secret'), 'whsec-of-the-first-server');
   // On a server with neither key (a backup restored somewhere else), it cannot be opened: it reads as not set, and nothing is given away.
-  delete process.env.LATTICE_SECRETS_KEY;
-  configureSecrets(mkdtempSync(join(tmpdir(), 'lattice-elsewhere-')));
+  delete process.env.PELAGO_SECRETS_KEY;
+  configureSecrets(mkdtempSync(join(tmpdir(), 'pelago-elsewhere-')));
   assert.equal(await l.secret('anthropic_key'), undefined);
   assert.equal(await l.secret('github_secret'), undefined);
   // Tampered with, a sealed value does not open either.
@@ -772,7 +797,7 @@ test('a secret is sealed with a key that is not in the database, and without tha
 
 test('launching runs a headless session on a task, holding the lane and recording the outcome', async () => {
   const l = await fresh();
-  const dir = mkdtempSync(join(tmpdir(), 'lattice-launch-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-launch-'));
   // A stand-in for the Claude Code CLI: echoes what it was given, as stream-json.
   const cli = join(dir, 'fake-claude.mjs');
   writeFileSync(
@@ -966,7 +991,7 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   ]);
   // Nor where agents' other changes are applied as made: an automation acts later with a human's authority, so
   // making one, changing one or bringing one back waits for the human.
-  const loose = new Lattice(l.db, l.registry, { create: 'auto', update: 'auto', archive: 'auto', restore: 'auto', link: 'auto' });
+  const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', archive: 'auto', restore: 'auto', link: 'auto' });
   const launches = { trigger: 'every', every_minutes: 1, action: 'launch', input: { task: made.hourly, mode: 'acceptEdits', instructions: 'anything' } };
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'An ordinary thing' }] })).status, 'applied');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'sys.automation', title: 'Launches', status: 'enabled', props: launches }] })).status, 'proposed');
@@ -1270,7 +1295,7 @@ test('an agent may settle its own work unreviewed, but only proposes the answer 
     { op: 'create', ref: 't', type: 'task', title: 'Wire the upload' },
   ]);
   // As in dev mode: nothing an agent does is reviewed.
-  const free = new Lattice(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
+  const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
   const decided = l.registry.type('decision')!.statuses.closed[0];
   const settled = l.registry.type('hypothesis')!.statuses.closed[0];
 
@@ -1305,7 +1330,7 @@ test('a held change that asks only for what is already so leaves the queue as su
   const pending = async () => (await l.proposals()).map((p) => p.id);
   assert.deepEqual(await pending(), [both, more, other], 'the answer already given is gone; what asks for more, or for something else, stays');
   const [gone] = await l.proposals({ status: 'superseded' });
-  assert.deepEqual([gone.id, gone.note, gone.decided_by], [answer, `Already so since ${(settled as { changeset: string }).changeset}`, 'agent:lattice']);
+  assert.deepEqual([gone.id, gone.note, gone.decided_by], [answer, `Already so since ${(settled as { changeset: string }).changeset}`, 'agent:pelago']);
   const said = (await l.events({ limit: 20 })).find((e: any) => e.action === 'proposal.supersede') as any;
   assert.deepEqual([said.detail.proposal, said.detail.by], [answer, (settled as { changeset: string }).changeset], 'and the log says what overtook it');
 
@@ -1325,7 +1350,7 @@ test('a backup holds every row, and restores into an empty database that then ca
   await l.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
 
   const taken = await dump(l.db, { id: 'default', name: 'Default' }, { id: 'local', types: [] });
-  const copy = new Lattice(await openDb(), l.registry);
+  const copy = new Archipelago(await openDb(), l.registry);
   const counts = await restore(copy.db, JSON.parse(JSON.stringify(taken)));
   assert.deepEqual([counts.entity, counts.relation, counts.proposal], [3, 1, 1]);
   assert.equal(counts.event, taken.tables.event.length);
@@ -1349,9 +1374,9 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
   await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
-  const snapshot = async (l: Lattice) => JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' })));
+  const snapshot = async (l: Archipelago) => JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' })));
   // b starts as a copy of a, then each goes its own way.
-  const b = new Lattice(await openDb(), a.registry);
+  const b = new Archipelago(await openDb(), a.registry);
   await restore(b.db, await snapshot(a));
   const partOf = ((await a.get(made.t)) as any).outgoing[0].relation;
 
@@ -1367,7 +1392,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   await a.decide(human, { proposal: pending.id, approve: false, note: 'no' });
   const session = await sessionStart(a, agent, { title: 'Still running in a', surface: 'test' });
   const from = await snapshot(a);
-  const count = async (l: Lattice, table: string) => (await l.db.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0].n;
+  const count = async (l: Archipelago, table: string) => (await l.db.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0].n;
   const before = [await count(b, 'entity'), await count(b, 'event')];
 
   const options = { workspace: 'default', sessionTypes: b.registry.family('sys.run') };
@@ -1379,7 +1404,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   assert.deepEqual([done.relations, done.proposals, done.left_out.open_sessions], [{ added: 1, ended: 1 }, { added: 0, decided: 1 }, 1]);
   assert.ok(done.events.added > 0 && done.events.last_seq! - done.events.first_seq! === done.events.added - 1, 'its history arrives as one run of events');
 
-  const title = async (l: Lattice, id: string) => (await l.entity(id))!.title;
+  const title = async (l: Archipelago, id: string) => (await l.entity(id))!.title;
   assert.deepEqual([await title(b, made.t), await title(b, made.p)], ['Task, renamed in a', 'Proj, renamed in b'], "each side's edit survives");
   assert.ok((await b.entity(made.u))!.archived_at, 'archived there, archived here');
   assert.deepEqual(((await b.get(made.t)) as any).outgoing, [], 'unlinked there, unlinked here');
@@ -1402,11 +1427,11 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
 });
 
 test('backups are written per workspace, read back, and only the newest are kept', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'lattice-backup-'));
+  const root = mkdtempSync(join(tmpdir(), 'pelago-backup-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
   await workspaces.create('acme', 'Acme');
-  await make((await workspaces.get('acme')).lattice, [{ op: 'create', type: 'task', title: 'Theirs' }]);
+  await make((await workspaces.get('acme')).pelago, [{ op: 'create', type: 'task', title: 'Theirs' }]);
   const dir = join(root, 'backups');
   assert.equal(newestBackup(dir), undefined);
   for (let i = 0; i < 3; i++) {
@@ -1460,12 +1485,12 @@ test('search puts the best match first and forgives a slip of the keys', async (
 });
 
 test('a workspace nobody is using is closed, and opens again with its data', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'lattice-idle-'));
+  const root = mkdtempSync(join(tmpdir(), 'pelago-idle-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: join(root, 'data'), rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
   await workspaces.get('default');
   const acme = await workspaces.create('acme', 'Acme');
-  await make(acme.lattice, [{ op: 'create', type: 'task', title: 'Theirs' }]);
+  await make(acme.pelago, [{ op: 'create', type: 'task', title: 'Theirs' }]);
 
   const release = workspaces.hold('acme');
   assert.deepEqual(await workspaces.closeIdle(0), [], 'not while a request is in hand, and never the default workspace');
@@ -1475,10 +1500,10 @@ test('a workspace nobody is using is closed, and opens again with its data', asy
   assert.deepEqual([workspaces.isOpen('acme'), workspaces.isOpen('default')], [false, true]);
 
   const again = await workspaces.get('acme');
-  assert.deepEqual((await again.lattice.search({ type: 'task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
-  const session = await sessionStart(again.lattice, agent, { title: 'Working' });
+  assert.deepEqual((await again.pelago.search({ type: 'task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
+  const session = await sessionStart(again.pelago, agent, { title: 'Working' });
   assert.deepEqual(await workspaces.closeIdle(0), [], 'a workspace with an open session stays open, so the session can be seen to go quiet');
-  await sessionEnd(again.lattice, agent, { run: session.run, outcome: 'finished', summary: 'done' });
+  await sessionEnd(again.pelago, agent, { run: session.run, outcome: 'finished', summary: 'done' });
 
   const dir = join(root, 'backups');
   assert.deepEqual(await workspaces.closeIdle(0), ['acme']);
@@ -1664,7 +1689,7 @@ test('a picture is kept for a result only when sent, travels in a backup, and go
   await assert.rejects(put(png, 'image/png', made.noaa), /not a test result/);
 
   // A backup carries the picture, byte for byte.
-  const copy = new Lattice(await openDb(), l.registry);
+  const copy = new Archipelago(await openDb(), l.registry);
   const counts = await restore(copy.db, JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))));
   assert.equal(counts.picture, 1);
   const restored = (await callTool(copy, human, 'picture', { result: first.id })) as { data: string };
@@ -1795,7 +1820,7 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   assert.equal(await publicPicture(l, results[made.sun]), null);
 
   // An agent cannot say so, even where its other changes are applied as made: it waits for the human.
-  const loose = new Lattice(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
+  const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.panel, title: 'The panel' }] })).status, 'applied');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.app, visibility: 'public' }] })).status, 'proposed');
   assert.equal(await publicPage(l, made.app), null);
@@ -1825,7 +1850,7 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   await assert.rejects(anyoneDb.query(`select body from entity`), /permission denied/);
   // Of an item's fields, only what the page shows: not where a result's picture lies in its repository.
   await assert.rejects(anyoneDb.query(`select props from entity`), /permission denied/);
-  const fields = async (id: string) => (await anyoneDb.query<{ props: Record<string, unknown> | null }>(`select lattice_public_props($1) as props`, [id])).rows[0].props;
+  const fields = async (id: string) => (await anyoneDb.query<{ props: Record<string, unknown> | null }>(`select pelago_public_props($1) as props`, [id])).rows[0].props;
   assert.deepEqual(await fields(results[made.sun]), { build: '1.0.0', passed: true, value: '0.004 degrees' });
   assert.equal(await fields(results[made.areas]), null, 'and of what is not public, none');
   await assert.rejects(anyoneDb.query(`select * from event`), /permission denied/);

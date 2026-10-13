@@ -1,8 +1,8 @@
-# Working with Lattice in this project
+# Working with Archipelago in this project
 
-This project's work is kept in Lattice: a map of people, work and what waits
+This project's work is kept in Archipelago: a map of people, work and what waits
 on what, used by the owner and by agents through the same tools (the
-`lattice` MCP tools). The map is the record of where the work stands. Keep it
+`pelago` MCP tools). The map is the record of where the work stands. Keep it
 true as you go; do not keep a second record in files or in the chat.
 
 ## At the start
@@ -13,7 +13,7 @@ true as you go; do not keep a second record in files or in the chat.
    lists are right. If it has `for_owner` with questions settled on an
    agent's own judgment, show the owner those in your first reply and ask
    them to confirm or correct; record their answer with `confirmed`.
-   If the session opened with no word from Lattice, the
+   If the session opened with no word from Archipelago, the
    hooks did not run here (the setup was run in another folder): call
    `session_start` with `cwd` and the repository's `remote` yourself, and
    tell the owner to run the setup in this repository's own folder.
@@ -40,12 +40,12 @@ true as you go; do not keep a second record in files or in the chat.
   the id of the item the same change makes.
 - **Correct a refused change, do not resend it.** The refusal gives a name:
   send `change` with `retry` and `fixes` for the ops that were wrong.
-- **If a lattice tool answers with a web page or "502",** the server is
+- **If a pelago tool answers with a web page or "502",** the server is
   restarting. Do not send the call again through MCP: each such answer is a
   whole page in your context. Wait until `GET /health` on the server answers,
   then send it as plain JSON (`POST /agent/<tool>` with the agent token from
   the environment, never printed).
-- **When Lattice gets in your way,** record it with the `lattice-bump` skill
+- **When Archipelago gets in your way,** record it with the `pelago-bump` skill
   when it happens. That is how it gets fixed.
 
 ## Before you finish

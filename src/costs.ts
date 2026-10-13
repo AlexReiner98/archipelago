@@ -4,7 +4,7 @@
 // does not say what it cost is counted in tokens, and a payment with no amount
 // is named as not priced.
 
-import type { Entity, Lattice } from './lattice.ts';
+import type { Entity, Archipelago } from './pelago.ts';
 
 /** Days in a month, on average: what a monthly payment is spread over. */
 const MONTH = 30.4375;
@@ -16,7 +16,7 @@ const cents = (n: number) => Math.round(n * 100) / 100;
  * it cost, tokens where it does not, by where they ran) and on regular
  * payments (each one's share of the period), with the rate per month.
  */
-export async function costs(l: Lattice, input: { days?: number }) {
+export async function costs(l: Archipelago, input: { days?: number }) {
   const days = Math.min(Math.max(Math.round(input.days ?? 30), 1), 366);
   const now = Date.now();
   const since = now - days * DAY;

@@ -5,14 +5,14 @@
 // world, and coordination that waits for approval is no coordination.
 
 import { repoByName, repoName } from './github.ts';
-import { actorId, type Actor, type Entity, type Lattice, type Op } from './lattice.ts';
+import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { blockGraph, handoff, toConfirm, UNCONFIRMED_DAYS, VIEWS } from './views.ts';
 
 const now = () => new Date().toISOString();
 const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
 
 /** Find a run by its entity id or by the session id its surface gave it. */
-async function resolveRun(l: Lattice, key: string, openOnly = false): Promise<Entity | undefined> {
+async function resolveRun(l: Archipelago, key: string, openOnly = false): Promise<Entity | undefined> {
   const byId = await l.entity(key);
   if (byId && l.registry.isA(byId.type, 'sys.run')) return byId;
   const { rows } = await l.db.query<Entity>(
@@ -28,7 +28,7 @@ async function resolveRun(l: Lattice, key: string, openOnly = false): Promise<En
  * this address, which is the same on every machine, or failing that the one
  * whose checkout on this machine contains the directory.
  */
-async function repoFor(l: Lattice, cwd: string | undefined, remote?: string): Promise<Entity | undefined> {
+async function repoFor(l: Archipelago, cwd: string | undefined, remote?: string): Promise<Entity | undefined> {
   if (!l.registry.type('software.repo')) return undefined;
   const named = remote ? await repoByName(l, repoName(remote)) : undefined;
   if (named || !cwd) return named;
@@ -45,7 +45,7 @@ async function repoFor(l: Lattice, cwd: string | undefined, remote?: string): Pr
  * Whether a hook may speak for the session it names, when the token it came with is limited to some repositories:
  * a session that is starting has to be in one of them, and any other has to be one that was registered there.
  */
-export async function hookWithin(l: Lattice, repos: string[], input: { session_id?: string; cwd?: string; remote?: string }, starting: boolean): Promise<boolean> {
+export async function hookWithin(l: Archipelago, repos: string[], input: { session_id?: string; cwd?: string; remote?: string }, starting: boolean): Promise<boolean> {
   if (starting) {
     const repo = await repoFor(l, input.cwd, typeof input.remote === 'string' ? input.remote : undefined);
     return Boolean(repo && repos.includes(repo.id));
@@ -57,13 +57,13 @@ export async function hookWithin(l: Lattice, repos: string[], input: { session_i
 }
 
 /** When a surface's session registered here, if it did and is still open. */
-export async function sessionBegan(l: Lattice, sessionId: string | undefined): Promise<Date | undefined> {
+export async function sessionBegan(l: Archipelago, sessionId: string | undefined): Promise<Date | undefined> {
   const run = sessionId ? await resolveRun(l, sessionId, true) : undefined;
   return run && new Date(run.created_at);
 }
 
 export async function sessionStart(
-  l: Lattice,
+  l: Archipelago,
   actor: Actor,
   input: { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string },
 ) {
@@ -123,7 +123,7 @@ export async function sessionStart(
   };
 }
 
-async function touch(l: Lattice, run: string): Promise<void> {
+async function touch(l: Archipelago, run: string): Promise<void> {
   await l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text) where id = $1`, [run, now()]);
 }
 
@@ -132,19 +132,19 @@ async function touch(l: Lattice, run: string): Promise<void> {
  * that said so is no longer true, so it leaves what the human has to read. It
  * can be flagged again if it goes quiet again.
  */
-async function heard(l: Lattice, run: Entity, why: string): Promise<void> {
+async function heard(l: Archipelago, run: Entity, why: string): Promise<void> {
   if (!run.props.stale_flagged) return;
   await l.db.query(`update entity set props = props - 'stale_flagged' where id = $1`, [run.id]);
   const { rows } = await l.db.query<{ id: string }>(
     `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
-     where r.to_id = $1 and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.props->>'from' = 'agent:lattice'`,
+     where r.to_id = $1 and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.props->>'from' in ('agent:pelago', 'agent:lattice')`,
     [run.id],
   );
-  if (rows.length) await l.apply('agent:lattice', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });
+  if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });
 }
 
 /** A surface's session was heard from (a prompt, say): it is not quiet, whether or not it reports in itself. */
-export async function sessionHeard(l: Lattice, sessionId: string | undefined): Promise<void> {
+export async function sessionHeard(l: Archipelago, sessionId: string | undefined): Promise<void> {
   const run = sessionId ? await resolveRun(l, sessionId, true) : undefined;
   if (!run) return;
   await touch(l, run.id);
@@ -159,7 +159,7 @@ export async function sessionHeard(l: Lattice, sessionId: string | undefined): P
  * states: it is written as the session's last-seen is, with no change to
  * review and without making the work look newly confirmed.
  */
-export async function recordUsage(l: Lattice, sessionId: string | undefined, tokens: unknown): Promise<{ run: string; added: number; to: string[] } | undefined> {
+export async function recordUsage(l: Archipelago, sessionId: string | undefined, tokens: unknown): Promise<{ run: string; added: number; to: string[] } | undefined> {
   if (!sessionId || typeof tokens !== 'number' || !Number.isFinite(tokens) || tokens <= 0) return undefined;
   const run = await resolveRun(l, sessionId, true);
   if (!run) return undefined;
@@ -177,14 +177,14 @@ export async function recordUsage(l: Lattice, sessionId: string | undefined, tok
 }
 
 /**
- * A run that happened where Lattice cannot watch it (the agent in GitHub
+ * A run that happened where Archipelago cannot watch it (the agent in GitHub
  * Actions that reads a push, or re-checks the map) says so once it is over:
  * what it was, how it ended and what it used. It is kept as a run that has
  * ended, in the repository it ran for. Told twice of the same run (its link
  * is the same), it is recorded once.
  */
 export async function recordRun(
-  l: Lattice,
+  l: Archipelago,
   actor: Actor,
   input: { repo: string; title: string; ok?: boolean; tokens?: number; cost_usd?: number; turns?: number; link?: string; summary?: string; surface?: string },
 ) {
@@ -210,7 +210,7 @@ export async function recordRun(
   return { run: created.run, recorded: true };
 }
 
-export async function sessionUpdate(l: Lattice, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string }) {
+export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string }) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
@@ -251,7 +251,7 @@ type Item = { id: string; type: string; title: string; status: string };
  * about: no work in the repository settles it. Nor is what has a change
  * waiting for the human: what was found has been said, and is theirs to confirm.
  */
-async function unreconciled(l: Lattice, run: Entity): Promise<Item[]> {
+async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
   const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'software.lives_in' and from_id = $1 and valid_to is null`, [run.id]);
   if (!repos.length) return [];
   const work = (await VIEWS.repo_work.run(l, { repo: repos[0].to_id })) as { ready: Item[]; blocked: Item[] };
@@ -264,7 +264,7 @@ async function unreconciled(l: Lattice, run: Entity): Promise<Item[]> {
 }
 
 export async function sessionEnd(
-  l: Lattice,
+  l: Archipelago,
   actor: Actor,
   input: {
     run: string;
@@ -335,9 +335,9 @@ export async function sessionEnd(
  * A Claude Code SessionStart hook: register the session and return the text
  * to put in front of the model, so it starts knowing what the map knows.
  */
-export async function hookSessionStart(l: Lattice, input: { session_id?: string; cwd?: string; remote?: string }): Promise<string> {
+export async function hookSessionStart(l: Archipelago, input: { session_id?: string; cwd?: string; remote?: string }): Promise<string> {
   const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code' });
-  const lines = [`This session is registered in Lattice, the owner's map of work and dependencies, as run ${started.run}.`];
+  const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}.`];
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) {
     const work = (await VIEWS.repo_work.run(l, { repo: repo.id })) as {
@@ -360,7 +360,7 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
     if (work.ready.length) lines.push('', 'Open work and issues here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${kind(t)}${t.title} (${t.id})${age(t)}`));
     if (work.blocked.length) lines.push('', 'Blocked work here:', ...work.blocked.slice(0, 15).map((t) => `- ${t.title} (${t.id}), waiting on: ${t.waiting_on.join('; ')}`));
   } else {
-    lines.push(`Lattice does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
+    lines.push(`Archipelago does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
   }
   // The owner is here, in chat, and mostly nowhere else: what agents settled since they last answered is put to them now.
   const ask = await toConfirm(l, { limit: 15 });
@@ -378,19 +378,19 @@ export async function hookSessionStart(l: Lattice, input: { session_id?: string;
   );
   for (const res of exclusive) {
     const held = now.held_resources.find((h) => h.title === res.title);
-    lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the lattice claim tool (holder ${started.run}) before using it and release it after.`);
+    lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago claim tool (holder ${started.run}) before using it and release it after.`);
   }
   lines.push(
     '',
     'When you take on a task that has no estimate, give it one: how many tokens you expect it to take (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.',
-    'If the lattice MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.',
-    'When Lattice itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.',
+    'If the pelago MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.',
+    'When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.',
     'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm unless this workspace applies agents’ changes as made, so send the answer with what was chosen and why.',
   );
   return lines.join('\n');
 }
 
-export async function hookSessionEnd(l: Lattice, input: { session_id?: string; reason?: string }): Promise<void> {
+export async function hookSessionEnd(l: Archipelago, input: { session_id?: string; reason?: string }): Promise<void> {
   if (!input.session_id) return;
   const run = await resolveRun(l, input.session_id, true);
   if (run) await sessionEnd(l, { kind: 'agent', name: 'claude-code' }, { run: run.id, outcome: 'finished', summary: input.reason ? `Session ended (${input.reason})` : undefined });

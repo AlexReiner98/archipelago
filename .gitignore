@@ -8,14 +8,14 @@ data-damaged/
 backups/
 .proof/
 
-# What the setup command writes into a project to connect it to a Lattice server (/connect/setup.mjs), and the
+# What the setup command writes into a project to connect it to a Archipelago server (/connect/setup.mjs), and the
 # maintainer's notes on their own installation. Each is true of one machine's setup, not of the code.
 .mcp.json
 .claude/settings.json
 .claude/settings.local.json
-.claude/lattice-hook.mjs
-.claude/lattice.md
-.claude/skills/lattice-bump/references/home.md
-.claude/lattice-setup.json
-*.lattice-backup
+.claude/pelago-hook.mjs
+.claude/pelago.md
+.claude/skills/pelago-bump/references/home.md
+.claude/pelago-setup.json
+*.pelago-backup
 CLAUDE.local.md

@@ -11,8 +11,9 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { env } from './env.ts';
 import type { GithubApp } from './github-app.ts';
-import type { Actor, Entity, Lattice } from './lattice.ts';
+import type { Actor, Entity, Archipelago } from './pelago.ts';
 import { recordRun } from './sessions.ts';
 import { callTool, TOOLS } from './tools.ts';
 
@@ -43,7 +44,7 @@ export function configureReader(make: ((key: string) => Ask) | undefined, check:
 
 /** The setting that holds a workspace's Anthropic key: sealed, since it has to be sent with every request and so cannot be kept as a hash. */
 const KEY = 'anthropic_key';
-export const READER_MODEL = process.env.LATTICE_READER_MODEL || 'claude-sonnet-5-5';
+export const READER_MODEL = env('READER_MODEL') || 'claude-sonnet-5-5';
 /** Dollars for a million tokens of the model above: what a run is said to have cost. */
 const PRICE = { input: 2, output: 10, cache_read: 0.2, cache_write: 2.5 };
 /** A run stops when it has taken this many turns or used this many tokens (not counting cached re-reads). */
@@ -52,7 +53,7 @@ const MAX_TOKENS_USED = 600_000;
 /** The most of one tool's answer that is handed back: a whole file or diff can be far more than is needed. */
 const MAX_RESULT = 60_000;
 
-export async function hasReaderKey(l: Lattice): Promise<boolean> {
+export async function hasReaderKey(l: Archipelago): Promise<boolean> {
   return Boolean(await l.secret(KEY));
 }
 
@@ -61,7 +62,7 @@ export async function hasReaderKey(l: Lattice): Promise<boolean> {
  * back out. A key Anthropic will not take is refused here, when it is given,
  * and not found out by the first push that goes unread.
  */
-export async function setReaderKey(l: Lattice, key: string | undefined): Promise<{ checked: boolean }> {
+export async function setReaderKey(l: Archipelago, key: string | undefined): Promise<{ checked: boolean }> {
   const given = key?.trim();
   if (given) {
     if (/^sk-ant-oat/.test(given)) throw new Error('That is a Claude sign-in token (it starts sk-ant-oat), which signs a person in to Claude Code. The server needs an API key: make one at console.anthropic.com, under API keys.');
@@ -95,11 +96,11 @@ export function within(path: unknown): string {
 /** What to search the one repository for: a query that names where to search (repo:, org:, user:) would widen it, so those words are dropped. */
 export const sought = (query: unknown): string => String(query ?? '').replace(/\b(?:repo|org|user|owner)\s*:\s*\S*/gi, ' ').replace(/\s+/g, ' ').trim();
 
-const LATTICE_TOOLS = ['view', 'search', 'get', 'events', 'schema', 'proposals', 'change', 'notify', 'rechecked'];
+const PELAGO_TOOLS = ['view', 'search', 'get', 'events', 'schema', 'proposals', 'change', 'notify', 'rechecked'];
 
 /** What the reader can do: the map's own tools, and reading the one repository through the app. */
-function tools(app: GithubApp, repo: Repo, ref: string): { defs: Anthropic.Beta.BetaTool[]; run: (l: Lattice, actor: Actor, name: string, input: Record<string, unknown>) => Promise<unknown> } {
-  const defs: Anthropic.Beta.BetaTool[] = LATTICE_TOOLS.map((name) => {
+function tools(app: GithubApp, repo: Repo, ref: string): { defs: Anthropic.Beta.BetaTool[]; run: (l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>) => Promise<unknown> } {
+  const defs: Anthropic.Beta.BetaTool[] = PELAGO_TOOLS.map((name) => {
     const { $schema: _, ...schema } = z.toJSONSchema(z.object(TOOLS[name].input)) as Record<string, unknown>;
     return { name, description: TOOLS[name].description, input_schema: schema as Anthropic.Beta.BetaTool['input_schema'] };
   });
@@ -147,11 +148,11 @@ function tools(app: GithubApp, repo: Repo, ref: string): { defs: Anthropic.Beta.
   };
   return {
     defs,
-    run: (l, actor, name, input) => (hubTools[name] ? hubTools[name](input) : LATTICE_TOOLS.includes(name) ? callTool(l, actor, name, input) : Promise.reject(new Error(`No tool "${name}".`))),
+    run: (l, actor, name, input) => (hubTools[name] ? hubTools[name](input) : PELAGO_TOOLS.includes(name) ? callTool(l, actor, name, input) : Promise.reject(new Error(`No tool "${name}".`))),
   };
 }
 
-const ABOUT = `Lattice is the owner's map of work: projects, features, tasks, issues, decisions. You keep it true to one
+const ABOUT = `Archipelago is the owner's map of work: projects, features, tasks, issues, decisions. You keep it true to one
 repository. You reach the map through its own tools (view, search, get, events, schema, proposals, change, notify)
 and the repository through commits, diff, file, list, log and find. You cannot change the repository, only read it.
 Depending on the workspace, what you send to the map is held for the owner or takes effect at once, so send only
@@ -172,7 +173,7 @@ A push has just landed. Your one job is to make the map true again for this repo
 1. Read what changed: \`commits\` over the range you are given, and \`diff\` for the commits that matter.
 2. Read what the map believes: \`view\` with name "repo_work" and the repository as params.repo; \`search\` for anything
    else these commits touch.
-3. Lattice itself has already read this push: where a commit on the default branch says "fixes", "closes" or
+3. Archipelago itself has already read this push: where a commit on the default branch says "fixes", "closes" or
    "resolves" with an item's id (e_ and eight characters), that item has been closed, or a change closing it is held
    (\`proposals\` lists what is held). Do not send those again. If \`get\` shows an item already in the state you would
    give it, leave it.
@@ -222,7 +223,7 @@ Finish with two or three lines saying what you sent.`;
  * until it has nothing more to ask, or has used what a run may. What it used is
  * recorded as a run in the repository whether it ended well or not.
  */
-async function run(l: Lattice, app: GithubApp, repo: Repo, ref: string, system: string, task: string, title: string, link: string) {
+async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, system: string, task: string, title: string, link: string) {
   const key = await l.secret(KEY);
   if (!key) return { ran: false as const, reason: 'This workspace has no Anthropic key, so nothing reads its pushes. Its admin sets one on the Workspace screen.' };
   const me = await l.setting<string>('me');
@@ -304,7 +305,7 @@ async function run(l: Lattice, app: GithubApp, repo: Repo, ref: string, system: 
 }
 
 /** Read one push against the map. */
-export function readPush(l: Lattice, app: GithubApp, repo: Repo, push: { branch: string; default_branch: string; before: string; after: string }) {
+export function readPush(l: Archipelago, app: GithubApp, repo: Repo, push: { branch: string; default_branch: string; before: string; after: string }) {
   const fresh = /^0+$/.test(push.before);
   const task = `A push has just landed on the branch "${push.branch}" of ${repo.name} (default branch: "${push.default_branch}"). In the map the repository is "${repo.entity.title}" (${repo.entity.id}).
 ${fresh ? `The branch is new: read the commits on it that are not on the default branch (commits with base "${push.default_branch}" and head "${push.after}").` : `The new commits are ${push.before}..${push.after} (commits with that base and head).`}`;
@@ -316,7 +317,7 @@ ${fresh ? `The branch is new: read the commits on it that are not on the default
  * for now (by a person, from the repository's page), it does not wait: the
  * oldest items are checked whatever each project's interval.
  */
-export async function recheck(l: Lattice, app: GithubApp, repo: Repo, branch: string, now = false) {
+export async function recheck(l: Archipelago, app: GithubApp, repo: Repo, branch: string, now = false) {
   const me = await l.setting<string>('me');
   const due = (await callTool(me ? l.as(me) : l, { kind: 'agent', name: 'reader', person: me }, 'view', { name: 'recheck', params: { repo: repo.entity.id, now } })) as { due: boolean; projects: { due: boolean }[] };
   if (!due.due) return { ran: false as const, reason: 'Nothing is due for a re-check.' };
@@ -331,13 +332,13 @@ const commitLink = (repo: Repo, sha: string) => `https://github.com/${repo.name}
 
 /**
  * Read the pushes that were recorded and never read: a run is cut off when
- * the server stops (a deploy of Lattice itself follows every push to its own
+ * the server stops (a deploy of Archipelago itself follows every push to its own
  * repository by half a minute), and a run that never ended left no record.
  * For each branch pushed to lately, everything since the last push that was
  * read is read as one, up to the newest. A push whose run ended, well or
  * badly, is not read again.
  */
-export async function readUnread(l: Lattice, app: GithubApp, installation: string, withinMinutes = 180): Promise<{ repo: string; branch: string; after: string }[]> {
+export async function readUnread(l: Archipelago, app: GithubApp, installation: string, withinMinutes = 180): Promise<{ repo: string; branch: string; after: string }[]> {
   if (!(await hasReaderKey(l))) return [];
   const done: { repo: string; branch: string; after: string }[] = [];
   for (const repo of await readable(l, app, installation)) {
@@ -369,7 +370,7 @@ export async function readUnread(l: Lattice, app: GithubApp, installation: strin
 }
 
 /** The repositories of a workspace that the app can read, as the map knows them. */
-export async function readable(l: Lattice, app: GithubApp, installation: string): Promise<Repo[]> {
+export async function readable(l: Archipelago, app: GithubApp, installation: string): Promise<Repo[]> {
   const names = new Set((await app.repositories(installation)).map((n) => n.toLowerCase()));
   const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and props ? 'remote'`, [l.registry.family('software.repo')]);
   const out: Repo[] = [];

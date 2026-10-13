@@ -2,7 +2,7 @@
 // Nothing is erased; the log keeps both. An edit that has been changed again
 // since is left alone and reported, not overwritten.
 
-import type { Actor, Entity, Lattice, Op, UpdateOp } from './lattice.ts';
+import type { Actor, Entity, Archipelago, Op, UpdateOp } from './pelago.ts';
 
 interface LoggedChange {
   seq: number;
@@ -14,9 +14,9 @@ interface LoggedChange {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-export async function undo(l: Lattice, actor: Actor, input: { changeset: string }) {
+export async function undo(l: Archipelago, actor: Actor, input: { changeset: string }) {
   const { rows: events } = await l.db.query<LoggedChange>(
-    `select seq::int as seq, action, target_id, reason, detail from event where changeset = $1 and origin = 'lattice' order by seq desc`,
+    `select seq::int as seq, action, target_id, reason, detail from event where changeset = $1 and origin = 'pelago' order by seq desc`,
     [input.changeset],
   );
   if (!events.length) throw new Error(`No change set "${input.changeset}"`);

@@ -1,11 +1,11 @@
 ---
-name: lattice-bump
-description: Record friction with Lattice on the Lattice map, the moment it happens. Use this whenever Lattice itself gets in the way while you work, in any repository: a lattice tool errors or refuses something reasonable, you need a second call or a workaround to do one thing, a view lacks what you needed or answers with something stale or wrong, a tool description misled you, the web UI shows something badly, a hook or the GitHub workflow misbehaves, or the owner complains about how Lattice behaves or looks. Also use it when the owner says "bump", "note that", "that was annoying" or "record that" about Lattice. Do not wait to be asked: a bump nobody wrote down is hit again by the next session.
+name: pelago-bump
+description: Record friction with Archipelago on the Archipelago map, the moment it happens. Use this whenever Archipelago itself gets in the way while you work, in any repository: a pelago tool errors or refuses something reasonable, you need a second call or a workaround to do one thing, a view lacks what you needed or answers with something stale or wrong, a tool description misled you, the web UI shows something badly, a hook or the GitHub workflow misbehaves, or the owner complains about how Archipelago behaves or looks. Also use it when the owner says "bump", "note that", "that was annoying" or "record that" about Archipelago. Do not wait to be asked: a bump nobody wrote down is hit again by the next session.
 ---
 
-# Lattice bump
+# Archipelago bump
 
-Lattice is built by using it. Every time it slows you or the owner down, that
+Archipelago is built by using it. Every time it slows you or the owner down, that
 is a finding about the product, and it is only worth something if it is on the
 map, where the next session will see it in the repository's work list. A bump
 left in the chat is lost when the chat ends.
@@ -15,7 +15,7 @@ were doing. Do not stop to fix it unless the owner asks or the fix is a line.
 
 ## What counts
 
-Anything where Lattice, not the task, cost you something:
+Anything where Archipelago, not the task, cost you something:
 
 - a tool call that failed, or needed a retry in a different shape;
 - something that took several calls and should take one;
@@ -28,15 +28,15 @@ Anything where Lattice, not the task, cost you something:
 - the hosted server, a hook or the Actions workflow not doing what it says.
 
 What does not count: a bug in the code you are working on, or a mistake of
-your own that Lattice could not have prevented. If Lattice could have
+your own that Archipelago could not have prevented. If Archipelago could have
 prevented it cheaply, it counts.
 
 ## How to record one
 
-1. **Find the home.** Bumps live as issues under the Lattice project's feature
+1. **Find the home.** Bumps live as issues under the Archipelago project's feature
    for friction. `search` with type `software.feature` and q `friction`. On the
    owner's hosted map its id is in `references/home.md`. If there is none in
-   this workspace, create the issue as part of the Lattice project instead.
+   this workspace, create the issue as part of the Archipelago project instead.
 
 2. **Look for it first.** `search` with type `issue`, open only, and two or
    three words of what happened. The same bump is usually already there.
@@ -57,7 +57,7 @@ prevented it cheaply, it counts.
 
      ```
      Seen
-     - 8 Oct 2026, in lattice: updating a handoff six times in a session, each
+     - 8 Oct 2026, in pelago: updating a handoff six times in a session, each
        time resending about 4,000 characters to change a sentence.
 
      What I did instead
@@ -76,7 +76,7 @@ prevented it cheaply, it counts.
      person fixing it will search for.
 
 5. **Say so in one line** in your next message to the owner ("Recorded a
-   Lattice bump: ..."), and carry on.
+   Archipelago bump: ..."), and carry on.
 
 ## When one is fixed
 

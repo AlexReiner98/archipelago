@@ -1,6 +1,6 @@
-# Contributing to Lattice
+# Contributing to Archipelago
 
-Lattice is published as it is, with no promise of answers or fixes. It is
+Archipelago is published as it is, with no promise of answers or fixes. It is
 built by one person and their agents. You may open an issue or propose a
 change, and either may go unanswered.
 
@@ -31,7 +31,7 @@ read it before you send it.
 These are refused in review, so they are said here first.
 
 - **One write path.** Every change to entities and relations goes through
-  `Lattice.change`. Sessions, claims and notifications are the only writes
+  `Archipelago.change`. Sessions, claims and notifications are the only writes
   that skip it.
 - **The database enforces who sees what** (row level security in
   `src/db.ts`). No visibility filters in application code. If something must
@@ -49,5 +49,5 @@ true for people too.
 
 ## Licence
 
-Lattice is licensed under [Apache-2.0](LICENSE). What you contribute is
+Archipelago is licensed under [Apache-2.0](LICENSE). What you contribute is
 licensed under the same terms.

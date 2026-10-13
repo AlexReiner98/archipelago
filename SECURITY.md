@@ -12,7 +12,7 @@ would rather not.
 
 ## What counts
 
-Lattice holds a map of someone's work and the tokens of the agents that
+Archipelago holds a map of someone's work and the tokens of the agents that
 change it. A problem is anything that lets someone:
 
 - read or change a workspace without a token for it, or one workspace from

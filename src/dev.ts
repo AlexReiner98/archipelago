@@ -1,6 +1,6 @@
-// Dev mode, for working on Lattice itself: `npm run dev`.
+// Dev mode, for working on Archipelago itself: `npm run dev`.
 //
-// Runs the server with LATTICE_DEV=1 and keeps it running. When the server
+// Runs the server with PELAGO_DEV=1 and keeps it running. When the server
 // exits asking for a restart (the `restart` tool), it is started again on the
 // code now on disk. When it dies any other way, it is started again as soon as
 // a file under src/ or packs/ changes, so a session that broke the server can
@@ -27,7 +27,7 @@ let waiting: (() => void) | undefined;
 
 function start(): void {
   note('starting the server');
-  const child = spawn(process.execPath, [join(ROOT, 'src', 'server.ts')], { cwd: ROOT, env: { ...process.env, LATTICE_DEV: '1' }, stdio: ['inherit', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(ROOT, 'src', 'server.ts')], { cwd: ROOT, env: { ...process.env, PELAGO_DEV: '1' }, stdio: ['inherit', 'pipe', 'pipe'] });
   child.stdout.on('data', say);
   child.stderr.on('data', say);
   child.on('exit', (code) => {

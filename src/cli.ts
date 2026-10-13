@@ -5,8 +5,9 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { newSecret, OPERATOR_RESET_FILE } from './auth.ts';
 import { loadConfig } from './config.ts';
+import { env } from './env.ts';
 
-const USAGE = `lattice <command>
+const USAGE = `pelago <command>
 
   init "<name>" [email]        set yourself as the workspace owner
   status                       pending proposals, connections, held resources
@@ -29,13 +30,13 @@ async function call<T = unknown>(tool: string, input: unknown = {}): Promise<T> 
   let res: Response;
   try {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
-    if (process.env.LATTICE_TOKEN) headers.authorization = `Bearer ${process.env.LATTICE_TOKEN}`;
+    if (env('TOKEN')) headers.authorization = `Bearer ${env('TOKEN')}`;
     res = await fetch(`${base}/api/${tool}`, { method: 'POST', headers, body: JSON.stringify(input) });
   } catch {
-    throw new Error(`Cannot reach lattice at ${base}. Start it with: npm start`);
+    throw new Error(`Cannot reach pelago at ${base}. Start it with: npm start`);
   }
   const body = (await res.json()) as { result?: T; error?: string };
-  if (res.status === 401) throw new Error('This server requires a token. Set LATTICE_TOKEN to your token and try again.');
+  if (res.status === 401) throw new Error('This server requires a token. Set PELAGO_TOKEN to your token and try again.');
   if (!res.ok) throw new Error(body.error);
   return body.result as T;
 }
@@ -97,7 +98,7 @@ async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   switch (command) {
     case 'init':
-      if (!args[0]) throw new Error('Usage: lattice init "<name>" [email]');
+      if (!args[0]) throw new Error('Usage: pelago init "<name>" [email]');
       return print(await call('init', { name: args[0], email: args[1] }));
 
     case 'status': {
@@ -118,12 +119,12 @@ async function main(): Promise<void> {
       const shown = args[0] ? pending.filter((p) => p.id === args[0]) : pending;
       if (!shown.length) return console.log(args[0] ? `No pending proposal ${args[0]}` : 'Nothing to review.');
       for (const p of shown) showProposal(p, Boolean(args[0]) || shown.length === 1);
-      console.log(`\nApprove with: lattice approve <id>   (or: approve all, approve <id> --except ref,#3)`);
+      console.log(`\nApprove with: pelago approve <id>   (or: approve all, approve <id> --except ref,#3)`);
       return;
     }
 
     case 'approve': {
-      if (!args[0]) throw new Error('Usage: lattice approve <id|all> [--except a,b]');
+      if (!args[0]) throw new Error('Usage: pelago approve <id|all> [--except a,b]');
       const flag = args.indexOf('--except');
       const except = flag >= 0 ? (args[flag + 1] ?? '').split(',').filter(Boolean) : undefined;
       const ids = args[0] === 'all' ? (await call<ProposalRow[]>('proposals')).map((p) => p.id) : [args[0]];
@@ -140,7 +141,7 @@ async function main(): Promise<void> {
     }
 
     case 'reject':
-      if (!args[0]) throw new Error('Usage: lattice reject <id> [note]');
+      if (!args[0]) throw new Error('Usage: pelago reject <id> [note]');
       return print(await call('decide', { proposal: args[0], approve: false, note: args.slice(1).join(' ') || undefined }));
 
     case 'view':
@@ -156,7 +157,7 @@ async function main(): Promise<void> {
       return print(await call('events', { limit: args[0] ? Number(args[0]) : 30 }));
 
     case 'call': {
-      if (!args[0]) throw new Error('Usage: lattice call <tool> [json | @file]');
+      if (!args[0]) throw new Error('Usage: pelago call <tool> [json | @file]');
       const raw = args[1]?.startsWith('@') ? readFileSync(args[1].slice(1), 'utf8') : args[1];
       return print(await call(args[0], raw ? JSON.parse(raw) : {}));
     }

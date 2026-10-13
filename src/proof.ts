@@ -3,7 +3,7 @@
 // question is answered is worked out from the results every time; nothing
 // says so that could go stale.
 
-import { actorId, type Actor, type Entity, type Lattice, type Op } from './lattice.ts';
+import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 
 interface Link {
   type: string;
@@ -17,7 +17,7 @@ interface Link {
  * build: the one asked for, or the build last reported. Without `of`, the
  * projects that have proof questions.
  */
-export async function proof(l: Lattice, input: { of?: string; build?: string }, within?: Set<string>) {
+export async function proof(l: Archipelago, input: { of?: string; build?: string }, within?: Set<string>) {
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, visibility, ${l.props}, updated_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
   const { rows: links } = await l.db.query<Link>(`select type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`, [['part_of', 'about', 'software.answers', 'produced']]);
@@ -132,7 +132,7 @@ export async function proof(l: Lattice, input: { of?: string; build?: string }, 
  * shipped, with the release each went out in. What is built and not yet
  * released comes first, then the newest. What is only planned is not here.
  */
-export async function changelog(l: Lattice, input: { of?: string }, within?: Set<string>) {
+export async function changelog(l: Archipelago, input: { of?: string }, within?: Set<string>) {
   if (!input.of) throw new Error('changelog needs "of": the id of a project or feature.');
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, ${l.props}, updated_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
@@ -196,7 +196,7 @@ export interface TestReport {
  * named in the answer and nothing is made for it, so a harness cannot fill
  * the map with tests nobody placed under a question.
  */
-export async function reportTests(l: Lattice, actor: Actor, input: TestReport) {
+export async function reportTests(l: Archipelago, actor: Actor, input: TestReport) {
   const build = input.build.trim();
   if (!build) throw new Error('test_report needs "build": the version or commit the tests ran on.');
   const { rows: tests } = await l.db.query<Entity>(`select id, title, props from entity where type = any($1::text[]) and archived_at is null`, [l.registry.family('software.test')]);
@@ -263,7 +263,7 @@ export const PICTURE_MAX = 1_000_000;
 const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 /** Remove the kept pictures of every result of these tests. */
-async function dropPictures(l: Lattice, actor: Actor, tests: string[], reason: string): Promise<number> {
+async function dropPictures(l: Archipelago, actor: Actor, tests: string[], reason: string): Promise<number> {
   const { rows } = await l.db.query<{ entity_id: string }>(
     `delete from picture where entity_id in (select to_id from relation where type = 'produced' and valid_to is null and from_id = any($1::text[])) returning entity_id`,
     [tests],
@@ -277,7 +277,7 @@ async function dropPictures(l: Lattice, actor: Actor, tests: string[], reason: s
  * shown in public: until then the picture stays in the repository it was made
  * in. There is one per result; sent again, it replaces what was kept.
  */
-export async function putPicture(l: Lattice, actor: Actor, input: { result: string; data: string; content_type: string }) {
+export async function putPicture(l: Archipelago, actor: Actor, input: { result: string; data: string; content_type: string }) {
   const result = await l.entity(input.result);
   if (!result || !l.registry.isA(result.type, 'software.test_result')) throw new Error(`picture_put: "${input.result}" is not a test result.`);
   if (!PICTURE_TYPES.includes(input.content_type)) throw new Error(`picture_put: the picture must be one of ${PICTURE_TYPES.join(', ')}, not ${input.content_type}.`);
@@ -294,7 +294,7 @@ export async function putPicture(l: Lattice, actor: Actor, input: { result: stri
 }
 
 /** The picture kept for a result, as base64, or null when none is. */
-export async function getPicture(l: Lattice, input: { result: string }) {
+export async function getPicture(l: Archipelago, input: { result: string }) {
   const { rows } = await l.db.query<{ content_type: string; data: string; size: number }>(`select content_type, encode(bytes, 'base64') as data, size from picture where entity_id = $1`, [input.result]);
   return rows[0] ? { result: input.result, content_type: rows[0].content_type, size: rows[0].size, data: rows[0].data.replaceAll('\n', '') } : null;
 }

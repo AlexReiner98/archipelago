@@ -1,11 +1,12 @@
-// A Claude Code hook that tells Lattice about the session: started, a prompt
+// A Claude Code hook that tells Archipelago about the session: started, a prompt
 // sent, ended. Claude Code hands the hook its input as JSON on stdin and
-// reads the answer from stdout; this passes both through to the Lattice
-// server the machine is connected to (LATTICE_URL and LATTICE_AGENT_TOKEN,
+// reads the answer from stdout; this passes both through to the Archipelago
+// server the machine is connected to (PELAGO_URL and PELAGO_AGENT_TOKEN,
 // the same two that .mcp.json reads), or to the one on this machine when
-// those are not set.
+// those are not set. A machine connected while this was called Lattice has
+// them as LATTICE_URL and LATTICE_AGENT_TOKEN, and those are read too.
 //
-//   node scripts/lattice-hook.mjs session-start | prompt | stop | session-end
+//   node scripts/pelago-hook.mjs session-start | prompt | stop | session-end
 //
 // At the start it also says which repository the folder is a checkout of (its
 // origin), so the map knows the session's repository on any machine.
@@ -13,7 +14,7 @@
 // With each prompt, at the end of each turn (stop) and at the end it also says how many tokens the session
 // has used so far, counted from the session's own record on this machine
 // (the transcript Claude Code names in the hook's input): input and output,
-// not counting cached re-reads. Lattice gives what is new to the work the
+// not counting cached re-reads. Archipelago gives what is new to the work the
 // session is on.
 //
 // It never fails the session: if the server is away it says so on stderr and
@@ -22,12 +23,12 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-// Which hand-out of Lattice's files this project has: the setup writes it in, and the server says when it is behind.
+// Which hand-out of Archipelago's files this project has: the setup writes it in, and the server says when it is behind.
 const SETUP = '';
 
 const name = process.argv[2];
-const base = (process.env.LATTICE_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
-const token = process.env.LATTICE_AGENT_TOKEN;
+const base = (process.env.PELAGO_URL || process.env.LATTICE_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
+const token = process.env.PELAGO_AGENT_TOKEN || process.env.LATTICE_AGENT_TOKEN;
 
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
@@ -86,7 +87,7 @@ try {
   });
   const answer = await res.text();
   if (res.ok) process.stdout.write(answer);
-  else console.error(`Lattice ${name} hook: ${base} answered ${res.status}`);
+  else console.error(`Archipelago ${name} hook: ${base} answered ${res.status}`);
 } catch (err) {
-  console.error(`Lattice ${name} hook: ${base} did not answer (${err.message})`);
+  console.error(`Archipelago ${name} hook: ${base} did not answer (${err.message})`);
 }

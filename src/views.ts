@@ -2,7 +2,7 @@
 // blockers are derived from relations every time, so they cannot go stale.
 
 import { lastPushes, repoByName, repoName } from './github.ts';
-import { ACTIVE_HOLDS, type Entity, type Lattice } from './lattice.ts';
+import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 import { costs } from './costs.ts';
 import { changelog, proof } from './proof.ts';
 
@@ -84,12 +84,12 @@ class BlockGraph {
   }
 }
 
-export async function blockGraph(l: Lattice): Promise<BlockGraph> {
+export async function blockGraph(l: Archipelago): Promise<BlockGraph> {
   const { rows } = await l.db.query<Edge>(EDGES);
   return new BlockGraph(rows);
 }
 
-async function briefs(l: Lattice, ids: Iterable<string>): Promise<Map<string, Brief>> {
+async function briefs(l: Archipelago, ids: Iterable<string>): Promise<Map<string, Brief>> {
   const list = [...new Set(ids)];
   if (!list.length) return new Map();
   const { rows } = await l.db.query<Brief>(
@@ -99,13 +99,13 @@ async function briefs(l: Lattice, ids: Iterable<string>): Promise<Map<string, Br
   return new Map(rows.map((r) => [r.id, r]));
 }
 
-async function person(l: Lattice, given?: string): Promise<string> {
+async function person(l: Archipelago, given?: string): Promise<string> {
   const id = given ?? (l.viewer || (await l.setting<string>('me')));
-  if (!id) throw new Error('No person given and no workspace owner set. Run: lattice init "Your Name"');
+  if (!id) throw new Error('No person given and no workspace owner set. Run: pelago init "Your Name"');
   return id;
 }
 
-async function blockers(l: Lattice, input: { owner?: string }) {
+async function blockers(l: Archipelago, input: { owner?: string }) {
   const graph = await blockGraph(l);
   const ids = [...graph.direct.keys()];
   const rootsOf = new Map(ids.map((id) => [id, graph.roots(id)]));
@@ -119,7 +119,7 @@ async function blockers(l: Lattice, input: { owner?: string }) {
     }));
 }
 
-async function availableNow(l: Lattice, input: { owner?: string }) {
+async function availableNow(l: Archipelago, input: { owner?: string }) {
   const graph = await blockGraph(l);
   const { rows: tasks } = await l.db.query<Brief>(
     `select id, type, title, status, owner, props->>'due' as due from entity
@@ -142,7 +142,7 @@ async function availableNow(l: Lattice, input: { owner?: string }) {
   };
 }
 
-async function needsMe(l: Lattice, input: { person?: string }) {
+async function needsMe(l: Archipelago, input: { person?: string }) {
   const me = await person(l, input.person);
   const graph = await blockGraph(l);
   const { rows } = await l.db.query<Brief>(
@@ -166,7 +166,7 @@ async function needsMe(l: Lattice, input: { person?: string }) {
   };
 }
 
-async function blockedOnMe(l: Lattice, input: { person?: string }) {
+async function blockedOnMe(l: Archipelago, input: { person?: string }) {
   const me = await person(l, input.person);
   const graph = await blockGraph(l);
   const waiting = new Map<string, string[]>(); // my blocker -> what it holds up
@@ -180,7 +180,7 @@ async function blockedOnMe(l: Lattice, input: { person?: string }) {
     .sort((a, b) => b.holding_up.length - a.holding_up.length);
 }
 
-async function waitingOn(l: Lattice, input: { person?: string }) {
+async function waitingOn(l: Archipelago, input: { person?: string }) {
   const me = await person(l, input.person);
   const graph = await blockGraph(l);
   const ids = [...graph.direct.keys()];
@@ -201,7 +201,7 @@ async function waitingOn(l: Lattice, input: { person?: string }) {
   return { blocked_by_others: blocked, owed_to_me: owed };
 }
 
-async function changedSince(l: Lattice, input: { since?: string; limit?: number }) {
+async function changedSince(l: Archipelago, input: { since?: string; limit?: number }) {
   if (!input.since || Number.isNaN(Date.parse(input.since))) throw new Error('changed_since needs "since" as an ISO date or date-time');
   // The counts are of everything since; the events are the newest of them, few enough to read.
   const events = await l.events({ since: input.since, limit: input.limit ?? 50 });
@@ -215,7 +215,7 @@ async function changedSince(l: Lattice, input: { since?: string; limit?: number 
   };
 }
 
-async function atRisk(l: Lattice, input: { days?: number }) {
+async function atRisk(l: Archipelago, input: { days?: number }) {
   const days = input.days ?? 7;
   const graph = await blockGraph(l);
   const { rows: due } = await l.db.query<Brief & { overdue: boolean }>(
@@ -248,7 +248,7 @@ export const HANDOFF_MAX = 3000;
  * chat, so this is what the next session shows them, in one list, in place of
  * a notification for each.
  */
-export async function toConfirm(l: Lattice, input: { limit?: number } = {}) {
+export async function toConfirm(l: Archipelago, input: { limit?: number } = {}) {
   const { rows: marks } = await l.db.query<{ upto: number | null }>(`select max((detail->>'upto')::int) as upto from event where action in ('changes.seen', 'questions.confirmed')`);
   const since = marks[0]?.upto ?? 0;
   const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; outcome: string | null; seq: number; ts: Date; actor: string; authority: { of?: string; basis?: string } | null }>(
@@ -286,7 +286,7 @@ export async function toConfirm(l: Lattice, input: { limit?: number } = {}) {
 /** Minutes without a report before an open session is shown as stale. */
 const STALE_MINUTES = 30;
 
-async function sessions(l: Lattice) {
+async function sessions(l: Archipelago) {
   const runs = l.registry.family('sys.run');
   const { rows: open } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null order by created_at desc`, [runs]);
   const { rows: links } = await l.db.query<{ run: string; type: string; id: string; title: string; entity_type: string }>(
@@ -322,7 +322,7 @@ async function sessions(l: Lattice) {
 }
 
 /** Everything a session needs to start on a task, as data and as text to paste. */
-async function brief(l: Lattice, input: { task?: string }) {
+async function brief(l: Archipelago, input: { task?: string }) {
   if (!input.task) throw new Error('brief needs "task": the id of the entity to work on');
   const task = await l.entity(input.task);
   if (!task) throw new Error(`No entity "${input.task}"`);
@@ -361,7 +361,7 @@ async function brief(l: Lattice, input: { task?: string }) {
     [needs.map((n) => n.id)],
   );
 
-  const lines = [`# ${task.title}`, `${l.registry.type(task.type)?.title ?? task.type}, ${task.status}. Lattice id: ${task.id}`];
+  const lines = [`# ${task.title}`, `${l.registry.type(task.type)?.title ?? task.type}, ${task.status}. Archipelago id: ${task.id}`];
   if (task.body) lines.push('', task.body);
   if (chain.length > 1) lines.push('', `Part of: ${chain.slice(1).map((c) => c.title).join(' > ')}`);
   if (repo) lines.push(`Repository: ${repo.title} (${repo.props.path ?? repo.props.remote ?? 'no path recorded'})`);
@@ -382,7 +382,7 @@ async function brief(l: Lattice, input: { task?: string }) {
   }
   if (issues.length) lines.push('', '## Addresses', ...issues.map((i) => `- ${i.title} (${i.status})${i.body ? `: ${i.body}` : ''}`));
   if (assumptions.length) lines.push('', '## Assumes', ...assumptions.map((a) => `- ${a.title} (${a.status})`));
-  lines.push('', '## Reporting', `Register with lattice (session_start, task ${task.id}), note anything worth knowing with session_update, and call session_end with a summary when done.`);
+  lines.push('', '## Reporting', `Register with pelago (session_start, task ${task.id}), note anything worth knowing with session_update, and call session_end with a summary when done.`);
 
   const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
   return {
@@ -402,7 +402,7 @@ async function brief(l: Lattice, input: { task?: string }) {
  * itself knows only that), or by its title in the map (what a session is told).
  * Asked for none, or one that is not there, it says which there are.
  */
-async function findRepo(l: Lattice, key: string | undefined, view: string): Promise<Entity> {
+async function findRepo(l: Archipelago, key: string | undefined, view: string): Promise<Entity> {
   const { rows: repos } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null order by title`, [l.registry.family('software.repo')]);
   const wanted = key?.trim().toLowerCase();
   const repo = wanted && (repos.find((r) => r.id === wanted) ?? (await repoByName(l, repoName(key))) ?? repos.find((r) => r.title.toLowerCase() === wanted));
@@ -423,7 +423,7 @@ const REPO_SCOPE = `with recursive scope(id) as (
      )`;
 
 /** The ids of everything that is a repository's: the repository, what lives in it, and all that is part of that or about it. */
-export async function repoScope(l: Lattice, repo: string): Promise<Set<string>> {
+export async function repoScope(l: Archipelago, repo: string): Promise<Set<string>> {
   const { rows } = await l.db.query<{ id: string }>(`${REPO_SCOPE} select id from scope`, [repo]);
   return new Set([repo, ...rows.map((r) => r.id)]);
 }
@@ -436,7 +436,7 @@ const UNDER = `with recursive scope(id) as (
      )`;
 
 /** Open work that belongs to whatever lives in a repository, split by whether it can run now. */
-async function repoWork(l: Lattice, input: { repo?: string }) {
+async function repoWork(l: Archipelago, input: { repo?: string }) {
   const repo = await findRepo(l, input.repo, 'repo_work');
   input = { repo: repo.id };
   const graph = await blockGraph(l);
@@ -473,7 +473,7 @@ const HANDOFF_DAYS = 7;
  * settled or opened, the sessions that ended and what each said). The note is
  * the one part an agent writes, and holds only what the map cannot know.
  */
-export async function handoff(l: Lattice, input: { repo?: string; since?: string }) {
+export async function handoff(l: Archipelago, input: { repo?: string; since?: string }) {
   const repo = await findRepo(l, input.repo, 'handoff');
   if (input.since && Number.isNaN(Date.parse(input.since))) throw new Error('handoff: "since" must be an ISO date or date-time');
   const work = await repoWork(l, { repo: repo.id });
@@ -540,7 +540,7 @@ export async function handoff(l: Lattice, input: { repo?: string; since?: string
  * last change is when it was last known true: an update that changes nothing
  * is how someone who checked it says so.
  */
-async function oldest(l: Lattice, input: { days?: number; repo?: string; project?: string; limit?: number }) {
+async function oldest(l: Archipelago, input: { days?: number; repo?: string; project?: string; limit?: number }) {
   const days = input.days ?? UNCONFIRMED_DAYS;
   const repo = input.repo ? await findRepo(l, input.repo, 'oldest') : undefined;
   const { rows } = await l.db.query<Brief & { last_confirmed: Date; days: number }>(
@@ -570,7 +570,7 @@ const RECHECK_DAYS = 7;
  * project says how often itself; a feature living in a repository on its own
  * takes the answer of the project it is part of.
  */
-async function recheckOf(l: Lattice, project: Entity, now = Date.now()) {
+async function recheckOf(l: Archipelago, project: Entity, now = Date.now()) {
   let every = RECHECK_DAYS;
   for (let at: Entity | undefined = project, depth = 0; at && depth < 6; depth++) {
     if (typeof at.props.recheck_days === 'number') {
@@ -592,7 +592,7 @@ async function recheckOf(l: Lattice, project: Entity, now = Date.now()) {
  * lives elsewhere, and its work goes stale like any other. A feature whose
  * project lives here too is that project's, and is not listed twice.
  */
-export async function projectsIn(l: Lattice, repo: string): Promise<Entity[]> {
+export async function projectsIn(l: Archipelago, repo: string): Promise<Entity[]> {
   const { rows } = await l.db.query<Entity>(
     `select p.* from relation r join entity p on p.id = r.from_id
      where r.type = 'software.lives_in' and r.to_id = $1 and r.valid_to is null and p.type = any($2::text[]) and p.is_open and p.archived_at is null
@@ -614,7 +614,7 @@ export async function projectsIn(l: Lattice, repo: string): Promise<Entity[]> {
  * said to wait on a person is left out: the code cannot tell, and that has
  * been recorded.
  */
-async function recheck(l: Lattice, input: { repo?: string; limit?: number; now?: boolean }) {
+async function recheck(l: Archipelago, input: { repo?: string; limit?: number; now?: boolean }) {
   const repo = await findRepo(l, input.repo, 'recheck');
   const projects = [];
   const graph = await blockGraph(l);
@@ -634,7 +634,7 @@ async function recheck(l: Lattice, input: { repo?: string; limit?: number; now?:
 }
 
 /** Projects in a repository that have waited out their interval, whether or not anything in them is old. */
-export async function awaitingRecheck(l: Lattice, repoKey: string): Promise<Entity[]> {
+export async function awaitingRecheck(l: Archipelago, repoKey: string): Promise<Entity[]> {
   const repo = await findRepo(l, repoKey, 'rechecked');
   const waiting = [];
   for (const p of await projectsIn(l, repo.id)) if ((await recheckOf(l, p)).waited) waiting.push(p);
@@ -647,7 +647,7 @@ export async function awaitingRecheck(l: Lattice, repoKey: string): Promise<Enti
  * newest first, and the sum for each place they ran over the last week and
  * the last thirty days.
  */
-async function agentUsage(l: Lattice, input: { repo?: string; limit?: number }) {
+async function agentUsage(l: Archipelago, input: { repo?: string; limit?: number }) {
   const repo = await findRepo(l, input.repo, 'agent_usage');
   const { rows } = await l.db.query<Entity>(
     `select e.* from entity e join relation r on r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null
@@ -689,7 +689,7 @@ const GRAPH_PRESETS: Record<string, string[] | undefined> = {
 const GRAPH_LIMIT = 400;
 
 /** Nodes and edges for drawing: the whole map under a preset, or the neighbourhood of one entity. */
-async function graph(l: Lattice, input: { focus?: string; depth?: number; relations?: string; include_closed?: boolean; include_system?: boolean }) {
+async function graph(l: Archipelago, input: { focus?: string; depth?: number; relations?: string; include_closed?: boolean; include_system?: boolean }) {
   const preset = input.relations ?? (input.focus ? 'all' : 'blocking');
   if (!(preset in GRAPH_PRESETS)) throw new Error(`relations must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
   const only = GRAPH_PRESETS[preset];
@@ -793,7 +793,7 @@ async function graph(l: Lattice, input: { focus?: string; depth?: number; relati
  * order, the work under each, progress rolled up from that work, and where
  * work is happening now. Without a root, the roots there are to choose from.
  */
-async function tree(l: Lattice, input: { tree?: string; root?: string }) {
+async function tree(l: Archipelago, input: { tree?: string; root?: string }) {
   const defs = l.registry.trees;
   const def = input.tree ? defs.get(input.tree) : defs.size === 1 ? [...defs.values()][0] : undefined;
   if (!def) throw new Error(`tree must be one of: ${[...defs.keys()].join(', ')}`);
@@ -881,7 +881,7 @@ async function tree(l: Lattice, input: { tree?: string; root?: string }) {
  * it, is about something in it, or something in it depends on or assumes it.
  * Without a project, the projects and how many open questions each has.
  */
-async function questions(l: Lattice, input: { project?: string }) {
+async function questions(l: Archipelago, input: { project?: string }) {
   const kindOf = (type: string) => (l.registry.isA(type, 'decision') ? 'decision' : l.registry.isA(type, 'hypothesis') ? 'hypothesis' : undefined);
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, body, status, is_open, props, updated_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
@@ -976,7 +976,7 @@ const GATE_WORK = ['task', 'issue', 'decision'];
  * item itself when that is a feature or project, which then brings all its
  * work. Without an event, the open events there are.
  */
-async function gate(l: Lattice, input: { event?: string }) {
+async function gate(l: Archipelago, input: { event?: string }) {
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, owner, props, created_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
   const { rows: links } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(
@@ -1111,7 +1111,7 @@ async function gate(l: Lattice, input: { event?: string }) {
   };
 }
 
-async function notifications(l: Lattice) {
+async function notifications(l: Archipelago) {
   const { rows } = await l.db.query(
     `select n.id, n.title, n.body, n.props->>'level' as level, n.props->>'from' as from, n.created_at,
             a.id as about_id, a.title as about_title
@@ -1127,7 +1127,7 @@ async function notifications(l: Lattice) {
 
 export interface View {
   description: string;
-  run(l: Lattice, input: Record<string, unknown>): Promise<unknown>;
+  run(l: Archipelago, input: Record<string, unknown>): Promise<unknown>;
 }
 
 export const VIEWS: Record<string, View> = {

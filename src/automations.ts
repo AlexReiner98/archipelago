@@ -7,7 +7,7 @@
 import { AUTOMATION_TOOLS, checkAutomation } from './automation-rules.ts';
 import { notImported } from './backup.ts';
 import { launch } from './launcher.ts';
-import type { Entity, Lattice } from './lattice.ts';
+import type { Entity, Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
 import { sessionEnd } from './sessions.ts';
 import { callTool } from './tools.ts';
@@ -32,11 +32,11 @@ const fill = (template: string, values: Record<string, string>) => template.repl
 const matches = (pattern: string, action: string) => (pattern.endsWith('*') ? action.startsWith(pattern.slice(0, -1)) : action === pattern);
 
 export class Automations {
-  readonly l: Lattice;
+  readonly l: Archipelago;
   private timer: ReturnType<typeof setInterval> | undefined;
   private busy = false;
 
-  constructor(l: Lattice) {
+  constructor(l: Archipelago) {
     this.l = l;
   }
 
@@ -105,7 +105,7 @@ export class Automations {
     const { rows } = await this.l.db.query<LoggedEvent>(
       `select ev.seq::int as seq, ev.actor, ev.action, ev.target_id, e.title as target_title, ev.reason
        from event ev left join entity e on e.id = ev.target_id
-       where ev.seq > $1 and ev.seq <= $2 and ev.origin = 'lattice' and ev.actor not like '%:automation:%' and ev.action <> 'automation.fire' and ${notImported('ev')}
+       where ev.seq > $1 and ev.seq <= $2 and ev.origin = 'pelago' and ev.actor not like '%:automation:%' and ev.action <> 'automation.fire' and ${notImported('ev')}
        order by ev.seq`,
       [cursor, latest],
     );
@@ -156,18 +156,18 @@ export class Automations {
       // Half a day without a word: its window was shut, or its machine was. It is ended for it, as its end hook
       // would have ended it, and what it held is given back.
       if (Date.now() - Date.parse(run.last_seen) > QUIET_HOURS * 3_600_000) {
-        await sessionEnd(this.l, { kind: 'agent', name: 'lattice' }, { run: run.id, outcome: 'finished', summary: `Not heard from for over ${QUIET_HOURS} hours: ended for it` });
+        await sessionEnd(this.l, { kind: 'agent', name: 'pelago' }, { run: run.id, outcome: 'finished', summary: `Not heard from for over ${QUIET_HOURS} hours: ended for it` });
         continue;
       }
       const entity = await this.l.entity(run.id);
       if (entity?.props.stale_flagged) continue;
       await this.l.db.query(`update entity set props = props || '{"stale_flagged": true}' where id = $1`, [run.id]);
-      await this.l.log(this.l.db, { actor: 'agent:lattice', action: 'run.stale', target: run.id, reason: `No report for over ${view.stale_after_minutes} minutes` });
+      await this.l.log(this.l.db, { actor: 'agent:pelago', action: 'run.stale', target: run.id, reason: `No report for over ${view.stale_after_minutes} minutes` });
       // Worth a person's attention only when it keeps something from everyone else: the rest end by themselves.
       if (!run.holds.length) continue;
       await notify(
         this.l,
-        { kind: 'agent', name: 'lattice' },
+        { kind: 'agent', name: 'pelago' },
         { title: `Session "${run.title}" has gone quiet`, body: `It still holds: ${run.holds.map((h) => h.title).join(', ')}. End it from its page to release them; left alone, it is ended after ${QUIET_HOURS} hours.`, level: 'warning', about: run.id },
       );
     }
