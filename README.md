@@ -2,17 +2,93 @@
 
 [![Tests](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml)
 
-A typed, extensible map of people, work and dependencies, built to be used by a
-human and by AI agents through the same tools.
+Lattice is a map of your work that you and your AI agents keep together:
+projects, tasks, decisions, people, and what waits on what. You look at it in
+a web page. Your agents read and change it through the same tools you use, and
+what an agent changes either waits for your yes or is applied, logged and one
+click to undo.
 
-## Run it
+It is for someone who runs several agent sessions across several
+repositories and has lost track of where things stand. Each session starts by
+reading the map, says what it takes on, and leaves the map true when it ends,
+so the next session, or you, can pick up without being told.
+
+![You and your agents use the same tools on one map](docs/overview.svg)
+
+## Start in five minutes
+
+You need [Node.js](https://nodejs.org) 24 or newer. Nothing else: the database
+is embedded and lives in a `data/` folder beside the code.
 
 ```bash
+git clone https://github.com/AlexReiner98/lattice.git
+cd lattice
 npm install
 npm start
 ```
 
-The server listens on `http://127.0.0.1:3100` and keeps its data in `data/`
+Open `http://127.0.0.1:3100`. On the **Workspace** screen, type your name
+under Owner: the map's questions ("what needs me?") are asked about you.
+
+Then make something to look at. Press **New** on the Search screen and create
+a project and a task in it, or let an agent do it in the next step.
+
+## Connect Claude Code
+
+In the folder of a project you work on with [Claude Code](https://claude.com/claude-code),
+with the server running:
+
+```bash
+node -e "fetch('http://127.0.0.1:3100/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"
+```
+
+It writes a few files into that project and holds no secret: the connection
+to the map (`.mcp.json`), hooks that register each session and count its
+tokens, and working rules that it adds to the project's `CLAUDE.md`. It adds
+to what is there and can be run again. On a server on your own machine no
+token is needed, whatever its last line says. Quit Claude Code completely and
+open it again in that folder.
+
+## A first session
+
+Open Claude Code in the connected project and ask it for something:
+
+> Put this repository in Lattice as a project, with the three things I am
+> working on as tasks, and tell me what you would do first.
+
+What happens:
+
+1. The session registers itself in the map. Work it has taken on is marked
+   "session open".
+2. The agent searches the map, then sends one change: the project, the
+   tasks, and how they hang together.
+3. The change waits for you. **Changes** shows each thing it would make; you
+   apply it, leave parts out, or decline it. Nothing an agent sends takes
+   effect before that, unless you choose otherwise in Workspace settings.
+4. The next session in that folder starts by being told what is open there
+   and what is blocked, and by whom.
+
+From here the map answers the questions it is for: what needs you now, what
+is blocked and on what, what changed since you last looked, what an agent
+decided without you. A project's page draws its roadmap; an item's page
+draws what it depends on.
+
+## Where to go next
+
+- **Use it from several machines, or with other people:** [Hosting](#hosting)
+  and [Identity and workspaces](#identity-and-workspaces). Beyond your own
+  machine the server asks for a token with every request.
+- **Have the map follow your code:** [GitHub](#github-pushes-keep-the-map-current).
+  A push is recorded, and an agent reads it against what was open.
+- **Add your own kinds of thing:** [Packs and flavours](#packs-and-flavours).
+- **Work on Lattice itself:** [Dev mode](#dev-mode), [Tests](#tests) and
+  `CLAUDE.md`.
+
+# Reference
+
+## Running the server
+
+`npm start` listens on `http://127.0.0.1:3100` and keeps its data in `data/`
 (embedded Postgres, no install needed). Everything else talks to that server.
 Only one server may use a data folder at a time: it writes `data.lock` beside
 the folder, and a second one refuses to start.
@@ -27,7 +103,7 @@ For working on Lattice itself, one person on one machine. It differs from
 `npm start` in two ways:
 
 - **Agent changes are not reviewed.** Every op applies at once unless
-  `policy` in `lattice.config.json` says otherwise. Undo in the Activity screen
+  `policy` in `lattice.config.json` says otherwise. Undo on the Changes screen
   still reverses a change set.
 - **Agents can restart the server** with the `restart` tool, to run code they
   have just changed. The server is kept running by [src/dev.ts](src/dev.ts):
@@ -49,49 +125,35 @@ All three call the tools in [src/tools.ts](src/tools.ts). The web UI and CLI
 have human authority; the MCP endpoint does not, and two tools (`decide`,
 `init`) are not offered to agents at all.
 
-The web UI has four places. **Home** is what needs you, project by project.
-Changes held for you, to apply or decline, come first. Then each project is a card: its
-progress, what is being worked on, and under it what there is for you to
-read, to decide and to do in that project, each dealt with where it stands
-and each list showing its first two until asked for more. A project's
-**Roadmap** and **Questions** open from its card. What belongs to no project
-has a card of its own, and what is blocked, at risk, waiting on others, in
-session or held is a row of counts, opened one at a time.
-**Search** finds anything in the map by words or type (it lists nothing
-until you ask), creates new things, and opens each entity with its fields,
-relations and history; **Activity** (the event log, one line per change set)
-is beside it. **Workspace** holds the owner, tokens, members, importing a backup and
-automations. A held change's parts can be excluded or corrected one by one in
-**Changes**, in the menu and reached from it on Home; below them the same screen lists what
-agents changed without waiting since you last looked, each with Undo, and
-"Mark all seen" records that you looked. The **Graph** opens from an
-entity's page.
+The web UI has three places, and one page for each thing.
 
-The roadmap is one project's features in the order they are to be built. Each
-shows its own status and how much of the work that is part of it is closed, and
-whatever is being built or has a session open on it is marked. Reorder features
-with the arrows; tasks that belong to the project but to no feature are listed
-underneath, to be moved under one. **Graph** at the top lays the features
-out by dependency: each sits one column to the right of everything it waits
-on, with an arrow from what is needed (red while that is unfinished). It is the `tree` view, which agents can call
-too. The tree itself is declared in the software pack (`trees` in
+- **Search** is where it opens. It finds anything in the map by words or
+  type, and **New** makes a thing by hand.
+- **Changes** holds what agents sent that waits for you: each part can be
+  left out or corrected before you apply it. Below that it lists what agents
+  changed without waiting since you last looked, each with Undo; "Mark all
+  seen" records that you looked.
+- **Workspace** holds the owner, agent tokens, members, GitHub, what agents
+  may change unreviewed, importing a backup, and what the work has cost.
+
+Every item has a single page, and every way to it leads there: its fields,
+its note folded to the first paragraph, its relations drawn as a graph, and
+its history. A project's page also draws its **roadmap** (its features in
+the order they are to be built, with progress, and marked where a session is
+open) and lists its open **questions**: decisions not made and hypotheses not
+settled, the ones holding up the most first. A decision is made where it
+stands: pick an option or type the outcome, and say why. The whole log of
+changes is at `#/activity`.
+
+The roadmap is the `tree` view, which agents can call too. The tree is
+declared in the software pack (`trees` in
 [packs/software/pack.json](packs/software/pack.json)): which types are roots,
 branches and work, which field orders them, and which statuses mean "now". A
 pack can declare another tree the same way, with no code.
 
-**Questions** is one project's undecided things, to be worked through from the
-top: open decisions and unsettled hypotheses, the ones holding up the most
-first, each with what waits on it and what is testing it. A decision is made
-where it stands: pick one of its options or type the outcome, add why, and it
-is recorded as decided. To have something looked into first, type it in
-"Ask an agent" on the card: that makes a task about the question, leaves the
-question open, and reaches any agent that is listening. A question belongs to a project when it is part of it,
-is about something in it, or something in it depends on or assumes it. Agents
-get the same list from the `questions` view.
-
 **Following agents.** With "Follow agents" ticked (bottom of the menu), an
 agent can bring your page to what it is working on: every change it makes
-opens what it touched (or Review, when the change waits there), and the `show`
+opens what it touched (or Changes, when the change waits there), and the `show`
 tool opens any entity or screen with a one-line note. Anything you are in the
 middle of is kept; the note offers the jump instead.
 
@@ -102,11 +164,11 @@ while one waits. A Claude Code session in this repository is also told, with
 your next message, what you did since it last heard (the `UserPromptSubmit`
 hook in `.claude/settings.json`).
 
-The graph draws the map as nodes and arrows: what blocks what, what belongs to
-what, or every relation. Open it on one entity (the **Graph** button on its
-page) to see only its neighbourhood, one to four steps out. Colour shows the
-kind of thing, a dashed red ring marks what is blocked, and finished work is
-hollow. Drag to move, scroll to zoom, click a node to open it. It is plain files in `ui/` with no build step.
+The graph on an item's page shows its neighbourhood, one to four steps out:
+what blocks what, what belongs to what, or every relation. A dashed red ring
+marks what is blocked, and finished work is hollow. Drag to move, scroll to
+zoom, click a node to open it. The UI is plain files in `ui/` with no build
+step.
 
 ## How a change happens
 
@@ -119,15 +181,15 @@ reason and a source.
 2. Policy decides: applied at once, or held as a proposal. Closing a decision
    or a hypothesis is held when an agent does it, whatever the server's policy
    (unless the workspace itself has chosen otherwise, below):
-   the agent proposes the answer and you confirm it on Home, under the
-   project it belongs to. By default agents
+   the agent proposes the answer and you confirm it on the Changes
+   screen. By default agents
    propose everything. Loosen it per op in `lattice.config.json`:
    `{ "policy": { "create": "auto", "link": "auto" } }`.
    A workspace can make the choice for itself, on its Workspace screen under
    Settings ("What agents change"): held until you have looked, or taking
    effect as agents make it, merges and archives included. Then an agent can
    settle a decision or a hypothesis too: a decision must say what was chosen
-   and why, and you are notified on Home. The log and Undo are the record,
+   and why, and you are notified on the Changes screen. The log and Undo are the record,
    not a gate. Its admin sets it; an agent cannot.
 3. You look at what is held and apply or decline it, in the web UI's Changes
    screen or from the CLI (where the words are still approve and reject):
@@ -187,7 +249,7 @@ at once; they are the session's own state, not facts about the world.
 - **A project with nothing of Lattice's in it** is connected by one command,
   given under "Connect an agent" on the Workspace screen and run in the
   project's folder. It fetches `GET /connect/setup.mjs` from the server and
-  runs it: that writes `.mcp.json`, the hook script and the three hooks that
+  runs it: that writes `.mcp.json`, the hook script and the four hooks that
   call it, the friction skill, and the working rules
   ([examples/working-rules.md](examples/working-rules.md)), which it reads
   into the project's `CLAUDE.md`. It adds to what is there, holds no secret,
@@ -204,15 +266,15 @@ at once; they are the session's own state, not facts about the world.
   the full transcript is kept under `runs/`. Ending the run from the UI stops
   the process. This needs the `claude` CLI on the PATH.
 
-Home lists open sessions (under Sessions), flags one that has not reported for 30
-minutes, and can end it, which releases what it holds. An entity page has
+A session's page has **End session**, which releases what it holds; one that
+has not reported for 30 minutes raises a notification. An entity page has
 **Copy session brief**: the task's context, blockers, needed resources and the
 rules that govern them, as text to start a session with.
 
 ## Notifications and automations
 
 - **Notifications:** an agent (`notify`), an automation or the system can leave
-  you a message. Unread ones sit at the top of Home. A session that stops
+  you a message. Unread ones are on the Changes screen. A session that stops
   reporting raises one, saying what it still holds.
 - **Automations:** a trigger and an action, stored as an entity.
   - Triggers: `every` N minutes, `daily` at a local time, or an `event` in the
@@ -223,7 +285,7 @@ rules that govern them, as text to start a session with.
     firing is logged with its result. Events caused by automations cannot
     trigger automations, and a launching automation waits for its last session
     to end before starting another.
-  - Create and pause them on the Automations screen.
+  - Create and pause them from Search, as things of the type Automation.
 
 ## Views
 
@@ -283,14 +345,15 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 - Semantic search. Search matches words in any form in titles and notes, puts
   the best match first, and falls back to near-misses in titles when nothing
   matches; it does not match by meaning.
-- Hosting is part built (see Hosting below): backups and the first deployment
-  are not done, and a Postgres server instead of the embedded database is the
-  later step.
+- A Postgres server instead of the embedded database. Each workspace is one
+  embedded database on the server's disk (see Hosting below).
+- Editing the same item from two imports at once: the later edit wins as a
+  whole (see Backups).
 - Single sign-on.
 
 ## Hosting
 
-The first hosted version is one server running everything, with the embedded
+A hosted Lattice is one server running everything, with the embedded
 database on a persistent disk, on Render ([render.yaml](render.yaml)). TLS ends
 at the platform.
 
@@ -320,8 +383,6 @@ at the platform.
   one address. Beyond that the answer is 429 with `Retry-After`. The count
   for all together is what holds if the proxies are not named
   (`LATTICE_TRUSTED_PROXIES`) and a caller's address cannot be told.
-- Not done yet: the first deployment, and a copy of the backups off the
-  server has not been tried against a real bucket (see Backups).
 
 ## GitHub: pushes keep the map current
 
@@ -619,9 +680,9 @@ change that:
 - **The Workspace screen** manages all of this: your agent tokens, members,
   the default visibility and which workspaces to accept notifications from.
 
-Limits, stated plainly: the server
-still listens on this machine only, with no
-TLS. And on a single machine an agent running as your OS user can read any
+Limits, stated plainly: unless told otherwise the server listens on this
+machine only, and it never speaks TLS itself: hosted, that ends at the
+platform in front of it. And on a single machine an agent running as your OS user can read any
 token you keep in a file or environment variable, so tokens are a real
 boundary between machines and between customers, not between you and an agent
 on your own laptop.
