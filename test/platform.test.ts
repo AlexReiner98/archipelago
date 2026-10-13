@@ -26,7 +26,7 @@ after(async () => {
 });
 
 /** A server on its own port with in-memory databases and its own copy of the packs. */
-async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp, limits?: { open?: Limit; deliveries?: Limit }) {
+async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp, limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }) {
   const root = mkdtempSync(join(tmpdir(), 'lattice-platform-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
@@ -1328,4 +1328,30 @@ test('where a request came from is what the trusted proxies say, not what the ca
   for (let i = 0; i < 5; i++) seen.push((await fetch(base + '/connect/setup.mjs', { headers: { 'x-forwarded-for': `203.0.113.${i}, 198.51.100.7` } })).status);
   assert.deepEqual(seen, [200, 200, 200, 429, 429]);
   assert.equal((await fetch(base + '/connect/setup.mjs', { headers: { 'x-forwarded-for': '203.0.113.1, 198.51.100.8' } })).status, 200, 'and another caller is another');
+});
+
+test('refused tokens are counted by address, a backup unpacks only so far, and the UI comes with a policy for what it may load', async () => {
+  const { base, call, workspaces } = await serve('tokens', undefined, { refused: { each: 3 } });
+  const db = (await workspaces.get('default')).lattice.db;
+  const good = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
+  const wrong = `lat_default_${'0'.repeat(40)}`;
+  const from = (token: string | undefined, address: string) =>
+    fetch(`${base}/agent/search`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': address, ...(token && { authorization: `Bearer ${token}` }) }, body: '{}' }).then((r) => r.status);
+  // Three refusals from one address, and the fourth request is not looked at, whatever token it carries.
+  assert.deepEqual([await from(wrong, '198.51.100.1'), await from(undefined, '198.51.100.1'), await from('nonsense', '198.51.100.1')], [401, 401, 401]);
+  assert.deepEqual([await from(wrong, '198.51.100.1'), await from(good, '198.51.100.1')], [429, 429]);
+  // Another address is not held up by it, and a good token is never counted.
+  for (let i = 0; i < 5; i++) assert.equal(await from(good, '198.51.100.2'), 200);
+  assert.equal((await call('/agent/search', good, {})).status, 200);
+
+  // A file that unpacks to more than a backup is taken to be is refused before it is read.
+  const { parseBackup } = await import('../src/backup.ts');
+  assert.throws(() => parseBackup(gzipSync(Buffer.alloc(257_000_000, 0x20))), /unpacks to more than 256 MB/);
+  assert.throws(() => parseBackup(Buffer.from('not a backup')), /not a Lattice backup file/);
+
+  // The page may load its own script and stylesheet and talk to this server; the public page has its own, stricter still.
+  const page = await fetch(base + '/');
+  assert.match(page.headers.get('content-security-policy') ?? '', /default-src 'none'; script-src 'self'; style-src 'self';.*frame-ancestors 'none'/);
+  assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal((await fetch(base + '/app.js')).headers.get('x-content-type-options'), 'nosniff');
 });

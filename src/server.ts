@@ -47,7 +47,7 @@ import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.ts';
 import { clientAddress, trustedProxies } from './address.ts';
-import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, type Limit } from './limit.ts';
+import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
 import { publicPage, publicPicture } from './public.ts';
 import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
@@ -138,7 +138,7 @@ class Refused extends Error {
   }
 }
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit }; proxies?: string } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   const named = options.publicHosts ?? [];
@@ -155,6 +155,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   // What answers without a token is counted by address: the public pages and the setup script, and GitHub's deliveries.
   const open = limiter(options.limits?.open ?? PUBLIC_LIMIT);
   const deliveries = limiter(options.limits?.deliveries ?? DELIVERY_LIMIT);
+  // A token that is refused is counted too: finding one wrong can mean opening a workspace's database first.
+  const refusedTokens = limiter(options.limits?.refused ?? REFUSED_LIMIT);
   /** Where a request came from: what the proxies we trust say, not what the caller wrote ahead of them (src/address.ts). */
   const trusted = trustedProxies(options.proxies);
   const addressOf = (req: IncomingMessage) => clientAddress(req.headers['x-forwarded-for'], req.socket.remoteAddress, trusted);
@@ -178,14 +180,20 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     const id = token && workspaceOf(token);
     // The same answer whether the token is malformed, unknown, expired or for
     // a workspace that does not exist: nothing to probe.
-    const denied = new Refused(401, 'A valid token is required. Send it as: Authorization: Bearer <token>');
-    if (!token || !id || !workspaces.has(id)) throw denied;
+    const address = addressOf(req);
+    const wait = refusedTokens.full(address);
+    if (wait) throw new Refused(429, `Too many requests from here were refused for their token. Try again in ${wait} seconds.`);
+    const deny = () => {
+      refusedTokens.take(address);
+      return new Refused(401, 'A valid token is required. Send it as: Authorization: Bearer <token>');
+    };
+    if (!token || !id || !workspaces.has(id)) throw deny();
     // The workspace stays open for as long as this request lasts, however long that is.
     res.once('close', workspaces.hold(id));
     const ws = await workspaces.get(id);
     // Where the request came from is a help in noticing a token used somewhere new, not a control.
-    const identity = await verifyToken(ws.lattice.db, token, addressOf(req) || undefined);
-    if (!identity) throw denied;
+    const identity = await verifyToken(ws.lattice.db, token, address || undefined);
+    if (!identity) throw deny();
     if (identity.newPlace)
       await notify(ws.lattice, { kind: 'agent', name: 'lattice' }, {
         title: `The token "${identity.actor.name}" was used from a new place`,
@@ -258,7 +266,14 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname];
-        res.writeHead(200, { 'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`, 'cache-control': 'no-store' });
+        // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.
+        res.writeHead(200, {
+          'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff',
+          'referrer-policy': 'no-referrer',
+          ...(file === 'index.html' && { 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" }),
+        });
         return res.end(await readFile(join(UI_DIR, file)));
       }
 

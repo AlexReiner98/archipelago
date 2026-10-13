@@ -250,10 +250,20 @@ export function newestBackup(dir: string, workspace = 'default'): Date | undefin
   return newest ? new Date(newest.replace('.json.gz', '').replace(/T(\d\d)-(\d\d)-/, 'T$1:$2:')) : undefined;
 }
 
+/** The most a backup may unpack to: a small file can be made that unpacks to more memory than the server has. */
+const BACKUP_MAX = 256_000_000;
+
 /** A backup file's contents, as written by backupAll. */
 export function parseBackup(bytes: Uint8Array): Dump {
+  let text: string;
   try {
-    return JSON.parse(gunzipSync(bytes).toString('utf8')) as Dump;
+    text = gunzipSync(bytes, { maxOutputLength: BACKUP_MAX }).toString('utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') throw new Error(`That file unpacks to more than ${BACKUP_MAX / 1_000_000} MB, which is more than a backup is taken to be.`);
+    throw new Error('That is not a Lattice backup file (a .json.gz written by the server).');
+  }
+  try {
+    return JSON.parse(text) as Dump;
   } catch {
     throw new Error('That is not a Lattice backup file (a .json.gz written by the server).');
   }
