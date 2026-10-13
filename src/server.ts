@@ -46,6 +46,7 @@ import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import type { Actor, Lattice } from './lattice.ts';
 import { configureOutbox } from './outbox.ts';
 import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.ts';
+import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, type Limit } from './limit.ts';
 import { publicPage, publicPicture } from './public.ts';
 import { configureSecrets } from './secrets.ts';
@@ -137,7 +138,7 @@ class Refused extends Error {
   }
 }
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit } } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit }; proxies?: string } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   const named = options.publicHosts ?? [];
@@ -154,11 +155,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   // What answers without a token is counted by address: the public pages and the setup script, and GitHub's deliveries.
   const open = limiter(options.limits?.open ?? PUBLIC_LIMIT);
   const deliveries = limiter(options.limits?.deliveries ?? DELIVERY_LIMIT);
-  /** Where a request came from, as the proxy in front of the server says, or the connection itself. A caller can claim to come from anywhere. */
-  const addressOf = (req: IncomingMessage) => {
-    const forwarded = req.headers['x-forwarded-for'];
-    return (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0].trim() || req.socket.remoteAddress || '';
-  };
+  /** Where a request came from: what the proxies we trust say, not what the caller wrote ahead of them (src/address.ts). */
+  const trusted = trustedProxies(options.proxies);
+  const addressOf = (req: IncomingMessage) => clientAddress(req.headers['x-forwarded-for'], req.socket.remoteAddress, trusted);
   /** True, and the request answered, when its address has asked too often. */
   const tooOften = (req: IncomingMessage, res: ServerResponse, count: ReturnType<typeof limiter>) => {
     const wait = count.take(addressOf(req));
@@ -535,7 +534,7 @@ If that process is not a lattice server, delete ${lock}.`);
   // The GitHub App is told this server's address: the name it is reached by from outside, when it has one.
   const origin = config.publicHosts[0] ? `https://${config.publicHosts[0]}` : `http://127.0.0.1:${config.port}`;
   const githubApp = new GithubApp({ dir: rootDir, origin });
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: githubApp });
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: githubApp, proxies: config.trustedProxies });
   // Every hour each workspace that connected GitHub is asked, for each repository the app can read, whether a
   // re-check is due (each project says how often); the agent on this server does the ones that are. An hour when
   // nothing is due costs no run. Asked that often because a server that is deployed daily never sees a whole day.
@@ -589,6 +588,7 @@ If that process is not a lattice server, delete ${lock}.`);
     const main = await workspaces.get(DEFAULT_WORKSPACE);
     console.log(`lattice listening on http://${config.host}:${config.port}  (MCP at /mcp)`);
     if (config.publicHosts.length) console.log(`answering to: ${config.publicHosts.join(', ')}`);
+    if (config.trustedProxies) console.log(`proxies trusted for a caller's address: private networks, ${config.trustedProxies}`);
     console.log(`data: ${config.dataDir}`);
     console.log(`packs: ${main.lattice.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
     console.log(`auth: ${config.auth}`);

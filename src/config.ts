@@ -29,6 +29,12 @@ export interface Config {
    */
   publicHosts: string[];
   /**
+   * The proxies in front of the server whose word is taken for where a
+   * request came from, beyond private networks (LATTICE_TRUSTED_PROXIES):
+   * networks as CIDR, comma separated, or "cloudflare". See src/address.ts.
+   */
+  trustedProxies?: string;
+  /**
    * Where and how often every workspace is written out as a backup, and how
    * many of each to keep. On by default, beside the data folder, every 6
    * hours, keeping 28 (a week). `"backup": false` turns it off;
@@ -105,6 +111,7 @@ export function loadConfig(): Config {
     // A hosted server has neither its customers' repositories nor their Claude CLI.
     launch: local,
     publicHosts: named.map((name) => name.trim().toLowerCase()).filter(Boolean),
+    trustedProxies: process.env.LATTICE_TRUSTED_PROXIES ?? fromFile.trustedProxies,
     // Hosting platforms say which port to use through PORT.
     port: Number(process.env.LATTICE_PORT ?? process.env.PORT ?? fromFile.port ?? 3100),
     dataDir,

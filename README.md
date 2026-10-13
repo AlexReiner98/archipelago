@@ -299,6 +299,12 @@ at the platform.
   mode.
 - `LATTICE_PUBLIC_HOST=lattice.example.com` names what it is reached by.
   Requests for any other host name are refused.
+- `LATTICE_TRUSTED_PROXIES` names the proxies in front of the server whose
+  word is taken for where a request came from: networks as CIDR, comma
+  separated, or `cloudflare` (set in `render.yaml`, since Render is reached
+  through Cloudflare). Private networks are always trusted. The caller is
+  the last address in `x-forwarded-for` that is not a trusted proxy; what
+  stands before it he could have written himself (`src/address.ts`).
 - `PORT` is honoured when `LATTICE_PORT` is not set.
 - Each workspace is its own database and costs about 200 MB of memory while
   open, on top of about 350 MB for the server. A workspace nobody has used for
@@ -311,9 +317,9 @@ at the platform.
 - What answers without a token is asked only so often (`src/limit.ts`): a
   product's public page and the setup script, 120 requests a minute from one
   address and 1,200 from all together; GitHub's deliveries, 300 a minute from
-  one address. Beyond that the answer is 429 with `Retry-After`. The address
-  is what the proxy reports, so the count for all together is the one that
-  holds against a caller who claims a new address each time.
+  one address. Beyond that the answer is 429 with `Retry-After`. The count
+  for all together is what holds if the proxies are not named
+  (`LATTICE_TRUSTED_PROXIES`) and a caller's address cannot be told.
 - Not done yet: the first deployment, and a copy of the backups off the
   server has not been tried against a real bucket (see Backups).
 
@@ -433,7 +439,7 @@ person can read it. Three things limit what a copied one is worth:
 - **Its owner hears of a new place.** Each token keeps the networks it has
   been used from. Used from one it has not been, a warning goes to the
   owner; the first place a token is used is not news. This notices, it does
-  not prevent: the address is what the proxy in front of the server reports.
+  not prevent.
 
 No tool gives a sealed secret back, to a person or an agent: the Workspace
 screen says only whether one is set. A key is typed into a field that does

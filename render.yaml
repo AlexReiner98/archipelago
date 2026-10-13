@@ -21,6 +21,10 @@ services:
         value: 0.0.0.0
       - key: LATTICE_DATA
         value: /var/lattice/data
+      # Render reaches the server through Cloudflare: its word is taken for where a request came from, and what a
+      # caller writes into x-forwarded-for himself is not.
+      - key: LATTICE_TRUSTED_PROXIES
+        value: cloudflare
       - key: LATTICE_PUBLIC_HOST # the name(s) customers reach it by, e.g. lattice.example.com
         sync: false
       # The key the server's secrets are sealed with (a workspace's Anthropic key, GitHub's signing secrets, the

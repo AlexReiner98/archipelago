@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { gzipSync } from 'node:zlib';
+import { clientAddress, trustedProxies } from '../src/address.ts';
 import { createToken, OPERATOR_RESET_FILE, workspaceOf } from '../src/auth.ts';
 import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
@@ -1295,4 +1296,36 @@ test('the hook says which repository a session is in without the name and passwo
     child.stdin!.end(JSON.stringify({ session_id: 'desk-2', cwd: project }));
   });
   assert.deepEqual(heard.map((h) => h.remote), ['https://github.com/acme/site.git']);
+});
+
+test('where a request came from is what the trusted proxies say, not what the caller wrote ahead of them', async () => {
+  const hosted = trustedProxies('cloudflare');
+  const bare = trustedProxies();
+  // Straight to the server: the connection is the caller, whatever the header says.
+  assert.equal(clientAddress(undefined, '198.51.100.7', bare), '198.51.100.7');
+  assert.equal(clientAddress('203.0.113.77', '198.51.100.7', bare), '198.51.100.7');
+  // Through a platform's balancer on a private network, and Cloudflare before it: the address Cloudflare was reached from.
+  assert.equal(clientAddress('198.51.100.7, 172.70.1.2', '::ffff:10.0.3.4', hosted), '198.51.100.7');
+  assert.equal(clientAddress('198.51.100.7, 172.70.1.2, 10.9.9.9', '10.0.3.4', hosted), '198.51.100.7');
+  assert.equal(clientAddress(['198.51.100.7', '2606:4700::1'], '10.0.3.4', hosted), '198.51.100.7');
+  assert.equal(clientAddress('2001:db8::5, 172.70.1.2', '10.0.3.4', hosted), '2001:db8::5');
+  // What the caller wrote himself stands before it, and is not believed: one made-up address or ten.
+  assert.equal(clientAddress('203.0.113.77, 198.51.100.7, 172.70.1.2', '10.0.3.4', hosted), '198.51.100.7');
+  assert.equal(clientAddress('10.1.1.1, 172.70.9.9, 198.51.100.7, 172.70.1.2', '10.0.3.4', hosted), '198.51.100.7');
+  assert.equal(clientAddress('not an address, 198.51.100.7, 172.70.1.2', '10.0.3.4', hosted), '198.51.100.7');
+  // A server that was not told about Cloudflare takes Cloudflare for the caller: wrong, but nothing a caller can choose.
+  assert.equal(clientAddress('203.0.113.77, 198.51.100.7, 172.70.1.2', '10.0.3.4', bare), '172.70.1.2');
+  // From inside, through nothing but trusted proxies, it is the first of them.
+  assert.equal(clientAddress('10.1.1.1', '127.0.0.1', bare), '10.1.1.1');
+  assert.equal(clientAddress(undefined, undefined, bare), '');
+  // Other proxies are named as networks; what is not one is refused when the server starts.
+  assert.equal(clientAddress('198.51.100.7, 192.0.2.9', '10.0.3.4', trustedProxies('192.0.2.0/24, 2001:db8:1::/48')), '198.51.100.7');
+  assert.throws(() => trustedProxies('cloudfront'), /LATTICE_TRUSTED_PROXIES: "cloudfront" is not an address/);
+
+  // On a server: a caller who claims a new address with every request is still one caller.
+  const { base } = await serve('tokens', undefined, { open: { each: 3 } });
+  const seen: number[] = [];
+  for (let i = 0; i < 5; i++) seen.push((await fetch(base + '/connect/setup.mjs', { headers: { 'x-forwarded-for': `203.0.113.${i}, 198.51.100.7` } })).status);
+  assert.deepEqual(seen, [200, 200, 200, 429, 429]);
+  assert.equal((await fetch(base + '/connect/setup.mjs', { headers: { 'x-forwarded-for': '203.0.113.1, 198.51.100.8' } })).status, 200, 'and another caller is another');
 });
