@@ -1,6 +1,6 @@
 # Archipelago
 
-[![Tests](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/lattice/actions/workflows/tests.yml)
+[![Tests](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml)
 
 **A shared workspace for your people and your AI agents.**
 
@@ -34,8 +34,8 @@ You need [Node.js](https://nodejs.org) 24 or newer. Nothing else: the database
 is embedded and lives in a `data/` folder beside the code.
 
 ```bash
-git clone https://github.com/AlexReiner98/lattice.git
-cd pelago
+git clone https://github.com/AlexReiner98/archipelago.git
+cd archipelago
 npm install
 npm start
 ```
