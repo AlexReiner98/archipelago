@@ -1931,12 +1931,20 @@ const keptStyle = (key) => {
 };
 
 /**
- * The picture a lens gives, drawn in a style. `style` is what the page or an
- * address asks for this one look, over what the person chose before.
+ * The picture a lens gives, drawn in a style, under a bar that says what it
+ * is a picture of: the views kept about the item (the first is the one it
+ * opens on), its shortcuts, what this view lets the person change, and the
+ * view's rule in words. `style` is what the page or an address asks for this
+ * one look, over what the person chose before.
  */
 function lensView({ lens = {}, style = {}, key = lens.from ?? 'map', quiet = false } = {}) {
-  const chosen = { ...LENS_STYLE };
-  const host = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
+  const chosen = {};
+  const bar = h('div', { class: 'toolbar fold-bar lens-bar', hidden: true });
+  const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
+  const host = h('div', { class: 'lens-wrap' }, bar, body);
+  // What was opened, where the picture stood and which view was chosen outlive a redraw: the map changes under an open page.
+  if (!lensPlace.has(key)) lensPlace.set(key, { opened: new Map(), ask: {} });
+  const place = lensPlace.get(key);
   const keep = (change) => {
     Object.assign(chosen, change);
     try {
@@ -1945,22 +1953,48 @@ function lensView({ lens = {}, style = {}, key = lens.from ?? 'map', quiet = fal
       // Without storage the choice lasts until the page is reloaded.
     }
   };
-  host.ready = (async () => {
+  const load = async () => {
     let answer;
     try {
-      answer = await api('view', { name: 'lens', params: lens });
+      answer = await api('view', { name: 'lens', params: { ...lens, ...place.ask } });
     } catch (err) {
-      return host.replaceChildren(h('div', { class: 'error' }, err.message));
+      return body.replaceChildren(h('div', { class: 'error' }, err.message));
     }
-    if (answer.items.length < 2) return quiet ? void ((host.closest('.lens-card') ?? host).hidden = true) : host.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw here.'));
-    // Nearest wins, field by field: built in, what the map keeps for this picture, what this person chose, what the address asks.
-    Object.assign(chosen, answer.style, keptStyle(key), style);
-    dress(host, chosen);
-    // What was opened and where the picture stood outlive a redraw: the map changes under an open page.
-    if (!lensPlace.has(key)) lensPlace.set(key, { opened: new Map() });
+    const views = answer.views ?? [];
+    const empty = answer.items.length < 2;
+    if (empty && !views.length && quiet) return void ((host.closest('.lens-card') ?? host).hidden = true);
+    const again = (change) => () => (Object.assign(place.ask, change), load());
+    const pictures = views.filter((view) => !view.to);
+    const far = answer.lens.far;
+    const finished = !answer.lens.fold.includes('closed');
+    const parts = [
+      // The views of the item, one click apart.
+      pictures.length > 1 && h('span', { class: 'switch' }, pictures.map((view) => h('button', { class: view.id === answer.view ? 'on' : '', title: view.title, onclick: again({ lens: view.id, far: undefined, fold: undefined }) }, view.title))),
+      // Its shortcuts: views that start somewhere else.
+      views.filter((view) => view.to).map((view) => h('a', { class: 'chip lens-pin', href: `#/e/${view.to.id}`, title: `Goes to ${view.to.title}` }, view.title)),
+      // The rule of this view, in words: what is in the picture and what is not.
+      h('span', { class: 'lens-rule grow', title: answer.said }, answer.said),
+      answer.controls.includes('far') &&
+        h(
+          'span',
+          { class: 'switch', title: 'How many steps down are drawn' },
+          h('button', { title: 'One step fewer', disabled: far === 0, onclick: again({ far: Math.max((far ?? 4) - 1, 0) }) }, '−'),
+          h('button', { class: 'on', title: 'How many steps down are drawn' }, far === undefined ? 'All' : String(far)),
+          h('button', { title: 'One step more', onclick: again({ far: (far ?? 0) + 1 }) }, '+'),
+        ),
+      answer.controls.includes('closed') && h('button', { class: finished ? 'on' : '', title: finished ? 'Leave out what is finished' : 'Show what is finished too', onclick: again({ fold: finished ? [...answer.lens.fold, 'closed'] : answer.lens.fold.filter((f) => f !== 'closed') }) }, 'Finished'),
+    ];
+    bar.replaceChildren(...parts.flat().filter(Boolean));
+    bar.hidden = false;
+    if (empty) return body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this view.'));
+    // Nearest wins, field by field: built in, what the map keeps for this view, what this person chose, what the address asks.
+    for (const name of Object.keys(chosen)) delete chosen[name];
+    Object.assign(chosen, LENS_STYLE, answer.style, keptStyle(key), style, { noLit: !answer.controls.includes('lit') });
+    dress(body, chosen);
     // A style with code of its own is the drawing; without, one of those that come built in.
-    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest))(host, answer, chosen, keep, lensPlace.get(key));
-  })();
+    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest))(body, answer, chosen, keep, place);
+  };
+  host.ready = load();
   return host;
 }
 
@@ -2002,6 +2036,8 @@ function lensTree(answer) {
 
 /** The switch for what stays lit, the same in every shape. */
 function litSwitch(me, style, keep, redraw) {
+  // A view that does not offer the choice has no switch.
+  if (style.noLit) return '';
   const lit = h('span', { class: 'switch' });
   for (const [value, label, title] of LIT) {
     if (value === 'you' && !me) continue;
@@ -2368,7 +2404,7 @@ async function graph(query = '') {
   const { lens, style } = readLens(query);
   const view = lensView({ lens, style });
   // One already there stays until the new one is drawn: the map changing under it does not blank the page.
-  if (part('graph').querySelector('.lens-view')) await view.ready;
+  if (part('graph').querySelector('.lens-wrap')) await view.ready;
   part('graph').replaceChildren(h('section', { class: 'card lens-card' }, view));
 }
 

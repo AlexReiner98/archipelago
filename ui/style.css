@@ -175,6 +175,13 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
   --ln-text-size: 13px; --ln-radius-size: 8px; --ln-gap-size: 8px; --ln-column-size: 270px;
 }
 .lens-card { overflow: hidden; }
+.lens-bar { padding: 10px 14px 0; flex-wrap: wrap; min-width: 0; }
+.lens-bar .switch { flex: none; max-width: 100%; }
+/* A picture takes the width it is given and never asks the page for more. */
+.lens-wrap { min-width: 0; contain: inline-size; }
+.lens-bar .switch button { padding: 3px 10px; font-size: 12.5px; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lens-pin { flex: none; text-decoration: none; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lens-rule { color: var(--muted); font-size: 12px; min-width: 0; flex: 1 1 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lens-view .fold-bar { padding: 10px 14px; flex-wrap: nowrap; }
 .lens-trail { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; white-space: nowrap; }
 .lens-trail button { border: 0; background: none; padding: 2px 4px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; flex: 0 1 auto; }

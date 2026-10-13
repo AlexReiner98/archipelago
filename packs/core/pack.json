@@ -51,6 +51,10 @@
       "statuses": { "open": ["planned", "active", "paused"], "closed": ["done", "dropped"] },
       "fields": {
         "due": { "type": "date" },
+        "hub_at": {
+          "type": "number",
+          "description": "How many open things an item in this project holds before it is a hub: an item with views of its own, owed them when it has none. 12 when not set. While a project is being shaped, set 1: nearly everything in it is then a hub."
+        },
         "recheck_days": {
           "type": "number",
           "description": "How often, in days, an agent re-checks this project's oldest open items against its repository. Weekly when not set; 0 turns it off."
@@ -204,9 +208,12 @@
     {
       "id": "lens",
       "title": "Lens",
-      "description": "What is in a picture of the map. About a project or item, it is that thing's picture; about nothing, the workspace's. A field left empty comes from the level above. Read by the lens view.",
+      "description": "What is in a picture of the map. About a project or item, it is a view of that thing, named by its title: an item's page shows its views as a switch and opens on the first (place). About nothing, it is the workspace's, under every view. A field left empty comes from the level above. Read by the lens view.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
+        "place": { "type": "number", "description": "Its order among the views of the item it is about: the lowest is the one the page opens on." },
+        "from": { "type": "string", "description": "The id of the item this view starts from, when that is not the item it is about. Such a view is a shortcut: the page shows it as a way to that item." },
+        "controls": { "type": "json", "description": "What the person looking may change on the page, as a list of: lit (what stays lit), far (how many steps down), closed (whether what is finished shows). Only lit when not set." },
         "kinds": { "type": "json", "description": "Types to keep, as a list: a type (flavours included) or \"work\"; with a leading \"-\", to leave out." },
         "by": { "type": "string", "description": "The kind of link that says what is inside what, e.g. part_of." },
         "over": { "type": "json", "description": "The kinds of link sent along as links, as a list, or \"all\"." },

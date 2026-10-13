@@ -4,7 +4,7 @@
 import { lastPushes, repoByName, repoName } from './github.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 import { costs } from './costs.ts';
-import { lens } from './lens.ts';
+import { hubs, HUB_AT, lens } from './lens.ts';
 import { changelog, proof } from './proof.ts';
 
 interface Edge {
@@ -509,6 +509,8 @@ export async function handoff(l: Archipelago, input: { repo?: string; since?: st
   );
   const slim = ({ id, type, title, status }: { id: string; type: string; title: string; status: string }) => ({ id, type, title, status });
   const unconfirmed = await toConfirm(l, { limit: 15 });
+  const inRepo = await repoScope(l, repo.id);
+  const unshaped = (await hubs(l)).filter((h) => h.views === 0 && inRepo.has(h.id));
   // What a session said when it ended is the last thing it was heard to say: the line that opens with the time.
   const said = (body: string) => (body.split('\n').findLast((line) => /^\[\d{4}-/.test(line)) ?? '').replace(/^\[[^\]]*\]\s*/, '').slice(0, 400);
   return {
@@ -525,6 +527,13 @@ export async function handoff(l: Archipelago, input: { repo?: string; since?: st
       sessions: ended.map((r) => ({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said(r.body) })),
     },
     open: { ready: work.ready.map(slim), blocked: work.blocked.map((b) => ({ ...slim(b), waiting_on: b.waiting_on })) },
+    // Work that is owed though nobody wrote it down: an item here that has grown into a hub and has no view of its own.
+    ...(unshaped.length > 0 && {
+      to_shape: {
+        hubs: unshaped.slice(0, 15),
+        how: 'Each of these holds enough to be the hub of its problem and has no view of its own. Give it its views: for each, a lens item (change, type lens) linked about it, named for the question it answers, with place for its order, controls for what the person may change (lit, far, closed), and a style about it if it should look its own way. A lens with from set to another item is a shortcut to there. The view named hubs lists every hub.',
+      },
+    }),
     how:
       (note ? '' : `Nobody has written a handoff note for this repository. To write the first, create a software.handoff and link it software.lives_in to ${repo.id} in the same change; this view finds it from then on. `) +
       (note && note.body.length > HANDOFF_MAX
@@ -1161,9 +1170,14 @@ export const VIEWS: Record<string, View> = {
       'Nodes and edges for drawing the map. Params: relations (blocking, structure or all), focus (an entity id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system.',
     run: graph,
   },
+  hubs: {
+    description:
+      `The hubs: open items that hold enough to need views of their own, largest first, each with how much it holds (inside), the size at which an item there counts as a hub (at) and how many views it has. An item is a hub when it holds at least its project's hub_at open things (${HUB_AT} when the project does not say; a project still being shaped sets it to 1, so that nearly everything in it is one). A hub with no views is work owed: give it its views with lens items about it. Nothing is stored: this is read off the map each time.`,
+    run: async (l) => ({ at: HUB_AT, hubs: await hubs(l) }),
+  },
   lens: {
     description:
-      'What is in a picture, as data of one fixed shape, whatever is asked: `lens` (the lens as it was read), `items` (each with what it is `inside`, its `place` among those beside it, its `size`, its `state`: blocked, who it waits on, sessions at work; and `within`: the same counted over everything inside it, sent or not), `links` (kind, from, to, and how many each stands for: a link whose end was not sent is moved up to the nearest thing that was) and `rest` (how many items were left out, by reason). The lens is the built-in one, under the workspace’s (an item of type lens that is about nothing), under one about what the picture starts from, under what is asked here: a field that is named replaces it whole. How it looks is not decided here: `style` is what the map keeps for the page that draws (items of type style, combined the same way), passed on as it is, and `kept` names the lenses and styles that went in. Params, each optional: lens and style (the id of one kept on the map, used outright), from (an entity id; without it, the whole map), kinds (types to keep, or "work"; with a leading "-", to leave out), by (the kind of link that says what is inside what; part_of), over (the kinds of link sent along, or "all"; depends_on and waits_on), far (steps down from the start), lanes (stage, link or person: what each item is filed under, as `lane`), order (the number field that orders things beside each other; order), measure (work or tokens), fold (what to leave out, of: closed, system, unlinked; all three).',
+      'What is in a picture, as data of one fixed shape, whatever is asked: `lens` (the lens as it was read), `items` (each with what it is `inside`, its `place` among those beside it, its `size`, its `state`: blocked, who it waits on, sessions at work; and `within`: the same counted over everything inside it, sent or not), `links` (kind, from, to, and how many each stands for: a link whose end was not sent is moved up to the nearest thing that was) and `rest` (how many items were left out, by reason). The lens is the built-in one, under the workspace’s (an item of type lens that is about nothing), under one about what the picture starts from, under what is asked here: a field that is named replaces it whole. How it looks is not decided here: `style` is what the map keeps for the page that draws (items of type style, combined the same way), passed on as it is, and `kept` names the lenses and styles that went in. Around one item (from), each lens kept about it is a view of it: `views` names them in order (place), `view` says which this is (the first, unless lens names another), one whose own from is another item is a shortcut to there (`to`), `controls` says what the person may change on the page, and `hub` says whether the item holds enough to be a hub. `said` is the lens in words. Params, each optional: lens and style (the id of one kept on the map, used outright), from (an entity id; without it, the whole map), kinds (types to keep, or "work"; with a leading "-", to leave out), by (the kind of link that says what is inside what; part_of), over (the kinds of link sent along, or "all"; depends_on and waits_on), far (steps down from the start), lanes (stage, link or person: what each item is filed under, as `lane`), order (the number field that orders things beside each other; order), measure (work or tokens), fold (what to leave out, of: closed, system, unlinked; all three).',
     run: lens,
   },
   tree: {

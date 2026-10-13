@@ -1281,6 +1281,29 @@ test('a lens answers with one shape of data: what is inside what, the same count
   assert.equal((await run({ from: made.p, far: 0 })).lens.far, 0, 'what is asked for the moment weighs most');
   assert.equal((await run({ style: drawn.spare })).style.shape, 'nest', 'a style named outright is used, retired or not');
   await assert.rejects(run({ style: 'e_nothing0' }), /No style/);
+  // Each lens about an item is a view of it, in order; one that starts somewhere else is a shortcut; and the lens is said in words.
+  const more = await make(l, [
+    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, kinds: ['software.feature'], far: 1, controls: ['lit', 'far', 'nonsense'] } },
+    { op: 'create', ref: 'go', type: 'lens', title: 'Go to Q', props: { place: 9, from: made.q, far: 0 } },
+    { op: 'link', type: 'about', from: 'road', to: made.p },
+    { op: 'link', type: 'about', from: 'go', to: made.p },
+  ]);
+  const hubP = await run({ from: made.p });
+  assert.deepEqual(hubP.views.map((v: any) => [v.title, v.to?.title]), [['Roadmap', undefined], ['Go to Q', 'Q'], ['P in full', undefined]], 'by place, then those with none');
+  assert.deepEqual([hubP.view, hubP.lens.kinds, hubP.controls, titles(hubP)], [more.road, ['software.feature'], ['lit', 'far'], ['Early', 'Late', 'P']], 'it opens on the first');
+  assert.equal((await run({ from: made.p, lens: drawn.pl })).lens.far, 2, 'another view is asked for by its id');
+  const gone = await run({ from: made.p, lens: more.go });
+  assert.deepEqual([gone.lens.from, titles(gone), gone.view], [made.q, ['Q'], more.go], 'a shortcut is a view that starts somewhere else, tightly scoped');
+  assert.match(hubP.said, /^"P" and what is part of it; 1 step down; only software\.feature; .*without what is finished/);
+  assert.equal((await run()).views, undefined, 'the whole map has no item to have views of');
+
+  // A hub is an item that holds enough to need views of its own: how much is enough is its project's to say.
+  assert.deepEqual([hubP.hub, ((await VIEWS.hubs.run(l, {})) as any).hubs], [{ is: false }, []], 'six things are not twelve');
+  await make(l, [{ op: 'update', id: made.p, props: { hub_at: 2 } }]);
+  const found = ((await VIEWS.hubs.run(l, {})) as any).hubs.map((h: any) => [h.title, h.inside, h.at, h.views]);
+  assert.deepEqual(found, [['P', 5, 2, 3], ['Early', 2, 2, 0]], 'while a project is shaped, most of what is in it is a hub; Q is another project and keeps the usual size');
+  assert.deepEqual((await run({ from: made.early })).hub, { is: true, inside: 2, at: 2 });
+
   // Code in a style runs in the browser of whoever looks: an agent that writes it proposes it, whatever else agents may do unreviewed.
   const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', merge: 'auto' });
   const plain = await free.change(agent, { reason: 'a colour', ops: [{ op: 'update', id: drawn.ws, props: { radius: 4 } }] });
