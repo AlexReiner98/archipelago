@@ -424,7 +424,11 @@ person can read it. Three things limit what a copied one is worth:
   lives in them and all that is part of that or about it (`src/scope.ts`).
   What it makes has to be tied into that work in the same change. It cannot
   archive, merge or re-link anything else, define a type, or speak for
-  another repository. The agent that reads pushes on the server is held to
+  another repository. What it may call is a list: beyond the tools that
+  only read, it reports results for that work's tests, takes a resource
+  that work needs or that no work is said to need, and notifies about that work. Everything else (a backup,
+  the owner's word on settled questions, a tool added later) is refused
+  until it is named in the list. The agent that reads pushes on the server is held to
   the repository it is reading in the same way.
 - **Its owner hears of a new place.** Each token keeps the networks it has
   been used from. Used from one it has not been, a warning goes to the

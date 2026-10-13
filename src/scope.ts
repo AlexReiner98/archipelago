@@ -2,7 +2,9 @@
 // and change only what is those repositories': what lives in them and all
 // that is part of that or about it. A token that leaks, or an agent that is
 // led astray by what it reads, can then reach no further than the work it
-// was given. Checked here, before the tool runs, for every tool that writes.
+// was given. Checked here, before the tool runs. What such a token may call
+// is a list: a tool that writes is on it with its check, the tools that only
+// read are named, and anything else is refused.
 
 import { repoByName, repoName } from './github.ts';
 import type { Actor, Lattice, Op } from './lattice.ts';
@@ -75,5 +77,49 @@ export async function withinScope(l: Lattice, actor: Actor, tool: string, input:
     case 'rechecked':
     case 'run_report':
       return isRepo(input.repo);
+    case 'notify':
+      return mustBeIn(input.about, 'send a notification about it');
+    // A resource is taken or given back for work: one that something of this work needs, or one no work is said to
+    // need (a lane everyone shares). One that only other work needs is that work's.
+    case 'claim':
+    case 'release': {
+      const { rows } = await l.db.query<{ from_id: string }>(`select from_id from relation where type = 'needs' and to_id = $1 and valid_to is null`, [input.resource]);
+      if (rows.length && !rows.some((r) => scope.has(r.from_id))) refuse(`Nothing there needs ${await named(String(input.resource))}, so this token cannot ${tool} it.`);
+      if (tool === 'claim') await mustBeIn(input.for, 'hold a resource for it');
+      return;
+    }
+    // A test is this work's when it is part of it, or helps answer a question that is; a result is its test's.
+    case 'test_report': {
+      const { rows: tests } = await l.db.query<{ id: string; entrypoint: string | null }>(`select id, props->>'entrypoint' as entrypoint from entity where type = any($1::text[]) and archived_at is null`, [l.registry.family('software.test')]);
+      const mine = await testsOf(l, scope);
+      for (const result of (input.results ?? []) as { test: string }[]) {
+        // Found as the report itself finds it: by id, then by the name the harness knows it by. One the map does not know is not recorded at all.
+        const test = tests.find((t) => t.id === result.test) ?? tests.find((t) => t.entrypoint === result.test);
+        if (test && !mine.has(test.id)) refuse(`${await named(test.id)} is not a test of it, so this token cannot report what it found.`);
+      }
+      return;
+    }
+    case 'picture_put': {
+      const { rows } = await l.db.query<{ from_id: string }>(`select from_id from relation where type = 'produced' and to_id = $1 and valid_to is null`, [input.result]);
+      const mine = await testsOf(l, scope);
+      if (!rows.some((r) => mine.has(r.from_id))) refuse(`${await named(String(input.result))} is not the result of a test of it, so this token cannot keep a picture for it.`);
+      return;
+    }
+    default:
+      // Everything else is refused unless it only reads: a tool added later is not open to a limited token until it is named here.
+      if (!READS.includes(tool)) refuse(`It cannot call ${tool}.`);
   }
+}
+
+/** What a limited token may call that changes nothing in the map: reading it, listening for the owner, pointing their screen. */
+const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show'];
+
+/** The tests of some work: those in it, and those that help answer a proof question in it. */
+async function testsOf(l: Lattice, scope: Set<string>): Promise<Set<string>> {
+  const { rows } = await l.db.query<{ id: string; question: string | null }>(
+    `select e.id, a.to_id as question from entity e left join relation a on a.from_id = e.id and a.type = 'software.answers' and a.valid_to is null
+     where e.type = any($1::text[]) and e.archived_at is null`,
+    [l.registry.family('software.test')],
+  );
+  return new Set(rows.filter((r) => scope.has(r.id) || (r.question !== null && scope.has(r.question))).map((r) => r.id));
 }

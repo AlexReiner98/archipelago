@@ -1029,6 +1029,53 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
   assert.match((await call('/agent/session_update', site, { run, task: made.o })).error, /cannot take it on/);
   assert.equal((await call('/agent/session_update', site, { run, task: made.t })).status, 200);
 
+  // What it may call is a list. Beyond changing its own work it reads, and what else writes is held to that work too.
+  const more = (
+    await call('/api/change', admin, {
+      reason: 'x',
+      ops: [
+        { op: 'create', ref: 'q', type: 'software.proof', title: 'Does the footer stay down?' },
+        { op: 'create', ref: 'mine', type: 'software.test', title: 'Footer stays down', props: { entrypoint: 'Footer.StaysDown' } },
+        { op: 'create', ref: 'theirs', type: 'software.test', title: 'Books balance', props: { entrypoint: 'Books.Balance' } },
+        { op: 'create', ref: 'lane', type: 'resource', title: 'The one browser' },
+        { op: 'create', ref: 'press', type: 'resource', title: 'The printing press' },
+        { op: 'create', ref: 'shared', type: 'resource', title: 'The one lane' },
+        { op: 'link', type: 'part_of', from: 'q', to: made.p },
+        { op: 'link', type: 'software.answers', from: 'mine', to: 'q' },
+        { op: 'link', type: 'needs', from: made.t, to: 'lane' },
+        { op: 'link', type: 'needs', from: made.o, to: 'press' },
+      ],
+    })
+  ).result.created;
+  for (const tool of ['backup', 'confirmed', 'check_connections', 'import_audit']) {
+    const input = tool === 'confirmed' ? { upto: 1, basis: 'x' } : tool === 'import_audit' ? { connection: 'x' } : {};
+    assert.match((await call(`/agent/${tool}`, site, input)).error, new RegExp(`limited to the work of Site repo\\. It cannot call ${tool}\\.`));
+  }
+  for (const tool of ['schema', 'search', 'proposals']) assert.equal((await call(`/agent/${tool}`, site, {})).status, 200, `${tool} only reads`);
+  // A test's results: for a test that helps answer a question of its work, not for another's.
+  const report = (results: unknown[]) => call('/agent/test_report', site, { build: '1.0.0', results });
+  assert.match((await report([{ test: 'Books.Balance', passed: true }])).error, /"Books balance" is not a test of it/);
+  assert.match((await report([{ test: 'Footer.StaysDown', passed: true }, { test: more.theirs, passed: true }])).error, /not a test of it/);
+  assert.equal((await report([{ test: 'Footer.StaysDown', passed: true }])).status, 200);
+  assert.deepEqual((await report([{ test: 'Nobody.KnowsThis', passed: true }])).result.unknown, ['Nobody.KnowsThis'], 'a test the map does not know is named, as for any token');
+  const theirResult = (await call('/api/test_report', admin, { build: '1.0.0', results: [{ test: 'Books.Balance', passed: true }] })).result;
+  assert.equal(theirResult.recorded, 1);
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64');
+  const resultOf = async (test: string) => (await call('/api/get', admin, { id: test })).result.outgoing.find((r: any) => r.type === 'produced')?.id;
+  assert.match((await call('/agent/picture_put', site, { result: await resultOf(more.theirs), data: png, content_type: 'image/png' })).error, /not the result of a test of it/);
+  // A resource: one its work needs or that no work is said to need, held for its work; not one that is other work's.
+  assert.equal((await call('/agent/claim', site, { resource: more.shared, holder: run, reason: 'x' })).status, 200);
+  assert.equal((await call('/agent/release', site, { resource: more.shared, holder: run, reason: 'x' })).status, 200);
+  assert.match((await call('/agent/claim', site, { resource: more.press, holder: run, reason: 'x' })).error, /Nothing there needs "The printing press"/);
+  assert.match((await call('/agent/release', site, { resource: more.press, reason: 'x' })).error, /cannot release it/);
+  assert.match((await call('/agent/claim', site, { resource: more.lane, holder: run, for: made.o, reason: 'x' })).error, /cannot hold a resource for it/);
+  assert.equal((await call('/agent/claim', site, { resource: more.lane, holder: run, for: made.t, reason: 'x' })).status, 200);
+  assert.equal((await call('/agent/release', site, { resource: more.lane, holder: run, reason: 'x' })).status, 200);
+  // And it tells the owner only of its own work.
+  assert.match((await call('/agent/notify', site, { title: 'Look', about: made.o })).error, /cannot send a notification about it/);
+  assert.equal((await call('/agent/notify', site, { title: 'Look', about: made.t })).status, 200);
+  assert.equal((await call('/agent/check_connections', free, {})).status, 200, 'a token with no limit calls what it could');
+
   // Used from a network it has not been used from, its owner is told, once for that network. The first place is not news.
   const from = (address: string) => fetch(`${base}/agent/search`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${site}`, 'x-forwarded-for': address }, body: '{}' });
   const notices = async () => (await call('/api/view', admin, { name: 'notifications' })).result.filter((n: any) => /new place/.test(n.title));
