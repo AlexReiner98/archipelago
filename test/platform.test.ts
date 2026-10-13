@@ -377,7 +377,15 @@ test('dev mode turns review off and offers agents a restart; without it neither 
 
 test('an agent can point the human\'s screen, and its changes point it too', async () => {
   const { call } = await serve('off');
-  assert.match((await call('/agent/show', undefined, {})).error, /needs "entity" or "screen"/);
+  assert.match((await call('/agent/show', undefined, {})).error, /needs "entity", "screen" or "lens"/);
+
+  // A picture of the map: the lens and the style go in the address, and a lens that could not be drawn is refused here.
+  await call('/agent/show', undefined, { actor: 'robot', lens: { far: 1, over: ['depends_on'] }, style: { lit: 'blocked' } });
+  assert.equal((await call('/api/pulse')).result.focus.hash, 'graph?far=1&over=depends_on&lit=blocked');
+  await call('/agent/show', undefined, { actor: 'robot', lens: {} });
+  assert.equal((await call('/api/pulse')).result.focus.hash, 'graph?lens', 'the whole map as it opens');
+  assert.match((await call('/agent/show', undefined, { lens: { by: 'nope' } })).error, /unknown kind of link/);
+  assert.match((await call('/agent/show', undefined, { lens: { from: 'e_nothing0' } })).error, /No entity/);
 
   await call('/agent/show', undefined, { actor: 'robot', screen: 'roadmap', of: 'e_x', note: 'Look here' });
   const shown = (await call('/api/pulse')).result.focus;

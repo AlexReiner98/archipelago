@@ -61,7 +61,7 @@ interface Counts {
 }
 
 /** The lens asked for, over the built-in one: a field that is named replaces it whole. */
-function read(l: Archipelago, input: Record<string, unknown>): Lens {
+export function readLens(l: Archipelago, input: Record<string, unknown>): Lens {
   const lens: Lens = { ...LENS_DEFAULT };
   const known = (kind: unknown, field: string) => {
     if (typeof kind !== 'string' || !l.registry.relations.has(kind)) throw new Error(`${field}: unknown kind of link "${kind}". Known: ${[...l.registry.relations.keys()].join(', ')}`);
@@ -98,7 +98,7 @@ function read(l: Archipelago, input: Record<string, unknown>): Lens {
 
 /** What a lens answers with: the lens as read, the items, the links between them, and what was left out. */
 export async function lens(l: Archipelago, input: Record<string, unknown>) {
-  const asked = read(l, input);
+  const asked = readLens(l, input);
   const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at from entity where archived_at is null`);
   const all = new Map(entities.map((e) => [e.id, e]));
   if (asked.from && !all.has(asked.from)) throw new Error(`No entity "${asked.from}"`);
@@ -258,7 +258,9 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
 
   return {
     lens: asked,
-    items: [...sent].map((id) => {
+    // Who it was answered for, so a style can light what waits on them.
+    viewer: l.viewer || (await l.setting<string>('me')) || null,
+    items:[...sent].map((id) => {
       const e = eligible.get(id)!;
       return {
         id,

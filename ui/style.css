@@ -168,6 +168,37 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .rm-node .track { fill: var(--closed-soft); }
 .rm-node .fill { fill: var(--ok); }
 .rm-node .flag { fill: var(--g-blocked); }
+/* A lens, drawn as a nest: a thing is a circle, and what is inside it is in it. */
+.lens-card { overflow: hidden; }
+.lens-view .fold-bar { padding: 10px 14px; flex-wrap: nowrap; }
+.lens-trail { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.lens-trail button { border: 0; background: none; padding: 2px 4px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; flex: 0 1 auto; }
+.lens-trail button.here { color: var(--text); font-weight: 600; }
+.lens-trail .sep { color: var(--muted); }
+.lens-view .switch { flex: none; }
+.ln-sea { display: block; width: 100%; height: min(calc(100vh - 190px), 780px); min-height: 360px; background: var(--bg); touch-action: none; user-select: none; cursor: grab; }
+.ln-thing { cursor: pointer; }
+.ln-thing .land { fill: var(--panel); stroke: var(--edge); stroke-width: 1.2; }
+.ln-thing.odd .land { fill: var(--bg); }
+.ln-thing.leaf .land { fill: var(--closed-soft); stroke: var(--edge); }
+.ln-thing.leaf.blocked .land { fill: var(--g-blocked); stroke: var(--panel); }
+.ln-thing.leaf.you .land { fill: var(--g-problems); stroke: var(--panel); }
+.ln-thing.leaf.you.blocked .land { stroke: var(--g-blocked); stroke-width: 2.5; }
+.ln-thing.closed .land { fill: var(--ok-soft); stroke: var(--ok); }
+.ln-thing .arc { fill: none; stroke-linecap: butt; pointer-events: none; }
+.ln-thing .arc.you { stroke: var(--g-problems); }
+.ln-thing .arc.blocked { stroke: var(--g-blocked); }
+.ln-thing .boat { fill: var(--accent); stroke: var(--panel); stroke-width: 2; pointer-events: none; }
+.ln-thing .name { font-size: 12px; fill: var(--text); text-anchor: middle; pointer-events: none; }
+.ln-thing .name.mid, .ln-thing .name.top { font-weight: 600; }
+.ln-thing .name.top { pointer-events: auto; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+.ln-thing .name.top:hover { fill: var(--accent); }
+.ln-thing .name.leaf { font-size: 11px; }
+.ln-thing.leaf.blocked .name, .ln-thing.leaf.you .name { fill: #fff; }
+.ln-thing .name .count { font-size: 11px; font-weight: 400; fill: var(--muted); }
+.ln-line { stroke: var(--edge-strong); stroke-width: 1.2; stroke-dasharray: 2 4; pointer-events: stroke; }
+.ln-line.waits { stroke: var(--g-blocked); stroke-dasharray: 5 4; stroke-width: 1.5; }
+#ln-arrow path { fill: var(--g-blocked); }
 /* The one graph. */
 .graph-view.full { position: fixed; inset: 0; z-index: 40; background: var(--panel); display: flex; flex-direction: column; }
 .graph-view.full > .fold-bar { padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }

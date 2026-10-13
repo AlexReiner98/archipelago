@@ -1887,9 +1887,341 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
   return h('div', { class: 'graph-body' }, h('div', { class: 'graph-scroll' }, svg), legend.length > 0 && h('div', { class: 'legend' }, legend));
 }
 
-/** The whole map, as the same drawing with no one thing at its centre. */
-async function graph() {
-  part('graph').replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Graph')), h('section', { class: 'card' }, graphView({ defaults: { kind: 'structure' } })));
+// ---- Lens ----------------------------------------------------------------
+
+// A lens says what is in a picture and the server answers it with data of one
+// shape (the `lens` view). A style says how that data looks, and is only ever
+// read here: which shape, and what stays lit. One shape so far, the nest: a
+// thing is a circle and what is inside it is in it, at every depth. It opens
+// as it grows on the screen, and closed it says of its parts what each part
+// says of itself, so every zoom is the same drawing at another scale.
+const LENS_STYLE = { shape: 'nest', lit: 'all' };
+const LIT = [
+  ['all', 'All', 'Everything in the picture'],
+  ['you', 'Needs you', 'Only what waits on you stays lit'],
+  ['blocked', 'Blocked', 'Only what is blocked stays lit'],
+];
+/** The fields a lens may carry in an address, and which of them are lists. */
+const LENS_FIELDS = { from: false, by: false, far: false, lanes: false, order: false, measure: false, kinds: true, over: true, fold: true };
+
+/** A lens and a style, as the end of an address says them: ?from=…&far=1&lit=you. */
+function readLens(query) {
+  const lens = {};
+  const style = {};
+  for (const [key, value] of new URLSearchParams(query)) {
+    if (key === 'lit' || key === 'shape') style[key] = value;
+    else if (!(key in LENS_FIELDS)) continue;
+    else if (key === 'far') lens.far = Number(value);
+    else if (key === 'over' && value === 'all') lens.over = 'all';
+    else lens[key] = LENS_FIELDS[key] ? value.split(',').filter(Boolean) : value;
+  }
+  return { lens, style };
+}
+
+/** What a person chose for a picture is kept in their browser, by what it is a picture of. */
+const keptStyle = (key) => {
+  try {
+    return JSON.parse(localStorage.getItem(`pelago-lens:${key}`) ?? '{}');
+  } catch {
+    return {};
+  }
+};
+
+/**
+ * The picture a lens gives, drawn in a style. `style` is what the page or an
+ * address asks for this one look, over what the person chose before.
+ */
+function lensView({ lens = {}, style = {}, key = lens.from ?? 'map' } = {}) {
+  const chosen = { ...LENS_STYLE, ...keptStyle(key), ...style };
+  const host = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
+  const keep = (change) => {
+    Object.assign(chosen, change);
+    try {
+      localStorage.setItem(`pelago-lens:${key}`, JSON.stringify({ lit: chosen.lit }));
+    } catch {
+      // Without storage the choice lasts until the page is reloaded.
+    }
+  };
+  (async () => {
+    let answer;
+    try {
+      answer = await api('view', { name: 'lens', params: lens });
+    } catch (err) {
+      return host.replaceChildren(h('div', { class: 'error' }, err.message));
+    }
+    if (answer.items.length < 2) return host.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw here.'));
+    (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest)(host, answer, chosen, keep);
+  })();
+  return host;
+}
+
+/** The nest: circles in circles, opened by zooming. Reads only what a lens answers with. */
+function drawNest(host, answer, style, keep) {
+  const me = answer.viewer;
+  const byId = new Map(answer.items.map((item) => [item.id, { ...item, kids: [] }]));
+  const root = { kids: [], depth: -1, x: 0, y: 0, title: 'Everything' };
+  for (const n of byId.values()) (byId.get(n.inside) ?? root).kids.push(Object.assign(n, { up: byId.get(n.inside) ?? root }));
+  // What a thing says of itself and of all that is inside it, in the same three numbers at every depth.
+  for (const n of byId.values()) {
+    n.all = 1 + n.within.items;
+    n.you = (me && n.state.waits_on.includes(me) ? 1 : 0) + ((me && n.within.waits_on[me]) || 0);
+    n.blk = (n.state.blocked ? 1 : 0) + n.within.blocked;
+    n.work = n.size.work + n.within.work;
+    n.at = n.state.sessions + n.within.sessions;
+  }
+
+  // Sizes and places. A thing with nothing sent inside it is as big as what it stands for; one with parts, as big as they are packed.
+  const pack = (n, depth) => {
+    n.depth = depth;
+    if (!n.kids.length) return void (n.r = 6 * Math.sqrt(1 + (n.within?.not_sent ?? 0)));
+    for (const kid of n.kids) pack(kid, depth + 1);
+    const gap = depth < 0 ? 34 : depth === 0 ? 7 : 3.5;
+    const placed = [];
+    for (const kid of [...n.kids].sort((a, b) => b.r - a.r || a.place - b.place)) {
+      for (let a = 0, far = 0; ; a += 0.3, far += Math.max(0.5, kid.r / 28)) {
+        const [x, y] = [Math.cos(a) * far, Math.sin(a) * far];
+        if (placed.some((p) => Math.hypot(p.px - x, p.py - y) < p.r + kid.r + gap)) continue;
+        Object.assign(kid, { px: x, py: y });
+        break;
+      }
+      placed.push(kid);
+    }
+    // Centred on what it holds, with room at the rim.
+    const [cx, cy] = [(Math.min(...placed.map((p) => p.px - p.r)) + Math.max(...placed.map((p) => p.px + p.r))) / 2, (Math.min(...placed.map((p) => p.py - p.r)) + Math.max(...placed.map((p) => p.py + p.r))) / 2];
+    for (const p of placed) Object.assign(p, { px: p.px - cx, py: p.py - cy });
+    const reach = Math.max(...placed.map((p) => Math.hypot(p.px, p.py) + p.r));
+    n.r = reach + Math.max(5, reach * 0.12);
+  };
+  pack(root, -1);
+  const settle = (n) => n.kids.forEach((kid) => (Object.assign(kid, { x: n.x + kid.px, y: n.y + kid.py }), settle(kid)));
+  settle(root);
+
+  // What is drawn: a sea, the lines, then each thing over what it is inside.
+  const lineLayer = s('g', { class: 'ln-lines' });
+  const landLayer = s('g');
+  const svg = s('svg', { class: 'ln-sea', role: 'img', 'aria-label': 'The map, each thing inside what it is part of' }, s('defs', {}, s('marker', { id: 'ln-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, s('path', { d: 'M0,1 L10,5 L0,9 z' }))), landLayer, lineLayer);
+  const make = (n) => {
+    const holds = n.all > 1;
+    n.g = s('g', { class: `ln-thing${holds ? ' holds' : ' leaf'}${n.depth % 2 ? ' odd' : ''}${n.state.blocked && !holds ? ' blocked' : ''}${n.you && !holds ? ' you' : ''}${n.open ? '' : ' closed'}`, 'data-id': n.id });
+    n.hint = s('title');
+    n.circle = s('circle', { class: 'land' });
+    n.youArc = holds && n.you > 0 && s('circle', { class: 'arc you' });
+    n.blkArc = holds && n.blk > 0 && s('circle', { class: 'arc blocked' });
+    n.boat = n.at > 0 && s('circle', { class: 'boat', r: 4.5 });
+    n.label = s('text', { class: 'name' });
+    n.g.append(n.hint, n.circle, ...[n.youArc, n.blkArc, n.boat].filter(Boolean), n.label);
+    n.hint.textContent = `${n.title}\n${typeTitle(n.type)}, ${n.status}${holds ? `\n${n.work} open, ${n.blk} blocked${me ? `, ${n.you} need you` : ''}` : n.state.blocked ? ', blocked' : ''}${n.at ? '\nA session is at work here' : ''}`;
+    landLayer.append(n.g);
+    n.kids.forEach(make);
+  };
+  root.kids.forEach(make);
+
+  const trail = h('span', { class: 'lens-trail' });
+  const lit = h('span', { class: 'switch' });
+  const page = h('button', { title: 'Open its page' }, 'Open');
+  host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, trail, h('span', { class: 'grow' }), page, lit), svg);
+
+  const view = { x: 0, y: 0, k: 1 };
+  let [W, H] = [800, 500];
+  let focus = root;
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  // The whole of a thing in sight, with some sea around it.
+  const fit = (n) => {
+    if (n !== root) return { x: n.x, y: n.y, k: (Math.min(W, H) * 0.92) / (2 * n.r) };
+    const [x0, x1, y0, y1] = [Math.min(...root.kids.map((p) => p.x - p.r)), Math.max(...root.kids.map((p) => p.x + p.r)), Math.min(...root.kids.map((p) => p.y - p.r)), Math.max(...root.kids.map((p) => p.y + p.r))];
+    return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, k: Math.min(W / (x1 - x0), H / (y1 - y0)) * 0.9 };
+  };
+  const cut = (text, room) => (room < 4 ? '' : text.length > room ? text.slice(0, room - 1).trimEnd() + '…' : text);
+  const lines = (text, room, most) => {
+    const out = [''];
+    for (const word of text.split(' ')) {
+      if ((out.at(-1) + ' ' + word).trim().length <= room) out[out.length - 1] = (out.at(-1) + ' ' + word).trim();
+      else if (out.length < most) out.push(cut(word, room));
+      else return [...out.slice(0, -1), cut(out.at(-1) + ' ' + word, room)];
+    }
+    return out;
+  };
+  const write = (n, rows, x, y, cls) => {
+    const said = `${cls}|${rows.join('|')}`;
+    if (n.said !== said) {
+      n.said = said;
+      n.label.setAttribute('class', `name ${cls}`);
+      n.label.replaceChildren(...rows.map((row, i) => s('tspan', { dy: i ? 13 : 0, class: i && cls !== 'leaf' ? 'count' : null }, document.createTextNode(row))));
+    }
+    for (const span of n.label.children) span.setAttribute('x', x);
+    n.label.setAttribute('y', y);
+  };
+  const drawn = new Map();
+  const frame = () => {
+    const shut = Math.min(W, H) * 0.34;
+    const place = (n, shown, seen) => {
+      const [sr, sx, sy] = [n.r * view.k, (n.x - view.x) * view.k + W / 2, (n.y - view.y) * view.k + H / 2];
+      // A thing opens as it grows on the screen: its own marks fade and its parts come in.
+      const open = n.kids.length ? clamp((sr - shut) / (shut * 0.12)) : 0;
+      Object.assign(n, { sr, sx, sy, seen, opened: open > 0.5 });
+      const inSight = shown > 0.03 && sx + sr > 0 && sx - sr < W && sy + sr > 0 && sy - sr < H;
+      n.g.style.display = inSight ? '' : 'none';
+      if (inSight) {
+        const count = style.lit === 'you' ? n.you : style.lit === 'blocked' ? n.blk : 1;
+        n.g.setAttribute('opacity', shown * (count ? 1 : 0.2));
+        n.g.classList.toggle('open', open > 0.5);
+        for (const [key, value] of [['cx', sx], ['cy', sy], ['r', Math.max(sr, 1.5)]]) n.circle.setAttribute(key, value);
+        // Closed, it shows the share of what it holds that needs you, then the share that is blocked.
+        const rim = Math.max(sr - Math.max(3, Math.min(sr * 0.16, 9)), 1);
+        const round = 2 * Math.PI * rim;
+        let from = 0;
+        for (const [arc, share] of [[n.youArc, n.you / n.all], [n.blkArc, n.blk / n.all]]) {
+          if (!arc) continue;
+          const len = Math.max(share * round, 3);
+          for (const [key, value] of [['cx', sx], ['cy', sy], ['r', rim], ['stroke-width', Math.max(2, Math.min(sr * 0.13, 7))], ['stroke-dasharray', `${len} ${round}`], ['stroke-dashoffset', -from], ['transform', `rotate(-90 ${sx} ${sy})`], ['opacity', (1 - open) * (sr > 7 ? 1 : 0)]]) arc.setAttribute(key, value);
+          from += len + 2;
+        }
+        if (n.boat) for (const [key, value] of [['cx', sx + sr * 0.71], ['cy', sy - sr * 0.71], ['opacity', sr > 9 ? 1 : 0]]) n.boat.setAttribute(key, value);
+        // Its name: across its top when it is open, in its middle with a count when it is closed, wrapped when it holds nothing.
+        const cx = Math.max(Math.min(sx, W - 70), 70);
+        if (open > 0.5) write(n, [cut(n.title, Math.floor(Math.min(sr * 1.5, W - 40) / 7))], cx, Math.max(sy - sr + 17, 16), 'top');
+        else if (n.all > 1 && sr >= 22) write(n, [cut(n.title, Math.floor((sr * 1.8) / 6.6)), sr >= 36 ? (style.lit === 'you' ? `${n.you} need you` : style.lit === 'blocked' ? `${n.blk} blocked` : `${n.work} open`) : ''].filter(Boolean), sx, sy + (sr >= 36 ? -2 : 4), 'mid');
+        else if (n.all === 1 && sr >= 26) {
+          const rows = lines(n.title, Math.floor((sr * 1.7) / 6.1), Math.max(1, Math.min(4, Math.floor((sr * 1.5) / 13))));
+          write(n, rows, sx, sy + 4 - ((rows.length - 1) * 13) / 2, 'leaf');
+        } else write(n, [], sx, sy, 'none');
+      }
+      for (const kid of n.kids) place(kid, shown * open, seen && open > 0.5);
+    };
+    for (const top of root.kids) place(top, 1, true);
+
+    // A link runs between the nearest things in sight that stand for its ends, so a closed thing gathers the links of its parts.
+    const stand = (id) => {
+      let n = byId.get(id);
+      while (n && !n.seen) n = n.up === root ? undefined : n.up;
+      return n;
+    };
+    const wanted = new Map();
+    for (const link of answer.links) {
+      const [a, b] = [stand(link.from), stand(link.to)];
+      if (!a || !b || a === b) continue;
+      const key = `${link.kind} ${a.id} ${b.id}`;
+      const line = wanted.get(key) ?? { kind: link.kind, a, b, n: 0 };
+      line.n += link.n;
+      wanted.set(key, line);
+    }
+    for (const [key, el] of drawn) if (!wanted.has(key)) (el.remove(), drawn.delete(key));
+    for (const [key, { kind, a, b, n }] of wanted) {
+      let el = drawn.get(key);
+      if (!el) {
+        el = s('line', { class: `ln-line${BLOCKING.includes(kind) ? ' waits' : ''}`, 'marker-end': BLOCKING.includes(kind) ? 'url(#ln-arrow)' : null }, s('title'));
+        drawn.set(key, el);
+        lineLayer.append(el);
+      }
+      const len = Math.hypot(b.sx - a.sx, b.sy - a.sy) || 1;
+      const [ux, uy] = [(b.sx - a.sx) / len, (b.sy - a.sy) / len];
+      for (const [k, v] of [['x1', a.sx + ux * (a.sr + 2)], ['y1', a.sy + uy * (a.sr + 2)], ['x2', b.sx - ux * (b.sr + 4)], ['y2', b.sy - uy * (b.sr + 4)], ['opacity', len < a.sr + b.sr + 8 ? 0 : style.lit === 'you' ? 0.15 : 0.75]]) el.setAttribute(k, v);
+      el.firstChild.textContent = `${a.title} ${relations.get(kind)?.title ?? kind} ${b.title}${n > 1 ? `, ${n} times over` : ''}`;
+    }
+
+    // Where the picture is: the deepest open thing that holds the middle of it.
+    let at = root;
+    for (let next; (next = at.kids.find((kid) => kid.opened && Math.hypot(kid.sx - W / 2, kid.sy - H / 2) < kid.sr)); ) at = next;
+    if (at !== focus || !trail.firstChild) {
+      focus = at;
+      const path = [];
+      for (let n = at; n !== root; n = n.up) path.unshift(n);
+      trail.replaceChildren(...[root, ...path].flatMap((n, i) => [i > 0 && h('span', { class: 'sep' }, '›'), h('button', { class: n === at ? 'here' : '', title: n === root ? 'The whole picture' : n.title, onclick: () => zoomTo(n) }, n === root ? 'All' : n.title)]).filter(Boolean));
+      page.hidden = at === root;
+      page.onclick = () => (location.hash = `#/e/${at.id}`);
+    }
+  };
+
+  let moving;
+  // What was last gone to, until the picture is moved by hand: it is fitted again when the room changes.
+  let aim = root;
+  const zoomTo = (n, glide = true) => {
+    aim = n;
+    const [from, to, t0] = [{ ...view }, fit(n), performance.now()];
+    cancelAnimationFrame(moving);
+    if (!glide) return void (Object.assign(view, to), frame());
+    const step = (now) => {
+      const t = clamp((now - t0) / 600);
+      const e = t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
+      Object.assign(view, { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e, k: from.k * (to.k / from.k) ** e });
+      frame();
+      if (t < 1 && host.isConnected) moving = requestAnimationFrame(step);
+    };
+    moving = requestAnimationFrame(step);
+  };
+
+  for (const [value, label, title] of LIT) {
+    if (value === 'you' && !me) continue;
+    lit.append(h('button', { class: style.lit === value ? 'on' : '', title, onclick: (ev) => (keep({ lit: value }), [...lit.children].forEach((b) => b.classList.toggle('on', b === ev.currentTarget)), frame()) }, label));
+  }
+
+  // A press that moves drags the picture; one that does not is a click: into a closed thing, to the page of one that holds nothing, out from the sea.
+  svg.addEventListener('pointerdown', (down) => {
+    if (down.button !== 0) return;
+    svg.setPointerCapture(down.pointerId);
+    const from = { ...view };
+    const target = down.target;
+    let far = false;
+    const move = (ev) => {
+      // Only the pointer that pressed, and only while it is down.
+      if (ev.pointerId !== down.pointerId || !(ev.buttons & 1)) return;
+      const [dx, dy] = [ev.clientX - down.clientX, ev.clientY - down.clientY];
+      far ||= Math.hypot(dx, dy) > 4;
+      if (!far) return;
+      cancelAnimationFrame(moving);
+      aim = undefined;
+      Object.assign(view, { x: from.x - dx / view.k, y: from.y - dy / view.k });
+      frame();
+    };
+    const up = () => {
+      svg.removeEventListener('pointermove', move);
+      svg.removeEventListener('pointerup', up);
+      if (far) return;
+      const n = byId.get(target.closest?.('[data-id]')?.dataset.id);
+      if (!n) return zoomTo(focus.up ?? root);
+      if (!n.kids.length) return void (location.hash = `#/e/${n.id}`);
+      if (n.opened && target.closest('text')) return void (location.hash = `#/e/${n.id}`);
+      zoomTo(n === focus ? (n.up ?? root) : n);
+    };
+    svg.addEventListener('pointermove', move);
+    svg.addEventListener('pointerup', up);
+  });
+  // The wheel zooms about the pointer, no further out than the whole picture.
+  svg.addEventListener(
+    'wheel',
+    (ev) => {
+      ev.preventDefault();
+      cancelAnimationFrame(moving);
+      aim = undefined;
+      const box = svg.getBoundingClientRect();
+      const [px, py] = [ev.clientX - box.left - W / 2, ev.clientY - box.top - H / 2];
+      const k = Math.max(fit(root).k * 0.7, Math.min(view.k * Math.exp(-ev.deltaY * 0.0016), 60));
+      Object.assign(view, { x: view.x + px / view.k - px / k, y: view.y + py / view.k - py / k, k });
+      frame();
+    },
+    { passive: false },
+  );
+  // It is drawn to the room it has, and again when that changes.
+  let sized = false;
+  new ResizeObserver(() => {
+    const [w, hgt] = [svg.clientWidth, svg.clientHeight];
+    if (!w || !hgt || (w === W && hgt === H && sized)) return;
+    [W, H] = [w, hgt];
+    sized = true;
+    aim ? zoomTo(aim, false) : frame();
+  }).observe(svg);
+}
+const LENS_SHAPES = { nest: drawNest };
+
+/**
+ * The map as a picture. With a lens in its address (anything after a ?), the
+ * lens drawn in its style; without, the drawing there was before, which stays
+ * until the owner takes a style to open on.
+ */
+async function graph(query = '') {
+  if (!query) return part('graph').replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Graph')), h('section', { class: 'card' }, graphView({ defaults: { kind: 'structure' } })));
+  const { lens, style } = readLens(query);
+  part('graph').replaceChildren(h('section', { class: 'card lens-card' }, lensView({ lens, style })));
 }
 
 // ---- Workspace -----------------------------------------------------------
@@ -3254,7 +3586,9 @@ const UNDER = { e: 'map', new: 'map', graph: 'map' };
 const PART = { e: 'item', new: 'item' };
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
 async function route(pulse = false) {
-  const [, name = 'map', arg] = location.hash.split('/');
+  // What follows a ? says how the page is to be drawn (a lens and a style), not which page it is.
+  const [where, query = ''] = location.hash.split('?');
+  const [, name = 'map', arg] = where.split('/');
   // Addresses that have been folded into another screen still lead somewhere.
   if (name === 'activity') return activity();
   // The projects are the top of Search, where the app opens.
@@ -3274,7 +3608,7 @@ async function route(pulse = false) {
     map: name === 'map' || page !== 'map' ? map : searchBar,
     // The graph around an item is drawn on that item's page, under it.
     item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
-    graph: name === 'graph' && graph,
+    graph: name === 'graph' && (() => graph(query)),
     workspace,
   };
   const wanted = PAGES[page];

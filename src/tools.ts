@@ -18,6 +18,7 @@ import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { undo } from './undo.ts';
 import { getPicture, putPicture, reportTests } from './proof.ts';
+import { readLens } from './lens.ts';
 import { awaitingRecheck, HANDOFF_MAX, toConfirm, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
@@ -471,17 +472,35 @@ export const TOOLS: Record<string, Tool> = {
   },
   show: {
     description:
-      'Point the human\'s web UI at something, so they can follow what you are doing: an entity, or a screen (optionally "of" one entity: the graph around it, or a project\'s roadmap). ' +
+      'Point the human\'s web UI at something, so they can follow what you are doing: an entity, a screen (optionally "of" one entity: the graph around it, or a project\'s roadmap), or a picture of the map (a lens, with a style). ' +
       'Their page goes there within a couple of seconds if they have "Follow agents" on. Add a short note saying what they are looking at. ' +
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
     input: {
       entity: z.string().optional().describe('An entity id: open its page.'),
       screen: z.enum(['today', 'review', 'map', 'graph', 'roadmap', 'questions', 'automations', 'activity', 'workspace']).optional(),
       of: z.string().optional().describe('With screen graph, roadmap or questions: the entity (for the last two, a project) it is drawn for.'),
+      lens: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('A picture of the map, drawn on the graph screen for this one look: the params of the lens view (from, kinds, by, over, far, lanes, order, measure, fold). {} is the whole map as it opens.'),
+      style: z
+        .object({ lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.') })
+        .optional()
+        .describe('With lens: how the picture is drawn.'),
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
     },
     run: async (l, actor, input) => {
-      if (!input.entity && !input.screen) throw new Error('show needs "entity" or "screen".');
+      if (input.lens || input.style) {
+        // Read as the lens view reads it, so a lens the page could not draw is refused here and not on the owner's screen.
+        const asked = readLens(l, input.lens ?? {});
+        if (asked.from && !(await l.entity(asked.from))) throw new Error(`No entity "${asked.from}"`);
+        const query = new URLSearchParams();
+        for (const [key, value] of Object.entries(input.lens ?? {})) if (key in asked) query.set(key, Array.isArray(value) ? value.join(',') : String(value));
+        if (input.style?.lit) query.set('lit', input.style.lit);
+        // The address always says it is a lens: the graph screen without one is still the old drawing.
+        return point(l, actor, `graph?${query.size ? query : 'lens'}`, input.note);
+      }
+      if (!input.entity && !input.screen) throw new Error('show needs "entity", "screen" or "lens".');
       return point(l, actor, input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);
     },
   },
