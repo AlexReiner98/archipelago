@@ -485,6 +485,15 @@ svg.graph .dim { opacity: 0.18; }
 #listening:not([hidden]) + #follow { margin-top: 0; }
 #follow { margin-top: auto; padding: 8px 10px; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12.5px; cursor: pointer; }
 #follow + #whoami { margin-top: 0; }
+#follow > label { flex: 1; display: flex; gap: 6px; align-items: center; cursor: pointer; white-space: nowrap; }
+#follow-what > summary { padding: 1px 8px; font-size: 12px; }
+#follow:has(> label input:not(:checked)) #follow-what { opacity: 0.5; }
+#follow-what > .menu-items { right: auto; left: 0; top: auto; bottom: calc(100% + 4px); min-width: 210px; color: var(--text); cursor: default; }
+#follow-what > .menu-items > label { display: flex; gap: 8px; align-items: center; padding: 5px 10px; border-radius: 6px; white-space: nowrap; cursor: pointer; max-width: 300px; }
+#follow-what > .menu-items > label > span { overflow: hidden; text-overflow: ellipsis; }
+#follow-what > .menu-items > label:hover { background: var(--accent-soft); }
+#follow-what > .menu-items > hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--line); }
+@media (max-width: 720px) { #follow-what > .menu-items { left: auto; right: 0; bottom: auto; top: calc(100% + 4px); } }
 #followed { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 6; display: flex; gap: 10px; align-items: center; max-width: min(720px, calc(100vw - 32px)); padding: 8px 8px 8px 14px; background: var(--panel); border: 1px solid var(--warn); border-radius: 10px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); }
 #followed[hidden] { display: none; }
 #followed > * { flex: none; white-space: nowrap; }

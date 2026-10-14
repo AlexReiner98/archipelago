@@ -398,6 +398,30 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
 
   await call('/api/change', undefined, { reason: 'mine', ops: [{ op: 'create', type: 'note', title: 'M' }] });
   assert.equal((await call('/api/pulse')).result.focus.hash, 'review', 'the human\'s own changes do not move their screen');
+
+  // Every step an agent takes is kept, the last few of them, each with its kind: the page follows the kinds the person chose.
+  const last = async () => (await call('/api/pulse')).result.steps.at(-1);
+  const sofar = (await call('/api/pulse')).result.steps.slice(-4);
+  assert.deepEqual(sofar.map((s: any) => s.kind), ['show', 'show', 'show', 'change'], 'a show and an agent\'s change are steps; a refused call and the human\'s change are not');
+  assert.deepEqual([sofar[2].did, sofar[2].hash, sofar[3].did], ['Look here', 'roadmap/e_x', 'A note']);
+  await call('/agent/search', undefined, { actor: 'robot', q: 'N' });
+  const searched = await last();
+  assert.deepEqual([searched.kind, searched.actor, searched.did, searched.hash], ['search', 'robot', 'searched for "N"', undefined]);
+  const note = (await call('/api/search', undefined, { q: 'M' })).result[0].id;
+  assert.equal((await last()).at, searched.at, 'what the human reads is no step');
+  await call('/agent/get', undefined, { actor: 'robot', id: note });
+  const read = await last();
+  assert.deepEqual([read.kind, read.did, read.hash], ['read', 'is reading this', `e/${note}`]);
+  assert.ok(read.at > searched.at);
+  await call('/agent/view', undefined, { actor: 'robot', name: 'lens' });
+  assert.deepEqual([(await last()).kind, (await last()).did, (await last()).hash], ['view', 'asked for lens', 'graph?lens']);
+  await call('/agent/proposals', undefined, { actor: 'robot' });
+  assert.deepEqual([(await last()).kind, (await last()).did], ['read', 'proposals']);
+  for (let i = 0; i < 12; i++) await call('/agent/search', undefined, { actor: 'robot', q: 'N' });
+  const kept = (await call('/api/pulse')).result.steps;
+  assert.equal(kept.length, 12, 'only the last few are kept');
+  assert.ok(kept.every((s: any, i: number) => !i || s.at > kept[i - 1].at));
+  assert.equal((await call('/api/pulse')).result.focus.hash, 'review', 'a step leaves where the agent pointed as it was');
 });
 
 test('an agent hears what the human does: by waiting for it, and with the owner\'s next message', async () => {

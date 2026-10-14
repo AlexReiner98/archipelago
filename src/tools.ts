@@ -209,10 +209,57 @@ interface Focus {
 // not a fact about the map, and it means nothing after a restart.
 const focus = new Map<string, Focus>();
 const focusKey = (l: Archipelago) => `${l.workspace}:${l.viewer ?? ''}`;
-function point(l: Archipelago, actor: Actor, hash: string, note?: string): Focus {
+function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string): Focus {
   const next = { at: Date.now(), hash, actor: actor.name, note };
   focus.set(focusKey(l), next);
+  took(l, { kind, actor: actor.name, did: note, hash });
   return next;
+}
+
+/**
+ * One thing an agent did through a tool, whatever it was. The page is given
+ * the last few and follows those the person has chosen to: by what kind of
+ * step it is, and by whose it is.
+ */
+interface Step {
+  /** Counts up: a higher number is how the page knows a step is new. */
+  at: number;
+  /** show: it pointed the page. change: it changed the map. read: one item. view: a standing question or a picture. search. other: sessions, resources and the rest. */
+  kind: 'show' | 'change' | 'read' | 'view' | 'search' | 'other';
+  actor: string;
+  /** What it did, in a few words; for a show or a change, the note or the reason it gave. */
+  did?: string;
+  /** The UI address of what it did it to, when that is one item or one picture. */
+  hash?: string;
+}
+/** How many steps are kept for a page to catch up on between two looks. */
+const STEPS_KEPT = 12;
+const steps = new Map<string, Step[]>();
+function took(l: Archipelago, step: Omit<Step, 'at'>): void {
+  const list = steps.get(focusKey(l)) ?? [];
+  // Two steps in one millisecond are still two.
+  list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step });
+  steps.set(focusKey(l), list.slice(-STEPS_KEPT));
+}
+/** Tools that are no step of their own: the two that point the screen themselves, and the one that only waits. */
+const UNWATCHED = new Set(['show', 'change', 'watch']);
+const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
+function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>): void {
+  const params = (input.params ?? {}) as Record<string, unknown>;
+  // A session saying only that it is alive has done nothing to see.
+  if (UNWATCHED.has(name) || (name === 'session_update' && !input.task && !input.note)) return;
+  const named = [input.id, input.entity, input.target, input.task, input.resource, input.about, input.repo, params.from, params.root, params.project, params.event, params.of, params.task, params.repo, params.focus];
+  const id = named.find((v): v is string => typeof v === 'string' && /^e_[a-z0-9]{8}$/.test(v));
+  const did =
+    name === 'get'
+      ? 'is reading this'
+      : name === 'search'
+        ? `searched${input.q ? ` for "${String(input.q).slice(0, 60)}"` : input.type ? ` for every ${String(input.type)}` : ''}`
+        : name === 'view'
+          ? `asked ${input.name ? `for ${String(input.name).replaceAll('_', ' ')}` : 'what can be asked'}`
+          : name.replaceAll('_', ' ');
+  const kind = name === 'view' || name === 'search' ? name : READS.has(name) ? 'read' : 'other';
+  took(l, { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'lens' ? 'graph?lens' : undefined });
 }
 
 /**
@@ -380,7 +427,7 @@ export const TOOLS: Record<string, Tool> = {
     description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
     humanOnly: true,
     input: {},
-    run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)), ui: uiStamp(), listening }),
+    run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)), steps: steps.get(focusKey(l)) ?? [], ui: uiStamp(), listening }),
   },
   backup: {
     description: 'Back every workspace up now, without waiting for the schedule. Do this before anything that changes the database schema. Answers with what was written.',
@@ -504,10 +551,10 @@ export const TOOLS: Record<string, Tool> = {
         if (input.style?.shape) query.set('shape', input.style.shape);
         if (input.style?.id) query.set('style', input.style.id);
         // The address always says it is a lens: the graph screen without one is still the old drawing.
-        return point(l, actor, `graph?${query.size ? query : 'lens'}`, input.note);
+        return point(l, actor, 'show', `graph?${query.size ? query : 'lens'}`, input.note);
       }
       if (!input.entity && !input.screen) throw new Error('show needs "entity", "screen" or "lens".');
-      return point(l, actor, input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);
+      return point(l, actor, 'show', input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);
     },
   },
   change: {
@@ -609,7 +656,7 @@ export const TOOLS: Record<string, Tool> = {
         const target = made ?? touched;
         // A lens or a style that was changed is seen in the picture it changes, not on its own page.
         const picture = result.status !== 'proposed' && target ? await pictureOf(l, target) : undefined;
-        point(l, actor, result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason);
+        point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason);
       }
       return result;
     },
@@ -1016,5 +1063,7 @@ export async function callTool(l: Archipelago, actor: Actor, name: string, input
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);
   // An agent whose token is limited to some repositories is held to them here, whatever the tool.
   if (actor.kind === 'agent' && actor.repos?.length) await withinScope(l, actor, name, parsed.data as Record<string, unknown>);
-  return tool.run(l, actor, parsed.data);
+  const answer = await tool.run(l, actor, parsed.data);
+  if (actor.kind === 'agent') step(l, actor, name, parsed.data as Record<string, unknown>);
+  return answer;
 }
