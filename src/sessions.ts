@@ -301,43 +301,19 @@ export async function tell(
   return { run: run.id, beat: beat.n, standing: next.filter((b) => !b.replaced_by).length };
 }
 
-/**
- * A session's story as its page draws it: the beats in order, the items they
- * are about, the ties the session drew, and the links the map already has
- * between those items, which the session did not have to say.
- */
+/** A session's story as told: the run and its beats in order. The picture of it is the lens, started from the run (story). */
 export async function story(l: Archipelago, input: Record<string, unknown>) {
   const key = String(input.run ?? '');
   const run = key ? await resolveRun(l, key) : undefined;
   if (!run) throw new Error(`No session "${key}": give run, a run id or a session id.`);
   const beats = Array.isArray(run.props.story) ? (run.props.story as Beat[]) : [];
-  const standing = beats.filter((b) => !b.replaced_by);
-  // What a beat that was taken back was about stays only if a standing beat is about it too.
-  const ids = [...new Set(standing.flatMap((b) => b.about))];
-  const { rows: items } = await l.db.query<Item & { is_open: boolean }>(`select id, type, title, status, is_open from entity where id = any($1::text[]) and archived_at is null`, [ids]);
-  const seen = new Map<string, { from: string; to: string; says: string; beat: number }>();
-  for (const b of standing) for (const k of b.links) seen.set(`${k.from} ${k.to} ${k.says}`, { ...k, beat: b.n });
-  const { rows: ties } = await l.db.query<{ type: string; from: string; to: string }>(
-    `select type, from_id as "from", to_id as "to" from relation where from_id = any($1::text[]) and to_id = any($1::text[]) and valid_to is null`,
-    [items.map((i) => i.id)],
-  );
-  return {
-    run: { id: run.id, title: run.title, status: run.status, open: run.is_open },
-    beats,
-    // `last`: the latest standing beat about it, so the drawing can light what the story is on now.
-    // In the order the story came to them.
-    items: items
-      .map(({ is_open, ...i }) => ({ ...i, open: is_open, last: Math.max(...standing.filter((b) => b.about.includes(i.id)).map((b) => b.n)) }))
-      .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)),
-    links: [...seen.values()],
-    ties,
-  };
+  return { run: { id: run.id, title: run.title, status: run.status, open: run.is_open }, beats };
 }
 
 // Asked like any standing question; kept here, beside what writes it.
 VIEWS.story = {
   description:
-    'The story a session told of its work (the tell tool): its beats in order (n, said, about, links; one taken back says replaced_by), the items the standing beats are about, the links the session drew between them, and the ties the map already has between those items. Params: run (required): a run id or session id.',
+    'The story a session told of its work (the tell tool): its beats in order (n, said, about, links; one taken back says replaced_by). The picture of it is the lens view with story: the run. Params: run (required): a run id or session id.',
   run: story,
 };
 

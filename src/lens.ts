@@ -10,6 +10,8 @@ import { blockGraph } from './views.ts';
 export interface Lens {
   /** Where it starts: one item. Without it, the whole map. */
   from?: string;
+  /** Or the story a session told (a run): what its standing beats are about, with the ties it drew. */
+  story?: string;
   /** Which types are in it: a type (flavours included) or "work"; with a leading "-", left out. */
   kinds?: string[];
   /** The one kind of link that says what is inside what. */
@@ -78,6 +80,7 @@ export function readLens(l: Archipelago, input: Record<string, unknown>, under: 
     return value as string[];
   };
   if (input.from !== undefined) lens.from = String(input.from);
+  if (input.story !== undefined) lens.story = String(input.story);
   if (input.kinds !== undefined) lens.kinds = list(input.kinds, 'kinds');
   if (input.by !== undefined) lens.by = known(input.by, 'by');
   if (input.over !== undefined) lens.over = input.over === 'all' ? 'all' : list(input.over, 'over').map((kind) => known(kind, 'over'));
@@ -126,7 +129,7 @@ async function keptOf(l: Archipelago, type: 'lens' | 'style', named: unknown): P
 /** A lens in words, so a person and an agent read the same rule: what is in the picture and what is not. */
 function sayLens(l: Archipelago, asked: Lens, startTitle: string | undefined): string {
   const link = (kind: string) => l.registry.relations.get(kind)?.title ?? kind;
-  const parts = [startTitle ? `"${startTitle}" and what ${link(asked.by)} it` : `Everything, by what ${link(asked.by)} what`];
+  const parts = [asked.story ? `What "${startTitle}" told of, with the ties it drew` : startTitle ? `"${startTitle}" and what ${link(asked.by)} it` : `Everything, by what ${link(asked.by)} what`];
   if (asked.far !== undefined) parts.push(asked.far === 0 ? 'nothing below it' : `${asked.far} step${asked.far === 1 ? '' : 's'} down`);
   if (asked.kinds?.length) parts.push(`only ${asked.kinds.map((k) => (k.startsWith('-') ? `not ${k.slice(1)}` : k)).join(', ')}`);
   parts.push(asked.over === 'all' ? 'with every kind of link' : asked.over.length ? `with links: ${asked.over.map(link).join(', ')}` : 'with no links');
@@ -190,8 +193,29 @@ export async function pictureOf(l: Archipelago, id: string): Promise<string | un
   return rows.length ? `graph?from=${rows[0].to_id}` : 'graph?lens';
 }
 
+/** A beat of a session's story, as the tell tool keeps it on the run. */
+interface Beat {
+  n: number;
+  about: string[];
+  links: { from: string; to: string; says: string }[];
+  replaced_by?: number;
+}
+
+/** The story a run told: the run, and its beats that stand (not taken back). By its id or by the id its surface gave it. */
+async function storyOf(l: Archipelago, key: string): Promise<{ id: string; title: string; beats: Beat[] }> {
+  const { rows } = await l.db.query<{ id: string; title: string; story: unknown }>(
+    `select id, title, props->'story' as story from entity where type = any($1::text[]) and archived_at is null and (id = $2 or props->>'session_id' = $2) order by is_open desc, created_at desc limit 1`,
+    [l.registry.family('sys.run'), key],
+  );
+  if (!rows.length) throw new Error(`No session "${key}" to draw the story of`);
+  const beats = Array.isArray(rows[0].story) ? (rows[0].story as Beat[]) : [];
+  return { id: rows[0].id, title: rows[0].title, beats: beats.filter((b) => !b.replaced_by) };
+}
+
 /** What a lens answers with: the lens as read, the items, the links between them, and what was left out. */
 export async function lens(l: Archipelago, input: Record<string, unknown>) {
+  // A story is drawn under no view of its own: the workspace's views are pictures of the map, not of what a session said.
+  const told = input.story === undefined ? undefined : await storyOf(l, String(input.story));
   // The item the picture is asked for. Each lens kept about it is a view of it, with a name; the first in order is the one it opens on.
   const hub = input.from === undefined ? undefined : String(input.from);
   // Around one item there is always the picture of what it is tied to, by kind of link: what it waits on and what waits on it.
@@ -201,13 +225,14 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   // Every lens that applies can be chosen: those about the item, then what it is tied to, then the workspace's own (about nothing), each in its order.
   const own = hub === undefined ? [] : lenses.filter((one) => one.about.includes(hub)).sort((a, b) => placed(a) - placed(b));
   const shared = lenses.filter((one) => !one.about.length).sort((a, b) => placed(a) - placed(b));
-  const views = [...own, ...(hub === undefined ? [] : [{ id: AROUND, title: 'Around it', props: {}, about: [] }]), ...shared];
+  const views = told ? [] : [...own, ...(hub === undefined ? [] : [{ id: AROUND, title: 'Around it', props: {}, about: [] }]), ...shared];
   // An item opens on its first picture of its own (not a shortcut, which leads away), else on what it is tied to; the whole map on the workspace's first.
-  const view = around ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
+  const view = around || (told && typeof input.lens !== 'string') ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
   // A view may start somewhere else than the item it is kept about: tightly scoped, that is a shortcut.
   const start = typeof view?.props.from === 'string' ? view.props.from : hub;
   // Around one item the picture is its neighbourhood: every kind of link, each neighbour filed under the link that ties it.
-  let under: Lens = start === undefined ? LENS_DEFAULT : { ...LENS_DEFAULT, over: 'all', lanes: 'link' };
+  // A story's items are tied by whatever the map ties them by, and what is finished stays: it was told of.
+  let under: Lens = told ? { ...LENS_DEFAULT, over: 'all', fold: ['system'] } : start === undefined ? LENS_DEFAULT : { ...LENS_DEFAULT, over: 'all', lanes: 'link' };
   // One view at a time, over what is built in: a field it does not name is the built-in one.
   const read = view ? [view] : [];
   for (const one of read) {
@@ -217,7 +242,10 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
       throw new Error(`The lens "${one.title}" cannot be read: ${(err as Error).message}`);
     }
   }
-  const asked = readLens(l, { ...input, ...(start !== undefined && { from: start }) }, under);
+  const asked = readLens(l, { ...input, ...(start !== undefined && { from: start }), ...(told && { story: told.id, from: undefined }) }, under);
+  // What the story is about, in the order it came to them; and for each, the beats that are about it.
+  const about = told ? [...new Set(told.beats.flatMap((b) => b.about))] : [];
+  const beatsOf = (id: string) => (told ? told.beats.filter((b) => b.about.includes(id)).map((b) => b.n) : []);
   // A style is passed on as it is kept: only the page that draws reads it. The workspace's, then the item's, then this view's, then one named.
   const weight = (one: Kept) => (one.id === input.style ? 3 : view && one.about.includes(view.id) ? 2 : hub !== undefined && one.about.includes(hub) ? 1 : one.about.length ? -1 : 0);
   const drawn = styles.filter((one) => weight(one) >= 0).sort((a, b) => weight(a) - weight(b));
@@ -242,7 +270,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   // What stands on the map for this picture before kinds are chosen: the ladder a thing is found on when what holds it is not of the kinds kept.
   const standing = new Set<string>();
   for (const e of entities) {
-    if (e.id === asked.from) (eligible.set(e.id, e), standing.add(e.id));
+    if (e.id === asked.from || about.includes(e.id)) (eligible.set(e.id, e), standing.add(e.id));
     else if (asked.fold.includes('system') && system(e.type)) rest.system++;
     else if (asked.fold.includes('closed') && !e.is_open) rest.closed++;
     else if ((wanted.length && !wanted.some((k) => is(e.type, k))) || unwanted.some((k) => is(e.type, k))) (rest.kinds++, standing.add(e.id));
@@ -282,7 +310,10 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   // Which of them are sent.
   const along = (type: string) => asked.over === 'all' || asked.over.includes(type);
   let sent = new Set<string>();
-  if (asked.from) {
+  if (told) {
+    // Only what the story is about: it is what the session chose to show.
+    for (const id of about) if (eligible.has(id)) sent.add(id);
+  } else if (asked.from) {
     // Down from the start, as far as asked; then whatever a link that is sent along ties to one of those.
     const reach = (id: string, steps: number) => {
       sent.add(id);
@@ -379,7 +410,11 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     for (let cur: string | undefined = id, steps = 0; cur !== undefined && steps < 64; cur = parent.get(cur), steps++) if (sent.has(cur)) return cur;
     return undefined;
   };
-  const lines = new Map<string, { kind: string; from: string; to: string; n: number }>();
+  const lines = new Map<string, { kind: string; from: string; to: string; n: number; says?: string; beat?: number }>();
+  // The ties the session drew are links of their own kind, each with its words and the beat that said it.
+  if (told)
+    for (const b of told.beats)
+      for (const k of b.links) if (sent.has(k.from) && sent.has(k.to)) lines.set(`said ${k.from} ${k.to} ${k.says}`, { kind: 'said', from: k.from, to: k.to, n: 1, says: k.says, beat: b.n });
   for (const r of live) {
     if (!along(r.type)) continue;
     const [from, to] = [lift(r.from_id), lift(r.to_id)];
@@ -398,7 +433,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     // Which lenses and styles kept on the map went into those two, the one that weighs most last.
     kept: { lens: read.map(({ id, title }) => ({ id, title })), style: drawn.map(({ id, title }) => ({ id, title })) },
     // The lens in words: the rule a person reads on the page and an agent reads here.
-    said: sayLens(l, asked, asked.from ? all.get(asked.from)?.title : undefined),
+    said: sayLens(l, asked, told ? told.title : asked.from ? all.get(asked.from)?.title : undefined),
     // The lenses that can be chosen for this picture, in order, and which this is. One that starts somewhere else is a shortcut to there.
     views: views.map((one) => ({ id: one.id, title: one.title, ...(typeof one.props.from === 'string' && one.props.from !== hub && { to: { id: one.props.from, title: all.get(one.props.from)?.title ?? one.props.from } }) })),
     view: view?.id ?? (hub !== undefined ? AROUND : null),
@@ -413,7 +448,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     controls: Array.isArray(view?.props.controls) ? (view!.props.controls as unknown[]).filter((c) => CONTROLS.includes(c as string)) : ['lit'],
     // Who it was answered for, so a style can light what waits on them.
     viewer: l.viewer || (await l.setting<string>('me')) || null,
-    items:[...sent].map((id) => {
+    items: [...sent].sort((a, b) => (told ? about.indexOf(a) - about.indexOf(b) : 0)).map((id) => {
       const e = eligible.get(id)!;
       return {
         id,
@@ -428,6 +463,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
         size: size(e),
         state: state(e),
         within: within(id),
+        // In a story: the beats that are about it.
+        ...(told && { told: beatsOf(id) }),
       };
     }),
     links: [...lines.values()],

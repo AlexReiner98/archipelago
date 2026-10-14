@@ -449,9 +449,13 @@ test('a session tells the story of its work, beat by beat, and can take a beat b
 
   const told = (await VIEWS.story.run(l, { run })) as any;
   assert.deepEqual(told.beats.map((b: any) => [b.n, b.replaced_by ?? null]), [[1, null], [2, 3], [3, null]]);
-  assert.deepEqual(told.items.map((i: any) => i.title).sort(), ['Fix the halo', 'Labels clip'], 'what only a beat taken back was about drops out');
-  assert.deepEqual(told.links.map((k: any) => k.says), ['is why']);
-  assert.deepEqual(told.ties.map((t: any) => t.type), ['depends_on'], 'the map’s own link between them comes too');
+  // The picture of it is a lens started from the story, the same answer every style draws.
+  const drawn = (await VIEWS.lens.run(l, { story: 's-story' })) as any;
+  assert.deepEqual(drawn.items.map((i: any) => i.title), ['Labels clip', 'Fix the halo'], 'what only a beat taken back was about drops out; the rest in the order told');
+  assert.deepEqual(drawn.items.map((i: any) => i.told), [[1], [1]]);
+  assert.deepEqual(drawn.links.map((k: any) => [k.kind, k.says ?? null]).sort(), [['depends_on', null], ['said', 'is why']], 'the map’s own link between them comes too');
+  assert.deepEqual(drawn.views, [], 'a story is drawn under no view of the workspace');
+  assert.match(drawn.said, /What "Storyteller" told of/);
 
   await assert.rejects(tell(l, agent, { run, said: 'x'.repeat(281) }), /280 characters/);
   await assert.rejects(tell(l, agent, { run, said: 'About nothing real', about: ['e_nothere1'] }), /No item "e_nothere1"/);

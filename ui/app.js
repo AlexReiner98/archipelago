@@ -1901,29 +1901,33 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
 // ---- A session's story -----------------------------------------------------
 
 // What a session told of its work, beat by beat (the tell tool): read top to
-// bottom it is a briefing, and beside it the items the beats are about, with
-// the ties the session drew and the ones the map already had. Pointing at a
-// beat lights what it is about; the newest beat's items are lit until then.
+// bottom it is a briefing. Beside it, the picture of what the beats are
+// about: a lens started from the story, drawn in the style the person chose,
+// like every other picture. Pointing at a beat lights what it is about.
 function storyPart(data) {
   const standing = data.beats.filter((b) => !b.replaced_by);
   const newest = standing.at(-1)?.n;
-  const named = new Map(data.items.map((i) => [i.id, i]));
-  const drawing = storyGraph(data, newest);
-  const light = (beat) => drawing.light(beat ? new Set(beat.about) : null);
+  const picture = lensView({ lens: { story: data.run.id } });
+  const light = (beat) => picture.light(beat ? beat.about : null);
+  const named = (box, beat) => {
+    const known = new Map((picture.answer?.items ?? []).map((item) => [item.id, item.title]));
+    box?.replaceChildren(...beat.about.map((id) => h('a', { href: `#/e/${id}` }, known.get(id) ?? titles.get(id) ?? 'no longer on the map')));
+  };
   const rows = data.beats.map((b) =>
     h(
       'li',
       { class: `beat${b.replaced_by ? ' taken-back' : ''}${b.n === newest ? ' newest' : ''}`, onpointerenter: () => !b.replaced_by && light(b), onfocusin: () => !b.replaced_by && light(b) },
       h(
         'details',
-        {},
+        // What it is about is named when it is opened: by then the picture has said what each item is called.
+        { ontoggle: (ev) => ev.target.open && named(ev.target.querySelector('.beat-items'), b) },
         h('summary', { title: b.said }, h('span', { class: 'n' }, b.n), h('span', { class: 'said' }, b.said), ago(b.at)),
         h(
           'div',
           { class: 'beat-more' },
           h('p', {}, b.said),
           b.replaced_by && h('p', { class: 'muted small' }, `Taken back in beat ${b.replaced_by}.`),
-          b.about.length > 0 && h('div', { class: 'beat-items' }, b.about.map((id) => (named.get(id) ? link(named.get(id)) : h('span', { class: 'muted' }, 'gone')))),
+          b.about.length > 0 && h('div', { class: 'beat-items' }),
         ),
       ),
     ),
@@ -1932,106 +1936,8 @@ function storyPart(data) {
     'section',
     { class: 'card story', style: 'margin-bottom: 14px' },
     h('header', { class: 'toolbar fold-bar' }, h('h2', { title: 'What the session concluded as it worked, and what about' }, 'Story'), h('span', { class: 'n' }, standing.length), h('span', { class: 'grow' })),
-    h('div', { class: 'story-body' }, h('ol', { class: 'beats', onpointerleave: () => light(null) }, rows), drawing.el),
+    h('div', { class: 'story-body' }, h('ol', { class: 'beats', onpointerleave: () => light(null) }, rows), h('div', { class: 'story-picture' }, picture)),
   );
-}
-
-/** The items a story is about, laid out by pulling tied things together and pushing the rest apart, from the same start every time. */
-function storyGraph(data, newest) {
-  const W = 168;
-  const H = 40;
-  const nodes = data.items.map((i, k) => ({ ...i, k }));
-  const at = new Map(nodes.map((n) => [n.id, n]));
-  const said = data.links.filter((k) => at.has(k.from) && at.has(k.to));
-  // A tie the session drew already says what the map's own link between the same two would.
-  const drawn = new Set(said.flatMap((k) => [`${k.from} ${k.to}`, `${k.to} ${k.from}`]));
-  const ties = data.ties.filter((t) => !drawn.has(`${t.from} ${t.to}`));
-  const pairs = [...said, ...ties];
-  // Each group of tied items reads left to right, along its ties; the groups are stacked in the order the story came to them.
-  const group = new Map(nodes.map((n) => [n.id, n.id]));
-  const root = (id) => (group.get(id) === id ? id : root(group.get(id)));
-  for (const p of pairs) group.set(root(p.from), root(p.to));
-  const layer = new Map(nodes.map((n) => [n.id, 0]));
-  // As far right as the longest run of ties into it; a loop stops growing after as many rounds as there are items.
-  for (let round = 0; round < nodes.length; round++)
-    for (const p of pairs) {
-      // What waits sits after what it waits on, as the session's own "holds up" reads.
-      const [a, b] = BLOCKING.includes(p.type) ? [p.to, p.from] : [p.from, p.to];
-      if (layer.get(b) < layer.get(a) + 1) layer.set(b, Math.min(layer.get(a) + 1, nodes.length - 1));
-    }
-  const groups = [...new Set(nodes.map((n) => root(n.id)))].map((g) => nodes.filter((n) => root(n.id) === g));
-  const [GAP_X, GAP_Y] = [W + 72, H + 22];
-  let top = 0;
-  const loose = groups.filter((g) => g.length === 1).flat();
-  for (const members of groups.filter((g) => g.length > 1)) {
-    const columns = new Map();
-    for (const n of members) columns.set(layer.get(n.id), [...(columns.get(layer.get(n.id)) ?? []), n]);
-    let rows = 0;
-    for (const [col, list] of columns) {
-      list.forEach((n, i) => ([n.x, n.y] = [col * GAP_X, top + i * GAP_Y]));
-      rows = Math.max(rows, list.length);
-    }
-    top += rows * GAP_Y + 10;
-  }
-  // What is told of on its own, tied to nothing in the story, goes in a row under the rest.
-  loose.forEach((n, i) => ([n.x, n.y] = [(i % 4) * (W + 16), top + Math.floor(i / 4) * GAP_Y]));
-  const pad = 14;
-  const [minX, minY] = [Math.min(...nodes.map((n) => n.x)), Math.min(...nodes.map((n) => n.y))];
-  for (const n of nodes) [n.x, n.y] = [n.x - minX + pad, n.y - minY + pad + 6];
-  const width = Math.max(...nodes.map((n) => n.x + W)) + pad;
-  const height = Math.max(...nodes.map((n) => n.y + H)) + pad;
-  const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
-  const centre = (n) => [n.x + W / 2, n.y + H / 2];
-  // A line stops at the edge of each box, so an arrow's head is seen.
-  const edge = (n, [tx, ty]) => {
-    const [cx, cy] = centre(n);
-    const [dx, dy] = [tx - cx, ty - cy];
-    const t = Math.min(Math.abs(W / 2 / (dx || 1e-9)), Math.abs(H / 2 / (dy || 1e-9)));
-    return [cx + dx * Math.min(t, 1), cy + dy * Math.min(t, 1)];
-  };
-  const lines = s('g', {});
-  const labels = s('g', { class: 'story-labels' });
-  const boxes = s('g', {});
-  const drawnLines = pairs.map((p) => {
-    const [a, b] = [at.get(p.from), at.get(p.to)];
-    const [x1, y1] = edge(a, centre(b));
-    const [x2, y2] = edge(b, centre(a));
-    const phrase = p.says ?? relations.get(p.type)?.title ?? p.type;
-    const el = s('line', { x1, y1, x2, y2, class: p.says ? 'story-tie' : 'rm-link other', 'marker-end': p.says ? 'url(#story-arrow)' : null }, s('title', {}, document.createTextNode(`${a.title} ${phrase} ${b.title}`)));
-    lines.append(el);
-    if (p.says) labels.append(s('text', { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 4, 'text-anchor': 'middle' }, document.createTextNode(cut(p.says, 28))));
-    return { el, ends: [p.from, p.to] };
-  });
-  const drawnBoxes = nodes.map((n) => {
-    const box = s(
-      'g',
-      { class: `rm-node story-node${n.open ? '' : ' closed'}`, transform: `translate(${n.x},${n.y})`, tabindex: 0 },
-      s('title', {}, document.createTextNode(`${n.title}\n${typeTitle(n.type)}, ${n.status}`)),
-      s('rect', { class: 'box', width: W, height: H, rx: 7 }),
-      s('text', { x: 10, y: 17 }, document.createTextNode(cut(n.title, 25))),
-      s('text', { class: 'small', x: 10, y: 32 }, document.createTextNode(`${typeTitle(n.type)} · ${n.status}`)),
-    );
-    box.addEventListener('click', () => (location.hash = `#/e/${n.id}`));
-    boxes.append(box);
-    return { box, n };
-  });
-  const svg = s(
-    'svg',
-    { width: '100%', viewBox: `0 0 ${width} ${height}`, style: `max-width: ${width}px`, role: 'img', 'aria-label': 'The items the story is about' },
-    s('defs', {}, s('marker', { id: 'story-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: 'story-arrowhead' }))),
-    lines,
-    labels,
-    boxes,
-  );
-  // Lit: what one beat is about, or when no beat is pointed at, what the newest is about.
-  const light = (ids) => {
-    const lit = ids ?? new Set(nodes.filter((n) => n.last === newest).map((n) => n.id));
-    for (const { box, n } of drawnBoxes) box.classList.toggle('lit', lit.has(n.id));
-    for (const l of drawnLines) l.el.classList.toggle('dim', Boolean(ids) && !l.ends.every((id) => lit.has(id)));
-  };
-  light(null);
-  const el = nodes.length ? h('div', { class: 'story-graph' }, svg) : h('div', { class: 'story-graph empty' }, 'No items named yet.');
-  return { el, light: nodes.length ? light : () => {} };
 }
 
 // ---- Lens ----------------------------------------------------------------
@@ -2049,7 +1955,7 @@ const LIT = [
   ['blocked', 'Blocked', 'Only what is blocked stays lit'],
 ];
 /** The fields a lens may carry in an address, and which of them are lists. */
-const LENS_FIELDS = { from: false, by: false, far: false, lanes: false, order: false, measure: false, kinds: true, over: true, fold: true };
+const LENS_FIELDS = { from: false, story: false, by: false, far: false, lanes: false, order: false, measure: false, kinds: true, over: true, fold: true };
 
 /** A lens and a style, as the end of an address says them: ?from=…&far=1&lit=you. */
 function readLens(query) {
@@ -2083,7 +1989,7 @@ const keptStyle = (key) => {
  * view's rule in words. `style` is what the page or an address asks for this
  * one look, over what the person chose before.
  */
-function lensView({ lens = {}, style = {}, key = lens.from ?? 'map', quiet = false } = {}) {
+function lensView({ lens = {}, style = {}, key = lens.story ? `story:${lens.story}` : (lens.from ?? 'map'), quiet = false } = {}) {
   const chosen = {};
   const bar = h('div', { class: 'toolbar fold-bar lens-bar', hidden: true });
   const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
@@ -2106,6 +2012,7 @@ function lensView({ lens = {}, style = {}, key = lens.from ?? 'map', quiet = fal
     } catch (err) {
       return body.replaceChildren(h('div', { class: 'error' }, err.message));
     }
+    host.answer = answer;
     const views = answer.views ?? [];
     const empty = answer.items.length < 2;
     if (empty && !views.length && quiet) return void ((host.closest('.lens-card') ?? host).hidden = true);
@@ -2141,6 +2048,11 @@ function lensView({ lens = {}, style = {}, key = lens.from ?? 'map', quiet = fal
     (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest))(body, answer, chosen, keep, place);
   };
   host.ready = load();
+  // Light only these items (a beat's, pointed at beside the picture), or everything as the style says again: the shape draws itself anew.
+  host.light = (ids) => {
+    chosen.only = ids ? [...ids] : undefined;
+    body.redraw?.();
+  };
   return host;
 }
 
@@ -2180,6 +2092,16 @@ function lensTree(answer) {
   return { me, byId, root };
 }
 
+/** How much of a thing stays lit: what was asked for by name (style.only), else what the style's lit says; a thing that holds others, by what is in it. */
+function litCount(n, style) {
+  if (Array.isArray(style.only)) {
+    const only = new Set(style.only);
+    const any = (m) => only.has(m.id) || m.kids.some(any);
+    return any(n) ? 1 : 0;
+  }
+  return style.lit === 'you' ? n.you : style.lit === 'blocked' ? n.blk : 1;
+}
+
 /** The switch for what stays lit, the same in every shape. */
 function litSwitch(me, style, keep, redraw) {
   // A view that does not offer the choice has no switch.
@@ -2206,8 +2128,12 @@ function drawBoxes(host, answer, style, keep, kept) {
   // What each thing waits on, by name, for its tooltip.
   const waits = new Map();
   for (const link of answer.links) if (BLOCKING.includes(link.kind) && byId.has(link.to)) waits.set(link.from, [...(waits.get(link.from) ?? []), byId.get(link.to).title]);
+  // What a session said ties a thing to another is written on its line, after its name: boxes draw no lines.
+  const ties = new Map();
+  for (const link of answer.links) if (link.says && byId.has(link.to)) ties.set(link.from, [...(ties.get(link.from) ?? []), `${link.says} → ${byId.get(link.to).title}`]);
+  const tied = (n) => ties.has(n.id) && h('span', { class: 'lb-said', title: ties.get(n.id).join('\n') }, ties.get(n.id).join(' · '));
   const body = h('div', { class: 'lb-top' });
-  const count = (n) => (style.lit === 'you' ? n.you : style.lit === 'blocked' ? n.blk : 1);
+  const count = (n) => litCount(n, style);
   const hint = (n) => `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.all > 1 ? `\n${n.work} open, ${n.blk} blocked${me ? `, ${n.you} need you` : ''}` : n.state.blocked ? ', blocked' : ''}${waits.has(n.id) ? `\nWaits on: ${waits.get(n.id).join('; ')}` : ''}${n.at ? '\nA session is at work here' : ''}`;
   const mark = (cls, text, title) => h('span', { class: `lb-mark lb-${cls}`, title }, text);
   const marks = (n) => [
@@ -2220,7 +2146,7 @@ function drawBoxes(host, answer, style, keep, kept) {
   ];
   const thing = (n) => {
     const state = `${count(n) ? '' : ' dim'}${n.open ? '' : ' closed'}${n.state.blocked ? ' blocked' : ''}${me && n.state.waits_on.includes(me) ? ' you' : ''}${n === here ? ' here' : ''}`;
-    if (n.all === 1) return h('a', { class: `lb-leaf${state}`, href: `#/e/${n.id}`, title: hint(n) }, h('span', { class: 'lb-dot' }), h('span', { class: 'lb-name' }, n.title), ...marks(n).slice(2));
+    if (n.all === 1) return h('a', { class: `lb-leaf${state}`, href: `#/e/${n.id}`, title: hint(n) }, h('span', { class: 'lb-dot' }), h('span', { class: 'lb-name' }, n.title), tied(n), ...marks(n).slice(2));
     const open = n.kids.length > 0 && (opened.get(n.id) ?? (above.has(n.id) || n.depth - base < levels));
     const leaves = n.kids.filter((kid) => kid.all === 1);
     const boxes = n.kids.filter((kid) => kid.all > 1);
@@ -2232,6 +2158,7 @@ function drawBoxes(host, answer, style, keep, kept) {
         { title: hint(n) },
         n.kids.length > 0 && h('button', { class: 'lb-fold', title: open ? 'Close it' : 'Open it', onclick: () => (opened.set(n.id, !open), draw()) }, open ? '▾' : '▸'),
         h('a', { class: 'lb-name', href: `#/e/${n.id}` }, n.title),
+        tied(n),
         ...marks(n),
       ),
       show.has('bar') && h('div', { class: 'lb-bar', title: `${n.you} need you, ${n.blk} blocked, of ${n.all}` }, h('span', { class: 'lb-you', style: `width:${(100 * n.you) / n.all}%` }), h('span', { class: 'lb-blocked', style: `width:${(100 * n.blk) / n.all}%` })),
@@ -2257,6 +2184,7 @@ function drawBoxes(host, answer, style, keep, kept) {
     );
   };
   host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), litSwitch(me, style, keep, draw)), body);
+  host.redraw = draw;
   draw();
 }
 
@@ -2293,7 +2221,7 @@ function drawNest(host, answer, style, keep, kept) {
   // What is drawn: a sea, the lines, then each thing over what it is inside.
   const lineLayer = s('g', { class: 'ln-lines' });
   const landLayer = s('g');
-  const svg = s('svg', { class: 'ln-sea', role: 'img', 'aria-label': 'The map, each thing inside what it is part of' }, s('defs', {}, s('marker', { id: 'ln-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, s('path', { d: 'M0,1 L10,5 L0,9 z' }))), landLayer, lineLayer);
+  const svg = s('svg', { class: 'ln-sea', role: 'img', 'aria-label': 'The map, each thing inside what it is part of' }, s('defs', {}, ...['ln-arrow', 'ln-arrow-said'].map((id) => s('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, s('path', { d: 'M0,1 L10,5 L0,9 z' })))), landLayer, lineLayer);
   const make = (n) => {
     const holds = n.all > 1;
     n.g = s('g', { class: `ln-thing${holds ? ' holds' : ' leaf'}${n.depth % 2 ? ' odd' : ''}${n.state.blocked && !holds ? ' blocked' : ''}${n.you && !holds ? ' you' : ''}${n.open ? '' : ' closed'}`, 'data-id': n.id });
@@ -2356,7 +2284,7 @@ function drawNest(host, answer, style, keep, kept) {
       const inSight = shown > 0.03 && sx + sr > 0 && sx - sr < W && sy + sr > 0 && sy - sr < H;
       n.g.style.display = inSight ? '' : 'none';
       if (inSight) {
-        const count = style.lit === 'you' ? n.you : style.lit === 'blocked' ? n.blk : 1;
+        const count = litCount(n, style);
         n.g.setAttribute('opacity', shown * (count ? 1 : 0.2));
         n.g.classList.toggle('open', open > 0.5);
         for (const [key, value] of [['cx', sx], ['cy', sy], ['r', Math.max(sr, 1.5)]]) n.circle.setAttribute(key, value);
@@ -2394,23 +2322,31 @@ function drawNest(host, answer, style, keep, kept) {
     for (const link of answer.links) {
       const [a, b] = [stand(link.from), stand(link.to)];
       if (!a || !b || a === b) continue;
-      const key = `${link.kind} ${a.id} ${b.id}`;
-      const line = wanted.get(key) ?? { kind: link.kind, a, b, n: 0 };
+      // A tie a session drew keeps its own words, so two drawn between the same two things are two lines.
+      const key = `${link.kind} ${a.id} ${b.id}${link.says ? ` ${link.says}` : ''}`;
+      const line = wanted.get(key) ?? { kind: link.kind, a, b, n: 0, says: link.says };
       line.n += link.n;
       wanted.set(key, line);
     }
-    for (const [key, el] of drawn) if (!wanted.has(key)) (el.remove(), drawn.delete(key));
-    for (const [key, { kind, a, b, n }] of wanted) {
+    for (const [key, el] of drawn) if (!wanted.has(key)) (el.remove(), el.words?.remove(), drawn.delete(key));
+    // Asked to light some things by name, a line stays lit only between two of them.
+    const only = Array.isArray(style.only) ? new Set(style.only) : null;
+    for (const [key, { kind, a, b, n, says }] of wanted) {
       let el = drawn.get(key);
       if (!el) {
-        el = s('line', { class: `ln-line${BLOCKING.includes(kind) ? ' waits' : ''}`, 'marker-end': BLOCKING.includes(kind) ? 'url(#ln-arrow)' : null }, s('title'));
+        el = s('line', { class: `ln-line${BLOCKING.includes(kind) ? ' waits' : ''}${says ? ' said' : ''}`, 'marker-end': says ? 'url(#ln-arrow-said)' : BLOCKING.includes(kind) ? 'url(#ln-arrow)' : null }, s('title'));
+        // What a session said ties the two is written on the line.
+        if (says) el.words = s('text', { class: 'said', 'text-anchor': 'middle' }, document.createTextNode(says.length > 28 ? says.slice(0, 27) + '…' : says));
         drawn.set(key, el);
-        lineLayer.append(el);
+        lineLayer.append(el, ...(el.words ? [el.words] : []));
       }
       const len = Math.hypot(b.sx - a.sx, b.sy - a.sy) || 1;
       const [ux, uy] = [(b.sx - a.sx) / len, (b.sy - a.sy) / len];
-      for (const [k, v] of [['x1', a.sx + ux * (a.sr + 2)], ['y1', a.sy + uy * (a.sr + 2)], ['x2', b.sx - ux * (b.sr + 4)], ['y2', b.sy - uy * (b.sr + 4)], ['opacity', len < a.sr + b.sr + 8 ? 0 : style.lit === 'you' ? 0.15 : 0.75]]) el.setAttribute(k, v);
-      el.firstChild.textContent = `${a.title} ${relations.get(kind)?.title ?? kind} ${b.title}${n > 1 ? `, ${n} times over` : ''}`;
+      const lit = only ? (litCount(a, style) && litCount(b, style) ? 0.9 : 0.12) : style.lit === 'you' ? 0.15 : 0.75;
+      const shown = len < a.sr + b.sr + 8 ? 0 : lit;
+      for (const [k, v] of [['x1', a.sx + ux * (a.sr + 2)], ['y1', a.sy + uy * (a.sr + 2)], ['x2', b.sx - ux * (b.sr + 4)], ['y2', b.sy - uy * (b.sr + 4)], ['opacity', shown]]) el.setAttribute(k, v);
+      if (el.words) for (const [k, v] of [['x', (a.sx + ux * a.sr + b.sx - ux * b.sr) / 2], ['y', (a.sy + uy * a.sr + b.sy - uy * b.sr) / 2 - 5], ['opacity', len > a.sr + b.sr + 60 ? shown : 0]]) el.words.setAttribute(k, v);
+      el.firstChild.textContent = `${a.title} ${says ?? relations.get(kind)?.title ?? kind} ${b.title}${n > 1 ? `, ${n} times over` : ''}`;
     }
 
     // Where the picture is: the deepest open thing that holds the middle of it.
@@ -2426,6 +2362,7 @@ function drawNest(host, answer, style, keep, kept) {
     }
   };
 
+  host.redraw = frame;
   let moving;
   // What was last gone to, until the picture is moved by hand: it is fitted again when the room changes.
   let aim = byId.get(kept.aim) ?? root;

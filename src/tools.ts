@@ -531,7 +531,7 @@ export const TOOLS: Record<string, Tool> = {
       lens: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('A picture of the map, drawn on the graph screen for this one look: the params of the lens view (from, kinds, by, over, far, lanes, order, measure, fold). {} is the whole map as it opens.'),
+        .describe('A picture of the map, drawn on the graph screen for this one look: the params of the lens view (from, story, kinds, by, over, far, lanes, order, measure, fold). {} is the whole map as it opens; story: a run id draws what that session told of.'),
       style: z
         .object({
           lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
