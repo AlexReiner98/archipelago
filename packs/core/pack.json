@@ -206,6 +206,15 @@
       "statuses": { "open": ["current"], "closed": ["stale"] }
     },
     {
+      "id": "document",
+      "title": "Document",
+      "description": "Writing for a reader, made of the map: its note is the text, and a line holding only an item's id brings that item in at that place, as a section with its title and note. Read whole with the document tool; the owner can give someone a link to it.",
+      "statuses": { "open": ["draft", "ready"], "closed": ["superseded", "withdrawn"] },
+      "fields": {
+        "for": { "type": "string", "description": "Who it is written for, e.g. \"Sam at Northwind\"." }
+      }
+    },
+    {
       "id": "lens",
       "title": "Lens",
       "description": "What is in a picture of the map. About a project or item, it is a view of that thing, named by its title: an item's page shows its views as a switch and opens on the first (place). About nothing, it is the workspace's: a view that can be chosen for any picture, and the one the whole map opens on. A field left empty is the built-in one. Read by the lens view.",

@@ -1604,3 +1604,32 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.equal((await fetch(base + '/draw.js')).headers.get('access-control-allow-origin'), '*');
   assert.equal((await fetch(base + '/app.js')).headers.get('access-control-allow-origin'), null, 'and nothing else here is given to strangers');
 });
+
+test('a link to a document opens its page and its text with no login, until it is revoked', async () => {
+  const { call, base } = await serve('off');
+  const made = await call('/api/change', undefined, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'n', type: 'note', title: 'IRAP', body: 'Call first.' },
+      { op: 'create', ref: 'd', type: 'document', title: 'Funding', body: 'Intro.\n\n{n}' },
+    ],
+  });
+  const { d } = made.result.created;
+  assert.match((await call('/agent/share_create', undefined, { id: d })).error, /humans only/);
+  const link = (await call('/api/share_create', undefined, { id: d })).result;
+  const page = await fetch(base + link.path);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/);
+  assert.equal(page.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(page.headers.get('cache-control'), 'no-store');
+  assert.match(await page.text(), /doc\.js/);
+  const data = await fetch(`${base}${link.path}/data`);
+  assert.equal(data.status, 200);
+  const doc = (await data.json()) as { title: string; parts: { text?: string; section?: { title: string } }[] };
+  assert.deepEqual([doc.title, doc.parts.map((p) => p.section?.title ?? p.text)], ['Funding', ['Intro.', 'IRAP']]);
+  assert.equal((await fetch(`${base}/doc.js`)).status, 200);
+  assert.equal((await fetch(`${base}/s/default/${'0'.repeat(48)}/data`)).status, 404);
+  assert.equal((await fetch(`${base}/s/elsewhere/${link.path.split('/').at(-1)}/data`)).status, 404);
+  await call('/api/share_revoke', undefined, { id: link.share });
+  assert.equal((await fetch(`${base}${link.path}/data`)).status, 404);
+});

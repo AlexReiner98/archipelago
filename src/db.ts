@@ -97,6 +97,18 @@ create table if not exists token (
   revoked_at timestamptz
 );
 
+-- A link that lets someone with no login read one document. Stored as a hash only; the secret is shown once.
+create table if not exists share (
+  id         text primary key,
+  workspace  text not null default 'default',
+  hash       text not null unique,
+  hint       text not null,
+  entity_id  text not null references entity(id),
+  made_by    text not null,
+  created_at timestamptz not null default now(),
+  revoked_at timestamptz
+);
+
 create table if not exists setting (
   key   text primary key,
   value jsonb not null
@@ -261,6 +273,37 @@ drop policy if exists member_setting on setting;
 create policy member_setting on setting for all to pelago_member
   using (current_setting('pelago.admin', true) = '1' or key like 'audit_cursor:%')
   with check (current_setting('pelago.admin', true) = '1' or key like 'audit_cursor:%');
+
+-- A document's links are seen, made and revoked by whoever may see the document.
+grant select, insert, update on share to pelago_member;
+alter table share enable row level security;
+drop policy if exists member_share on share;
+create policy member_share on share for all to pelago_member
+  using (entity_id in (select id from entity))
+  with check (entity_id in (select id from entity));
+
+-- What a link shows, and nothing else: the document it was made for, while the link stands and the document is not
+-- archived, and the items its note brings in by a line holding only their id. An item private to anyone but the
+-- document's own author is left out, as is anything archived or in another workspace. Titles, states and notes only.
+create or replace function pelago_shared_document(secret_hash text) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  with d as (
+    select e.* from share s join entity e on e.id = s.entity_id
+    where s.hash = secret_hash and s.revoked_at is null and e.archived_at is null and e.type = 'document'
+  ),
+  named as (
+    select distinct m[1] as id from d, regexp_matches(d.body, '^[ \\t]*(e_[a-z0-9]{8})[ \\t]*$', 'gn') as m
+  ),
+  items as (
+    select i.id, i.type, i.title, i.status, i.body, i.updated_at from entity i join named n on n.id = i.id, d
+    where i.archived_at is null and i.workspace = d.workspace and (i.private_to is null or i.private_to = d.private_to)
+  )
+  select jsonb_build_object(
+    'id', d.id, 'title', d.title, 'body', d.body, 'status', d.status, 'updated_at', d.updated_at,
+    'items', coalesce((select jsonb_agg(to_jsonb(items)) from items), '[]'::jsonb))
+  from d
+$fn$;
+grant execute on function pelago_shared_document(text) to pelago_public;
 
 drop policy if exists member_proposal on proposal;
 create policy member_proposal on proposal for all to pelago_member

@@ -121,7 +121,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
 }
 
 /** What a limited token may call that changes nothing in the map: reading it, listening for the owner, pointing their screen. */
-const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show'];
+const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show', 'document'];
 
 /** The tests of some work: those in it, and those that help answer a proof question in it. */
 async function testsOf(l: Archipelago, scope: Set<string>): Promise<Set<string>> {

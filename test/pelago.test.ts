@@ -2124,3 +2124,64 @@ test('a member sees their own tokens and the few settings every request needs; t
   await ann.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"') on conflict (key) do update set value = excluded.value`);
   assert.equal(await bo.agentChanges(), 'apply');
 });
+
+test('a document brings items in by id, and a link shows it and them to anyone holding it, and nothing more', async () => {
+  const { sharedDocument, sectionIds } = await import('../src/documents.ts');
+  const l = await fresh();
+  const people = await make(l, [
+    { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
+    { op: 'create', ref: 'bo', type: 'person', title: 'Bo' },
+  ]);
+  const ann = l.as(people.ann);
+  const bo = l.as(people.bo);
+  const annActor: Actor = { kind: 'human', name: 'ann', person: people.ann };
+  const boActor: Actor = { kind: 'human', name: 'bo', person: people.bo };
+  const theirs = async (who: Archipelago, actor: Actor, ops: Op[]) => ((await who.change(actor, { ops, reason: 'test' })) as { created: Record<string, string> }).created;
+  const hers = await theirs(ann, annActor, [
+    { op: 'create', ref: 'mine', type: 'note', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
+    { op: 'create', ref: 'all', type: 'note', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
+  ]);
+  const his = await theirs(bo, boActor, [{ op: 'create', ref: 'n', type: 'note', title: 'Bo’s secret plan', body: 'Not for Ann’s readers.', visibility: 'private' }]);
+  const body = `# Funding\n\nTwo programs, and a third (${his.n}) the reader does not see.\n\n${hers.mine}\n\nBetween them, ${hers.mine} comes first.\n${hers.all}\n${his.n}\ne_nothing1\n`;
+  const { doc } = await theirs(ann, annActor, [{ op: 'create', ref: 'doc', type: 'document', title: 'Funding for Northwind', body, visibility: 'private', props: { for: 'Sam' } }]);
+  assert.deepEqual(sectionIds(body), [hers.mine, hers.all, his.n, 'e_nothing1']);
+
+  // Its author reads it whole; what she may not see is said as missing, in its place.
+  const read = (await callTool(ann, annActor, 'document', { id: doc })) as { for: string; parts: Record<string, any>[] };
+  assert.equal(read.for, 'Sam');
+  assert.deepEqual(
+    read.parts.map((p) => p.section?.title ?? p.missing ?? p.text.split('\n')[0]),
+    ['# Funding', 'IRAP', 'Between them, ' + hers.mine + ' comes first.', 'SR&ED', his.n, 'e_nothing1'],
+  );
+  // An agent may read it, but only a person makes a link, and only to what they can see.
+  await assert.rejects(callTool(ann, { kind: 'agent', name: 'a', person: people.ann }, 'share_create', { id: doc }), /humans only/);
+  await assert.rejects(callTool(bo, boActor, 'share_create', { id: doc }), /not a document/);
+  await assert.rejects(callTool(ann, annActor, 'share_create', { id: hers.all }), /not a document/);
+
+  const made = (await callTool(ann, annActor, 'share_create', { id: doc })) as { share: string; path: string };
+  const secret = made.path.split('/').at(-1)!;
+  assert.match(made.path, /^\/s\/default\/[a-f0-9]{48}$/);
+  const shown = (await sharedDocument(l, secret))!;
+  assert.equal(shown.title, 'Funding for Northwind');
+  assert.deepEqual(
+    shown.parts.map((p: Record<string, any>) => p.section?.title ?? p.text),
+    ['# Funding\n\nTwo programs, and a third the reader does not see.', 'IRAP', `Between them, ${hers.mine} comes first.`, 'SR&ED'],
+    'Bo’s private note is left out, and so is its id in the text; an id that is nothing is not said',
+  );
+  assert.equal(JSON.stringify(shown).includes('secret plan'), false);
+  assert.equal(await sharedDocument(l, 'f'.repeat(48)), null, 'a link never made opens nothing');
+  assert.equal(await sharedDocument(l, '../x'), null);
+
+  // Bo cannot see her links; she can, and revoking one closes it at once. An archived document is not shown either.
+  assert.deepEqual(await callTool(bo, boActor, 'share_list', { id: doc }), []);
+  assert.equal(((await callTool(ann, annActor, 'share_list', { id: doc })) as unknown[]).length, 1);
+  await assert.rejects(callTool(bo, boActor, 'share_revoke', { id: made.share }), /No standing link/);
+  await callTool(ann, annActor, 'share_revoke', { id: made.share });
+  assert.equal(await sharedDocument(l, secret), null);
+  const again = (await callTool(ann, annActor, 'share_create', { id: doc })) as { path: string };
+  await theirs(ann, annActor, [{ op: 'archive', id: doc }]);
+  assert.equal(await sharedDocument(l, again.path.split('/').at(-1)!), null);
+  // What was done is in the history.
+  const actions = (await l.db.query<{ action: string }>(`select action from event where target_id = $1 and action like 'share.%' order by seq`, [doc])).rows.map((r) => r.action);
+  assert.deepEqual(actions, ['share.create', 'share.revoke', 'share.create']);
+});

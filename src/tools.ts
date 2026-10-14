@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
+import { createShare, listShares, readDocument, revokeShare } from './documents.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -869,6 +870,31 @@ export const TOOLS: Record<string, Tool> = {
       const token = await createToken(l.db, l.workspace, { kind: 'human', name: input.name, entity: created.p, admin: input.admin });
       return { person: created.p, token: token.token, note: token.note };
     },
+  },
+  document: {
+    description:
+      'A document read whole, as its reader meets it: its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. ' +
+      'To write one, make an item of type document whose note is the text, and put an item’s id alone on a line where that item belongs. Write each such item for the document’s reader. Only the owner can give someone a link to it.',
+    input: { id: z.string() },
+    run: async (l, _actor, input) => readDocument(l, input.id),
+  },
+  share_create: {
+    description: 'Make a link that lets someone with no login read one document and the items it brings in. The link is shown once.',
+    humanOnly: true,
+    input: { id: z.string().describe('The document.') },
+    run: async (l, actor, input) => createShare(l, actor, input.id),
+  },
+  share_list: {
+    description: 'The links made to a document, standing ones first. Secrets are never shown.',
+    humanOnly: true,
+    input: { id: z.string().describe('The document.') },
+    run: async (l, _actor, input) => listShares(l, input.id),
+  },
+  share_revoke: {
+    description: 'Stop a link to a document from working, at once.',
+    humanOnly: true,
+    input: { id: z.string().describe('The link, from share_list.') },
+    run: async (l, actor, input) => revokeShare(l, actor, input.id),
   },
   token_create: {
     description:

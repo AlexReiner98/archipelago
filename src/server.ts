@@ -49,6 +49,7 @@ import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
 import { publicPage, publicPicture } from './public.ts';
+import { sharedDocument } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
@@ -127,6 +128,8 @@ const UI_FILES: Record<string, string> = {
   '/style.css': 'style.css',
   '/public.js': 'public.js',
   '/public.css': 'public.css',
+  '/doc.js': 'doc.js',
+  '/doc.css': 'doc.css',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
@@ -273,6 +276,23 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const picture = extra ? await publicPicture(pelago, extra) : null;
         if (!picture) return none();
         return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
+      }
+
+      // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
+      // the page is never cached, never framed and never says where it was read from. What it shows is read through one
+      // function that gives that document and what it brings in, and nothing else (src/db.ts).
+      const shared = req.method === 'GET' ? /^\/s\/([^/]+)\/([^/]+?)(\/data)?\/?$/.exec(url.pathname) : null;
+      if (shared) {
+        if (tooOften(req, res, open)) return;
+        const [, wsId, secret, data] = shared;
+        const guard = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' };
+        if (!data) {
+          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
+          return res.end(await readFile(join(UI_DIR, 'doc.html')));
+        }
+        const doc = workspaces.has(wsId) ? await sharedDocument((await workspaces.get(wsId)).pelago, secret) : null;
+        if (!doc) return res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'This link does not open anything: it may have been revoked.' }));
+        return res.writeHead(200, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify(doc));
       }
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {

@@ -1,0 +1,139 @@
+:root {
+  --ink: #1d1f23;
+  --muted: #6b7079;
+  --line: #e3e5e8;
+  --link: #2457c5;
+  --page: #ffffff;
+  --bad: #b3261e;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e6e7ea;
+    --muted: #9aa0a9;
+    --line: #33363c;
+    --link: #8cb0ff;
+    --page: #16181b;
+    --bad: #ff8a80;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 17px/1.6 Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+}
+main {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 48px 20px 64px;
+}
+h1,
+h2,
+h3,
+h4,
+nav,
+footer,
+.muted {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  margin: 0 0 4px;
+}
+h2 {
+  font-size: 1.35rem;
+  margin: 2.2em 0 0.4em;
+  padding-top: 0.6em;
+  border-top: 1px solid var(--line);
+}
+h3 {
+  font-size: 1.08rem;
+  margin: 1.4em 0 0.3em;
+}
+h4 {
+  font-size: 1rem;
+  margin: 1.2em 0 0.2em;
+}
+p,
+ul,
+ol {
+  margin: 0 0 0.9em;
+}
+li {
+  margin: 0.2em 0;
+}
+a {
+  color: var(--link);
+  overflow-wrap: anywhere;
+}
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.error {
+  color: var(--bad);
+}
+header {
+  margin-bottom: 1.6em;
+}
+nav.contents {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 0 0 1.6em;
+  font-size: 0.95rem;
+}
+nav.contents ol {
+  margin: 0;
+  padding-left: 1.3em;
+}
+footer {
+  margin-top: 3em;
+  padding-top: 1em;
+  border-top: 1px solid var(--line);
+}
+button.print {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+@media print {
+  :root {
+    --ink: #000;
+    --muted: #555;
+    --link: #000;
+    --page: #fff;
+  }
+  body {
+    font-size: 11pt;
+  }
+  main {
+    max-width: none;
+    padding: 0;
+  }
+  footer,
+  nav.contents {
+    display: none;
+  }
+  h2 {
+    break-after: avoid;
+  }
+  section {
+    break-inside: auto;
+  }
+}
+/* Text between two sections is the document's own, not the end of the section above it. */
+section + div.text {
+  margin-top: 2.2em;
+  padding-top: 0.8em;
+  border-top: 1px solid var(--line);
+}

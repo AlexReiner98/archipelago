@@ -1043,6 +1043,9 @@ async function entity(id) {
   const used = isA(e.type, 'software.repo') ? await api('view', { name: 'agent_usage', params: { repo: id } }).catch(() => null) : null;
   // A session that told the story of its work is that story first.
   const story = isA(e.type, 'sys.run') && e.props.story?.length ? await api('view', { name: 'story', params: { run: id } }).catch(() => null) : null;
+  // A document is read as its reader meets it: its text with the items it brings in, in their places.
+  const doc = isA(e.type, 'document') ? await api('document', { id }).catch(() => null) : null;
+  const links = doc ? (await api('share_list', { id }).catch(() => [])).filter((s) => !s.revoked_at) : [];
   const relRows = (rows, direction) =>
     rows.map((r) => {
       const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
@@ -1206,7 +1209,34 @@ async function entity(id) {
     }
   };
 
-  const note = h(
+  const docPart = (p) =>
+    p.section
+      ? h(
+          'details',
+          { class: 'doc-section', open: unfolded.get(`${id}:${p.section.id}`) ?? false, ontoggle: (ev) => unfolded.set(`${id}:${p.section.id}`, ev.target.open) },
+          h('summary', {}, chip(p.section.type), h('span', { class: 'grow', title: p.section.title }, h('a', { href: `#/e/${p.section.id}` }, p.section.title)), pill(p.section.type, p.section.status)),
+          p.section.body ? renderBody(p.section.body) : h('div', { class: 'empty' }, 'No notes.'),
+        )
+      : p.missing
+        ? h('div', { class: 'error' }, `${p.missing}: not found, archived or not yours to see`)
+        : renderBody(p.text.replace(/^#{1,3}\s+/gm, '')); // a heading for the reader is a section title here
+  const shareLink = async () => {
+    if (!(await ask({ title: `Make a link to "${e.title}"?`, message: 'Anyone with the link can read it and every item it brings in, with no login, until the link is revoked.', action: 'Make link' }))) return;
+    try {
+      const made = await api('share_create', { id });
+      main.querySelector('.note').prepend(secretBox('Link to read this document. Send it to its reader.', `${location.origin}${made.path}`));
+    } catch (err) {
+      tell('No link was made', err.message);
+    }
+  };
+  const stopSharing = async () => {
+    if (!(await ask({ title: `Stop the ${links.length === 1 ? 'link' : `${links.length} links`} to "${e.title}"?`, message: 'They stop working at once.', action: 'Stop sharing', danger: true }))) return;
+    for (const s of links) await api('share_revoke', { id: s.id }).catch(() => null);
+    entity(id);
+  };
+  const note = doc
+    ? h('section', { class: 'card wide note doc' }, doc.parts.length ? doc.parts.map(docPart) : h('div', { class: 'empty' }, 'Nothing written yet.'))
+    : h(
     'section',
     { class: 'card wide note' },
     long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
@@ -1217,7 +1247,7 @@ async function entity(id) {
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public')),
+      h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.length > 0 && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.length})` }, 'shared by link')),
       h('h1', { style: 'margin-top: 6px' }, e.title),
     ),
     h(
@@ -1256,6 +1286,8 @@ async function entity(id) {
           ],
         publishable && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
         e.visibility === 'public' && (project || isA(e.type, 'software.feature')) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
+        doc && !e.archived_at && ['Make a link to read it', shareLink],
+        links.length > 0 && ['Stop sharing', stopSharing, 'danger'],
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),
