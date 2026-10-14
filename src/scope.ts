@@ -8,6 +8,7 @@
 
 import { repoByName, repoName } from './github.ts';
 import type { Actor, Archipelago, Op } from './pelago.ts';
+import { resolveRun } from './sessions.ts';
 import { repoScope } from './views.ts';
 
 export async function withinScope(l: Archipelago, actor: Actor, tool: string, input: Record<string, unknown>): Promise<void> {
@@ -71,6 +72,14 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
     case 'session_start':
     case 'session_update':
       return mustBeIn(input.task, 'take it on');
+    // A story is told of the token's own work: the run is one of a session in its repository.
+    case 'tell': {
+      const run = await resolveRun(l, String(input.run ?? ''));
+      if (!run) return;
+      const { rows } = await l.db.query(`select 1 from relation where type = 'software.lives_in' and from_id = $1 and to_id = any($2::text[]) and valid_to is null`, [run.id, repos]);
+      if (!rows.length) refuse(`${await named(run.id)} is not a session there, so this token cannot tell its story.`);
+      return;
+    }
     case 'session_end':
       for (const id of (input.still_true ?? []) as string[]) await mustBeIn(id, 'vouch for it');
       return;

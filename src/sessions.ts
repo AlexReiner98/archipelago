@@ -12,7 +12,7 @@ const now = () => new Date().toISOString();
 const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
 
 /** Find a run by its entity id or by the session id its surface gave it. */
-async function resolveRun(l: Archipelago, key: string, openOnly = false): Promise<Entity | undefined> {
+export async function resolveRun(l: Archipelago, key: string, openOnly = false): Promise<Entity | undefined> {
   const byId = await l.entity(key);
   if (byId && l.registry.isA(byId.type, 'sys.run')) return byId;
   const { rows } = await l.db.query<Entity>(
@@ -242,6 +242,105 @@ export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: 
   };
 }
 
+/** One beat of a session's story: what it concluded, the items that is about, and the ties it wants seen between them. */
+export interface Beat {
+  /** Its number in the story, from 1. */
+  n: number;
+  at: string;
+  said: string;
+  about: string[];
+  links: { from: string; to: string; says: string }[];
+  /** The beat this one takes back: what the session thought then and no longer does. */
+  replaces?: number;
+  /** Set on a beat a later one took back. */
+  replaced_by?: number;
+}
+const BEATS_KEPT = 80;
+const SAID_MAX = 280;
+const SAYS_MAX = 40;
+
+/**
+ * A session tells the story of its work: as it reasons, it adds a beat (what
+ * it concluded and why, the items that is about, the ties between them it
+ * wants seen), and the owner reads the story on the session's page, the
+ * beats beside a small drawing of only those items. Chosen, not everything
+ * touched. Kept on the run as its tokens are, written straight and not as a
+ * change: it is the session's own account, and a change logged for every
+ * beat would carry the whole story in each event.
+ */
+export async function tell(
+  l: Archipelago,
+  _actor: Actor,
+  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number },
+) {
+  const run = await resolveRun(l, input.run);
+  if (!run) throw new Error(`No session "${input.run}"`);
+  if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
+  const said = input.said.trim();
+  if (!said) throw new Error('A beat says something: give said a sentence.');
+  if (said.length > SAID_MAX) throw new Error(`A beat is a sentence or two, ${SAID_MAX} characters at most (this is ${said.length}). Say the point; what else there is goes in a note on the item.`);
+  const story = Array.isArray(run.props.story) ? (run.props.story as Beat[]) : [];
+  if (story.length >= BEATS_KEPT) throw new Error(`This story already has ${BEATS_KEPT} beats. Take one back with replaces rather than adding: a story that long is no longer read.`);
+  const links = (input.links ?? []).map((k) => ({ from: k.from, to: k.to, says: k.says.trim() }));
+  for (const k of links) if (!k.says || k.says.length > SAYS_MAX) throw new Error(`A link says what ties the two in a few words, ${SAYS_MAX} characters at most: "${k.says}".`);
+  // An end of a link is about what the beat is about, whether or not it was named there.
+  const about = [...new Set([...(input.about ?? []), ...links.flatMap((k) => [k.from, k.to])])];
+  if (about.length > 12) throw new Error('A beat is about a few items, 12 at most: tell another beat for the rest.');
+  const { rows: found } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and archived_at is null`, [about]);
+  const missing = about.filter((id) => !found.some((f) => f.id === id));
+  if (missing.length) throw new Error(`No item ${missing.map((id) => `"${id}"`).join(', ')} to tell of. Name items by the ids the map gave them.`);
+  if (input.replaces !== undefined) {
+    const old = story.find((b) => b.n === input.replaces);
+    if (!old) throw new Error(`There is no beat ${input.replaces} in this story to take back: it has ${story.length}.`);
+    if (old.replaced_by) throw new Error(`Beat ${old.n} was already taken back by beat ${old.replaced_by}.`);
+  }
+  const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }) };
+  const next = [...story.map((b) => (b.n === input.replaces ? { ...b, replaced_by: beat.n } : b)), beat];
+  await l.db.query(`update entity set props = props || jsonb_build_object('story', $2::jsonb, 'last_seen', $3::text) where id = $1`, [run.id, JSON.stringify(next), now()]);
+  await heard(l, run, `Session "${run.title}" told of its work`);
+  return { run: run.id, beat: beat.n, standing: next.filter((b) => !b.replaced_by).length };
+}
+
+/**
+ * A session's story as its page draws it: the beats in order, the items they
+ * are about, the ties the session drew, and the links the map already has
+ * between those items, which the session did not have to say.
+ */
+export async function story(l: Archipelago, input: Record<string, unknown>) {
+  const key = String(input.run ?? '');
+  const run = key ? await resolveRun(l, key) : undefined;
+  if (!run) throw new Error(`No session "${key}": give run, a run id or a session id.`);
+  const beats = Array.isArray(run.props.story) ? (run.props.story as Beat[]) : [];
+  const standing = beats.filter((b) => !b.replaced_by);
+  // What a beat that was taken back was about stays only if a standing beat is about it too.
+  const ids = [...new Set(standing.flatMap((b) => b.about))];
+  const { rows: items } = await l.db.query<Item & { is_open: boolean }>(`select id, type, title, status, is_open from entity where id = any($1::text[]) and archived_at is null`, [ids]);
+  const seen = new Map<string, { from: string; to: string; says: string; beat: number }>();
+  for (const b of standing) for (const k of b.links) seen.set(`${k.from} ${k.to} ${k.says}`, { ...k, beat: b.n });
+  const { rows: ties } = await l.db.query<{ type: string; from: string; to: string }>(
+    `select type, from_id as "from", to_id as "to" from relation where from_id = any($1::text[]) and to_id = any($1::text[]) and valid_to is null`,
+    [items.map((i) => i.id)],
+  );
+  return {
+    run: { id: run.id, title: run.title, status: run.status, open: run.is_open },
+    beats,
+    // `last`: the latest standing beat about it, so the drawing can light what the story is on now.
+    // In the order the story came to them.
+    items: items
+      .map(({ is_open, ...i }) => ({ ...i, open: is_open, last: Math.max(...standing.filter((b) => b.about.includes(i.id)).map((b) => b.n)) }))
+      .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)),
+    links: [...seen.values()],
+    ties,
+  };
+}
+
+// Asked like any standing question; kept here, beside what writes it.
+VIEWS.story = {
+  description:
+    'The story a session told of its work (the tell tool): its beats in order (n, said, about, links; one taken back says replaced_by), the items the standing beats are about, the links the session drew between them, and the ties the map already has between those items. Params: run (required): a run id or session id.',
+  run: story,
+};
+
 type Item = { id: string; type: string; title: string; status: string };
 
 /**
@@ -392,7 +491,7 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   lines.push(
     '',
     'When you take on a task that has no estimate, give it one: how many tokens you expect it to take (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.',
-    'If the pelago MCP tools are available: when you take on one of these, call session_update with its id as task; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.',
+    `If the pelago MCP tools are available: when you take on one of these, call session_update with its id as task; as you reason about the work, tell its story with tell (run ${started.run}): a beat for each thing you conclude, the items it is about and the ties between them, so the owner sees what you see; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.`,
     'When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.',
     'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm unless this workspace applies agents’ changes as made, so send the answer with what was chosen and why.',
   );

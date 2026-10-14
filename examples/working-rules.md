@@ -23,6 +23,11 @@ true as you go; do not keep a second record in files or in the chat.
 
 ## While you work
 
+- **Tell the story as you go.** Each time you conclude something (a cause,
+  a finding, a choice and why), `tell` it: one sentence, the items it is
+  about, and the ties between them you want seen. The owner reads the beats
+  on your session's page beside a drawing of those items. Tell what matters,
+  not every step; take a beat back with `replaces` when you change your mind.
 - **Change the map when the work changes it.** A task done, a decision made
   in practice, a problem found: change its status with what happened and the
   evidence. Do not leave it open with a note.

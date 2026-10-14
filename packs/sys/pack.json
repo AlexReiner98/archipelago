@@ -100,6 +100,11 @@
           "description": "Tokens the session has used so far, as its machine counted them.",
           "system": true
         },
+        "story": {
+          "type": "json",
+          "description": "The story the session tells of its work, beat by beat (the tell tool).",
+          "system": true
+        },
         "cost_usd": {
           "type": "number",
           "description": "What the run cost, in US dollars, where its surface says.",

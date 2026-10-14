@@ -966,6 +966,8 @@ async function entity(id) {
   const owner = e.owner ? await api('get', { id: e.owner }).then((r) => r.entity, () => null) : null;
   // A repository says what the agents working in it have used: the sync agent in GitHub Actions, and sessions on a machine.
   const used = isA(e.type, 'software.repo') ? await api('view', { name: 'agent_usage', params: { repo: id } }).catch(() => null) : null;
+  // A session that told the story of its work is that story first.
+  const story = isA(e.type, 'sys.run') && e.props.story?.length ? await api('view', { name: 'story', params: { run: id } }).catch(() => null) : null;
   const relRows = (rows, direction) =>
     rows.map((r) => {
       const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
@@ -1088,7 +1090,7 @@ async function entity(id) {
   };
   const workish = !e.archived_at && ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t);
   // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
-  const fields = Object.entries(e.props).filter(([, v]) => v !== null && v !== '');
+  const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story');
   const short = fields.filter(([, v]) => String(v).length <= 32);
   const long = fields.filter(([, v]) => String(v).length > 32);
   const edit = () => {
@@ -1176,9 +1178,9 @@ async function entity(id) {
     ),
     editor,
     // Where it sits and what it holds, as a picture: the lens and the style kept for it, or the ones every item opens on. It takes no room when there is nothing to draw.
-    h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true })),
+    story ? storyPart(story) : h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true })),
     // What it holds up and what holds it, said outright: a picture places them, these say which way the tie runs.
-    holding.length + heldBy.length > 0 &&
+    (holding.length + heldBy.length > 0 || '') &&
       h('div', { class: 'grid', style: 'margin-bottom: 14px' }, holding.length > 0 && fold('holding', 'Waiting on this', holding.length, true, tieRows(holding)), heldBy.length > 0 && fold('held', 'This waits on', heldBy.length, true, tieRows(heldBy))),
     // What a project is comes before its chart: said under the chart, it reads as a caption to it.
     project ? h('div', { class: 'grid', style: 'margin-bottom: 14px' }, note) : '',
@@ -1894,6 +1896,142 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     nodes.some((n) => n.blocked) && key('swatch rm-blocked', 'Blocked'),
   ].filter(Boolean);
   return h('div', { class: 'graph-body' }, h('div', { class: 'graph-scroll' }, svg), legend.length > 0 && h('div', { class: 'legend' }, legend));
+}
+
+// ---- A session's story -----------------------------------------------------
+
+// What a session told of its work, beat by beat (the tell tool): read top to
+// bottom it is a briefing, and beside it the items the beats are about, with
+// the ties the session drew and the ones the map already had. Pointing at a
+// beat lights what it is about; the newest beat's items are lit until then.
+function storyPart(data) {
+  const standing = data.beats.filter((b) => !b.replaced_by);
+  const newest = standing.at(-1)?.n;
+  const named = new Map(data.items.map((i) => [i.id, i]));
+  const drawing = storyGraph(data, newest);
+  const light = (beat) => drawing.light(beat ? new Set(beat.about) : null);
+  const rows = data.beats.map((b) =>
+    h(
+      'li',
+      { class: `beat${b.replaced_by ? ' taken-back' : ''}${b.n === newest ? ' newest' : ''}`, onpointerenter: () => !b.replaced_by && light(b), onfocusin: () => !b.replaced_by && light(b) },
+      h(
+        'details',
+        {},
+        h('summary', { title: b.said }, h('span', { class: 'n' }, b.n), h('span', { class: 'said' }, b.said), ago(b.at)),
+        h(
+          'div',
+          { class: 'beat-more' },
+          h('p', {}, b.said),
+          b.replaced_by && h('p', { class: 'muted small' }, `Taken back in beat ${b.replaced_by}.`),
+          b.about.length > 0 && h('div', { class: 'beat-items' }, b.about.map((id) => (named.get(id) ? link(named.get(id)) : h('span', { class: 'muted' }, 'gone')))),
+        ),
+      ),
+    ),
+  );
+  return h(
+    'section',
+    { class: 'card story', style: 'margin-bottom: 14px' },
+    h('header', { class: 'toolbar fold-bar' }, h('h2', { title: 'What the session concluded as it worked, and what about' }, 'Story'), h('span', { class: 'n' }, standing.length), h('span', { class: 'grow' })),
+    h('div', { class: 'story-body' }, h('ol', { class: 'beats', onpointerleave: () => light(null) }, rows), drawing.el),
+  );
+}
+
+/** The items a story is about, laid out by pulling tied things together and pushing the rest apart, from the same start every time. */
+function storyGraph(data, newest) {
+  const W = 168;
+  const H = 40;
+  const nodes = data.items.map((i, k) => ({ ...i, k }));
+  const at = new Map(nodes.map((n) => [n.id, n]));
+  const said = data.links.filter((k) => at.has(k.from) && at.has(k.to));
+  // A tie the session drew already says what the map's own link between the same two would.
+  const drawn = new Set(said.flatMap((k) => [`${k.from} ${k.to}`, `${k.to} ${k.from}`]));
+  const ties = data.ties.filter((t) => !drawn.has(`${t.from} ${t.to}`));
+  const pairs = [...said, ...ties];
+  // Each group of tied items reads left to right, along its ties; the groups are stacked in the order the story came to them.
+  const group = new Map(nodes.map((n) => [n.id, n.id]));
+  const root = (id) => (group.get(id) === id ? id : root(group.get(id)));
+  for (const p of pairs) group.set(root(p.from), root(p.to));
+  const layer = new Map(nodes.map((n) => [n.id, 0]));
+  // As far right as the longest run of ties into it; a loop stops growing after as many rounds as there are items.
+  for (let round = 0; round < nodes.length; round++)
+    for (const p of pairs) {
+      // What waits sits after what it waits on, as the session's own "holds up" reads.
+      const [a, b] = BLOCKING.includes(p.type) ? [p.to, p.from] : [p.from, p.to];
+      if (layer.get(b) < layer.get(a) + 1) layer.set(b, Math.min(layer.get(a) + 1, nodes.length - 1));
+    }
+  const groups = [...new Set(nodes.map((n) => root(n.id)))].map((g) => nodes.filter((n) => root(n.id) === g));
+  const [GAP_X, GAP_Y] = [W + 72, H + 22];
+  let top = 0;
+  const loose = groups.filter((g) => g.length === 1).flat();
+  for (const members of groups.filter((g) => g.length > 1)) {
+    const columns = new Map();
+    for (const n of members) columns.set(layer.get(n.id), [...(columns.get(layer.get(n.id)) ?? []), n]);
+    let rows = 0;
+    for (const [col, list] of columns) {
+      list.forEach((n, i) => ([n.x, n.y] = [col * GAP_X, top + i * GAP_Y]));
+      rows = Math.max(rows, list.length);
+    }
+    top += rows * GAP_Y + 10;
+  }
+  // What is told of on its own, tied to nothing in the story, goes in a row under the rest.
+  loose.forEach((n, i) => ([n.x, n.y] = [(i % 4) * (W + 16), top + Math.floor(i / 4) * GAP_Y]));
+  const pad = 14;
+  const [minX, minY] = [Math.min(...nodes.map((n) => n.x)), Math.min(...nodes.map((n) => n.y))];
+  for (const n of nodes) [n.x, n.y] = [n.x - minX + pad, n.y - minY + pad + 6];
+  const width = Math.max(...nodes.map((n) => n.x + W)) + pad;
+  const height = Math.max(...nodes.map((n) => n.y + H)) + pad;
+  const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
+  const centre = (n) => [n.x + W / 2, n.y + H / 2];
+  // A line stops at the edge of each box, so an arrow's head is seen.
+  const edge = (n, [tx, ty]) => {
+    const [cx, cy] = centre(n);
+    const [dx, dy] = [tx - cx, ty - cy];
+    const t = Math.min(Math.abs(W / 2 / (dx || 1e-9)), Math.abs(H / 2 / (dy || 1e-9)));
+    return [cx + dx * Math.min(t, 1), cy + dy * Math.min(t, 1)];
+  };
+  const lines = s('g', {});
+  const labels = s('g', { class: 'story-labels' });
+  const boxes = s('g', {});
+  const drawnLines = pairs.map((p) => {
+    const [a, b] = [at.get(p.from), at.get(p.to)];
+    const [x1, y1] = edge(a, centre(b));
+    const [x2, y2] = edge(b, centre(a));
+    const phrase = p.says ?? relations.get(p.type)?.title ?? p.type;
+    const el = s('line', { x1, y1, x2, y2, class: p.says ? 'story-tie' : 'rm-link other', 'marker-end': p.says ? 'url(#story-arrow)' : null }, s('title', {}, document.createTextNode(`${a.title} ${phrase} ${b.title}`)));
+    lines.append(el);
+    if (p.says) labels.append(s('text', { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 4, 'text-anchor': 'middle' }, document.createTextNode(cut(p.says, 28))));
+    return { el, ends: [p.from, p.to] };
+  });
+  const drawnBoxes = nodes.map((n) => {
+    const box = s(
+      'g',
+      { class: `rm-node story-node${n.open ? '' : ' closed'}`, transform: `translate(${n.x},${n.y})`, tabindex: 0 },
+      s('title', {}, document.createTextNode(`${n.title}\n${typeTitle(n.type)}, ${n.status}`)),
+      s('rect', { class: 'box', width: W, height: H, rx: 7 }),
+      s('text', { x: 10, y: 17 }, document.createTextNode(cut(n.title, 25))),
+      s('text', { class: 'small', x: 10, y: 32 }, document.createTextNode(`${typeTitle(n.type)} · ${n.status}`)),
+    );
+    box.addEventListener('click', () => (location.hash = `#/e/${n.id}`));
+    boxes.append(box);
+    return { box, n };
+  });
+  const svg = s(
+    'svg',
+    { width: '100%', viewBox: `0 0 ${width} ${height}`, style: `max-width: ${width}px`, role: 'img', 'aria-label': 'The items the story is about' },
+    s('defs', {}, s('marker', { id: 'story-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,1 L10,5 L0,9 z', class: 'story-arrowhead' }))),
+    lines,
+    labels,
+    boxes,
+  );
+  // Lit: what one beat is about, or when no beat is pointed at, what the newest is about.
+  const light = (ids) => {
+    const lit = ids ?? new Set(nodes.filter((n) => n.last === newest).map((n) => n.id));
+    for (const { box, n } of drawnBoxes) box.classList.toggle('lit', lit.has(n.id));
+    for (const l of drawnLines) l.el.classList.toggle('dim', Boolean(ids) && !l.ends.every((id) => lit.has(id)));
+  };
+  light(null);
+  const el = nodes.length ? h('div', { class: 'story-graph' }, svg) : h('div', { class: 'story-graph empty' }, 'No items named yet.');
+  return { el, light: nodes.length ? light : () => {} };
 }
 
 // ---- Lens ----------------------------------------------------------------
@@ -3716,6 +3854,7 @@ const following = {
 const STEP_KINDS = [
   ['show', 'What they show you'],
   ['change', 'What they change'],
+  ['story', 'The story they tell'],
   ['read', 'What they read'],
   ['view', 'Views and pictures they ask for'],
   ['search', 'What they search for'],
@@ -3724,7 +3863,7 @@ const STEP_KINDS = [
 const followBox = document.querySelector('#follow input');
 followBox.checked = following.on;
 followBox.addEventListener('change', () => (following.on = followBox.checked));
-const chosen = { kinds: new Set(following.list('kinds', ['show', 'change'])), muted: new Set(following.list('muted', [])) };
+const chosen = { kinds: new Set(following.list('kinds', ['show', 'change', 'story'])), muted: new Set(following.list('muted', [])) };
 /** The agents heard from while the page is open, with those left out before: each can be left out. */
 const heardFrom = new Set(chosen.muted);
 function followMenu() {
@@ -3743,19 +3882,24 @@ const followed = h('div', { id: 'followed', hidden: true });
 document.body.append(followed);
 let seenStep;
 let followedTimer;
+/** Where each agent that tells a story tells it: following it goes there, not from item to item. */
+const storyOf = new Map();
 
 function follow(steps = []) {
   // The first answer only says where things stand; an old step is not followed.
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
-  for (const s of steps) heardFrom.add(s.actor);
+  for (const s of steps) {
+    heardFrom.add(s.actor);
+    if (s.kind === 'story') storyOf.set(s.actor, s.hash);
+  }
   if (!following.on) return;
   const wanted = fresh.filter((s) => chosen.kinds.has(s.kind) && !chosen.muted.has(s.actor));
   // The line says the last thing done; the page goes to the last that has a place. A step may have none: then the page stays.
   const to = wanted.at(-1);
   if (!to) return;
-  const place = wanted.findLast((s) => s.hash);
-  const there = place && `#/${place.hash}`;
+  const place = wanted.findLast((s) => s.hash || storyOf.has(s.actor));
+  const there = place && `#/${storyOf.get(place.actor) ?? place.hash}`;
   const busy = dirty || document.querySelector('dialog[open]');
   followed.replaceChildren(
     ...[

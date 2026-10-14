@@ -15,7 +15,7 @@ import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
 import { withinScope } from './scope.ts';
-import { recordRun, sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
+import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { undo } from './undo.ts';
 import { getPicture, putPicture, reportTests } from './proof.ts';
 import { pictureOf, readLens } from './lens.ts';
@@ -224,8 +224,8 @@ function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: stri
 interface Step {
   /** Counts up: a higher number is how the page knows a step is new. */
   at: number;
-  /** show: it pointed the page. change: it changed the map. read: one item. view: a standing question or a picture. search. other: sessions, resources and the rest. */
-  kind: 'show' | 'change' | 'read' | 'view' | 'search' | 'other';
+  /** show: it pointed the page. change: it changed the map. story: it told a beat of its session's story. read: one item. view: a standing question or a picture. search. other: sessions, resources and the rest. */
+  kind: 'show' | 'change' | 'story' | 'read' | 'view' | 'search' | 'other';
   actor: string;
   /** What it did, in a few words; for a show or a change, the note or the reason it gave. */
   did?: string;
@@ -241,8 +241,10 @@ function took(l: Archipelago, step: Omit<Step, 'at'>): void {
   list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step });
   steps.set(focusKey(l), list.slice(-STEPS_KEPT));
 }
-/** Tools that are no step of their own: the two that point the screen themselves, and the one that only waits. */
-const UNWATCHED = new Set(['show', 'change', 'watch']);
+/** Tools that are no step of their own: those that point the screen themselves, and the one that only waits. */
+const UNWATCHED = new Set(['show', 'change', 'tell', 'watch']);
+// Beats told, per workspace: the stamp a page watches moves with them, so a story being read grows as it is told.
+const told = new Map<string, number>();
 const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
 function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>): void {
   const params = (input.params ?? {}) as Record<string, unknown>;
@@ -427,7 +429,7 @@ export const TOOLS: Record<string, Tool> = {
     description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
     humanOnly: true,
     input: {},
-    run: async (l) => ({ ...(await l.pulse()), focus: focus.get(focusKey(l)), steps: steps.get(focusKey(l)) ?? [], ui: uiStamp(), listening }),
+    run: async (l) => ({ ...(await l.pulse().then((p) => ({ stamp: `${p.stamp}.${told.get(l.workspace) ?? 0}` }))), focus: focus.get(focusKey(l)), steps: steps.get(focusKey(l)) ?? [], ui: uiStamp(), listening }),
   },
   backup: {
     description: 'Back every workspace up now, without waiting for the schedule. Do this before anything that changes the database schema. Answers with what was written.',
@@ -709,6 +711,26 @@ export const TOOLS: Record<string, Tool> = {
       task: z.string().optional(),
     },
     run: async (l, actor, input) => sessionUpdate(l, actor, input),
+  },
+  tell: {
+    description:
+      'Tell the story of your session as you work, so the owner sees what you see: one beat at a time, what you have concluded and why, in a sentence (said), the items it is about, and the ties between them you want seen (links, each saying in a few words what ties the two: "blocks", "is why", "same fault as"). Tell what matters, not every step: a finding, a cause, a choice and its reason, what stands in the way. The owner reads the beats on your session’s page beside a drawing of only those items, and follows them there. When you change your mind, take the old beat back with replaces (its number) and say what you think now. Takes effect at once.',
+    input: {
+      run: z.string().describe('The run id from session_start, or the session id.'),
+      said: z.string().min(1).describe('What you concluded and why, in a sentence or two: 280 characters at most.'),
+      about: z.array(z.string()).optional().describe('Ids of the items it is about; the ends of links are added for you.'),
+      links: z
+        .array(z.object({ from: z.string(), to: z.string(), says: z.string().describe('What ties them, in a few words.') }))
+        .optional()
+        .describe('Ties to draw between items, as you see them; the map’s own links between the items are drawn too.'),
+      replaces: z.number().int().positive().optional().describe('The number of an earlier beat this one takes back.'),
+    },
+    run: async (l, actor, input) => {
+      const answer = await tell(l, actor, input);
+      told.set(l.workspace, (told.get(l.workspace) ?? 0) + 1);
+      took(l, { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}` });
+      return answer;
+    },
   },
   run_report: {
     description:

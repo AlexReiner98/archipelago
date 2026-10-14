@@ -14,7 +14,7 @@ import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { publicPage, publicPicture } from '../src/public.ts';
 import { configureSecrets, isSealed, seal, unseal } from '../src/secrets.ts';
-import { hookSessionEnd, hookSessionStart, recordUsage, sessionEnd, sessionStart, sessionUpdate } from '../src/sessions.ts';
+import { hookSessionEnd, hookSessionStart, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 import { Workspaces } from '../src/workspaces.ts';
@@ -428,6 +428,37 @@ test('a session registers, takes the lane its task needs, and gives it back when
   assert.deepEqual(view.open.map((r: any) => r.id), [two.run]);
   assert.equal((await l.claim(agent, { resource: made.lane, holder: two.run, reason: 'My turn' })).status, 'claimed');
   await assert.rejects(sessionUpdate(l, agent, { run: one.run, note: 'late' }), /already ended/);
+});
+
+test('a session tells the story of its work, beat by beat, and can take a beat back', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'a', type: 'task', title: 'Fix the halo' },
+    { op: 'create', ref: 'b', type: 'issue', title: 'Labels clip' },
+    { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
+    { op: 'create', ref: 'c', type: 'task', title: 'Unrelated' },
+  ]);
+  const { run } = await sessionStart(l, agent, { title: 'Storyteller', session_id: 's-story' });
+  const one = await tell(l, agent, { run: 's-story', said: 'The halo is blocked by the clipping: fix that first.', links: [{ from: made.b, to: made.a, says: 'is why' }] });
+  assert.deepEqual([one.run, one.beat, one.standing], [run, 1, 1]);
+  await tell(l, agent, { run, said: 'The unrelated task matters after all.', about: [made.c] });
+  const three = await tell(l, agent, { run, said: 'No: it does not.', replaces: 2 });
+  assert.equal(three.standing, 2);
+  assert.equal((await l.proposals()).length, 0, 'a story needs no approval');
+  assert.equal(((await l.events({ target: run })) as any[]).length, 1, 'and logs no event: only the session starting');
+
+  const told = (await VIEWS.story.run(l, { run })) as any;
+  assert.deepEqual(told.beats.map((b: any) => [b.n, b.replaced_by ?? null]), [[1, null], [2, 3], [3, null]]);
+  assert.deepEqual(told.items.map((i: any) => i.title).sort(), ['Fix the halo', 'Labels clip'], 'what only a beat taken back was about drops out');
+  assert.deepEqual(told.links.map((k: any) => k.says), ['is why']);
+  assert.deepEqual(told.ties.map((t: any) => t.type), ['depends_on'], 'the map’s own link between them comes too');
+
+  await assert.rejects(tell(l, agent, { run, said: 'x'.repeat(281) }), /280 characters/);
+  await assert.rejects(tell(l, agent, { run, said: 'About nothing real', about: ['e_nothere1'] }), /No item "e_nothere1"/);
+  await assert.rejects(tell(l, agent, { run, said: 'Again', replaces: 2 }), /already taken back/);
+  await sessionEnd(l, agent, { run });
+  await assert.rejects(tell(l, agent, { run, said: 'Too late' }), /already ended/);
+  assert.equal(((await VIEWS.story.run(l, { run })) as any).beats.length, 3, 'the story is still read after the session ends');
 });
 
 test('a session that goes quiet is shown as stale', async () => {

@@ -701,3 +701,30 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .rows.costs > li.row-top, .proofs .rows > li.row-top { flex-wrap: nowrap; }
 .rows.costs > li.row-top > .grow, .proofs .rows > li.row-top > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rows.costs > li.row-top > :not(.grow), .proofs .rows > li.row-top > :not(.grow) { flex: none; }
+
+/* A session's story: the beats beside the items they are about. */
+.story-body { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 0; border-top: 1px solid var(--line); margin-top: 10px; }
+.beats { list-style: none; margin: 0; padding: 6px 0; border-right: 1px solid var(--line); max-height: 560px; overflow-y: auto; }
+.beat summary { display: flex; align-items: center; gap: 8px; padding: 5px 14px; cursor: pointer; list-style: none; white-space: nowrap; }
+.beat summary::-webkit-details-marker { display: none; }
+.beat summary .n { flex: none; min-width: 1.6em; color: var(--muted); font-size: 12px; text-align: right; }
+.beat summary .said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.beat summary .ago { flex: none; }
+.beat:hover summary, .beat summary:focus-visible { background: var(--accent-soft); }
+.beat.newest summary .said { font-weight: 600; }
+.beat.taken-back summary .said { text-decoration: line-through; color: var(--muted); }
+.beat-more { padding: 2px 14px 10px calc(14px + 1.6em + 8px); max-width: 70ch; }
+.beat-more p { margin: 0 0 6px; }
+.beat-items { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.story-graph { padding: 8px; min-width: 0; }
+.story-graph.empty { padding: 20px; color: var(--muted); }
+.story-tie { stroke: var(--accent); stroke-width: 1.6; }
+.story-arrowhead { fill: var(--accent); }
+.story-labels text { fill: var(--accent); font-size: 11px; paint-order: stroke; stroke: var(--panel); stroke-width: 4px; }
+.story-node .box { transition: stroke 0.15s, fill 0.15s; }
+.story-node.lit .box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.8; }
+.story-graph line.dim { opacity: 0.25; }
+@media (max-width: 720px) {
+  .story-body { grid-template-columns: minmax(0, 1fr); }
+  .beats { border-right: 0; border-bottom: 1px solid var(--line); max-height: 320px; }
+}
