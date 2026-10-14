@@ -12,6 +12,8 @@ export interface Lens {
   from?: string;
   /** Or the story a session told (a run): what its standing beats are about, with the ties it drew. */
   story?: string;
+  /** With story: one beat only (its number), as its finding is drawn. */
+  beat?: number;
   /** Which types are in it: a type (flavours included) or "work"; with a leading "-", left out. */
   kinds?: string[];
   /** The one kind of link that says what is inside what. */
@@ -81,6 +83,10 @@ export function readLens(l: Archipelago, input: Record<string, unknown>, under: 
   };
   if (input.from !== undefined) lens.from = String(input.from);
   if (input.story !== undefined) lens.story = String(input.story);
+  if (input.beat !== undefined) {
+    if (!Number.isInteger(input.beat) || (input.beat as number) < 1) throw new Error('beat must be the number of a beat, from 1');
+    lens.beat = input.beat as number;
+  }
   if (input.kinds !== undefined) lens.kinds = list(input.kinds, 'kinds');
   if (input.by !== undefined) lens.by = known(input.by, 'by');
   if (input.over !== undefined) lens.over = input.over === 'all' ? 'all' : list(input.over, 'over').map((kind) => known(kind, 'over'));
@@ -216,6 +222,12 @@ async function storyOf(l: Archipelago, key: string): Promise<{ id: string; title
 export async function lens(l: Archipelago, input: Record<string, unknown>) {
   // A story is drawn under no view of its own: the workspace's views are pictures of the map, not of what a session said.
   const told = input.story === undefined ? undefined : await storyOf(l, String(input.story));
+  // One beat of it, where one is asked for: a finding is drawn alone.
+  if (told && input.beat !== undefined) {
+    const one = told.beats.find((b) => b.n === input.beat);
+    if (!one) throw new Error(`No beat ${input.beat} stands in the story of "${told.title}"`);
+    told.beats = [one];
+  }
   // The item the picture is asked for. Each lens kept about it is a view of it, with a name; the first in order is the one it opens on.
   const hub = input.from === undefined ? undefined : String(input.from);
   // Around one item there is always the picture of what it is tied to, by kind of link: what it waits on and what waits on it.
@@ -415,10 +427,12 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   if (told)
     for (const b of told.beats)
       for (const k of b.links) if (sent.has(k.from) && sent.has(k.to)) lines.set(`said ${k.from} ${k.to} ${k.says}`, { kind: 'said', from: k.from, to: k.to, n: 1, says: k.says, beat: b.n });
+  // Between two things a session tied, its words say what the map's own link would.
+  const tiedBySession = new Set([...lines.values()].flatMap((k) => [`${k.from} ${k.to}`, `${k.to} ${k.from}`]));
   for (const r of live) {
     if (!along(r.type)) continue;
     const [from, to] = [lift(r.from_id), lift(r.to_id)];
-    if (!from || !to || from === to) continue;
+    if (!from || !to || from === to || tiedBySession.has(`${from} ${to}`)) continue;
     // What is inside what is already said by `inside`.
     if (r.type === asked.by && inside(from) === to) continue;
     const key = `${r.type} ${from} ${to}`;
@@ -445,7 +459,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
       })(),
     }),
     // What the person looking may change on the page, where the view says.
-    controls: Array.isArray(view?.props.controls) ? (view!.props.controls as unknown[]).filter((c) => CONTROLS.includes(c as string)) : ['lit'],
+    // A story is what the session chose to show: there is nothing to light by but what it says.
+    controls: told ? [] : Array.isArray(view?.props.controls) ? (view!.props.controls as unknown[]).filter((c) => CONTROLS.includes(c as string)) : ['lit'],
     // Who it was answered for, so a style can light what waits on them.
     viewer: l.viewer || (await l.setting<string>('me')) || null,
     items: [...sent].sort((a, b) => (told ? about.indexOf(a) - about.indexOf(b) : 0)).map((id) => {

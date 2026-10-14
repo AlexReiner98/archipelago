@@ -453,16 +453,27 @@ test('a session tells the story of its work, beat by beat, and can take a beat b
   const drawn = (await VIEWS.lens.run(l, { story: 's-story' })) as any;
   assert.deepEqual(drawn.items.map((i: any) => i.title), ['Labels clip', 'Fix the halo'], 'what only a beat taken back was about drops out; the rest in the order told');
   assert.deepEqual(drawn.items.map((i: any) => i.told), [[1], [1]]);
-  assert.deepEqual(drawn.links.map((k: any) => [k.kind, k.says ?? null]).sort(), [['depends_on', null], ['said', 'is why']], 'the map’s own link between them comes too');
+  assert.deepEqual(drawn.links.map((k: any) => [k.kind, k.says ?? null]), [['said', 'is why']], 'the map’s own link between the two is said by the session’s words');
   assert.deepEqual(drawn.views, [], 'a story is drawn under no view of the workspace');
   assert.match(drawn.said, /What "Storyteller" told of/);
+  assert.deepEqual(drawn.controls, [], 'nothing to light it by but what it says');
+
+  // The page opens on the finding: the latest that stands, else the latest beat; its picture is that beat alone.
+  assert.equal(told.finding, 3);
+  await assert.rejects(tell(l, agent, { run, said: 'Found nothing about anything', finding: true }), /names the items/);
+  const found = await tell(l, agent, { run, said: `The halo waits on ${made.b} only; fix that and ${made.a} can go.`, about: [made.a, made.b], finding: true });
+  await tell(l, agent, { run, said: 'A later note on the side.', about: [made.c] });
+  assert.equal(((await VIEWS.story.run(l, { run })) as any).finding, found.beat, 'a later beat is history under the finding');
+  const alone = (await VIEWS.lens.run(l, { story: run, beat: found.beat })) as any;
+  assert.deepEqual(alone.items.map((i: any) => i.title).sort(), ['Fix the halo', 'Labels clip']);
+  await assert.rejects(VIEWS.lens.run(l, { story: run, beat: 2 }), /No beat 2 stands/);
 
   await assert.rejects(tell(l, agent, { run, said: 'x'.repeat(281) }), /280 characters/);
   await assert.rejects(tell(l, agent, { run, said: 'About nothing real', about: ['e_nothere1'] }), /No item "e_nothere1"/);
   await assert.rejects(tell(l, agent, { run, said: 'Again', replaces: 2 }), /already taken back/);
   await sessionEnd(l, agent, { run });
   await assert.rejects(tell(l, agent, { run, said: 'Too late' }), /already ended/);
-  assert.equal(((await VIEWS.story.run(l, { run })) as any).beats.length, 3, 'the story is still read after the session ends');
+  assert.equal(((await VIEWS.story.run(l, { run })) as any).beats.length, 5, 'the story is still read after the session ends');
 });
 
 test('a session that goes quiet is shown as stale', async () => {

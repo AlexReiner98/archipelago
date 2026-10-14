@@ -181,6 +181,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .lens-bar { padding: 10px 14px 0; flex-wrap: wrap; min-width: 0; }
 .lens-bar .switch { flex: none; max-width: 100%; }
 /* A picture takes the width it is given and never asks the page for more. */
+.lens-bar[hidden] { display: none; }
 .lens-wrap { min-width: 0; contain: inline-size; }
 .lens-bar .switch button { padding: 3px 10px; font-size: 12.5px; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lens-pin { flex: none; text-decoration: none; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -210,6 +211,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .ln-thing .name.top { pointer-events: auto; paint-order: stroke; stroke: var(--ln-sea); stroke-width: 4px; stroke-linejoin: round; }
 .ln-thing .name.top:hover { fill: var(--accent); }
 .ln-thing .name.leaf { font-size: calc(var(--ln-text-size) - 2px); }
+.ln-thing .name.beside { text-anchor: start; font-size: calc(var(--ln-text-size) - 2px); paint-order: stroke; stroke: var(--ln-sea); stroke-width: 4px; stroke-linejoin: round; }
 .ln-thing.leaf.blocked .name, .ln-thing.leaf.you .name { fill: #fff; }
 .ln-thing .name .count { font-size: calc(var(--ln-text-size) - 2px); font-weight: 400; fill: var(--ln-muted); }
 .ln-line { stroke: var(--ln-muted); stroke-width: 1.2; stroke-dasharray: 2 4; pointer-events: stroke; }
@@ -705,26 +707,22 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .rows.costs > li.row-top > .grow, .proofs .rows > li.row-top > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rows.costs > li.row-top > :not(.grow), .proofs .rows > li.row-top > :not(.grow) { flex: none; }
 
-/* A session's story: the beats beside the items they are about. */
-.story-body { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 0; border-top: 1px solid var(--line); margin-top: 10px; }
-.beats { list-style: none; margin: 0; padding: 6px 0; border-right: 1px solid var(--line); max-height: 560px; overflow-y: auto; }
+/* A session's story: what it found, over a picture of that; how it got there, folded. */
+.story .finding { margin: 4px 14px 12px; max-width: 70ch; font-size: 15px; line-height: 1.5; }
+.beats { list-style: none; margin: 0; padding: 4px 0 8px; }
 .beat summary { display: flex; align-items: center; gap: 8px; padding: 5px 14px; cursor: pointer; list-style: none; white-space: nowrap; }
 .beat summary::-webkit-details-marker { display: none; }
 .beat summary .n { flex: none; min-width: 1.6em; color: var(--muted); font-size: 12px; text-align: right; }
 .beat summary .said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .beat summary .ago { flex: none; }
 .beat:hover summary, .beat summary:focus-visible { background: var(--accent-soft); }
-.beat.newest summary .said { font-weight: 600; }
+.beat.found summary .said { font-weight: 600; }
 .beat.taken-back summary .said { text-decoration: line-through; color: var(--muted); }
 .beat-more { padding: 2px 14px 10px calc(14px + 1.6em + 8px); max-width: 70ch; }
 .beat-more p { margin: 0 0 6px; }
 .beat-items { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
-.story-picture { min-width: 0; }
-.story-picture .ln-sea { height: 460px; min-height: 0; }
+.story-picture { min-width: 0; border-top: 1px solid var(--line); }
+.story-picture .ln-sea { height: 380px; min-height: 0; }
 /* A tie a session drew, with its words on it: in every shape that draws links. */
 .ln-line.said { stroke: var(--accent); stroke-dasharray: none; stroke-width: 1.6; }
 .ln-lines text.said { fill: var(--accent); font-size: 11px; paint-order: stroke; stroke: var(--ln-sea); stroke-width: 4px; pointer-events: none; }
-@media (max-width: 720px) {
-  .story-body { grid-template-columns: minmax(0, 1fr); }
-  .beats { border-right: 0; border-bottom: 1px solid var(--line); max-height: 320px; }
-}

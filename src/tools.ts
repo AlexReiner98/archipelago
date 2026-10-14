@@ -714,7 +714,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   tell: {
     description:
-      'Tell the story of your session as you work, so the owner sees what you see: one beat at a time, what you have concluded and why, in a sentence (said), the items it is about, and the ties between them you want seen (links, each saying in a few words what ties the two: "blocks", "is why", "same fault as"). Tell what matters, not every step: a finding, a cause, a choice and its reason, what stands in the way. The owner reads the beats on your session’s page beside a drawing of only those items, and follows them there. When you change your mind, take the old beat back with replaces (its number) and say what you think now. Takes effect at once.',
+      'Tell the story of your session as you work, so the owner sees what you see: one beat at a time, what you have concluded and why, in a sentence (said), the items it is about, and the ties between them you want seen (links, each saying in a few words what ties the two: "blocks", "is why", "same fault as"). Tell what matters, not every step: a cause, a choice and its reason, what stands in the way. Your session’s page opens on your finding: send finding: true with what you have found so far, said whole for someone who has read nothing else (a few plain sentences: the point, what it rests on, what is left; item ids in it are shown as their names), its items and the ties between them, which are its picture. Send a new finding whenever what you have found changes; the beats are the history under it. When you change your mind, take the old beat back with replaces (its number) and say what you think now. Takes effect at once.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
       said: z.string().min(1).describe('What you concluded and why, in a sentence or two: 280 characters at most.'),
@@ -724,6 +724,7 @@ export const TOOLS: Record<string, Tool> = {
         .optional()
         .describe('Ties to draw between items, as you see them; the map’s own links between the items are drawn too.'),
       replaces: z.number().int().positive().optional().describe('The number of an earlier beat this one takes back.'),
+      finding: z.boolean().optional().describe('true: this is what the session has found, said whole (600 characters at most); its page opens on the latest.'),
     },
     run: async (l, actor, input) => {
       const answer = await tell(l, actor, input);

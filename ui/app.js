@@ -1090,7 +1090,15 @@ async function entity(id) {
   };
   const workish = !e.archived_at && ['task', 'issue', 'software.feature'].some((t) => types.get(e.type)?.flavour_of === t || e.type === t);
   // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
-  const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story');
+  // A session's own record (where it ran, its ids, when it was heard from, what it used) is said as marks, not as fields.
+  const run = isA(e.type, 'sys.run');
+  const RUN_OWN = ['story', 'session_id', 'cwd', 'last_seen', 'tokens_used', 'surface'];
+  const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story' && !(run && RUN_OWN.includes(k)));
+  const runFacts = run && [
+    e.props.surface && h('span', { class: 'fact', title: e.props.cwd ?? '' }, e.props.surface === 'claude-code' ? 'Claude Code' : (RAN[e.props.surface] ?? e.props.surface)),
+    e.props.last_seen && h('span', { class: 'fact' }, h('span', { class: 'muted' }, 'heard from '), ago(e.props.last_seen)),
+    e.props.tokens_used > 0 && h('span', { class: 'fact', title: `${e.props.tokens_used} tokens, input and output, not counting cached re-reads` }, h('span', { class: 'muted' }, 'used '), tokensText(e.props.tokens_used)),
+  ];
   const short = fields.filter(([, v]) => String(v).length <= 32);
   const long = fields.filter(([, v]) => String(v).length > 32);
   const edit = () => {
@@ -1150,6 +1158,7 @@ async function entity(id) {
       automation && h('span', { class: 'fact' }, automationDoes(e.props)),
       automation && e.props.last_fired && h('span', { class: `fact${String(e.props.last_result).startsWith('failed') ? ' error' : ''}`, title: String(e.props.last_result) }, `last fired ${when(e.props.last_fired)}`),
       h('span', { class: 'fact' }, owner ? link(owner) : h('span', { class: 'muted' }, 'no owner')),
+      runFacts,
       short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), String(v))),
       h('span', { class: 'grow' }),
       !e.archived_at && h('button', { onclick: edit }, 'Edit'),
@@ -1178,7 +1187,7 @@ async function entity(id) {
     ),
     editor,
     // Where it sits and what it holds, as a picture: the lens and the style kept for it, or the ones every item opens on. It takes no room when there is nothing to draw.
-    story ? storyPart(story) : h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true })),
+    ...(story ? [storyPart(story)].flat() : [h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true }))]),
     // What it holds up and what holds it, said outright: a picture places them, these say which way the tie runs.
     (holding.length + heldBy.length > 0 || '') &&
       h('div', { class: 'grid', style: 'margin-bottom: 14px' }, holding.length > 0 && fold('holding', 'Waiting on this', holding.length, true, tieRows(holding)), heldBy.length > 0 && fold('held', 'This waits on', heldBy.length, true, tieRows(heldBy))),
@@ -1192,7 +1201,8 @@ async function entity(id) {
     h(
       'div',
       { class: 'grid' },
-      !project && note,
+      // A session that tells its story keeps its log of notes behind a fold: the story is what it says.
+      !project && (story ? fold('log', 'Log', 0, false, note) : note),
       used?.runs.length > 0 &&
         fold('usage', 'Tokens used here', `${tokensText(Object.values(used.month).reduce((sum, u) => sum + u.tokens, 0))} in 30 days`, false, [
           h(
@@ -1900,23 +1910,25 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
 
 // ---- A session's story -----------------------------------------------------
 
-// What a session told of its work, beat by beat (the tell tool): read top to
-// bottom it is a briefing. Beside it, the picture of what the beats are
-// about: a lens started from the story, drawn in the style the person chose,
-// like every other picture. Pointing at a beat lights what it is about.
+// What a session has found, said whole, over a picture of only what that is
+// about: a lens started from the story's finding, drawn with its ties (the
+// nest, which draws lines). How it got there, beat by beat (the tell tool),
+// is folded under it: a log, for whoever wants it.
 function storyPart(data) {
-  const standing = data.beats.filter((b) => !b.replaced_by);
-  const newest = standing.at(-1)?.n;
-  const picture = lensView({ lens: { story: data.run.id } });
-  const light = (beat) => picture.light(beat ? beat.about : null);
-  const named = (box, beat) => {
-    const known = new Map((picture.answer?.items ?? []).map((item) => [item.id, item.title]));
-    box?.replaceChildren(...beat.about.map((id) => h('a', { href: `#/e/${id}` }, known.get(id) ?? titles.get(id) ?? 'no longer on the map')));
-  };
+  const found = data.beats.find((b) => b.n === data.finding);
+  if (!found) return '';
+  const picture = lensView({ lens: { story: data.run.id, beat: found.n }, style: { shape: 'nest' }, key: `story:${data.run.id}`, bare: true });
+  // The finding names items by their ids; they read as names once the picture has said what each is called.
+  const said = h('p', { class: 'finding' }, idsAsLinks(found.said));
+  picture.ready.then(() => {
+    for (const item of picture.answer?.items ?? []) titles.set(item.id, item.title);
+    said.replaceChildren(...idsAsLinks(found.said));
+  });
+  const named = (box, beat) => box?.replaceChildren(...beat.about.map((id) => h('a', { href: `#/e/${id}` }, titles.get(id) ?? 'an item')));
   const rows = data.beats.map((b) =>
     h(
       'li',
-      { class: `beat${b.replaced_by ? ' taken-back' : ''}${b.n === newest ? ' newest' : ''}`, onpointerenter: () => !b.replaced_by && light(b), onfocusin: () => !b.replaced_by && light(b) },
+      { class: `beat${b.replaced_by ? ' taken-back' : ''}${b.finding ? ' found' : ''}` },
       h(
         'details',
         // What it is about is named when it is opened: by then the picture has said what each item is called.
@@ -1932,12 +1944,21 @@ function storyPart(data) {
       ),
     ),
   );
-  return h(
-    'section',
-    { class: 'card story', style: 'margin-bottom: 14px' },
-    h('header', { class: 'toolbar fold-bar' }, h('h2', { title: 'What the session concluded as it worked, and what about' }, 'Story'), h('span', { class: 'n' }, standing.length), h('span', { class: 'grow' })),
-    h('div', { class: 'story-body' }, h('ol', { class: 'beats', onpointerleave: () => light(null) }, rows), h('div', { class: 'story-picture' }, picture)),
-  );
+  return [
+    h(
+      'section',
+      { class: 'card story', style: 'margin-bottom: 14px' },
+      h('header', { class: 'toolbar fold-bar' }, h('h2', { title: 'What this session has found, as it last said it' }, 'Found'), h('span', { class: 'grow' }), ago(found.at)),
+      said,
+      h('div', { class: 'story-picture' }, picture),
+    ),
+    h(
+      'details',
+      { class: 'card wide fold story-beats', style: 'margin-bottom: 14px' },
+      h('summary', { title: 'Each thing the session concluded, in order' }, h('h2', {}, 'How it got there'), h('span', { class: 'n' }, data.beats.filter((b) => !b.replaced_by).length)),
+      h('ol', { class: 'beats' }, rows),
+    ),
+  ];
 }
 
 // ---- Lens ----------------------------------------------------------------
@@ -1989,7 +2010,7 @@ const keptStyle = (key) => {
  * view's rule in words. `style` is what the page or an address asks for this
  * one look, over what the person chose before.
  */
-function lensView({ lens = {}, style = {}, key = lens.story ? `story:${lens.story}` : (lens.from ?? 'map'), quiet = false } = {}) {
+function lensView({ lens = {}, style = {}, key = lens.story ? `story:${lens.story}` : (lens.from ?? 'map'), quiet = false, bare = false } = {}) {
   const chosen = {};
   const bar = h('div', { class: 'toolbar fold-bar lens-bar', hidden: true });
   const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
@@ -2038,7 +2059,9 @@ function lensView({ lens = {}, style = {}, key = lens.story ? `story:${lens.stor
       answer.controls.includes('closed') && h('button', { class: finished ? 'on' : '', title: finished ? 'Leave out what is finished' : 'Show what is finished too', onclick: again({ fold: finished ? [...answer.lens.fold, 'closed'] : answer.lens.fold.filter((f) => f !== 'closed') }) }, 'Finished'),
     ];
     bar.replaceChildren(...parts.flat().filter(Boolean));
-    bar.hidden = false;
+    // A picture that says what it is in words of its own (a finding) has no bar of rules over it, and is not there when it has nothing to draw.
+    bar.hidden = bare;
+    if (empty && bare) return void (host.hidden = true);
     if (empty) return body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this view.'));
     // Nearest wins, field by field: built in, what the map keeps for this view, what this person chose, what the address asks.
     for (const name of Object.keys(chosen)) delete chosen[name];
@@ -2274,6 +2297,7 @@ function drawNest(host, answer, style, keep, kept) {
     n.label.setAttribute('y', y);
   };
   const drawn = new Map();
+  const few = byId.size <= 24;
   const frame = () => {
     const shut = Math.min(W, H) * 0.34;
     const place = (n, shown, seen) => {
@@ -2302,10 +2326,15 @@ function drawNest(host, answer, style, keep, kept) {
         // Its name: across its top when it is open, in its middle with a count when it is closed, wrapped when it holds nothing.
         const cx = Math.max(Math.min(sx, W - 70), 70);
         if (open > 0.5) write(n, [cut(n.title, Math.floor(Math.min(sr * 1.5, W - 40) / 7))], cx, Math.max(sy - sr + 17, 16), 'top');
-        else if (n.all > 1 && sr >= 22) write(n, [cut(n.title, Math.floor((sr * 1.8) / 6.6)), sr >= 36 ? (style.lit === 'you' ? `${n.you} need you` : style.lit === 'blocked' ? `${n.blk} blocked` : `${n.work} open`) : ''].filter(Boolean), sx, sy + (sr >= 36 ? -2 : 4), 'mid');
+        else if (n.all > 1 && sr >= 22 && !(few && n.title.length > Math.floor((sr * 1.8) / 6.6))) write(n, [cut(n.title, Math.floor((sr * 1.8) / 6.6)), sr >= 36 ? (style.lit === 'you' ? `${n.you} need you` : style.lit === 'blocked' ? `${n.blk} blocked` : `${n.work} open`) : ''].filter(Boolean), sx, sy + (sr >= 36 ? -2 : 4), 'mid');
         else if (n.all === 1 && sr >= 26) {
           const rows = lines(n.title, Math.floor((sr * 1.7) / 6.1), Math.max(1, Math.min(4, Math.floor((sr * 1.5) / 13))));
           write(n, rows, sx, sy + 4 - ((rows.length - 1) * 13) / 2, 'leaf');
+        } else if (few && sr >= 3) {
+          // A picture of a few things names each one, beside it when it is too small to hold its name.
+          // As much of it as the room to the right of it holds.
+          const rows = lines(n.title, Math.max(8, Math.min(26, Math.floor((W - sx - sr - 10) / 6))), 2);
+          write(n, rows, sx + sr + 6, sy + 4 - ((rows.length - 1) * 13) / 2, 'beside');
         } else write(n, [], sx, sy, 'none');
       }
       for (const kid of n.kids) place(kid, shown * open, seen && open > 0.5);

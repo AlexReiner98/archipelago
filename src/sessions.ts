@@ -254,9 +254,13 @@ export interface Beat {
   replaces?: number;
   /** Set on a beat a later one took back. */
   replaced_by?: number;
+  /** What the session has found, said whole: the latest that stands is what its page opens on. */
+  finding?: boolean;
 }
 const BEATS_KEPT = 80;
 const SAID_MAX = 280;
+/** A finding is a few plain sentences: the point, what it rests on, what is left. */
+const FINDING_MAX = 600;
 const SAYS_MAX = 40;
 
 /**
@@ -271,14 +275,20 @@ const SAYS_MAX = 40;
 export async function tell(
   l: Archipelago,
   _actor: Actor,
-  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number },
+  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number; finding?: boolean },
 ) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
   const said = input.said.trim();
   if (!said) throw new Error('A beat says something: give said a sentence.');
-  if (said.length > SAID_MAX) throw new Error(`A beat is a sentence or two, ${SAID_MAX} characters at most (this is ${said.length}). Say the point; what else there is goes in a note on the item.`);
+  const most = input.finding ? FINDING_MAX : SAID_MAX;
+  if (said.length > most)
+    throw new Error(
+      input.finding
+        ? `A finding is a few plain sentences, ${most} characters at most (this is ${said.length}): the point, what it rests on, what is left.`
+        : `A beat is a sentence or two, ${most} characters at most (this is ${said.length}). Say the point; what else there is goes in a note on the item.`,
+    );
   const story = Array.isArray(run.props.story) ? (run.props.story as Beat[]) : [];
   if (story.length >= BEATS_KEPT) throw new Error(`This story already has ${BEATS_KEPT} beats. Take one back with replaces rather than adding: a story that long is no longer read.`);
   const links = (input.links ?? []).map((k) => ({ from: k.from, to: k.to, says: k.says.trim() }));
@@ -294,7 +304,8 @@ export async function tell(
     if (!old) throw new Error(`There is no beat ${input.replaces} in this story to take back: it has ${story.length}.`);
     if (old.replaced_by) throw new Error(`Beat ${old.n} was already taken back by beat ${old.replaced_by}.`);
   }
-  const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }) };
+  if (input.finding && !about.length) throw new Error('A finding names the items it is about (about, or the ends of links): they are its picture.');
+  const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }) };
   const next = [...story.map((b) => (b.n === input.replaces ? { ...b, replaced_by: beat.n } : b)), beat];
   await l.db.query(`update entity set props = props || jsonb_build_object('story', $2::jsonb, 'last_seen', $3::text) where id = $1`, [run.id, JSON.stringify(next), now()]);
   await heard(l, run, `Session "${run.title}" told of its work`);
@@ -307,13 +318,16 @@ export async function story(l: Archipelago, input: Record<string, unknown>) {
   const run = key ? await resolveRun(l, key) : undefined;
   if (!run) throw new Error(`No session "${key}": give run, a run id or a session id.`);
   const beats = Array.isArray(run.props.story) ? (run.props.story as Beat[]) : [];
-  return { run: { id: run.id, title: run.title, status: run.status, open: run.is_open }, beats };
+  // What the page opens on: the latest finding that stands, else the latest beat that does.
+  const standing = beats.filter((b) => !b.replaced_by);
+  const found = standing.findLast((b) => b.finding) ?? standing.at(-1);
+  return { run: { id: run.id, title: run.title, status: run.status, open: run.is_open }, finding: found?.n ?? null, beats };
 }
 
 // Asked like any standing question; kept here, beside what writes it.
 VIEWS.story = {
   description:
-    'The story a session told of its work (the tell tool): its beats in order (n, said, about, links; one taken back says replaced_by). The picture of it is the lens view with story: the run. Params: run (required): a run id or session id.',
+    'The story a session told of its work (the tell tool): its beats in order (n, said, about, links; one taken back says replaced_by; a finding says finding), and which beat its page opens on (finding: the latest finding that stands, else the latest beat). The picture of it is the lens view with story: the run. Params: run (required): a run id or session id.',
   run: story,
 };
 
