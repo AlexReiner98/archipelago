@@ -1291,7 +1291,7 @@ test('a lens answers with one shape of data: what is inside what, the same count
     { op: 'link', type: 'about', from: 'go', to: made.p },
   ]);
   const hubP = await run({ from: made.p });
-  assert.deepEqual(hubP.views.map((v: any) => [v.title, v.to?.title]), [['Roadmap', undefined], ['Go to Q', 'Q'], ['P in full', undefined], ['As it opens', undefined]], 'its own by place, then those with none, then the workspace\u2019s: every lens that applies can be chosen');
+  assert.deepEqual(hubP.views.map((v: any) => [v.title, v.to?.title]), [['Roadmap', undefined], ['Go to Q', 'Q'], ['P in full', undefined], ['Around it', undefined], ['As it opens', undefined]], 'its own by place, then those with none, then what it is tied to, then the workspace\u2019s: every lens that applies can be chosen');
   assert.equal((await run({ from: made.p, lens: drawn.wl })).lens.far, 1, 'the workspace\u2019s view, chosen for this item');
   assert.deepEqual([hubP.view, hubP.lens.kinds, hubP.controls, titles(hubP)], [more.road, ['software.feature'], ['lit', 'far'], ['Early', 'Late', 'P']], 'it opens on the first');
   assert.equal((await run({ from: made.p, lens: drawn.pl })).lens.far, 2, 'another view is asked for by its id');
@@ -1299,6 +1299,17 @@ test('a lens answers with one shape of data: what is inside what, the same count
   assert.deepEqual([gone.lens.from, titles(gone), gone.view], [made.q, ['Q'], more.go], 'a shortcut is a view that starts somewhere else, tightly scoped');
   assert.match(hubP.said, /^"P" and what is part of it; 1 step down; only software\.feature; .*without what is finished/);
   assert.deepEqual([(await run()).views, (await run()).view], [[{ id: drawn.wl, title: 'As it opens' }], drawn.wl], 'the whole map has the workspace\u2019s views');
+  // An item with no picture of its own opens on what it is tied to: not on a view of the workspace's, and never on a shortcut.
+  const plainQ = await run({ from: made.q });
+  assert.deepEqual([plainQ.view, plainQ.lens.over, plainQ.lens.lanes, plainQ.views.map((v: any) => v.title)], ['around', 'all', 'link', ['Around it', 'As it opens']]);
+  assert.equal((await run({ from: made.q, lens: 'around' })).view, 'around', 'asked for by name');
+  assert.equal((await run({ from: made.q, lens: drawn.wl })).view, drawn.wl, 'the workspace\u2019s view can still be chosen');
+  const onlyShortcut = await make(l, [
+    { op: 'create', ref: 's', type: 'lens', title: 'To P', props: { from: made.p, far: 0 } },
+    { op: 'link', type: 'about', from: 's', to: made.q },
+  ]);
+  assert.equal((await run({ from: made.q })).view, 'around', 'a shortcut is never what an item opens on');
+  await make(l, [{ op: 'archive', id: onlyShortcut.s }]);
 
   // A hub is an item that holds enough to need views of its own: how much is enough is its project's to say.
   assert.deepEqual([hubP.hub, ((await VIEWS.hubs.run(l, {})) as any).hubs], [{ is: false }, []], 'six things are not twelve');

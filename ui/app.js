@@ -1070,6 +1070,11 @@ async function entity(id) {
       h('summary', {}, h('h2', {}, title), n ? h('span', { class: 'n' }, n) : ''),
       content,
     );
+  // The ties that hold work up: what depends on it, waits on it or needs it; and what it depends on, waits on or needs.
+  const HOLDING = ['depends_on', 'waits_on', 'needs'];
+  const holding = data.incoming.filter((r) => HOLDING.includes(r.type));
+  const heldBy = data.outgoing.filter((r) => HOLDING.includes(r.type));
+  const tieRows = (rows) => h('ul', { class: 'rows' }, rows.map((r) => h('li', { class: 'row-top tie-row' }, chip(r.entity_type), h('span', { class: 'grow', title: r.title }, link(r)), r.type !== 'depends_on' && h('span', { class: 'muted small' }, relations.get(r.type)?.title ?? r.type), pill(r.entity_type, r.status))));
   const session = isA(e.type, 'sys.run') && e.is_open && !e.archived_at;
   const automation = isA(e.type, 'sys.automation');
   const endSession = async () => {
@@ -1172,6 +1177,9 @@ async function entity(id) {
     editor,
     // Where it sits and what it holds, as a picture: the lens and the style kept for it, or the ones every item opens on. It takes no room when there is nothing to draw.
     h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true })),
+    // What it holds up and what holds it, said outright: a picture places them, these say which way the tie runs.
+    holding.length + heldBy.length > 0 &&
+      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, holding.length > 0 && fold('holding', 'Waiting on this', holding.length, true, tieRows(holding)), heldBy.length > 0 && fold('held', 'This waits on', heldBy.length, true, tieRows(heldBy))),
     // What a project is comes before its chart: said under the chart, it reads as a caption to it.
     project ? h('div', { class: 'grid', style: 'margin-bottom: 14px' }, note) : '',
     project ? h('div', { id: 'roadmap', 'data-root': id }) : '',

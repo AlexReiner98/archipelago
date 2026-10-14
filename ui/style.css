@@ -140,6 +140,9 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .rows > li.finished a { color: var(--muted); }
 .rows > li.row-top > select { flex: none; width: 170px; }
 .rows > li.row-top > .grow { flex-basis: 220px; }
+.rows > li.tie-row { flex-wrap: nowrap; align-items: center; }
+.rows > li.tie-row > .grow { min-width: 0; flex-basis: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rows > li.tie-row > :not(.grow) { flex: none; }
 .progress { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
 .progress .bar { width: 90px; height: 6px; border-radius: 3px; background: var(--closed-soft); overflow: hidden; }
 .progress .bar > span { display: block; height: 100%; background: var(--ok); }

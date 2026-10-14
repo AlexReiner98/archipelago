@@ -102,6 +102,9 @@ export function readLens(l: Archipelago, input: Record<string, unknown>, under: 
   return lens;
 }
 
+/** The view every item has: what it is tied to, by kind of link. Asked for by this name in place of a lens's id. */
+export const AROUND = 'around';
+
 interface Kept {
   id: string;
   title: string;
@@ -191,12 +194,16 @@ export async function pictureOf(l: Archipelago, id: string): Promise<string | un
 export async function lens(l: Archipelago, input: Record<string, unknown>) {
   // The item the picture is asked for. Each lens kept about it is a view of it, with a name; the first in order is the one it opens on.
   const hub = input.from === undefined ? undefined : String(input.from);
-  const [lenses, styles] = [await keptOf(l, 'lens', input.lens), await keptOf(l, 'style', input.style)];
+  // Around one item there is always the picture of what it is tied to, by kind of link: what it waits on and what waits on it.
+  const around = hub !== undefined && input.lens === AROUND;
+  const [lenses, styles] = [await keptOf(l, 'lens', around ? undefined : input.lens), await keptOf(l, 'style', input.style)];
   const placed = (one: Kept) => (typeof one.props.place === 'number' ? one.props.place : Infinity);
-  // Every lens that applies can be chosen: those about the item, then the workspace's own (about nothing), each in its order.
+  // Every lens that applies can be chosen: those about the item, then what it is tied to, then the workspace's own (about nothing), each in its order.
   const own = hub === undefined ? [] : lenses.filter((one) => one.about.includes(hub)).sort((a, b) => placed(a) - placed(b));
-  const views = [...own, ...lenses.filter((one) => !one.about.length).sort((a, b) => placed(a) - placed(b))];
-  const view = typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : views[0];
+  const shared = lenses.filter((one) => !one.about.length).sort((a, b) => placed(a) - placed(b));
+  const views = [...own, ...(hub === undefined ? [] : [{ id: AROUND, title: 'Around it', props: {}, about: [] }]), ...shared];
+  // An item opens on its first picture of its own (not a shortcut, which leads away), else on what it is tied to; the whole map on the workspace's first.
+  const view = around ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
   // A view may start somewhere else than the item it is kept about: tightly scoped, that is a shortcut.
   const start = typeof view?.props.from === 'string' ? view.props.from : hub;
   // Around one item the picture is its neighbourhood: every kind of link, each neighbour filed under the link that ties it.
@@ -394,7 +401,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     said: sayLens(l, asked, asked.from ? all.get(asked.from)?.title : undefined),
     // The lenses that can be chosen for this picture, in order, and which this is. One that starts somewhere else is a shortcut to there.
     views: views.map((one) => ({ id: one.id, title: one.title, ...(typeof one.props.from === 'string' && one.props.from !== hub && { to: { id: one.props.from, title: all.get(one.props.from)?.title ?? one.props.from } }) })),
-    view: view?.id ?? null,
+    view: view?.id ?? (hub !== undefined ? AROUND : null),
     ...(hub !== undefined && {
       views_of_it: own.length,
       hub: await (async () => {
