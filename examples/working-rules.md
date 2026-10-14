@@ -38,6 +38,15 @@ true as you go; do not keep a second record in files or in the chat.
   taken with `claim` and given back with `release`.
 - **Name what a change makes by its ref.** `{ref}` in a title or note becomes
   the id of the item the same change makes.
+- **Give a hub its views.** An item that holds a lot is the hub of its
+  problem, and the owner reads it through its views: each a `lens` item
+  linked `about` it, named for the question it answers (`place` for its
+  order; `kinds`, `far`, `over` for what is in it; `controls` for what the
+  owner may change on the page). A lens whose `from` is another item is a
+  shortcut to there. Give a project its views when you make it, if the owner
+  says what they want to see; the session start and `view` `hubs` name the
+  hubs that have none. While a project is still being shaped, set its
+  `hub_at` to 1: nearly everything in it is then a hub.
 - **Correct a refused change, do not resend it.** The refusal gives a name:
   send `change` with `retry` and `fixes` for the ops that were wrong.
 - **If a pelago tool answers with a web page or "502",** the server is

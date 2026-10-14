@@ -360,6 +360,14 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
     };
     if (work.ready.length) lines.push('', 'Open work and issues here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${kind(t)}${t.title} (${t.id})${age(t)}`));
     if (work.blocked.length) lines.push('', 'Blocked work here:', ...work.blocked.slice(0, 15).map((t) => `- ${t.title} (${t.id}), waiting on: ${t.waiting_on.join('; ')}`));
+    // Work that is owed though nobody wrote it down: what has grown into the hub of its problem and has no view of its own.
+    const owed = 'to_shape' in stand ? stand.to_shape!.hubs : [];
+    if (owed.length)
+      lines.push(
+        '',
+        'Hubs here with no view of their own (each holds enough to be the hub of its problem; when you work in one, give it its views: lens items about it, named for the questions they answer. View "hubs" says how much each holds):',
+        ...owed.slice(0, 8).map((h) => `- ${h.title} (${h.id}), holding ${h.inside}`),
+      );
   } else {
     lines.push(`Archipelago does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
   }
