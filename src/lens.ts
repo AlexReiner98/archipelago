@@ -193,13 +193,16 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const hub = input.from === undefined ? undefined : String(input.from);
   const [lenses, styles] = [await keptOf(l, 'lens', input.lens), await keptOf(l, 'style', input.style)];
   const placed = (one: Kept) => (typeof one.props.place === 'number' ? one.props.place : Infinity);
-  const views = hub === undefined ? [] : lenses.filter((one) => one.about.includes(hub)).sort((a, b) => placed(a) - placed(b));
+  // Every lens that applies can be chosen: those about the item, then the workspace's own (about nothing), each in its order.
+  const own = hub === undefined ? [] : lenses.filter((one) => one.about.includes(hub)).sort((a, b) => placed(a) - placed(b));
+  const views = [...own, ...lenses.filter((one) => !one.about.length).sort((a, b) => placed(a) - placed(b))];
   const view = typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : views[0];
   // A view may start somewhere else than the item it is kept about: tightly scoped, that is a shortcut.
   const start = typeof view?.props.from === 'string' ? view.props.from : hub;
   // Around one item the picture is its neighbourhood: every kind of link, each neighbour filed under the link that ties it.
   let under: Lens = start === undefined ? LENS_DEFAULT : { ...LENS_DEFAULT, over: 'all', lanes: 'link' };
-  const read = [...lenses.filter((one) => !one.about.length && one !== view), ...(view ? [view] : [])];
+  // One view at a time, over what is built in: a field it does not name is the built-in one.
+  const read = view ? [view] : [];
   for (const one of read) {
     try {
       under = readLens(l, Object.fromEntries(Object.entries(one.props).filter(([key, value]) => key in LENS_KEPT && value != null)), under);
@@ -229,21 +232,29 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const rest = { closed: 0, system: 0, kinds: 0, unlinked: 0, far: 0, limit: 0 };
 
   const eligible = new Map<string, Row>();
+  // What stands on the map for this picture before kinds are chosen: the ladder a thing is found on when what holds it is not of the kinds kept.
+  const standing = new Set<string>();
   for (const e of entities) {
-    if (e.id === asked.from) eligible.set(e.id, e);
+    if (e.id === asked.from) (eligible.set(e.id, e), standing.add(e.id));
     else if (asked.fold.includes('system') && system(e.type)) rest.system++;
     else if (asked.fold.includes('closed') && !e.is_open) rest.closed++;
-    else if ((wanted.length && !wanted.some((k) => is(e.type, k))) || unwanted.some((k) => is(e.type, k))) rest.kinds++;
-    else eligible.set(e.id, e);
+    else if ((wanted.length && !wanted.some((k) => is(e.type, k))) || unwanted.some((k) => is(e.type, k))) (rest.kinds++, standing.add(e.id));
+    else (eligible.set(e.id, e), standing.add(e.id));
   }
   const live = relations.filter((r) => eligible.has(r.from_id) && eligible.has(r.to_id));
 
   // What a thing is inside: where its organising link leads. Led to two things (a task of a feature, linked
   // to the project as well), it is inside the nearer: the one that is itself inside something.
   const leads = new Map<string, string[]>();
-  for (const r of live) if (r.type === asked.by && r.from_id !== r.to_id) leads.set(r.from_id, [...(leads.get(r.from_id) ?? []), r.to_id]);
+  for (const r of relations) if (r.type === asked.by && r.from_id !== r.to_id && standing.has(r.from_id) && standing.has(r.to_id)) leads.set(r.from_id, [...(leads.get(r.from_id) ?? []), r.to_id]);
   const parent = new Map<string, string>();
-  for (const [id, to] of leads) parent.set(id, to.find((p) => leads.has(p)) ?? to[0]);
+  const holder = (id: string) => leads.get(id)?.find((p) => leads.has(p)) ?? leads.get(id)?.[0];
+  for (const id of eligible.keys()) {
+    // Up past what is not of the kinds kept, to the nearest thing that is.
+    let up = holder(id);
+    for (let steps = 0; up !== undefined && !eligible.has(up) && steps < 64; steps++) up = holder(up);
+    if (up !== undefined && up !== id && eligible.has(up)) parent.set(id, up);
+  }
   // A loop of belonging is cut where it closes, so everything has a depth.
   const depths = new Map<string, number>();
   const depth = (id: string, trail = new Set<string>()): number => {
@@ -381,10 +392,11 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     kept: { lens: read.map(({ id, title }) => ({ id, title })), style: drawn.map(({ id, title }) => ({ id, title })) },
     // The lens in words: the rule a person reads on the page and an agent reads here.
     said: sayLens(l, asked, asked.from ? all.get(asked.from)?.title : undefined),
-    // The views kept about the item asked for, in order, and which this is. One that starts somewhere else is a shortcut to there.
+    // The lenses that can be chosen for this picture, in order, and which this is. One that starts somewhere else is a shortcut to there.
+    views: views.map((one) => ({ id: one.id, title: one.title, ...(typeof one.props.from === 'string' && one.props.from !== hub && { to: { id: one.props.from, title: all.get(one.props.from)?.title ?? one.props.from } }) })),
+    view: view?.id ?? null,
     ...(hub !== undefined && {
-      views: views.map((one) => ({ id: one.id, title: one.title, ...(typeof one.props.from === 'string' && one.props.from !== hub && { to: { id: one.props.from, title: all.get(one.props.from)?.title ?? one.props.from } }) })),
-      view: view?.id ?? null,
+      views_of_it: own.length,
       hub: await (async () => {
         const known = (await hubs(l)).find((h) => h.id === hub);
         return known ? { is: true, inside: known.inside, at: known.at } : { is: false };

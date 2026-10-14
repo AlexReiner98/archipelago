@@ -208,7 +208,7 @@
     {
       "id": "lens",
       "title": "Lens",
-      "description": "What is in a picture of the map. About a project or item, it is a view of that thing, named by its title: an item's page shows its views as a switch and opens on the first (place). About nothing, it is the workspace's, under every view. A field left empty comes from the level above. Read by the lens view.",
+      "description": "What is in a picture of the map. About a project or item, it is a view of that thing, named by its title: an item's page shows its views as a switch and opens on the first (place). About nothing, it is the workspace's: a view that can be chosen for any picture, and the one the whole map opens on. A field left empty is the built-in one. Read by the lens view.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "place": { "type": "number", "description": "Its order among the views of the item it is about: the lowest is the one the page opens on." },

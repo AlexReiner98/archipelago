@@ -1256,6 +1256,8 @@ test('a lens answers with one shape of data: what is inside what, the same count
   assert.deepEqual(['Early', 'Late', 'E'].map((t) => item(staged, t).lane), ['under_way', 'to_come', 'done']);
   const tasks = await run({ kinds: ['task'], fold: ['closed', 'system'] });
   assert.deepEqual([titles(tasks), tasks.rest.kinds], [['A', 'B', 'C', 'D', 'X'], 7], 'the two projects, two features, Sam and the two notes are not tasks');
+  const tasksOfP = await run({ from: made.p, kinds: ['task'], over: [] });
+  assert.deepEqual([titles(tasksOfP), item(tasksOfP, 'A').inside, item(tasksOfP, 'P').within.items], [['A', 'B', 'C', 'P'], made.p, 3], 'of some kinds only, a thing sits in the nearest thing kept above it: the feature between is not drawn, and its tasks are not lost');
 
   await assert.rejects(run({ by: 'nope' }), /unknown kind of link/);
   await assert.rejects(run({ fold: ['everything'] }), /fold must be of/);
@@ -1289,13 +1291,14 @@ test('a lens answers with one shape of data: what is inside what, the same count
     { op: 'link', type: 'about', from: 'go', to: made.p },
   ]);
   const hubP = await run({ from: made.p });
-  assert.deepEqual(hubP.views.map((v: any) => [v.title, v.to?.title]), [['Roadmap', undefined], ['Go to Q', 'Q'], ['P in full', undefined]], 'by place, then those with none');
+  assert.deepEqual(hubP.views.map((v: any) => [v.title, v.to?.title]), [['Roadmap', undefined], ['Go to Q', 'Q'], ['P in full', undefined], ['As it opens', undefined]], 'its own by place, then those with none, then the workspace\u2019s: every lens that applies can be chosen');
+  assert.equal((await run({ from: made.p, lens: drawn.wl })).lens.far, 1, 'the workspace\u2019s view, chosen for this item');
   assert.deepEqual([hubP.view, hubP.lens.kinds, hubP.controls, titles(hubP)], [more.road, ['software.feature'], ['lit', 'far'], ['Early', 'Late', 'P']], 'it opens on the first');
   assert.equal((await run({ from: made.p, lens: drawn.pl })).lens.far, 2, 'another view is asked for by its id');
   const gone = await run({ from: made.p, lens: more.go });
   assert.deepEqual([gone.lens.from, titles(gone), gone.view], [made.q, ['Q'], more.go], 'a shortcut is a view that starts somewhere else, tightly scoped');
   assert.match(hubP.said, /^"P" and what is part of it; 1 step down; only software\.feature; .*without what is finished/);
-  assert.equal((await run()).views, undefined, 'the whole map has no item to have views of');
+  assert.deepEqual([(await run()).views, (await run()).view], [[{ id: drawn.wl, title: 'As it opens' }], drawn.wl], 'the whole map has the workspace\u2019s views');
 
   // A hub is an item that holds enough to need views of its own: how much is enough is its project's to say.
   assert.deepEqual([hubP.hub, ((await VIEWS.hubs.run(l, {})) as any).hubs], [{ is: false }, []], 'six things are not twelve');
