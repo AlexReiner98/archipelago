@@ -524,6 +524,81 @@ async function projects(main) {
   openDrawer();
 }
 
+// ---- Home ----------------------------------------------------------------
+
+// What the app opens on: each project, its open questions, answered where they
+// stand, and where it is against its next release. Two things and no more;
+// everything else is a click away on the item's own page.
+async function home() {
+  const main = part('home');
+  if (!main.childElementCount) main.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
+  const data = await api('view', { name: 'home' });
+  const change = async (ops, reason) => {
+    try {
+      await api('change', { ops, reason });
+      home();
+    } catch (err) {
+      tell('That change was not made', err.message);
+    }
+  };
+  const confirm = async (offer, yes) => {
+    try {
+      await api('decide', { proposal: offer.proposal, approve: yes });
+    } catch (err) {
+      await tell('That was not done', err.message);
+    }
+    home();
+    refreshReviewCount();
+  };
+  // A question opens to be answered where it stands: its name does what Answer does, and its page is one link inside.
+  const answerable = (q) => {
+    const li = questionItem(q, change, null, true);
+    const name = li.querySelector('.row-top a');
+    const toggle = li.querySelector('.row-top button');
+    name?.addEventListener('click', (ev) => (ev.preventDefault(), toggle?.click()));
+    li.querySelector('.question-more')?.append(h('div', { class: 'toolbar' }, h('a', { href: `#/e/${q.id}` }, 'Open its page')));
+    return li;
+  };
+  const questionsOf = (p) => {
+    const offered = new Set(p.offered.map((o) => o.id));
+    const rows = [
+      // An agent's answer waits for a yes: the question and what it proposes, on one line.
+      ...p.offered.map((o) => h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'grow', title: o.reason }, link(o), ' ', h('span', { class: 'arrow' }, '→'), ' ', h('strong', {}, o.answer)), h('button', { class: 'primary', onclick: () => confirm(o, true) }, 'Confirm'), h('button', { onclick: () => confirm(o, false) }, 'No')))),
+      ...p.questions.filter((q) => !offered.has(q.id)).map((q) => answerable(q)),
+    ];
+    return h('div', { class: 'home-half' }, h('h3', {}, 'Questions', rows.length > 0 && h('span', { class: 'n' }, rows.length)), rows.length ? h('ul', { class: 'rows' }, rows) : h('div', { class: 'muted small' }, 'None open.'));
+  };
+  const releaseOf = (p) => {
+    const r = p.release;
+    if (!r) return h('div', { class: 'home-half' }, h('h3', {}, 'Next release'), h('div', { class: 'muted small' }, 'None set.'));
+    return h(
+      'div',
+      { class: 'home-half' },
+      h('h3', { class: 'row-top' }, h('span', { class: 'grow', title: r.title }, link(r)), r.at && h('span', { class: 'pill' }, r.at)),
+      h(
+        'div',
+        { class: 'toolbar home-marks' },
+        progressBar({ done: r.done, total: r.total }),
+        r.yours > 0 && h('span', { class: 'pill warn', title: 'Waiting on you to answer, act or decide' }, `${r.yours} yours`),
+        r.blocked > 0 && h('span', { class: 'pill bad', title: 'Waiting on something else first' }, `${r.blocked} blocked`),
+        r.done === r.total && r.to_sort === 0 && h('span', { class: 'pill ok' }, 'ready'),
+      ),
+      r.still.length > 0 &&
+        h(
+          'ul',
+          { class: 'rows' },
+          r.still.map((i) => h('li', { class: 'row-top tie-row' }, chip(i.type), h('span', { class: 'grow', title: i.waiting_on.length ? `Waits on: ${i.waiting_on.join('; ')}` : i.title }, link(i)), i.yours ? h('span', { class: 'pill warn' }, 'yours') : i.blocked && h('span', { class: 'pill bad' }, 'blocked'))),
+          r.total - r.done > r.still.length && h('li', { class: 'more' }, h('a', { href: `#/e/${r.id}` }, `${r.total - r.done - r.still.length} more`)),
+        ),
+    );
+  };
+  main.replaceChildren(
+    ...(data.projects.length
+      ? data.projects.map((p) => h('section', { class: 'card home-project' }, h('header', { class: 'bar' }, h('h2', {}, link(p))), h('div', { class: 'home-cols' }, questionsOf(p), releaseOf(p))))
+      : [h('div', { class: 'empty' }, 'No projects yet.')]),
+  );
+}
+
 // ---- Review --------------------------------------------------------------
 
 // What has changed, as one list, newest first: what is held for the owner
@@ -3928,7 +4003,7 @@ document.addEventListener('visibilitychange', checkPulse);
 // page of the thing it is about or in the search, and its old address leads
 // there. Search is one thing at a time under its search box: the search, an
 // item, or a graph.
-const PAGES = { review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace'] };
+const PAGES = { home: ['home'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace'] };
 const UNDER = { e: 'map', new: 'map', graph: 'map' };
 /** The part an address names, where that is not the address's own name. */
 const PART = { e: 'item', new: 'item' };
@@ -3936,11 +4011,11 @@ const PART = { e: 'item', new: 'item' };
 async function route(pulse = false) {
   // What follows a ? says how the page is to be drawn (a lens and a style), not which page it is.
   const [where, query = ''] = location.hash.split('?');
-  const [, name = 'map', arg] = where.split('/');
+  const [, name = 'home', arg] = where.split('/');
   // Addresses that have been folded into another screen still lead somewhere.
   if (name === 'activity') return activity();
-  // The projects are the top of Search, where the app opens.
-  if (name === 'projects' || name === 'today') return void (location.hash = '#/map');
+  // The app opens on Home: each project's questions and its next release.
+  if (name === 'projects' || name === 'today') return void (location.hash = '#/home');
   // Automations are found like any other kind of item.
   // The graph around an item is its relations, drawn further out, on its own page.
   if (name === 'graph' && arg) return void (location.hash = `#/graph?from=${arg}`);
@@ -3952,6 +4027,7 @@ async function route(pulse = false) {
   stale.hidden = true;
   for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === page);
   const draw = {
+    home,
     review,
     map: name === 'map' || page !== 'map' ? map : searchBar,
     // The graph around an item is drawn on that item's page, under it.

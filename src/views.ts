@@ -2,7 +2,7 @@
 // blockers are derived from relations every time, so they cannot go stale.
 
 import { lastPushes, repoByName, repoName } from './github.ts';
-import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
+import { ACTIVE_HOLDS, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { costs } from './costs.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
 import { changelog, proof } from './proof.ts';
@@ -1121,6 +1121,59 @@ async function gate(l: Archipelago, input: { event?: string }) {
   };
 }
 
+/** How many of what a release still waits for are named on Home: the owner's first, then what is blocked. */
+const HOME_STILL = 6;
+
+/**
+ * What the owner opens the app on: each active project, its open questions
+ * (most-blocking first, with what an agent has proposed as the answer), and
+ * where it stands against its next release or milestone (an open event that
+ * is part of it: the one dated soonest, else the one made first). Two things,
+ * said plainly; everything else is a click away on the item's own page.
+ */
+async function home(l: Archipelago) {
+  const listed = (await questions(l, {})) as { projects: { id: string; title: string; status: string; open: boolean; questions: number }[] };
+  const active = listed.projects.filter((p) => p.open);
+  const { rows: pending } = await l.db.query<{ id: string; ops: Op[]; reason: string; actor: string }>(`select id, ops, reason, actor from proposal where status = 'pending' order by ts`);
+  const { rows: events } = await l.db.query<{ id: string; project: string; at: string | null; created_at: Date }>(
+    `select e.id, r.to_id as project, e.props->>'at' as at, e.created_at from entity e join relation r on r.from_id = e.id and r.type = 'part_of' and r.valid_to is null
+     where e.type = any($1::text[]) and e.is_open and e.archived_at is null`,
+    [l.registry.family('event')],
+  );
+  type Still = { id: string; title: string; type: string; status: string; yours: boolean; blocked: boolean; waiting_on: string[] };
+  type Release = Record<string, unknown> & { done: number; total: number; yours: number; blocked: number; to_sort: number; still: Still[] };
+  const projects: { id: string; title: string; questions: unknown[]; offered: { proposal: string; id: string; title: unknown; answer: unknown; reason: string }[]; release: Release | null }[] = [];
+  for (const p of active) {
+    const asked = (await questions(l, { project: p.id })) as { open: (Record<string, unknown> & { id: string })[] };
+    // An answer an agent offered and the owner has still to confirm: one change that closes a question here.
+    const offered = pending.flatMap((pr) => {
+      const op = pr.ops.length === 1 && pr.ops[0].op === 'update' ? pr.ops[0] : undefined;
+      const q = op && 'status' in op && op.status ? asked.open.find((x) => x.id === op.id) : undefined;
+      return q && op && op.op === 'update' ? [{ proposal: pr.id, id: q.id, title: q.title, answer: (op.props?.outcome as string | undefined) ?? op.status, reason: pr.reason }] : [];
+    });
+    const next = events.filter((e) => e.project === p.id).sort((a, b) => (a.at ?? '9').localeCompare(b.at ?? '9') || +a.created_at - +b.created_at)[0];
+    let release: Release | null = null;
+    if (next) {
+      const g = (await gate(l, { event: next.id })) as Awaited<ReturnType<typeof gate>> & { streams: { items: { id: string; title: string; type: string; status: string; done: boolean; blocked: boolean; yours: boolean; waiting_on: { title: string }[] }[] }[] };
+      const items = g.streams.flatMap((s) => s.items);
+      const still = items.filter((i) => !i.done).sort((a, b) => Number(b.yours) - Number(a.yours) || Number(b.blocked) - Number(a.blocked) || a.title.localeCompare(b.title));
+      release = {
+        ...g.event,
+        done: items.length - still.length,
+        total: items.length,
+        yours: still.filter((i) => i.yours).length,
+        blocked: still.filter((i) => i.blocked).length,
+        to_sort: g.counts.to_sort,
+        still: still.slice(0, HOME_STILL).map(({ id, title, type, status, yours, blocked, waiting_on }) => ({ id, title, type, status, yours, blocked, waiting_on: waiting_on.map((w) => w.title) })),
+      };
+    }
+    projects.push({ id: p.id, title: p.title, questions: asked.open, offered, release });
+  }
+  // What needs the owner most comes first: answers to confirm and questions, then what of a release is theirs.
+  const weight = (p: (typeof projects)[number]) => p.offered.length * 2 + p.questions.length + (p.release?.yours ?? 0);
+  return { projects: projects.sort((a, b) => weight(b) - weight(a) || a.title.localeCompare(b.title)) };
+}
+
 async function notifications(l: Archipelago) {
   const { rows } = await l.db.query(
     `select n.id, n.title, n.body, n.props->>'level' as level, n.props->>'from' as from, n.created_at,
@@ -1252,5 +1305,10 @@ export const VIEWS: Record<string, View> = {
   available_now: {
     description: 'What can run right now: open tasks with nothing blocking them, tasks waiting only on a resource, and who holds each resource. Params: owner.',
     run: availableNow,
+  },
+  home: {
+    description:
+      'What the owner opens the app on: each active project with its open questions (most-blocking first, each with its options; offered: answers an agent proposed that wait for the owner) and its next release or milestone (release: how many of the things it waits for are done of how many, how many are the owner’s, how many blocked, and the first few still open, the owner’s first). No params.',
+    run: home,
   },
 };

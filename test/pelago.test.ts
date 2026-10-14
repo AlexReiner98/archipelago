@@ -430,6 +430,34 @@ test('a session registers, takes the lane its task needs, and gives it back when
   await assert.rejects(sessionUpdate(l, agent, { run: one.run, note: 'late' }), /already ended/);
 });
 
+test('Home gives each project its open questions and where it stands against its next release', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Shadows', status: 'active' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Which licence?', status: 'open', props: { options: ['MIT', 'Apache'] } },
+    { op: 'link', type: 'part_of', from: 'q', to: 'p' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Write the installer', status: 'todo' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Sign the package', status: 'done' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'p' },
+    { op: 'link', type: 'depends_on', from: 'a', to: 'q' },
+    { op: 'create', ref: 'r', type: 'software.release', title: 'First release', status: 'upcoming' },
+    { op: 'link', type: 'part_of', from: 'r', to: 'p' },
+    { op: 'link', type: 'depends_on', from: 'r', to: 'a' },
+    { op: 'link', type: 'depends_on', from: 'r', to: 'b' },
+    { op: 'create', ref: 'quiet', type: 'project', title: 'Quiet one', status: 'active' },
+  ]);
+  const { projects } = (await VIEWS.home.run(l, {})) as any;
+  assert.deepEqual(projects.map((p: any) => p.title), ['Shadows', 'Quiet one'], 'what needs the owner most comes first');
+  const [shadows, quiet] = projects;
+  assert.deepEqual(shadows.questions.map((q: any) => [q.title, q.options]), [['Which licence?', ['MIT', 'Apache']]]);
+  assert.deepEqual([shadows.release.title, shadows.release.done, shadows.release.total, shadows.release.blocked], ['First release', 1, 2, 1]);
+  assert.deepEqual(shadows.release.still.map((i: any) => [i.title, i.blocked, i.waiting_on]), [['Write the installer', true, ['Which licence?']]]);
+  assert.equal(quiet.release, null);
+  assert.deepEqual(quiet.questions, []);
+  assert.ok(made.p);
+});
+
 test('a session tells the story of its work, beat by beat, and can take a beat back', async () => {
   const l = await fresh();
   const made = await make(l, [

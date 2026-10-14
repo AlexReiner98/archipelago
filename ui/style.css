@@ -726,3 +726,24 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 /* A tie a session drew, with its words on it: in every shape that draws links. */
 .ln-line.said { stroke: var(--accent); stroke-dasharray: none; stroke-width: 1.6; }
 .ln-lines text.said { fill: var(--accent); font-size: 11px; paint-order: stroke; stroke: var(--ln-sea); stroke-width: 4px; pointer-events: none; }
+
+/* Home: a card per project, its questions beside its next release. */
+.home-project { margin-bottom: 14px; }
+.home-project > header { padding: 12px 14px 0; }
+.home-project > header h2 { margin: 0; font-size: 16px; }
+.home-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.home-half { min-width: 0; padding: 8px 14px 14px; }
+.home-half + .home-half { border-left: 1px solid var(--line); }
+.home-half > h3 { margin: 4px 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.home-half > h3 a { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-half .rows > li { padding-left: 0; padding-right: 0; }
+.home-marks { gap: 8px; margin-bottom: 6px; }
+@media (max-width: 720px) {
+  .home-cols { grid-template-columns: minmax(0, 1fr); }
+  .home-half + .home-half { border-left: 0; border-top: 1px solid var(--line); }
+}
+.home-half .question > .row-top { flex-wrap: nowrap; align-items: center; }
+.home-half .question > .row-top > .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-half .question > .row-top > :not(.grow) { flex: none; }
+.home-half .rows > li.question { grid-template-columns: minmax(0, 1fr); padding: 9px 0; }
+.home-half .question > .row-top > .grow { flex-basis: 0; flex-grow: 1; }
