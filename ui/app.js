@@ -1046,6 +1046,8 @@ async function entity(id) {
   // A document is read as its reader meets it: its text with the items it brings in, in their places.
   const doc = isA(e.type, 'document') ? await api('document', { id }).catch(() => null) : null;
   const links = doc ? (await api('share_list', { id }).catch(() => [])).filter((s) => !s.revoked_at) : [];
+  // A note or file may keep a figure (a document shows it with the section); its own page shows it too.
+  const figure = ['note', 'file'].some((t) => isA(e.type, t)) ? await api('picture', { result: id }).catch(() => null) : null;
   const relRows = (rows, direction) =>
     rows.map((r) => {
       const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
@@ -1214,7 +1216,7 @@ async function entity(id) {
     p.section
       ? h(
           'details',
-          { class: 'doc-section', open: unfolded.get(`${id}:${p.section.id}`) ?? false, ontoggle: (ev) => unfolded.set(`${id}:${p.section.id}`, ev.target.open) },
+          { class: 'doc-section', open: unfolded.get(`${id}:${p.section.id}`) ?? Boolean(p.section.picture), ontoggle: (ev) => unfolded.set(`${id}:${p.section.id}`, ev.target.open) },
           h('summary', {}, chip(p.section.type), h('span', { class: 'grow', title: p.section.title }, h('a', { href: `#/e/${p.section.id}` }, p.section.title)), pill(p.section.type, p.section.status)),
           p.section.picture && figureOf(p.section),
           p.section.body ? renderBody(p.section.body) : h('div', { class: 'empty' }, 'No notes.'),
@@ -1247,6 +1249,7 @@ async function entity(id) {
     : h(
     'section',
     { class: 'card wide note' },
+    figure && h('img', { class: 'figure', src: `data:${figure.content_type};base64,${figure.data}`, alt: e.title }),
     long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
     e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
   );
