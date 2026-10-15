@@ -49,5 +49,5 @@ true for people too.
 
 ## Licence
 
-Archipelago is licensed under [Apache-2.0](LICENSE). What you contribute is
+Archipelago is licensed under the [MIT License](LICENSE). What you contribute is
 licensed under the same terms.

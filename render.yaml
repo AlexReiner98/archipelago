@@ -1,5 +1,5 @@
 # An example for hosting your own Archipelago on Render: one server running everything, with the embedded
-# database on a persistent disk. Any host that runs Node 24 and keeps a disk will do; see README, "Hosting".
+# database on a persistent disk. Any host that runs Node 24 and keeps a disk will do; see docs/reference.md, "Hosting".
 # Render knows a service and a disk by name: choose them before the first deploy, and keep them after.
 services:
   - type: web
@@ -34,7 +34,7 @@ services:
       - key: PELAGO_SECRETS_KEY
         sync: false
       # Optional: where a copy of every backup is sent, off the server. Any address that takes a file by POST
-      # with a bearer key; see README, "Backups".
+      # with a bearer key; see docs/reference.md, "Backups".
       - key: PELAGO_BACKUP_UPLOAD_URL
         sync: false
       - key: PELAGO_BACKUP_UPLOAD_KEY
