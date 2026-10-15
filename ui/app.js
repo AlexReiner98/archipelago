@@ -4404,6 +4404,7 @@ function workPicker(initial, onPick) {
 /** Hours since midnight as a time of day: 13.5 is 13:30. */
 const clockText = (n) => {
   const m = Math.round(n * 60);
+  if (m === 1440) return '24:00';
   return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 };
 
@@ -4659,7 +4660,7 @@ function weekCalendar(wk, today, act, full) {
       h(
         'div',
         { class: 'cal-grid', style: `grid-template-columns: 44px repeat(${days.length}, minmax(64px, 1fr))` },
-        h('div', { class: 'cal-axis' }, h('div', { class: 'cal-head' }), h('div', { class: 'cal-loose' }), h('div', { class: 'cal-body' }, hours.filter((n) => n > top && (span <= 16 || n % 2 === 0)).map((n) => h('span', { class: 'cal-hour', style: `top: ${((n - top) / span) * 100}%` }, clockText(n))))),
+        h('div', { class: 'cal-axis' }, h('div', { class: 'cal-head' }), h('div', { class: 'cal-loose' }), h('div', { class: 'cal-body' }, [...hours, bottom].filter((n) => n === top || n === bottom || span <= 16 || n % 2 === 0).map((n) => h('span', { class: `cal-hour${n === top ? ' cal-first' : n === bottom ? ' cal-last' : ''}`, style: `top: ${((n - top) / span) * 100}%` }, clockText(n))))),
         days.map((d) => {
           const loose = d.owner.filter((b) => b.from_hour == null);
           const lanes = d.agents.length;

@@ -881,3 +881,6 @@ dialog.cal-ask .tq-picks { position: static; margin-top: 4px; }
 dialog.cal-ask .cal-when { display: flex; align-items: center; gap: 8px; }
 /* Something this week lies outside what is shown: a dot on the toggle. */
 .cal-more::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+/* The first and last hours sit inside the day, at its top and bottom edges. */
+.cal-hour.cal-first { transform: none; }
+.cal-hour.cal-last { transform: translateY(-100%); }
