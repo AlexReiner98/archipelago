@@ -128,7 +128,10 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .tq-picks button { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 0; border-radius: 0; background: transparent; text-align: left; white-space: nowrap; overflow: hidden; }
 .tq-picks button:hover { background: var(--bg); }
 .tq-bill { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted); white-space: nowrap; }
-.tq-day, .tq-money { padding: 0; }
+/* A card clips what it holds; an entry's menu has to open past its edge. */
+.tq-day, .tq-money { padding: 0; overflow: visible; }
+.tq-entry details.menu { position: relative; }
+.tq-entry details.menu > .menu-items { z-index: 30; }
 .tq-dayhead { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
 .tq-h { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rows > li.tq-entry, .tq-money .rows > li { padding: 6px 14px; gap: 10px; white-space: nowrap; min-width: 0; flex-wrap: nowrap; align-items: center; }
