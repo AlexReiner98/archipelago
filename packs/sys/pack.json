@@ -100,6 +100,16 @@
           "description": "Tokens the session has used so far, as its machine counted them.",
           "system": true
         },
+        "active": {
+          "type": "json",
+          "description": "When the session was at work: stretches from a turn's start to its end, as [from, to] date-times, oldest first.",
+          "system": true
+        },
+        "busy": {
+          "type": "boolean",
+          "description": "Set while a turn is under way: begun and not yet ended.",
+          "system": true
+        },
         "story": {
           "type": "json",
           "description": "The story the session tells of its work, beat by beat (the tell tool).",

@@ -469,7 +469,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
         if (url.pathname !== '/hooks/session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
         if (url.pathname === '/hooks/prompt') {
-          await sessionHeard(pelago, body.session_id).catch((err) => console.error(`hook heard: ${(err as Error).message}`));
+          await sessionHeard(pelago, body.session_id, 'begin').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
           const key = body.session_id ?? '';
           const heard = heardUpTo.get(key);
           const changes = heard === undefined ? [] : await humanChanges(pelago, heard);
@@ -504,7 +504,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // The end of a turn: nothing to say back, but the session was heard from and its count (taken above) is
         // up to date, so one long turn does not go a whole session without its tokens.
         if (url.pathname === '/hooks/stop') {
-          await sessionHeard(pelago, body.session_id).catch((err) => console.error(`hook heard: ${(err as Error).message}`));
+          await sessionHeard(pelago, body.session_id, 'until').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
           return send(res, 200, {});
         }
       }

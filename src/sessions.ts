@@ -80,7 +80,7 @@ export async function sessionStart(
   if (input.task && !task) throw new Error(`No entity "${input.task}" to work on`);
   const repo = await repoFor(l, input.cwd, input.remote);
 
-  const props: Record<string, unknown> = { last_seen: now() };
+  const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   if (input.surface) props.surface = input.surface;
   if (input.cwd) props.cwd = input.cwd;
   if (input.session_id) props.session_id = input.session_id;
@@ -124,8 +124,33 @@ export async function sessionStart(
   };
 }
 
-async function touch(l: Archipelago, run: string): Promise<void> {
-  await l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text) where id = $1`, [run, now()]);
+/** Two signs of a session at work this close together are one stretch of work; further apart, it was idle between. */
+export const IDLE_MS = 10 * 60_000;
+/** Stretches kept on a run: past this, the oldest are let go. */
+const STRETCHES_KEPT = 400;
+
+/**
+ * Add a sign of work to a run's stretches of activity. `at`: a turn begins, or something was heard from it (a new
+ * stretch, unless the last ended a moment ago); `until`: a turn ended, so the stretch it began runs to now; `close`: the
+ * session ended, which extends the last stretch only if it was at work a moment ago (one ended for it after hours of
+ * quiet stopped when it went quiet).
+ */
+export function stretch(active: unknown, when: string, how: 'at' | 'until' | 'close'): [string, string][] {
+  const list = (Array.isArray(active) ? active : []).filter((s): s is [string, string] => Array.isArray(s) && typeof s[0] === 'string' && typeof s[1] === 'string').map(([a, b]): [string, string] => [a, b]);
+  const last = list.at(-1);
+  const near = last && Date.parse(when) - Date.parse(last[1]) <= IDLE_MS;
+  if (last && (how === 'until' || near)) last[1] = when > last[1] ? when : last[1];
+  else if (how !== 'close') list.push([when, when]);
+  return list.slice(-STRETCHES_KEPT);
+}
+
+/** The session was heard from: when, and as a sign of work. A turn that begins marks it busy until it ends. */
+async function touch(l: Archipelago, run: string, how: 'at' | 'until' | 'close' | 'begin' = 'at'): Promise<void> {
+  const at = now();
+  const { rows } = await l.db.query<{ active: unknown }>(`select props -> 'active' as active from entity where id = $1`, [run]);
+  const active = stretch(rows[0]?.active, at, how === 'begin' ? 'at' : how);
+  const busy = how === 'begin' ? `, 'busy', true` : how === 'until' || how === 'close' ? `, 'busy', false` : '';
+  await l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text, 'active', $3::jsonb${busy}) where id = $1`, [run, at, JSON.stringify(active)]);
 }
 
 /**
@@ -144,11 +169,11 @@ async function heard(l: Archipelago, run: Entity, why: string): Promise<void> {
   if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });
 }
 
-/** A surface's session was heard from (a prompt, say): it is not quiet, whether or not it reports in itself. */
-export async function sessionHeard(l: Archipelago, sessionId: string | undefined): Promise<void> {
+/** A surface's session was heard from (a prompt begins a turn, a stop ends one): it is not quiet, whether or not it reports in itself. */
+export async function sessionHeard(l: Archipelago, sessionId: string | undefined, turn?: 'begin' | 'until'): Promise<void> {
   const run = sessionId ? await resolveRun(l, sessionId, true) : undefined;
   if (!run) return;
-  await touch(l, run.id);
+  await touch(l, run.id, turn ?? 'at');
   await heard(l, run, `Session "${run.title}" was heard from again`);
 }
 
@@ -232,6 +257,7 @@ export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: 
   ];
   if (input.task) ops.push({ op: 'link', type: 'sys.works_on', from: run.id, to: input.task });
   await l.apply(actorId(actor), { ops, reason: input.note ?? `Session ${input.status ?? 'update'}` });
+  await touch(l, run.id);
   // Work that is picked up with no estimate is the moment to give it one.
   const task = input.task ? await l.entity(input.task) : undefined;
   const unestimated = task && l.registry.type(task.type)?.fields.tokens_estimated && task.props.tokens_estimated == null;
@@ -308,6 +334,7 @@ export async function tell(
   const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }) };
   const next = [...story.map((b) => (b.n === input.replaces ? { ...b, replaced_by: beat.n } : b)), beat];
   await l.db.query(`update entity set props = props || jsonb_build_object('story', $2::jsonb, 'last_seen', $3::text) where id = $1`, [run.id, JSON.stringify(next), now()]);
+  await touch(l, run.id);
   await heard(l, run, `Session "${run.title}" told of its work`);
   return { run: run.id, beat: beat.n, standing: next.filter((b) => !b.replaced_by).length };
 }
@@ -406,6 +433,7 @@ export async function sessionEnd(
       authority: { of: 'agent', basis: `Named in still_true when session ${run.id} ended` },
     });
   }
+  await touch(l, run.id, 'close');
   const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'sys.works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
     ops: [

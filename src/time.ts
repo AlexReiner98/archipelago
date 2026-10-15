@@ -203,6 +203,37 @@ async function projectOf(l: Archipelago, id: string, cache: Map<string, string |
   return found;
 }
 
+/** Signs of work further apart than this, in a session recorded before its stretches were kept, are taken as idle between. */
+const GUESS_GAP_MS = 45 * 60_000;
+/** A lone sign of work, with nothing near it, is drawn as this much work. */
+const LONE_MS = 5 * 60_000;
+
+/**
+ * When a session was at work, as spans of instants: the stretches its turns recorded (one still under way runs to now),
+ * or, for a session from before they were kept, its signs of work (beginning, ending, what it told and what it did to
+ * its own record) gathered where they fall close together.
+ */
+function activity(run: { is_open: boolean; busy: boolean | null; active: unknown; story: unknown; last_seen: string | null }, began: number, ended: number, events: number[]): [number, number][] {
+  const kept = (Array.isArray(run.active) ? run.active : []).filter((s) => Array.isArray(s) && s.length === 2).map(([a, b]) => [Date.parse(a), Date.parse(b)] as [number, number]).filter(([a, b]) => b >= a);
+  if (kept.length) {
+    const last = kept.at(-1)!;
+    if (run.is_open && run.busy) last[1] = Math.max(last[1], Date.now());
+    // A turn with nothing heard between its start and end still took a moment.
+    return kept.map(([a, b]) => [a, Math.max(b, a + 60_000)] as [number, number]);
+  }
+  const beats = (Array.isArray(run.story) ? run.story : []).map((b) => Date.parse(b?.at)).filter(Number.isFinite);
+  const seen = Date.parse(run.last_seen ?? '');
+  const points = [began, ended, ...events, ...beats, ...(Number.isFinite(seen) ? [seen] : [])].filter((t) => t >= began && t <= ended).sort((a, b) => a - b);
+  const spans: [number, number][] = [];
+  for (const t of points) {
+    const last = spans.at(-1);
+    if (last && t - last[1] <= GUESS_GAP_MS) last[1] = t;
+    else spans.push([t, t]);
+  }
+  // A lone sign is a few minutes of work, inside the session: the moment it ended is the end of its last few minutes.
+  return spans.map(([a, b]) => (b - a >= LONE_MS ? [a, b] : a + LONE_MS <= ended ? [a, a + LONE_MS] : [Math.max(began, ended - LONE_MS), ended]));
+}
+
 /** Lay sessions in as few lanes as hold them without overlap, each keeping to one lane all day: one lane per agent at work at once. */
 function lanes(blocks: Block[]): Block[][] {
   const runs = new Map<string, Block[]>();
@@ -261,8 +292,9 @@ export async function week(l: Archipelago, input: { from?: string }) {
 
   // The agents' lanes: every session that ran in the week, from when it began to when it ended (or was last heard from,
   // if it is still open), cut by the work it said it was on. Time on nothing in particular counts to its repository.
-  const { rows: runs } = await l.db.query<{ id: string; title: string; is_open: boolean; status: string; created_at: Date; updated_at: Date; last_seen: string | null; repo: string | null }>(
+  const { rows: runs } = await l.db.query<{ id: string; title: string; is_open: boolean; status: string; created_at: Date; updated_at: Date; last_seen: string | null; active: unknown; busy: boolean | null; story: unknown; repo: string | null }>(
     `select e.id, e.title, e.is_open, e.status, e.created_at, e.updated_at, e.props ->> 'last_seen' as last_seen,
+            e.props -> 'active' as active, (e.props ->> 'busy')::boolean as busy, e.props -> 'story' as story,
             (select r.to_id from relation r where r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null limit 1) as repo
      from entity e where e.type = any($1::text[]) and e.archived_at is null and e.created_at < $3
        and greatest(e.updated_at, coalesce((e.props ->> 'last_seen')::timestamptz, e.created_at)) >= $2
@@ -273,6 +305,8 @@ export async function week(l: Archipelago, input: { from?: string }) {
     `select from_id as run, to_id as task, valid_from, valid_to from relation where type = 'sys.works_on' and from_id = any($1::text[]) order by valid_from`,
     [runs.map((r) => r.id)],
   );
+  // What else says when a session recorded before its stretches were kept was at work: what it did to its own record.
+  const { rows: signs } = await l.db.query<{ run: string; ts: Date }>(`select target_id as run, ts from event where target_id = any($1::text[])`, [runs.map((r) => r.id)]);
   const agents: Block[][] = days.map(() => []);
   // A run recorded only once it was over (a push read in GitHub Actions) has no length to draw: each day counts them.
   const reported: number[] = days.map(() => 0);
@@ -301,25 +335,29 @@ export async function week(l: Archipelago, input: { from?: string }) {
       cursor = Math.max(cursor, a, b);
     });
     if (ended > cursor || !pieces.length) pieces.push({ a: cursor, b: ended, task: null });
+    // Only the stretches it was at work count: a session left open overnight was not working overnight.
+    const at = activity(run, began, ended, signs.filter((s) => s.run === run.id).map((s) => new Date(s.ts).getTime()));
     for (const p of pieces) {
       const work = p.task ?? run.repo;
       const what = (p.task && (await named(p.task))) || run.title;
-      for (const { d, x, y } of cut(p.a, p.b))
-        agents[d].push({
-          id: run.id,
-          what,
-          start: new Date(x).toISOString(),
-          end: new Date(y).toISOString(),
-          from_hour: hourOf(x, d),
-          to_hour: hourOf(y, d),
-          hours: cents((y - x) / 3_600_000),
-          work: await named(work),
-          work_id: work,
-          project: work ? await projectOf(l, work, projects) : null,
-          status: run.status,
-          session: run.title,
-          open: run.is_open,
-        });
+      const worked = at.map(([a, b]) => [Math.max(a, p.a), Math.min(b, p.b)]).filter(([a, b]) => b > a);
+      for (const [wa, wb] of worked)
+        for (const { d, x, y } of cut(wa, wb))
+          agents[d].push({
+            id: run.id,
+            what,
+            start: new Date(x).toISOString(),
+            end: new Date(y).toISOString(),
+            from_hour: hourOf(x, d),
+            to_hour: hourOf(y, d),
+            hours: cents((y - x) / 3_600_000),
+            work: await named(work),
+            work_id: work,
+            project: work ? await projectOf(l, work, projects) : null,
+            status: run.status,
+            session: run.title,
+            open: run.is_open,
+          });
     }
   }
 

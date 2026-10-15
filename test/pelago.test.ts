@@ -2401,7 +2401,7 @@ test('a block of time has hours from its start and end, and a week holds the own
   const one = await sessionStart(l, agent, { task: made.t, session_id: 'w1' });
   const two = await sessionStart(l, agent, { cwd: 'c:/code/arch', session_id: 'w2' });
   const when = async (run: string, from: string, to: string) => {
-    await l.db.query(`update entity set created_at = $2::timestamptz, updated_at = $3::text::timestamptz, props = props || jsonb_build_object('last_seen', $3::text) where id = $1`, [run, from, to]);
+    await l.db.query(`update entity set created_at = $2::timestamptz, updated_at = $3::text::timestamptz, props = props || jsonb_build_object('last_seen', $3::text, 'active', jsonb_build_array(jsonb_build_array($2::text, $3::text))) where id = $1`, [run, from, to]);
     await l.db.query(`update relation set valid_from = $2 where from_id = $1 and type = 'sys.works_on'`, [run, from]);
   };
   await when(one.run, '2026-10-14T17:00:00Z', '2026-10-14T19:00:00Z');
@@ -2440,6 +2440,41 @@ test('a block of time has hours from its start and end, and a week holds the own
   assert.deepEqual([last.days[4].agents.length, last.days[4].reported], [0, 1]);
   assert.equal(last.days[5].owner.find((b) => b.what === 'Looked at houses')?.project, null);
   assert.ok(!last.projects.some((p) => p.title === 'Which house'));
+
+  // Only the stretches a session was at work count: one left open overnight is drawn where its turns were.
+  const night = await sessionStart(l, agent, { task: made.t, session_id: 'w4' });
+  await when(night.run, '2026-10-13T00:00:00Z', '2026-10-13T13:00:00Z');
+  await l.db.query(`update entity set props = props || '{"active": [["2026-10-13T00:00:00Z", "2026-10-13T01:00:00Z"], ["2026-10-13T12:30:00Z", "2026-10-13T13:00:00Z"]]}'::jsonb where id = $1`, [night.run]);
+  // One recorded before stretches were kept is drawn from its signs of work, gathered where they fall close together.
+  const old = await sessionStart(l, agent, { task: made.t, session_id: 'w5' });
+  await when(old.run, '2026-10-13T14:00:00Z', '2026-10-13T22:00:00Z');
+  await l.db.query(`update entity set props = (props - 'active') || '{"story": [{"n": 1, "at": "2026-10-13T14:30:00Z", "said": "x", "about": [], "links": []}]}'::jsonb where id = $1`, [old.run]);
+  const runs = (await callTool(l, human, 'week', { from: '2026-10-12' })) as typeof wk;
+  const spans = (run: string) => runs.days.flatMap((d) => d.agents.flat().filter((b) => b.id === run).map((b) => [d.date, b.from_hour, b.to_hour]));
+  assert.deepEqual(spans(night.run), [['2026-10-12', 20, 21], ['2026-10-13', 8.5, 9]]);
+  assert.deepEqual(spans(old.run), [['2026-10-13', 10, 10.5], ['2026-10-13', 17.92, 18]]);
+});
+
+test('a session’s turns are kept as stretches of work: a prompt begins one, a stop ends it, a long quiet starts the next', async () => {
+  const { stretch, IDLE_MS } = await import('../src/sessions.ts');
+  const t = (m: number) => new Date(Date.parse('2026-10-15T12:00:00Z') + m * 60_000).toISOString();
+  let s = stretch([], t(0), 'at');
+  s = stretch(s, t(40), 'until');
+  assert.deepEqual(s, [[t(0), t(40)]], 'a turn runs from its prompt to its stop, however long');
+  s = stretch(s, t(45), 'at');
+  assert.deepEqual(s, [[t(0), t(45)]], 'a prompt a moment after a turn ended carries the stretch on');
+  s = stretch(s, t(45 + IDLE_MS / 60_000 + 5), 'at');
+  assert.equal(s.length, 2, 'after a long quiet, a new stretch');
+  assert.deepEqual(stretch(s, t(600), 'close'), s, 'a session closed hours after it went quiet stopped when it went quiet');
+  const l = await fresh();
+  await sessionStart(l, agent, { session_id: 'turns' });
+  const { sessionHeard } = await import('../src/sessions.ts');
+  await sessionHeard(l, 'turns', 'begin');
+  const run = (await l.db.query<{ props: Record<string, unknown> }>(`select props from entity where props->>'session_id' = 'turns'`)).rows[0];
+  assert.deepEqual([(run.props.active as unknown[]).length, run.props.busy], [1, true]);
+  await sessionHeard(l, 'turns', 'until');
+  const after = (await l.db.query<{ props: Record<string, unknown> }>(`select props from entity where props->>'session_id' = 'turns'`)).rows[0];
+  assert.equal(after.props.busy, false);
 });
 
 test('an invoice says how to pay, takes payments in parts, and what is owed and overdue is in the timesheet', async () => {
