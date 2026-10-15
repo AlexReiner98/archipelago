@@ -1632,7 +1632,7 @@ test('a link to a document opens its page and its text with no login, until it i
   const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
   const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'note', title: 'Not in it' }] })).result.created.o;
   for (const id of [made.result.created.n, other]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: png, content_type: 'image/png' })).status, 200);
-  assert.match((await call('/api/picture_put', undefined, { result: d, data: png, content_type: 'image/png' })).error, /not a test result, a note or a file/);
+  assert.match((await call('/api/picture_put', undefined, { result: d, data: png, content_type: 'image/png' })).error, /not a test result, a note, a file or a lens/);
   const pictured = (await (await fetch(`${base}${link.path}/data`)).json()) as { parts: { section?: { picture: boolean } }[] };
   assert.equal(pictured.parts[1].section?.picture, true);
   const figure = await fetch(`${base}${link.path}/picture/${made.result.created.n}`);
