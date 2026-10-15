@@ -523,7 +523,7 @@ button.quiet-button { padding: 2px 9px; font-size: 12px; }
 .form .fields dt { padding-top: 6px; }
 .form input[type="text"], .form input[type="number"], .form input[type="date"], .form textarea { width: 100%; }
 .form select { min-width: 180px; }
-textarea, input[type="number"], input[type="date"] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+textarea, input[type="number"], input[type="date"], input[type="time"] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
 textarea { resize: vertical; }
 .form .actions { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
 .row-sub.error { color: var(--bad); }
@@ -878,3 +878,4 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .cal-ghost { background: color-mix(in srgb, var(--accent) 30%, transparent); outline: 1.5px dashed var(--accent); outline-offset: -1.5px; pointer-events: none; }
 dialog.cal-ask .tq-picker { flex: none; }
 dialog.cal-ask .tq-picks { position: static; margin-top: 4px; }
+dialog.cal-ask .cal-when { display: flex; align-items: center; gap: 8px; }

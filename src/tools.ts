@@ -911,7 +911,7 @@ export const TOOLS: Record<string, Tool> = {
     description:
       'A week as a calendar, Monday to Sunday (this week unless from is given): for each day, the owner’s blocks (owner: time entries, with start and end where they were logged as blocks, else hours alone) and the agents’ lanes (agents: one list per agent at work at once, each block a session, or the part of one spent on one piece of work). ' +
       'Every block has from_hour and to_hour (hours since that day’s midnight in Toronto), hours, the work and the project it counts toward; projects lists them in the order the page colours them. ' +
-      'An owner block with status planned is time set aside: a day’s hours leave it out and planned counts it. to_confirm lists planned time whose end has passed, in any week: the owner confirms it (status logged) or drops it (archive).',
+      'An owner block with status planned is time set aside: a day’s hours leave it out and planned counts it. to_confirm lists planned time whose end has passed, in any week, for the owner to confirm (status logged), as planned or as it happened, or drop. Only a person can confirm it: an agent that tries is refused.',
     input: { from: z.string().optional().describe('Any day in the week, or its Monday, as 2026-10-12.') },
     run: async (l, _actor, input) => week(l, input),
   },

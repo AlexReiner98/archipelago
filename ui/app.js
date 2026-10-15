@@ -4450,6 +4450,63 @@ function blockDialog(when, planned) {
   });
 }
 
+/** A moment as this browser's time of day: 09:30. */
+const timeOfDay = (iso) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+/**
+ * Ask what planned time actually was, before it counts: the work, a few words, the day and when it began and ended (or
+ * its hours, for time planned without a time of day). Resolves to the ops that confirm it so, or null.
+ */
+function happenedDialog(b) {
+  return new Promise((resolve) => {
+    const picker = workPicker(b.work_id ? { id: b.work_id, title: b.work } : null);
+    const what = h('input', { type: 'text', maxlength: '60', value: b.what, title: 'A few words: the block’s name', required: true });
+    const day = h('input', { type: 'date', value: b.date, title: 'The day it happened', required: true });
+    const timed = Boolean(b.start && b.end);
+    const from = h('input', { type: 'time', step: '300', value: timed ? timeOfDay(b.start) : '', title: 'When it began', required: true });
+    const to = h('input', { type: 'time', step: '300', value: timed ? timeOfDay(b.end) : '', title: 'When it ended', required: true });
+    const hrs = h('input', { type: 'number', class: 'tq-hours', min: '0.25', max: '24', step: '0.25', value: String(b.hours), title: 'Hours spent', required: true });
+    const check = () => to.setCustomValidity(timed && from.value && to.value && to.value <= from.value ? 'It ends before it begins' : '');
+    from.oninput = to.oninput = check;
+    const dialog = h(
+      'dialog',
+      { class: 'ask cal-ask' },
+      h(
+        'form',
+        { method: 'dialog' },
+        h('h2', {}, 'What happened'),
+        picker.el,
+        what,
+        h('div', { class: 'cal-when' }, day, timed ? [from, h('span', { class: 'muted' }, '–'), to] : hrs),
+        h('div', { class: 'toolbar' }, h('button', { value: 'cancel', formNoValidate: true }, 'Cancel'), h('button', { value: 'ok', class: 'primary' }, 'Confirm')),
+      ),
+    );
+    const done = (value) => (dialog.remove(), resolve(value));
+    dialog.firstChild.addEventListener('submit', (e) => {
+      if (e.submitter?.value !== 'ok') return done(null);
+      const work = picker.get();
+      if (!work) {
+        e.preventDefault();
+        return picker.el.querySelector('input').focus();
+      }
+      const start = timed && new Date(`${day.value}T${from.value}:00`).toISOString();
+      const end = timed && new Date(`${day.value}T${to.value}:00`).toISOString();
+      const hours = timed ? Math.round(((Date.parse(end) - Date.parse(start)) / 3_600_000) * 100) / 100 : Number(hrs.value);
+      const ops = [{ op: 'update', id: b.id, status: 'logged', title: what.value.trim(), props: { date: day.value, hours, ...(timed && { start, end }) } }];
+      // Done for other work than was planned: it is moved there.
+      if (work.id !== b.work_id) ops.push(...(b.link ? [{ op: 'unlink', relation: b.link }] : []), { op: 'link', type: 'part_of', from: b.id, to: work.id });
+      done(ops);
+    });
+    dialog.addEventListener('cancel', () => done(null));
+    document.body.append(dialog);
+    dialog.showModal();
+    what.focus();
+  });
+}
+
 /**
  * The week as a calendar: a column for each day, split into the owner's lane and a narrow lane for each agent at work at
  * once; time runs down, and each block is coloured by the project it counts toward. Time logged as hours alone has no
@@ -4768,6 +4825,10 @@ async function time() {
       h('a', { class: 'gist grow', href: `#/e/${b.id}`, title: [b.what, b.work, b.start && `${clock(b.start)}\u2013${clock(b.end)}`].filter(Boolean).join('\n') }, b.what),
       h('span', { class: 'tq-h' }, hoursText(b.hours)),
       h('button', { title: 'It happened as planned: count it', onclick: () => write([{ op: 'update', id: b.id, status: 'logged' }], 'Confirmed on the Time screen') }, 'Confirm'),
+      h('button', { title: 'Say what actually happened, then count it', onclick: async () => {
+        const ops = await happenedDialog(b);
+        if (ops) write(ops, 'Confirmed on the Time screen, as it happened');
+      } }, 'Adjust'),
       menu('\u22ef', [['Drop', () => write([{ op: 'archive', id: b.id }], 'Dropped on the Time screen: it did not happen'), 'danger']]),
     );
   const confirm = due.length

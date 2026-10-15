@@ -81,6 +81,8 @@ interface Row {
   billable: boolean;
   rate: number | null;
   work: string | null;
+  /** The part_of link that ties it to its work. */
+  link: string | null;
 }
 
 /** Time entries, each with the work it is part of. A block's hours are the time from its start to its end. Time only planned is left out unless asked for. */
@@ -88,7 +90,8 @@ async function entries(l: Archipelago, where: string, params: unknown[], planned
   const { rows } = await l.db.query<Row>(
     `select e.id, e.title, e.body, e.status, e.date, (e.props ->> 'hours')::float8 as hours, e.props ->> 'start' as start, e.props ->> 'end' as end,
             coalesce((e.props ->> 'billable')::boolean, true) as billable, (e.props ->> 'rate')::float8 as rate,
-            (select r.to_id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as work
+            (select r.to_id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as work,
+            (select r.id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as link
      from (select *, coalesce(props ->> 'date', left(props ->> 'start', 10)) as date from entity) e
      where e.type = any($1::text[]) and e.archived_at is null and e.status <> 'void' ${planned ? '' : "and e.status <> 'planned'"} and ${where.replaceAll("e.props ->> 'date'", 'e.date')}
      order by e.date, e.props ->> 'start', e.created_at`,
@@ -370,12 +373,12 @@ export async function week(l: Archipelago, input: { from?: string }) {
 
   // Planned time whose end has passed, whatever week it was in: the owner says whether it happened.
   const nowMs = Date.now();
-  const due: (Block & { date: string })[] = [];
+  const due: (Block & { date: string; link: string | null })[] = [];
   for (const r of await entries(l, `e.status = 'planned' and e.date <= $2`, [today()], true)) {
     const over = r.end ? Date.parse(r.end) <= nowMs : r.date < today();
     if (!over) continue;
     const project = r.work ? await projectOf(l, r.work, projects) : null;
-    due.push({ id: r.id, what: r.title, date: r.date, start: r.start, end: r.end, from_hour: null, to_hour: null, hours: r.hours, work: await named(r.work), work_id: r.work, project, status: r.status });
+    due.push({ id: r.id, what: r.title, date: r.date, start: r.start, end: r.end, from_hour: null, to_hour: null, hours: r.hours, work: await named(r.work), work_id: r.work, link: r.link, project, status: r.status });
   }
 
   const counted = new Set([...owner.flat(), ...agents.flat(), ...due].map((b) => b.project).filter((p): p is string => Boolean(p)));

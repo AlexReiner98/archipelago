@@ -297,6 +297,16 @@ export class Archipelago {
     // record has to stand on its own: a decision says what was chosen and why,
     // and the human is told (see `answered`).
     const answered: { id: string; title: string; status: string; outcome?: string; authority: Authority }[] = [];
+    // Time set aside becomes time worked only on a person's word: an agent may plan it and move it, never confirm it.
+    if (actor.kind !== 'human' && this.registry.type('time.entry')) {
+      const entries = new Set(this.registry.family('time.entry'));
+      for (const op of input.ops) {
+        if (op.op !== 'update' || !op.status || op.status === 'planned') continue;
+        const e = await this.entity(op.id);
+        if (e && entries.has(e.type) && e.status === 'planned')
+          throw new Error(`Change rejected:\n- "${e.title}" is planned time: only a person confirms that it happened, on the Time screen. It waits there under To confirm.`);
+      }
+    }
     if (actor.kind !== 'human') {
       const decisions = new Set(this.registry.family('decision'));
       const questions = new Set([...decisions, ...this.registry.family('hypothesis')]);
