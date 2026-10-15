@@ -149,3 +149,63 @@ figure img {
   border-radius: 8px;
   background: #fff;
 }
+/* An invoice: its number, dates and what is due as a heading block; the rest reads as the bill, in a plain face. */
+body.invoice main {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+}
+.invoice-head {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 18px;
+  margin-bottom: 1.4em;
+  border-bottom: 2px solid var(--ink);
+}
+.invoice-head h1 {
+  font-size: 2.2rem;
+  letter-spacing: 0.02em;
+}
+.invoice-facts {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 18px;
+  margin: 6px 0 0;
+  text-align: right;
+}
+.invoice-facts dt {
+  color: var(--muted);
+}
+.invoice-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.invoice-total {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.stamp {
+  position: absolute;
+  left: 46%;
+  top: 8px;
+  padding: 4px 14px;
+  border: 3px solid #2e7d4f;
+  border-radius: 6px;
+  color: #2e7d4f;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transform: rotate(-8deg);
+}
+.stamp.void {
+  border-color: #b3261e;
+  color: #b3261e;
+}
+body.invoice ul {
+  padding-left: 1.1em;
+}
+body.invoice li {
+  font-variant-numeric: tabular-nums;
+}

@@ -1628,6 +1628,11 @@ test('a link to a document opens its page and its text with no login, until it i
   const doc = (await data.json()) as { title: string; parts: { text?: string; section?: { title: string } }[] };
   assert.deepEqual([doc.title, doc.parts.map((p) => p.section?.title ?? p.text)], ['Funding', ['Intro.', 'IRAP']]);
   assert.equal((await fetch(`${base}/doc.js`)).status, 200);
+  // The same page reads a document with the reader's own sign-in, to print it; the page itself holds nothing.
+  const read = await fetch(`${base}/read/${d}`);
+  assert.equal(read.status, 200);
+  assert.match(read.headers.get('content-security-policy') ?? '', /img-src 'self' data:/);
+  assert.equal((await fetch(`${base}/read/not-an-id`)).status === 200, false);
   // A section's figure is shown through the link; a figure of anything the document does not bring in is not.
   const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
   const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'note', title: 'Not in it' }] })).result.created.o;

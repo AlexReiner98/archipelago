@@ -2343,6 +2343,9 @@ test('time is logged against work, summed by day and client, and billed on a num
   const text = doc.parts.map((p) => p.text).join('\n');
   assert.match(text, /From: Aperture Design Tools Inc\. · 1 King St, Toronto · HST 123456789RT0001/);
   assert.match(text, /3 h × \$80\.00 = \$240\.00/);
+  const read = (await callTool(l, human, 'document', { id: inv.created.inv })) as { type: string; fields: Record<string, unknown> };
+  assert.equal(read.type, 'time.invoice');
+  assert.deepEqual([read.fields.number, read.fields.total], [inv.number, 406.8], 'an invoice says its number and total to the page that lays it out');
   assert.match(text, /Total due: \$406\.80 CAD/);
   await assert.rejects(callTool(l, human, 'invoice_draft', { client: made.aa, to: '2026-10-31' }), /No billable time/);
   // A void invoice frees its time to be billed again, on the next number.

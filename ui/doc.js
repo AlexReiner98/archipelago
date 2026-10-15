@@ -4,6 +4,23 @@
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
+// Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in; from a link (/s/...), with the link.
+const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
+const token = () => {
+  try {
+    return localStorage.getItem('pelago-token') ?? '';
+  } catch {
+    return '';
+  }
+};
+const api = async (tool, input) => {
+  const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token() && { authorization: `Bearer ${token()}` }) }, body: JSON.stringify(input) });
+  const body = await res.json();
+  if (!res.ok) throw new Error(res.status === 401 ? 'Sign in to Archipelago in this browser first, then open this again.' : body.error);
+  return body.result;
+};
+/** A section's figure: from the link's own address, or fetched with the reader's sign-in. */
+const figureSrc = (id) => (own ? '' : `${here}/picture/${id}`);
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -81,13 +98,38 @@ function blocks(text, titles, depth) {
   return out;
 }
 
+const INVOICE = 'time.invoice';
+const money = (n, currency = 'CAD') => new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(Number(n) || 0);
+const longDay = (ts) => new Date(`${ts}T12:00:00Z`).toLocaleDateString('en-CA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+/** An invoice's heading: its number, its dates and what is due, and a mark once it is paid. */
+function invoiceHead(d) {
+  const f = d.fields ?? {};
+  const owing = Number(f.total ?? 0) - Number(f.paid ?? 0);
+  return h(
+    'header',
+    { class: 'invoice-head' },
+    h('div', {}, h('h1', {}, 'Invoice'), h('p', { class: 'muted' }, f.number ?? d.title)),
+    h(
+      'dl',
+      { class: 'invoice-facts' },
+      f.issued && [h('dt', {}, 'Issued'), h('dd', {}, longDay(f.issued))],
+      f.due && [h('dt', {}, 'Due'), h('dd', {}, longDay(f.due))],
+      f.paid > 0 && owing > 0 && [h('dt', {}, 'Paid'), h('dd', {}, money(f.paid))],
+      [h('dt', {}, owing > 0 || !f.paid ? 'Total due' : 'Total'), h('dd', { class: 'invoice-total' }, money(owing > 0 || !f.paid ? owing || f.total : f.total))],
+    ),
+    d.status === 'paid' && h('span', { class: 'stamp' }, 'Paid'),
+    d.status === 'void' && h('span', { class: 'stamp void' }, 'Void'),
+  );
+}
+
 function draw(d) {
-  document.title = d.title;
+  document.title = d.type === INVOICE && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
   const sections = d.parts.filter((p) => p.section);
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
-    h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, `Updated ${day(d.updated_at)}`)),
+    d.type === INVOICE ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, `Updated ${day(d.updated_at)}`)),
     sections.length > 2 && h('nav', { class: 'contents' }, h('ol', {}, sections.map((p) => h('li', {}, h('a', { href: `#${p.section.id}` }, p.section.title))))),
     d.parts.map((p) =>
       p.section
@@ -95,7 +137,7 @@ function draw(d) {
             'section',
             { id: p.section.id },
             h('h2', {}, p.section.title),
-            p.section.picture && h('figure', {}, h('a', { href: `${here}/picture/${p.section.id}`, target: '_blank', rel: 'noopener', title: 'Open the figure on its own' }, h('img', { src: `${here}/picture/${p.section.id}`, alt: p.section.title }))),
+            p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id })),
             blocks(p.section.body, titles, 3),
           )
         : h('div', { class: 'text' }, blocks(p.text, titles, 2)),
@@ -103,12 +145,18 @@ function draw(d) {
     h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
+  document.body.classList.toggle('invoice', d.type === INVOICE);
+  // Read with the reader's sign-in, a figure is fetched the same way.
+  if (own) for (const img of main.querySelectorAll('img[data-figure]')) api('picture', { result: img.dataset.figure }).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }
 
-fetch(`${here}/data`)
-  .then(async (res) => {
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');
-    draw(body);
-  })
+(own
+  ? api('document', { id: own })
+  : fetch(`${here}/data`).then(async (res) => {
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');
+      return body;
+    })
+)
+  .then(draw)
   .catch((err) => main.replaceChildren(h('p', { class: 'error' }, err.message)));

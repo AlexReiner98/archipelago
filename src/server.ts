@@ -300,6 +300,13 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         return res.writeHead(200, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify(doc));
       }
 
+      // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
+      // document with the reader's own token. The page holds nothing; what it shows is what that token may see.
+      if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
+        res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
+        return res.end(await readFile(join(UI_DIR, 'doc.html')));
+      }
+
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname];
         // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.

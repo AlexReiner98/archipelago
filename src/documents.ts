@@ -52,6 +52,12 @@ export function assemble(body: string, items: Map<string, Section>): Part[] {
   return parts;
 }
 
+/** Of an item's fields, those its type's pack marks as shown: what a page may lay out (an invoice's number, dates, total). */
+const shownOf = (l: Archipelago, type: string, props: Record<string, unknown>) => {
+  const defs = l.registry.type(type)?.fields ?? {};
+  return Object.fromEntries(Object.entries(props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
+};
+
 /** A document whole, as the one asking may see it. */
 export async function readDocument(l: Archipelago, id: string) {
   const doc = await l.entity(id);
@@ -68,7 +74,7 @@ export async function readDocument(l: Archipelago, id: string) {
     (await l.db.query<{ from_id: string }>(`select from_id from relation where type = 'part_of' and valid_to is null and to_id = $1 and from_id = any($2::text[])`, [doc.id, ids])).rows.map((r) => r.from_id),
   );
   const notInside = [...items.keys()].filter((sid) => !inside.has(sid));
-  return { id: doc.id, title: doc.title, status: doc.status, for: doc.props.for ?? null, updated_at: doc.updated_at, parts: assemble(doc.body, items), ...(notInside.length && { not_inside: notInside }) };
+  return { id: doc.id, type: doc.type, title: doc.title, status: doc.status, for: doc.props.for ?? null, fields: shownOf(l, doc.type, doc.props), updated_at: doc.updated_at, parts: assemble(doc.body, items), ...(notInside.length && { not_inside: notInside }) };
 }
 
 const hash = (secret: string) => createHash('sha256').update(secret).digest('hex');
@@ -123,7 +129,7 @@ export async function sharedPicture(l: Archipelago, secret: string, id: string):
 /** What a link shows, read as anyone with no login: the document and the items it brings in, or nothing. */
 export async function sharedDocument(l: Archipelago, secret: string) {
   if (!/^[a-f0-9]{48}$/.test(secret)) return null;
-  const { rows } = await l.forAnyone().db.query<{ doc: { id: string; title: string; body: string; status: string; updated_at: string; items: Section[] } | null }>(
+  const { rows } = await l.forAnyone().db.query<{ doc: { id: string; type: string; title: string; body: string; status: string; props: Record<string, unknown>; updated_at: string; items: Section[] } | null }>(
     `select pelago_shared_document($1) as doc`,
     [hash(secret)],
   );
@@ -134,5 +140,5 @@ export async function sharedDocument(l: Archipelago, secret: string) {
   const scrub = (text: string) => text.replace(/[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g, (found, id) => (shown.has(id) ? found : ''));
   const items = new Map(doc.items.map((item) => [item.id, { ...item, body: scrub(item.body) }]));
   const parts = assemble(doc.body, items).flatMap((part): Part[] => ('missing' in part ? [] : 'text' in part ? [{ text: scrub(part.text) }] : [part]));
-  return { title: doc.title, updated_at: doc.updated_at, parts };
+  return { type: doc.type, title: doc.title, status: doc.status, fields: shownOf(l, doc.type, doc.props), updated_at: doc.updated_at, parts };
 }

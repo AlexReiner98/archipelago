@@ -300,7 +300,7 @@ language sql stable security definer set search_path = public as $fn$
     where i.archived_at is null and i.workspace = d.workspace and (i.private_to is null or i.private_to = d.private_to)
   )
   select jsonb_build_object(
-    'id', d.id, 'title', d.title, 'body', d.body, 'status', d.status, 'updated_at', d.updated_at,
+    'id', d.id, 'type', d.type, 'title', d.title, 'body', d.body, 'status', d.status, 'props', d.props, 'updated_at', d.updated_at,
     'items', coalesce((select jsonb_agg(to_jsonb(items)) from items), '[]'::jsonb))
   from d
 $fn$;

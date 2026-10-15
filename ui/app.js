@@ -1351,6 +1351,7 @@ async function entity(id, here) {
           ],
         publishable && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
         e.visibility === 'public' && (project || isA(e.type, 'software.feature')) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
+        doc && ['Print or save as PDF', () => window.open(`/read/${id}`, '_blank')],
         doc && !e.archived_at && ['Make a link to read it', shareLink],
         links.length > 0 && ['Stop sharing', stopSharing, 'danger'],
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
