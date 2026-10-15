@@ -884,3 +884,8 @@ dialog.cal-ask .cal-when { display: flex; align-items: center; gap: 8px; }
 /* The first and last hours sit inside the day, at its top and bottom edges. */
 .cal-hour.cal-first { transform: none; }
 .cal-hour.cal-last { transform: translateY(-100%); }
+/* A routine for nothing (dinner) only holds the time: grey, quiet. */
+.cal-own { --cal-hue: var(--closed); background: color-mix(in srgb, var(--closed) 35%, transparent); outline: none; color: var(--muted); }
+.cal-routine .cal-what::before { content: "\21bb  "; }
+dialog.cal-ask .cal-days { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+dialog.cal-ask [hidden] { display: none; }

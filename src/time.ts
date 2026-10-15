@@ -174,6 +174,29 @@ export interface Block {
   /** A session's own name, and whether it is still open. */
   session?: string;
   open?: boolean;
+  /** A day of a routine: the day, and the link that ties the routine to its work. */
+  routine?: boolean;
+  date?: string;
+  link?: string | null;
+}
+
+/** Hours since midnight from a time of day: 17.5 from "17:30"; undefined for anything else. */
+const clockHours = (t: unknown) => {
+  const m = typeof t === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(t.trim()) : null;
+  const n = m ? Number(m[1]) + Number(m[2]) / 60 : NaN;
+  return n >= 0 && n <= 24 ? n : undefined;
+};
+
+/** The hours a routine holds on a day, if it falls on it: not before it starts or after it ends, not on a day skipped or done. */
+export function occurs(p: Record<string, unknown>, day: string, made?: string): [number, number] | undefined {
+  const days = Array.isArray(p.days) && p.days.length ? p.days.map(Number) : [1, 2, 3, 4, 5, 6, 7];
+  if (!days.includes(new Date(`${day}T12:00:00Z`).getUTCDay() || 7)) return undefined;
+  const starts = typeof p.starts === 'string' ? p.starts : made;
+  if ((starts && day < starts) || (typeof p.until === 'string' && day > p.until)) return undefined;
+  if ((Array.isArray(p.skip) && p.skip.includes(day)) || (Array.isArray(p.done) && p.done.includes(day))) return undefined;
+  const moved = p.moved && typeof p.moved === 'object' ? (p.moved as Record<string, unknown>)[day] : undefined;
+  const [a, b] = Array.isArray(moved) ? moved.map(clockHours) : [clockHours(p.from_time), clockHours(p.to_time)];
+  return a !== undefined && b !== undefined && b > a ? [a, b] : undefined;
 }
 
 /**
@@ -300,6 +323,30 @@ export async function week(l: Archipelago, input: { from?: string }) {
     for (const { d, x, y } of cut(s, e)) owner[d].push({ ...base, start: new Date(x).toISOString(), end: new Date(y).toISOString(), from_hour: hourOf(x, d), to_hour: hourOf(y, d), hours: cents((y - x) / 3_600_000) });
   }
 
+  // Routines: drawn on each day they fall on. One for a piece of work is planned time for it; one for nothing holds the time.
+  const { rows: routines } = await l.db.query<{ id: string; title: string; props: Record<string, unknown>; created_at: Date; work: string | null; link: string | null }>(
+    `select e.id, e.title, e.props, e.created_at,
+            (select r.to_id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as work,
+            (select r.id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as link
+     from entity e where e.type = any($1::text[]) and e.archived_at is null and e.is_open order by e.props ->> 'from_time', e.title`,
+    [l.registry.family('time.routine')],
+  );
+  const routineOn = async (r: (typeof routines)[number], day: string): Promise<Block | undefined> => {
+    const at = occurs(r.props, day, today(new Date(r.created_at)));
+    if (!at) return undefined;
+    const base = dayStart(day);
+    return {
+      id: r.id, what: r.title, date: day, routine: true, link: r.link,
+      start: new Date(base + at[0] * 3_600_000).toISOString(), end: new Date(base + at[1] * 3_600_000).toISOString(),
+      from_hour: at[0], to_hour: at[1], hours: cents(at[1] - at[0]),
+      work: await named(r.work), work_id: r.work, project: r.work ? await projectOf(l, r.work, projects) : null, status: 'routine',
+    };
+  };
+  for (const r of routines) for (const [i, day] of days.entries()) {
+    const b = await routineOn(r, day);
+    if (b) owner[i].push(b);
+  }
+
   // The agents' lanes: every session that ran in the week, from when it began to when it ended (or was last heard from,
   // if it is still open), cut by the work it said it was on. Time on nothing in particular counts to its repository.
   const { rows: runs } = await l.db.query<{ id: string; title: string; is_open: boolean; status: string; created_at: Date; updated_at: Date; last_seen: string | null; active: unknown; busy: boolean | null; story: unknown; repo: string | null }>(
@@ -380,6 +427,14 @@ export async function week(l: Archipelago, input: { from?: string }) {
     const project = r.work ? await projectOf(l, r.work, projects) : null;
     due.push({ id: r.id, what: r.title, date: r.date, start: r.start, end: r.end, from_hour: null, to_hour: null, hours: r.hours, work: await named(r.work), work_id: r.work, link: r.link, project, status: r.status });
   }
+  // The days a routine for some work has passed in the last two weeks and the owner has not said how they went.
+  const now = today();
+  for (const r of routines.filter((r) => r.work))
+    for (let i = 13; i >= 0; i--) {
+      const b = await routineOn(r, addDays(now, -i));
+      if (b && Date.parse(b.end!) <= nowMs) due.push(b as Block & { date: string; link: string | null });
+    }
+  due.sort((a, b) => (a.start ?? a.date).localeCompare(b.start ?? b.date));
 
   const counted = new Set([...owner.flat(), ...agents.flat(), ...due].map((b) => b.project).filter((p): p is string => Boolean(p)));
   return {
@@ -390,8 +445,9 @@ export async function week(l: Archipelago, input: { from?: string }) {
     projects: await Promise.all([...counted].sort().map(async (id) => ({ id, title: await named(id) }))),
     days: days.map((date, i) => ({
       date,
-      hours: cents(owner[i].filter((b) => b.status !== 'planned').reduce((n, b) => n + b.hours, 0)),
-      planned: cents(owner[i].filter((b) => b.status === 'planned').reduce((n, b) => n + b.hours, 0)),
+      hours: cents(owner[i].filter((b) => b.status !== 'planned' && !b.routine).reduce((n, b) => n + b.hours, 0)),
+      // A routine for some work is time planned for it; one for nothing is not work at all.
+      planned: cents(owner[i].filter((b) => b.status === 'planned' || (b.routine && b.work_id)).reduce((n, b) => n + b.hours, 0)),
       owner: owner[i],
       agents: lanes(agents[i]),
       reported: reported[i],

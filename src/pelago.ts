@@ -300,8 +300,15 @@ export class Archipelago {
     // Time set aside becomes time worked only on a person's word: an agent may plan it and move it, never confirm it.
     if (actor.kind !== 'human' && this.registry.type('time.entry')) {
       const entries = new Set(this.registry.family('time.entry'));
+      const routines = new Set(this.registry.family('time.routine'));
       for (const op of input.ops) {
-        if (op.op !== 'update' || !op.status || op.status === 'planned') continue;
+        if (op.op !== 'update') continue;
+        // A day of a routine for some work is confirmed by marking it done.
+        if (op.props && 'done' in op.props) {
+          const e = await this.entity(op.id);
+          if (e && routines.has(e.type)) throw new Error(`Change rejected:\n- "${e.title}" is a routine: only a person confirms a day of it, on the Time screen. Its days wait there under To confirm.`);
+        }
+        if (!op.status || op.status === 'planned') continue;
         const e = await this.entity(op.id);
         if (e && entries.has(e.type) && e.status === 'planned')
           throw new Error(`Change rejected:\n- "${e.title}" is planned time: only a person confirms that it happened, on the Time screen. It waits there under To confirm.`);

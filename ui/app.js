@@ -4415,12 +4415,28 @@ const atHour = (day, hour) => {
   return d.toISOString();
 };
 
-/** Ask what a block drawn on the calendar was for: the work, a few words, and whether it is only planned. */
-function blockDialog(when, planned) {
+/** The days of the week as a routine keeps them, 1 for Monday to 7 for Sunday, with their short names. */
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7].map((n) => [n, new Date(Date.UTC(2026, 0, 4 + n)).toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' })]);
+
+/**
+ * Ask what a block drawn on the calendar is: the work, a few words, whether it is only planned, and whether it repeats.
+ * A block that repeats is a routine, and needs no work: dinner is for nothing.
+ */
+function blockDialog(when, planned, day) {
   return new Promise((resolve) => {
     const picker = workPicker(remember(LAST_WORK), (w) => remember(LAST_WORK, w));
     const what = h('input', { type: 'text', maxlength: '60', placeholder: 'What', title: 'A few words: the block’s name', required: true });
     const plan = h('input', { type: 'checkbox', checked: planned });
+    const planLabel = h('label', { class: 'tq-bill', title: 'Time set aside, not yet worked: it counts once you confirm it' }, plan, 'Planned');
+    const repeat = h('select', { title: 'Whether it repeats' }, [['never', 'Once'], ['daily', 'Every day'], ['weekdays', 'Weekdays'], ['days', 'Days…']].map(([v, t]) => h('option', { value: v }, t)));
+    const own = new Date(`${day}T12:00:00`).getDay() || 7;
+    const ticks = WEEKDAYS.map(([n, name]) => h('label', { class: 'tq-bill' }, h('input', { type: 'checkbox', value: String(n), checked: n === own }), name));
+    const dayRow = h('div', { class: 'cal-days', hidden: true }, ticks);
+    repeat.onchange = repeat.oninput = () => {
+      dayRow.hidden = repeat.value !== 'days';
+      planLabel.hidden = repeat.value !== 'never';
+      picker.el.querySelector('input').placeholder = repeat.value === 'never' ? 'Project or task' : 'Project or task, if it is work';
+    };
     const dialog = h(
       'dialog',
       { class: 'ask cal-ask' },
@@ -4430,7 +4446,8 @@ function blockDialog(when, planned) {
         h('h2', {}, when),
         picker.el,
         what,
-        h('label', { class: 'tq-bill', title: 'Time set aside, not yet worked: it counts once you confirm it' }, plan, 'Planned'),
+        h('div', { class: 'cal-when' }, repeat, planLabel),
+        dayRow,
         h('div', { class: 'toolbar' }, h('button', { value: 'cancel', formNoValidate: true }, 'Cancel'), h('button', { value: 'ok', class: 'primary' }, 'Add')),
       ),
     );
@@ -4438,16 +4455,31 @@ function blockDialog(when, planned) {
     dialog.firstChild.addEventListener('submit', (e) => {
       if (e.submitter?.value !== 'ok') return done(null);
       const work = picker.get();
-      if (!work) {
+      const days = { never: null, daily: [1, 2, 3, 4, 5, 6, 7], weekdays: [1, 2, 3, 4, 5], days: ticks.map((t) => t.firstChild).filter((c) => c.checked).map((c) => Number(c.value)) }[repeat.value];
+      // Time worked is for some work; a routine may be for nothing.
+      if (!work && !days) {
         e.preventDefault();
         return picker.el.querySelector('input').focus();
       }
-      done({ work, what: what.value.trim(), planned: plan.checked });
+      if (days && !days.length) return e.preventDefault();
+      done({ work, what: what.value.trim(), planned: plan.checked, days });
     });
     dialog.addEventListener('cancel', () => done(null));
     document.body.append(dialog);
     dialog.showModal();
     (picker.get() ? what : picker.el.querySelector('input')).focus();
+  });
+}
+
+/** A choice of a few actions about one thing: resolves to the value of the one taken, or null. */
+function choose(title, choices) {
+  return new Promise((resolve) => {
+    const dialog = h('dialog', { class: 'ask' }, h('form', { method: 'dialog' }, h('h2', {}, title), h('div', { class: 'toolbar' }, h('button', { value: '' }, 'Cancel'), choices.map(([value, label, cls]) => h('button', { value, class: cls ?? '' }, label)))));
+    const done = (value) => (dialog.remove(), resolve(value || null));
+    dialog.firstChild.addEventListener('submit', (e) => done(e.submitter?.value));
+    dialog.addEventListener('cancel', () => done(null));
+    document.body.append(dialog);
+    dialog.showModal();
   });
 }
 
@@ -4459,7 +4491,7 @@ const timeOfDay = (iso) => {
 
 /**
  * Ask what planned time actually was, before it counts: the work, a few words, the day and when it began and ended (or
- * its hours, for time planned without a time of day). Resolves to the ops that confirm it so, or null.
+ * its hours, for time planned without a time of day). Resolves to what was said, or null.
  */
 function happenedDialog(b) {
   return new Promise((resolve) => {
@@ -4493,19 +4525,32 @@ function happenedDialog(b) {
         e.preventDefault();
         return picker.el.querySelector('input').focus();
       }
-      const start = timed && new Date(`${day.value}T${from.value}:00`).toISOString();
-      const end = timed && new Date(`${day.value}T${to.value}:00`).toISOString();
+      const start = timed ? new Date(`${day.value}T${from.value}:00`).toISOString() : null;
+      const end = timed ? new Date(`${day.value}T${to.value}:00`).toISOString() : null;
       const hours = timed ? Math.round(((Date.parse(end) - Date.parse(start)) / 3_600_000) * 100) / 100 : Number(hrs.value);
-      const ops = [{ op: 'update', id: b.id, status: 'logged', title: what.value.trim(), props: { date: day.value, hours, ...(timed && { start, end }) } }];
-      // Done for other work than was planned: it is moved there.
-      if (work.id !== b.work_id) ops.push(...(b.link ? [{ op: 'unlink', relation: b.link }] : []), { op: 'link', type: 'part_of', from: b.id, to: work.id });
-      done(ops);
+      done({ work, what: what.value.trim(), date: day.value, start, end, hours });
     });
     dialog.addEventListener('cancel', () => done(null));
     document.body.append(dialog);
     dialog.showModal();
     what.focus();
   });
+}
+
+/** The ops that confirm planned time as it was said to have happened: the entry is logged, and moved to other work if it was. */
+const confirmEntryOps = (b, v) => [
+  { op: 'update', id: b.id, status: 'logged', title: v.what, props: { date: v.date, hours: v.hours, ...(v.start && { start: v.start, end: v.end }) } },
+  ...(v.work.id !== b.work_id ? [...(b.link ? [{ op: 'unlink', relation: b.link }] : []), { op: 'link', type: 'part_of', from: b.id, to: v.work.id }] : []),
+];
+
+/** The ops that confirm a day of a routine: a time entry for what happened, and the day marked done on the routine. */
+async function confirmRoutineOps(b, v) {
+  const p = (await api('get', { id: b.id })).entity.props;
+  return [
+    { op: 'create', ref: 'e', type: 'time.entry', title: v.what, status: 'logged', props: { date: v.date, hours: v.hours, ...(v.start && { start: v.start, end: v.end }) } },
+    { op: 'link', type: 'part_of', from: 'e', to: v.work.id },
+    { op: 'update', id: b.id, props: { done: [...(Array.isArray(p.done) ? p.done : []), b.date] } },
+  ];
 }
 
 /**
@@ -4521,7 +4566,7 @@ const CAL_FULL = 'pelago-cal-full';
 /** Whether the week has anything outside the hours and days shown by default. */
 const calHidden = (wk) =>
   wk.days.some((d, i) => {
-    const all = [...d.owner, ...d.agents.flat()];
+    const all = [...d.owner.filter((b) => !b.routine), ...d.agents.flat()];
     if (i >= CAL_DAYS) return all.length > 0;
     return all.some((b) => b.from_hour != null && (b.from_hour < CAL_HOURS[0] || b.to_hour > CAL_HOURS[1]));
   });
@@ -4544,7 +4589,7 @@ function weekCalendar(wk, today, act, full) {
       [titleOf.get(b.project), b.what].filter(Boolean).join(' · '),
       b.work && b.work !== b.what && b.work !== titleOf.get(b.project) ? b.work : null,
       b.from_hour != null ? `${clockText(b.from_hour)}–${clockText(b.to_hour)} · ${hoursText(b.hours)}` : hoursText(b.hours),
-      b.status === 'planned' ? 'Planned' : null,
+      b.status === 'planned' ? 'Planned' : b.routine ? 'Repeats' : null,
       b.session && b.session !== b.what ? `Agent: ${b.session}${b.open ? ' (running)' : ''}` : b.session ? `Agent${b.open ? ', running' : ''}` : null,
     ]
       .filter(Boolean)
@@ -4565,7 +4610,7 @@ function weekCalendar(wk, today, act, full) {
   const mineEl = (b) => {
     const el = h(
       'a',
-      { class: `cal-block cal-mine${b.status === 'planned' ? ' cal-planned' : ''}`, href: `#/e/${b.id}`, title: tip(b), style: `${place(b.from_hour, b.to_hour)}; ${colour(b)}` },
+      { class: `cal-block cal-mine${b.status === 'planned' || (b.routine && b.work_id) ? ' cal-planned' : ''}${b.routine ? ' cal-routine' : ''}${b.routine && !b.work_id ? ' cal-own' : ''}`, href: `#/e/${b.id}`, title: tip(b), style: `${place(b.from_hour, b.to_hour)}; ${colour(b)}` },
       b.to_hour - b.from_hour >= 0.75 ? h('span', { class: 'cal-what' }, b.what) : null,
     );
     if (!act || b.status === 'invoiced' || b.start == null) return el;
@@ -4585,7 +4630,8 @@ function weekCalendar(wk, today, act, full) {
       if (drag.grip) {
         drag.to = Math.max(drag.from + 0.25, hourAt(drag.lane, ev.clientY));
       } else {
-        const lane = laneAt(ev.clientX) ?? drag.lane;
+        // A day of a routine moves within its day; the routine itself is changed on its page.
+        const lane = b.routine ? drag.lane : (laneAt(ev.clientX) ?? drag.lane);
         if (lane !== el.parentElement) lane.append(el);
         drag.lane = lane;
         const length = b.to_hour - b.from_hour;
@@ -4599,6 +4645,10 @@ function weekCalendar(wk, today, act, full) {
       const was = drag;
       drag = null;
       dirty = false;
+      if (was && !was.moved && b.routine) {
+        el.addEventListener('click', (e) => e.preventDefault(), { once: true });
+        return act.routineDay(b);
+      }
       if (!was?.moved) return;
       // The click that ends a drag does not open the block.
       el.addEventListener('click', (e) => e.preventDefault(), { once: true });
@@ -4817,17 +4867,38 @@ async function time() {
     add: async (day, from, to) => {
       const start = atHour(day, from);
       const end = atHour(day, to);
-      const said = await blockDialog(`${dayName(day)}, ${clockText(from)}\u2013${clockText(to)}`, Date.parse(end) > Date.now());
+      const said = await blockDialog(`${dayName(day)}, ${clockText(from)}\u2013${clockText(to)}`, Date.parse(end) > Date.now(), day);
       if (!said) return;
       try {
-        await api('time_log', { work: said.work.id, what: said.what, start, end, ...(said.planned && { planned: true }) });
+        if (said.days)
+          await api('change', {
+            ops: [
+              { op: 'create', ref: 'r', type: 'time.routine', title: said.what, status: 'active', props: { from_time: clockText(from), to_time: clockText(to), days: said.days, starts: day } },
+              ...(said.work ? [{ op: 'link', type: 'part_of', from: 'r', to: said.work.id }] : []),
+            ],
+            reason: 'Made a routine on the Time screen',
+          });
+        else await api('time_log', { work: said.work.id, what: said.what, start, end, ...(said.planned && { planned: true }) });
         again();
       } catch (err) {
         tell('That was not added', err.message);
       }
     },
-    move: (b, day, from, to) => write([{ op: 'update', id: b.id, props: { start: atHour(day, from), end: atHour(day, to), date: day, hours: Math.round((to - from) * 100) / 100 } }], 'Moved on the calendar'),
+    routineDay: async (b) => {
+      const said = await choose(`${b.what} \u00b7 ${dayName(b.date)}, ${clockText(b.from_hour)}\u2013${clockText(b.to_hour)}`, [['open', 'Open routine'], ['skip', 'Skip this day', 'danger']]);
+      if (said === 'open') location.hash = `#/e/${b.id}`;
+      if (said !== 'skip') return;
+      const p = (await api('get', { id: b.id })).entity.props;
+      write([{ op: 'update', id: b.id, props: { skip: [...(Array.isArray(p.skip) ? p.skip : []), b.date] } }], `Skipped ${b.date} on the Time screen`);
+    },
+    move: async (b, day, from, to) => {
+      if (!b.routine) return moveEntry(b, day, from, to);
+      const p = (await api('get', { id: b.id })).entity.props;
+      write([{ op: 'update', id: b.id, props: { moved: { ...(p.moved && typeof p.moved === 'object' ? p.moved : {}), [b.date]: [clockText(from), clockText(to)] } } }], `Moved ${b.date} on the Time screen`);
+    },
   };
+  const moveEntry = (b, day, from, to) =>
+    write([{ op: 'update', id: b.id, props: { start: atHour(day, from), end: atHour(day, to), date: day, hours: Math.round((to - from) * 100) / 100 } }], 'Moved on the calendar');
 
   // Planned time whose end has passed: the owner says it happened (and it counts), or drops it.
   const due = wk.to_confirm ?? [];
@@ -4839,12 +4910,19 @@ async function time() {
       h('a', { class: 'muted small tq-h', href: '#/time', title: 'Show its week', onclick: (ev) => (ev.preventDefault(), (timeState.from = mondayOf(b.date)), again()) }, dayName(b.date, { weekday: 'short', day: 'numeric' })),
       h('a', { class: 'gist grow', href: `#/e/${b.id}`, title: [b.what, b.work, b.start && `${clock(b.start)}\u2013${clock(b.end)}`].filter(Boolean).join('\n') }, b.what),
       h('span', { class: 'tq-h' }, hoursText(b.hours)),
-      h('button', { title: 'It happened as planned: count it', onclick: () => write([{ op: 'update', id: b.id, status: 'logged' }], 'Confirmed on the Time screen') }, 'Confirm'),
+      h('button', { title: 'It happened as planned: count it', onclick: async () => {
+        const v = { work: { id: b.work_id }, what: b.what, date: b.date, start: b.start, end: b.end, hours: b.hours };
+        write(b.routine ? await confirmRoutineOps(b, v) : [{ op: 'update', id: b.id, status: 'logged' }], 'Confirmed on the Time screen');
+      } }, 'Confirm'),
       h('button', { title: 'Say what actually happened, then count it', onclick: async () => {
-        const ops = await happenedDialog(b);
-        if (ops) write(ops, 'Confirmed on the Time screen, as it happened');
+        const v = await happenedDialog(b);
+        if (v) write(b.routine ? await confirmRoutineOps(b, v) : confirmEntryOps(b, v), 'Confirmed on the Time screen, as it happened');
       } }, 'Adjust'),
-      menu('\u22ef', [['Drop', () => write([{ op: 'archive', id: b.id }], 'Dropped on the Time screen: it did not happen'), 'danger']]),
+      menu('\u22ef', [['Drop', async () => {
+        if (!b.routine) return write([{ op: 'archive', id: b.id }], 'Dropped on the Time screen: it did not happen');
+        const p = (await api('get', { id: b.id })).entity.props;
+        write([{ op: 'update', id: b.id, props: { skip: [...(Array.isArray(p.skip) ? p.skip : []), b.date] } }], `Skipped ${b.date} on the Time screen: it did not happen`);
+      }, 'danger']]),
     );
   const confirm = due.length
     ? h(
@@ -4854,7 +4932,17 @@ async function time() {
           'header',
           { class: 'tq-dayhead' },
           h('span', { class: 'grow' }, `To confirm ${due.length}`),
-          due.length > 1 && h('button', { title: 'Every one happened as planned', onclick: () => write(due.map((b) => ({ op: 'update', id: b.id, status: 'logged' })), 'Confirmed on the Time screen') }, 'Confirm all'),
+          due.length > 1 && h('button', { title: 'Every one happened as planned', onclick: async () => {
+            const ops = due.filter((b) => !b.routine).map((b) => ({ op: 'update', id: b.id, status: 'logged' }));
+            // The days of one routine are marked done together, each with its own entry.
+            const byRoutine = Map.groupBy(due.filter((b) => b.routine), (b) => b.id);
+            for (const [id, bs] of byRoutine) {
+              const p = (await api('get', { id })).entity.props;
+              bs.forEach((b, i) => ops.push({ op: 'create', ref: `e${id}${i}`, type: 'time.entry', title: b.what, status: 'logged', props: { date: b.date, hours: b.hours, start: b.start, end: b.end } }, { op: 'link', type: 'part_of', from: `e${id}${i}`, to: b.work_id }));
+              ops.push({ op: 'update', id, props: { done: [...(Array.isArray(p.done) ? p.done : []), ...bs.map((b) => b.date)] } });
+            }
+            write(ops, 'Confirmed on the Time screen');
+          } }, 'Confirm all'),
         ),
         h('ul', { class: 'rows' }, due.map(confirmRow)),
       )

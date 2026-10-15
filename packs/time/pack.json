@@ -20,6 +20,22 @@
       }
     },
     {
+      "id": "time.routine",
+      "title": "Routine",
+      "description": "A block that repeats: the same hours on the same days of the week, like dinner from 17:00 to 19:00 every day. Nothing is stored for a day: the calendar draws it where it falls. Made part of a piece of work, each day it falls on is planned time for that work, which the owner confirms as it happened; one that is part of nothing only holds the time.",
+      "statuses": { "open": ["active"], "closed": ["ended"] },
+      "fields": {
+        "from_time": { "type": "string", "shown": true, "description": "When it begins each day, as 17:00, in Toronto." },
+        "to_time": { "type": "string", "shown": true, "description": "When it ends each day, as 19:00." },
+        "days": { "type": "json", "shown": true, "description": "The days of the week it falls on, 1 for Monday to 7 for Sunday. Every day when left out." },
+        "starts": { "type": "date", "description": "The first day it falls on. From when it was made when left out." },
+        "until": { "type": "date", "description": "The last day it falls on, when it ends." },
+        "skip": { "type": "json", "description": "Days it does not fall on after all, as 2026-10-15." },
+        "moved": { "type": "json", "description": "Days it falls at other hours: each day with its from and to, as {\"2026-10-15\": [\"18:00\", \"20:00\"]}." },
+        "done": { "type": "json", "description": "Days of work the owner has confirmed: each made a time entry, and is no longer drawn from the routine.", "system": true }
+      }
+    },
+    {
       "id": "time.invoice",
       "extends": "document",
       "title": "Invoice",

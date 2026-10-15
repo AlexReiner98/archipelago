@@ -2504,6 +2504,52 @@ test('planned time counts toward nothing and is never invoiced until the owner c
   assert.deepEqual([inv.hours, inv.subtotal], [1.5, 75]);
 });
 
+test('a routine is drawn on the days it falls on; one for work waits to be confirmed day by day, by a person', async () => {
+  const { occurs, today } = await import('../src/time.ts');
+  // Wednesday 14 October 2026 is a 3; Saturday the 17th a 6.
+  const dinner = { from_time: '17:00', to_time: '19:00' };
+  assert.deepEqual(occurs(dinner, '2026-10-14'), [17, 19], 'every day when no days are given');
+  assert.equal(occurs({ ...dinner, days: [1, 2, 3, 4, 5] }, '2026-10-17'), undefined, 'not on a day it does not fall on');
+  assert.equal(occurs({ ...dinner, starts: '2026-10-15' }, '2026-10-14'), undefined, 'not before it starts');
+  assert.equal(occurs({ ...dinner, skip: ['2026-10-14'] }, '2026-10-14'), undefined, 'not on a day skipped');
+  assert.deepEqual(occurs({ ...dinner, moved: { '2026-10-14': ['18:00', '20:30'] } }, '2026-10-14'), [18, 20.5], 'at other hours on a day moved');
+  assert.equal(occurs({ from_time: 'dinner', to_time: '19:00' }, '2026-10-14'), undefined, 'nothing from hours it cannot read');
+
+  const l = await fresh();
+  const now = today();
+  const back = (n: number) => new Date(Date.parse(`${now}T12:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Aperture' },
+    { op: 'create', ref: 'dinner', type: 'time.routine', title: 'Dinner', status: 'active', props: { ...dinner, starts: back(10) } },
+    { op: 'create', ref: 'deep', type: 'time.routine', title: 'Deep work', status: 'active', props: { from_time: '09:00', to_time: '11:00', starts: back(2) } },
+    { op: 'link', type: 'part_of', from: 'deep', to: 'p' },
+  ]);
+  type B = { id: string; what: string; date: string; from_hour: number; to_hour: number; routine?: boolean; work_id: string | null; start: string; end: string; hours: number };
+  type W = { days: { date: string; hours: number; planned: number; owner: B[] }[]; to_confirm: B[] };
+  const wk = (await callTool(l, human, 'week', { from: now })) as W;
+  const on = wk.days.find((d) => d.date === now)!;
+  assert.deepEqual(on.owner.filter((b) => b.id === made.dinner).map((b) => [b.from_hour, b.to_hour, b.routine]), [[17, 19, true]]);
+  assert.deepEqual([on.hours, on.planned], [0, 2], 'dinner is not work; deep work is time planned for its project');
+  // The days of deep work that have passed wait to be confirmed: the two before today, and today's once it is over.
+  const due = wk.to_confirm.filter((b) => b.id === made.deep).map((b) => b.date);
+  assert.ok(due.includes(back(2)) && due.includes(back(1)) && !due.includes(back(3)));
+  assert.ok(!wk.to_confirm.some((b) => b.id === made.dinner), 'a routine for nothing is never confirmed');
+
+  // Only a person confirms a day: an agent may not mark one done.
+  await assert.rejects(l.change(agent, { ops: [{ op: 'update', id: made.deep, props: { done: [back(1)] } }], reason: 'test' }), /only a person confirms a day/);
+  // Confirmed as the page sends it: an entry for the day, and the day marked done on the routine.
+  const day = wk.to_confirm.find((b) => b.id === made.deep && b.date === back(1))!;
+  await make(l, [
+    { op: 'create', ref: 'e', type: 'time.entry', title: day.what, status: 'logged', props: { date: day.date, hours: 1.5, start: day.start, end: new Date(Date.parse(day.start) + 5_400_000).toISOString() } },
+    { op: 'link', type: 'part_of', from: 'e', to: made.p },
+    { op: 'update', id: made.deep, props: { done: [day.date] } },
+  ]);
+  const after = (await callTool(l, human, 'week', { from: back(1) })) as W;
+  const that = after.days.find((d) => d.date === back(1))!;
+  assert.deepEqual([that.hours, that.owner.filter((b) => b.routine && b.id === made.deep).length], [1.5, 0], 'the day counts as worked and is no longer drawn from the routine');
+  assert.ok(!after.to_confirm.some((b) => b.id === made.deep && b.date === back(1)));
+});
+
 test('a session’s turns are kept as stretches of work: a prompt begins one, a stop ends it, a long quiet starts the next', async () => {
   const { stretch, IDLE_MS } = await import('../src/sessions.ts');
   const t = (m: number) => new Date(Date.parse('2026-10-15T12:00:00Z') + m * 60_000).toISOString();
