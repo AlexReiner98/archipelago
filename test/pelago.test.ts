@@ -2341,12 +2341,12 @@ test('time is logged against work, summed by day and client, and billed on a num
   assert.deepEqual([inv.number.replace(/\d{4}/, 'YYYY'), inv.entries, inv.subtotal, inv.tax, inv.total], ['INV-YYYY-001', 2, 360, 46.8, 406.8]);
   const doc = (await callTool(l, human, 'document', { id: inv.created.inv })) as { parts: { text?: string }[] };
   const text = doc.parts.map((p) => p.text).join('\n');
-  assert.match(text, /From: Aperture Design Tools Inc\. · 1 King St, Toronto · HST 123456789RT0001/);
-  assert.match(text, /3 h × \$80\.00 = \$240\.00/);
+  assert.match(text, /\| \*\*Aperture Design Tools Inc\.\*\* \| \*\*Northwind\*\* \|\n\| 1 King St, Toronto \|  \|\n\| HST 123456789RT0001 \|  \|/);
+  assert.match(text, /\| Oct 14 \| Funding research \| 3 \| \$80\.00 \| \$240\.00 \|/);
   const read = (await callTool(l, human, 'document', { id: inv.created.inv })) as { type: string; fields: Record<string, unknown> };
   assert.equal(read.type, 'time.invoice');
   assert.deepEqual([read.fields.number, read.fields.total], [inv.number, 406.8], 'an invoice says its number and total to the page that lays it out');
-  assert.match(text, /Total due: \$406\.80 CAD/);
+  assert.match(text, /\| \*\*Total due \(CAD\)\*\* \| \*\*\$406\.80\*\* \|/);
   await assert.rejects(callTool(l, human, 'invoice_draft', { client: made.aa, to: '2026-10-31' }), /No billable time/);
   // A void invoice frees its time to be billed again, on the next number.
   await callTool(l, human, 'invoice_void', { id: inv.created.inv });

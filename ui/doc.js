@@ -54,6 +54,33 @@ function inline(text, titles) {
 }
 
 /**
+ * A table, written as lines of | cells |, with a rule of dashes under its head (| --- | --: |): a colon on the right
+ * of a rule's cell sets that column to the right, on both sides to the centre. A head with no words is not drawn.
+ * Read from lines[at]; null when no table starts there.
+ */
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_RULE = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/;
+function readTable(lines, at) {
+  if (!TABLE_ROW.test(lines[at] ?? '') || !TABLE_RULE.test(lines[at + 1] ?? '')) return null;
+  const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+  const aligns = cells(lines[at + 1]).map((c) => (c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : 'left'));
+  let end = at + 2;
+  while (end < lines.length && TABLE_ROW.test(lines[end])) end++;
+  return { end, head: cells(lines[at]), aligns, rows: lines.slice(at + 2, end).map(cells) };
+}
+/** A table read by readTable, each cell drawn by `cell`. */
+function drawTable(t, cell) {
+  // The page's policy allows no inline style: a column's side is a class.
+  const td = (tag, text, i) => h(tag, { class: `align-${t.aligns[i] ?? 'left'}` }, cell(text));
+  return h(
+    'table',
+    { class: 'text-table' },
+    t.head.some(Boolean) && h('thead', {}, h('tr', {}, t.head.map((c, i) => td('th', c, i)))),
+    h('tbody', {}, t.rows.map((row) => h('tr', {}, t.aligns.map((_, i) => td('td', row[i] ?? '', i))))),
+  );
+}
+
+/**
  * Text as blocks: "# " and "## " lines are headings; a short line on its own above a paragraph, not ending as a
  * sentence, is that paragraph's title (as notes on the map are written); "- ", "1. " lines are lists.
  */
@@ -67,7 +94,16 @@ function blocks(text, titles, depth) {
     if (para.length) out.push(h('p', {}, inline(para.join(' '), titles)));
     para = [];
   };
-  for (const [i, line] of lines.entries()) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const table = readTable(lines, i);
+    if (table) {
+      flush();
+      list = undefined;
+      out.push(drawTable(table, (text) => inline(text, titles)));
+      i = table.end - 1;
+      continue;
+    }
     const trimmed = line.trim();
     const mark = item(line);
     const heading = /^(#{1,3})\s+(.*)$/.exec(trimmed);
@@ -85,7 +121,7 @@ function blocks(text, titles, depth) {
       list.append(h('li', {}, inline(line.slice(mark[0].length), titles)));
     } else if (list && /^\s{2,}/.test(line)) {
       list.lastChild.append(...inline(` ${trimmed}`, titles));
-    } else if (!lines[i - 1]?.trim() && lines[i + 1]?.trim() && trimmed.length <= 90 && !/[.;,:!?]$/.test(trimmed)) {
+    } else if (!lines[i - 1]?.trim() && lines[i + 1]?.trim() && trimmed.length <= 90 && !/[.;,:!?|]$/.test(trimmed)) {
       flush();
       list = undefined;
       out.push(h(`h${Math.min(depth + 1, 4)}`, {}, inline(trimmed, titles)));

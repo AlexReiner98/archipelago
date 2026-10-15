@@ -160,22 +160,29 @@ export async function draftInvoice(l: Archipelago, actor: Actor, input: { client
   const number = await nextNumber(l, billedBy.id, issued.slice(0, 4));
   const bp = billedBy.props as Record<string, unknown>;
   const said = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  // A cell holds no pipe of its own.
+  const cell = (v: unknown) => String(v ?? '').replaceAll('|', '/').trim();
+  const fromLines = [billedBy.title, said(bp.address), said(bp.email), said(bp.hst_number) && `HST ${said(bp.hst_number)}`].filter(Boolean) as string[];
+  const toLines = [client.title, said(p.address), said(p.email)].filter(Boolean) as string[];
   const body = [
-    `From: ${[billedBy.title, said(bp.address), said(bp.email), said(bp.hst_number) && `HST ${said(bp.hst_number)}`].filter(Boolean).join(' · ')}`,
-    // Each heading line is a paragraph of its own, so they read as lines and not as one run of text.
-    '',
-    `To: ${[client.title, said(p.address), said(p.email)].filter(Boolean).join(' · ')}`,
+    '| From | Bill to |',
+    '| --- | --- |',
+    ...Array.from({ length: Math.max(fromLines.length, toLines.length) }, (_, i) => `| ${i === 0 ? `**${cell(fromLines[i])}**` : cell(fromLines[i])} | ${i === 0 ? `**${cell(toLines[i])}**` : cell(toLines[i])} |`),
     '',
     `For work from ${longDay(mine[0].date)} to ${longDay(mine.at(-1)!.date)}. Due ${terms} days from issue.`,
     '',
     'Work',
-    ...lines.map(({ r, each, amount }) => `- ${shortDay(r.date)} · ${r.title}${r.workTitle ? ` (${r.workTitle})` : ''} · ${r.hours} h × ${money(each, currency)} = ${money(amount, currency)}`),
+    '| Date | Description | Hours | Rate | Amount |',
+    '| --- | --- | --: | --: | --: |',
+    ...lines.map(({ r, each, amount }) => `| ${shortDay(r.date)} | ${cell(r.title)}${r.workTitle && r.workTitle !== r.title ? ` — ${cell(r.workTitle)}` : ''} | ${r.hours} | ${money(each, currency)} | ${money(amount, currency)} |`),
     '',
     'Totals',
-    `- ${hours} hours`,
-    `- Subtotal: ${money(subtotal, currency)}`,
-    ...(p.hst === true ? [`- HST 13%: ${money(tax, currency)}`] : []),
-    `- Total due: ${money(total, currency)} ${currency}`,
+    '| | |',
+    '| --: | --: |',
+    `| Hours | ${hours} |`,
+    `| Subtotal | ${money(subtotal, currency)} |`,
+    ...(p.hst === true ? [`| HST 13% | ${money(tax, currency)} |`] : []),
+    `| **Total due (${currency})** | **${money(total, currency)}** |`,
     // How to pay, as the biller keeps it: one way per line.
     ...(said(bp.payment) ? ['', 'How to pay', ...said(bp.payment)!.split('\n').map((way) => way.trim().replace(/^[-*]\s*/, '')).filter(Boolean).map((way) => `- ${way}`), `- Please quote ${number} with your payment.`] : []),
   ].join('\n');

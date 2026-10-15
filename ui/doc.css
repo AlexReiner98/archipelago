@@ -209,3 +209,60 @@ body.invoice ul {
 body.invoice li {
   font-variant-numeric: tabular-nums;
 }
+/* Tables: ruled rows, numbers that line up, a head in the plain face. */
+table.text-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.4em 0 1.2em;
+  font-variant-numeric: tabular-nums;
+}
+table.text-table th {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 8px;
+  border-bottom: 1.5px solid var(--ink);
+}
+table.text-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+table.text-table tr:last-child td {
+  border-bottom: 0;
+}
+/* On an invoice, the totals sit to the right under the work, and its last row is what is due. */
+body.invoice h3 + table.text-table:not(:has(thead)) {
+  width: auto;
+  min-width: 46%;
+  margin-left: auto;
+}
+body.invoice table.text-table:not(:has(thead)) tr:last-child td {
+  border-top: 1.5px solid var(--ink);
+  font-size: 1.1em;
+}
+body.invoice table.text-table:first-of-type td {
+  border-bottom: 0;
+  padding: 2px 8px;
+}
+@media print {
+  table.text-table th {
+    color: #000;
+  }
+  table.text-table tr {
+    break-inside: avoid;
+  }
+}
+
+.align-left {
+  text-align: left;
+}
+.align-right {
+  text-align: right;
+}
+.align-center {
+  text-align: center;
+}

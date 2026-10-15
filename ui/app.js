@@ -938,13 +938,40 @@ function map() {
  * titles of what else it holds: every section, and the rest of the opening,
  * is one click away.
  */
+/**
+ * A table, written as lines of | cells |, with a rule of dashes under its head (| --- | --: |): a colon on the right
+ * of a rule's cell sets that column to the right, on both sides to the centre. A head with no words is not drawn.
+ * Read from lines[at]; null when no table starts there.
+ */
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_RULE = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/;
+function readTable(lines, at) {
+  if (!TABLE_ROW.test(lines[at] ?? '') || !TABLE_RULE.test(lines[at + 1] ?? '')) return null;
+  const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+  const aligns = cells(lines[at + 1]).map((c) => (c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : 'left'));
+  let end = at + 2;
+  while (end < lines.length && TABLE_ROW.test(lines[end])) end++;
+  return { end, head: cells(lines[at]), aligns, rows: lines.slice(at + 2, end).map(cells) };
+}
+/** A table read by readTable, each cell drawn by `cell`. */
+function drawTable(t, cell) {
+  // The page's policy allows no inline style: a column's side is a class.
+  const td = (tag, text, i) => h(tag, { class: `align-${t.aligns[i] ?? 'left'}` }, cell(text));
+  return h(
+    'table',
+    { class: 'text-table' },
+    t.head.some(Boolean) && h('thead', {}, h('tr', {}, t.head.map((c, i) => td('th', c, i)))),
+    h('tbody', {}, t.rows.map((row) => h('tr', {}, t.aligns.map((_, i) => td('td', row[i] ?? '', i))))),
+  );
+}
+
 function renderBody(text) {
   const heading = (line) => /^[A-Z0-9][A-Z0-9 ,'()\/&-]{2,60}:?$/.test(line.trim()) && /[A-Z]{3}/.test(line);
   const item = (line) => /^\s*(-|\*|\d+\.|[A-Z]\.)\s+/.exec(line);
   const sections = [{ title: null, lines: [] }];
   const lines = text.split('\n');
   // A short line that opens a paragraph and does not end as a sentence is that paragraph's title.
-  const titles = (line, i) => !lines[i - 1]?.trim() && Boolean(lines[i + 1]?.trim()) && line.trim().length <= 90 && !/[.;,]$/.test(line.trim()) && !item(line);
+  const titles = (line, i) => !lines[i - 1]?.trim() && Boolean(lines[i + 1]?.trim()) && line.trim().length <= 90 && !/[.;,|]$/.test(line.trim()) && !item(line);
   for (const [i, line] of lines.entries()) {
     if (heading(line) || (line.trim() && titles(line, i))) sections.push({ title: line.trim().replace(/:$/, ''), lines: [] });
     else sections.at(-1).lines.push(line);
@@ -957,7 +984,18 @@ function renderBody(text) {
       if (para.length) out.push(h('p', {}, idsAsLinks(para.join(' '))));
       para = [];
     };
-    for (const line of lines) {
+    // A cell said in **stars** is strong.
+    const cell = (text) => (/^\*\*.*\*\*$/.test(text) ? h('strong', {}, idsAsLinks(text.slice(2, -2))) : idsAsLinks(text));
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const table = readTable(lines, i);
+      if (table) {
+        flush();
+        list = undefined;
+        out.push(drawTable(table, cell));
+        i = table.end - 1;
+        continue;
+      }
       const mark = item(line);
       if (mark) {
         flush();
