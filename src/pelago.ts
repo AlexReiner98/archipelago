@@ -980,6 +980,7 @@ export class Archipelago {
       entity,
       source: source && { id: source.id, title: source.title, uri: source.props.uri },
       trail: await this.trail(id),
+      mentioned_in: await this.mentionedIn(id),
       outgoing: out.rows,
       incoming: inc.rows,
       recent_events: events.rows,
@@ -1016,6 +1017,21 @@ export class Archipelago {
     );
     for (const v of rows) trail.find((t) => t.id === v.about)?.views.push({ id: v.id, title: v.title });
     return trail;
+  }
+
+  /**
+   * What names an item in its text or its fields (a note that points at it, a document that brings it in, a
+   * decision whose reasons cite it): the way back for a link written as an id, which no relation records.
+   * Documents first, then the newest. The system's own records are left out. Only what the asker may see.
+   */
+  async mentionedIn(id: string) {
+    const { rows } = await this.db.query<{ id: string; type: string; title: string; status: string }>(
+      `select id, type, title, status from entity
+       where id <> $1 and archived_at is null and type not like 'sys.%' and position($1 in body || ' ' || props::text) > 0
+       order by type = any($2::text[]) desc, updated_at desc limit 30`,
+      [id, this.registry.family('document')],
+    );
+    return rows;
   }
 
   async events(input: { since?: string; before?: number; target?: string; actor?: string; origin?: string; limit?: number }) {

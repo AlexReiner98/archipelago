@@ -374,7 +374,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => l.search(input),
   },
   get: {
-    description: 'One entity in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it) and its relations in both directions. Its recent history too, when asked for with history: true.',
+    description: 'One entity in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in) and its relations in both directions. Its recent history too, when asked for with history: true.',
     input: { id: z.string(), history: z.boolean().optional().describe('true to be given the last changes to it as well (recent_events).'), full: FULL },
     run: async (l, actor, input) => {
       const found = await l.get(input.id);

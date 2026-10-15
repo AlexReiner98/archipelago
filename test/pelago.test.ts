@@ -2274,3 +2274,23 @@ test('an item says where it sits: what it is part of, outermost first, with the 
   assert.deepEqual(trail.map((t) => [t.title, t.views.map((v) => v.title)]), [['Research project', ['Funding map']], ['Simulation tools', []]], 'a shortcut is not a view of it');
   assert.deepEqual(((await callTool(l, human, 'get', { id: made.p })) as { trail: unknown[] }).trail, []);
 });
+
+test('an item knows what names it in its text or fields, documents first, and only what the asker may see', async () => {
+  const l = await fresh();
+  const people = await make(l, [{ op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
+  const made = await make(l, [
+    { op: 'create', ref: 'n', type: 'note', title: 'FedDev section', visibility: 'shared' },
+    { op: 'create', ref: 't', type: 'task', title: 'Send the document', body: 'Details in {n}.', visibility: 'shared' },
+    { op: 'create', ref: 'd', type: 'document', title: 'Funding document', body: 'Intro\n{n}', visibility: 'shared' },
+  ]);
+  Object.assign(made, await make(l, [{ op: 'create', ref: 'q', type: 'decision', title: 'Apply to RAII?', visibility: 'shared', props: { rationale: `See ${made.n}` } }]));
+  const mentions = async (who: Archipelago) => ((await callTool(who, human, 'get', { id: made.n })) as { mentioned_in: { id: string }[] }).mentioned_in.map((m) => m.id);
+  const all = await mentions(l);
+  assert.equal(all[0], made.d, 'the document comes first');
+  assert.deepEqual([...all].sort(), [made.t, made.d, made.q].sort());
+  // Bo's own private note naming it is his alone to see.
+  const bo = l.as(people.bo);
+  await bo.change({ kind: 'human', name: 'bo', person: people.bo }, { ops: [{ op: 'create', type: 'note', title: 'Mine', body: `About ${made.n}`, visibility: 'private' }], reason: 'test' });
+  assert.equal((await mentions(bo)).length, 4);
+  assert.equal((await mentions(l.as('someone else'))).length, 3);
+});

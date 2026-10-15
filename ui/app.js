@@ -1127,6 +1127,8 @@ async function entity(id) {
   };
 
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
+  // What names it, less what the trail already leads to.
+  const mentions = (data.mentioned_in ?? []).filter((m) => !data.trail?.some((t) => t.id === m.id));
   const delivers = data.incoming.filter((r) => r.type === 'part_of' && types.get(r.entity_type)?.deliverable && !isClosed(r.entity_type, r.status));
   // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
   const project = isA(e.type, 'project');
@@ -1281,6 +1283,14 @@ async function entity(id) {
             h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title),
             t.views.map((v) => h('a', { class: 'trail-view', href: `#/graph?from=${t.id}&lens=${v.id}&here=${id}`, title: `Open "${v.title}" with this marked in it` }, v.title)),
           ]),
+        ),
+      // What names it in its text: a link written as an id has its way back here.
+      mentions.length > 0 &&
+        h(
+          'div',
+          { class: 'delivers mentions', title: 'What names this in its text or fields' },
+          h('span', { class: 'muted small' }, 'Mentioned in'),
+          mentions.map((m) => h('span', { class: 'deliverable' }, chip(m.type), h('span', { class: 'gist', title: m.title }, link(m)))),
         ),
       // What it makes for a reader or a customer, named where it is looked for: under the title of what it is part of.
       delivers.length > 0 &&
