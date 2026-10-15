@@ -4290,8 +4290,12 @@ function follow(steps = []) {
   if (!busy && there && location.hash !== there) location.hash = there;
 }
 
+/** A page that has just drawn itself again after its own change: the change the pulse then sees is already on it. */
+let selfDrawn = false;
+/** A redraw under way: another is not started on top of it. */
+let redrawing = false;
 async function checkPulse() {
-  if (document.hidden) return;
+  if (document.hidden || redrawing) return;
   let now;
   try {
     const beat = await api('pulse');
@@ -4316,6 +4320,7 @@ async function checkPulse() {
   const moved = pulse !== undefined && now !== pulse;
   pulse = now;
   if (!moved) return;
+  if (selfDrawn) return void (selfDrawn = false);
   if (dirty || document.querySelector('dialog[open]') || /^#\/new/.test(location.hash)) {
     refreshReviewCount();
     stale.hidden = false;
@@ -4323,7 +4328,12 @@ async function checkPulse() {
   }
   // Hold the page's height while it is redrawn, so the scroll position stays.
   main.style.minHeight = `${main.offsetHeight}px`;
-  await route(true);
+  redrawing = true;
+  try {
+    await route(true);
+  } finally {
+    redrawing = false;
+  }
   setTimeout(() => (main.style.minHeight = ''), 1000);
 }
 setInterval(checkPulse, 2000);
@@ -4750,7 +4760,7 @@ async function time() {
   const write = async (ops, reason) => {
     try {
       await api('change', { ops, reason });
-      again();
+      (selfDrawn = true), again();
     } catch (err) {
       tell('That was not saved', err.message);
     }
@@ -4774,7 +4784,7 @@ async function time() {
         try {
           const made = await api('time_log', { work: work.id, hours: Number(hours.value), what: what.value.trim(), note: note.value.trim() || undefined, date: date.value, billable: billable.checked ? undefined : false });
           if (!made.client) await tell('Logged, with no client', made.note ?? 'This work involves no company, so it is not invoiced.');
-          again();
+          (selfDrawn = true), again();
         } catch (err) {
           tell('That was not logged', err.message);
         }
@@ -4879,7 +4889,7 @@ async function time() {
             reason: 'Made a routine on the Time screen',
           });
         else await api('time_log', { work: said.work.id, what: said.what, start, end, ...(said.planned && { planned: true }) });
-        again();
+        (selfDrawn = true), again();
       } catch (err) {
         tell('That was not added', err.message);
       }
@@ -4965,7 +4975,7 @@ async function time() {
     const method = said.replace(/^\s*\$?[\d,]+(?:\.\d+)?\s*/, '').trim();
     try {
       await api('invoice_paid', { id: i.id, ...(amount && { amount: Number(amount.replaceAll(',', '')) }), ...(method && { method }) });
-      again();
+      (selfDrawn = true), again();
     } catch (err) {
       tell('The payment was not recorded', err.message);
     }

@@ -204,29 +204,60 @@ export function occurs(p: Record<string, unknown>, day: string, made?: string): 
  * repository it sits in or lives in; failing that, that repository. Work that is in neither counts toward nothing.
  */
 async function projectOf(l: Archipelago, id: string, cache: Map<string, string | null>): Promise<string | null> {
-  if (cache.has(id)) return cache.get(id)!;
-  const self = await l.entity(id);
-  let found: string | null = null;
-  if (self) {
-    const chain = [...(await l.trail(id)), { id: self.id, type: self.type }];
-    found = chain.find((c) => l.registry.isA(c.type, 'project'))?.id ?? null;
-    if (!found) {
-      const { rows } = await l.db.query<{ id: string }>(
-        `select p.id from relation h join entity p on p.id = h.from_id
-         where h.type = 'software.lives_in' and h.valid_to is null and p.archived_at is null and p.type = any($1::text[])
-           and h.to_id in (select x from unnest($2::text[]) x union select r.to_id from relation r where r.from_id = any($2::text[]) and r.type = 'software.lives_in' and r.valid_to is null)
-         order by p.created_at limit 1`,
-        [l.registry.family('project'), chain.map((c) => c.id)],
-      );
-      const { rows: repos } = await l.db.query<{ id: string }>(
-        `select to_id as id from relation where from_id = any($1::text[]) and type = 'software.lives_in' and valid_to is null limit 1`,
-        [chain.map((c) => c.id)],
-      );
-      found = rows[0]?.id ?? chain.find((c) => c.type === 'software.repo')?.id ?? repos[0]?.id ?? null;
+  await projectsOf(l, [id], cache);
+  return cache.get(id) ?? null;
+}
+
+/** What each of many pieces of work counts toward (see projectOf), found in a few queries however many there are. */
+async function projectsOf(l: Archipelago, ids: (string | null)[], cache: Map<string, string | null>): Promise<void> {
+  const ask = [...new Set(ids.filter((id): id is string => Boolean(id) && !cache.has(id!)))];
+  if (!ask.length) return;
+  // Each piece of work with everything it sits in, as deep as the trail goes.
+  const { rows: up } = await l.db.query<{ start: string; id: string; type: string; depth: number }>(
+    `with recursive up(start, id, type, depth) as (
+       select e.id, e.id, e.type, 0 from entity e where e.id = any($1::text[]) and e.archived_at is null
+       union all
+       select up.start, p.id, p.type, up.depth + 1 from up
+         join relation r on r.from_id = up.id and r.type = 'part_of' and r.valid_to is null
+         join entity p on p.id = r.to_id and p.archived_at is null
+       where up.depth < 8)
+     select distinct start, id, type, depth from up`,
+    [ask],
+  );
+  const chains = new Map<string, { id: string; type: string; depth: number }[]>(ask.map((id) => [id, []]));
+  for (const r of up) chains.get(r.start)?.push(r);
+  const outermost = (chain: { id: string; type: string; depth: number }[], fits: (type: string) => boolean) =>
+    chain.filter((c) => fits(c.type)).sort((a, b) => b.depth - a.depth)[0]?.id;
+  const open = ask.filter((id) => !outermost(chains.get(id)!, (t) => l.registry.isA(t, 'project')));
+  // Where a piece of work in no project lives: a repository it sits in, or one it or what it sits in lives in.
+  const inChains = [...new Set(open.flatMap((id) => chains.get(id)!.map((c) => c.id)))];
+  const { rows: lives } = inChains.length
+    ? await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where from_id = any($1::text[]) and type = 'software.lives_in' and valid_to is null`, [inChains])
+    : { rows: [] };
+  const reposOf = (id: string) => {
+    const chain = chains.get(id)!;
+    return [...new Set([...chain.filter((c) => c.type === 'software.repo').map((c) => c.id), ...chain.flatMap((c) => lives.filter((x) => x.from_id === c.id).map((x) => x.to_id))])];
+  };
+  const repos = [...new Set(open.flatMap(reposOf))];
+  const { rows: living } = repos.length
+    ? await l.db.query<{ repo: string; project: string }>(
+        `select h.to_id as repo, p.id as project from relation h join entity p on p.id = h.from_id
+         where h.type = 'software.lives_in' and h.valid_to is null and p.archived_at is null and p.type = any($1::text[]) and h.to_id = any($2::text[])
+         order by p.created_at`,
+        [l.registry.family('project'), repos],
+      )
+    : { rows: [] };
+  for (const id of ask) {
+    const chain = chains.get(id)!;
+    const project = outermost(chain, (t) => l.registry.isA(t, 'project'));
+    if (project || !chain.length) {
+      cache.set(id, project ?? null);
+      continue;
     }
+    const own = reposOf(id);
+    // As in the trail: a repository it sits in before one it only lives in, the oldest project living there first.
+    cache.set(id, living.find((x) => own.includes(x.repo))?.project ?? chain.find((c) => c.type === 'software.repo')?.id ?? own[0] ?? null);
   }
-  cache.set(id, found);
-  return found;
 }
 
 /** Signs of work further apart than this, in a session recorded before its stretches were kept, are taken as idle between. */
@@ -308,9 +339,41 @@ export async function week(l: Archipelago, input: { from?: string }) {
     }
   };
 
+  // Everything the week is drawn from, fetched first; then every name and project it needs, in a handful of queries.
+  const logged = await entries(l, `e.props ->> 'date' between $2 and $3`, [from, to], true);
+  const plannedRows = await entries(l, `e.status = 'planned' and e.date <= $2`, [today()], true);
+  const { rows: routines } = await l.db.query<{ id: string; title: string; props: Record<string, unknown>; created_at: Date; work: string | null; link: string | null }>(
+    `select e.id, e.title, e.props, e.created_at, r.to_id as work, r.id as link
+     from entity e left join relation r on r.from_id = e.id and r.type = 'part_of' and r.valid_to is null
+     where e.type = any($1::text[]) and e.archived_at is null and e.is_open order by e.props ->> 'from_time', e.title`,
+    [l.registry.family('time.routine')],
+  );
+  const { rows: runs } = await l.db.query<{ id: string; title: string; is_open: boolean; status: string; created_at: Date; updated_at: Date; last_seen: string | null; active: unknown; busy: boolean | null; story: unknown; repo: string | null }>(
+    `select e.id, e.title, e.is_open, e.status, e.created_at, e.updated_at, e.props ->> 'last_seen' as last_seen,
+            e.props -> 'active' as active, (e.props ->> 'busy')::boolean as busy, e.props -> 'story' as story, r.to_id as repo
+     from entity e left join relation r on r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null
+     where e.type = any($1::text[]) and e.archived_at is null and e.created_at < $3
+       and greatest(e.updated_at, coalesce((e.props ->> 'last_seen')::timestamptz, e.created_at)) >= $2
+     order by e.created_at`,
+    [l.registry.family('sys.run'), new Date(edges[0]).toISOString(), new Date(edges[7]).toISOString()],
+  );
+  const runIds = runs.map((r) => r.id);
+  const { rows: tasks } = runIds.length
+    ? await l.db.query<{ run: string; task: string; valid_from: Date; valid_to: Date | null }>(
+        `select from_id as run, to_id as task, valid_from, valid_to from relation where type = 'sys.works_on' and from_id = any($1::text[]) order by valid_from`,
+        [runIds],
+      )
+    : { rows: [] };
+  // What else says when a session recorded before its stretches were kept was at work: what it did to its own record.
+  const { rows: signs } = runIds.length ? await l.db.query<{ run: string; ts: Date }>(`select target_id as run, ts from event where target_id = any($1::text[])`, [runIds]) : { rows: [] };
+  const works = [...logged.map((r) => r.work), ...plannedRows.map((r) => r.work), ...routines.map((r) => r.work), ...tasks.map((t) => t.task), ...runs.map((r) => r.repo)];
+  await projectsOf(l, works, projects);
+  const wanted = [...new Set([...works, ...projects.values()].filter((id): id is string => Boolean(id) && !titles.has(id!)))];
+  if (wanted.length) for (const r of (await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[])`, [wanted])).rows) titles.set(r.id, r.title);
+
   // The owner's lane: what they logged, as blocks where they said when.
   const owner: Block[][] = days.map(() => []);
-  for (const r of await entries(l, `e.props ->> 'date' between $2 and $3`, [from, to], true)) {
+  for (const r of logged) {
     const at = days.indexOf(r.date);
     const base = { id: r.id, what: r.title, work: await named(r.work), work_id: r.work, project: r.work ? await projectOf(l, r.work, projects) : null, status: r.status };
     const s = r.start ? Date.parse(r.start) : NaN;
@@ -324,13 +387,6 @@ export async function week(l: Archipelago, input: { from?: string }) {
   }
 
   // Routines: drawn on each day they fall on. One for a piece of work is planned time for it; one for nothing holds the time.
-  const { rows: routines } = await l.db.query<{ id: string; title: string; props: Record<string, unknown>; created_at: Date; work: string | null; link: string | null }>(
-    `select e.id, e.title, e.props, e.created_at,
-            (select r.to_id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as work,
-            (select r.id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as link
-     from entity e where e.type = any($1::text[]) and e.archived_at is null and e.is_open order by e.props ->> 'from_time', e.title`,
-    [l.registry.family('time.routine')],
-  );
   const routineOn = async (r: (typeof routines)[number], day: string): Promise<Block | undefined> => {
     const at = occurs(r.props, day, today(new Date(r.created_at)));
     if (!at) return undefined;
@@ -349,21 +405,6 @@ export async function week(l: Archipelago, input: { from?: string }) {
 
   // The agents' lanes: every session that ran in the week, from when it began to when it ended (or was last heard from,
   // if it is still open), cut by the work it said it was on. Time on nothing in particular counts to its repository.
-  const { rows: runs } = await l.db.query<{ id: string; title: string; is_open: boolean; status: string; created_at: Date; updated_at: Date; last_seen: string | null; active: unknown; busy: boolean | null; story: unknown; repo: string | null }>(
-    `select e.id, e.title, e.is_open, e.status, e.created_at, e.updated_at, e.props ->> 'last_seen' as last_seen,
-            e.props -> 'active' as active, (e.props ->> 'busy')::boolean as busy, e.props -> 'story' as story,
-            (select r.to_id from relation r where r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null limit 1) as repo
-     from entity e where e.type = any($1::text[]) and e.archived_at is null and e.created_at < $3
-       and greatest(e.updated_at, coalesce((e.props ->> 'last_seen')::timestamptz, e.created_at)) >= $2
-     order by e.created_at`,
-    [l.registry.family('sys.run'), new Date(edges[0]).toISOString(), new Date(edges[7]).toISOString()],
-  );
-  const { rows: tasks } = await l.db.query<{ run: string; task: string; valid_from: Date; valid_to: Date | null }>(
-    `select from_id as run, to_id as task, valid_from, valid_to from relation where type = 'sys.works_on' and from_id = any($1::text[]) order by valid_from`,
-    [runs.map((r) => r.id)],
-  );
-  // What else says when a session recorded before its stretches were kept was at work: what it did to its own record.
-  const { rows: signs } = await l.db.query<{ run: string; ts: Date }>(`select target_id as run, ts from event where target_id = any($1::text[])`, [runs.map((r) => r.id)]);
   const agents: Block[][] = days.map(() => []);
   // A run recorded only once it was over (a push read in GitHub Actions) has no length to draw: each day counts them.
   const reported: number[] = days.map(() => 0);
@@ -421,7 +462,7 @@ export async function week(l: Archipelago, input: { from?: string }) {
   // Planned time whose end has passed, whatever week it was in: the owner says whether it happened.
   const nowMs = Date.now();
   const due: (Block & { date: string; link: string | null })[] = [];
-  for (const r of await entries(l, `e.status = 'planned' and e.date <= $2`, [today()], true)) {
+  for (const r of plannedRows) {
     const over = r.end ? Date.parse(r.end) <= nowMs : r.date < today();
     if (!over) continue;
     const project = r.work ? await projectOf(l, r.work, projects) : null;
