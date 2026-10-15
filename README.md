@@ -102,7 +102,8 @@ draws what it depends on.
 - **Report a security problem:** in private, as [SECURITY.md](SECURITY.md)
   says.
 
-Archipelago is licensed under [Apache-2.0](LICENSE).
+Archipelago is copyright 2026 Aperture Design Tools Inc., licensed under
+[Apache-2.0](LICENSE); see [NOTICE](NOTICE).
 
 # Reference
 

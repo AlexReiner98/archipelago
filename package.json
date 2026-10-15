@@ -5,6 +5,7 @@
   "type": "module",
   "description": "A shared workspace for people and AI agents: a typed map of work, decisions and what waits on what.",
   "license": "Apache-2.0",
+  "author": "Aperture Design Tools Inc.",
   "engines": {
     "node": ">=24"
   },
