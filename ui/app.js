@@ -4456,7 +4456,7 @@ function weekCalendar(wk, today) {
           return h(
             'div',
             { class: `cal-day${d.date === today ? ' cal-today' : ''}` },
-            h('div', { class: 'cal-head', title: `${hoursText(d.hours)} of your time${lanes ? `, ${lanes} agent${lanes === 1 ? '' : 's'} at once at most` : ''}` }, h('span', { class: 'gist' }, dayName(d.date, { weekday: 'short', day: 'numeric' })), d.hours ? h('span', { class: 'tq-h muted small' }, hoursText(d.hours)) : null),
+            h('div', { class: 'cal-head', title: `${hoursText(d.hours)} of your time${lanes ? `, ${lanes} agent${lanes === 1 ? '' : 's'} at once at most` : ''}${d.reported ? `, ${d.reported} run${d.reported === 1 ? '' : 's'} reported when done` : ''}` }, h('span', { class: 'gist' }, dayName(d.date, { weekday: 'short', day: 'numeric' })), d.hours ? h('span', { class: 'tq-h muted small' }, hoursText(d.hours)) : null),
             h('div', { class: 'cal-loose' }, loose.map((b) => h('a', { class: 'cal-chip', href: `#/e/${b.id}`, title: tip(b), style: `flex-grow: ${b.hours}; ${colour(b)}` }))),
             h(
               'div',

@@ -2429,6 +2429,17 @@ test('a block of time has hours from its start and end, and a week holds the own
   await l.db.query(`update entity set status = 'finished', is_open = false, updated_at = '2026-10-16T03:00:00Z' where id = $1`, [quiet.run]);
   const later = (await callTool(l, human, 'week', { from: '2026-10-12' })) as typeof wk;
   assert.deepEqual(later.days[3].agents.flat().map((b) => [b.from_hour, b.to_hour]), [[10, 11]]);
+
+  // A run told of only once it was over has no length: it is counted, not given a lane.
+  const told = await callTool(l, agent, 'run_report', { repo: made.repo, title: 'Read the push to main (abc1234)' }) as { run: string };
+  await l.db.query(`update entity set created_at = '2026-10-16T13:00:00Z', updated_at = '2026-10-16T13:00:00Z' where id = $1`, [told.run]);
+  // Work in no project and no repository counts toward nothing, not toward itself.
+  const loose = await make(l, [{ op: 'create', ref: 'q', type: 'decision', title: 'Which house' }]);
+  await callTool(l, human, 'time_log', { work: loose.q, what: 'Looked at houses', start: '2026-10-17T10:00:00-04:00', end: '2026-10-17T11:00:00-04:00' });
+  const last = (await callTool(l, human, 'week', { from: '2026-10-12' })) as typeof wk & { days: { reported: number }[] };
+  assert.deepEqual([last.days[4].agents.length, last.days[4].reported], [0, 1]);
+  assert.equal(last.days[5].owner.find((b) => b.what === 'Looked at houses')?.project, null);
+  assert.ok(!last.projects.some((p) => p.title === 'Which house'));
 });
 
 test('an invoice says how to pay, takes payments in parts, and what is owed and overdue is in the timesheet', async () => {

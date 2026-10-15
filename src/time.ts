@@ -175,7 +175,7 @@ export interface Block {
 
 /**
  * What a piece of work counts toward: the outermost project it sits in; failing that, the project that lives in the
- * repository it sits in or lives in; failing that, the outermost thing it sits in.
+ * repository it sits in or lives in; failing that, that repository. Work that is in neither counts toward nothing.
  */
 async function projectOf(l: Archipelago, id: string, cache: Map<string, string | null>): Promise<string | null> {
   if (cache.has(id)) return cache.get(id)!;
@@ -192,7 +192,11 @@ async function projectOf(l: Archipelago, id: string, cache: Map<string, string |
          order by p.created_at limit 1`,
         [l.registry.family('project'), chain.map((c) => c.id)],
       );
-      found = rows[0]?.id ?? chain[0].id;
+      const { rows: repos } = await l.db.query<{ id: string }>(
+        `select to_id as id from relation where from_id = any($1::text[]) and type = 'software.lives_in' and valid_to is null limit 1`,
+        [chain.map((c) => c.id)],
+      );
+      found = rows[0]?.id ?? chain.find((c) => c.type === 'software.repo')?.id ?? repos[0]?.id ?? null;
     }
   }
   cache.set(id, found);
@@ -236,8 +240,7 @@ export async function week(l: Archipelago, input: { from?: string }) {
     for (let d = 0; d < 7; d++) {
       const x = Math.max(a, edges[d]);
       const y = Math.min(b, edges[d + 1]);
-      // A run that was over as soon as it was recorded is still drawn, as a sliver.
-      if (y > x || (a === b && a >= edges[d] && a < edges[d + 1])) yield { d, x, y };
+      if (y > x) yield { d, x, y };
     }
   };
 
@@ -271,6 +274,8 @@ export async function week(l: Archipelago, input: { from?: string }) {
     [runs.map((r) => r.id)],
   );
   const agents: Block[][] = days.map(() => []);
+  // A run recorded only once it was over (a push read in GitHub Actions) has no length to draw: each day counts them.
+  const reported: number[] = days.map(() => 0);
   for (const run of runs) {
     const began = new Date(run.created_at).getTime();
     // An open session runs until it was last heard from. One that was closed long after it went quiet (ended for it)
@@ -278,6 +283,11 @@ export async function week(l: Archipelago, input: { from?: string }) {
     const seen = Date.parse(run.last_seen ?? '') || 0;
     const closed = new Date(run.updated_at).getTime();
     const ended = Math.max(began, run.is_open ? Math.max(seen, closed) : seen && closed - seen > QUIET_MS ? seen : closed);
+    if (ended - began < 1000) {
+      const d = edges.findIndex((edge, i) => i < 7 && began >= edge && began < edges[i + 1]);
+      if (d >= 0) reported[d]++;
+      continue;
+    }
     // Each piece of work holds from when it was taken up until the next one was, or until it was let go.
     const mine = tasks.filter((t) => t.run === run.id);
     const pieces: { a: number; b: number; task: string | null }[] = [];
@@ -325,6 +335,7 @@ export async function week(l: Archipelago, input: { from?: string }) {
       hours: cents(owner[i].reduce((n, b) => n + b.hours, 0)),
       owner: owner[i],
       agents: lanes(agents[i]),
+      reported: reported[i],
     })),
   };
 }
