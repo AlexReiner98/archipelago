@@ -1271,6 +1271,17 @@ async function entity(id) {
       { class: 'page-head' },
       h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.length > 0 && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.length})` }, 'shared by link')),
       h('h1', { style: 'margin-top: 6px' }, e.title),
+      // Where it sits, outermost first, each step a way back up; the views kept about a step open with this item marked in them.
+      data.trail?.length > 0 &&
+        h(
+          'nav',
+          { class: 'trail', title: 'Where this sits' },
+          data.trail.map((t, i) => [
+            i > 0 && h('span', { class: 'trail-sep' }, '\u203A'),
+            h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title),
+            t.views.map((v) => h('a', { class: 'trail-view', href: `#/graph?from=${t.id}&lens=${v.id}&here=${id}`, title: `Open "${v.title}" with this marked in it` }, v.title)),
+          ]),
+        ),
       // What it makes for a reader or a customer, named where it is looked for: under the title of what it is part of.
       delivers.length > 0 &&
         h(
@@ -2120,7 +2131,8 @@ function readLens(query) {
   const lens = {};
   const style = {};
   for (const [key, value] of new URLSearchParams(query)) {
-    if (key === 'lit' || key === 'shape') style[key] = value;
+    // here: the item a picture was opened from, marked in it.
+    if (key === 'lit' || key === 'shape' || key === 'here') style[key] = value;
     // A lens or a style kept on the map, named outright: the server reads it.
     else if ((key === 'lens' || key === 'style') && value) lens[key] = value;
     else if (!(key in LENS_FIELDS)) continue;
@@ -2305,7 +2317,7 @@ function drawBoxes(host, answer, style, keep, kept) {
     show.has('status') && mark('word', n.status, 'Its status'),
   ];
   const thing = (n) => {
-    const state = `${count(n) ? '' : ' dim'}${n.open ? '' : ' closed'}${n.state.blocked ? ' blocked' : ''}${me && n.state.waits_on.includes(me) ? ' you' : ''}${n === here ? ' here' : ''}`;
+    const state = `${count(n) ? '' : ' dim'}${n.open ? '' : ' closed'}${n.state.blocked ? ' blocked' : ''}${me && n.state.waits_on.includes(me) ? ' you' : ''}${n === here || n.id === style.here ? ' here' : ''}`;
     if (n.all === 1) return h('a', { class: `lb-leaf${state}`, href: `#/e/${n.id}`, title: hint(n) }, h('span', { class: 'lb-dot' }), h('span', { class: 'lb-name' }, n.title), tied(n), ...marks(n).slice(2));
     const open = n.kids.length > 0 && (opened.get(n.id) ?? (above.has(n.id) || n.depth - base < levels));
     const leaves = n.kids.filter((kid) => kid.all === 1);
@@ -2698,7 +2710,7 @@ function drawGrid(host, answer, style, keep, kept) {
     const el = h(
       'a',
       {
-        class: `lg-card${litCount(n, style) ? '' : ' dim'}${n.open ? '' : ' closed'}${me && n.state.waits_on.includes(me) ? ' you' : ''}`,
+        class: `lg-card${litCount(n, style) ? '' : ' dim'}${n.open ? '' : ' closed'}${me && n.state.waits_on.includes(me) ? ' you' : ''}${n.id === style.here ? ' here' : ''}`,
         href: `#/e/${n.id}`,
         title: [n.title, value !== undefined && name(value), n.fields?.[detail], n.status].filter(Boolean).join('\n'),
         style: `--lg-hue: ${colour}`,
@@ -2802,6 +2814,8 @@ function drawGrid(host, answer, style, keep, kept) {
   };
   host.replaceChildren(stage, legend, key);
   new ResizeObserver(() => requestAnimationFrame(draw)).observe(stage);
+  // Opened from an item's page, the picture is brought to that item.
+  if (style.here && cardEls.has(style.here)) requestAnimationFrame(() => cardEls.get(style.here).scrollIntoView({ block: 'center', inline: 'center' }));
   host.redraw = () => {
     for (const [id, el] of cardEls) el.classList.toggle('dim', !litCount(byId.get(id), style));
   };

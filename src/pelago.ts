@@ -979,10 +979,43 @@ export class Archipelago {
     return {
       entity,
       source: source && { id: source.id, title: source.title, uri: source.props.uri },
+      trail: await this.trail(id),
       outgoing: out.rows,
       incoming: inc.rows,
       recent_events: events.rows,
     };
+  }
+
+  /**
+   * Where an item sits: what it is part of, what that is part of, and so on, outermost first, each with the views
+   * kept about it (lenses, not shortcuts), so a page can lead back up to a picture it was reached from. Led to two
+   * things, it goes up the nearer: the one that is itself part of something. Only what the asker may see.
+   */
+  async trail(id: string) {
+    const trail: { id: string; type: string; title: string; views: { id: string; title: string }[] }[] = [];
+    const seen = new Set([id]);
+    for (let at = id; trail.length < 8; ) {
+      const { rows } = await this.db.query<{ id: string; type: string; title: string }>(
+        `select e.id, e.type, e.title from relation r join entity e on e.id = r.to_id
+         where r.from_id = $1 and r.type = 'part_of' and r.valid_to is null and e.archived_at is null
+         order by exists (select 1 from relation u where u.from_id = e.id and u.type = 'part_of' and u.valid_to is null) desc, e.title`,
+        [at],
+      );
+      const next = rows.find((r) => !seen.has(r.id));
+      if (!next) break;
+      seen.add(next.id);
+      trail.unshift({ ...next, views: [] });
+      at = next.id;
+    }
+    if (!trail.length) return trail;
+    const { rows } = await this.db.query<{ id: string; title: string; about: string }>(
+      `select v.id, v.title, a.to_id as about from entity v join relation a on a.from_id = v.id and a.type = 'about' and a.valid_to is null
+       where v.type = any($1::text[]) and v.archived_at is null and v.is_open and a.to_id = any($2::text[]) and v.props ->> 'from' is null
+       order by (v.props ->> 'place')::numeric nulls last, v.title`,
+      [this.registry.family('lens'), trail.map((t) => t.id)],
+    );
+    for (const v of rows) trail.find((t) => t.id === v.about)?.views.push({ id: v.id, title: v.title });
+    return trail;
   }
 
   async events(input: { since?: string; before?: number; target?: string; actor?: string; origin?: string; limit?: number }) {

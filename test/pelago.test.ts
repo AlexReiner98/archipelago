@@ -2256,3 +2256,21 @@ test('a lens asked for by its id alone starts from what it is kept about, and ca
   const png = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');
   assert.equal(((await callTool(l, human, 'picture_put', { result: made.v, data: png, content_type: 'image/png' })) as { size: number }).size, 8);
 });
+
+test('an item says where it sits: what it is part of, outermost first, with the views kept about each', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
+    { op: 'create', ref: 'area', type: 'project', title: 'Simulation tools' },
+    { op: 'create', ref: 'prog', type: 'funding.program', title: 'Mitacs AI Advantage', status: 'upcoming' },
+    { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { place: 1 } },
+    { op: 'create', ref: 'cut', type: 'lens', title: 'Shortcut', props: { from: 'e_elsewhere' } },
+    { op: 'link', type: 'part_of', from: 'area', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'prog', to: 'area' },
+    { op: 'link', type: 'about', from: 'map', to: 'p' },
+    { op: 'link', type: 'about', from: 'cut', to: 'p' },
+  ]);
+  const { trail } = (await callTool(l, human, 'get', { id: made.prog })) as { trail: { id: string; title: string; views: { title: string }[] }[] };
+  assert.deepEqual(trail.map((t) => [t.title, t.views.map((v) => v.title)]), [['Research project', ['Funding map']], ['Simulation tools', []]], 'a shortcut is not a view of it');
+  assert.deepEqual(((await callTool(l, human, 'get', { id: made.p })) as { trail: unknown[] }).trail, []);
+});

@@ -90,6 +90,14 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .note.doc details.doc-section > summary::before { content: "\25B8"; color: var(--muted); }
 .note.doc details.doc-section[open] > summary::before { content: "\25BE"; }
 .note.doc details.doc-section[open] { padding-bottom: 8px; }
+/* Where an item sits: one line under its title, each step a link up, with the views kept about it as small chips. */
+.page-head .trail { display: flex; align-items: center; gap: 6px; flex-basis: 100%; width: 100%; margin-top: 4px; font-size: 13px; white-space: nowrap; overflow: hidden; color: var(--muted); }
+.page-head .trail-step { color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.page-head .trail-step:hover { color: var(--text); text-decoration: underline; }
+.page-head .trail-sep { color: var(--muted); }
+.page-head .trail-view { flex: none; padding: 1px 8px; border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); text-decoration: none; font-size: 12px; }
+.page-head .trail-view:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.lg-card.here { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* What an item delivers: one line under its title, each deliverable a way to its own page. */
 .page-head .delivers { display: flex; flex-basis: 100%; width: 100%; align-items: center; gap: 10px; margin-top: 8px; white-space: nowrap; overflow: hidden; }
 .page-head .delivers .deliverable { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; }
