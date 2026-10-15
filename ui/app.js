@@ -1128,7 +1128,7 @@ async function entity(id, here) {
 
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
   // What names it, less what the trail already leads to.
-  const mentions = (data.mentioned_in ?? []).filter((m) => !data.trail?.some((t) => t.id === m.id));
+  const mentions = (data.mentioned_in ?? []).filter((m) => !data.trail?.some((t) => t.id === m.id) && !data.incoming.some((r) => r.id === m.id && r.type === 'part_of' && types.get(r.entity_type)?.deliverable));
   const delivers = data.incoming.filter((r) => r.type === 'part_of' && types.get(r.entity_type)?.deliverable && !isClosed(r.entity_type, r.status));
   // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
   const project = isA(e.type, 'project');
@@ -1183,6 +1183,10 @@ async function entity(id, here) {
     e.props.tokens_used > 0 && h('span', { class: 'fact', title: `${e.props.tokens_used} tokens, input and output, not counting cached re-reads` }, h('span', { class: 'muted' }, 'used '), tokensText(e.props.tokens_used)),
   ];
   const short = fields.filter(([, v]) => String(v).length <= 32);
+  // A field that holds an item's id says that item's name, as a way to it.
+  const ID = /^e_[a-z0-9]{8}$/;
+  await Promise.all(short.filter(([, v]) => ID.test(String(v)) && !titles.has(String(v))).map(([, v]) => api('get', { id: String(v) }).then((r) => titles.set(r.entity.id, r.entity.title), () => null)));
+  const value = (v) => (ID.test(String(v)) ? idsAsLinks(String(v)) : String(v));
   const long = fields.filter(([, v]) => String(v).length > 32);
   const edit = () => {
     const form = entityForm(e.type, e, {
@@ -1325,7 +1329,7 @@ async function entity(id, here) {
       automation && e.props.last_fired && h('span', { class: `fact${String(e.props.last_result).startsWith('failed') ? ' error' : ''}`, title: String(e.props.last_result) }, `last fired ${when(e.props.last_fired)}`),
       h('span', { class: 'fact' }, owner ? link(owner) : h('span', { class: 'muted' }, 'no owner')),
       runFacts,
-      short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), String(v))),
+      short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), value(v))),
       h('span', { class: 'grow' }),
       !e.archived_at && h('button', { onclick: edit }, 'Edit'),
       menu('More', [

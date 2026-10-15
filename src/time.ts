@@ -162,9 +162,13 @@ export async function draftInvoice(l: Archipelago, actor: Actor, input: { client
   const said = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   const body = [
     `From: ${[billedBy.title, said(bp.address), said(bp.email), said(bp.hst_number) && `HST ${said(bp.hst_number)}`].filter(Boolean).join(' · ')}`,
+    // Each heading line is a paragraph of its own, so they read as lines and not as one run of text.
+    '',
     `To: ${[client.title, said(p.address), said(p.email)].filter(Boolean).join(' · ')}`,
-    `Invoice ${number}, issued ${longDay(issued)}, due ${longDay(due)} (${terms} days)`,
-    `For work from ${longDay(mine[0].date)} to ${longDay(mine.at(-1)!.date)}`,
+    '',
+    `Invoice ${number}, issued ${longDay(issued)}, due ${longDay(due)} (${terms} days).`,
+    '',
+    `For work from ${longDay(mine[0].date)} to ${longDay(mine.at(-1)!.date)}.`,
     '',
     'Work',
     ...lines.map(({ r, each, amount }) => `- ${shortDay(r.date)} · ${r.title}${r.workTitle ? ` (${r.workTitle})` : ''} · ${r.hours} h × ${money(each, currency)} = ${money(amount, currency)}`),
@@ -173,7 +177,7 @@ export async function draftInvoice(l: Archipelago, actor: Actor, input: { client
     `- ${hours} hours`,
     `- Subtotal: ${money(subtotal, currency)}`,
     ...(p.hst === true ? [`- HST 13%: ${money(tax, currency)}`] : []),
-    `- **Total due: ${money(total, currency)} ${currency}**`,
+    `- Total due: ${money(total, currency)} ${currency}`,
     // How to pay, as the biller keeps it: one way per line.
     ...(said(bp.payment) ? ['', 'How to pay', ...said(bp.payment)!.split('\n').map((way) => way.trim().replace(/^[-*]\s*/, '')).filter(Boolean).map((way) => `- ${way}`), `- Please quote ${number} with your payment.`] : []),
   ].join('\n');
