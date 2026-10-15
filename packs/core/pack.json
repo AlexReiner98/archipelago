@@ -253,6 +253,7 @@
         "lines": { "type": "boolean", "description": "Whether links are drawn as lines." },
         "colors": { "type": "json", "description": "Colours by name, each a hex colour: sea, land, inner, line, text, muted, blocked, you, session, done." },
         "color_by": { "type": "string", "description": "grid: the shown field each card is coloured by, e.g. kind." },
+        "rows": { "type": "string", "description": "grid: what the rows are. Left empty, what the start holds. link:<kind>, the things those links lead to, e.g. link:funding.could_fund: a thing is a card in each row its links lead to, with the link's words as its second line." },
         "palette": { "type": "json", "description": "grid: a hex colour for each value of color_by, e.g. {\"grant\": \"#2e7d4f\"}. A value not named takes one of the built-in colours." },
         "labels": { "type": "json", "description": "grid: what a lane or a value is called, e.g. {\"set_up\": \"Set up\"}. Not named, it is the value in words." },
         "detail": { "type": "string", "description": "grid: the shown field written on each card's second line, e.g. amount." },

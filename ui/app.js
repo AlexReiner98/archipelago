@@ -2696,7 +2696,26 @@ function drawGrid(host, answer, style, keep, kept) {
   const groups = start.kids.filter((n) => n.kids.length > 0);
   const loose = start.kids.filter((n) => n.kids.length === 0);
   const under = (n) => n.kids.flatMap((kid) => (kid.kids.length ? under(kid) : [kid]));
-  const rows = [...groups.map((g) => ({ head: g, cards: under(g) })), ...(loose.length ? [{ head: null, cards: loose }] : [])];
+  // Rows by a kind of link (style.rows link:<kind>): a row for each thing such links lead to, in the order the tree
+  // gives them, a card in it for each thing that links there, with the link's words as its second line. A thing tied
+  // to two is in both rows; things of the same kinds tied to none are a last row of their own.
+  const byLink = typeof style.rows === 'string' && style.rows.startsWith('link:') ? style.rows.slice(5) : null;
+  const order = new Map();
+  const walk = (n) => (order.set(n.id, order.size), n.kids.forEach(walk));
+  root.kids.forEach(walk);
+  const says = new Map();
+  let rows;
+  if (byLink) {
+    const tied = answer.links.filter((link) => link.kind === byLink && byId.has(link.from) && byId.has(link.to));
+    const heads = [...new Set(tied.map((link) => link.to))].sort((a, b) => order.get(a) - order.get(b)).map((to) => byId.get(to));
+    rows = heads.map((head) => ({
+      head,
+      cards: tied.filter((link) => link.to === head.id).map((link) => (link.says && says.set(`${head.id} ${link.from}`, link.says), byId.get(link.from))),
+    }));
+    const kinds = new Set(tied.map((link) => byId.get(link.from).type));
+    const untied = [...byId.values()].filter((n) => kinds.has(n.type) && !tied.some((link) => link.from === n.id));
+    if (untied.length) rows.push({ head: null, cards: untied });
+  } else rows = [...groups.map((g) => ({ head: g, cards: under(g) })), ...(loose.length ? [{ head: null, cards: loose }] : [])];
   // Columns: the lanes in the lens's order, then any value it did not name, then what has none.
   const seen = [...new Set(rows.flatMap((r) => r.cards.map((n) => n.lane ?? null)))];
   const lanes = [...(answer.lanes ?? []), ...seen.filter((v) => v !== null && !(answer.lanes ?? []).includes(v)), ...(seen.includes(null) ? [null] : [])];
@@ -2715,14 +2734,15 @@ function drawGrid(host, answer, style, keep, kept) {
   const day = (value) => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   // The links between two cards, numbered in the order the key gives them.
   const cardIds = new Set(rows.flatMap((r) => r.cards.map((n) => n.id)));
-  const lines = answer.links.filter((link) => cardIds.has(link.from) && cardIds.has(link.to) && link.kind !== answer.lens.by);
+  // With rows by a kind of link, a card can stand in several rows: its links are the rows, and no lines are drawn.
+  const lines = byLink ? [] : answer.links.filter((link) => cardIds.has(link.from) && cardIds.has(link.to) && link.kind !== answer.lens.by);
   const numbers = new Map();
   lines.forEach((link, i) => {
     for (const end of [link.from, link.to]) numbers.set(end, [...(numbers.get(end) ?? []), i + 1]);
   });
 
   const cardEls = new Map();
-  const card = (n) => {
+  const card = (n, head) => {
     const value = field ? n.fields?.[field] : undefined;
     const colour = value !== undefined ? hue(value) : 'var(--ln-line)';
     const date = markField && n.fields?.[markField];
@@ -2736,7 +2756,9 @@ function drawGrid(host, answer, style, keep, kept) {
         style: `--lg-hue: ${colour}`,
       },
       h('span', { class: 'lg-title' }, n.title),
-      detail && n.fields?.[detail] && h('span', { class: 'lg-detail' }, String(n.fields[detail])),
+      says.has(`${head?.id} ${n.id}`)
+        ? h('span', { class: 'lg-detail', title: says.get(`${head.id} ${n.id}`) }, says.get(`${head.id} ${n.id}`))
+        : detail && n.fields?.[detail] && h('span', { class: 'lg-detail' }, String(n.fields[detail])),
       (date || numbers.has(n.id)) &&
         h(
           'span',
@@ -2752,8 +2774,14 @@ function drawGrid(host, answer, style, keep, kept) {
   const grid = h('div', { class: 'lg-grid', style: `grid-template-columns: minmax(120px, 0.7fr) repeat(${lanes.length}, minmax(170px, 1fr)); min-width: ${120 + lanes.length * 176}px` });
   grid.append(h('div', { class: 'lg-corner' }), ...lanes.map((lane) => h('div', { class: 'lg-lane' }, name(lane))));
   for (const row of rows) {
-    grid.append(row.head ? h('a', { class: 'lg-row', href: `#/e/${row.head.id}`, title: row.head.title }, row.head.title) : h('div', { class: 'lg-row loose', title: `What ${start.title} holds directly` }, 'Across all'));
-    for (const lane of lanes) grid.append(h('div', { class: 'lg-cell' }, row.cards.filter((n) => (n.lane ?? null) === lane).sort((a, b) => a.place - b.place || a.title.localeCompare(b.title)).map(card)));
+    grid.append(
+      row.head
+        ? h('a', { class: 'lg-row', href: `#/e/${row.head.id}`, title: row.head.title }, row.head.title)
+        : byLink
+          ? h('div', { class: 'lg-row loose', title: `Tied to nothing by ${relations.get(byLink)?.title ?? byLink}` }, 'Not tied yet')
+          : h('div', { class: 'lg-row loose', title: `What ${start.title} holds directly` }, 'Across all'),
+    );
+    for (const lane of lanes) grid.append(h('div', { class: 'lg-cell' }, row.cards.filter((n) => (n.lane ?? null) === lane).sort((a, b) => a.place - b.place || a.title.localeCompare(b.title)).map((n) => card(n, row.head))));
   }
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
