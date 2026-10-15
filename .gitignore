@@ -4,6 +4,7 @@ data-backup-*/
 runs/
 workspaces/
 data.lock
+/demo/
 data-damaged/
 backups/
 .proof/

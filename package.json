@@ -12,6 +12,7 @@
   "scripts": {
     "start": "node src/server.ts",
     "dev": "node src/dev.ts",
+    "demo": "node src/demo.ts",
     "pelago": "node src/cli.ts",
     "test": "node --test \"test/*.test.ts\"",
     "typecheck": "tsc --noEmit"

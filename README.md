@@ -10,7 +10,7 @@ tasks, decisions, people and what waits on what. You look at it in a web page;
 agents read and change it through the same tools, over MCP. What an agent
 changes waits for your yes, or is applied, logged and one click to undo.
 
-![You and your agents use the same tools on one map](docs/overview.svg)
+![Archipelago in its own demo map: you, Claude Code and GitHub working on one project, and the release it is waiting for](docs/demo-map.png)
 
 ## What you get
 
@@ -35,11 +35,17 @@ You need [Node.js](https://nodejs.org) 24 or newer. The database is embedded.
 git clone https://github.com/AlexReiner98/archipelago.git
 cd archipelago
 npm install
-npm start
+npm run demo
 ```
 
-Open `http://127.0.0.1:3100`, go to **Workspace** and type your name under
-Owner.
+Open `http://127.0.0.1:3200`: a map of Archipelago itself, with a release
+waiting on you, two open questions and an agent's proposal on **Changes**.
+The picture above is its project page, drawn by a style of its own
+([examples/demo/overview.js](examples/demo/overview.js)).
+
+For your own map, `npm start` and open `http://127.0.0.1:3100`, go to
+**Workspace** and type your name under Owner. The demo keeps its data apart,
+in `demo/`.
 
 ## Connect Claude Code
 
