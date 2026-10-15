@@ -137,3 +137,15 @@ section + div.text {
   padding-top: 0.8em;
   border-top: 1px solid var(--line);
 }
+/* A section's figure: as wide as the text, on its own light card so a drawing made on white reads in the dark too. */
+figure {
+  margin: 0.4em 0 1.2em;
+}
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}

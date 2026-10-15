@@ -90,6 +90,7 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .note.doc details.doc-section > summary::before { content: "\25B8"; color: var(--muted); }
 .note.doc details.doc-section[open] > summary::before { content: "\25BE"; }
 .note.doc details.doc-section[open] { padding-bottom: 8px; }
+.note.doc img.doc-figure { display: block; max-width: 100%; margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 #around svg.graph { height: 520px; }
 .card .empty, .card .error { padding: 14px; color: var(--muted); }
 .card .error { color: var(--bad); }

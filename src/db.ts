@@ -295,7 +295,8 @@ language sql stable security definer set search_path = public as $fn$
     select distinct m[1] as id from d, regexp_matches(d.body, '^[ \\t]*(e_[a-z0-9]{8})[ \\t]*$', 'gn') as m
   ),
   items as (
-    select i.id, i.type, i.title, i.status, i.body, i.updated_at from entity i join named n on n.id = i.id, d
+    select i.id, i.type, i.title, i.status, i.body, i.updated_at, exists (select 1 from picture p where p.entity_id = i.id) as picture
+    from entity i join named n on n.id = i.id, d
     where i.archived_at is null and i.workspace = d.workspace and (i.private_to is null or i.private_to = d.private_to)
   )
   select jsonb_build_object(
@@ -303,7 +304,15 @@ language sql stable security definer set search_path = public as $fn$
     'items', coalesce((select jsonb_agg(to_jsonb(items)) from items), '[]'::jsonb))
   from d
 $fn$;
-grant execute on function pelago_shared_document(text) to pelago_public;
+-- The figure of one item a link shows, and of nothing else.
+create or replace function pelago_shared_picture(secret_hash text, target text)
+returns table (content_type text, bytes bytea)
+language sql stable security definer set search_path = public as $fn$
+  select p.content_type, p.bytes from picture p
+  where p.entity_id = target
+    and exists (select 1 from jsonb_array_elements(pelago_shared_document(secret_hash) -> 'items') i where i ->> 'id' = target)
+$fn$;
+grant execute on function pelago_shared_document(text), pelago_shared_picture(text, text) to pelago_public;
 
 drop policy if exists member_proposal on proposal;
 create policy member_proposal on proposal for all to pelago_member

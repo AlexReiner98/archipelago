@@ -1215,11 +1215,18 @@ async function entity(id) {
           'details',
           { class: 'doc-section', open: unfolded.get(`${id}:${p.section.id}`) ?? false, ontoggle: (ev) => unfolded.set(`${id}:${p.section.id}`, ev.target.open) },
           h('summary', {}, chip(p.section.type), h('span', { class: 'grow', title: p.section.title }, h('a', { href: `#/e/${p.section.id}` }, p.section.title)), pill(p.section.type, p.section.status)),
+          p.section.picture && figureOf(p.section),
           p.section.body ? renderBody(p.section.body) : h('div', { class: 'empty' }, 'No notes.'),
         )
       : p.missing
         ? h('div', { class: 'error' }, `${p.missing}: not found, archived or not yours to see`)
         : renderBody(p.text.replace(/^#{1,3}\s+/gm, '')); // a heading for the reader is a section title here
+  // A section's figure is fetched with the page's token, so it is drawn from what the picture tool gives.
+  const figureOf = (s) => {
+    const img = h('img', { class: 'doc-figure', alt: s.title });
+    api('picture', { result: s.id }).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
+    return img;
+  };
   const shareLink = async () => {
     if (!(await ask({ title: `Make a link to "${e.title}"?`, message: 'Anyone with the link can read it and every item it brings in, with no login, until the link is revoked.', action: 'Make link' }))) return;
     try {

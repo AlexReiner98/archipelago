@@ -772,17 +772,17 @@ export const TOOLS: Record<string, Tool> = {
   },
   picture_put: {
     description:
-      'Keep the picture a test drew, for one test result. Only for a result that is shown in public: until then the picture stays in the repository it was made in, and the result says where (its picture field). One picture per result, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when the test is run again (test_report) what was kept for it is removed. Takes effect at once.',
+      'Keep a picture for one item: the picture a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text. A test result\u2019s only when the result is shown in public: until then the picture stays in the repository it was made in, and the result says where (its picture field). One picture per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
     input: {
-      result: z.string().describe('The id of the test result.'),
+      result: z.string().describe('The id of the test result, or of the note or file the figure belongs to.'),
       data: z.string().min(1).describe('The file, as base64.'),
       content_type: z.enum(['image/png', 'image/jpeg', 'image/webp']),
     },
     run: async (l, actor, input) => putPicture(l, actor, input),
   },
   picture: {
-    description: 'The picture kept for a test result, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored).',
-    input: { result: z.string().describe('The id of the test result.') },
+    description: 'The picture kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; the document tool, which sections have a figure).',
+    input: { result: z.string().describe('The id of the test result, note or file.') },
     run: async (l, _actor, input) => getPicture(l, input),
   },
   session_end: {

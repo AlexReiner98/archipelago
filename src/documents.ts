@@ -17,6 +17,8 @@ export interface Section {
   status: string;
   body: string;
   updated_at: string | Date;
+  /** Whether a figure is kept for it, shown above its text. */
+  picture?: boolean;
 }
 
 /** A document as its reader meets it: the text between sections, and each section in its place. */
@@ -55,9 +57,11 @@ export async function readDocument(l: Archipelago, id: string) {
   const doc = await l.entity(id);
   if (!doc || !l.registry.isA(doc.type, 'document')) throw new Error(`"${id}" is not a document`);
   const items = new Map<string, Section>();
-  for (const sid of sectionIds(doc.body)) {
+  const ids = sectionIds(doc.body);
+  const pictured = new Set((await l.db.query<{ entity_id: string }>(`select entity_id from picture where entity_id = any($1::text[])`, [ids])).rows.map((r) => r.entity_id));
+  for (const sid of ids) {
     const e = await l.entity(sid);
-    if (e && !e.archived_at) items.set(sid, { id: e.id, type: e.type, title: e.title, status: e.status, body: e.body, updated_at: e.updated_at });
+    if (e && !e.archived_at) items.set(sid, { id: e.id, type: e.type, title: e.title, status: e.status, body: e.body, updated_at: e.updated_at, picture: pictured.has(sid) });
   }
   return { id: doc.id, title: doc.title, status: doc.status, for: doc.props.for ?? null, updated_at: doc.updated_at, parts: assemble(doc.body, items) };
 }
@@ -99,6 +103,16 @@ export async function revokeShare(l: Archipelago, actor: Actor, share: string) {
     await l.log(tx, { actor: `${actor.kind}:${actor.name}`, action: 'share.revoke', target: rows[0].entity_id, reason: 'A link to read it was revoked', detail: { share } });
     return { revoked: share, document: rows[0].entity_id };
   });
+}
+
+/** The figure of one item a link shows, read as anyone with no login, or nothing. */
+export async function sharedPicture(l: Archipelago, secret: string, id: string): Promise<{ content_type: string; bytes: Buffer } | null> {
+  if (!/^[a-f0-9]{48}$/.test(secret) || !/^e_[a-z0-9]{8}$/.test(id)) return null;
+  const { rows } = await l.forAnyone().db.query<{ content_type: string; data: string }>(
+    `select content_type, encode(bytes, 'base64') as data from pelago_shared_picture($1, $2)`,
+    [hash(secret), id],
+  );
+  return rows[0] ? { content_type: rows[0].content_type, bytes: Buffer.from(rows[0].data, 'base64') } : null;
 }
 
 /** What a link shows, read as anyone with no login: the document and the items it brings in, or nothing. */

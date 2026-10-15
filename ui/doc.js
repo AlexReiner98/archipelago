@@ -3,6 +3,7 @@
 // printed: the one place in Archipelago where a page is meant to be read through.
 
 const main = document.getElementById('main');
+const here = location.pathname.replace(/\/+$/, '');
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -90,7 +91,13 @@ function draw(d) {
     sections.length > 2 && h('nav', { class: 'contents' }, h('ol', {}, sections.map((p) => h('li', {}, h('a', { href: `#${p.section.id}` }, p.section.title))))),
     d.parts.map((p) =>
       p.section
-        ? h('section', { id: p.section.id }, h('h2', {}, p.section.title), blocks(p.section.body, titles, 3))
+        ? h(
+            'section',
+            { id: p.section.id },
+            h('h2', {}, p.section.title),
+            p.section.picture && h('figure', {}, h('a', { href: `${here}/picture/${p.section.id}`, target: '_blank', rel: 'noopener', title: 'Open the figure on its own' }, h('img', { src: `${here}/picture/${p.section.id}`, alt: p.section.title }))),
+            blocks(p.section.body, titles, 3),
+          )
         : h('div', { class: 'text' }, blocks(p.text, titles, 2)),
     ),
     h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
@@ -98,7 +105,7 @@ function draw(d) {
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
 }
 
-fetch(`${location.pathname.replace(/\/+$/, '')}/data`)
+fetch(`${here}/data`)
   .then(async (res) => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');

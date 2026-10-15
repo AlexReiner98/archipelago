@@ -1628,8 +1628,21 @@ test('a link to a document opens its page and its text with no login, until it i
   const doc = (await data.json()) as { title: string; parts: { text?: string; section?: { title: string } }[] };
   assert.deepEqual([doc.title, doc.parts.map((p) => p.section?.title ?? p.text)], ['Funding', ['Intro.', 'IRAP']]);
   assert.equal((await fetch(`${base}/doc.js`)).status, 200);
+  // A section's figure is shown through the link; a figure of anything the document does not bring in is not.
+  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
+  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'note', title: 'Not in it' }] })).result.created.o;
+  for (const id of [made.result.created.n, other]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: png, content_type: 'image/png' })).status, 200);
+  assert.match((await call('/api/picture_put', undefined, { result: d, data: png, content_type: 'image/png' })).error, /not a test result, a note or a file/);
+  const pictured = (await (await fetch(`${base}${link.path}/data`)).json()) as { parts: { section?: { picture: boolean } }[] };
+  assert.equal(pictured.parts[1].section?.picture, true);
+  const figure = await fetch(`${base}${link.path}/picture/${made.result.created.n}`);
+  assert.deepEqual([figure.status, figure.headers.get('content-type'), figure.headers.get('content-security-policy')], [200, 'image/png', "default-src 'none'"]);
+  assert.equal(Buffer.from(await figure.arrayBuffer()).toString('base64'), png);
+  assert.equal((await fetch(`${base}${link.path}/picture/${other}`)).status, 404);
+  assert.match((await page.headers.get('content-security-policy')) ?? '', /img-src 'self'/);
   assert.equal((await fetch(`${base}/s/default/${'0'.repeat(48)}/data`)).status, 404);
   assert.equal((await fetch(`${base}/s/elsewhere/${link.path.split('/').at(-1)}/data`)).status, 404);
   await call('/api/share_revoke', undefined, { id: link.share });
+  assert.equal((await fetch(`${base}${link.path}/picture/${made.result.created.n}`)).status, 404);
   assert.equal((await fetch(`${base}${link.path}/data`)).status, 404);
 });
