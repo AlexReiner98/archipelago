@@ -2294,3 +2294,20 @@ test('an item knows what names it in its text or fields, documents first, and on
   assert.equal((await mentions(bo)).length, 4);
   assert.equal((await mentions(l.as('someone else'))).length, 3);
 });
+
+test('an item knows the pictures it is drawn in, and the documents that show them', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
+    { op: 'create', ref: 'in', type: 'funding.program', title: 'Mitacs Accelerate', status: 'open', props: { kind: 'wage_subsidy', phase: 'research' } },
+    { op: 'create', ref: 'out', type: 'task', title: 'Call IRAP' },
+    { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { kinds: ['project', 'funding.program'] } },
+    { op: 'create', ref: 'd', type: 'document', title: 'Funding document', body: 'Intro\n{map}' },
+    { op: 'link', type: 'part_of', from: 'in', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'out', to: 'p' },
+    { op: 'link', type: 'about', from: 'map', to: 'p' },
+  ]);
+  const shown = async (id: string) => ((await callTool(l, human, 'get', { id })) as { shown_in: { title: string; of: { id: string }; documents: { id: string }[] }[] }).shown_in;
+  assert.deepEqual(await shown(made.in), [{ id: made.map, title: 'Funding map', of: { id: made.p, title: 'Research project' }, documents: [{ id: made.d, title: 'Funding document' }] }]);
+  assert.deepEqual(await shown(made.out), [], 'a task is not in a picture of programs');
+});

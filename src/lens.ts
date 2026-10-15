@@ -114,6 +114,22 @@ export function readLens(l: Archipelago, input: Record<string, unknown>, under: 
   return lens;
 }
 
+/**
+ * The pictures an item is drawn in: each view kept about something it sits in (its trail), where that view's answer
+ * has it, with the documents that bring the view in. The way back from an item to the picture it was reached from.
+ */
+export async function shownIn(l: Archipelago, id: string, trail: { id: string; title: string; views: { id: string; title: string }[] }[]) {
+  const shown: { id: string; title: string; of: { id: string; title: string }; documents: { id: string; title: string }[] }[] = [];
+  for (const step of trail)
+    for (const view of step.views) {
+      const answer = await lens(l, { lens: view.id }).catch(() => undefined);
+      if (!answer?.items.some((item) => item.id === id)) continue;
+      const documents = (await l.mentionedIn(view.id)).filter((m) => l.registry.isA(m.type, 'document')).map((m) => ({ id: m.id, title: m.title }));
+      shown.push({ id: view.id, title: view.title, of: { id: step.id, title: step.title }, documents });
+    }
+  return shown;
+}
+
 /** The view every item has: what it is tied to, by kind of link. Asked for by this name in place of a lens's id. */
 export const AROUND = 'around';
 

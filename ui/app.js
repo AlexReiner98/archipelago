@@ -1017,7 +1017,7 @@ const RAN = { 'github-actions': 'Sync agent', server: 'Reader', 'claude-code': '
 /** Which of each item's sections are unfolded, kept while the page is open. */
 const unfolded = new Map();
 
-async function entity(id) {
+async function entity(id, here) {
   const main = part('item');
   // Drawn again in place (after a change, a step further out), the page keeps its height and its scroll.
   if (main.dataset.item !== id) main.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
@@ -1220,7 +1220,7 @@ async function entity(id) {
       'section',
       { class: 'doc-lens' },
       h('div', { class: 'doc-lens-head' }, chip(s.type), h('a', { class: 'grow', href: `#/e/${s.id}`, title: s.title }, s.title)),
-      h('div', { class: 'lens-card' }, lensView({ lens: { lens: s.id }, key: `doc:${id}:${s.id}`, bare: true })),
+      h('div', { class: 'lens-card' }, lensView({ lens: { lens: s.id }, key: `doc:${id}:${s.id}`, bare: true, style: here ? { here } : {} })),
       s.body && renderBody(s.body),
     );
   const docPart = (p) =>
@@ -1281,7 +1281,17 @@ async function entity(id) {
           data.trail.map((t, i) => [
             i > 0 && h('span', { class: 'trail-sep' }, '\u203A'),
             h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title),
-            t.views.map((v) => h('a', { class: 'trail-view', href: `#/graph?from=${t.id}&lens=${v.id}&here=${id}`, title: `Open "${v.title}" with this marked in it` }, v.title)),
+          ]),
+        ),
+      // The pictures it is drawn in, each a way straight back to it with this item marked, and the documents that show it.
+      data.shown_in?.length > 0 &&
+        h(
+          'div',
+          { class: 'delivers shown-in', title: 'The pictures this is drawn in' },
+          h('span', { class: 'muted small' }, 'Shown in'),
+          data.shown_in.map((v) => [
+            h('a', { class: 'trail-view', href: `#/graph?from=${v.of.id}&lens=${v.id}&here=${id}`, title: `Open "${v.title}" of ${v.of.title}, with this marked in it` }, v.title),
+            v.documents.map((d) => h('a', { class: 'deliverable', href: `#/e/${d.id}?here=${id}`, title: `"${v.title}" is drawn in this document; it opens with this marked` }, chip('document'), h('span', { class: 'gist' }, d.title))),
           ]),
         ),
       // What names it in its text: a link written as an id has its way back here.
@@ -4281,7 +4291,7 @@ async function route(pulse = false) {
     review,
     map: name === 'map' || page !== 'map' ? map : searchBar,
     // The graph around an item is drawn on that item's page, under it.
-    item: name === 'e' && arg ? () => entity(arg) : name === 'new' && (() => newEntity(arg)),
+    item: name === 'e' && arg ? () => entity(arg, new URLSearchParams(query).get('here') ?? undefined) : name === 'new' && (() => newEntity(arg)),
     graph: name === 'graph' && (() => graph(query)),
     workspace,
   };

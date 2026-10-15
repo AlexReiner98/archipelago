@@ -19,7 +19,7 @@ import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { undo } from './undo.ts';
 import { getPicture, putPicture, reportTests } from './proof.ts';
-import { pictureOf, readLens } from './lens.ts';
+import { pictureOf, readLens, shownIn } from './lens.ts';
 import { awaitingRecheck, HANDOFF_MAX, toConfirm, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
@@ -374,10 +374,11 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => l.search(input),
   },
   get: {
-    description: 'One entity in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in) and its relations in both directions. Its recent history too, when asked for with history: true.',
+    description: 'One entity in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the pictures it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in) and its relations in both directions. Its recent history too, when asked for with history: true.',
     input: { id: z.string(), history: z.boolean().optional().describe('true to be given the last changes to it as well (recent_events).'), full: FULL },
     run: async (l, actor, input) => {
-      const found = await l.get(input.id);
+      const found = { ...(await l.get(input.id)), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
+      found.shown_in = await shownIn(l, input.id, found.trail);
       if (actor.kind === 'human' || input.full) return found;
       // An agent mostly wants the item; its history is several times the size, so it is given when asked for.
       const { recent_events, ...item } = found;
