@@ -133,10 +133,10 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .tq-h { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rows > li.tq-entry, .tq-money .rows > li { padding: 6px 14px; gap: 10px; white-space: nowrap; min-width: 0; flex-wrap: nowrap; align-items: center; }
 .tq-entry .gist { overflow: hidden; text-overflow: ellipsis; }
-.tq-entry .tq-what-text { flex: 0 1 auto; max-width: 40%; color: inherit; text-decoration: none; font-weight: 500; }
+.tq-entry .tq-what-text { flex: 0 0 auto; max-width: 42%; color: inherit; text-decoration: none; font-weight: 500; }
 .tq-entry .tq-what-text:hover { text-decoration: underline; }
-.tq-entry .tq-note-text { flex: 1 1 auto; min-width: 0; }
-.tq-entry .tq-work-text { flex: 0 1 auto; max-width: 30%; margin-left: auto; }
+.tq-entry .tq-note-text { flex: 1 1 0; min-width: 0; }
+.tq-entry .tq-work-text { flex: 0 1 auto; max-width: 26%; margin-left: auto; }
 .tq-edit { width: 100%; }
 .tq-money .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .note.doc img.doc-figure { display: block; max-width: 100%; margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
