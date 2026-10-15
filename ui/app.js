@@ -1019,6 +1019,8 @@ function renderBody(text) {
   const opening = (lines) => {
     const [first, ...more] = blocks(lines);
     if (!first) return [];
+    // A table that opens a note is shown whole: cut short, its cells would run together as words.
+    if (first.tagName === 'TABLE') return [first, more.length > 0 && h('details', { class: 'section' }, h('summary', {}, 'More'), more)];
     // A first paragraph that is itself long is shown as its first sentences, and whole with the rest.
     const text = first.textContent;
     const long = text.length > 320 || first.tagName !== 'P';
@@ -4334,7 +4336,283 @@ document.addEventListener('visibilitychange', checkPulse);
 // page of the thing it is about or in the search, and its old address leads
 // there. Search is one thing at a time under its search box: the search, an
 // item, or a graph.
-const PAGES = { home: ['home'], review: ['review'], map: ['map', 'item', 'graph'], workspace: ['workspace'] };
+// ---- Time ------------------------------------------------------------------
+
+// Hours worked, a week at a time: each day with what was done and its total, a line to log more, and beside it what
+// is owed: time not yet invoiced, invoices out and late, and drafts. Every entry and invoice is an item; this page
+// points at them and writes through the same tools an agent uses.
+const timeState = { from: null };
+const LAST_WORK = 'pelago-time-work';
+const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const shiftDay = (day, n) => {
+  const d = new Date(`${day}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return localDay(d);
+};
+const mondayOf = (day) => shiftDay(day, -((new Date(`${day}T12:00:00`).getDay() + 6) % 7));
+const dayName = (day, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => new Date(`${day}T12:00:00`).toLocaleDateString(undefined, opts);
+const hoursText = (n) => `${Math.round(n * 100) / 100} h`;
+const moneyText = (n, currency = 'CAD') => new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(Number(n) || 0);
+const remember = (key, value) => {
+  try {
+    if (value === undefined) return JSON.parse(localStorage.getItem(key) ?? 'null');
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Without storage, the last work is forgotten on reload.
+  }
+  return null;
+};
+
+/** A field that finds the work time is for, as it is typed: projects, tasks and clients. */
+function workPicker(initial, onPick) {
+  let picked = initial ?? null;
+  let turn = 0;
+  const input = h('input', { type: 'search', class: 'tq-work', placeholder: 'Project or task', value: picked?.title ?? '', title: 'The project, task or client this time was for', autocomplete: 'off' });
+  const list = h('div', { class: 'tq-picks', hidden: true });
+  const find = async () => {
+    const mine = ++turn;
+    const q = input.value.trim();
+    if (!q) return void (list.hidden = true);
+    const hits = (await Promise.all(['project', 'task', 'company'].map((type) => api('search', { q, type, open: true, limit: 6 }).catch(() => [])))).flat();
+    if (mine !== turn) return;
+    list.replaceChildren(
+      ...hits.slice(0, 8).map((x) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            onmousedown: (ev) => {
+              ev.preventDefault();
+              picked = { id: x.id, title: x.title };
+              input.value = x.title;
+              list.hidden = true;
+              onPick?.(picked);
+            },
+          },
+          chip(x.type),
+          h('span', { class: 'gist' }, x.title),
+        ),
+      ),
+    );
+    list.hidden = !hits.length;
+  };
+  input.oninput = () => ((picked = null), find());
+  input.onblur = () => setTimeout(() => (list.hidden = true), 150);
+  return { el: h('span', { class: 'tq-picker' }, input, list), get: () => picked };
+}
+
+async function time() {
+  const main = part('time');
+  const today = localDay();
+  const from = timeState.from ?? mondayOf(today);
+  const to = shiftDay(from, 6);
+  let sheet;
+  try {
+    sheet = await api('timesheet', { from, to });
+  } catch (err) {
+    return main.replaceChildren(h('div', { class: 'error' }, err.message));
+  }
+  const again = () => ((dirty = false), time());
+  const week = (n) => () => ((timeState.from = n === 0 ? null : shiftDay(from, n * 7)), again());
+  const write = async (ops, reason) => {
+    try {
+      await api('change', { ops, reason });
+      again();
+    } catch (err) {
+      tell('That was not saved', err.message);
+    }
+  };
+
+  // The line to log more: the day (today when this week is shown), hours, the work, what was done, a note, whether it is billed.
+  const picker = workPicker(remember(LAST_WORK), (w) => remember(LAST_WORK, w));
+  const date = h('input', { type: 'date', value: today >= from && today <= to ? today : from, title: 'The day the work was done', required: true });
+  const hours = h('input', { type: 'number', class: 'tq-hours', min: '0.25', max: '24', step: '0.25', placeholder: 'Hours', title: 'Hours spent', required: true });
+  const what = h('input', { type: 'text', class: 'tq-what', maxlength: '60', placeholder: 'What you did', title: 'A few words: the entry\u2019s name', required: true });
+  const note = h('input', { type: 'text', class: 'tq-note', placeholder: 'Note', title: 'More about the work, if there is more to say' });
+  const billable = h('input', { type: 'checkbox', checked: true });
+  const add = h(
+    'form',
+    {
+      class: 'tq-add card',
+      onsubmit: async (ev) => {
+        ev.preventDefault();
+        const work = picker.get();
+        if (!work) return tell('Which work was it for?', 'Choose a project, task or client from the list as you type.');
+        try {
+          const made = await api('time_log', { work: work.id, hours: Number(hours.value), what: what.value.trim(), note: note.value.trim() || undefined, date: date.value, billable: billable.checked ? undefined : false });
+          if (!made.client) await tell('Logged, with no client', made.note ?? 'This work involves no company, so it is not invoiced.');
+          again();
+        } catch (err) {
+          tell('That was not logged', err.message);
+        }
+      },
+    },
+    date,
+    hours,
+    picker.el,
+    what,
+    note,
+    h('label', { class: 'tq-bill', title: 'Goes on an invoice' }, billable, 'Billable'),
+    h('button', { type: 'submit', class: 'primary' }, 'Log'),
+  );
+
+  // One line per entry; in place, its fields to change. What is invoiced is kept as billed.
+  const entryRow = (e) => {
+    const li = h('li', { class: 'row-top tq-entry' });
+    // The parts of the line, less those that say nothing: replaceChildren would write them out as words.
+    const show = () =>
+      li.replaceChildren(
+        ...[
+        h('a', { class: 'gist tq-what-text', href: `#/e/${e.id}`, title: [e.what, e.note].filter(Boolean).join('\n') }, e.what),
+        e.note && h('span', { class: 'gist muted small tq-note-text', title: e.note }, e.note),
+        e.work_id ? h('a', { class: 'gist muted small tq-work-text', href: `#/e/${e.work_id}`, title: e.client ? `${e.work} \u2192 billed to ${e.client}` : `${e.work}: no client` }, e.work) : h('span', { class: 'muted small tq-work-text', title: 'Not tied to any work, so it has no client' }, 'no work'),
+        e.billable === false && h('span', { class: 'pill closed', title: 'Not invoiced' }, 'not billable'),
+        e.status !== 'logged' && h('span', { class: 'pill closed', title: 'On an invoice' }, e.status),
+        h('span', { class: 'tq-h' }, hoursText(e.hours)),
+        e.status === 'logged' &&
+          menu('\u22ef', [
+            ['Edit', edit],
+            [
+              'Remove',
+              async () => (await ask({ title: `Remove "${e.what}"?`, message: `${hoursText(e.hours)} on ${dayName(e.date ?? day)}`, action: 'Remove', danger: true })) && write([{ op: 'archive', id: e.id }], 'Removed on the Time screen'),
+              'danger',
+            ],
+          ]),
+        ].filter(Boolean),
+      );
+    const edit = () => {
+      dirty = true;
+      const d = h('input', { type: 'date', value: e.date });
+      const hrs = h('input', { type: 'number', class: 'tq-hours', min: '0.25', max: '24', step: '0.25', value: String(e.hours) });
+      const w = h('input', { type: 'text', class: 'tq-what', maxlength: '60', value: e.what });
+      const n = h('input', { type: 'text', class: 'tq-note', value: e.note ?? '', placeholder: 'Note' });
+      const b = h('input', { type: 'checkbox', checked: e.billable !== false });
+      li.replaceChildren(
+        h(
+          'form',
+          {
+            class: 'tq-edit',
+            onsubmit: (ev) => (
+              ev.preventDefault(),
+              write([{ op: 'update', id: e.id, title: w.value.trim(), body: n.value.trim(), props: { date: d.value, hours: Number(hrs.value), billable: b.checked ? null : false } }], 'Edited on the Time screen')
+            ),
+          },
+          d,
+          hrs,
+          w,
+          n,
+          h('label', { class: 'tq-bill' }, b, 'Billable'),
+          h('button', { type: 'submit', class: 'primary' }, 'Save'),
+          h('button', { type: 'button', onclick: () => ((dirty = false), show()) }, 'Cancel'),
+        ),
+      );
+      w.focus();
+    };
+    show();
+    return li;
+  };
+
+  // The days of the week that have time, and today.
+  const byDay = new Map(sheet.days.map((d) => [d.date, d]));
+  let day;
+  const days = [...Array(7)]
+    .map((_, i) => shiftDay(from, i))
+    .filter((d) => byDay.has(d) || d === today)
+    .map((d) => {
+      day = d;
+      const one = byDay.get(d) ?? { hours: 0, entries: [] };
+      return h(
+        'section',
+        { class: 'card tq-day' },
+        h('header', { class: 'tq-dayhead' }, h('span', { class: 'grow' }, dayName(d, { weekday: 'long', day: 'numeric', month: 'long' })), h('span', { class: 'tq-h' }, hoursText(one.hours))),
+        one.entries.length ? h('ul', { class: 'rows' }, one.entries.map((e) => entryRow({ ...e, date: d }))) : h('div', { class: 'empty' }, 'Nothing logged yet.'),
+      );
+    });
+
+  // What is owed: time not yet invoiced, by client; invoices sent and not paid; drafts.
+  const inv = sheet.invoices;
+  const draft = async (client) => {
+    try {
+      const made = await api('invoice_draft', { client: client.id });
+      location.hash = `#/e/${made.created.inv}`;
+    } catch (err) {
+      tell('No invoice was drafted', err.message);
+    }
+  };
+  const paid = async (i) => {
+    const said = await ask({ title: `Payment on ${i.number}`, message: `${moneyText(i.owing, i.currency)} is owed. Give the amount received and how it came, e.g. "${i.owing} EFT". Left empty, the whole amount.`, input: { placeholder: `${i.owing} EFT` }, action: 'Record payment' });
+    if (said === null) return;
+    const amount = /^\s*\$?([\d,]+(?:\.\d+)?)/.exec(said)?.[1];
+    const method = said.replace(/^\s*\$?[\d,]+(?:\.\d+)?\s*/, '').trim();
+    try {
+      await api('invoice_paid', { id: i.id, ...(amount && { amount: Number(amount.replaceAll(',', '')) }), ...(method && { method }) });
+      again();
+    } catch (err) {
+      tell('The payment was not recorded', err.message);
+    }
+  };
+  const block = (title, rows, empty) => h('section', { class: 'card tq-money' }, h('header', { class: 'tq-dayhead' }, h('span', { class: 'grow' }, title)), rows.length ? h('ul', { class: 'rows' }, rows) : h('div', { class: 'empty' }, empty));
+  const money = h(
+    'aside',
+    { class: 'tq-side' },
+    block(
+      'Not invoiced',
+      sheet.not_invoiced.map((c) =>
+        h('li', { class: 'row-top' }, h('span', { class: 'gist grow', title: c.client }, c.client), h('span', { class: 'tq-h' }, hoursText(c.hours)), c.id ? h('button', { title: `Draft an invoice to ${c.client} for this time`, onclick: () => draft(c) }, 'Draft invoice') : h('span', { class: 'muted small', title: 'This time is for work that involves no company' }, 'no client')),
+      ),
+      'All billed.',
+    ),
+    block(
+      `Owed ${moneyText(inv.owed_total)}`,
+      inv.outstanding.map((i) =>
+        h(
+          'li',
+          { class: 'row-top' },
+          h('a', { class: 'gist grow', href: `#/e/${i.id}`, title: `${i.number} to ${i.client}: ${moneyText(i.total, i.currency)}, ${moneyText(i.paid, i.currency)} paid` }, `${i.number} \u00b7 ${i.client}`),
+          i.overdue_days ? h('span', { class: 'pill bad', title: `Due ${i.due}` }, `${i.overdue_days} d late`) : h('span', { class: 'muted small', title: 'Due' }, i.due ? dayName(i.due, { day: 'numeric', month: 'short' }) : ''),
+          h('span', { class: 'tq-h' }, moneyText(i.owing, i.currency)),
+          h('button', { onclick: () => paid(i) }, 'Mark paid'),
+        ),
+      ),
+      'Nothing owed.',
+    ),
+    block(
+      'Drafts',
+      inv.drafts.map((i) =>
+        h(
+          'li',
+          { class: 'row-top' },
+          h('a', { class: 'gist grow', href: `#/e/${i.id}`, title: `${i.number} to ${i.client}` }, `${i.number} \u00b7 ${i.client}`),
+          h('span', { class: 'tq-h' }, moneyText(i.total, i.currency)),
+          h('button', { title: 'Open it to print or save as a PDF', onclick: () => window.open(`/read/${i.id}`, '_blank') }, 'PDF'),
+          h('button', { title: 'Mark it sent to the client', onclick: () => write([{ op: 'update', id: i.id, status: 'sent' }], `Marked ${i.number} sent on the Time screen`) }, 'Sent'),
+        ),
+      ),
+      'No drafts.',
+    ),
+  );
+
+  const thisWeek = from === mondayOf(today);
+  main.replaceChildren(
+    h(
+      'div',
+      { class: 'page-head' },
+      h('h1', {}, 'Time'),
+      h(
+        'span',
+        { class: 'switch' },
+        h('button', { title: 'The week before', onclick: week(-1) }, '\u2039'),
+        h('button', { class: 'on', title: `${from} to ${to}` }, `${dayName(from, { day: 'numeric', month: 'short' })} \u2013 ${dayName(to, { day: 'numeric', month: 'short' })}`),
+        h('button', { title: 'The week after', onclick: week(1) }, '\u203a'),
+      ),
+      !thisWeek && h('button', { onclick: week(0) }, 'This week'),
+      h('span', { class: 'fact', title: 'Hours this week' }, h('strong', {}, hoursText(sheet.total))),
+    ),
+    h('div', { class: 'tq-grid' }, h('div', { class: 'tq-main' }, add, days.length ? days : h('div', { class: 'empty card' }, 'Nothing logged this week.')), money),
+  );
+}
+
+const PAGES = { home: ['home'], review: ['review'], map: ['map', 'item', 'graph'], time: ['time'], workspace: ['workspace'] };
 const UNDER = { e: 'map', new: 'map', graph: 'map' };
 /** The part an address names, where that is not the address's own name. */
 const PART = { e: 'item', new: 'item' };
@@ -4364,6 +4642,7 @@ async function route(pulse = false) {
     // The graph around an item is drawn on that item's page, under it.
     item: name === 'e' && arg ? () => entity(arg, new URLSearchParams(query).get('here') ?? undefined) : name === 'new' && (() => newEntity(arg)),
     graph: name === 'graph' && (() => graph(query)),
+    time,
     workspace,
   };
   const wanted = PAGES[page];

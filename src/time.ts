@@ -54,6 +54,7 @@ export async function logTime(l: Archipelago, actor: Actor, input: { work: strin
 interface Row {
   id: string;
   title: string;
+  body: string;
   status: string;
   date: string;
   hours: number;
@@ -65,7 +66,7 @@ interface Row {
 /** Time entries, each with the work it is part of. */
 async function entries(l: Archipelago, where: string, params: unknown[]): Promise<Row[]> {
   const { rows } = await l.db.query<Row>(
-    `select e.id, e.title, e.status, e.props ->> 'date' as date, (e.props ->> 'hours')::float8 as hours,
+    `select e.id, e.title, e.body, e.status, e.props ->> 'date' as date, (e.props ->> 'hours')::float8 as hours,
             coalesce((e.props ->> 'billable')::boolean, true) as billable, (e.props ->> 'rate')::float8 as rate,
             (select r.to_id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as work
      from entity e where e.type = any($1::text[]) and e.archived_at is null and e.status <> 'void' and ${where}
@@ -97,7 +98,7 @@ export async function timesheet(l: Archipelago, input: { from?: string; to?: str
     const client = await clientFor(r.work);
     const day = days.get(r.date) ?? { date: r.date, hours: 0, entries: [] };
     day.hours = cents(day.hours + r.hours);
-    day.entries.push({ id: r.id, what: r.title, hours: r.hours, work: await named(r.work), client: client?.title ?? null, status: r.status, ...(!r.billable && { billable: false }) });
+    day.entries.push({ id: r.id, what: r.title, hours: r.hours, work: await named(r.work), work_id: r.work, client: client?.title ?? null, status: r.status, ...(r.body && { note: r.body }), ...(r.rate != null && { rate: r.rate }), ...(!r.billable && { billable: false }) });
     days.set(r.date, day);
     const key = client?.title ?? 'No client';
     const sum = byClient.get(key) ?? { client: key, hours: 0, billable: 0 };
