@@ -385,9 +385,11 @@ sees bugs too. Types outside `core` are named `<pack>.<name>`.
 
 ## Hosting
 
-A hosted Archipelago is one server running everything, with the embedded
-database on a persistent disk, on Render ([render.yaml](render.yaml)). TLS ends
-at the platform.
+You host Archipelago yourself: one server running everything, with the
+embedded database on a persistent disk. Any host that runs Node 24 and keeps
+a disk will do; [render.yaml](render.yaml) is a ready example for Render.
+The server does not speak TLS: that ends at the platform or proxy in front of
+it.
 
 - `PELAGO_HOST=0.0.0.0` makes the server listen beyond this machine. It
   refuses to start that way without `PELAGO_AUTH=tokens`, and never in dev
@@ -396,8 +398,8 @@ at the platform.
   Requests for any other host name are refused.
 - `PELAGO_TRUSTED_PROXIES` names the proxies in front of the server whose
   word is taken for where a request came from: networks as CIDR, comma
-  separated, or `cloudflare` (set in `render.yaml`, since Render is reached
-  through Cloudflare). Private networks are always trusted. The caller is
+  separated, or `cloudflare` (as in the Render example, since Render is
+  reached through Cloudflare). Private networks are always trusted. The caller is
   the last address in `x-forwarded-for` that is not a trusted proxy; what
   stands before it he could have written himself (`src/address.ts`).
 - `PORT` is honoured when `PELAGO_PORT` is not set.
@@ -584,9 +586,10 @@ either direction:
 
 The backups sit on the same disk as the data. To send a copy of each one off
 the server, set `PELAGO_BACKUP_UPLOAD_URL` and `PELAGO_BACKUP_UPLOAD_KEY`:
-any address that takes a file by POST with a bearer key. For Supabase Storage
-that is `https://<project>.supabase.co/storage/v1/object/<private bucket>` and
-a key allowed to write to it. A copy that fails is reported in the server's
+any address that takes a file by POST with a bearer key, such as an S3-style
+bucket behind a signed upload endpoint or Supabase Storage
+(`https://<project>.supabase.co/storage/v1/object/<private bucket>`, with a
+key allowed to write to it). A copy that fails is reported in the server's
 output and the backup itself still stands. Copies sent away are not pruned.
 
 ## Identity and workspaces
@@ -669,7 +672,7 @@ change that:
   and arrive revoked. If the file cannot be put in, no workspace is made.
 
   **If the operator secret is lost**, run this on the machine the server runs
-  on (on Render, in the service's Shell), with the server running:
+  on (on Render, for example, in the service's Shell), with the server running:
 
   ```bash
   node src/cli.ts operator-reset
