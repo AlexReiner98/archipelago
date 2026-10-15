@@ -251,7 +251,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (!hosts.includes(host)) return send(res, 404, { error: 'Not found' });
         if (tooOften(req, res, open)) return;
         res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
-        return res.end(setupScript(`${named.includes(host) ? 'https' : 'http'}://${host}`));
+        return res.end(setupScript(`${named.includes(host) ? 'https' : 'http'}://${host}`, Boolean(tokens)));
       }
 
       // A product's public page: open to anyone, on any name this server has. It is read as the public role sees the

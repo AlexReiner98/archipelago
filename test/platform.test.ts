@@ -457,6 +457,20 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   assert.deepEqual(await later('/hooks/prompt', undefined, { session_id: 'after' }), { status: 200 }, 'a session that began on this server is not told');
 });
 
+test('a server that asks for no token does not send the setup to look for one', async () => {
+  const { base } = await serve('off');
+  const project = mkdtempSync(join(tmpdir(), 'pelago-local-'));
+  const out = await new Promise<string>((done) => {
+    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, PELAGO_AGENT_TOKEN: '' } });
+    let text = '';
+    child.stdout.on('data', (d) => (text += d));
+    child.stderr.on('data', (d) => (text += d));
+    child.on('close', () => done(text));
+  });
+  assert.match(out, /Connected to http:\/\/127\.0\.0\.1:\d+, which asks for no token\./);
+  assert.doesNotMatch(out, /no token yet/);
+});
+
 test('a project with nothing of Archipelago\'s in it is connected by one command, which adds to what is there and can be run again', async () => {
   const { base } = await serve('tokens');
   const project = mkdtempSync(join(tmpdir(), 'pelago-customer-'));

@@ -25,8 +25,8 @@ export const SETUP_VERSION = createHash('sha256')
 /** The one command, with no secret in it, that sets a project up or brings its files up to date. */
 export const setupCommand = (origin: string) => `node -e "fetch('${origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
 
-/** The setup script for a project that is to work with the server at this address. */
-export function setupScript(origin: string): string {
+/** The setup script for a project that is to work with the server at this address; tokens says whether that server asks for one. */
+export function setupScript(origin: string, tokens = true): string {
   const files = {
     // Away from this repository the hook has no local server to fall back on: it calls the one that handed it out.
     hook: read('scripts/pelago-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin)).replace(`const SETUP = '';`, `const SETUP = '${SETUP_VERSION}';`),
@@ -34,5 +34,5 @@ export function setupScript(origin: string): string {
     home: `# Where bumps live\n\nWorkspace: ${origin}.\n\nFind the feature that gathers friction with Archipelago by search (type \`software.feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,
     rules: read('examples/working-rules.md'),
   };
-  return `const ORIGIN = ${JSON.stringify(origin)};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-setup.mjs')}`;
+  return `const ORIGIN = ${JSON.stringify(origin)};\nconst TOKENS = ${tokens};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-setup.mjs')}`;
 }

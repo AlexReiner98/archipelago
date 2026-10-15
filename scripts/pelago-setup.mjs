@@ -381,7 +381,7 @@ if (!top || !same(top, here))
   );
 if (carried && !DRY) console.log(`\nThis machine kept its token as ${OLD_NAMES[1]}. It is now kept as ${NAMES[1]} as well, and .mcp.json reads the old name until Claude Code has been opened again: run this once more after that.`);
 console.log(
-  token
-    ? `\nConnected to ${ORIGIN}. Quit Claude Code completely${process.platform === 'win32' ? ' (from the system tray too)' : ''}, open it again in this folder, and the session will say it is registered in Archipelago.`
+  token || !TOKENS
+    ? `\nConnected to ${ORIGIN}${token ? '' : ', which asks for no token'}. Quit Claude Code completely${process.platform === 'win32' ? ' (from the system tray too)' : ''}, open it again in this folder, and the session will say it is registered in Archipelago.`
     : `\nThe files are in place, but this machine has no token yet. On the Workspace screen at ${ORIGIN}, press Connect an agent and run the command it gives under 1, in this folder.`,
 );
