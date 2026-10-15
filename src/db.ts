@@ -289,7 +289,7 @@ create or replace function pelago_shared_document(secret_hash text) returns json
 language sql stable security definer set search_path = public as $fn$
   with d as (
     select e.* from share s join entity e on e.id = s.entity_id
-    where s.hash = secret_hash and s.revoked_at is null and e.archived_at is null and e.type = 'document'
+    where s.hash = secret_hash and s.revoked_at is null and e.archived_at is null
   ),
   named as (
     select distinct m[1] as id from d, regexp_matches(d.body, '^[ \\t]*(e_[a-z0-9]{8})[ \\t]*$', 'gn') as m

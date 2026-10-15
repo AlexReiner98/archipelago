@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { createShare, listShares, readDocument, revokeShare } from './documents.ts';
+import { draftInvoice, logTime, timesheet, voidInvoice } from './time.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -880,6 +881,42 @@ export const TOOLS: Record<string, Tool> = {
       'To write one, make an item of type document whose note is the text, and put an item’s id alone on a line where that item belongs; a lens\u2019s id brings in its picture, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
     input: { id: z.string() },
     run: async (l, _actor, input) => readDocument(l, input.id),
+  },
+  time_log: {
+    description:
+      'Record time spent on a piece of work: how many hours, on which day (today unless given, in Toronto), what was done in a few words, and a note if there is more to say. ' +
+      'work is the id of the project, task or client it was for; the client billed is the company that work, or what it sits in, involves. Search for the work first. Say what you logged back to the person, with the client.',
+    input: {
+      work: z.string().describe('Id of the project, task or client company the time was for.'),
+      hours: z.number().describe('Hours spent, e.g. 1.5.'),
+      what: z.string().min(1).max(60).describe('What was done, in a few words: the entry’s title.'),
+      note: z.string().optional().describe('More about the work, if there is more to say.'),
+      date: z.string().optional().describe('The day, as 2026-10-15. Today when left out.'),
+      billable: z.boolean().optional().describe('false for time that is not to be invoiced.'),
+      rate: z.number().optional().describe('An hourly rate for this entry only, when it is not the client’s.'),
+    },
+    run: async (l, actor, input) => logTime(l, actor, input),
+  },
+  timesheet: {
+    description: 'Time logged over a span of days, by day and by client, and what is logged but not yet invoiced, by client. This week (Monday to Sunday) unless from and to are given.',
+    input: { from: z.string().optional().describe('The first day, as 2026-10-01.'), to: z.string().optional().describe('The last day.') },
+    run: async (l, _actor, input) => timesheet(l, input),
+  },
+  invoice_draft: {
+    description:
+      'Draft an invoice to a client company for its billable time not yet invoiced, up to a day (today unless given). The client says who bills it (billed_by), its rate, terms_days, currency and whether HST is charged (hst). ' +
+      'The invoice is a document, part of the client, numbered INV-<year>-<n> for its biller; its entries are marked invoiced. It stays a draft until the owner sends it; invoice_void undoes it.',
+    input: {
+      client: z.string().describe('Id of the client company.'),
+      from: z.string().optional().describe('Only time from this day, as 2026-10-01.'),
+      to: z.string().optional().describe('Only time up to this day. Today when left out.'),
+    },
+    run: async (l, actor, input) => draftInvoice(l, actor, input),
+  },
+  invoice_void: {
+    description: 'Void an invoice: it is kept, marked void, and its time entries go back to being logged, to be invoiced again.',
+    input: { id: z.string().describe('The invoice.'), reason: z.string().optional() },
+    run: async (l, actor, input) => voidInvoice(l, actor, input),
   },
   share_create: {
     description: 'Make a link that lets someone with no login read one document and the items it brings in. The link is shown once.',

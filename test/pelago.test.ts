@@ -2311,3 +2311,49 @@ test('an item knows the pictures it is drawn in, and the documents that show the
   assert.deepEqual(await shown(made.in), [{ id: made.map, title: 'Funding map', of: { id: made.p, title: 'Research project' }, documents: [{ id: made.d, title: 'Funding document' }] }]);
   assert.deepEqual(await shown(made.out), [], 'a task is not in a picture of programs');
 });
+
+test('time is logged against work, summed by day and client, and billed on a numbered invoice that can be voided', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'ap', type: 'company', title: 'Aperture Design Tools Inc.', props: { address: '1 King St, Toronto', hst_number: '123456789RT0001' } },
+    { op: 'create', ref: 'aa', type: 'company', title: 'Northwind', props: { rate: 80, hst: true, terms_days: 30, billed_by: 'PLACEHOLDER' } },
+    { op: 'create', ref: 'p', type: 'project', title: 'Northwind research project' },
+    { op: 'create', ref: 't', type: 'task', title: 'Funding research' },
+    { op: 'create', ref: 'mine', type: 'project', title: 'Archipelago' },
+    { op: 'link', type: 'involves', from: 'p', to: 'aa' },
+    { op: 'link', type: 'part_of', from: 't', to: 'p' },
+  ]);
+  await make(l, [{ op: 'update', id: made.aa, props: { billed_by: made.ap } }]);
+  const log = (input: Record<string, unknown>) => callTool(l, human, 'time_log', input) as Promise<{ client: string | null; note?: string }>;
+  assert.equal((await log({ work: made.t, hours: 3, what: 'Funding research', note: 'BDC LIFT and IRAP', date: '2026-10-14' })).client, 'Northwind');
+  await log({ work: made.p, hours: 1.5, what: 'Call with Sam', date: '2026-10-15' });
+  await log({ work: made.p, hours: 2, what: 'Internal notes', date: '2026-10-15', billable: false });
+  assert.match((await log({ work: made.mine, hours: 1, what: 'Own work', date: '2026-10-15' })).note ?? '', /No client/);
+  await assert.rejects(log({ work: made.t, hours: 30, what: 'Too long' }), /at most 24/);
+
+  const sheet = (await callTool(l, human, 'timesheet', { from: '2026-10-13', to: '2026-10-19' })) as { total: number; days: { date: string; hours: number }[]; by_client: { client: string; hours: number; billable: number }[]; not_invoiced: { client: string; hours: number }[] };
+  assert.equal(sheet.total, 7.5);
+  assert.deepEqual(sheet.days.map((d) => [d.date, d.hours]), [['2026-10-14', 3], ['2026-10-15', 4.5]]);
+  assert.deepEqual(sheet.by_client.find((c) => c.client === 'Northwind'), { client: 'Northwind', hours: 6.5, billable: 4.5 });
+  assert.deepEqual(sheet.not_invoiced.find((c) => c.client === 'Northwind')?.hours, 4.5);
+
+  const inv = (await callTool(l, human, 'invoice_draft', { client: made.aa, to: '2026-10-31' })) as { number: string; created: { inv: string }; subtotal: number; tax: number; total: number; entries: number };
+  assert.deepEqual([inv.number.replace(/\d{4}/, 'YYYY'), inv.entries, inv.subtotal, inv.tax, inv.total], ['INV-YYYY-001', 2, 360, 46.8, 406.8]);
+  const doc = (await callTool(l, human, 'document', { id: inv.created.inv })) as { parts: { text?: string }[] };
+  const text = doc.parts.map((p) => p.text).join('\n');
+  assert.match(text, /From: Aperture Design Tools Inc\. · 1 King St, Toronto · HST 123456789RT0001/);
+  assert.match(text, /3 h × \$80\.00 = \$240\.00/);
+  assert.match(text, /\*\*Total due: \$406\.80 CAD\*\*/);
+  await assert.rejects(callTool(l, human, 'invoice_draft', { client: made.aa, to: '2026-10-31' }), /No billable time/);
+  // A void invoice frees its time to be billed again, on the next number.
+  await callTool(l, human, 'invoice_void', { id: inv.created.inv });
+  const again = (await callTool(l, human, 'invoice_draft', { client: made.aa, to: '2026-10-31' })) as { number: string; entries: number };
+  assert.deepEqual([again.number.endsWith('-002'), again.entries], [true, 2]);
+  // An invoice is a document: it can be given as a link, which shows the bill.
+  const { sharedDocument } = await import('../src/documents.ts');
+  const link = (await callTool(l, human, 'share_create', { id: inv.created.inv })) as { path: string };
+  assert.match(JSON.stringify(await sharedDocument(l, link.path.split('/').at(-1)!)), /Total due/);
+  // A client with no biller says so.
+  const other = await make(l, [{ op: 'create', ref: 'c', type: 'company', title: 'Nobody bills me' }]);
+  await assert.rejects(callTool(l, human, 'invoice_draft', { client: other.c }), /does not say who bills it/);
+});

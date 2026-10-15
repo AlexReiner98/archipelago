@@ -1,0 +1,65 @@
+{
+  "id": "time",
+  "version": "0.1.0",
+  "title": "Time",
+  "description": "Hours worked, each tied to the work it was for, and invoices made from them. A client company says who bills it, its rate, terms and whether HST is charged.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "time.entry",
+      "title": "Time entry",
+      "description": "Time spent on one piece of work on one day. The title says what was done in a few words; the note says more. Make it part of the work it was for (a project or task); the client is the company that work involves.",
+      "statuses": { "open": ["logged"], "closed": ["invoiced", "void"] },
+      "fields": {
+        "date": { "type": "date", "shown": true, "description": "The day the work was done." },
+        "hours": { "type": "number", "shown": true, "description": "Hours spent, e.g. 1.5." },
+        "billable": { "type": "boolean", "default": true, "description": "Whether it goes on an invoice." },
+        "rate": { "type": "number", "description": "An hourly rate for this entry only, when it is not the client's." }
+      }
+    },
+    {
+      "id": "time.invoice",
+      "extends": "document",
+      "title": "Invoice",
+      "description": "A bill to a client for time entries, kept as a document: its note is the invoice as sent, fixed when made. Read, print or share it as any document.",
+      "statuses": { "open": ["draft", "sent"], "closed": ["paid", "void"] },
+      "fields": {
+        "number": { "type": "string", "shown": true, "description": "The invoice number, e.g. INV-2026-001." },
+        "client": { "type": "string", "description": "The company billed." },
+        "billed_by": { "type": "string", "description": "The company or person the invoice is from." },
+        "issued": { "type": "date", "shown": true, "description": "The day it was made." },
+        "due": { "type": "date", "shown": true, "description": "The day it is due." },
+        "period_from": { "type": "date", "description": "The first day of the work billed." },
+        "period_to": { "type": "date", "description": "The last day of the work billed." },
+        "hours": { "type": "number", "description": "Hours billed." },
+        "subtotal": { "type": "number", "description": "Before tax." },
+        "tax": { "type": "number", "description": "HST charged." },
+        "total": { "type": "number", "shown": true, "description": "What is due." },
+        "currency": { "type": "string", "description": "e.g. CAD." }
+      }
+    }
+  ],
+  "relations": [
+    { "id": "time.bills", "title": "bills", "inverse": "is billed on", "from": ["time.invoice"], "to": ["time.entry"], "description": "The invoice bills this time entry." }
+  ],
+  "extend": {
+    "company": {
+      "fields": {
+        "rate": { "type": "number", "description": "Hourly rate billed to this client." },
+        "currency": { "type": "string", "description": "Currency billed in, e.g. CAD." },
+        "terms_days": { "type": "number", "description": "Days until an invoice is due." },
+        "hst": { "type": "boolean", "description": "Whether 13% HST is charged to this client." },
+        "billed_by": { "type": "string", "description": "Id of the company or person who bills this client, e.g. Aperture Design Tools Inc." },
+        "address": { "type": "string", "description": "Postal address, for invoices." },
+        "email": { "type": "string", "description": "Where invoices go." },
+        "hst_number": { "type": "string", "description": "Its own HST number, when it bills." }
+      }
+    },
+    "person": {
+      "fields": {
+        "address": { "type": "string", "description": "Postal address, for invoices." },
+        "hst_number": { "type": "string", "description": "HST number, when they bill as a sole proprietor." }
+      }
+    }
+  }
+}
