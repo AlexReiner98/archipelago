@@ -218,9 +218,16 @@ function activity(run: { is_open: boolean; busy: boolean | null; active: unknown
   if (kept.length) {
     const last = kept.at(-1)!;
     if (run.is_open && run.busy) last[1] = Math.max(last[1], Date.now());
+    // A session already under way when stretches began to be kept is guessed at up to its first one.
+    const before = kept[0][0] - began > LONE_MS ? guessed(run, began, kept[0][0], events).filter(([, b]) => b < kept[0][0]) : [];
     // A turn with nothing heard between its start and end still took a moment.
-    return kept.map(([a, b]) => [a, Math.max(b, a + 60_000)] as [number, number]);
+    return [...before, ...kept.map(([a, b]) => [a, Math.max(b, a + 60_000)] as [number, number])];
   }
+  return guessed(run, began, ended, events);
+}
+
+/** When a session was at work, from its signs of work between two moments, gathered where they fall close together. */
+function guessed(run: { story: unknown; last_seen: string | null }, began: number, ended: number, events: number[]): [number, number][] {
   const beats = (Array.isArray(run.story) ? run.story : []).map((b) => Date.parse(b?.at)).filter(Number.isFinite);
   const seen = Date.parse(run.last_seen ?? '');
   const points = [began, ended, ...events, ...beats, ...(Number.isFinite(seen) ? [seen] : [])].filter((t) => t >= began && t <= ended).sort((a, b) => a - b);

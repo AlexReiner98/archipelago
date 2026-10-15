@@ -2453,6 +2453,10 @@ test('a block of time has hours from its start and end, and a week holds the own
   const spans = (run: string) => runs.days.flatMap((d) => d.agents.flat().filter((b) => b.id === run).map((b) => [d.date, b.from_hour, b.to_hour]));
   assert.deepEqual(spans(night.run), [['2026-10-12', 20, 21], ['2026-10-13', 8.5, 9]]);
   assert.deepEqual(spans(old.run), [['2026-10-13', 10, 10.5], ['2026-10-13', 17.92, 18]]);
+  // One already under way when stretches began to be kept is guessed at up to its first stretch, then drawn by them.
+  await l.db.query(`update entity set props = props || '{"active": [["2026-10-13T21:00:00Z", "2026-10-13T22:00:00Z"]]}'::jsonb where id = $1`, [old.run]);
+  const both = (await callTool(l, human, 'week', { from: '2026-10-12' })) as typeof wk;
+  assert.deepEqual(both.days.flatMap((d) => d.agents.flat().filter((b) => b.id === old.run).map((b) => [b.from_hour, b.to_hour])), [[10, 10.5], [17, 18]]);
 });
 
 test('a session’s turns are kept as stretches of work: a prompt begins one, a stop ends it, a long quiet starts the next', async () => {
