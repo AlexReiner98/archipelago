@@ -4401,14 +4401,85 @@ function workPicker(initial, onPick) {
   return { el: h('span', { class: 'tq-picker' }, input, list), get: () => picked };
 }
 
+/** Hours since midnight as a time of day: 13.5 is 13:30. */
+const clockText = (n) => {
+  const m = Math.round(n * 60);
+  return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+};
+
+/**
+ * The week as a calendar: a column for each day, split into the owner's lane and a narrow lane for each agent at work at
+ * once; time runs down, and each block is coloured by the project it counts toward. Time logged as hours alone has no
+ * place in the day, so it is a strip above it.
+ */
+function weekCalendar(wk, today) {
+  const hueOf = new Map(wk.projects.map((p, i) => [p.id, GRID_HUES[i % GRID_HUES.length]]));
+  const titleOf = new Map(wk.projects.map((p) => [p.id, p.title]));
+  const timed = wk.days.flatMap((d) => [...d.owner, ...d.agents.flat()]).filter((b) => b.from_hour != null);
+  // The hours shown: the working day, stretched to whatever the week holds.
+  const top = Math.max(0, Math.min(8, ...timed.map((b) => Math.floor(b.from_hour))));
+  const bottom = Math.min(24, Math.max(18, ...timed.map((b) => Math.ceil(b.to_hour))));
+  const span = bottom - top;
+  const place = (b) => `top: ${((b.from_hour - top) / span) * 100}%; height: max(2px, ${((b.to_hour - b.from_hour) / span) * 100}%)`;
+  const colour = (b) => `--cal-hue: ${hueOf.get(b.project) ?? 'var(--closed)'}`;
+  const tip = (b) =>
+    [
+      [titleOf.get(b.project), b.what].filter(Boolean).join(' \u00b7 '),
+      b.work && b.work !== b.what && b.work !== titleOf.get(b.project) ? b.work : null,
+      b.from_hour != null ? `${clockText(b.from_hour)}\u2013${clockText(b.to_hour)} \u00b7 ${hoursText(b.hours)}` : hoursText(b.hours),
+      b.session && b.session !== b.what ? `Agent: ${b.session}${b.open ? ' (running)' : ''}` : b.session ? `Agent${b.open ? ', running' : ''}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  const blockEl = (b, cls) => h('a', { class: `cal-block ${cls}`, href: `#/e/${b.id}`, title: tip(b), style: `${place(b)}; ${colour(b)}` }, cls === 'cal-mine' && b.to_hour - b.from_hour >= 0.75 ? h('span', { class: 'cal-what' }, b.what) : null);
+  const hours = [...Array(span)].map((_, i) => top + i);
+  const tall = `height: ${span * 28}px`;
+
+  return h(
+    'section',
+    { class: 'card cal' },
+    h(
+      'header',
+      { class: 'cal-legend' },
+      wk.projects.length ? wk.projects.map((p) => h('a', { class: 'cal-key', href: `#/e/${p.id}`, title: p.title, style: `--cal-hue: ${hueOf.get(p.id)}` }, p.title)) : h('span', { class: 'muted small' }, 'Nothing this week.'),
+    ),
+    h(
+      'div',
+      { class: 'cal-scroll' },
+      h(
+        'div',
+        { class: 'cal-grid' },
+        h('div', { class: 'cal-axis' }, h('div', { class: 'cal-head' }), h('div', { class: 'cal-loose' }), h('div', { class: 'cal-body', style: tall }, hours.filter((n) => n > top && (span <= 14 || n % 2 === 0)).map((n) => h('span', { class: 'cal-hour', style: `top: ${((n - top) / span) * 100}%` }, clockText(n))))),
+        wk.days.map((d) => {
+          const loose = d.owner.filter((b) => b.from_hour == null);
+          const lanes = d.agents.length;
+          return h(
+            'div',
+            { class: `cal-day${d.date === today ? ' cal-today' : ''}` },
+            h('div', { class: 'cal-head', title: `${hoursText(d.hours)} of your time${lanes ? `, ${lanes} agent${lanes === 1 ? '' : 's'} at once at most` : ''}` }, h('span', { class: 'gist' }, dayName(d.date, { weekday: 'short', day: 'numeric' })), d.hours ? h('span', { class: 'tq-h muted small' }, hoursText(d.hours)) : null),
+            h('div', { class: 'cal-loose' }, loose.map((b) => h('a', { class: 'cal-chip', href: `#/e/${b.id}`, title: tip(b), style: `flex-grow: ${b.hours}; ${colour(b)}` }))),
+            h(
+              'div',
+              { class: 'cal-body', style: `${tall}; --cal-agents: ${lanes}` },
+              hours.map((n) => h('span', { class: 'cal-rule', style: `top: ${((n - top) / span) * 100}%` })),
+              h('div', { class: 'cal-lane cal-owner' }, d.owner.filter((b) => b.from_hour != null).map((b) => blockEl(b, 'cal-mine'))),
+              d.agents.map((lane) => h('div', { class: 'cal-lane cal-agent' }, lane.map((b) => blockEl(b, 'cal-run')))),
+            ),
+          );
+        }),
+      ),
+    ),
+  );
+}
+
 async function time() {
   const main = part('time');
   const today = localDay();
   const from = timeState.from ?? mondayOf(today);
   const to = shiftDay(from, 6);
-  let sheet;
+  let sheet, wk;
   try {
-    sheet = await api('timesheet', { from, to });
+    [sheet, wk] = await Promise.all([api('timesheet', { from, to }), api('week', { from })]);
   } catch (err) {
     return main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
@@ -4608,6 +4679,7 @@ async function time() {
       !thisWeek && h('button', { onclick: week(0) }, 'This week'),
       h('span', { class: 'fact', title: 'Hours this week' }, h('strong', {}, hoursText(sheet.total))),
     ),
+    weekCalendar(wk, today),
     h('div', { class: 'tq-grid' }, h('div', { class: 'tq-main' }, add, days.length ? days : h('div', { class: 'empty card' }, 'Nothing logged this week.')), money),
   );
 }

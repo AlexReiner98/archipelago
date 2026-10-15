@@ -16,6 +16,13 @@ const money = (n: number, currency: string) => new Intl.NumberFormat('en-CA', { 
 /** HST in Ontario. */
 const HST = 0.13;
 
+/** The hours of a block from its start to its end, when both are given and the end comes after the start. */
+export function blockHours(start: unknown, end: unknown): number | undefined {
+  if (typeof start !== 'string' || typeof end !== 'string') return undefined;
+  const ms = Date.parse(end) - Date.parse(start);
+  return ms > 0 ? cents(ms / 3_600_000) : undefined;
+}
+
 /** The client of a piece of work: the company it, or the nearest thing it sits in, involves; a company is its own. */
 export async function clientOf(l: Archipelago, id: string): Promise<Entity | undefined> {
   const self = await l.entity(id);
@@ -33,22 +40,33 @@ export async function clientOf(l: Archipelago, id: string): Promise<Entity | und
 }
 
 /** Record time spent on a piece of work. */
-export async function logTime(l: Archipelago, actor: Actor, input: { work: string; hours: number; what: string; note?: string; date?: string; billable?: boolean; rate?: number }) {
+export async function logTime(
+  l: Archipelago,
+  actor: Actor,
+  input: { work: string; hours?: number; start?: string; end?: string; what: string; note?: string; date?: string; billable?: boolean; rate?: number },
+) {
   const work = await l.entity(input.work);
   if (!work || work.archived_at) throw new Error(`No work "${input.work}" to log time against: give the id of a project, task or client.`);
-  if (!(input.hours > 0 && input.hours <= 24)) throw new Error('hours must be more than 0 and at most 24');
-  const date = input.date ?? today();
+  // A block says when; its hours are the time between, and its day is the day it began.
+  const timed = input.start !== undefined || input.end !== undefined;
+  if (timed && (Number.isNaN(Date.parse(input.start ?? '')) || Number.isNaN(Date.parse(input.end ?? '')))) throw new Error('start and end must both be date-times like 2026-10-15T09:30:00-04:00');
+  const start = timed ? new Date(input.start!).toISOString() : undefined;
+  const end = timed ? new Date(input.end!).toISOString() : undefined;
+  const hours = timed ? blockHours(start, end) : input.hours;
+  if (timed && hours === undefined) throw new Error('end must come after start');
+  if (!(hours !== undefined && hours > 0 && hours <= 24)) throw new Error('hours must be more than 0 and at most 24');
+  const date = input.date ?? (start ? today(new Date(start)) : today());
   if (!DAY.test(date)) throw new Error('date must look like 2026-10-15');
   const client = await clientOf(l, work.id);
-  const props = { date, hours: input.hours, ...(input.billable === false && { billable: false }), ...(input.rate !== undefined && { rate: input.rate }) };
+  const props = { date, hours, ...(start && { start, end }), ...(input.billable === false && { billable: false }), ...(input.rate !== undefined && { rate: input.rate }) };
   const result = await l.change(actor, {
     ops: [
       { op: 'create', ref: 'e', type: 'time.entry', title: input.what, status: 'logged', body: input.note ?? '', props },
       { op: 'link', type: 'part_of', from: 'e', to: work.id },
     ],
-    reason: `Logged ${input.hours} h on ${work.title} for ${date}`,
+    reason: `Logged ${hours} h on ${work.title} for ${date}`,
   });
-  return { ...result, work: work.title, client: client?.title ?? null, date, hours: input.hours, ...(!client && { note: 'No client: this work involves no company, so it cannot be invoiced until it, or what it sits in, involves one.' }) };
+  return { ...result, work: work.title, client: client?.title ?? null, date, hours, ...(start && { start, end }), ...(!client && { note: 'No client: this work involves no company, so it cannot be invoiced until it, or what it sits in, involves one.' }) };
 }
 
 interface Row {
@@ -58,22 +76,25 @@ interface Row {
   status: string;
   date: string;
   hours: number;
+  start: string | null;
+  end: string | null;
   billable: boolean;
   rate: number | null;
   work: string | null;
 }
 
-/** Time entries, each with the work it is part of. */
+/** Time entries, each with the work it is part of. A block's hours are the time from its start to its end. */
 async function entries(l: Archipelago, where: string, params: unknown[]): Promise<Row[]> {
   const { rows } = await l.db.query<Row>(
-    `select e.id, e.title, e.body, e.status, e.props ->> 'date' as date, (e.props ->> 'hours')::float8 as hours,
+    `select e.id, e.title, e.body, e.status, e.date, (e.props ->> 'hours')::float8 as hours, e.props ->> 'start' as start, e.props ->> 'end' as end,
             coalesce((e.props ->> 'billable')::boolean, true) as billable, (e.props ->> 'rate')::float8 as rate,
             (select r.to_id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as work
-     from entity e where e.type = any($1::text[]) and e.archived_at is null and e.status <> 'void' and ${where}
-     order by e.props ->> 'date', e.created_at`,
+     from (select *, coalesce(props ->> 'date', left(props ->> 'start', 10)) as date from entity) e
+     where e.type = any($1::text[]) and e.archived_at is null and e.status <> 'void' and ${where.replaceAll("e.props ->> 'date'", 'e.date')}
+     order by e.date, e.props ->> 'start', e.created_at`,
     [l.registry.family('time.entry'), ...params],
   );
-  return rows;
+  return rows.map((r) => ({ ...r, hours: blockHours(r.start, r.end) ?? r.hours ?? 0 }));
 }
 
 /** Time logged over a span of days (this week, Monday to Sunday, unless asked), by day and by client, and what is not yet invoiced. */
@@ -98,7 +119,7 @@ export async function timesheet(l: Archipelago, input: { from?: string; to?: str
     const client = await clientFor(r.work);
     const day = days.get(r.date) ?? { date: r.date, hours: 0, entries: [] };
     day.hours = cents(day.hours + r.hours);
-    day.entries.push({ id: r.id, what: r.title, hours: r.hours, work: await named(r.work), work_id: r.work, client: client?.title ?? null, status: r.status, ...(r.body && { note: r.body }), ...(r.rate != null && { rate: r.rate }), ...(!r.billable && { billable: false }) });
+    day.entries.push({ id: r.id, what: r.title, hours: r.hours, work: await named(r.work), work_id: r.work, client: client?.title ?? null, status: r.status, ...(r.start && { start: r.start, end: r.end }), ...(r.body && { note: r.body }), ...(r.rate != null && { rate: r.rate }), ...(!r.billable && { billable: false }) });
     days.set(r.date, day);
     const key = client?.title ?? 'No client';
     const sum = byClient.get(key) ?? { client: key, hours: 0, billable: 0 };
@@ -117,6 +138,195 @@ export async function timesheet(l: Archipelago, input: { from?: string; to?: str
     unbilled.set(key, sum);
   }
   return { from, to, total: cents(rows.reduce((n, r) => n + r.hours, 0)), days: [...days.values()], by_client: [...byClient.values()], not_invoiced: [...unbilled.values()], invoices: await owed(l) };
+}
+
+/** The hour and minute a moment falls at where the work is done, as hours since midnight: 13.5 for half past one. */
+const clock = (iso: string) => {
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso)).split(':').map(Number);
+  return h + m / 60;
+};
+/** The first moment of a day where the work is done. Midnight there is midnight UTC less the offset the zone keeps at noon. */
+const dayStart = (day: string) => Date.parse(`${day}T00:00:00Z`) - (clock(`${day}T12:00:00Z`) - 12) * 3_600_000;
+
+/** A session closed this long after it was last heard from was ended for it: it stopped when it went quiet. */
+const QUIET_MS = 3_600_000;
+
+export interface Block {
+  /** The time entry, or the session. */
+  id: string;
+  /** What was done: the entry's title, or what the session worked on. */
+  what: string;
+  /** From and to, cut to the day; null for time logged as hours alone. */
+  start: string | null;
+  end: string | null;
+  /** The same as hours since that day's midnight where the work is done, so a page can place it without a time zone. */
+  from_hour: number | null;
+  to_hour: number | null;
+  hours: number;
+  work: string | null;
+  work_id: string | null;
+  /** The project it counts toward, which colours it. */
+  project: string | null;
+  status: string;
+  /** A session's own name, and whether it is still open. */
+  session?: string;
+  open?: boolean;
+}
+
+/**
+ * What a piece of work counts toward: the outermost project it sits in; failing that, the project that lives in the
+ * repository it sits in or lives in; failing that, the outermost thing it sits in.
+ */
+async function projectOf(l: Archipelago, id: string, cache: Map<string, string | null>): Promise<string | null> {
+  if (cache.has(id)) return cache.get(id)!;
+  const self = await l.entity(id);
+  let found: string | null = null;
+  if (self) {
+    const chain = [...(await l.trail(id)), { id: self.id, type: self.type }];
+    found = chain.find((c) => l.registry.isA(c.type, 'project'))?.id ?? null;
+    if (!found) {
+      const { rows } = await l.db.query<{ id: string }>(
+        `select p.id from relation h join entity p on p.id = h.from_id
+         where h.type = 'software.lives_in' and h.valid_to is null and p.archived_at is null and p.type = any($1::text[])
+           and h.to_id in (select x from unnest($2::text[]) x union select r.to_id from relation r where r.from_id = any($2::text[]) and r.type = 'software.lives_in' and r.valid_to is null)
+         order by p.created_at limit 1`,
+        [l.registry.family('project'), chain.map((c) => c.id)],
+      );
+      found = rows[0]?.id ?? chain[0].id;
+    }
+  }
+  cache.set(id, found);
+  return found;
+}
+
+/** Lay sessions in as few lanes as hold them without overlap, each keeping to one lane all day: one lane per agent at work at once. */
+function lanes(blocks: Block[]): Block[][] {
+  const runs = new Map<string, Block[]>();
+  for (const b of blocks) runs.set(b.id, [...(runs.get(b.id) ?? []), b]);
+  const spans = [...runs.values()].map((bs) => ({ bs, from: Math.min(...bs.map((b) => b.from_hour!)), to: Math.max(...bs.map((b) => b.to_hour!)) })).sort((a, b) => a.from - b.from);
+  const out: Block[][] = [];
+  const ends: number[] = [];
+  for (const s of spans) {
+    let at = ends.findIndex((end) => end <= s.from);
+    if (at < 0) (at = ends.length), out.push([]);
+    ends[at] = Math.max(s.to, s.from + 0.05);
+    out[at].push(...s.bs);
+  }
+  return out;
+}
+
+/**
+ * A week as a calendar: for each day, the owner's blocks (time entries, timed or not) and the agents' lanes (the
+ * sessions the map recorded, each cut where it moved from one piece of work to another), every block with the project
+ * it counts toward. The page draws this, and an agent reads the same.
+ */
+export async function week(l: Archipelago, input: { from?: string }) {
+  const asked = input.from ?? today();
+  if (!DAY.test(asked)) throw new Error('from must look like 2026-10-15');
+  const from = addDays(asked, -((new Date(`${asked}T12:00:00Z`).getUTCDay() + 6) % 7));
+  const to = addDays(from, 6);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(from, i));
+  const edges = [...days, addDays(from, 7)].map(dayStart);
+  const projects = new Map<string, string | null>();
+  const titles = new Map<string, string>();
+  const named = async (id: string | null) => (id ? (titles.get(id) ?? (titles.set(id, (await l.entity(id))?.title ?? id), titles.get(id)!)) : null);
+  const hourOf = (ms: number, d: number) => cents((ms - edges[d]) / 3_600_000);
+  /** The parts of a span that fall on each day of the week. */
+  const cut = function* (a: number, b: number) {
+    for (let d = 0; d < 7; d++) {
+      const x = Math.max(a, edges[d]);
+      const y = Math.min(b, edges[d + 1]);
+      // A run that was over as soon as it was recorded is still drawn, as a sliver.
+      if (y > x || (a === b && a >= edges[d] && a < edges[d + 1])) yield { d, x, y };
+    }
+  };
+
+  // The owner's lane: what they logged, as blocks where they said when.
+  const owner: Block[][] = days.map(() => []);
+  for (const r of await entries(l, `e.props ->> 'date' between $2 and $3`, [from, to])) {
+    const at = days.indexOf(r.date);
+    const base = { id: r.id, what: r.title, work: await named(r.work), work_id: r.work, project: r.work ? await projectOf(l, r.work, projects) : null, status: r.status };
+    const s = r.start ? Date.parse(r.start) : NaN;
+    const e = r.end ? Date.parse(r.end) : NaN;
+    if (!(e > s)) {
+      if (at >= 0) owner[at].push({ ...base, start: null, end: null, from_hour: null, to_hour: null, hours: r.hours });
+      continue;
+    }
+    // A block past midnight is drawn on each day it covers.
+    for (const { d, x, y } of cut(s, e)) owner[d].push({ ...base, start: new Date(x).toISOString(), end: new Date(y).toISOString(), from_hour: hourOf(x, d), to_hour: hourOf(y, d), hours: cents((y - x) / 3_600_000) });
+  }
+
+  // The agents' lanes: every session that ran in the week, from when it began to when it ended (or was last heard from,
+  // if it is still open), cut by the work it said it was on. Time on nothing in particular counts to its repository.
+  const { rows: runs } = await l.db.query<{ id: string; title: string; is_open: boolean; status: string; created_at: Date; updated_at: Date; last_seen: string | null; repo: string | null }>(
+    `select e.id, e.title, e.is_open, e.status, e.created_at, e.updated_at, e.props ->> 'last_seen' as last_seen,
+            (select r.to_id from relation r where r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null limit 1) as repo
+     from entity e where e.type = any($1::text[]) and e.archived_at is null and e.created_at < $3
+       and greatest(e.updated_at, coalesce((e.props ->> 'last_seen')::timestamptz, e.created_at)) >= $2
+     order by e.created_at`,
+    [l.registry.family('sys.run'), new Date(edges[0]).toISOString(), new Date(edges[7]).toISOString()],
+  );
+  const { rows: tasks } = await l.db.query<{ run: string; task: string; valid_from: Date; valid_to: Date | null }>(
+    `select from_id as run, to_id as task, valid_from, valid_to from relation where type = 'sys.works_on' and from_id = any($1::text[]) order by valid_from`,
+    [runs.map((r) => r.id)],
+  );
+  const agents: Block[][] = days.map(() => []);
+  for (const run of runs) {
+    const began = new Date(run.created_at).getTime();
+    // An open session runs until it was last heard from. One that was closed long after it went quiet (ended for it)
+    // stopped then too; one that ended itself stopped when it ended.
+    const seen = Date.parse(run.last_seen ?? '') || 0;
+    const closed = new Date(run.updated_at).getTime();
+    const ended = Math.max(began, run.is_open ? Math.max(seen, closed) : seen && closed - seen > QUIET_MS ? seen : closed);
+    // Each piece of work holds from when it was taken up until the next one was, or until it was let go.
+    const mine = tasks.filter((t) => t.run === run.id);
+    const pieces: { a: number; b: number; task: string | null }[] = [];
+    let cursor = began;
+    mine.forEach((t, i) => {
+      const a = Math.min(Math.max(new Date(t.valid_from).getTime(), cursor), ended);
+      const next = mine[i + 1] ? new Date(mine[i + 1].valid_from).getTime() : ended;
+      const b = Math.min(t.valid_to ? new Date(t.valid_to).getTime() : ended, next, ended);
+      if (a > cursor) pieces.push({ a: cursor, b: a, task: null });
+      if (b > a) pieces.push({ a, b, task: t.task });
+      cursor = Math.max(cursor, a, b);
+    });
+    if (ended > cursor || !pieces.length) pieces.push({ a: cursor, b: ended, task: null });
+    for (const p of pieces) {
+      const work = p.task ?? run.repo;
+      const what = (p.task && (await named(p.task))) || run.title;
+      for (const { d, x, y } of cut(p.a, p.b))
+        agents[d].push({
+          id: run.id,
+          what,
+          start: new Date(x).toISOString(),
+          end: new Date(y).toISOString(),
+          from_hour: hourOf(x, d),
+          to_hour: hourOf(y, d),
+          hours: cents((y - x) / 3_600_000),
+          work: await named(work),
+          work_id: work,
+          project: work ? await projectOf(l, work, projects) : null,
+          status: run.status,
+          session: run.title,
+          open: run.is_open,
+        });
+    }
+  }
+
+  const counted = new Set([...owner.flat(), ...agents.flat()].map((b) => b.project).filter((p): p is string => Boolean(p)));
+  return {
+    from,
+    to,
+    zone: ZONE,
+    // Every project the week touches, in a fixed order, so each keeps one colour all week.
+    projects: await Promise.all([...counted].sort().map(async (id) => ({ id, title: await named(id) }))),
+    days: days.map((date, i) => ({
+      date,
+      hours: cents(owner[i].reduce((n, b) => n + b.hours, 0)),
+      owner: owner[i],
+      agents: lanes(agents[i]),
+    })),
+  };
 }
 
 /** The next number for an invoice from one biller this year: INV-2026-001, then 002. */

@@ -2378,6 +2378,59 @@ test('time is logged against work, summed by day and client, and billed on a num
   await assert.rejects(callTool(l, human, 'invoice_draft', { client: other.c }), /does not say who bills it/);
 });
 
+test('a block of time has hours from its start and end, and a week holds the owner’s blocks beside the agents’ lanes', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'ap', type: 'project', title: 'Aperture' },
+    { op: 'create', ref: 't', type: 'task', title: 'Sun study loop' },
+    { op: 'create', ref: 'ar', type: 'project', title: 'Archipelago' },
+    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Archipelago repo', props: { path: 'c:/code/arch' } },
+    { op: 'link', type: 'part_of', from: 't', to: 'ap' },
+    { op: 'link', type: 'software.lives_in', from: 'ar', to: 'repo' },
+  ]);
+  const log = (input: Record<string, unknown>) => callTool(l, human, 'time_log', input) as Promise<{ hours: number; date: string; start?: string }>;
+  const block = await log({ work: made.t, what: 'Reviewed the loop', start: '2026-10-14T13:00:00-04:00', end: '2026-10-14T15:30:00-04:00' });
+  assert.deepEqual([block.hours, block.date, block.start], [2.5, '2026-10-14', '2026-10-14T17:00:00.000Z'], 'the hours are the time between start and end, on the day it began');
+  await log({ work: made.ar, what: 'Notes', hours: 1, date: '2026-10-15' });
+  await log({ work: made.ar, what: 'Late night', start: '2026-10-16T23:00:00-04:00', end: '2026-10-17T01:00:00-04:00' });
+  await assert.rejects(log({ work: made.t, what: 'Backwards', start: '2026-10-14T15:00:00-04:00', end: '2026-10-14T13:00:00-04:00' }), /end must come after start/);
+  const sheet = (await callTool(l, human, 'timesheet', { from: '2026-10-12', to: '2026-10-18' })) as { total: number };
+  assert.equal(sheet.total, 5.5, 'an entry with only date and hours still counts beside the blocks');
+
+  // Two agents at work at once that afternoon: one on the loop, one in the repository with no task named.
+  const one = await sessionStart(l, agent, { task: made.t, session_id: 'w1' });
+  const two = await sessionStart(l, agent, { cwd: 'c:/code/arch', session_id: 'w2' });
+  const when = async (run: string, from: string, to: string) => {
+    await l.db.query(`update entity set created_at = $2::timestamptz, updated_at = $3::text::timestamptz, props = props || jsonb_build_object('last_seen', $3::text) where id = $1`, [run, from, to]);
+    await l.db.query(`update relation set valid_from = $2 where from_id = $1 and type = 'sys.works_on'`, [run, from]);
+  };
+  await when(one.run, '2026-10-14T17:00:00Z', '2026-10-14T19:00:00Z');
+  await when(two.run, '2026-10-14T17:30:00Z', '2026-10-14T18:00:00Z');
+
+  type B = { id: string; what: string; from_hour: number | null; to_hour: number | null; hours: number; project: string | null; session?: string };
+  const wk = (await callTool(l, human, 'week', { from: '2026-10-15' })) as { from: string; to: string; projects: { id: string; title: string }[]; days: { date: string; hours: number; owner: B[]; agents: B[][] }[] };
+  assert.deepEqual([wk.from, wk.to, wk.days.length], ['2026-10-12', '2026-10-18', 7], 'any day names its week, Monday to Sunday');
+  assert.deepEqual(wk.projects.map((p) => p.title).sort(), ['Aperture', 'Archipelago']);
+  const wed = wk.days[2];
+  assert.deepEqual(wed.owner.map((b) => [b.what, b.from_hour, b.to_hour, b.project]), [['Reviewed the loop', 13, 15.5, made.ap]]);
+  assert.equal(wed.agents.length, 2, 'one lane for each agent at work at once');
+  assert.deepEqual(wed.agents.flat().map((b) => [b.id, b.what, b.from_hour, b.to_hour, b.hours, b.project]).sort(), [
+    [one.run, 'Sun study loop', 13, 15, 2, made.ap],
+    [two.run, (await l.entity(two.run))!.title, 13.5, 14, 0.5, made.ar],
+  ].sort(), 'a session counts to its task’s project, or to the project that lives in its repository');
+  const thu = wk.days[3];
+  assert.deepEqual(thu.owner.map((b) => [b.what, b.from_hour, b.hours]), [['Notes', null, 1]], 'time logged as hours alone has no place in the day');
+  assert.deepEqual([wk.days[4].owner[0].from_hour, wk.days[4].owner[0].to_hour, wk.days[5].owner[0].from_hour, wk.days[5].owner[0].to_hour], [23, 24, 0, 1], 'a block past midnight is drawn on both days');
+  assert.equal(wk.days[4].hours, 1);
+
+  // A session that went quiet and was closed for it hours later stopped when it was last heard from.
+  const quiet = await sessionStart(l, agent, { task: made.t, session_id: 'w3' });
+  await when(quiet.run, '2026-10-15T14:00:00Z', '2026-10-15T15:00:00Z');
+  await l.db.query(`update entity set status = 'finished', is_open = false, updated_at = '2026-10-16T03:00:00Z' where id = $1`, [quiet.run]);
+  const later = (await callTool(l, human, 'week', { from: '2026-10-12' })) as typeof wk;
+  assert.deepEqual(later.days[3].agents.flat().map((b) => [b.from_hour, b.to_hour]), [[10, 11]]);
+});
+
 test('an invoice says how to pay, takes payments in parts, and what is owed and overdue is in the timesheet', async () => {
   const l = await fresh();
   const made = await make(l, [

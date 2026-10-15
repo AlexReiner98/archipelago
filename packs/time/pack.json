@@ -8,11 +8,13 @@
     {
       "id": "time.entry",
       "title": "Time entry",
-      "description": "Time spent on one piece of work on one day. The title says what was done in a few words; the note says more. Make it part of the work it was for (a project or task); the client is the company that work involves.",
+      "description": "Time spent on one piece of work on one day, as hours or as a block from a start to an end. The title says what was done in a few words; the note says more. Make it part of the work it was for (a project or task); the client is the company that work involves.",
       "statuses": { "open": ["logged"], "closed": ["invoiced", "void"] },
       "fields": {
         "date": { "type": "date", "shown": true, "description": "The day the work was done." },
-        "hours": { "type": "number", "shown": true, "description": "Hours spent, e.g. 1.5." },
+        "hours": { "type": "number", "shown": true, "description": "Hours spent, e.g. 1.5. When start and end are both given, the hours are the time between them." },
+        "start": { "type": "datetime", "shown": true, "description": "When the block of work began, for an entry drawn on the calendar." },
+        "end": { "type": "datetime", "shown": true, "description": "When the block of work ended." },
         "billable": { "type": "boolean", "default": true, "description": "Whether it goes on an invoice." },
         "rate": { "type": "number", "description": "An hourly rate for this entry only, when it is not the client's." }
       }

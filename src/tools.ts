@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { createShare, listShares, readDocument, revokeShare } from './documents.ts';
-import { draftInvoice, logTime, payInvoice, timesheet, voidInvoice } from './time.ts';
+import { draftInvoice, logTime, payInvoice, timesheet, voidInvoice, week } from './time.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -885,10 +885,13 @@ export const TOOLS: Record<string, Tool> = {
   time_log: {
     description:
       'Record time spent on a piece of work: how many hours, on which day (today unless given, in Toronto), what was done in a few words, and a note if there is more to say. ' +
+      'Or a block, with start and end in place of hours: the hours are the time between, and the day is the day it began. ' +
       'work is the id of the project, task or client it was for; the client billed is the company that work, or what it sits in, involves. Search for the work first. Say what you logged back to the person, with the client.',
     input: {
       work: z.string().describe('Id of the project, task or client company the time was for.'),
-      hours: z.number().describe('Hours spent, e.g. 1.5.'),
+      hours: z.number().optional().describe('Hours spent, e.g. 1.5. Needed unless start and end are given.'),
+      start: z.string().optional().describe('When the block began, as a date-time with its offset, e.g. 2026-10-15T09:30:00-04:00.'),
+      end: z.string().optional().describe('When the block ended.'),
       what: z.string().min(1).max(60).describe('What was done, in a few words: the entry’s title.'),
       note: z.string().optional().describe('More about the work, if there is more to say.'),
       date: z.string().optional().describe('The day, as 2026-10-15. Today when left out.'),
@@ -901,6 +904,13 @@ export const TOOLS: Record<string, Tool> = {
     description: 'Time logged over a span of days, by day and by client; what is logged but not yet invoiced, by client; and invoices not yet paid (invoices: outstanding, overdue with how many days, drafts, owed_total). This week (Monday to Sunday) unless from and to are given.',
     input: { from: z.string().optional().describe('The first day, as 2026-10-01.'), to: z.string().optional().describe('The last day.') },
     run: async (l, _actor, input) => timesheet(l, input),
+  },
+  week: {
+    description:
+      'A week as a calendar, Monday to Sunday (this week unless from is given): for each day, the owner’s blocks (owner: time entries, with start and end where they were logged as blocks, else hours alone) and the agents’ lanes (agents: one list per agent at work at once, each block a session, or the part of one spent on one piece of work). ' +
+      'Every block has from_hour and to_hour (hours since that day’s midnight in Toronto), hours, the work and the project it counts toward; projects lists them in the order the page colours them.',
+    input: { from: z.string().optional().describe('Any day in the week, or its Monday, as 2026-10-12.') },
+    run: async (l, _actor, input) => week(l, input),
   },
   invoice_draft: {
     description:
