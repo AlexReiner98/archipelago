@@ -4,6 +4,8 @@
 
 **A shared workspace for your people and your AI agents.**
 
+*Early: built and used daily by its author; expect rough edges.*
+
 Each agent session usually starts from nothing, and what it learned stays in
 a chat. Archipelago is the place the work lives instead: a map of projects,
 tasks, decisions, people and what waits on what. You look at it in a web page;
