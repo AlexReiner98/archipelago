@@ -35,7 +35,10 @@
         "subtotal": { "type": "number", "description": "Before tax." },
         "tax": { "type": "number", "description": "HST charged." },
         "total": { "type": "number", "shown": true, "description": "What is due." },
-        "currency": { "type": "string", "description": "e.g. CAD." }
+        "currency": { "type": "string", "description": "e.g. CAD." },
+        "paid": { "type": "number", "shown": true, "description": "What has been paid so far." },
+        "paid_on": { "type": "date", "description": "The day of the last payment." },
+        "payments": { "type": "json", "description": "Each payment received: date, amount and method (e-Transfer, EFT, cheque, card)." }
       }
     }
   ],
@@ -52,13 +55,15 @@
         "billed_by": { "type": "string", "description": "Id of the company or person who bills this client, e.g. Aperture Design Tools Inc." },
         "address": { "type": "string", "description": "Postal address, for invoices." },
         "email": { "type": "string", "description": "Where invoices go." },
-        "hst_number": { "type": "string", "description": "Its own HST number, when it bills." }
+        "hst_number": { "type": "string", "description": "Its own HST number, when it bills." },
+        "payment": { "type": "string", "description": "How to pay, as it goes on invoices: one way per line, e.g. \"Interac e-Transfer to pay@example.com (autodeposit)\" and \"EFT: institution 004, transit 12345, account 1234567\"." }
       }
     },
     "person": {
       "fields": {
         "address": { "type": "string", "description": "Postal address, for invoices." },
-        "hst_number": { "type": "string", "description": "HST number, when they bill as a sole proprietor." }
+        "hst_number": { "type": "string", "description": "HST number, when they bill as a sole proprietor." },
+        "payment": { "type": "string", "description": "How to pay, as it goes on invoices: one way per line, e.g. \"Interac e-Transfer to pay@example.com (autodeposit)\" and \"EFT: institution 004, transit 12345, account 1234567\"." }
       }
     }
   }

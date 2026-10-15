@@ -2357,3 +2357,34 @@ test('time is logged against work, summed by day and client, and billed on a num
   const other = await make(l, [{ op: 'create', ref: 'c', type: 'company', title: 'Nobody bills me' }]);
   await assert.rejects(callTool(l, human, 'invoice_draft', { client: other.c }), /does not say who bills it/);
 });
+
+test('an invoice says how to pay, takes payments in parts, and what is owed and overdue is in the timesheet', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'me', type: 'person', title: 'Alex', props: { address: '92 King St E', hst_number: '748361565RT0001', payment: 'Interac e-Transfer to pay@example.com (autodeposit)\n- EFT: institution 004, transit 12345, account 1234567' } },
+    { op: 'create', ref: 'aa', type: 'company', title: 'Northwind', props: { rate: 50, hst: true } },
+    { op: 'create', ref: 'p', type: 'project', title: 'Research' },
+    { op: 'link', type: 'involves', from: 'p', to: 'aa' },
+  ]);
+  await make(l, [{ op: 'update', id: made.aa, props: { billed_by: made.me } }]);
+  await callTool(l, human, 'time_log', { work: made.p, hours: 10, what: 'Funding research', date: '2026-10-14' });
+  const inv = (await callTool(l, human, 'invoice_draft', { client: made.aa, to: '2026-10-31' })) as { created: { inv: string }; total: number; number: string };
+  assert.equal(inv.total, 565);
+  const text = ((await callTool(l, human, 'document', { id: inv.created.inv })) as { parts: { text?: string }[] }).parts.map((p) => p.text).join('\n');
+  assert.match(text, /How to pay\n- Interac e-Transfer to pay@example\.com \(autodeposit\)\n- EFT: institution 004, transit 12345, account 1234567\n- Please quote INV-\d{4}-001 with your payment\./);
+
+  const sheet = async () => ((await callTool(l, human, 'timesheet', {})) as { invoices: { outstanding: { owing: number; overdue_days?: number }[]; overdue: unknown[]; drafts: unknown[]; owed_total: number } }).invoices;
+  assert.deepEqual([(await sheet()).drafts.length, (await sheet()).outstanding.length], [1, 0], 'a draft is not yet owed');
+  const part = (await callTool(l, human, 'invoice_paid', { id: inv.created.inv, amount: 200, method: 'e-Transfer', date: '2026-10-20' })) as { status: string; owing: number };
+  assert.deepEqual([part.status, part.owing], ['sent', 365], 'a payment on a draft says it was sent');
+  // Past its due day, what is owed is overdue.
+  await make(l, [{ op: 'update', id: inv.created.inv, props: { due: '2026-01-01' } }]);
+  const late = await sheet();
+  assert.deepEqual([late.owed_total, late.overdue.length, (late.outstanding[0].overdue_days ?? 0) > 0], [365, 1, true]);
+  const rest = (await callTool(l, human, 'invoice_paid', { id: inv.created.inv, method: 'EFT' })) as { status: string; owing: number };
+  assert.deepEqual([rest.status, rest.owing], ['paid', 0]);
+  assert.deepEqual([(await sheet()).outstanding.length, (await sheet()).owed_total], [0, 0]);
+  await assert.rejects(callTool(l, human, 'invoice_paid', { id: inv.created.inv }), /already paid in full/);
+  const kept = ((await callTool(l, human, 'get', { id: inv.created.inv })) as { entity: { props: { payments: { amount: number; method: string }[] } } }).entity.props.payments;
+  assert.deepEqual(kept.map((p) => [p.amount, p.method]), [[200, 'e-Transfer'], [365, 'EFT']]);
+});

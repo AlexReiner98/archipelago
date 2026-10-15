@@ -115,7 +115,7 @@ export async function timesheet(l: Archipelago, input: { from?: string; to?: str
     sum.hours = cents(sum.hours + r.hours);
     unbilled.set(key, sum);
   }
-  return { from, to, total: cents(rows.reduce((n, r) => n + r.hours, 0)), days: [...days.values()], by_client: [...byClient.values()], not_invoiced: [...unbilled.values()] };
+  return { from, to, total: cents(rows.reduce((n, r) => n + r.hours, 0)), days: [...days.values()], by_client: [...byClient.values()], not_invoiced: [...unbilled.values()], invoices: await owed(l) };
 }
 
 /** The next number for an invoice from one biller this year: INV-2026-001, then 002. */
@@ -174,6 +174,8 @@ export async function draftInvoice(l: Archipelago, actor: Actor, input: { client
     `- Subtotal: ${money(subtotal, currency)}`,
     ...(p.hst === true ? [`- HST 13%: ${money(tax, currency)}`] : []),
     `- **Total due: ${money(total, currency)} ${currency}**`,
+    // How to pay, as the biller keeps it: one way per line.
+    ...(said(bp.payment) ? ['', 'How to pay', ...said(bp.payment)!.split('\n').map((way) => way.trim().replace(/^[-*]\s*/, '')).filter(Boolean).map((way) => `- ${way}`), `- Please quote ${number} with your payment.`] : []),
   ].join('\n');
   const result = await l.change(actor, {
     ops: [
@@ -190,6 +192,53 @@ export async function draftInvoice(l: Archipelago, actor: Actor, input: { client
     reason: `Drafted invoice ${number} to ${client.title}: ${hours} h, ${money(total, currency)}`,
   });
   return { ...result, number, hours, subtotal, tax, total, currency, entries: mine.length };
+}
+
+/** Record a payment on an invoice: its date (today unless given), amount (what is still owed unless given) and method. Paid in full, it closes. */
+export async function payInvoice(l: Archipelago, actor: Actor, input: { id: string; amount?: number; date?: string; method?: string }) {
+  const invoice = await l.entity(input.id);
+  if (!invoice || !l.registry.isA(invoice.type, 'time.invoice')) throw new Error(`"${input.id}" is not an invoice`);
+  if (invoice.status === 'void') throw new Error('It is void: nothing is owed on it.');
+  const p = invoice.props as Record<string, unknown>;
+  const total = Number(p.total ?? 0);
+  const before = Number(p.paid ?? 0);
+  const owing = cents(total - before);
+  if (owing <= 0) throw new Error(`${String(p.number ?? invoice.title)} is already paid in full.`);
+  const amount = cents(input.amount ?? owing);
+  if (!(amount > 0)) throw new Error('amount must be more than 0');
+  const date = input.date ?? today();
+  if (!DAY.test(date)) throw new Error('date must look like 2026-10-15');
+  const paid = cents(before + amount);
+  const payments = [...(Array.isArray(p.payments) ? p.payments : []), { date, amount, ...(input.method && { method: input.method }) }];
+  const currency = typeof p.currency === 'string' ? p.currency : 'CAD';
+  // Paid in full it is paid; a payment on a draft says it was sent.
+  const status = paid >= total ? 'paid' : invoice.status === 'draft' ? 'sent' : invoice.status;
+  const result = await l.change(actor, {
+    ops: [{ op: 'update', id: invoice.id, status, props: { paid, paid_on: date, payments } }],
+    reason: `${money(amount, currency)} received${input.method ? ` by ${input.method}` : ''} on ${String(p.number ?? invoice.title)}${status === 'paid' ? ': paid in full' : `: ${money(cents(total - paid), currency)} still owed`}`,
+  });
+  return { ...result, number: p.number, paid, owing: cents(Math.max(total - paid, 0)), status };
+}
+
+/** Invoices not yet paid: those sent (and of them, those past due) and the drafts, each with what is still owed. */
+async function owed(l: Archipelago) {
+  const { rows } = await l.db.query<{ id: string; status: string; props: Record<string, unknown> }>(
+    `select id, status, props from entity where type = any($1::text[]) and archived_at is null and status in ('draft', 'sent') order by props ->> 'due', props ->> 'number'`,
+    [l.registry.family('time.invoice')],
+  );
+  const now = today();
+  const names = new Map<string, string>();
+  const name = async (id: unknown) => (typeof id === 'string' ? (names.get(id) ?? (names.set(id, (await l.entity(id))?.title ?? id), names.get(id)!)) : null);
+  const list = [];
+  for (const r of rows) {
+    const total = Number(r.props.total ?? 0);
+    const paid = Number(r.props.paid ?? 0);
+    const due = typeof r.props.due === 'string' ? r.props.due : null;
+    const late = r.status === 'sent' && due !== null && due < now ? Math.round((Date.parse(now) - Date.parse(due)) / 86_400_000) : 0;
+    list.push({ id: r.id, number: r.props.number, client: await name(r.props.client), status: r.status, total, paid, owing: cents(total - paid), currency: r.props.currency ?? 'CAD', due, ...(late > 0 && { overdue_days: late }) });
+  }
+  const sent = list.filter((i) => i.status === 'sent');
+  return { outstanding: sent, overdue: sent.filter((i) => 'overdue_days' in i), drafts: list.filter((i) => i.status === 'draft'), owed_total: cents(sent.reduce((n, i) => n + i.owing, 0)) };
 }
 
 /** Void an invoice: its entries go back to being logged, to be billed again. */

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { createShare, listShares, readDocument, revokeShare } from './documents.ts';
-import { draftInvoice, logTime, timesheet, voidInvoice } from './time.ts';
+import { draftInvoice, logTime, payInvoice, timesheet, voidInvoice } from './time.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -898,7 +898,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => logTime(l, actor, input),
   },
   timesheet: {
-    description: 'Time logged over a span of days, by day and by client, and what is logged but not yet invoiced, by client. This week (Monday to Sunday) unless from and to are given.',
+    description: 'Time logged over a span of days, by day and by client; what is logged but not yet invoiced, by client; and invoices not yet paid (invoices: outstanding, overdue with how many days, drafts, owed_total). This week (Monday to Sunday) unless from and to are given.',
     input: { from: z.string().optional().describe('The first day, as 2026-10-01.'), to: z.string().optional().describe('The last day.') },
     run: async (l, _actor, input) => timesheet(l, input),
   },
@@ -912,6 +912,16 @@ export const TOOLS: Record<string, Tool> = {
       to: z.string().optional().describe('Only time up to this day. Today when left out.'),
     },
     run: async (l, actor, input) => draftInvoice(l, actor, input),
+  },
+  invoice_paid: {
+    description: 'Record a payment received on an invoice: the day (today unless given), the amount (all that is still owed unless given) and how it came (e-Transfer, EFT, cheque, card). Paid in full, the invoice closes as paid; a part-payment leaves it open with what is still owed. Record what the owner says came in.',
+    input: {
+      id: z.string().describe('The invoice.'),
+      amount: z.number().optional().describe('What was received. All that is still owed when left out.'),
+      date: z.string().optional().describe('The day it was received, as 2026-10-15. Today when left out.'),
+      method: z.string().optional().describe('How it came, e.g. e-Transfer, EFT, cheque.'),
+    },
+    run: async (l, actor, input) => payInvoice(l, actor, input),
   },
   invoice_void: {
     description: 'Void an invoice: it is kept, marked void, and its time entries go back to being logged, to be invoiced again.',
