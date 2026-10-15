@@ -4513,16 +4513,30 @@ function happenedDialog(b) {
  * place in the day, so it is a strip above it. In the owner's lane a block is drawn by dragging, and moved or stretched
  * the same way; time ahead is planned, and counts only once it is confirmed.
  */
-function weekCalendar(wk, today, act) {
+/** The hours and days the calendar opens on; the rest is one toggle away. */
+const CAL_HOURS = [6, 22];
+const CAL_DAYS = 5;
+const CAL_FULL = 'pelago-cal-full';
+/** Whether the week has anything outside the hours and days shown by default. */
+const calHidden = (wk) =>
+  wk.days.some((d, i) => {
+    const all = [...d.owner, ...d.agents.flat()];
+    if (i >= CAL_DAYS) return all.length > 0;
+    return all.some((b) => b.from_hour != null && (b.from_hour < CAL_HOURS[0] || b.to_hour > CAL_HOURS[1]));
+  });
+
+function weekCalendar(wk, today, act, full) {
   const hueOf = new Map(wk.projects.map((p, i) => [p.id, GRID_HUES[i % GRID_HUES.length]]));
   const titleOf = new Map(wk.projects.map((p) => [p.id, p.title]));
-  const timed = wk.days.flatMap((d) => [...d.owner, ...d.agents.flat()]).filter((b) => b.from_hour != null);
-  // The hours shown: the working day, stretched to whatever the week holds.
-  const top = Math.max(0, Math.min(8, ...timed.map((b) => Math.floor(b.from_hour))));
-  const bottom = Math.min(24, Math.max(18, ...timed.map((b) => Math.ceil(b.to_hour))));
+  // The waking day on weekdays, unless the whole of it is asked for; a block that runs past the edge is cut there.
+  const [top, bottom] = full ? [0, 24] : CAL_HOURS;
+  const days = full ? wk.days : wk.days.slice(0, CAL_DAYS);
   const span = bottom - top;
-  const tall = `height: ${span * 28}px`;
-  const place = (from, to) => `top: ${((from - top) / span) * 100}%; height: max(2px, ${((to - from) / span) * 100}%)`;
+  const seen = (b) => b.to_hour > top && b.from_hour < bottom;
+  const place = (from, to) => {
+    const [a, z] = [Math.max(from, top), Math.min(to, bottom)];
+    return `top: ${((a - top) / span) * 100}%; height: max(2px, ${((z - a) / span) * 100}%)`;
+  };
   const colour = (b) => `--cal-hue: ${hueOf.get(b.project) ?? 'var(--closed)'}`;
   const tip = (b) =>
     [
@@ -4598,7 +4612,7 @@ function weekCalendar(wk, today, act) {
 
   // A new block is drawn by dragging down the owner's lane; a click alone sets aside an hour.
   const ownerLane = (d) => {
-    const lane = h('div', { class: 'cal-lane cal-owner', 'data-date': d.date, title: act ? 'Drag to add a block' : '' }, d.owner.filter((b) => b.from_hour != null).map((b) => mineEl({ ...b, date: d.date })));
+    const lane = h('div', { class: 'cal-lane cal-owner', 'data-date': d.date, title: act ? 'Drag to add a block' : '' }, d.owner.filter((b) => b.from_hour != null && seen(b)).map((b) => mineEl({ ...b, date: d.date })));
     if (!act) return lane;
     let draw = null;
     lane.addEventListener('pointerdown', (ev) => {
@@ -4644,9 +4658,9 @@ function weekCalendar(wk, today, act) {
       { class: 'cal-scroll' },
       h(
         'div',
-        { class: 'cal-grid' },
-        h('div', { class: 'cal-axis' }, h('div', { class: 'cal-head' }), h('div', { class: 'cal-loose' }), h('div', { class: 'cal-body', style: tall }, hours.filter((n) => n > top && (span <= 14 || n % 2 === 0)).map((n) => h('span', { class: 'cal-hour', style: `top: ${((n - top) / span) * 100}%` }, clockText(n))))),
-        wk.days.map((d) => {
+        { class: 'cal-grid', style: `grid-template-columns: 44px repeat(${days.length}, minmax(64px, 1fr))` },
+        h('div', { class: 'cal-axis' }, h('div', { class: 'cal-head' }), h('div', { class: 'cal-loose' }), h('div', { class: 'cal-body' }, hours.filter((n) => n > top && (span <= 16 || n % 2 === 0)).map((n) => h('span', { class: 'cal-hour', style: `top: ${((n - top) / span) * 100}%` }, clockText(n))))),
+        days.map((d) => {
           const loose = d.owner.filter((b) => b.from_hour == null);
           const lanes = d.agents.length;
           const said = [`${hoursText(d.hours)} of your time`, d.planned && `${hoursText(d.planned)} planned`, lanes && `${lanes} agent${lanes === 1 ? '' : 's'} at once at most`, d.reported && `${d.reported} run${d.reported === 1 ? '' : 's'} reported when done`].filter(Boolean).join(', ');
@@ -4657,10 +4671,10 @@ function weekCalendar(wk, today, act) {
             h('div', { class: 'cal-loose' }, loose.map((b) => h('a', { class: `cal-chip${b.status === 'planned' ? ' cal-planned' : ''}`, href: `#/e/${b.id}`, title: tip(b), style: `flex-grow: ${b.hours}; ${colour(b)}` }))),
             h(
               'div',
-              { class: 'cal-body', style: `${tall}; --cal-agents: ${lanes}` },
+              { class: 'cal-body', style: `--cal-agents: ${lanes}` },
               hours.map((n) => h('span', { class: 'cal-rule', style: `top: ${((n - top) / span) * 100}%` })),
               ownerLane(d),
-              d.agents.map((lane) => h('div', { class: 'cal-lane cal-agent' }, lane.map((b) => h('a', { class: 'cal-block cal-run', href: `#/e/${b.id}`, title: tip(b), style: `${place(b.from_hour, b.to_hour)}; ${colour(b)}` })))),
+              d.agents.map((lane) => h('div', { class: 'cal-lane cal-agent' }, lane.filter(seen).map((b) => h('a', { class: 'cal-block cal-run', href: `#/e/${b.id}`, title: tip(b), style: `${place(b.from_hour, b.to_hour)}; ${colour(b)}` })))),
             ),
           );
         }),
@@ -4910,6 +4924,7 @@ async function time() {
   );
 
   const thisWeek = from === mondayOf(today);
+  const full = remember(CAL_FULL) === true;
   main.replaceChildren(
     h(
       'div',
@@ -4923,9 +4938,18 @@ async function time() {
         h('button', { title: 'The week after', onclick: week(1) }, '\u203a'),
       ),
       !thisWeek && h('button', { onclick: week(0) }, 'This week'),
+      h(
+        'button',
+        {
+          class: `${full ? 'on' : ''}${!full && calHidden(wk) ? ' cal-more' : ''}`,
+          title: full ? 'Show weekdays, 06:00 to 22:00' : `Show the whole day and the weekend${calHidden(wk) ? ': there is more there this week' : ''}`,
+          onclick: () => (remember(CAL_FULL, !full), again()),
+        },
+        'Full week',
+      ),
       h('span', { class: 'fact', title: 'Hours this week' }, h('strong', {}, hoursText(sheet.total))),
     ),
-    weekCalendar(wk, today, calendarActs),
+    weekCalendar(wk, today, calendarActs, full),
     h('div', { class: 'tq-grid' }, h('div', { class: 'tq-main' }, add, days.length ? days : h('div', { class: 'empty card' }, 'Nothing logged this week.')), money),
   );
 }

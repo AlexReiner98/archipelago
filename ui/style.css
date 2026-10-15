@@ -858,7 +858,7 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .cal-head .tq-h { margin-left: auto; font-weight: 400; }
 .cal-loose { display: flex; gap: 2px; height: 6px; margin: 0 4px 6px; }
 .cal-chip { display: block; min-width: 4px; border-radius: 3px; background: var(--cal-hue); }
-.cal-body { position: relative; display: flex; gap: 2px; padding: 0 3px; border-top: 1px solid var(--line); }
+.cal-body { position: relative; display: flex; gap: 2px; padding: 0 3px; border-top: 1px solid var(--line); overflow: hidden; height: max(420px, calc(100vh - 170px)); }
 .cal-hour { position: absolute; right: 6px; transform: translateY(-50%); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .cal-rule { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); pointer-events: none; }
 .cal-lane { position: relative; min-width: 0; }
@@ -879,3 +879,5 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 dialog.cal-ask .tq-picker { flex: none; }
 dialog.cal-ask .tq-picks { position: static; margin-top: 4px; }
 dialog.cal-ask .cal-when { display: flex; align-items: center; gap: 8px; }
+/* Something this week lies outside what is shown: a dot on the toggle. */
+.cal-more::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
