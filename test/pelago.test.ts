@@ -2185,3 +2185,23 @@ test('a document brings items in by id, and a link shows it and them to anyone h
   const actions = (await l.db.query<{ action: string }>(`select action from event where target_id = $1 and action like 'share.%' order by seq`, [doc])).rows.map((r) => r.action);
   assert.deepEqual(actions, ['share.create', 'share.revoke', 'share.create']);
 });
+
+test('what is made for a reader is marked deliverable by its type, and a document names the sections kept outside it', async () => {
+  const l = await fresh();
+  const marked = (await callTool(l, human, 'schema', {})) as { types: { id: string; deliverable?: boolean }[] };
+  const deliverable = (id: string) => Boolean(marked.types.find((t) => t.id === id)?.deliverable);
+  assert.deepEqual(['document', 'file', 'software.release', 'software.spec', 'note', 'task'].map(deliverable), [true, true, true, false, false, false]);
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Research' },
+    { op: 'create', ref: 'a', type: 'note', title: 'Inside' },
+    { op: 'create', ref: 'b', type: 'note', title: 'Beside' },
+    { op: 'create', ref: 'd', type: 'document', title: 'Brief', body: '{a}\n{b}' },
+    { op: 'link', type: 'part_of', from: 'd', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'd' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'p' },
+  ]);
+  const read = (await callTool(l, human, 'document', { id: made.d })) as { not_inside?: string[] };
+  assert.deepEqual(read.not_inside, [made.b]);
+  await make(l, [{ op: 'link', type: 'part_of', from: made.b, to: made.d }]);
+  assert.equal(((await callTool(l, human, 'document', { id: made.d })) as { not_inside?: string[] }).not_inside, undefined);
+});

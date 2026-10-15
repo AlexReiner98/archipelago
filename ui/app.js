@@ -1125,6 +1125,7 @@ async function entity(id) {
   };
 
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
+  const delivers = data.incoming.filter((r) => r.type === 'part_of' && types.get(r.entity_type)?.deliverable && !isClosed(r.entity_type, r.status));
   // A project is its roadmap first: what needs the owner in it and its features, then what every item has.
   const project = isA(e.type, 'project');
   const gated = isA(e.type, 'event') && !e.archived_at;
@@ -1256,6 +1257,14 @@ async function entity(id) {
       { class: 'page-head' },
       h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.length > 0 && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.length})` }, 'shared by link')),
       h('h1', { style: 'margin-top: 6px' }, e.title),
+      // What it makes for a reader or a customer, named where it is looked for: under the title of what it is part of.
+      delivers.length > 0 &&
+        h(
+          'div',
+          { class: 'delivers', title: 'What this delivers: documents, files and releases that are part of it' },
+          h('span', { class: 'muted small' }, 'Delivers'),
+          delivers.map((r) => h('span', { class: 'deliverable' }, chip(r.entity_type), h('span', { class: 'gist', title: r.title }, link(r)), pill(r.entity_type, r.status))),
+        ),
     ),
     h(
       'div',

@@ -28,6 +28,8 @@ export interface TypeDef {
   extends?: string;
   statuses?: Statuses;
   fields?: Record<string, FieldDef>;
+  /** What is made for a reader or a customer (a document, a file, a release): named under the title of what it is part of. A flavour inherits it. */
+  deliverable?: boolean;
 }
 
 export interface RelationDef {
@@ -81,6 +83,7 @@ export interface ResolvedType {
   lineage: string[];
   statuses: Statuses;
   fields: Record<string, FieldDef>;
+  deliverable: boolean;
 }
 
 /** The pack that approved type proposals are written to. */
@@ -176,6 +179,7 @@ export class Registry {
         lineage: [id, ...(parent?.lineage ?? [])],
         statuses,
         fields: { ...parent?.fields, ...def.fields, ...extra.get(id) },
+        deliverable: def.deliverable ?? parent?.deliverable ?? false,
       };
       types.set(id, resolved);
       return resolved;
@@ -323,6 +327,7 @@ export class Registry {
         flavour_of: t.lineage[1],
         statuses: t.statuses,
         fields: t.fields,
+        ...(t.deliverable && { deliverable: true }),
       })),
       relations: [...this.relations.values()],
       trees: [...this.trees.values()],

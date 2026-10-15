@@ -63,7 +63,12 @@ export async function readDocument(l: Archipelago, id: string) {
     const e = await l.entity(sid);
     if (e && !e.archived_at) items.set(sid, { id: e.id, type: e.type, title: e.title, status: e.status, body: e.body, updated_at: e.updated_at, picture: pictured.has(sid) });
   }
-  return { id: doc.id, title: doc.title, status: doc.status, for: doc.props.for ?? null, updated_at: doc.updated_at, parts: assemble(doc.body, items) };
+  // A section belongs inside its document. Those kept elsewhere are named, so whoever wrote them can move them in.
+  const inside = new Set(
+    (await l.db.query<{ from_id: string }>(`select from_id from relation where type = 'part_of' and valid_to is null and to_id = $1 and from_id = any($2::text[])`, [doc.id, ids])).rows.map((r) => r.from_id),
+  );
+  const notInside = [...items.keys()].filter((sid) => !inside.has(sid));
+  return { id: doc.id, title: doc.title, status: doc.status, for: doc.props.for ?? null, updated_at: doc.updated_at, parts: assemble(doc.body, items), ...(notInside.length && { not_inside: notInside }) };
 }
 
 const hash = (secret: string) => createHash('sha256').update(secret).digest('hex');

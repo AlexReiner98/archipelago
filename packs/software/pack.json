@@ -46,6 +46,7 @@
       "extends": "event",
       "title": "Release",
       "description": "A version shipped or planned.",
+      "deliverable": true,
       "fields": {
         "version": { "type": "string" },
         "tag": { "type": "string" }
@@ -100,7 +101,8 @@
       "id": "software.spec",
       "extends": "file",
       "title": "Spec",
-      "description": "A design or requirements document."
+      "description": "A design or requirements document.",
+      "deliverable": false
     },
     {
       "id": "software.handoff",

@@ -186,6 +186,7 @@
     {
       "id": "file",
       "title": "File",
+      "deliverable": true,
       "description": "A document or artefact that lives somewhere.",
       "statuses": { "open": ["current"], "closed": ["superseded", "removed"] },
       "fields": {
@@ -208,6 +209,7 @@
     {
       "id": "document",
       "title": "Document",
+      "deliverable": true,
       "description": "Writing for a reader, made of the map: its note is the text, and a line holding only an item's id brings that item in at that place, as a section with its title and note. Read whole with the document tool; the owner can give someone a link to it.",
       "statuses": { "open": ["draft", "ready"], "closed": ["superseded", "withdrawn"] },
       "fields": {
