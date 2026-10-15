@@ -2459,6 +2459,37 @@ test('a block of time has hours from its start and end, and a week holds the own
   assert.deepEqual(both.days.flatMap((d) => d.agents.flat().filter((b) => b.id === old.run).map((b) => [b.from_hour, b.to_hour])), [[10, 10.5], [17, 18]]);
 });
 
+test('planned time counts toward nothing and is never invoiced until the owner confirms it', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'me', type: 'company', title: 'Alex Reiner Consulting' },
+    { op: 'create', ref: 'c', type: 'company', title: 'PARTISANS', props: { rate: 50, billed_by: 'PLACEHOLDER' } },
+    { op: 'create', ref: 'p', type: 'project', title: 'PARTISANS work' },
+    { op: 'link', type: 'involves', from: 'p', to: 'c' },
+  ]);
+  await make(l, [{ op: 'update', id: made.c, props: { billed_by: made.me } }]);
+  type Made = { created: { e: string } };
+  const past = (await callTool(l, human, 'time_log', { work: made.p, what: 'Site visit', planned: true, start: '2026-10-13T09:00:00-04:00', end: '2026-10-13T11:00:00-04:00' })) as Made;
+  const ahead = (await callTool(l, human, 'time_log', { work: made.p, what: 'Drawings', planned: true, start: '2030-01-07T09:00:00-05:00', end: '2030-01-07T10:00:00-05:00' })) as Made;
+  assert.equal((await l.entity(past.created.e))!.status, 'planned');
+  const sheet = (await callTool(l, human, 'timesheet', { from: '2026-10-12', to: '2026-10-18' })) as { total: number; not_invoiced: unknown[] };
+  assert.deepEqual([sheet.total, sheet.not_invoiced.length], [0, 0], 'planned time is not counted as worked, nor waiting to be billed');
+  await assert.rejects(callTool(l, human, 'invoice_draft', { client: made.c, to: '2026-10-31' }), /No billable time/);
+
+  type W = { days: { hours: number; planned: number; owner: { id: string; status: string; from_hour: number | null }[] }[]; to_confirm: { id: string; what: string; date: string }[] };
+  const wk = (await callTool(l, human, 'week', { from: '2026-10-12' })) as W;
+  assert.deepEqual([wk.days[1].hours, wk.days[1].planned, wk.days[1].owner[0].status, wk.days[1].owner[0].from_hour], [0, 2, 'planned', 9], 'drawn on its day, counted apart');
+  assert.deepEqual(wk.to_confirm.map((b) => [b.id, b.date]), [[past.created.e, '2026-10-13']], 'what has passed waits to be confirmed; what is ahead does not');
+  assert.ok(!wk.to_confirm.some((b) => b.id === ahead.created.e));
+
+  // Confirmed, it is time worked, and it is billed.
+  await make(l, [{ op: 'update', id: past.created.e, status: 'logged' }]);
+  const after = (await callTool(l, human, 'week', { from: '2026-10-12' })) as W;
+  assert.deepEqual([after.days[1].hours, after.days[1].planned, after.to_confirm.length], [2, 0, 0]);
+  const inv = (await callTool(l, human, 'invoice_draft', { client: made.c, to: '2026-10-31' })) as { hours: number; subtotal: number };
+  assert.deepEqual([inv.hours, inv.subtotal], [2, 100]);
+});
+
 test('a session’s turns are kept as stretches of work: a prompt begins one, a stop ends it, a long quiet starts the next', async () => {
   const { stretch, IDLE_MS } = await import('../src/sessions.ts');
   const t = (m: number) => new Date(Date.parse('2026-10-15T12:00:00Z') + m * 60_000).toISOString();

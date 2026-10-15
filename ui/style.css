@@ -870,3 +870,11 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .cal-block:hover { outline: 2px solid var(--text); outline-offset: -1px; opacity: 1; z-index: 2; }
 .cal-what { display: block; padding: 2px 4px; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 760px) { .cal-head .tq-h { display: none; } }
+/* Planned time is set aside, not yet worked: hatched in its colour, with a dashed edge. */
+.cal-planned { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--cal-hue) 40%, transparent) 0 5px, color-mix(in srgb, var(--cal-hue) 18%, transparent) 5px 10px); outline: 1.5px dashed var(--cal-hue); outline-offset: -1.5px; color: var(--text); }
+.cal-owner { cursor: crosshair; touch-action: none; }
+.cal-mine { cursor: grab; touch-action: none; user-select: none; }
+.cal-grip { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; cursor: ns-resize; }
+.cal-ghost { background: color-mix(in srgb, var(--accent) 30%, transparent); outline: 1.5px dashed var(--accent); outline-offset: -1.5px; pointer-events: none; }
+dialog.cal-ask .tq-picker { flex: none; }
+dialog.cal-ask .tq-picks { position: static; margin-top: 4px; }

@@ -4407,12 +4407,56 @@ const clockText = (n) => {
   return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 };
 
+/** A moment from a day and the hours since its midnight, as this browser keeps time. */
+const atHour = (day, hour) => {
+  const d = new Date(`${day}T00:00:00`);
+  d.setMinutes(Math.round(hour * 60));
+  return d.toISOString();
+};
+
+/** Ask what a block drawn on the calendar was for: the work, a few words, and whether it is only planned. */
+function blockDialog(when, planned) {
+  return new Promise((resolve) => {
+    const picker = workPicker(remember(LAST_WORK), (w) => remember(LAST_WORK, w));
+    const what = h('input', { type: 'text', maxlength: '60', placeholder: 'What', title: 'A few words: the block’s name', required: true });
+    const plan = h('input', { type: 'checkbox', checked: planned });
+    const dialog = h(
+      'dialog',
+      { class: 'ask cal-ask' },
+      h(
+        'form',
+        { method: 'dialog' },
+        h('h2', {}, when),
+        picker.el,
+        what,
+        h('label', { class: 'tq-bill', title: 'Time set aside, not yet worked: it counts once you confirm it' }, plan, 'Planned'),
+        h('div', { class: 'toolbar' }, h('button', { value: 'cancel', formNoValidate: true }, 'Cancel'), h('button', { value: 'ok', class: 'primary' }, 'Add')),
+      ),
+    );
+    const done = (value) => (dialog.remove(), resolve(value));
+    dialog.firstChild.addEventListener('submit', (e) => {
+      if (e.submitter?.value !== 'ok') return done(null);
+      const work = picker.get();
+      if (!work) {
+        e.preventDefault();
+        return picker.el.querySelector('input').focus();
+      }
+      done({ work, what: what.value.trim(), planned: plan.checked });
+    });
+    dialog.addEventListener('cancel', () => done(null));
+    document.body.append(dialog);
+    dialog.showModal();
+    (picker.get() ? what : picker.el.querySelector('input')).focus();
+  });
+}
+
 /**
  * The week as a calendar: a column for each day, split into the owner's lane and a narrow lane for each agent at work at
  * once; time runs down, and each block is coloured by the project it counts toward. Time logged as hours alone has no
- * place in the day, so it is a strip above it.
+ * place in the day, so it is a strip above it. In the owner's lane a block is drawn by dragging, and moved or stretched
+ * the same way; time ahead is planned, and counts only once it is confirmed.
  */
-function weekCalendar(wk, today) {
+function weekCalendar(wk, today, act) {
   const hueOf = new Map(wk.projects.map((p, i) => [p.id, GRID_HUES[i % GRID_HUES.length]]));
   const titleOf = new Map(wk.projects.map((p) => [p.id, p.title]));
   const timed = wk.days.flatMap((d) => [...d.owner, ...d.agents.flat()]).filter((b) => b.from_hour != null);
@@ -4420,20 +4464,115 @@ function weekCalendar(wk, today) {
   const top = Math.max(0, Math.min(8, ...timed.map((b) => Math.floor(b.from_hour))));
   const bottom = Math.min(24, Math.max(18, ...timed.map((b) => Math.ceil(b.to_hour))));
   const span = bottom - top;
-  const place = (b) => `top: ${((b.from_hour - top) / span) * 100}%; height: max(2px, ${((b.to_hour - b.from_hour) / span) * 100}%)`;
+  const tall = `height: ${span * 28}px`;
+  const place = (from, to) => `top: ${((from - top) / span) * 100}%; height: max(2px, ${((to - from) / span) * 100}%)`;
   const colour = (b) => `--cal-hue: ${hueOf.get(b.project) ?? 'var(--closed)'}`;
   const tip = (b) =>
     [
-      [titleOf.get(b.project), b.what].filter(Boolean).join(' \u00b7 '),
+      [titleOf.get(b.project), b.what].filter(Boolean).join(' · '),
       b.work && b.work !== b.what && b.work !== titleOf.get(b.project) ? b.work : null,
-      b.from_hour != null ? `${clockText(b.from_hour)}\u2013${clockText(b.to_hour)} \u00b7 ${hoursText(b.hours)}` : hoursText(b.hours),
+      b.from_hour != null ? `${clockText(b.from_hour)}–${clockText(b.to_hour)} · ${hoursText(b.hours)}` : hoursText(b.hours),
+      b.status === 'planned' ? 'Planned' : null,
       b.session && b.session !== b.what ? `Agent: ${b.session}${b.open ? ' (running)' : ''}` : b.session ? `Agent${b.open ? ', running' : ''}` : null,
     ]
       .filter(Boolean)
       .join('\n');
-  const blockEl = (b, cls) => h('a', { class: `cal-block ${cls}`, href: `#/e/${b.id}`, title: tip(b), style: `${place(b)}; ${colour(b)}` }, cls === 'cal-mine' && b.to_hour - b.from_hour >= 0.75 ? h('span', { class: 'cal-what' }, b.what) : null);
   const hours = [...Array(span)].map((_, i) => top + i);
-  const tall = `height: ${span * 28}px`;
+  const snap = (n) => Math.min(bottom, Math.max(top, Math.round(n * 4) / 4));
+  const hourAt = (lane, y) => {
+    const r = lane.getBoundingClientRect();
+    return snap(top + ((y - r.top) / r.height) * span);
+  };
+  const laneAt = (x) =>
+    [...document.querySelectorAll('.cal-owner')].find((l) => {
+      const r = l.parentElement.getBoundingClientRect();
+      return x >= r.left && x < r.right;
+    });
+
+  // An owner's block is moved by dragging it, and stretched by its lower edge; a click opens it.
+  const mineEl = (b) => {
+    const el = h(
+      'a',
+      { class: `cal-block cal-mine${b.status === 'planned' ? ' cal-planned' : ''}`, href: `#/e/${b.id}`, title: tip(b), style: `${place(b.from_hour, b.to_hour)}; ${colour(b)}` },
+      b.to_hour - b.from_hour >= 0.75 ? h('span', { class: 'cal-what' }, b.what) : null,
+    );
+    if (!act || b.status === 'invoiced' || b.start == null) return el;
+    el.append(h('span', { class: 'cal-grip', title: 'Drag to change when it ends' }));
+    let drag = null;
+    el.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      el.setPointerCapture(ev.pointerId);
+      dirty = true;
+      drag = { y: ev.clientY, x: ev.clientX, moved: false, grip: ev.target.classList.contains('cal-grip'), from: b.from_hour, to: b.to_hour, lane: el.parentElement, at: hourAt(el.parentElement, ev.clientY) };
+    });
+    el.addEventListener('pointermove', (ev) => {
+      if (!drag) return;
+      if (!drag.moved && Math.abs(ev.clientY - drag.y) + Math.abs(ev.clientX - drag.x) < 5) return;
+      drag.moved = true;
+      if (drag.grip) {
+        drag.to = Math.max(drag.from + 0.25, hourAt(drag.lane, ev.clientY));
+      } else {
+        const lane = laneAt(ev.clientX) ?? drag.lane;
+        if (lane !== el.parentElement) lane.append(el);
+        drag.lane = lane;
+        const length = b.to_hour - b.from_hour;
+        drag.from = Math.min(bottom - length, Math.max(top, snap(b.from_hour + hourAt(lane, ev.clientY) - drag.at)));
+        drag.to = drag.from + length;
+      }
+      el.style.top = `${((drag.from - top) / span) * 100}%`;
+      el.style.height = `${((drag.to - drag.from) / span) * 100}%`;
+    });
+    const finish = () => {
+      const was = drag;
+      drag = null;
+      dirty = false;
+      if (!was?.moved) return;
+      // The click that ends a drag does not open the block.
+      el.addEventListener('click', (e) => e.preventDefault(), { once: true });
+      const day = was.lane.dataset.date;
+      if (day === b.date && was.from === b.from_hour && was.to === b.to_hour) return;
+      act.move(b, day, was.from, was.to);
+    };
+    el.addEventListener('pointerup', finish);
+    el.addEventListener('pointercancel', finish);
+    return el;
+  };
+
+  // A new block is drawn by dragging down the owner's lane; a click alone sets aside an hour.
+  const ownerLane = (d) => {
+    const lane = h('div', { class: 'cal-lane cal-owner', 'data-date': d.date, title: act ? 'Drag to add a block' : '' }, d.owner.filter((b) => b.from_hour != null).map((b) => mineEl({ ...b, date: d.date })));
+    if (!act) return lane;
+    let draw = null;
+    lane.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0 || ev.target !== lane) return;
+      ev.preventDefault();
+      lane.setPointerCapture(ev.pointerId);
+      dirty = true;
+      const at = hourAt(lane, ev.clientY);
+      draw = { at, from: at, to: at, ghost: h('div', { class: 'cal-block cal-ghost', style: place(at, at + 0.25) }) };
+      lane.append(draw.ghost);
+    });
+    lane.addEventListener('pointermove', (ev) => {
+      if (!draw) return;
+      const at = hourAt(lane, ev.clientY);
+      [draw.from, draw.to] = at < draw.at ? [at, draw.at] : [draw.at, at];
+      draw.ghost.style.cssText = place(draw.from, Math.max(draw.to, draw.from + 0.25));
+    });
+    const finish = async () => {
+      if (!draw) return;
+      const { from, to, ghost } = draw;
+      draw = null;
+      const end = to - from < 0.25 ? Math.min(bottom, from + 1) : to;
+      ghost.style.cssText = place(from, end);
+      await act.add(d.date, from, end);
+      ghost.remove();
+      dirty = false;
+    };
+    lane.addEventListener('pointerup', finish);
+    lane.addEventListener('pointercancel', () => (draw?.ghost.remove(), (draw = null), (dirty = false)));
+    return lane;
+  };
 
   return h(
     'section',
@@ -4453,17 +4592,18 @@ function weekCalendar(wk, today) {
         wk.days.map((d) => {
           const loose = d.owner.filter((b) => b.from_hour == null);
           const lanes = d.agents.length;
+          const said = [`${hoursText(d.hours)} of your time`, d.planned && `${hoursText(d.planned)} planned`, lanes && `${lanes} agent${lanes === 1 ? '' : 's'} at once at most`, d.reported && `${d.reported} run${d.reported === 1 ? '' : 's'} reported when done`].filter(Boolean).join(', ');
           return h(
             'div',
             { class: `cal-day${d.date === today ? ' cal-today' : ''}` },
-            h('div', { class: 'cal-head', title: `${hoursText(d.hours)} of your time${lanes ? `, ${lanes} agent${lanes === 1 ? '' : 's'} at once at most` : ''}${d.reported ? `, ${d.reported} run${d.reported === 1 ? '' : 's'} reported when done` : ''}` }, h('span', { class: 'gist' }, dayName(d.date, { weekday: 'short', day: 'numeric' })), d.hours ? h('span', { class: 'tq-h muted small' }, hoursText(d.hours)) : null),
-            h('div', { class: 'cal-loose' }, loose.map((b) => h('a', { class: 'cal-chip', href: `#/e/${b.id}`, title: tip(b), style: `flex-grow: ${b.hours}; ${colour(b)}` }))),
+            h('div', { class: 'cal-head', title: said }, h('span', { class: 'gist' }, dayName(d.date, { weekday: 'short', day: 'numeric' })), d.hours ? h('span', { class: 'tq-h muted small' }, hoursText(d.hours)) : null),
+            h('div', { class: 'cal-loose' }, loose.map((b) => h('a', { class: `cal-chip${b.status === 'planned' ? ' cal-planned' : ''}`, href: `#/e/${b.id}`, title: tip(b), style: `flex-grow: ${b.hours}; ${colour(b)}` }))),
             h(
               'div',
               { class: 'cal-body', style: `${tall}; --cal-agents: ${lanes}` },
               hours.map((n) => h('span', { class: 'cal-rule', style: `top: ${((n - top) / span) * 100}%` })),
-              h('div', { class: 'cal-lane cal-owner' }, d.owner.filter((b) => b.from_hour != null).map((b) => blockEl(b, 'cal-mine'))),
-              d.agents.map((lane) => h('div', { class: 'cal-lane cal-agent' }, lane.map((b) => blockEl(b, 'cal-run')))),
+              ownerLane(d),
+              d.agents.map((lane) => h('div', { class: 'cal-lane cal-agent' }, lane.map((b) => h('a', { class: 'cal-block cal-run', href: `#/e/${b.id}`, title: tip(b), style: `${place(b.from_hour, b.to_hour)}; ${colour(b)}` })))),
             ),
           );
         }),
@@ -4600,6 +4740,50 @@ async function time() {
       );
     });
 
+  // The calendar writes through the same tools: a drawn block is logged (or planned, when it is ahead), a moved one updated.
+  const calendarActs = {
+    add: async (day, from, to) => {
+      const start = atHour(day, from);
+      const end = atHour(day, to);
+      const said = await blockDialog(`${dayName(day)}, ${clockText(from)}\u2013${clockText(to)}`, Date.parse(end) > Date.now());
+      if (!said) return;
+      try {
+        await api('time_log', { work: said.work.id, what: said.what, start, end, ...(said.planned && { planned: true }) });
+        again();
+      } catch (err) {
+        tell('That was not added', err.message);
+      }
+    },
+    move: (b, day, from, to) => write([{ op: 'update', id: b.id, props: { start: atHour(day, from), end: atHour(day, to), date: day, hours: Math.round((to - from) * 100) / 100 } }], 'Moved on the calendar'),
+  };
+
+  // Planned time whose end has passed: the owner says it happened (and it counts), or drops it.
+  const due = wk.to_confirm ?? [];
+  const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const confirmRow = (b) =>
+    h(
+      'li',
+      { class: 'row-top' },
+      h('a', { class: 'muted small tq-h', href: '#/time', title: 'Show its week', onclick: (ev) => (ev.preventDefault(), (timeState.from = mondayOf(b.date)), again()) }, dayName(b.date, { weekday: 'short', day: 'numeric' })),
+      h('a', { class: 'gist grow', href: `#/e/${b.id}`, title: [b.what, b.work, b.start && `${clock(b.start)}\u2013${clock(b.end)}`].filter(Boolean).join('\n') }, b.what),
+      h('span', { class: 'tq-h' }, hoursText(b.hours)),
+      h('button', { title: 'It happened as planned: count it', onclick: () => write([{ op: 'update', id: b.id, status: 'logged' }], 'Confirmed on the Time screen') }, 'Confirm'),
+      menu('\u22ef', [['Drop', () => write([{ op: 'archive', id: b.id }], 'Dropped on the Time screen: it did not happen'), 'danger']]),
+    );
+  const confirm = due.length
+    ? h(
+        'section',
+        { class: 'card tq-money' },
+        h(
+          'header',
+          { class: 'tq-dayhead' },
+          h('span', { class: 'grow' }, `To confirm ${due.length}`),
+          due.length > 1 && h('button', { title: 'Every one happened as planned', onclick: () => write(due.map((b) => ({ op: 'update', id: b.id, status: 'logged' })), 'Confirmed on the Time screen') }, 'Confirm all'),
+        ),
+        h('ul', { class: 'rows' }, due.map(confirmRow)),
+      )
+    : null;
+
   // What is owed: time not yet invoiced, by client; invoices sent and not paid; drafts.
   const inv = sheet.invoices;
   const draft = async (client) => {
@@ -4626,6 +4810,7 @@ async function time() {
   const money = h(
     'aside',
     { class: 'tq-side' },
+    confirm,
     block(
       'Not invoiced',
       sheet.not_invoiced.map((c) =>
@@ -4679,7 +4864,7 @@ async function time() {
       !thisWeek && h('button', { onclick: week(0) }, 'This week'),
       h('span', { class: 'fact', title: 'Hours this week' }, h('strong', {}, hoursText(sheet.total))),
     ),
-    weekCalendar(wk, today),
+    weekCalendar(wk, today, calendarActs),
     h('div', { class: 'tq-grid' }, h('div', { class: 'tq-main' }, add, days.length ? days : h('div', { class: 'empty card' }, 'Nothing logged this week.')), money),
   );
 }

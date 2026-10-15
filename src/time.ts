@@ -43,7 +43,7 @@ export async function clientOf(l: Archipelago, id: string): Promise<Entity | und
 export async function logTime(
   l: Archipelago,
   actor: Actor,
-  input: { work: string; hours?: number; start?: string; end?: string; what: string; note?: string; date?: string; billable?: boolean; rate?: number },
+  input: { work: string; hours?: number; start?: string; end?: string; what: string; note?: string; date?: string; billable?: boolean; rate?: number; planned?: boolean },
 ) {
   const work = await l.entity(input.work);
   if (!work || work.archived_at) throw new Error(`No work "${input.work}" to log time against: give the id of a project, task or client.`);
@@ -61,10 +61,10 @@ export async function logTime(
   const props = { date, hours, ...(start && { start, end }), ...(input.billable === false && { billable: false }), ...(input.rate !== undefined && { rate: input.rate }) };
   const result = await l.change(actor, {
     ops: [
-      { op: 'create', ref: 'e', type: 'time.entry', title: input.what, status: 'logged', body: input.note ?? '', props },
+      { op: 'create', ref: 'e', type: 'time.entry', title: input.what, status: input.planned ? 'planned' : 'logged', body: input.note ?? '', props },
       { op: 'link', type: 'part_of', from: 'e', to: work.id },
     ],
-    reason: `Logged ${hours} h on ${work.title} for ${date}`,
+    reason: `${input.planned ? 'Planned' : 'Logged'} ${hours} h on ${work.title} for ${date}`,
   });
   return { ...result, work: work.title, client: client?.title ?? null, date, hours, ...(start && { start, end }), ...(!client && { note: 'No client: this work involves no company, so it cannot be invoiced until it, or what it sits in, involves one.' }) };
 }
@@ -83,14 +83,14 @@ interface Row {
   work: string | null;
 }
 
-/** Time entries, each with the work it is part of. A block's hours are the time from its start to its end. */
-async function entries(l: Archipelago, where: string, params: unknown[]): Promise<Row[]> {
+/** Time entries, each with the work it is part of. A block's hours are the time from its start to its end. Time only planned is left out unless asked for. */
+async function entries(l: Archipelago, where: string, params: unknown[], planned = false): Promise<Row[]> {
   const { rows } = await l.db.query<Row>(
     `select e.id, e.title, e.body, e.status, e.date, (e.props ->> 'hours')::float8 as hours, e.props ->> 'start' as start, e.props ->> 'end' as end,
             coalesce((e.props ->> 'billable')::boolean, true) as billable, (e.props ->> 'rate')::float8 as rate,
             (select r.to_id from relation r where r.from_id = e.id and r.type = 'part_of' and r.valid_to is null limit 1) as work
      from (select *, coalesce(props ->> 'date', left(props ->> 'start', 10)) as date from entity) e
-     where e.type = any($1::text[]) and e.archived_at is null and e.status <> 'void' and ${where.replaceAll("e.props ->> 'date'", 'e.date')}
+     where e.type = any($1::text[]) and e.archived_at is null and e.status <> 'void' ${planned ? '' : "and e.status <> 'planned'"} and ${where.replaceAll("e.props ->> 'date'", 'e.date')}
      order by e.date, e.props ->> 'start', e.created_at`,
     [l.registry.family('time.entry'), ...params],
   );
@@ -284,7 +284,7 @@ export async function week(l: Archipelago, input: { from?: string }) {
 
   // The owner's lane: what they logged, as blocks where they said when.
   const owner: Block[][] = days.map(() => []);
-  for (const r of await entries(l, `e.props ->> 'date' between $2 and $3`, [from, to])) {
+  for (const r of await entries(l, `e.props ->> 'date' between $2 and $3`, [from, to], true)) {
     const at = days.indexOf(r.date);
     const base = { id: r.id, what: r.title, work: await named(r.work), work_id: r.work, project: r.work ? await projectOf(l, r.work, projects) : null, status: r.status };
     const s = r.start ? Date.parse(r.start) : NaN;
@@ -368,7 +368,17 @@ export async function week(l: Archipelago, input: { from?: string }) {
     }
   }
 
-  const counted = new Set([...owner.flat(), ...agents.flat()].map((b) => b.project).filter((p): p is string => Boolean(p)));
+  // Planned time whose end has passed, whatever week it was in: the owner says whether it happened.
+  const nowMs = Date.now();
+  const due: (Block & { date: string })[] = [];
+  for (const r of await entries(l, `e.status = 'planned' and e.date <= $2`, [today()], true)) {
+    const over = r.end ? Date.parse(r.end) <= nowMs : r.date < today();
+    if (!over) continue;
+    const project = r.work ? await projectOf(l, r.work, projects) : null;
+    due.push({ id: r.id, what: r.title, date: r.date, start: r.start, end: r.end, from_hour: null, to_hour: null, hours: r.hours, work: await named(r.work), work_id: r.work, project, status: r.status });
+  }
+
+  const counted = new Set([...owner.flat(), ...agents.flat(), ...due].map((b) => b.project).filter((p): p is string => Boolean(p)));
   return {
     from,
     to,
@@ -377,11 +387,13 @@ export async function week(l: Archipelago, input: { from?: string }) {
     projects: await Promise.all([...counted].sort().map(async (id) => ({ id, title: await named(id) }))),
     days: days.map((date, i) => ({
       date,
-      hours: cents(owner[i].reduce((n, b) => n + b.hours, 0)),
+      hours: cents(owner[i].filter((b) => b.status !== 'planned').reduce((n, b) => n + b.hours, 0)),
+      planned: cents(owner[i].filter((b) => b.status === 'planned').reduce((n, b) => n + b.hours, 0)),
       owner: owner[i],
       agents: lanes(agents[i]),
       reported: reported[i],
     })),
+    to_confirm: due,
   };
 }
 

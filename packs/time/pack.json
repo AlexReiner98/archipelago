@@ -8,8 +8,8 @@
     {
       "id": "time.entry",
       "title": "Time entry",
-      "description": "Time spent on one piece of work on one day, as hours or as a block from a start to an end. The title says what was done in a few words; the note says more. Make it part of the work it was for (a project or task); the client is the company that work involves.",
-      "statuses": { "open": ["logged"], "closed": ["invoiced", "void"] },
+      "description": "Time spent on one piece of work on one day, as hours or as a block from a start to an end. A planned block is time set aside, not yet worked: it counts toward nothing and is never invoiced until the owner confirms it (logged). The title says what was done in a few words; the note says more. Make it part of the work it was for (a project or task); the client is the company that work involves.",
+      "statuses": { "open": ["logged", "planned"], "closed": ["invoiced", "void"] },
       "fields": {
         "date": { "type": "date", "shown": true, "description": "The day the work was done." },
         "hours": { "type": "number", "shown": true, "description": "Hours spent, e.g. 1.5. When start and end are both given, the hours are the time between them." },

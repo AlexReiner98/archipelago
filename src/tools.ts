@@ -886,6 +886,7 @@ export const TOOLS: Record<string, Tool> = {
     description:
       'Record time spent on a piece of work: how many hours, on which day (today unless given, in Toronto), what was done in a few words, and a note if there is more to say. ' +
       'Or a block, with start and end in place of hours: the hours are the time between, and the day is the day it began. ' +
+      'planned: true sets the time aside without saying it was worked: it counts toward nothing and is not invoiced until the owner confirms it. ' +
       'work is the id of the project, task or client it was for; the client billed is the company that work, or what it sits in, involves. Search for the work first. Say what you logged back to the person, with the client.',
     input: {
       work: z.string().describe('Id of the project, task or client company the time was for.'),
@@ -897,6 +898,7 @@ export const TOOLS: Record<string, Tool> = {
       date: z.string().optional().describe('The day, as 2026-10-15. Today when left out.'),
       billable: z.boolean().optional().describe('false for time that is not to be invoiced.'),
       rate: z.number().optional().describe('An hourly rate for this entry only, when it is not the client’s.'),
+      planned: z.boolean().optional().describe('true for time set aside ahead, not yet worked.'),
     },
     run: async (l, actor, input) => logTime(l, actor, input),
   },
@@ -908,7 +910,8 @@ export const TOOLS: Record<string, Tool> = {
   week: {
     description:
       'A week as a calendar, Monday to Sunday (this week unless from is given): for each day, the owner’s blocks (owner: time entries, with start and end where they were logged as blocks, else hours alone) and the agents’ lanes (agents: one list per agent at work at once, each block a session, or the part of one spent on one piece of work). ' +
-      'Every block has from_hour and to_hour (hours since that day’s midnight in Toronto), hours, the work and the project it counts toward; projects lists them in the order the page colours them.',
+      'Every block has from_hour and to_hour (hours since that day’s midnight in Toronto), hours, the work and the project it counts toward; projects lists them in the order the page colours them. ' +
+      'An owner block with status planned is time set aside: a day’s hours leave it out and planned counts it. to_confirm lists planned time whose end has passed, in any week: the owner confirms it (status logged) or drops it (archive).',
     input: { from: z.string().optional().describe('Any day in the week, or its Monday, as 2026-10-12.') },
     run: async (l, _actor, input) => week(l, input),
   },
