@@ -1505,6 +1505,23 @@ test('a project\'s questions are its open decisions and hypotheses, most-blockin
   assert.deepEqual([after.open.map((x: any) => x.title), after.settled[0].title, after.settled[0].outcome], [['Hyp', 'Small'], 'Big', 'A']);
 });
 
+test('a project inside another open project is not listed on its own; its questions count in its parent', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Parent' },
+    { op: 'create', ref: 'sub', type: 'project', title: 'Area' },
+    { op: 'create', ref: 'd', type: 'decision', title: 'Which way?' },
+    { op: 'link', type: 'part_of', from: 'sub', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'd', to: 'sub' },
+  ]);
+  const listed = async () => ((await VIEWS.questions.run(l, {})) as any).projects.map((p: any) => [p.title, p.questions]);
+  assert.deepEqual(await listed(), [['Parent', 1]]);
+  assert.equal(((await VIEWS.questions.run(l, { project: made.sub })) as any).open[0].title, 'Which way?', 'its own page still answers');
+
+  await make(l, [{ op: 'update', id: made.p, status: 'done' }]);
+  assert.deepEqual(await listed(), [['Area', 1], ['Parent', 1]], 'once the parent is finished, the area is listed again');
+});
+
 test('an agent may settle its own work unreviewed, but only proposes the answer to a question', async () => {
   const l = await fresh();
   const made = await make(l, [

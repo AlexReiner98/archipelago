@@ -923,7 +923,10 @@ async function questions(l: Archipelago, input: { project?: string }) {
     );
   const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status, open: e.is_open });
   if (!input.project) {
-    const projects = entities.filter((e) => l.registry.isA(e.type, 'project')).map((e) => ({ ...slim(e), questions: belonging(scopeOf(e.id)).filter((q) => q.is_open).length }));
+    // A project inside another open project is read on its parent's page, whose count already holds its questions.
+    const isProject = (e: Entity) => l.registry.isA(e.type, 'project');
+    const inner = (e: Entity) => live.some((r) => r.type === 'part_of' && r.from_id === e.id && isProject(byId.get(r.to_id)!) && byId.get(r.to_id)!.is_open);
+    const projects = entities.filter((e) => isProject(e) && !inner(e)).map((e) => ({ ...slim(e), questions: belonging(scopeOf(e.id)).filter((q) => q.is_open).length }));
     return { projects: projects.sort((a, b) => b.questions - a.questions || a.title.localeCompare(b.title)) };
   }
   const root = byId.get(input.project);
@@ -1240,7 +1243,7 @@ export const VIEWS: Record<string, View> = {
   },
   questions: {
     description:
-      'A project\'s open questions: decisions not yet made and hypotheses not yet settled, most-blocking first, each with what waits on it, its options, what is testing it, and anything the owner has asked an agent to look into first (`asks`: do those, write what you found into the notes or options of the question, and mark the ask done); then the ones settled lately with their outcome. Params: project (an entity id; without it, the projects and how many open questions each has).',
+      'A project\'s open questions: decisions not yet made and hypotheses not yet settled, most-blocking first, each with what waits on it, its options, what is testing it, and anything the owner has asked an agent to look into first (`asks`: do those, write what you found into the notes or options of the question, and mark the ask done); then the ones settled lately with their outcome. Params: project (an entity id; without it, the projects and how many open questions each has, leaving out a project that is part of another open project, whose count holds its questions).',
     run: questions,
   },
   gate: {
