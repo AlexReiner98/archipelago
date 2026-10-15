@@ -774,7 +774,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   picture_put: {
     description:
-      'Keep a picture for one item: the picture a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text. A test result\u2019s only when the result is shown in public: until then the picture stays in the repository it was made in, and the result says where (its picture field). One picture per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
+      'Keep a picture for one item: the picture a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text, or a still of a lens, which a link to a document shows where the app draws the lens live. A test result\u2019s only when the result is shown in public: until then the picture stays in the repository it was made in, and the result says where (its picture field). One picture per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
     input: {
       result: z.string().describe('The id of the test result, or of the note or file the figure belongs to.'),
       data: z.string().min(1).describe('The file, as base64.'),
@@ -876,7 +876,7 @@ export const TOOLS: Record<string, Tool> = {
   document: {
     description:
       'A document read whole, as its reader meets it: its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. ' +
-      'To write one, make an item of type document whose note is the text, and put an item’s id alone on a line where that item belongs. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
+      'To write one, make an item of type document whose note is the text, and put an item’s id alone on a line where that item belongs; a lens\u2019s id brings in its picture, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
     input: { id: z.string() },
     run: async (l, _actor, input) => readDocument(l, input.id),
   },

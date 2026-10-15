@@ -95,6 +95,10 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .page-head .delivers .deliverable { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; }
 .page-head .delivers .deliverable .gist { overflow: hidden; text-overflow: ellipsis; }
 .note > img.figure { display: block; margin: 14px 14px 4px; max-width: calc(100% - 28px); border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.note.doc section.doc-lens { border-top: 1px solid var(--line); padding: 8px 0 10px; }
+.note.doc .doc-lens-head { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; white-space: nowrap; overflow: hidden; }
+.note.doc .doc-lens-head a { overflow: hidden; text-overflow: ellipsis; }
+.note.doc .doc-lens .lens-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
 .note.doc img.doc-figure { display: block; max-width: 100%; margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 #around svg.graph { height: 520px; }
 .card .empty, .card .error { padding: 14px; color: var(--muted); }

@@ -1212,8 +1212,19 @@ async function entity(id) {
     }
   };
 
+  // A lens brought into a document is its picture, drawn live with the style kept for it, and then its note.
+  const lensPart = (s) =>
+    h(
+      'section',
+      { class: 'doc-lens' },
+      h('div', { class: 'doc-lens-head' }, chip(s.type), h('a', { class: 'grow', href: `#/e/${s.id}`, title: s.title }, s.title)),
+      h('div', { class: 'lens-card' }, lensView({ lens: { lens: s.id }, key: `doc:${id}:${s.id}`, bare: true })),
+      s.body && renderBody(s.body),
+    );
   const docPart = (p) =>
-    p.section
+    p.section && isA(p.section.type, 'lens')
+      ? lensPart(p.section)
+      : p.section
       ? h(
           'details',
           { class: 'doc-section', open: unfolded.get(`${id}:${p.section.id}`) ?? Boolean(p.section.picture), ontoggle: (ev) => unfolded.set(`${id}:${p.section.id}`, ev.target.open) },

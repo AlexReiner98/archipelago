@@ -274,14 +274,15 @@ async function dropPictures(l: Archipelago, actor: Actor, tests: string[], reaso
 
 /**
  * Keep the picture a test drew, for one result, or the figure a document shows
- * with one of its sections (a note or a file). A result's is meant for one that
+ * with one of its sections (a note or a file; for a lens, the picture a link
+ * shows in place of the live one). A result's is meant for one that
  * is shown in public: until then the picture stays in the repository it was
  * made in. There is one per item; sent again, it replaces what was kept.
  */
 export async function putPicture(l: Archipelago, actor: Actor, input: { result: string; data: string; content_type: string }) {
   const result = await l.entity(input.result);
-  const figure = result && ['note', 'file'].some((t) => l.registry.isA(result.type, t));
-  if (!result || !(figure || l.registry.isA(result.type, 'software.test_result'))) throw new Error(`picture_put: "${input.result}" is not a test result, a note or a file.`);
+  const figure = result && ['note', 'file', 'lens'].some((t) => l.registry.isA(result.type, t));
+  if (!result || !(figure || l.registry.isA(result.type, 'software.test_result'))) throw new Error(`picture_put: "${input.result}" is not a test result, a note, a file or a lens.`);
   if (!PICTURE_TYPES.includes(input.content_type)) throw new Error(`picture_put: the picture must be one of ${PICTURE_TYPES.join(', ')}, not ${input.content_type}.`);
   const bytes = Buffer.from(input.data, 'base64');
   if (!bytes.length) throw new Error('picture_put: "data" is empty. Send the file as base64.');

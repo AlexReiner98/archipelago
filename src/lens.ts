@@ -244,7 +244,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   // An item opens on its first picture of its own (not a shortcut, which leads away), else on what it is tied to; the whole map on the workspace's first.
   const view = around || (told && typeof input.lens !== 'string') ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
   // A view may start somewhere else than the item it is kept about: tightly scoped, that is a shortcut.
-  const start = typeof view?.props.from === 'string' ? view.props.from : hub;
+  // Asked for by its id alone, a view kept about one item starts from that item, so it can be drawn anywhere: in a document, for one.
+  const start = typeof view?.props.from === 'string' ? view.props.from : (hub ?? (view && view.about.length === 1 ? view.about[0] : undefined));
   // Around one item the picture is its neighbourhood: every kind of link, each neighbour filed under the link that ties it.
   // A story's items are tied by whatever the map ties them by, and what is finished stays: it was told of.
   let under: Lens = told ? { ...LENS_DEFAULT, over: 'all', fold: ['system'] } : start === undefined ? LENS_DEFAULT : { ...LENS_DEFAULT, over: 'all', lanes: 'link' };

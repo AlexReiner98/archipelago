@@ -2237,3 +2237,22 @@ test('a lens files items by a field, sends the fields their pack shows, and says
   assert.equal(item(made.irap).inside, made.ops);
   assert.deepEqual(answer.links, [{ kind: 'funding.reduces', from: made.sred, to: made.irap, n: 1, says: 'IRAP money is subtracted first' }]);
 });
+
+test('a lens asked for by its id alone starts from what it is kept about, and can keep a still', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
+    { op: 'create', ref: 'q', type: 'project', title: 'Something else' },
+    { op: 'create', ref: 'irap', type: 'funding.program', title: 'NRC IRAP', status: 'open', props: { kind: 'grant', phase: 'research' } },
+    { op: 'create', ref: 'other', type: 'task', title: 'Elsewhere' },
+    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { kinds: ['project', 'funding.program'], lanes: 'field:phase' } },
+    { op: 'link', type: 'part_of', from: 'irap', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'other', to: 'q' },
+    { op: 'link', type: 'about', from: 'v', to: 'p' },
+  ]);
+  const answer = (await callTool(l, human, 'view', { name: 'lens', params: { lens: made.v } })) as { view: string; items: { id: string }[] };
+  assert.equal(answer.view, made.v);
+  assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.p, made.irap].sort());
+  const png = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');
+  assert.equal(((await callTool(l, human, 'picture_put', { result: made.v, data: png, content_type: 'image/png' })) as { size: number }).size, 8);
+});
