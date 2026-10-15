@@ -30,6 +30,7 @@ const field = z.object({
   values: z.array(z.string()).optional(),
   description: z.string().optional(),
   default: z.unknown().optional(),
+  shown: z.boolean().optional().describe('Sent with the item in a lens answer, so a style can draw by it.'),
 });
 
 const source = z.object({

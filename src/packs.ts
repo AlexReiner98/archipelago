@@ -14,6 +14,8 @@ export interface FieldDef {
   default?: unknown;
   /** Maintained by the system; shown but not offered for editing. */
   system?: boolean;
+  /** Sent with the item in a lens answer, so a style can draw by it (a kind to colour, an amount, a date). */
+  shown?: boolean;
 }
 
 export interface Statuses {

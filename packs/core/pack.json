@@ -229,7 +229,7 @@
         "by": { "type": "string", "description": "The kind of link that says what is inside what, e.g. part_of." },
         "over": { "type": "json", "description": "The kinds of link sent along as links, as a list, or \"all\"." },
         "far": { "type": "number", "description": "How many steps down from the start." },
-        "lanes": { "type": "enum", "values": ["stage", "link", "person"], "description": "What each item is filed under." },
+        "lanes": { "type": "string", "description": "What each item is filed under: stage, link, person, or field:<name> for the value of one of its fields (e.g. field:phase)." },
         "order": { "type": "string", "description": "The number field that orders things beside each other." },
         "measure": { "type": "enum", "values": ["work", "tokens"], "description": "What size counts." },
         "fold": { "type": "json", "description": "What is left out, as a list of: closed, system, unlinked." }

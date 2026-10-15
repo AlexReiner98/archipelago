@@ -2205,3 +2205,35 @@ test('what is made for a reader is marked deliverable by its type, and a documen
   await make(l, [{ op: 'link', type: 'part_of', from: made.b, to: made.d }]);
   assert.equal(((await callTool(l, human, 'document', { id: made.d })) as { not_inside?: string[] }).not_inside, undefined);
 });
+
+test('a lens files items by a field, sends the fields their pack shows, and says what a link says', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
+    { op: 'create', ref: 'ops', type: 'project', title: 'Business and operations' },
+    { op: 'create', ref: 'irap', type: 'funding.program', title: 'NRC IRAP', status: 'open', props: { kind: 'grant', phase: 'research', amount: 'salaries ~80%', run_by: 'NRC' } },
+    { op: 'create', ref: 'sred', type: 'funding.program', title: 'SR&ED', status: 'open', props: { kind: 'tax_credit', phase: 'prove', deadline: '2027-06-30', deadline_note: 'file by' } },
+    { op: 'create', ref: 'lift', type: 'funding.program', title: 'BDC LIFT', status: 'open', props: { kind: 'loan', phase: 'build' } },
+    { op: 'link', type: 'part_of', from: 'ops', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'irap', to: 'ops' },
+    { op: 'link', type: 'part_of', from: 'sred', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'lift', to: 'ops' },
+    { op: 'link', type: 'funding.reduces', from: 'sred', to: 'irap', props: { says: 'IRAP money is subtracted first' } },
+  ]);
+  await assert.rejects(callTool(l, human, 'view', { name: 'lens', params: { from: made.p, lanes: 'field:nothing_like_it' } }), /no type has a field "nothing_like_it"/);
+  const answer = (await callTool(l, human, 'view', { name: 'lens', params: { from: made.p, lanes: 'field:phase', over: ['funding.reduces'] } })) as {
+    said: string;
+    lanes: string[];
+    items: { id: string; lane?: string | null; fields?: Record<string, unknown>; inside: string | null }[];
+    links: { kind: string; from: string; to: string; says?: string }[];
+  };
+  const item = (id: string) => answer.items.find((i) => i.id === id)!;
+  assert.deepEqual(answer.lanes, ['set_up', 'research', 'build', 'prove']);
+  assert.match(answer.said, /filed by its phase/);
+  assert.deepEqual([item(made.irap).lane, item(made.lift).lane, item(made.sred).lane, item(made.ops).lane], ['research', 'build', 'prove', null]);
+  assert.deepEqual(item(made.irap).fields, { kind: 'grant', phase: 'research', amount: 'salaries ~80%' }, 'run_by is not shown');
+  assert.deepEqual(item(made.sred).fields, { kind: 'tax_credit', phase: 'prove', deadline: '2027-06-30', deadline_note: 'file by' });
+  assert.equal(item(made.ops).fields, undefined);
+  assert.equal(item(made.irap).inside, made.ops);
+  assert.deepEqual(answer.links, [{ kind: 'funding.reduces', from: made.sred, to: made.irap, n: 1, says: 'IRAP money is subtracted first' }]);
+});

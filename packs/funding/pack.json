@@ -1,0 +1,30 @@
+{
+  "id": "funding",
+  "version": "0.1.0",
+  "title": "Funding",
+  "description": "Programs that can pay for work: grants, loans, tax credits, wage subsidies and support, where each pays in a project, and how they depend on each other.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "funding.program",
+      "title": "Funding program",
+      "description": "One program that can pay for part of the work: who runs it, what kind of money it is, how much, and in which phase of the project it pays. Make it part of the work it would fund. Its note says who applies, what costs count and the source.",
+      "statuses": { "open": ["open", "upcoming", "watching", "applying"], "closed": ["funded", "closed", "not_a_fit"] },
+      "fields": {
+        "kind": { "type": "enum", "values": ["grant", "loan", "tax_credit", "wage_subsidy", "support"], "shown": true, "description": "What kind of money or help: a grant or contribution, a loan, a tax credit, a wage subsidy or placement, or support (advice, testing, a test site)." },
+        "phase": { "type": "enum", "values": ["set_up", "research", "build", "prove"], "shown": true, "description": "Where in the project it pays: setting up, the research core, building and adopting, or proving and selling." },
+        "amount": { "type": "string", "shown": true, "description": "What it pays, in a few words, e.g. \"up to $5K per placement\" or \"0% loan, up to 50% of costs\"." },
+        "deadline": { "type": "date", "shown": true, "description": "The next date that matters: an intake closing or opening." },
+        "deadline_note": { "type": "string", "shown": true, "description": "What the deadline is, in a few words, e.g. \"apply by\" or \"opens\"." },
+        "run_by": { "type": "string", "description": "Who runs it, e.g. \"NRC IRAP\" or \"FedDev Ontario\"." },
+        "url": { "type": "url", "description": "The program's official page." }
+      }
+    }
+  ],
+  "relations": [
+    { "id": "funding.requires", "title": "requires first", "inverse": "comes before", "from": ["funding.program"], "to": ["*"], "description": "This program can only be used once the target is done or in hand, e.g. a loan that pays to carry out a plan. Say how in props.says." },
+    { "id": "funding.reduces", "title": "is figured after", "inverse": "reduces", "from": ["funding.program"], "to": ["funding.program"], "description": "Money from the target counts as assistance against this one: it is subtracted before this is figured. Say how in props.says." },
+    { "id": "funding.earns", "title": "also earns", "inverse": "is earned by", "from": ["funding.program"], "to": ["funding.program"], "description": "Money spent under this program also earns the target, e.g. a payment to a college that earns a tax credit. Say how in props.says." },
+    { "id": "funding.leads_to", "title": "leads to", "inverse": "follows from", "from": ["funding.program"], "to": ["funding.program"], "description": "What this program produces or decides makes the target easier to get or use. Say how in props.says." }
+  ]
+}

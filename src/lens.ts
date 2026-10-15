@@ -22,8 +22,8 @@ export interface Lens {
   over: string[] | 'all';
   /** How many steps down from the start, or from what is inside nothing. */
   far?: number;
-  /** What each item is filed under. */
-  lanes?: 'stage' | 'link' | 'person';
+  /** What each item is filed under: its stage of work, its link to the start, its owner, or the value of one of its fields (field:<name>). */
+  lanes?: 'stage' | 'link' | 'person' | `field:${string}`;
   /** The number field that orders the things beside each other. */
   order: string;
   /** What size counts. */
@@ -95,8 +95,11 @@ export function readLens(l: Archipelago, input: Record<string, unknown>, under: 
     lens.far = input.far as number;
   }
   if (input.lanes !== undefined) {
-    if (!LANES.includes(input.lanes as string)) throw new Error(`lanes must be one of: ${LANES.join(', ')}`);
-    lens.lanes = input.lanes as Lens['lanes'];
+    const lanes = String(input.lanes);
+    const field = /^field:([a-z][a-z0-9_]*)$/.exec(lanes)?.[1];
+    if (field !== undefined && ![...l.registry.types.values()].some((t) => t.fields[field])) throw new Error(`lanes: no type has a field "${field}"`);
+    if (field === undefined && !LANES.includes(lanes)) throw new Error(`lanes must be one of: ${LANES.join(', ')}, or field:<name>`);
+    lens.lanes = lanes as Lens['lanes'];
   }
   if (input.order !== undefined) lens.order = String(input.order);
   if (input.measure !== undefined) {
@@ -139,7 +142,7 @@ function sayLens(l: Archipelago, asked: Lens, startTitle: string | undefined): s
   if (asked.far !== undefined) parts.push(asked.far === 0 ? 'nothing below it' : `${asked.far} step${asked.far === 1 ? '' : 's'} down`);
   if (asked.kinds?.length) parts.push(`only ${asked.kinds.map((k) => (k.startsWith('-') ? `not ${k.slice(1)}` : k)).join(', ')}`);
   parts.push(asked.over === 'all' ? 'with every kind of link' : asked.over.length ? `with links: ${asked.over.map(link).join(', ')}` : 'with no links');
-  if (asked.lanes) parts.push(`filed by ${asked.lanes}`);
+  if (asked.lanes) parts.push(`filed by ${asked.lanes.startsWith('field:') ? `its ${asked.lanes.slice(6).replaceAll('_', ' ')}` : asked.lanes}`);
   const out = asked.fold.map((f) => ({ closed: 'what is finished', system: 'the system\u2019s own records', unlinked: 'what is linked to nothing this way' })[f] ?? f);
   parts.push(out.length ? `without ${out.join(', ')}` : 'with nothing left out');
   return parts.join('; ') + '.';
@@ -266,7 +269,9 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at from entity where archived_at is null`);
   const all = new Map(entities.map((e) => [e.id, e]));
   if (asked.from && !all.has(asked.from)) throw new Error(`No entity "${asked.from}"`);
-  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(`select id, type, from_id, to_id from relation where valid_to is null order by id`);
+  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null }>(
+    `select id, type, from_id, to_id, props ->> 'says' as says from relation where valid_to is null order by id`,
+  );
 
   const isA = (type: string, kind: string) => l.registry.isA(type, kind);
   // A lens and a style are how the map is looked at, not part of what is seen.
@@ -410,12 +415,23 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const tied = new Map<string, string>();
   // The kind of link, and which way it runs: "depends_on" where the start depends on it, "depends_on:in" where it depends on the start.
   if (asked.lanes === 'link' && asked.from) for (const r of live) for (const [a, b, way] of [[r.from_id, r.to_id, ''], [r.to_id, r.from_id, ':in']]) if (a === asked.from && !tied.has(b)) tied.set(b, r.type + way);
+  const byField = asked.lanes?.startsWith('field:') ? asked.lanes.slice(6) : undefined;
   const lane = (e: Row): string | null => {
+    if (byField !== undefined) return e.props[byField] == null ? null : String(e.props[byField]);
     if (asked.lanes === 'person') return e.owner;
     if (asked.lanes === 'link') return tied.get(e.id) ?? null;
     if (!e.is_open) return 'done';
     return (sessions.get(e.id) ?? 0) > 0 || Number(e.props.tokens_used ?? 0) > 0 || UNDER_WAY.includes(e.status) ? 'under_way' : 'to_come';
   };
+
+  // The fields a type's pack marks as shown travel with the item, so a style can draw by them.
+  const shownFields = (e: Row) => {
+    const defs = l.registry.type(e.type)?.fields ?? {};
+    const fields = Object.fromEntries(Object.entries(e.props).filter(([key, value]) => defs[key]?.shown && value != null));
+    return Object.keys(fields).length ? { fields } : {};
+  };
+  // Filed by a field that has a set of values, the lanes come in that order: the first type that declares them says it.
+  const laneOrder = byField === undefined ? undefined : [...l.registry.types.values()].find((t) => t.fields[byField]?.values)?.fields[byField].values;
 
   // A link whose end was not sent is moved up to the nearest thing that was, so one line can stand for several.
   const lift = (id: string): string | undefined => {
@@ -436,7 +452,9 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     // What is inside what is already said by `inside`.
     if (r.type === asked.by && inside(from) === to) continue;
     const key = `${r.type} ${from} ${to}`;
-    const line = lines.get(key) ?? { kind: r.type, from, to, n: 0 };
+    const line = lines.get(key) ?? { kind: r.type, from, to, n: 0, ...(r.says && { says: r.says }) };
+    // A line that stands for several links says something only when they all say the same.
+    if (line.n > 0 && line.says !== (r.says ?? undefined)) delete line.says;
     line.n++;
     lines.set(key, line);
   }
@@ -475,6 +493,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
         inside: inside(id),
         place: place.get(id)!,
         ...(asked.lanes && { lane: lane(e) }),
+        ...shownFields(e),
         size: size(e),
         state: state(e),
         within: within(id),
@@ -483,6 +502,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
       };
     }),
     links: [...lines.values()],
+    ...(laneOrder && { lanes: laneOrder }),
     rest,
   };
 }
