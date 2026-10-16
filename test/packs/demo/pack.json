@@ -1,0 +1,10 @@
+{
+  "id": "demo",
+  "version": "0.1.0",
+  "title": "Demo",
+  "description": "A pack for testing the pack host: one action that reads and writes, one that overruns, one that reaches outside its folder.",
+  "requires": ["core"],
+  "types": [
+    { "id": "demo.visit", "title": "Visit", "description": "A visit to a site.", "extends": "occurrence", "fields": { "site": { "type": "string" } } }
+  ]
+}

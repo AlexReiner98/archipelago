@@ -134,6 +134,8 @@ export interface ChangeInput {
   authority?: Pick<Authority, 'of' | 'basis'>;
   /** From an agent: have this change wait for a human even where agents' changes are applied as made. */
   hold?: boolean;
+  /** The pack action that made it, named on every event it logs ("time.log made this"). */
+  action?: string;
 }
 
 export interface Entity {
@@ -251,8 +253,7 @@ export class Archipelago {
   /** What the packs' rules make of each op: whether it waits for a person, and what refuses it. */
   private async judgeOps(actor: Actor, ops: Op[]) {
     const on = (op: Op) => (op.op === 'merge' ? [op.keep, op.drop] : 'id' in op ? [op.id] : []);
-    const ids = ops.flatMap(on);
-    const found = new Map((ids.length ? (await this.db.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ids])).rows : []).map((e) => [e.id, e]));
+    const found = new Map((await this.db.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
     return Promise.all(ops.map(async (op) => {
       const targets = on(op).flatMap((id) => found.get(id) ?? []);
       const judged = judge(this.registry, actor.kind === 'human', op as Written, targets);
@@ -274,8 +275,7 @@ export class Archipelago {
     const chosen = actor.kind === 'human' ? undefined : await this.setting<string>(AGENT_CHANGES);
     // The packs' rules: what waits for a person, whatever else agents may do unreviewed, and what is refused.
     const judged = await this.judgeOps(actor, input.ops);
-    const refused = judged.flatMap((j) => j.refused);
-    if (refused.length) throw new Error(`Change rejected:\n${refused.map((r) => `- ${r}`).join('\n')}`);
+    if (judged.some((j) => j.refused.length)) throw new Error(`Change rejected:\n${judged.flatMap((j) => j.refused).map((r) => `- ${r}`).join('\n')}`);
     const levels = input.ops.map((op, i): Level => {
       if (actor.kind === 'human') return 'auto';
       const level = this.policy[op.op];
@@ -552,7 +552,7 @@ export class Archipelago {
     const { warnings } = await this.plan(ops);
     const changeset = newId('c');
     const created: Record<string, string> = {};
-    const extra = { ...(opts.approvedBy && { approved_by: opts.approvedBy, ...(opts.revised && { revised_by: opts.approvedBy }) }), ...(opts.authority && { authority: opts.authority }) };
+    const extra = { ...(opts.approvedBy && { approved_by: opts.approvedBy, ...(opts.revised && { revised_by: opts.approvedBy }) }), ...(opts.authority && { authority: opts.authority }), ...(input.action && { action: input.action }) };
     const reg = this.registry;
 
     await this.db.transaction(async (tx) => {
