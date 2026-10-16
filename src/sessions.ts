@@ -102,7 +102,7 @@ export async function sessionStart(
     );
     for (const res of needed) {
       try {
-        if (res.props.exclusive === false && res.status === 'available') continue;
+        if (l.registry.capacity(res) === Infinity && res.status === 'available') continue;
         await l.claim(actor, { resource: res.id, holder: run, for: task.id, reason: `Needed for "${task.title}"` });
         claimed.push(res.title);
       } catch (err) {
@@ -499,9 +499,8 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
       ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: view "to_confirm".`] : []),
     );
   const now = (await VIEWS.available_now.run(l, {})) as { held_resources: { title: string; held_by_title: string }[] };
-  const { rows: exclusive } = await l.db.query<{ id: string; title: string }>(
-    `select id, title from entity where type = 'resource' and is_open and archived_at is null and coalesce((props->>'exclusive')::boolean, true)`,
-  );
+  const { rows: holdable } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [l.registry.having('capacity')]);
+  const exclusive = holdable.filter((res) => l.registry.capacity(res) !== Infinity);
   for (const res of exclusive) {
     const held = now.held_resources.find((h) => h.title === res.title);
     lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago claim tool (holder ${started.run}) before using it and release it after.`);

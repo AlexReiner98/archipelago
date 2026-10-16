@@ -57,14 +57,14 @@ const LONG_FILES: Record<string, number> = {
   'ui/app.js': 5121,
   'test/pelago.test.ts': 2604,
   'test/platform.test.ts': 1667,
-  'src/views.ts': 1317,
+  'src/views.ts': 1316,
   'src/tools.ts': 1181,
   'src/pelago.ts': 1133,
   'ui/style.css': 891,
   'src/server.ts': 713,
-  'src/time.ts': 643,
+  'src/time.ts': 626,
   'src/lens.ts': 525,
-  'src/sessions.ts': 523,
+  'src/sessions.ts': 522,
 };
 
 test(`no file is over ${MAX_LINES} lines`, () => {

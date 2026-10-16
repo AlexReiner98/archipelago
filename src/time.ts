@@ -2,6 +2,7 @@
 // that work, or what it sits in, involves. A client says who bills it, at what rate, on what terms and whether HST is
 // charged. An invoice is a document whose note is the bill as made, fixed from then on, and it bills its entries.
 
+import { occurs } from './capabilities.ts';
 import type { Actor, Archipelago, Entity } from './pelago.ts';
 
 /** Days are counted where the work is done. */
@@ -180,25 +181,6 @@ export interface Block {
   link?: string | null;
 }
 
-/** Hours since midnight from a time of day: 17.5 from "17:30"; undefined for anything else. */
-const clockHours = (t: unknown) => {
-  const m = typeof t === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(t.trim()) : null;
-  const n = m ? Number(m[1]) + Number(m[2]) / 60 : NaN;
-  return n >= 0 && n <= 24 ? n : undefined;
-};
-
-/** The hours a routine holds on a day, if it falls on it: not before it starts or after it ends, not on a day skipped or done. */
-export function occurs(p: Record<string, unknown>, day: string, made?: string): [number, number] | undefined {
-  const days = Array.isArray(p.days) && p.days.length ? p.days.map(Number) : [1, 2, 3, 4, 5, 6, 7];
-  if (!days.includes(new Date(`${day}T12:00:00Z`).getUTCDay() || 7)) return undefined;
-  const starts = typeof p.starts === 'string' ? p.starts : made;
-  if ((starts && day < starts) || (typeof p.until === 'string' && day > p.until)) return undefined;
-  if ((Array.isArray(p.skip) && p.skip.includes(day)) || (Array.isArray(p.done) && p.done.includes(day))) return undefined;
-  const moved = p.moved && typeof p.moved === 'object' ? (p.moved as Record<string, unknown>)[day] : undefined;
-  const [a, b] = Array.isArray(moved) ? moved.map(clockHours) : [clockHours(p.from_time), clockHours(p.to_time)];
-  return a !== undefined && b !== undefined && b > a ? [a, b] : undefined;
-}
-
 /**
  * What a piece of work counts toward: the outermost project it sits in; failing that, the project that lives in the
  * repository it sits in or lives in; failing that, that repository. Work that is in neither counts toward nothing.
@@ -342,8 +324,8 @@ export async function week(l: Archipelago, input: { from?: string }) {
   // Everything the week is drawn from, fetched first; then every name and project it needs, in a handful of queries.
   const logged = await entries(l, `e.props ->> 'date' between $2 and $3`, [from, to], true);
   const plannedRows = await entries(l, `e.status = 'planned' and e.date <= $2`, [today()], true);
-  const { rows: routines } = await l.db.query<{ id: string; title: string; props: Record<string, unknown>; created_at: Date; work: string | null; link: string | null }>(
-    `select e.id, e.title, e.props, e.created_at, r.to_id as work, r.id as link
+  const { rows: routines } = await l.db.query<{ id: string; type: string; title: string; props: Record<string, unknown>; created_at: Date; work: string | null; link: string | null }>(
+    `select e.id, e.type, e.title, e.props, e.created_at, r.to_id as work, r.id as link
      from entity e left join relation r on r.from_id = e.id and r.type = 'part_of' and r.valid_to is null
      where e.type = any($1::text[]) and e.archived_at is null and e.is_open order by e.props ->> 'from_time', e.title`,
     [l.registry.family('time.routine')],
@@ -388,7 +370,8 @@ export async function week(l: Archipelago, input: { from?: string }) {
 
   // Routines: drawn on each day they fall on. One for a piece of work is planned time for it; one for nothing holds the time.
   const routineOn = async (r: (typeof routines)[number], day: string): Promise<Block | undefined> => {
-    const at = occurs(r.props, day, today(new Date(r.created_at)));
+    const repeat = l.registry.type(r.type)?.capabilities.when?.repeat;
+    const at = repeat && occurs(repeat, r.props, day, today(new Date(r.created_at)));
     if (!at) return undefined;
     const base = dayStart(day);
     return {

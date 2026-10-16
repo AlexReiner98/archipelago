@@ -4,6 +4,7 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
 
@@ -36,6 +37,8 @@ export interface TypeDef {
   fields?: Record<string, FieldDef>;
   /** What is made for a reader or a customer (a document, a file, a release): named under the title of what it is part of. A flavour inherits it. */
   deliverable?: boolean;
+  /** What the kernel computes from it, each naming the field it reads. A flavour inherits them. */
+  capabilities?: Capabilities;
 }
 
 export interface RelationDef {
@@ -99,6 +102,7 @@ export interface ResolvedType {
   statuses: Statuses;
   fields: Record<string, FieldDef>;
   deliverable: boolean;
+  capabilities: Capabilities;
 }
 
 /** A relation as loaded: `root` names the root it extends (itself, for a root). */
@@ -214,6 +218,7 @@ export class Registry {
         statuses,
         fields: { ...parent?.fields, ...def.fields, ...extra.get(id) },
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
+        capabilities: { ...parent?.capabilities, ...def.capabilities },
       };
       types.set(id, resolved);
       return resolved;
@@ -240,6 +245,11 @@ export class Registry {
       return rootOf(parent, [...trail, rel.id]);
     };
     for (const rel of relations.values()) rel.root = rootOf(declared.get(rel.id)!, []);
+
+    for (const type of types.values()) {
+      const problems = checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()));
+      if (problems.length) throw new Error(`Type "${type.id}" in pack "${type.pack}": ${problems.join('; ')}`);
+    }
 
     const trees = new Map<string, TreeDef & { pack: string }>();
     for (const pack of ordered) {
@@ -281,6 +291,16 @@ export class Registry {
   ancestry(typeId: string): { root: string; kind: string | null } {
     const type = this.types.get(typeId);
     return { root: type?.base ?? typeId, kind: type?.kind ?? null };
+  }
+
+  /** How many may hold an item at once: Infinity for any number, undefined when it cannot be held. */
+  capacity(item: { type: string; props: Record<string, unknown> }): number | undefined {
+    return capacityOf(this.types.get(item.type)?.capabilities, item.props);
+  }
+
+  /** Every type that has this capability, its own or its parent's. */
+  having(capability: keyof Capabilities): string[] {
+    return [...this.types.values()].filter((t) => t.capabilities[capability] !== undefined).map((t) => t.id);
   }
 
   /** The type and every flavour of it. */
@@ -397,6 +417,7 @@ export class Registry {
         statuses: t.statuses,
         fields: t.fields,
         ...(t.deliverable && { deliverable: true }),
+        ...(Object.keys(t.capabilities).length && { capabilities: t.capabilities }),
       })),
       relations: [...this.relations.values()],
       trees: [...this.trees.values()],

@@ -27,6 +27,7 @@
     },
     {
       "id": "software.feature",
+      "capabilities": { "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Feature",
       "description": "A capability of a product. Built means merged but not yet in a release.",

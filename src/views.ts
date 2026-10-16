@@ -2,6 +2,7 @@
 // blockers are derived from relations every time, so they cannot go stale.
 
 import { lastPushes, repoByName, repoName } from './github.ts';
+import { pastBounds } from './bounds.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { costs } from './costs.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
@@ -24,8 +25,8 @@ interface Brief {
 
 // x is blocked by y when: x depends on something still open; x waits on a
 // person, company or agent to answer or act (until the link is removed); x
-// needs a resource that is unavailable; or x needs an exclusive resource
-// someone else holds (unless it is held for x).
+// needs a resource that is unavailable; or x needs a resource held by
+// others (not for x) as many times as its capacity allows.
 const EDGES = `
   select r.from_id as x, r.to_id as y, 'depends_on' as why
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
@@ -41,14 +42,15 @@ const EDGES = `
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
    where r.type = any($3::text[]) and r.valid_to is null
      and x.is_open and x.archived_at is null and y.status = 'unavailable' and y.archived_at is null
-  union all
-  select n.from_id, n.to_id, 'resource_held'
+`;
+const HELD = `
+  select n.from_id as x, n.to_id as y, 'resource_held' as why, res.type, res.props, count(*)::int as held
     from relation n join entity x on x.id = n.from_id join entity res on res.id = n.to_id
     join ${ACTIVE_HOLDS} h on h.to_id = n.to_id
-   where n.type = any($3::text[]) and n.valid_to is null
+   where n.type = any($1::text[]) and n.valid_to is null
      and x.is_open and x.archived_at is null and res.archived_at is null
-     and coalesce((res.props->>'exclusive')::boolean, true)
      and h.from_id <> n.from_id and coalesce(h.props->>'for', '') <> n.from_id
+   group by n.from_id, n.to_id, res.type, res.props
 `;
 
 class BlockGraph {
@@ -87,7 +89,9 @@ class BlockGraph {
 
 export async function blockGraph(l: Archipelago): Promise<BlockGraph> {
   const { rows } = await l.db.query<Edge>(EDGES, ['depends_on', 'waits_on', 'needs'].map((root) => l.registry.relationFamily(root)));
-  return new BlockGraph(rows);
+  const { rows: held } = await l.db.query<Edge & { type: string; props: Record<string, unknown>; held: number }>(HELD, [l.registry.relationFamily('needs')]);
+  const full = held.filter((h) => h.held >= (l.registry.capacity(h) ?? Infinity)).map(({ x, y, why }) => ({ x, y, why }));
+  return new BlockGraph([...rows, ...full]);
 }
 
 async function briefs(l: Archipelago, ids: Iterable<string>): Promise<Map<string, Brief>> {
@@ -219,13 +223,7 @@ async function changedSince(l: Archipelago, input: { since?: string; limit?: num
 async function atRisk(l: Archipelago, input: { days?: number }) {
   const days = input.days ?? 7;
   const graph = await blockGraph(l);
-  const { rows: due } = await l.db.query<Brief & { overdue: boolean }>(
-    `select id, type, title, status, owner, props->>'due' as due, (props->>'due')::date < current_date as overdue
-     from entity where is_open and archived_at is null and props ? 'due'
-       and (props->>'due')::date <= current_date + $1::int
-     order by props->>'due'`,
-    [days],
-  );
+  const { due, under } = await pastBounds(l, days);
   const { rows: assumptions } = await l.db.query(
     `select x.id, x.type, x.title, x.status, x.owner, h.id as hypothesis, h.title as hypothesis_title
      from relation r join entity x on x.id = r.from_id join entity h on h.id = r.to_id
@@ -235,6 +233,7 @@ async function atRisk(l: Archipelago, input: { days?: number }) {
   return {
     due_within_days: days,
     due_soon_or_overdue: due.map((d) => ({ ...d, blocked: graph.isBlocked(d.id) })),
+    ...(under.length && { under_limit: under.map((d) => ({ ...d, blocked: graph.isBlocked(d.id) })) }),
     resting_on_refuted_hypothesis: assumptions,
   };
 }
@@ -258,7 +257,7 @@ export async function toConfirm(l: Archipelago, input: { limit?: number } = {}) 
      where ev.seq > $1 and ev.action = 'entity.update' and ev.actor not like 'human:%' and coalesce(ev.detail->'authority'->>'who', '') not like 'human:%'
        and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and ev.detail->'changes'->'status'->>'to' = e.status
      order by e.id, ev.seq desc`,
-    [since, [...l.registry.family('decision'), ...l.registry.family('hypothesis')]],
+    [since, l.registry.having('settles')],
   );
   // What an agent settled on its own judgment is what the owner has not seen; what it settled on their word they
   // chose themselves, in chat. The first are listed first, and counted apart.
@@ -374,7 +373,7 @@ async function brief(l: Archipelago, input: { task?: string }) {
     lines.push('', '## Needs');
     for (const n of needs) {
       const holder = held.find((h) => h.to_id === n.id);
-      lines.push(`- ${n.title}: ${n.status}${holder ? `, held by ${holder.title}` : ''}${n.props.exclusive === false ? '' : ' (exclusive: claim it before use, release it after)'}`);
+      lines.push(`- ${n.title}: ${n.status}${holder ? `, held by ${holder.title}` : ''}${l.registry.capacity(n) === Infinity ? '' : ' (exclusive: claim it before use, release it after)'}`);
     }
   }
   if (rules.length) {
@@ -392,7 +391,7 @@ async function brief(l: Archipelago, input: { task?: string }) {
     repo: repo && { ...slim(repo), path: repo.props.path },
     blocked_by: blockedBy,
     root_blockers: roots.map((id) => names.get(id)),
-    needs: needs.map((n) => ({ ...slim(n), exclusive: n.props.exclusive !== false, held_by: held.find((h) => h.to_id === n.id)?.title })),
+    needs: needs.map((n) => ({ ...slim(n), exclusive: l.registry.capacity(n) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
     rules: rules.map(slim),
     text: lines.join('\n'),
   };

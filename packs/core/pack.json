@@ -100,6 +100,7 @@
     },
     {
       "id": "project",
+      "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Project",
       "description": "A body of work with an end.",
@@ -123,6 +124,7 @@
     },
     {
       "id": "task",
+      "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Task",
       "description": "A piece of work someone can do. A commitment is a task with an owed_to relation.",
@@ -143,6 +145,7 @@
     },
     {
       "id": "decision",
+      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner" } },
       "extends": "question",
       "title": "Decision",
       "description": "Something decided, or still open, with its reasoning. The title is the question.",
@@ -157,6 +160,7 @@
     },
     {
       "id": "issue",
+      "capabilities": { "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Issue",
       "description": "A problem or risk observed, separate from the work to fix it.",
@@ -170,6 +174,7 @@
     },
     {
       "id": "hypothesis",
+      "capabilities": { "settles": { "by": "evidence", "whose": "owner" } },
       "extends": "question",
       "title": "Hypothesis",
       "description": "A belief about the world that could be wrong. The title is the statement.",
@@ -189,6 +194,7 @@
     },
     {
       "id": "event",
+      "capabilities": { "when": { "start": "at", "end": "ends" }, "where": { "field": "location" } },
       "extends": "occurrence",
       "title": "Event",
       "description": "Something that happens at a time: a deadline, a launch, an appointment.",
@@ -208,6 +214,7 @@
     },
     {
       "id": "resource",
+      "capabilities": { "capacity": { "field": "exclusive" } },
       "extends": "place",
       "title": "Resource",
       "description": "Something limited or exclusive that work needs: a machine, a licence, a budget, a live app.",
@@ -222,6 +229,7 @@
     },
     {
       "id": "cost",
+      "capabilities": { "when": { "start": "since", "end": "until" } },
       "extends": "occurrence",
       "title": "Cost",
       "description": "Something paid for regularly: hosting, a subscription, a licence, a domain. What agents spend per token is not kept here: it is measured from their runs.",

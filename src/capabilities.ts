@@ -1,0 +1,144 @@
+// Capabilities: what the kernel computes from a type, declared by the type with the field each reads. There are
+// five and packs cannot add a sixth. A flavour inherits its parent's; a sibling does not. Each is checked against
+// the type's own fields when its pack loads, so a capability naming a field the type lacks stops the pack.
+
+import type { FieldDef } from './packs.ts';
+
+/** A field against a limit: a deadline is a bound on a date ({ field: 'due', limit: 'today' }), a reorder level one on a quantity ({ field: 'on_hand', below: 'reorder_at' }). */
+export interface Bound {
+  field: string;
+  limit?: 'today';
+  below?: string;
+}
+
+/** The days a thing repeats on, and the hours it holds on each: the fields that say so. */
+export interface Repeat {
+  from: string;
+  to: string;
+  days?: string;
+  starts?: string;
+  until?: string;
+  skip?: string;
+  moved?: string;
+  /** Days that happened and were recorded on their own: no longer drawn from the repeat. */
+  done?: string;
+}
+
+/** Happens at a time: a moment (at), a span (start and end), or a repeat. */
+export interface When {
+  at?: string;
+  start?: string;
+  end?: string;
+  repeat?: Repeat;
+}
+
+/** Is somewhere: by a field (an address, a name) or by a link to a place. */
+export interface Where {
+  field?: string;
+  link?: string;
+}
+
+/** How many at once: a number field, a boolean field (true for one, false for any number), or a fixed number. */
+export type Capacity = number | { field: string };
+
+/** A question settled by someone's word or by evidence, and whose word it is. */
+export interface Settles {
+  by: 'word' | 'evidence';
+  whose?: 'owner' | 'waits_on';
+}
+
+export interface Capabilities {
+  bound?: Bound;
+  when?: When;
+  where?: Where;
+  capacity?: Capacity;
+  settles?: Settles;
+}
+
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles'] as const;
+
+const DATES = ['date', 'datetime'];
+
+/** Problems with a type's capabilities, given its resolved fields and the relations known. Empty means they hold. */
+export function checkCapabilities(caps: Capabilities, fields: Record<string, FieldDef>, relations: Set<string>): string[] {
+  const problems: string[] = [];
+  const has = (what: string, field: string | undefined, types: string[]) => {
+    if (field === undefined) return;
+    const def = fields[field];
+    if (!def) problems.push(`${what} reads "${field}", which it has no field of`);
+    else if (!types.includes(def.type)) problems.push(`${what} reads "${field}", a ${def.type}, not a ${types.join(' or ')}`);
+  };
+  for (const name of Object.keys(caps)) if (!(CAPABILITIES as readonly string[]).includes(name)) problems.push(`"${name}" is not a capability: one of ${CAPABILITIES.join(', ')}`);
+  const { bound, when, where, capacity, settles } = caps;
+  if (bound) {
+    if (!bound.field) problems.push('bound needs a field');
+    if (bound.limit !== undefined && bound.below !== undefined) problems.push('bound has a limit or a field it stays above, not both');
+    if (bound.limit !== undefined && bound.limit !== 'today') problems.push('bound.limit can only be "today"');
+    has('bound', bound.field, bound.below !== undefined ? ['number'] : DATES);
+    has('bound.below', bound.below, ['number']);
+  }
+  if (when) {
+    if (!when.at && !when.start && !when.repeat) problems.push('when needs at, start or repeat');
+    has('when.at', when.at, DATES);
+    has('when.start', when.start, DATES);
+    has('when.end', when.end, DATES);
+    if (when.repeat) {
+      const r = when.repeat;
+      for (const key of ['from', 'to'] as const) if (!r[key]) problems.push(`when.repeat needs ${key}`);
+      for (const key of ['from', 'to'] as const) has(`when.repeat.${key}`, r[key], ['string']);
+      for (const key of ['starts', 'until'] as const) has(`when.repeat.${key}`, r[key], ['date']);
+      for (const key of ['days', 'skip', 'moved', 'done'] as const) has(`when.repeat.${key}`, r[key], ['json']);
+    }
+  }
+  if (where) {
+    if (Boolean(where.field) === Boolean(where.link)) problems.push('where reads a field or a link, one of them');
+    has('where', where.field, ['string', 'json']);
+    if (where.link && !relations.has(where.link)) problems.push(`where follows "${where.link}", which is no relation`);
+  }
+  if (capacity !== undefined) {
+    if (typeof capacity === 'number') {
+      if (!Number.isInteger(capacity) || capacity < 1) problems.push('capacity is a whole number, one or more');
+    } else has('capacity', capacity.field, ['number', 'boolean']);
+  }
+  if (settles) {
+    if (!['word', 'evidence'].includes(settles.by)) problems.push('settles.by is "word" or "evidence"');
+    if (settles.whose !== undefined && !['owner', 'waits_on'].includes(settles.whose)) problems.push('settles.whose is "owner" or "waits_on"');
+  }
+  return problems;
+}
+
+/** How many may hold one item at once: a number, Infinity for any number, or undefined when it cannot be held. */
+export function capacityOf(caps: Capabilities | undefined, props: Record<string, unknown>): number | undefined {
+  const capacity = caps?.capacity;
+  if (capacity === undefined) return undefined;
+  if (typeof capacity === 'number') return capacity;
+  const value = props[capacity.field];
+  if (typeof value === 'number') return value;
+  return value === false ? Infinity : 1;
+}
+
+/** Hours since midnight from a time of day: 17.5 from "17:30"; undefined for anything else. */
+const clockHours = (t: unknown) => {
+  const m = typeof t === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(t.trim()) : null;
+  const n = m ? Number(m[1]) + Number(m[2]) / 60 : NaN;
+  return n >= 0 && n <= 24 ? n : undefined;
+};
+
+/**
+ * The hours a repeating thing holds on a day, if it falls on it: not before it starts or after it ends, not on a
+ * day skipped or done. `made` is the day it was made, the start when it names none.
+ */
+export function occurs(repeat: Repeat, p: Record<string, unknown>, day: string, made?: string): [number, number] | undefined {
+  const list = (key: string | undefined) => (key && Array.isArray(p[key]) ? (p[key] as unknown[]) : undefined);
+  const days = list(repeat.days)?.length ? list(repeat.days)!.map(Number) : [1, 2, 3, 4, 5, 6, 7];
+  if (!days.includes(new Date(`${day}T12:00:00Z`).getUTCDay() || 7)) return undefined;
+  const text = (key: string | undefined) => (key && typeof p[key] === 'string' ? (p[key] as string) : undefined);
+  const starts = text(repeat.starts) ?? made;
+  const until = text(repeat.until);
+  if ((starts && day < starts) || (until && day > until)) return undefined;
+  if (list(repeat.skip)?.includes(day) || list(repeat.done)?.includes(day)) return undefined;
+  const all = repeat.moved ? p[repeat.moved] : undefined;
+  const moved = all && typeof all === 'object' ? (all as Record<string, unknown>)[day] : undefined;
+  const [a, b] = Array.isArray(moved) ? moved.map(clockHours) : [clockHours(p[repeat.from]), clockHours(p[repeat.to])];
+  return a !== undefined && b !== undefined && b > a ? [a, b] : undefined;
+}

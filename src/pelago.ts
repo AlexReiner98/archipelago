@@ -315,8 +315,8 @@ export class Archipelago {
       }
     }
     if (actor.kind !== 'human') {
-      const decisions = new Set(this.registry.family('decision'));
-      const questions = new Set([...decisions, ...this.registry.family('hypothesis')]);
+      const questions = new Set(this.registry.having('settles'));
+      const decisions = new Set([...questions].filter((t) => this.registry.type(t)!.capabilities.settles!.by === 'word'));
       for (const [i, op] of input.ops.entries()) {
         if (op.op !== 'update' || !op.status || levels[i] !== 'auto') continue;
         const e = await this.entity(op.id);
@@ -780,7 +780,7 @@ export class Archipelago {
   async claim(actor: Actor, input: { resource: string; holder: string; for?: string; reason: string }) {
     return this.db.transaction(async (tx) => {
       const resource = await this.entity(input.resource, tx);
-      if (!resource || !this.registry.isA(resource.type, 'resource')) throw new Error(`"${input.resource}" is not a resource`);
+      if (!resource || !this.registry.capacity(resource)) throw new Error(`"${input.resource}" is not a resource: nothing of its type can be held`);
       const holder = await this.entity(input.holder, tx);
       if (!holder) throw new Error(`No entity "${input.holder}" to hold it`);
       if (input.for && !(await this.entity(input.for, tx))) throw new Error(`No entity "${input.for}"`);
@@ -792,7 +792,7 @@ export class Archipelago {
       );
       const mine = held.find((h) => h.from_id === holder.id);
       if (mine) return { status: 'already_held' as const, relation: mine.id };
-      if (resource.props.exclusive !== false && held.length) {
+      if (held.length >= this.registry.capacity(resource)!) {
         const h = held[0];
         throw new Error(`"${resource.title}" is held by "${h.title}" (${h.from_id}) since ${h.valid_from.toISOString()}. It must be released first.`);
       }

@@ -2505,7 +2505,7 @@ test('planned time counts toward nothing and is never invoiced until the owner c
 });
 
 test('a routine is drawn on the days it falls on; one for work waits to be confirmed day by day, by a person', async () => {
-  const { occurs, today } = await import('../src/time.ts');
+  const [{ today }, { occurs: falls }] = [await import('../src/time.ts'), await import('../src/capabilities.ts')], occurs = (p: Record<string, unknown>, day: string) => falls({ from: 'from_time', to: 'to_time', days: 'days', starts: 'starts', skip: 'skip', moved: 'moved' }, p, day);
   // Wednesday 14 October 2026 is a 3; Saturday the 17th a 6.
   const dinner = { from_time: '17:00', to_time: '19:00' };
   assert.deepEqual(occurs(dinner, '2026-10-14'), [17, 19], 'every day when no days are given');
