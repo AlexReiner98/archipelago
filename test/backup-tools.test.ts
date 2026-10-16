@@ -5,6 +5,7 @@ import { after, test } from 'node:test';
 import { parseBackup } from '../src/backup.ts';
 import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
+import { configureOutbox } from '../src/outbox.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
@@ -45,4 +46,12 @@ test('an agent downloads a backup only once the owner allows it', async () => {
   assert.ok(takeBackup(made.path.replace('/backup-file/', '')));
   const logged = (await l.db.query<{ actor: string }>(`select actor from event where action = 'workspace.backup_download'`)).rows;
   assert.equal(logged.length, 1, 'the owner can see that an agent took one');
+});
+
+test("an agent's own view of the map reads whether the owner allows it a backup", async () => {
+  const whole = await map();
+  configureOutbox(async () => whole);
+  await callTool(whole.as('e_owner', true), owner, 'workspace_set', { agent_backups: true });
+  const made = (await callTool(whole.as('e_agentx'), agent, 'backup_download', {})) as Made;
+  assert.ok(takeBackup(made.path.replace('/backup-file/', '')), 'a member reads the setting, as an agent token does');
 });
