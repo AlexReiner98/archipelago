@@ -367,6 +367,14 @@
     { "id": "supersedes", "root": true, "title": "supersedes", "inverse": "is superseded by", "from": ["*"], "to": ["*"], "description": "Replaces an older version." },
     { "id": "relates_to", "root": true, "title": "relates to", "inverse": "relates to", "from": ["*"], "to": ["*"], "description": "A loose link. Prefer a specific relation when one fits." }
   ],
+  "verbs": [
+    { "id": "capture", "title": "Capture", "description": "Put something on the map: an item and its links, or a record of what happened." },
+    { "id": "assign", "title": "Assign", "description": "Give work to someone, inside the map or outside it: an owner, a person waited on, a party asked to act." },
+    { "id": "report", "title": "Report", "description": "Say that something happened or is so: progress, a result, a payment received, a check that it is still true." },
+    { "id": "ask", "title": "Ask", "description": "Put a question to someone and wait for the answer." },
+    { "id": "settle", "title": "Settle", "description": "Close a question by someone's word or by evidence: a decision made, a hypothesis borne out." },
+    { "id": "revise", "title": "Revise", "description": "Change, correct or undo what is on the map." }
+  ],
   "rules": [
     { "id": "code_runs", "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code"] }, "then": "hold", "say": "Code that runs in the browser of whoever looks is the human's to allow." },
     { "id": "styles_merge", "when": { "actor": "agent", "op": "merge", "type": "style" }, "then": "hold", "say": "Folding one style into another can bring its code along: the human's to allow." },

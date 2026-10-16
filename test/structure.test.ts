@@ -58,7 +58,7 @@ const LONG_FILES: Record<string, number> = {
   'test/pelago.test.ts': 2604,
   'test/platform.test.ts': 1667,
   'src/views.ts': 1316,
-  'src/tools.ts': 1181,
+  'src/tools.ts': 1127,
   'src/pelago.ts': 1113,
   'ui/style.css': 891,
   'src/server.ts': 713,

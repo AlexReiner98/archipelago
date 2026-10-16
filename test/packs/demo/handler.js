@@ -16,6 +16,11 @@ export default {
       reason: `Plan a visit to ${input.site} for "${task.title}"`,
     };
   },
+  // The visits planned to a site.
+  async 'demo.visits'(input, ctx) {
+    const visits = await ctx.read({ items: { type: 'demo.visit', where: { site: input.site } } });
+    return { answer: visits.map((v) => v.title) };
+  },
   // Never ends.
   async 'demo.spin'() {
     for (;;);

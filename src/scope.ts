@@ -7,6 +7,7 @@
 // read are named, and anything else is refused.
 
 import { repoByName, repoName } from './github.ts';
+import { packTool } from './packtools.ts';
 import type { Actor, Archipelago, Op } from './pelago.ts';
 import { resolveRun } from './sessions.ts';
 import { repoScope } from './views.ts';
@@ -116,11 +117,11 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
     }
     default:
       // Everything else is refused unless it only reads: a tool added later is not open to a limited token until it is named here.
-      if (!READS.includes(tool)) refuse(`It cannot call ${tool}.`);
+      if (!READS.includes(tool) && !packTool(l.registry, tool)?.reads) refuse(`It cannot call ${tool}.`);
   }
 }
 
-/** What a limited token may call that changes nothing in the map: reading it, listening for the owner, pointing their screen. */
+/** Kernel tools a limited token may call that change nothing in the map: reading it, listening for the owner, pointing their screen. A pack's views are reads too. */
 const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show', 'document', 'timesheet'];
 
 /** The tests of some work: those in it, and those that help answer a proof question in it. */

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { createShare, listShares, readDocument, revokeShare } from './documents.ts';
-import { draftInvoice, logTime, payInvoice, timesheet, voidInvoice, week } from './time.ts';
+import { TIME_TOOLS } from './time-tools.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -15,7 +15,8 @@ import { hasReaderKey, readable, READER_MODEL, recheck, setReaderKey } from './r
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
-import type { TypeDef } from './packs.ts';
+import type { Registry, TypeDef } from './packs.ts';
+import { packTool, packTools } from './packtools.ts';
 import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { undo } from './undo.ts';
@@ -882,65 +883,7 @@ export const TOOLS: Record<string, Tool> = {
     input: { id: z.string() },
     run: async (l, _actor, input) => readDocument(l, input.id),
   },
-  time_log: {
-    description:
-      'Record time spent on a piece of work: how many hours, on which day (today unless given, in Toronto), what was done in a few words, and a note if there is more to say. ' +
-      'Or a block, with start and end in place of hours: the hours are the time between, and the day is the day it began. ' +
-      'planned: true sets the time aside without saying it was worked: it counts toward nothing and is not invoiced until the owner confirms it. ' +
-      'work is the id of the project, task or client it was for; the client billed is the company that work, or what it sits in, involves. Search for the work first. Say what you logged back to the person, with the client.',
-    input: {
-      work: z.string().describe('Id of the project, task or client company the time was for.'),
-      hours: z.number().optional().describe('Hours spent, e.g. 1.5. Needed unless start and end are given.'),
-      start: z.string().optional().describe('When the block began, as a date-time with its offset, e.g. 2026-10-15T09:30:00-04:00.'),
-      end: z.string().optional().describe('When the block ended.'),
-      what: z.string().min(1).max(60).describe('What was done, in a few words: the entry’s title.'),
-      note: z.string().optional().describe('More about the work, if there is more to say.'),
-      date: z.string().optional().describe('The day, as 2026-10-15. Today when left out.'),
-      billable: z.boolean().optional().describe('false for time that is not to be invoiced.'),
-      rate: z.number().optional().describe('An hourly rate for this entry only, when it is not the client’s.'),
-      planned: z.boolean().optional().describe('true for time set aside ahead, not yet worked.'),
-    },
-    run: async (l, actor, input) => logTime(l, actor, input),
-  },
-  timesheet: {
-    description: 'Time logged over a span of days, by day and by client; what is logged but not yet invoiced, by client; and invoices not yet paid (invoices: outstanding, overdue with how many days, drafts, owed_total). This week (Monday to Sunday) unless from and to are given.',
-    input: { from: z.string().optional().describe('The first day, as 2026-10-01.'), to: z.string().optional().describe('The last day.') },
-    run: async (l, _actor, input) => timesheet(l, input),
-  },
-  week: {
-    description:
-      'A week as a calendar, Monday to Sunday (this week unless from is given): for each day, the owner’s blocks (owner: time entries, with start and end where they were logged as blocks, else hours alone) and the agents’ lanes (agents: one list per agent at work at once, each block a session, or the part of one spent on one piece of work). ' +
-      'Every block has from_hour and to_hour (hours since that day’s midnight in Toronto), hours, the work and the project it counts toward; projects lists them in the order the page colours them. ' +
-      'An owner block with status planned is time set aside: a day’s hours leave it out and planned counts it. to_confirm lists planned time whose end has passed, in any week, for the owner to confirm (status logged), as planned or as it happened, or drop. Only a person can confirm it: an agent that tries is refused.',
-    input: { from: z.string().optional().describe('Any day in the week, or its Monday, as 2026-10-12.') },
-    run: async (l, _actor, input) => week(l, input),
-  },
-  invoice_draft: {
-    description:
-      'Draft an invoice to a client company for its billable time not yet invoiced, up to a day (today unless given). The client says who bills it (billed_by), its rate, terms_days, currency and whether HST is charged (hst). ' +
-      'The invoice is a document, part of the client, numbered INV-<year>-<n> for its biller; its entries are marked invoiced. It stays a draft until the owner sends it; invoice_void undoes it.',
-    input: {
-      client: z.string().describe('Id of the client company.'),
-      from: z.string().optional().describe('Only time from this day, as 2026-10-01.'),
-      to: z.string().optional().describe('Only time up to this day. Today when left out.'),
-    },
-    run: async (l, actor, input) => draftInvoice(l, actor, input),
-  },
-  invoice_paid: {
-    description: 'Record a payment received on an invoice: the day (today unless given), the amount (all that is still owed unless given) and how it came (e-Transfer, EFT, cheque, card). Paid in full, the invoice closes as paid; a part-payment leaves it open with what is still owed. Record what the owner says came in.',
-    input: {
-      id: z.string().describe('The invoice.'),
-      amount: z.number().optional().describe('What was received. All that is still owed when left out.'),
-      date: z.string().optional().describe('The day it was received, as 2026-10-15. Today when left out.'),
-      method: z.string().optional().describe('How it came, e.g. e-Transfer, EFT, cheque.'),
-    },
-    run: async (l, actor, input) => payInvoice(l, actor, input),
-  },
-  invoice_void: {
-    description: 'Void an invoice: it is kept, marked void, and its time entries go back to being logged, to be invoiced again.',
-    input: { id: z.string().describe('The invoice.'), reason: z.string().optional() },
-    run: async (l, actor, input) => voidInvoice(l, actor, input),
-  },
+  ...TIME_TOOLS,
   share_create: {
     description: 'Make a link that lets someone with no login read one document and the items it brings in. The link is shown once.',
     humanOnly: true,
@@ -1165,10 +1108,13 @@ export const TOOLS: Record<string, Tool> = {
   },
 };
 
+/** Every tool offered in a workspace: the kernel's, then those its packs declare (a kernel tool's name wins). */
+export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(TOOLS).filter(([t]) => reg.offers(t)), ...packTools(reg).filter(([t]) => !TOOLS[t])];
+
 /** Validate input and run a tool. */
 export async function callTool(l: Archipelago, actor: Actor, name: string, input: unknown): Promise<unknown> {
-  const tool = TOOLS[name];
-  if (!tool || !l.registry.offers(name)) throw new Error(`No tool "${name}". Tools: ${Object.keys(TOOLS).filter((t) => l.registry.offers(t)).join(', ')}`);
+  const tool: Tool | undefined = l.registry.offers(name) ? (TOOLS[name] ?? packTool(l.registry, name)) : undefined;
+  if (!tool) throw new Error(`No tool "${name}". Tools: ${toolsFor(l.registry).map(([t]) => t).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
   const parsed = z.strictObject(tool.input).safeParse(input ?? {});

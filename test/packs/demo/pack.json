@@ -3,8 +3,68 @@
   "version": "0.1.0",
   "title": "Demo",
   "description": "A pack for testing the pack host: one action that reads and writes, one that overruns, one that reaches outside its folder.",
-  "requires": ["core"],
+  "requires": [
+    "core"
+  ],
   "types": [
-    { "id": "demo.visit", "title": "Visit", "description": "A visit to a site.", "extends": "occurrence", "fields": { "site": { "type": "string" } } }
+    {
+      "id": "demo.visit",
+      "title": "Visit",
+      "description": "A visit to a site.",
+      "extends": "occurrence",
+      "fields": {
+        "site": {
+          "type": "string"
+        }
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "demo.plan_visit",
+      "title": "Plan a visit",
+      "description": "Plan a visit to a site for a task: a demo.visit, part of the task.",
+      "verb": "capture",
+      "on": [
+        "work"
+      ],
+      "input": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "The task."
+          },
+          "site": {
+            "type": "string",
+            "description": "Where."
+          }
+        },
+        "required": [
+          "task",
+          "site"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "demo.visits",
+      "description": "The visits planned to a site.",
+      "shape": "data",
+      "input": {
+        "type": "object",
+        "properties": {
+          "site": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "site"
+        ],
+        "additionalProperties": false
+      }
+    }
   ]
 }

@@ -5,6 +5,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
+import { checkDeclared, KERNEL_VERBS, toolName, type ActionDef, type VerbDef, type ViewDef } from './declared.ts';
+import { checkValue } from './fields.ts';
 import { PACK_TOOLS } from './pack-tools.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 
@@ -87,6 +89,11 @@ export interface PackFile {
   trees?: TreeDef[];
   /** What tightens writes to the map: holds, refusals, required fields, unique values. */
   rules?: RuleDef[];
+  /** The kernel's six verbs, declared by the core pack. */
+  verbs?: VerbDef[];
+  /** What agents and people can do and read through it, run by its handler. */
+  actions?: ActionDef[];
+  views?: ViewDef[];
   /** Extra fields a pack adds to types owned by another pack. */
   extend?: Record<string, { fields: Record<string, FieldDef> }>;
 }
@@ -130,6 +137,9 @@ export class Registry {
   relations = new Map<string, ResolvedRelation>();
   trees = new Map<string, TreeDef & { pack: string }>();
   rules: (RuleDef & { pack: string })[] = [];
+  verbs: VerbDef[] = [];
+  /** Each pack's actions and views by the tool name they are offered as. */
+  tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
@@ -271,7 +281,14 @@ export class Registry {
       }
     }
 
+    const verbs = ordered.flatMap((pack) => pack.verbs ?? []);
+    const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
+      const folder = pack.id === LOCAL_PACK && this.localDir ? this.localDir : join(this.dir, pack.id);
+      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), existsSync(join(folder, 'handler.js')));
+      if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
+      for (const def of pack.actions ?? []) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
+      for (const def of pack.views ?? []) tools.set(toolName(def.id), { pack: pack.id, call: 'view', def });
       const problems = checkRules(pack.rules ?? [], { types });
       if (problems.length) throw new Error(`Pack "${pack.id}": ${problems.join('; ')}`);
     }
@@ -281,6 +298,8 @@ export class Registry {
     this.types = types;
     this.relations = relations;
     this.trees = trees;
+    this.verbs = verbs;
+    this.tools = tools;
     this.keep(this.kept);
   }
 
@@ -453,33 +472,8 @@ export class Registry {
       })),
       relations: [...this.relations.values()],
       trees: [...this.trees.values()],
+      verbs: this.verbs.map((v) => ({ ...v, kernel_tools: Object.keys(KERNEL_VERBS).filter((t) => KERNEL_VERBS[t] === v.id) })),
+      pack_tools: [...this.tools].map(([tool, { pack, call, def }]) => ({ tool, pack, [call]: def.id, ...('verb' in def && { verb: def.verb }) })),
     };
-  }
-}
-
-function checkValue(field: FieldDef, value: unknown): string | undefined {
-  switch (field.type) {
-    case 'string':
-      return typeof value === 'string' ? undefined : 'must be a string';
-    case 'number':
-      return typeof value === 'number' && Number.isFinite(value) ? undefined : 'must be a number';
-    case 'boolean':
-      return typeof value === 'boolean' ? undefined : 'must be true or false';
-    case 'date':
-      return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
-        ? undefined
-        : 'must be a date like 2026-10-07';
-    case 'datetime':
-      return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value))
-        ? undefined
-        : 'must be an ISO date-time like 2026-10-07T14:00:00Z';
-    case 'url':
-      return typeof value === 'string' && URL.canParse(value) ? undefined : 'must be a URL';
-    case 'enum':
-      return typeof value === 'string' && (field.values ?? []).includes(value)
-        ? undefined
-        : `must be one of: ${(field.values ?? []).join(', ')}`;
-    case 'json':
-      return undefined;
   }
 }

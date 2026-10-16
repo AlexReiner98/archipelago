@@ -52,7 +52,7 @@ import { publicPage, publicPicture } from './public.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
-import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
+import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, toolsFor } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 const actorField = {
@@ -79,8 +79,8 @@ export function lenient<T extends z.ZodType>(schema: T) {
 
 function buildMcp(pelago: Archipelago, actorFor: (label?: string) => Actor): McpServer {
   const mcp = new McpServer({ name: 'pelago', version: '0.1.0' });
-  for (const [name, tool] of Object.entries(TOOLS)) {
-    if (tool.humanOnly || (tool.devOnly && !devMode()) || !pelago.registry.offers(name)) continue;
+  for (const [name, tool] of toolsFor(pelago.registry)) {
+    if (tool.humanOnly || (tool.devOnly && !devMode())) continue;
     const inputSchema = { ...Object.fromEntries(Object.entries(tool.input).map(([key, schema]) => [key, lenient(schema as z.ZodType)])), ...actorField };
     mcp.registerTool(name, { description: tool.description, inputSchema }, async (args: Record<string, unknown>) => {
       const { actor, ...input } = args;
