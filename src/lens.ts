@@ -362,7 +362,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     // Brought in: whatever a link ties to the start itself, and what blocks or is blocked by anything inside it.
     // Not every neighbour of everything inside: a project's picture is not its whole surroundings.
     for (const r of live) {
-      if (!along(r.type) || !(r.from_id === asked.from || r.to_id === asked.from || WAITS.includes(r.type))) continue;
+      if (!along(r.type) || !(r.from_id === asked.from || r.to_id === asked.from || WAITS.includes(l.registry.relations.get(r.type)?.root ?? r.type))) continue;
       if (tree.has(r.from_id)) sent.add(r.to_id);
       // Not what is inside one of them, though: that is what `far` cut.
       if (tree.has(r.to_id) && r.type !== asked.by) sent.add(r.from_id);
@@ -503,7 +503,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
       return {
         id,
         type: e.type,
-        root: l.registry.type(e.type)?.lineage.at(-1) ?? e.type,
+        ...l.registry.ancestry(e.type),
         title: e.title,
         status: e.status,
         open: e.is_open,

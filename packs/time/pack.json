@@ -7,6 +7,7 @@
   "types": [
     {
       "id": "time.entry",
+      "extends": "occurrence",
       "title": "Time entry",
       "description": "Time spent on one piece of work on one day, as hours or as a block from a start to an end. A planned block is time set aside, not yet worked: it counts toward nothing and is never invoiced until the owner confirms it (logged). The title says what was done in a few words; the note says more. Make it part of the work it was for (a project or task); the client is the company that work involves.",
       "statuses": { "open": ["logged", "planned"], "closed": ["invoiced", "void"] },
@@ -21,6 +22,7 @@
     },
     {
       "id": "time.routine",
+      "extends": "occurrence",
       "title": "Routine",
       "description": "A block that repeats: the same hours on the same days of the week, like dinner from 17:00 to 19:00 every day. Nothing is stored for a day: the calendar draws it where it falls. Made part of a piece of work, each day it falls on is planned time for that work, which the owner confirms as it happened; one that is part of nothing only holds the time.",
       "statuses": { "open": ["active"], "closed": ["ended"] },
@@ -61,7 +63,7 @@
     }
   ],
   "relations": [
-    { "id": "time.bills", "title": "bills", "inverse": "is billed on", "from": ["time.invoice"], "to": ["time.entry"], "description": "The invoice bills this time entry." }
+    { "id": "time.bills", "extends": "relates_to", "title": "bills", "inverse": "is billed on", "from": ["time.invoice"], "to": ["time.entry"], "description": "The invoice bills this time entry." }
   ],
   "extend": {
     "company": {

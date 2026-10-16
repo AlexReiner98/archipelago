@@ -97,8 +97,8 @@ export async function sessionStart(
   if (task) {
     const { rows: needed } = await l.db.query<Entity>(
       `select res.* from relation n join entity res on res.id = n.to_id
-       where n.type = 'needs' and n.from_id = $1 and n.valid_to is null and res.archived_at is null`,
-      [task.id],
+       where n.type = any($2::text[]) and n.from_id = $1 and n.valid_to is null and res.archived_at is null`,
+      [task.id, l.registry.relationFamily('needs')],
     );
     for (const res of needed) {
       try {

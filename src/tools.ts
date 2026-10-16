@@ -95,7 +95,7 @@ const op = z.discriminatedUnion('op', [
       id: z.string().describe('Must look like "local.my_type".'),
       title: z.string(),
       description: z.string(),
-      extends: z.string().optional().describe('Make this a flavour of an existing type; it inherits fields and statuses.'),
+      extends: z.string().optional().describe('Needed: one of the seven kinds (actor, aim, work, question, record, occurrence, place) or a type of one; it inherits fields, statuses and the kind.'),
       statuses: z.object({ open: z.array(z.string()).min(1), closed: z.array(z.string()) }).optional(),
       fields: z.record(z.string(), field).optional(),
       deliverable: z.boolean().optional().describe('true when it is made for a reader or a customer, like a document or a release: what it is part of names it under its title.'),

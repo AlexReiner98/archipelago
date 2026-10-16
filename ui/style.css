@@ -235,7 +235,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 /* A lens, drawn in a style. What a style may change is a variable here: its colours and sizes come from the page (dress in app.js). */
 .lens-view {
   --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
-  --ln-blocked: var(--g-blocked); --ln-you: var(--g-problems); --ln-session: var(--accent); --ln-done: var(--ok);
+  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok);
   --ln-text-size: 13px; --ln-radius-size: 8px; --ln-gap-size: 8px; --ln-column-size: 270px;
 }
 .lens-card { overflow: hidden; }
@@ -369,9 +369,9 @@ a.lg-row:hover { text-decoration: underline; }
 .rm-link.other { stroke-dasharray: 2 4; }
 .g-node { cursor: grab; }
 .g-node .stripe { fill: var(--g-system); }
-.g-node.group-people .stripe { fill: var(--g-people); } .g-node.group-work .stripe { fill: var(--g-work); }
-.g-node.group-knowledge .stripe { fill: var(--g-knowledge); } .g-node.group-problems .stripe { fill: var(--g-problems); }
-.g-node.group-time .stripe { fill: var(--g-time); } .g-node.group-resources .stripe { fill: var(--g-resources); }
+.g-node.group-actor .stripe { fill: var(--g-actor); } .g-node.group-work .stripe { fill: var(--g-work); } .g-node.group-aim .stripe { fill: var(--g-aim); }
+.g-node.group-record .stripe { fill: var(--g-record); } .g-node.group-question .stripe { fill: var(--g-question); }
+.g-node.group-occurrence .stripe { fill: var(--g-occurrence); } .g-node.group-place .stripe { fill: var(--g-place); }
 .g-node.root .box { stroke-width: 2; }
 /* Under the pointer a box is a little brighter; nothing else changes. */
 .g-node:hover { filter: brightness(1.2); }
@@ -528,17 +528,17 @@ textarea { resize: vertical; }
 .form .actions { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
 .row-sub.error { color: var(--bad); }
 
-/* Graph. Group colours are the dataviz reference palette, slots 1-7, validated
+/* Graph. Group colours (one per kind) are the dataviz reference palette, slots 1-7, aim added, validated
    for colour-blind separation on these surfaces in each theme. */
 :root {
-  --g-people: #2a78d6; --g-work: #eb6834; --g-knowledge: #1baf7a; --g-problems: #eda100;
-  --g-time: #e87ba4; --g-resources: #008300; --g-system: #4a3aa7; --g-blocked: #d03b3b;
+  --g-actor: #2a78d6; --g-aim: #9a6a2f; --g-work: #eb6834; --g-record: #1baf7a; --g-question: #eda100;
+  --g-occurrence: #e87ba4; --g-place: #008300; --g-system: #4a3aa7; --g-blocked: #d03b3b;
   --edge: #b9b5aa; --edge-strong: #5f5c55;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --g-people: #3987e5; --g-work: #d95926; --g-knowledge: #199e70; --g-problems: #c98500;
-    --g-time: #d55181; --g-resources: #008300; --g-system: #9085e9; --g-blocked: #d03b3b;
+    --g-actor: #3987e5; --g-aim: #b8864b; --g-work: #d95926; --g-record: #199e70; --g-question: #c98500;
+    --g-occurrence: #d55181; --g-place: #008300; --g-system: #9085e9; --g-blocked: #d03b3b;
     --edge: #55534c; --edge-strong: #b5b2a8;
   }
 }
@@ -557,17 +557,17 @@ svg.graph .label { font-size: calc(12.5px / var(--k, 1)); fill: var(--text); pai
 svg.graph .label.quiet { display: none; }
 svg.graph .node.near .label.quiet { display: block; }
 svg.graph .dim { opacity: 0.18; }
-.group-people .dot, .swatch.group-people { fill: var(--g-people); background: var(--g-people); }
+.group-actor .dot, .swatch.group-actor { fill: var(--g-actor); background: var(--g-actor); } .group-aim .dot, .swatch.group-aim { fill: var(--g-aim); background: var(--g-aim); }
 .group-work .dot, .swatch.group-work { fill: var(--g-work); background: var(--g-work); }
-.group-knowledge .dot, .swatch.group-knowledge { fill: var(--g-knowledge); background: var(--g-knowledge); }
-.group-problems .dot, .swatch.group-problems { fill: var(--g-problems); background: var(--g-problems); }
-.group-time .dot, .swatch.group-time { fill: var(--g-time); background: var(--g-time); }
-.group-resources .dot, .swatch.group-resources { fill: var(--g-resources); background: var(--g-resources); }
+.group-record .dot, .swatch.group-record { fill: var(--g-record); background: var(--g-record); }
+.group-question .dot, .swatch.group-question { fill: var(--g-question); background: var(--g-question); }
+.group-occurrence .dot, .swatch.group-occurrence { fill: var(--g-occurrence); background: var(--g-occurrence); }
+.group-place .dot, .swatch.group-place { fill: var(--g-place); background: var(--g-place); }
 .group-system .dot, .swatch.group-system { fill: var(--g-system); background: var(--g-system); }
-.closed.group-people .dot { stroke: var(--g-people); } .closed.group-work .dot { stroke: var(--g-work); }
-.closed.group-knowledge .dot { stroke: var(--g-knowledge); } .closed.group-problems .dot { stroke: var(--g-problems); }
-.closed.group-time .dot { stroke: var(--g-time); } .closed.group-resources .dot { stroke: var(--g-resources); }
-.closed.group-system .dot { stroke: var(--g-system); }
+.closed.group-actor .dot { stroke: var(--g-actor); } .closed.group-work .dot { stroke: var(--g-work); }
+.closed.group-record .dot { stroke: var(--g-record); } .closed.group-question .dot { stroke: var(--g-question); }
+.closed.group-occurrence .dot { stroke: var(--g-occurrence); } .closed.group-place .dot { stroke: var(--g-place); }
+.closed.group-system .dot { stroke: var(--g-system); } .closed.group-aim .dot { stroke: var(--g-aim); }
 .graph-tip { position: absolute; max-width: 250px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); pointer-events: none; display: grid; gap: 4px; z-index: 2; }
 .graph-tip[hidden] { display: none; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }

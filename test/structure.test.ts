@@ -54,7 +54,7 @@ const count = (files: string[], pattern: RegExp) =>
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
-  'ui/app.js': 5126,
+  'ui/app.js': 5121,
   'test/pelago.test.ts': 2604,
   'test/platform.test.ts': 1667,
   'src/views.ts': 1317,
@@ -74,8 +74,8 @@ test(`no file is over ${MAX_LINES} lines`, () => {
 
 // 2. The kernel never names a pack's types or relations: it works from kinds and capabilities.
 const NAMES_PACKS: Record<string, number> = {
-  'ui/app.js': 26,
-  'src/views.ts': 19,
+  'ui/app.js': 20,
+  'src/views.ts': 18,
   'src/time.ts': 15,
   'src/proof.ts': 12,
   'src/demo.ts': 10,

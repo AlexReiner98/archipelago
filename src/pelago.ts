@@ -428,7 +428,7 @@ export class Archipelago {
             if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
             refs.set(op.ref, op.type);
           }
-          const root = type.lineage.at(-1)!;
+          const root = type.base;
           const key = `${root}\n${op.title.trim().toLowerCase()}`;
           if (seen.has(key)) warnings.push(`${where}: "${op.title}" appears more than once in this change`);
           seen.add(key);
@@ -521,7 +521,7 @@ export class Archipelago {
 
     for (const [i, op] of ops.entries()) {
       const where = `op ${i + 1} (${op.op})`;
-      if (op.op === 'link' && BLOCKING_RELATIONS.includes(op.type)) {
+      if (op.op === 'link' && BLOCKING_RELATIONS.includes(this.registry.relations.get(op.type)?.root ?? op.type)) {
         const [from, to] = [await lookup(op.from), await lookup(op.to)];
         if (to.private && !from.private) problems.push(`${where}: ${name(op.from)} is shared, so it cannot depend on ${name(op.to)}, which is private. Share ${name(op.to)}, or make ${name(op.from)} private too.`);
       }
@@ -537,7 +537,7 @@ export class Archipelago {
         const { rows: seen } = await this.db.query<{ id: string; title: string }>(
           `select s.id, s.title from relation r join entity s on s.id = r.from_id
            where r.to_id = $1 and r.valid_to is null and r.type = any($2::text[]) and s.archived_at is null and s.private_to is null`,
-          [op.id, BLOCKING_RELATIONS],
+          [op.id, this.registry.relationFamily(...BLOCKING_RELATIONS)],
         );
         const { rows: all } = await this.db.query<{ n: number }>(`select pelago_external_dependents($1, $2) as n`, [op.id, this.viewer]);
         const staying = seen.filter((s) => after.get(s.id) !== true);
@@ -552,7 +552,7 @@ export class Archipelago {
         const { rows: targets } = await this.db.query<{ id: string; title: string }>(
           `select t.id, t.title from relation r join entity t on t.id = r.to_id
            where r.from_id = $1 and r.valid_to is null and r.type = any($2::text[]) and t.archived_at is null and t.private_to is not null`,
-          [op.id, BLOCKING_RELATIONS],
+          [op.id, this.registry.relationFamily(...BLOCKING_RELATIONS)],
         );
         const stillPrivate = targets.filter((t) => after.get(t.id) !== false);
         if (stillPrivate.length) problems.push(`${where}: ${name(op.id)} cannot be shared while it depends on private items: ${stillPrivate.map((t) => `"${t.title}"`).join(', ')}. Share those in the same change.`);

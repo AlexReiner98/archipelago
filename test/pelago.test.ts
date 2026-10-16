@@ -63,7 +63,7 @@ test('a database made while this was called Lattice is opened under the new name
 test('flavours inherit fields and statuses, and are found through the parent', async () => {
   const l = await fresh();
   const bug = l.registry.type('software.bug')!;
-  assert.deepEqual(bug.lineage, ['software.bug', 'issue']);
+  assert.deepEqual(bug.lineage, ['software.bug', 'issue', 'work']);
   assert.ok(bug.fields.severity, 'inherits issue.severity');
   assert.ok(bug.fields.repro, 'adds its own field');
   assert.deepEqual(bug.statuses, l.registry.type('issue')!.statuses);
@@ -307,7 +307,7 @@ test('an approved type proposal becomes a flavour in the local pack', async () =
   assert.equal(proposed.status, 'proposed');
   assert.equal(l.registry.type('local.site_visit'), undefined);
   await l.decide(human, { proposal: (proposed as { proposal: string }).proposal, approve: true });
-  assert.deepEqual(l.registry.type('local.site_visit')!.lineage, ['local.site_visit', 'event']);
+  assert.deepEqual(l.registry.type('local.site_visit')!.lineage, ['local.site_visit', 'event', 'occurrence']);
   await make(l, [{ op: 'create', type: 'local.site_visit', title: 'Snowdon', props: { address: '1 High St', at: '2026-11-01T10:00:00Z' } }]);
   assert.equal((await l.search({ type: 'event' })).length, 1);
   await assert.rejects(make(l, [{ op: 'define_type', type: { id: 'thing', title: 'T', description: '' } }]), /must look like "local.my_type"/);

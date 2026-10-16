@@ -29,23 +29,23 @@ interface Brief {
 const EDGES = `
   select r.from_id as x, r.to_id as y, 'depends_on' as why
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
-   where r.type = 'depends_on' and r.valid_to is null
+   where r.type = any($1::text[]) and r.valid_to is null
      and x.is_open and x.archived_at is null and y.is_open and y.archived_at is null
   union all
   select r.from_id, r.to_id, 'waits_on'
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
-   where r.type = 'waits_on' and r.valid_to is null
+   where r.type = any($2::text[]) and r.valid_to is null
      and x.is_open and x.archived_at is null and y.archived_at is null
   union all
   select r.from_id, r.to_id, 'resource_unavailable'
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
-   where r.type = 'needs' and r.valid_to is null
+   where r.type = any($3::text[]) and r.valid_to is null
      and x.is_open and x.archived_at is null and y.status = 'unavailable' and y.archived_at is null
   union all
   select n.from_id, n.to_id, 'resource_held'
     from relation n join entity x on x.id = n.from_id join entity res on res.id = n.to_id
     join ${ACTIVE_HOLDS} h on h.to_id = n.to_id
-   where n.type = 'needs' and n.valid_to is null
+   where n.type = any($3::text[]) and n.valid_to is null
      and x.is_open and x.archived_at is null and res.archived_at is null
      and coalesce((res.props->>'exclusive')::boolean, true)
      and h.from_id <> n.from_id and coalesce(h.props->>'for', '') <> n.from_id
@@ -86,7 +86,7 @@ class BlockGraph {
 }
 
 export async function blockGraph(l: Archipelago): Promise<BlockGraph> {
-  const { rows } = await l.db.query<Edge>(EDGES);
+  const { rows } = await l.db.query<Edge>(EDGES, ['depends_on', 'waits_on', 'needs'].map((root) => l.registry.relationFamily(root)));
   return new BlockGraph(rows);
 }
 
@@ -155,9 +155,9 @@ async function needsMe(l: Archipelago, input: { person?: string }) {
   // What waits on me is mine to move, whoever owns it.
   const { rows: asked } = await l.db.query<Brief>(
     `select x.id, x.type, x.title, x.status, x.owner, x.props->>'due' as due from relation r join entity x on x.id = r.from_id
-     where r.type = 'waits_on' and r.to_id = $1 and r.valid_to is null and x.is_open and x.archived_at is null
+     where r.type = any($2::text[]) and r.to_id = $1 and r.valid_to is null and x.is_open and x.archived_at is null
      order by x.props->>'due' nulls last, x.updated_at desc`,
-    [me],
+    [me, l.registry.relationFamily('waits_on')],
   );
   const pending = await l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending'`);
   const mine = rows.filter((r) => !graph.isBlocked(r.id) && !asked.some((a) => a.id === r.id));
@@ -343,8 +343,8 @@ async function brief(l: Archipelago, input: { task?: string }) {
   const related = async (type: string, from: string[]) =>
     (
       await l.db.query<Entity>(
-        `select distinct e.* from relation r join entity e on e.id = r.to_id where r.type = $1 and r.from_id = any($2::text[]) and r.valid_to is null and e.archived_at is null`,
-        [type, from],
+        `select distinct e.* from relation r join entity e on e.id = r.to_id where r.type = any($1::text[]) and r.from_id = any($2::text[]) and r.valid_to is null and e.archived_at is null`,
+        [l.registry.relationFamily(type), from],
       )
     ).rows;
 
@@ -690,10 +690,10 @@ async function agentUsage(l: Archipelago, input: { repo?: string; limit?: number
   return { repo: { id: repo.id, title: repo.title }, week: within(7), month: within(30), runs: runs.slice(0, input.limit ?? 20) };
 }
 
-/** Which relations each preset draws. */
+/** Which relations each preset draws: these roots, and every relation extending them. */
 const GRAPH_PRESETS: Record<string, string[] | undefined> = {
   blocking: ['depends_on', 'waits_on', 'needs', 'holds'],
-  structure: ['part_of', 'serves', 'software.lives_in', 'works_at'],
+  structure: ['part_of', 'serves', 'lives_in', 'works_at'],
   all: undefined,
 };
 const GRAPH_LIMIT = 400;
@@ -702,7 +702,7 @@ const GRAPH_LIMIT = 400;
 async function graph(l: Archipelago, input: { focus?: string; depth?: number; relations?: string; include_closed?: boolean; include_system?: boolean }) {
   const preset = input.relations ?? (input.focus ? 'all' : 'blocking');
   if (!(preset in GRAPH_PRESETS)) throw new Error(`relations must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
-  const only = GRAPH_PRESETS[preset];
+  const only = GRAPH_PRESETS[preset] && l.registry.relationFamily(...GRAPH_PRESETS[preset]);
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, created_at from entity where archived_at is null`);
   const system = (type: string) => type.startsWith('sys.') && !l.registry.isA(type, 'resource');
   const eligible = new Map(
@@ -785,7 +785,7 @@ async function graph(l: Archipelago, input: { focus?: string; depth?: number; re
       return {
         id,
         type: e.type,
-        root: l.registry.type(e.type)?.lineage.at(-1) ?? e.type,
+        ...l.registry.ancestry(e.type),
         title: e.title,
         status: e.status,
         open: e.is_open,

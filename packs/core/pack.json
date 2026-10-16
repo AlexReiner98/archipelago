@@ -2,10 +2,60 @@
   "id": "core",
   "version": "0.1.0",
   "title": "Core",
-  "description": "The native types and relations every workspace has.",
+  "description": "The seven kinds every type extends, the root relations every relation extends, and the system tier.",
   "types": [
     {
+      "id": "actor",
+      "title": "Actor",
+      "kind": true,
+      "description": "Holds authority, owns work and is waited on: a person, a company, an agent. One of the seven kinds every type extends.",
+      "statuses": { "open": ["active"], "closed": ["inactive"] }
+    },
+    {
+      "id": "aim",
+      "title": "Aim",
+      "kind": true,
+      "description": "Why work exists: what serves points at, such as a goal or an area. One of the seven kinds every type extends.",
+      "statuses": { "open": ["active"], "closed": ["achieved", "retired"] }
+    },
+    {
+      "id": "work",
+      "title": "Work",
+      "kind": true,
+      "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. One of the seven kinds every type extends.",
+      "statuses": { "open": ["todo", "doing"], "closed": ["done", "dropped"] }
+    },
+    {
+      "id": "question",
+      "title": "Question",
+      "kind": true,
+      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. One of the seven kinds every type extends.",
+      "statuses": { "open": ["open"], "closed": ["settled", "dropped"] }
+    },
+    {
+      "id": "record",
+      "title": "Record",
+      "kind": true,
+      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. One of the seven kinds every type extends.",
+      "statuses": { "open": ["current"], "closed": ["superseded"] }
+    },
+    {
+      "id": "occurrence",
+      "title": "Occurrence",
+      "kind": true,
+      "description": "Happens at a time, and can be a gate: an event, a meeting, a release. One of the seven kinds every type extends.",
+      "statuses": { "open": ["upcoming"], "closed": ["happened", "cancelled"] }
+    },
+    {
+      "id": "place",
+      "title": "Place",
+      "kind": true,
+      "description": "Exists somewhere, physical or not; work lives in it or uses it: a resource, a repository, a file. One of the seven kinds every type extends.",
+      "statuses": { "open": ["available"], "closed": ["retired"] }
+    },
+    {
       "id": "person",
+      "extends": "actor",
       "title": "Person",
       "description": "A human being.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
@@ -16,6 +66,7 @@
     },
     {
       "id": "company",
+      "extends": "actor",
       "title": "Company",
       "description": "An organisation: a business, client, vendor or institution.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
@@ -23,6 +74,7 @@
     },
     {
       "id": "agent",
+      "extends": "actor",
       "title": "Agent",
       "description": "A non-human actor with its own identity, such as an AI agent or an automation.",
       "statuses": { "open": ["active"], "closed": ["retired"] },
@@ -30,6 +82,7 @@
     },
     {
       "id": "goal",
+      "extends": "aim",
       "title": "Goal",
       "description": "An outcome that projects and tasks serve.",
       "statuses": { "open": ["active", "paused"], "closed": ["achieved", "dropped"] },
@@ -40,12 +93,14 @@
     },
     {
       "id": "area",
+      "extends": "aim",
       "title": "Area",
       "description": "An ongoing responsibility with no end date.",
       "statuses": { "open": ["active"], "closed": ["retired"] }
     },
     {
       "id": "project",
+      "extends": "work",
       "title": "Project",
       "description": "A body of work with an end.",
       "statuses": { "open": ["planned", "active", "paused"], "closed": ["done", "dropped"] },
@@ -68,6 +123,7 @@
     },
     {
       "id": "task",
+      "extends": "work",
       "title": "Task",
       "description": "A piece of work someone can do. A commitment is a task with an owed_to relation.",
       "statuses": { "open": ["todo", "doing", "waiting"], "closed": ["done", "dropped"] },
@@ -87,6 +143,7 @@
     },
     {
       "id": "decision",
+      "extends": "question",
       "title": "Decision",
       "description": "Something decided, or still open, with its reasoning. The title is the question.",
       "statuses": { "open": ["open"], "closed": ["decided", "reversed"] },
@@ -100,6 +157,7 @@
     },
     {
       "id": "issue",
+      "extends": "work",
       "title": "Issue",
       "description": "A problem or risk observed, separate from the work to fix it.",
       "statuses": { "open": ["open", "investigating", "mitigated"], "closed": ["resolved", "wontfix"] },
@@ -112,12 +170,14 @@
     },
     {
       "id": "hypothesis",
+      "extends": "question",
       "title": "Hypothesis",
       "description": "A belief about the world that could be wrong. The title is the statement.",
       "statuses": { "open": ["untested", "testing"], "closed": ["supported", "refuted"] }
     },
     {
       "id": "result",
+      "extends": "record",
       "title": "Result",
       "description": "A recorded outcome with its evidence: a measurement, a test run, a reply.",
       "statuses": { "open": ["recorded"], "closed": ["superseded"] },
@@ -129,6 +189,7 @@
     },
     {
       "id": "event",
+      "extends": "occurrence",
       "title": "Event",
       "description": "Something that happens at a time: a deadline, a launch, an appointment.",
       "statuses": { "open": ["upcoming", "in_progress"], "closed": ["happened", "cancelled"] },
@@ -147,6 +208,7 @@
     },
     {
       "id": "resource",
+      "extends": "place",
       "title": "Resource",
       "description": "Something limited or exclusive that work needs: a machine, a licence, a budget, a live app.",
       "statuses": { "open": ["available", "unavailable"], "closed": ["retired"] },
@@ -160,6 +222,7 @@
     },
     {
       "id": "cost",
+      "extends": "occurrence",
       "title": "Cost",
       "description": "Something paid for regularly: hosting, a subscription, a licence, a domain. What agents spend per token is not kept here: it is measured from their runs.",
       "statuses": { "open": ["paying"], "closed": ["ended"] },
@@ -175,6 +238,7 @@
     },
     {
       "id": "procedure",
+      "extends": "record",
       "title": "Procedure",
       "description": "How something is done: a checklist, playbook or rule. One a machine can run is a function.",
       "statuses": { "open": ["draft", "current"], "closed": ["retired"] },
@@ -185,6 +249,7 @@
     },
     {
       "id": "file",
+      "extends": "place",
       "title": "File",
       "deliverable": true,
       "description": "A document or artefact that lives somewhere.",
@@ -196,18 +261,21 @@
     },
     {
       "id": "idea",
+      "extends": "question",
       "title": "Idea",
       "description": "Something we could do.",
       "statuses": { "open": ["raw", "exploring"], "closed": ["adopted", "dropped"] }
     },
     {
       "id": "note",
+      "extends": "record",
       "title": "Note",
       "description": "Free-form knowledge that does not fit another type.",
       "statuses": { "open": ["current"], "closed": ["stale"] }
     },
     {
       "id": "document",
+      "extends": "record",
       "title": "Document",
       "deliverable": true,
       "description": "Writing for a reader, made of the map: its note is the text, and a line holding only an item's id brings that item in at that place, as a section with its title and note. Read whole with the document tool; the owner can give someone a link to it.",
@@ -218,6 +286,7 @@
     },
     {
       "id": "lens",
+      "tier": "system",
       "title": "Lens",
       "description": "What is in a picture of the map. About a project or item, it is a view of that thing, named by its title: an item's page shows its views as a switch and opens on the first (place). About nothing, it is the workspace's: a view that can be chosen for any picture, and the one the whole map opens on. A field left empty is the built-in one. Read by the lens view.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
@@ -237,6 +306,7 @@
     },
     {
       "id": "style",
+      "tier": "system",
       "title": "Style",
       "description": "How a picture of the map is drawn. About a project or item, it is how that thing's picture looks; about nothing, the workspace's. A field left empty comes from the level above. Read only by the page that draws.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
@@ -263,28 +333,30 @@
     }
   ],
   "relations": [
-    { "id": "depends_on", "title": "depends on", "inverse": "blocks", "from": ["*"], "to": ["*"], "description": "The source cannot finish until the target is closed. Drives the blockers view." },
-    { "id": "waits_on", "title": "waits on", "inverse": "is waited on by", "from": ["*"], "to": ["person", "company", "agent"], "description": "The source cannot move until this person, company or agent has answered or acted. Say what is awaited in the relation's props.for. Drives the blockers view; remove the link once they have." },
-    { "id": "defers", "title": "goes ahead without", "inverse": "can follow", "from": ["event"], "to": ["*"], "description": "The event was planned with this in sight and does not wait for it: it can follow. What the event does wait for is depends_on. Drives the gate view." },
-    { "id": "part_of", "title": "is part of", "inverse": "contains", "from": ["*"], "to": ["*"], "description": "Hierarchy: a task in a project, a project in an area." },
-    { "id": "serves", "title": "serves", "inverse": "is served by", "from": ["*"], "to": ["goal", "area"], "description": "Why the work exists." },
-    { "id": "owed_to", "title": "is owed to", "inverse": "is owed", "from": ["task"], "to": ["person", "company"], "description": "Makes a task a commitment to someone." },
-    { "id": "requested_by", "title": "was requested by", "inverse": "requested", "from": ["*"], "to": ["person", "company", "agent"], "description": "Who asked for it." },
-    { "id": "involves", "title": "involves", "inverse": "is involved in", "from": ["*"], "to": ["person", "company", "agent"], "description": "Participants and stakeholders." },
-    { "id": "works_at", "title": "works at", "inverse": "employs", "from": ["person"], "to": ["company"], "description": "Put the job title in the relation's props.role." },
-    { "id": "about", "title": "is about", "inverse": "is described by", "from": ["*"], "to": ["*"], "description": "A note, file, decision or issue concerns the target." },
-    { "id": "needs", "title": "needs", "inverse": "is needed by", "from": ["*"], "to": ["resource"], "description": "The work cannot run without this resource. Drives the blockers view." },
-    { "id": "holds", "title": "holds", "inverse": "is held by", "from": ["*"], "to": ["resource"], "description": "Current occupancy of a resource. Created by claim, ended by release." },
-    { "id": "tests", "title": "tests", "inverse": "is tested by", "from": ["task"], "to": ["hypothesis"], "description": "The work that will settle the hypothesis." },
-    { "id": "supports", "title": "supports", "inverse": "is supported by", "from": ["result"], "to": ["hypothesis"], "description": "Evidence for." },
-    { "id": "refutes", "title": "refutes", "inverse": "is refuted by", "from": ["result"], "to": ["hypothesis"], "description": "Evidence against." },
-    { "id": "assumes", "title": "assumes", "inverse": "is assumed by", "from": ["*"], "to": ["hypothesis"], "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted." },
-    { "id": "explains", "title": "would explain", "inverse": "may be explained by", "from": ["hypothesis"], "to": ["issue"], "description": "A suspected cause." },
-    { "id": "addresses", "title": "addresses", "inverse": "is addressed by", "from": ["*"], "to": ["issue"], "description": "Work meant to fix or reduce the issue." },
-    { "id": "produced", "title": "produced", "inverse": "was produced by", "from": ["*"], "to": ["*"], "description": "The work led to this result, file or decision." },
-    { "id": "based_on", "title": "is based on", "inverse": "informs", "from": ["*"], "to": ["*"], "description": "A decision or plan rests on this result or source." },
-    { "id": "governed_by", "title": "is governed by", "inverse": "governs", "from": ["*"], "to": ["procedure", "decision"], "description": "The rule or procedure that applies." },
-    { "id": "supersedes", "title": "supersedes", "inverse": "is superseded by", "from": ["*"], "to": ["*"], "description": "Replaces an older version." },
-    { "id": "relates_to", "title": "relates to", "inverse": "relates to", "from": ["*"], "to": ["*"], "description": "A loose link. Prefer a specific relation when one fits." }
+    { "id": "depends_on", "root": true, "title": "depends on", "inverse": "blocks", "from": ["*"], "to": ["*"], "description": "The source cannot finish until the target is closed. Drives the blockers view." },
+    { "id": "waits_on", "root": true, "title": "waits on", "inverse": "is waited on by", "from": ["*"], "to": ["person", "company", "agent"], "description": "The source cannot move until this person, company or agent has answered or acted. Say what is awaited in the relation's props.for. Drives the blockers view; remove the link once they have." },
+    { "id": "defers", "root": true, "title": "goes ahead without", "inverse": "can follow", "from": ["event"], "to": ["*"], "description": "The event was planned with this in sight and does not wait for it: it can follow. What the event does wait for is depends_on. Drives the gate view." },
+    { "id": "part_of", "root": true, "title": "is part of", "inverse": "contains", "from": ["*"], "to": ["*"], "description": "Hierarchy: a task in a project, a project in an area." },
+    { "id": "serves", "root": true, "title": "serves", "inverse": "is served by", "from": ["*"], "to": ["goal", "area"], "description": "Why the work exists." },
+    { "id": "owed_to", "extends": "involves", "title": "is owed to", "inverse": "is owed", "from": ["task"], "to": ["person", "company"], "description": "Makes a task a commitment to someone." },
+    { "id": "requested_by", "extends": "involves", "title": "was requested by", "inverse": "requested", "from": ["*"], "to": ["person", "company", "agent"], "description": "Who asked for it." },
+    { "id": "involves", "root": true, "title": "involves", "inverse": "is involved in", "from": ["*"], "to": ["person", "company", "agent"], "description": "Participants and stakeholders." },
+    { "id": "works_at", "extends": "relates_to", "title": "works at", "inverse": "employs", "from": ["person"], "to": ["company"], "description": "Put the job title in the relation's props.role." },
+    { "id": "about", "root": true, "title": "is about", "inverse": "is described by", "from": ["*"], "to": ["*"], "description": "A note, file, decision or issue concerns the target." },
+    { "id": "needs", "root": true, "title": "needs", "inverse": "is needed by", "from": ["*"], "to": ["resource"], "description": "The work cannot run without this resource. Drives the blockers view." },
+    { "id": "holds", "root": true, "title": "holds", "inverse": "is held by", "from": ["*"], "to": ["resource"], "description": "Current occupancy of a resource. Created by claim, ended by release." },
+    { "id": "tests", "extends": "bears_on", "title": "tests", "inverse": "is tested by", "from": ["task"], "to": ["hypothesis"], "description": "The work that will settle the hypothesis." },
+    { "id": "supports", "extends": "bears_on", "title": "supports", "inverse": "is supported by", "from": ["result"], "to": ["hypothesis"], "description": "Evidence for." },
+    { "id": "refutes", "extends": "bears_on", "title": "refutes", "inverse": "is refuted by", "from": ["result"], "to": ["hypothesis"], "description": "Evidence against." },
+    { "id": "assumes", "extends": "relates_to", "title": "assumes", "inverse": "is assumed by", "from": ["*"], "to": ["hypothesis"], "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted." },
+    { "id": "explains", "extends": "about", "title": "would explain", "inverse": "may be explained by", "from": ["hypothesis"], "to": ["issue"], "description": "A suspected cause." },
+    { "id": "addresses", "extends": "about", "title": "addresses", "inverse": "is addressed by", "from": ["*"], "to": ["issue"], "description": "Work meant to fix or reduce the issue." },
+    { "id": "produced", "extends": "relates_to", "title": "produced", "inverse": "was produced by", "from": ["*"], "to": ["*"], "description": "The work led to this result, file or decision." },
+    { "id": "based_on", "extends": "relates_to", "title": "is based on", "inverse": "informs", "from": ["*"], "to": ["*"], "description": "A decision or plan rests on this result or source." },
+    { "id": "governed_by", "extends": "relates_to", "title": "is governed by", "inverse": "governs", "from": ["*"], "to": ["procedure", "decision"], "description": "The rule or procedure that applies." },
+    { "id": "lives_in", "root": true, "title": "lives in", "inverse": "is home to", "from": ["*"], "to": ["place"], "description": "Where something is: work in a repository, a visit at a site." },
+    { "id": "bears_on", "root": true, "title": "bears on", "inverse": "is borne on by", "from": ["*"], "to": ["question"], "description": "Evidence on a question: a result, a test or a finding that helps settle it." },
+    { "id": "supersedes", "root": true, "title": "supersedes", "inverse": "is superseded by", "from": ["*"], "to": ["*"], "description": "Replaces an older version." },
+    { "id": "relates_to", "root": true, "title": "relates to", "inverse": "relates to", "from": ["*"], "to": ["*"], "description": "A loose link. Prefer a specific relation when one fits." }
   ]
 }

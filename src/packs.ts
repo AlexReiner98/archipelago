@@ -28,6 +28,10 @@ export interface TypeDef {
   title: string;
   description: string;
   extends?: string;
+  /** One of the seven kinds every other type extends. Only the core pack declares them. */
+  kind?: boolean;
+  /** The kernel's own types (a run, a lens), outside the kinds. Only the kernel's packs declare them. */
+  tier?: 'system';
   statuses?: Statuses;
   fields?: Record<string, FieldDef>;
   /** What is made for a reader or a customer (a document, a file, a release): named under the title of what it is part of. A flavour inherits it. */
@@ -36,6 +40,10 @@ export interface TypeDef {
 
 export interface RelationDef {
   id: string;
+  /** One of the root relations every other relation extends. Only the core pack declares them. */
+  root?: boolean;
+  /** The relation this one is a flavour of. What the kernel computes from its root holds for it too. */
+  extends?: string;
   title: string;
   inverse: string;
   from: string[];
@@ -81,12 +89,23 @@ export interface ResolvedType {
   pack: string;
   title: string;
   description: string;
-  /** This type first, then each ancestor. */
+  /** This type first, then each ancestor, its kind last. */
   lineage: string[];
+  /** The kind it falls back to: the last of its lineage. None for the system tier. */
+  kind: string | undefined;
+  /** The type nearest its kind: what it is, said without the kind (task for an experiment). */
+  base: string;
+  system: boolean;
   statuses: Statuses;
   fields: Record<string, FieldDef>;
   deliverable: boolean;
 }
+
+/** A relation as loaded: `root` names the root it extends (itself, for a root). */
+export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root: string };
+
+/** Packs whose types make up the kernel: the kinds, the root relations and the system tier. */
+const KERNEL_PACKS = ['core', 'sys'];
 
 /** The pack that approved type proposals are written to. */
 export const LOCAL_PACK = 'local';
@@ -98,7 +117,7 @@ export class Registry {
   readonly localDir: string | undefined;
   packs: PackFile[] = [];
   types = new Map<string, ResolvedType>();
-  relations = new Map<string, RelationDef & { pack: string }>();
+  relations = new Map<string, ResolvedRelation>();
   trees = new Map<string, TreeDef & { pack: string }>();
 
   constructor(dir: string, only?: string[], localDir?: string) {
@@ -141,18 +160,23 @@ export class Registry {
     for (const pack of [...found.values()].sort((a, b) => a.id.localeCompare(b.id))) visit(pack, []);
 
     const raw = new Map<string, TypeDef & { pack: string }>();
-    const relations = new Map<string, RelationDef & { pack: string }>();
+    const relations = new Map<string, ResolvedRelation>();
+    const declared = new Map<string, RelationDef>();
     const owned = (pack: PackFile, id: string) => pack.id === 'core' || id.startsWith(pack.id + '.');
     for (const pack of ordered) {
       for (const type of pack.types ?? []) {
         if (!owned(pack, type.id)) throw new Error(`Type "${type.id}" in pack "${pack.id}" must be named "${pack.id}.<name>"`);
         if (raw.has(type.id)) throw new Error(`Type "${type.id}" is defined twice`);
+        if (type.kind && pack.id !== 'core') throw new Error(`Type "${type.id}": only the core pack declares kinds`);
+        if (type.tier && !KERNEL_PACKS.includes(pack.id)) throw new Error(`Type "${type.id}": only the kernel's packs declare the system tier`);
         raw.set(type.id, { ...type, pack: pack.id });
       }
       for (const rel of pack.relations ?? []) {
         if (!owned(pack, rel.id)) throw new Error(`Relation "${rel.id}" in pack "${pack.id}" must be named "${pack.id}.<name>"`);
         if (relations.has(rel.id)) throw new Error(`Relation "${rel.id}" is defined twice`);
-        relations.set(rel.id, { ...rel, pack: pack.id });
+        if (rel.root && pack.id !== 'core') throw new Error(`Relation "${rel.id}": only the core pack declares root relations`);
+        declared.set(rel.id, rel);
+        relations.set(rel.id, { ...rel, pack: pack.id, root: rel.id });
       }
     }
     const extra = new Map<string, Record<string, FieldDef>>();
@@ -171,6 +195,11 @@ export class Registry {
       if (!def) throw new Error(`Unknown type "${id}"${trail.length ? ` (extended by "${trail.at(-1)}")` : ''}`);
       if (trail.includes(id)) throw new Error(`Type cycle: ${[...trail, id].join(' -> ')}`);
       const parent = def.extends ? resolve(def.extends, [...trail, id]) : undefined;
+      if (def.extends && (def.kind || def.tier)) throw new Error(`Type "${id}" is a ${def.kind ? 'kind' : 'system type'} and extends nothing`);
+      if (parent?.system) throw new Error(`Type "${id}" cannot extend "${parent.id}", which is the kernel's own`);
+      const kind = def.kind ? id : parent?.kind;
+      // Every shipped type has a kind; a workspace's own may predate the kinds.
+      if (!kind && !def.tier && def.pack !== LOCAL_PACK) throw new Error(`Type "${id}" in pack "${def.pack}" must extend one of the kinds: ${[...raw.values()].filter((t) => t.kind).map((t) => t.id).join(', ')}`);
       const statuses = def.statuses ?? parent?.statuses;
       if (!statuses?.open.length) throw new Error(`Type "${id}" needs at least one open status`);
       const resolved: ResolvedType = {
@@ -179,6 +208,9 @@ export class Registry {
         title: def.title,
         description: def.description,
         lineage: [id, ...(parent?.lineage ?? [])],
+        kind,
+        base: !parent || parent.id === parent.kind ? id : parent.base,
+        system: def.tier === 'system',
         statuses,
         fields: { ...parent?.fields, ...def.fields, ...extra.get(id) },
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
@@ -193,6 +225,21 @@ export class Registry {
         if (end !== '*' && !types.has(end)) throw new Error(`Relation "${rel.id}" refers to unknown type "${end}"`);
       }
     }
+    // Every relation extends a root, and joins only what its root may join.
+    const fits = (allowed: string[], end: string) => allowed.some((a) => a === '*' || (end !== '*' && types.get(end)!.lineage.includes(a)));
+    const rootOf = (rel: RelationDef, trail: string[]): string => {
+      if (rel.root) return rel.id;
+      if (rel.extends && rel.extends === rel.id) throw new Error(`Relation "${rel.id}" extends itself`);
+      if (trail.includes(rel.id)) throw new Error(`Relation cycle: ${[...trail, rel.id].join(' -> ')}`);
+      const parent = rel.extends ? declared.get(rel.extends) : undefined;
+      if (!parent) throw new Error(`Relation "${rel.id}" must extend one of the root relations${rel.extends ? `, not unknown "${rel.extends}"` : ''}`);
+      for (const [side, ends] of [['from', rel.from], ['to', rel.to]] as const) {
+        const bad = ends.find((end) => !fits(parent[side], end));
+        if (bad) throw new Error(`Relation "${rel.id}" goes ${side} ${bad}, which "${parent.id}" does not`);
+      }
+      return rootOf(parent, [...trail, rel.id]);
+    };
+    for (const rel of relations.values()) rel.root = rootOf(declared.get(rel.id)!, []);
 
     const trees = new Map<string, TreeDef & { pack: string }>();
     for (const pack of ordered) {
@@ -215,8 +262,25 @@ export class Registry {
     return this.types.get(id);
   }
 
+  /** The seven kinds, in the core pack's order. */
+  kinds(): ResolvedType[] {
+    return [...this.types.values()].filter((t) => t.kind === t.id);
+  }
+
+  /** A relation and every relation extending it: what the kernel computes from a root holds for all of them. */
+  relationFamily(...roots: string[]): string[] {
+    const family = (id: string): string[] => [id, ...[...this.relations.values()].filter((r) => r.extends === id).flatMap((r) => family(r.id))];
+    return roots.flatMap(family);
+  }
+
   isA(typeId: string, ancestor: string): boolean {
     return this.types.get(typeId)?.lineage.includes(ancestor) ?? false;
+  }
+
+  /** What a picture says a thing is: its type nearest the kind (root) and its kind, or null in the system tier. */
+  ancestry(typeId: string): { root: string; kind: string | null } {
+    const type = this.types.get(typeId);
+    return { root: type?.base ?? typeId, kind: type?.kind ?? null };
   }
 
   /** The type and every flavour of it. */
@@ -277,8 +341,10 @@ export class Registry {
     const problems: string[] = [];
     if (!/^local\.[a-z][a-z0-9_]*$/.test(def.id)) problems.push(`new type id must look like "local.my_type", got "${def.id}"`);
     if (this.types.has(def.id)) problems.push(`type "${def.id}" already exists`);
-    if (def.extends && !this.types.has(def.extends)) problems.push(`cannot extend unknown type "${def.extends}"`);
-    if (!def.extends && !def.statuses?.open.length) problems.push('a type that extends nothing needs statuses with at least one open status');
+    const kinds = this.kinds().map((t) => t.id).join(', ');
+    if (!def.extends) problems.push(`a new type extends one of the kinds (${kinds}) or a type of one`);
+    else if (!this.types.has(def.extends)) problems.push(`cannot extend unknown type "${def.extends}"`);
+    else if (this.types.get(def.extends)!.system) problems.push(`cannot extend "${def.extends}", which is the kernel's own`);
     return problems;
   }
 
@@ -327,6 +393,7 @@ export class Registry {
         title: t.title,
         description: t.description,
         flavour_of: t.lineage[1],
+        kind: t.kind,
         statuses: t.statuses,
         fields: t.fields,
         ...(t.deliverable && { deliverable: true }),

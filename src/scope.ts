@@ -92,7 +92,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
     // need (a lane everyone shares). One that only other work needs is that work's.
     case 'claim':
     case 'release': {
-      const { rows } = await l.db.query<{ from_id: string }>(`select from_id from relation where type = 'needs' and to_id = $1 and valid_to is null`, [input.resource]);
+      const { rows } = await l.db.query<{ from_id: string }>(`select from_id from relation where type = any($2::text[]) and to_id = $1 and valid_to is null`, [input.resource, l.registry.relationFamily('needs')]);
       if (rows.length && !rows.some((r) => scope.has(r.from_id))) refuse(`Nothing there needs ${await named(String(input.resource))}, so this token cannot ${tool} it.`);
       if (tool === 'claim') await mustBeIn(input.for, 'hold a resource for it');
       return;

@@ -7,6 +7,7 @@
   "types": [
     {
       "id": "software.application",
+      "extends": "place",
       "title": "Application",
       "description": "A software application the work uses or targets, such as Rhino or Revit.",
       "statuses": { "open": ["in_use"], "closed": ["retired"] },
@@ -14,6 +15,7 @@
     },
     {
       "id": "software.repo",
+      "extends": "place",
       "title": "Repository",
       "description": "A source repository.",
       "statuses": { "open": ["active"], "closed": ["archived"] },
@@ -25,6 +27,7 @@
     },
     {
       "id": "software.feature",
+      "extends": "work",
       "title": "Feature",
       "description": "A capability of a product. Built means merged but not yet in a release.",
       "statuses": { "open": ["planned", "building", "built"], "closed": ["shipped", "dropped"] },
@@ -54,6 +57,7 @@
     },
     {
       "id": "software.proof",
+      "extends": "question",
       "title": "Proof",
       "description": "Something a user would ask before trusting the software, such as how we know the sun is correct. The title is the question. It is answered on a build when every test of it passed there: that is worked out from the results, not stored.",
       "statuses": { "open": ["open"], "closed": ["retired"] }
@@ -82,6 +86,7 @@
     },
     {
       "id": "software.pull_request",
+      "extends": "work",
       "title": "Pull request",
       "description": "A proposed code change.",
       "statuses": { "open": ["draft", "open"], "closed": ["merged", "closed"] },
@@ -92,6 +97,7 @@
     },
     {
       "id": "software.environment",
+      "extends": "place",
       "title": "Environment",
       "description": "Somewhere software runs: a machine, a VM, staging, production.",
       "statuses": { "open": ["up", "down"], "closed": ["retired"] },
@@ -112,10 +118,10 @@
     }
   ],
   "relations": [
-    { "id": "software.lives_in", "title": "lives in", "inverse": "hosts", "from": ["*"], "to": ["software.repo"], "description": "The repository that holds the work." },
-    { "id": "software.uses", "title": "uses", "inverse": "is used by", "from": ["*"], "to": ["software.application"], "description": "An application the work depends on or targets." },
-    { "id": "software.answers", "title": "helps answer", "inverse": "is answered by", "from": ["software.test"], "to": ["software.proof"], "description": "The test is part of how we know. A proof question is answered on a build when every test that helps answer it passed there." },
-    { "id": "software.ships", "title": "ships", "inverse": "ships in", "from": ["software.release"], "to": ["*"], "description": "What a release contains." }
+    { "id": "software.lives_in", "extends": "lives_in", "title": "lives in", "inverse": "hosts", "from": ["*"], "to": ["software.repo"], "description": "The repository that holds the work." },
+    { "id": "software.uses", "extends": "relates_to", "title": "uses", "inverse": "is used by", "from": ["*"], "to": ["software.application"], "description": "An application the work depends on or targets." },
+    { "id": "software.answers", "extends": "bears_on", "title": "helps answer", "inverse": "is answered by", "from": ["software.test"], "to": ["software.proof"], "description": "The test is part of how we know. A proof question is answered on a build when every test that helps answer it passed there." },
+    { "id": "software.ships", "extends": "relates_to", "title": "ships", "inverse": "ships in", "from": ["software.release"], "to": ["*"], "description": "What a release contains." }
   ],
   "trees": [
     {

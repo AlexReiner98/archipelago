@@ -1588,20 +1588,15 @@ const automationDoes = (p) => {
 
 // ---- Graph ---------------------------------------------------------------
 
-// Colour says what kind of thing a node is. Seven groups, in a fixed order,
-// from a palette checked for colour-blind separation in both themes. Red is
-// kept for "blocked", which is also drawn as a ring and named in the tooltip.
-const GROUPS = [
-  { key: 'people', label: 'People and organisations', roots: ['person', 'company', 'agent'] },
-  { key: 'work', label: 'Work', roots: ['project', 'task', 'goal', 'area', 'idea', 'software.feature', 'software.pull_request'] },
-  { key: 'knowledge', label: 'Decisions and knowledge', roots: ['decision', 'hypothesis', 'result', 'note', 'file', 'procedure'] },
-  { key: 'problems', label: 'Issues', roots: ['issue'] },
-  { key: 'time', label: 'Events', roots: ['event'] },
-  { key: 'resources', label: 'Resources and tools', roots: ['resource', 'software.application', 'software.repo', 'software.environment'] },
-  { key: 'system', label: 'System records', roots: [] },
-];
-const groupOf = (root) => GROUPS.find((g) => g.roots.includes(root)) ?? GROUPS.at(-1);
+// Colour says what kind of thing a node is: one of the seven kinds every
+// type extends, or the system's own records. A palette checked for
+// colour-blind separation in both themes. Red is kept for "blocked", which is
+// also drawn as a ring and named in the tooltip.
+const GROUPS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
+const groupOf = (kind) => (GROUPS.includes(kind) ? kind : 'system');
 const BLOCKING = ['depends_on', 'waits_on', 'needs', 'holds'];
+/** Whether a relation is one of these, or extends one of them. */
+const isOf = (list, type) => list.includes(type) || list.includes(relations.get(type)?.root);
 const SVG = 'http://www.w3.org/2000/svg';
 const s = (tag, attrs = {}, ...kids) => {
   const el = document.createElementNS(SVG, tag);
@@ -1620,7 +1615,7 @@ const s = (tag, attrs = {}, ...kids) => {
 // Where there is none, what a thing belongs to or waits on is to its left
 // and what belongs to it or waits on it to its right. Anything can then be
 // dragged aside.
-const KINDS = { structure: ['part_of', 'serves', 'software.lives_in', 'works_at'], blocking: BLOCKING, all: null };
+const KINDS = { structure: ['part_of', 'serves', 'lives_in', 'works_at'], blocking: BLOCKING, all: null };
 const KIND_LABELS = [['structure', 'Structure'], ['blocking', 'Blocking'], ['all', 'Everything']];
 /** Each drawing's filters and what was dragged in it, by what it is drawn around, kept while the page is open. */
 const graphPrefs = new Map();
@@ -1698,7 +1693,7 @@ function shapeGraph(data, focus, prefs, extras = {}) {
   const byId = new Map(data.nodes.filter((n) => n.id === focus || ((prefs.finished || n.open) && (!extras.workOnly || n.work) && (!extras.restOnly || !n.work))).map((n) => [n.id, { ...n, ...info.get(n.id) }]));
   const seen = new Set();
   const all = [...data.edges, ...(extras.edges ?? [])].filter((e) => byId.has(e.from) && byId.has(e.to) && !seen.has(e.id) && seen.add(e.id));
-  const counts = (e) => !KINDS[prefs.kind] || KINDS[prefs.kind].includes(e.type);
+  const counts = (e) => !KINDS[prefs.kind] || isOf(KINDS[prefs.kind], e.type);
   const walk = all.filter(counts);
 
   // How many columns from the start each thing is: to the right when it
@@ -1719,17 +1714,17 @@ function shapeGraph(data, focus, prefs, extras = {}) {
     frontier = next;
   }
   // What a thing in sight waits on is in sight too, though it is a step further out: a thing marked as blocked shows what by.
-  if (focus) for (const e of all) if (BLOCKING.includes(e.type) && rank.has(e.from) && !rank.has(e.to)) rank.set(e.to, rank.get(e.from) - 1);
+  if (focus) for (const e of all) if (isOf(BLOCKING, e.type) && rank.has(e.from) && !rank.has(e.to)) rank.set(e.to, rank.get(e.from) - 1);
   // A project's chart is one level: its features, and its work that is under none of them. A task that is part of a feature is on that feature's page.
   if (extras.workOnly) for (const e of walk) if (e.type === 'part_of' && e.to !== focus && rank.has(e.to) && rank.has(e.from)) rank.delete(e.from);
   const nodes = [...rank.keys()].map((id) => byId.get(id));
   // What waits on what is drawn whatever the filter, among the things in sight.
-  const edges = all.filter((e) => rank.has(e.from) && rank.has(e.to) && (counts(e) || BLOCKING.includes(e.type)));
+  const edges = all.filter((e) => rank.has(e.from) && rank.has(e.to) && (counts(e) || isOf(BLOCKING, e.type)));
   // What waits comes after what it waits on. A loop of waiting stops going round.
   for (let pass = 0; pass < 12; pass++) {
     let moved = false;
     for (const e of edges) {
-      if (!BLOCKING.includes(e.type) || e.from === focus || rank.get(e.from) > rank.get(e.to)) continue;
+      if (!isOf(BLOCKING, e.type) || e.from === focus || rank.get(e.from) > rank.get(e.to)) continue;
       rank.set(e.from, rank.get(e.to) + 1);
       moved = true;
     }
@@ -1799,7 +1794,7 @@ function timeline(nodes, edges, byId, focus, prefs) {
   const inner = new Set(parts.map((e) => e.from));
   const parentOf = new Map();
   for (const e of parts) if (!parentOf.has(e.from) || (inner.has(e.to) && !inner.has(parentOf.get(e.from)))) parentOf.set(e.from, e.to);
-  const waits = edges.filter((e) => BLOCKING.includes(e.type));
+  const waits = edges.filter((e) => isOf(BLOCKING, e.type));
   // Around one piece of work the scale is that work's own: it, and what is part of it, have a length. What it is
   // itself part of, and work that belongs elsewhere, do not: the first would only be a bar across everything.
   const within = (id) => {
@@ -1922,7 +1917,7 @@ function timeline(nodes, edges, byId, focus, prefs) {
   loose.forEach((n, i) => Object.assign(n, { bar: true, loose: true, x: (i % across) * 300, y: bottom + 12 + Math.floor(i / across) * (ROW.h + ROW.gap), w: 210, h: ROW.h, fills: [] }));
   // What a thing is part of is said by its bar spanning it, not by a line as well.
   // Nor is waiting that is over drawn: the order along the scale already says what came first.
-  const over = (e) => BLOCKING.includes(e.type) && !byId.get(e.to).open;
+  const over = (e) => isOf(BLOCKING, e.type) && !byId.get(e.to).open;
   const belongs = (e) => parts.includes(e) || (e.type === 'part_of' && rows.includes(byId.get(e.from)) && rows.includes(byId.get(e.to)));
   // Nor a wait that another already says: if it waits on B, and B on A, the line to A adds nothing but a crossing.
   const on = new Map();
@@ -2011,7 +2006,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
   };
   const seen = { waiting: false, met: false, lifted: false, other: false };
   const lines = edges.map((e) => {
-    const blocking = BLOCKING.includes(e.type);
+    const blocking = isOf(BLOCKING, e.type);
     // An arrow runs from what is needed to what needs it; any other line from the thing to what it belongs to.
     const [a, b] = blocking ? [byId.get(e.to), byId.get(e.from)] : [byId.get(e.from), byId.get(e.to)];
     const structure = KINDS.structure.includes(e.type);
@@ -2046,7 +2041,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const box = n.bar
       ? s(
           'g',
-          { class: `rm-node g-node bar group-${groupOf(n.root).key}${state}${n.guess ? ' guess' : ''}${n.loose ? ' loose' : ''}${n.gate ? ' gate' : ''}`, transform: `translate(${n.x},${n.y})` },
+          { class: `rm-node g-node bar group-${groupOf(n.kind)}${state}${n.guess ? ' guess' : ''}${n.loose ? ' loose' : ''}${n.gate ? ' gate' : ''}`, transform: `translate(${n.x},${n.y})` },
           hint,
           n.gate ? s('path', { class: 'box', d: `M0,${n.h / 2} L7,${n.h / 2 - 7} L14,${n.h / 2} L7,${n.h / 2 + 7} z` }) : s('rect', { class: 'box', width: n.w, height: n.h, rx: 3 }),
           ...n.fills.map((f) => s('rect', { class: f.over ? 'over' : 'used', x: f.x, y: 1, width: Math.min(f.w, n.w - f.x), height: n.h - 2 })),
@@ -2058,7 +2053,7 @@ function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
         )
       : s(
           'g',
-          { class: `rm-node g-node group-${groupOf(n.root).key}${state}`, transform: `translate(${n.x},${n.y})` },
+          { class: `rm-node g-node group-${groupOf(n.kind)}${state}`, transform: `translate(${n.x},${n.y})` },
           hint,
           s('rect', { class: 'box', width: n.w, height: n.h, rx: 7 }),
           s('rect', { class: 'stripe', x: 0, y: 8, width: 3, height: n.h - 16, rx: 1.5 }),
@@ -2364,7 +2359,7 @@ function drawBoxes(host, answer, style, keep, kept) {
   const base = here?.depth ?? 0;
   // What each thing waits on, by name, for its tooltip.
   const waits = new Map();
-  for (const link of answer.links) if (BLOCKING.includes(link.kind) && byId.has(link.to)) waits.set(link.from, [...(waits.get(link.from) ?? []), byId.get(link.to).title]);
+  for (const link of answer.links) if (isOf(BLOCKING, link.kind) && byId.has(link.to)) waits.set(link.from, [...(waits.get(link.from) ?? []), byId.get(link.to).title]);
   // What a session said ties a thing to another is written on its line, after its name: boxes draw no lines.
   const ties = new Map();
   for (const link of answer.links) if (link.says && byId.has(link.to)) ties.set(link.from, [...(ties.get(link.from) ?? []), `${link.says} → ${byId.get(link.to).title}`]);
@@ -2577,7 +2572,7 @@ function drawNest(host, answer, style, keep, kept) {
     for (const [key, { kind, a, b, n, says }] of wanted) {
       let el = drawn.get(key);
       if (!el) {
-        el = s('line', { class: `ln-line${BLOCKING.includes(kind) ? ' waits' : ''}${says ? ' said' : ''}`, 'marker-end': says ? 'url(#ln-arrow-said)' : BLOCKING.includes(kind) ? 'url(#ln-arrow)' : null }, s('title'));
+        el = s('line', { class: `ln-line${isOf(BLOCKING, kind) ? ' waits' : ''}${says ? ' said' : ''}`, 'marker-end': says ? 'url(#ln-arrow-said)' : isOf(BLOCKING, kind) ? 'url(#ln-arrow)' : null }, s('title'));
         // What a session said ties the two is written on the line.
         if (says) el.words = s('text', { class: 'said', 'text-anchor': 'middle' }, document.createTextNode(says.length > 28 ? says.slice(0, 27) + '…' : says));
         drawn.set(key, el);
