@@ -540,8 +540,8 @@ test('the session-start hook registers the session and hands it the repo\'s work
   assert.ok(repoId, 'the repository comes with its id');
   assert.match(await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Aperture' }), new RegExp(`Repository: Aperture repo \\(${repoId}\\)`), 'a session that is resumed is told its repository again');
   // What the session was told is enough to ask for the repository's work; asked for none, the view says which there are.
-  for (const repo of [repoId, 'aperture repo']) assert.equal(((await VIEWS.repo_work.run(l, { repo })) as any).repo.id, repoId);
-  await assert.rejects(async () => VIEWS.repo_work.run(l, {}), new RegExp(`repo_work needs "repo".*Repositories here: Aperture repo \\(${repoId}\\)`));
+  for (const repo of [repoId, 'aperture repo']) assert.equal(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo } })) as any).repo.id, repoId);
+  await assert.rejects(async () => callTool(l, human, 'view', { name: 'repo_work', params: {} }), new RegExp(`repo_work needs "repo".*Repositories here: Aperture repo \\(${repoId}\\)`));
   assert.match(text, new RegExp(`Write unit tests \\(${made.offline}\\)`));
   assert.match(text, /Tune the solver .* waiting on: Which target\?/);
   assert.match(text, /"Live lane" .* is free/);
@@ -606,30 +606,30 @@ test('a session that finishes says where the repository\'s open work stands', as
   await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r0', outcome: 'cancelled' });
 
   // A scheduled re-check asks what is due: a project says how often, weekly when it does not.
-  let due = (await VIEWS.recheck.run(l, { repo: made.repo })) as any;
+  let due = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any;
   assert.deepEqual([due.due, due.projects[0].every_days, due.projects[0].items.map((i: any) => i.title)], [true, 7, ['Capture probe']]);
   await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 30 } }]);
-  assert.equal(((await VIEWS.recheck.run(l, { repo: made.repo })) as any).due, false, 'nothing here has gone 30 days');
+  assert.equal(((await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any).due, false, 'nothing here has gone 30 days');
   await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 0 } }]);
-  assert.equal(((await VIEWS.recheck.run(l, { repo: made.repo })) as any).due, false, '0 turns it off');
+  assert.equal(((await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any).due, false, '0 turns it off');
   // Once done, the project waits out its interval again, even with old items left.
   await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 7 } }]);
   const done = (await callTool(l, agent, 'rechecked', { repo: made.repo, summary: 'One left for the owner' })) as any;
   assert.deepEqual(done.rechecked.map((p: any) => p.title), ['Aperture']);
-  due = (await VIEWS.recheck.run(l, { repo: made.repo })) as any;
+  due = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any;
   assert.deepEqual([due.due, typeof due.projects[0].rechecked_at], [false, 'string']);
   await l.db.query(`update entity set props = props || '{"rechecked_at":"2020-01-01T00:00:00Z"}' where id = $1`, [made.proj]);
-  assert.equal(((await VIEWS.recheck.run(l, { repo: made.repo })) as any).due, true, 'and is due again when it has');
+  assert.equal(((await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any).due, true, 'and is due again when it has');
   // Asked for now, it does not wait: the interval and the items' age are set aside.
   await callTool(l, agent, 'rechecked', { repo: made.repo });
-  const atOnce = (await VIEWS.recheck.run(l, { repo: made.repo, now: true })) as any;
+  const atOnce = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo, now: true } })) as any;
   assert.deepEqual([atOnce.due, atOnce.projects[0].items.length], [true, 2]);
   // An issue filed as about a project, not as part of it, is the repository's work all the same.
   const { drift } = await make(l, [
     { op: 'create', ref: 'drift', type: 'issue', title: 'The carve reads origins' },
     { op: 'link', type: 'about', from: 'drift', to: made.proj },
   ]);
-  assert.ok(((await VIEWS.repo_work.run(l, { repo: made.repo })) as any).ready.some((i: any) => i.id === drift));
+  assert.ok(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any).ready.some((i: any) => i.id === drift));
 
   // An open issue in the repository is its work too: shown at the start, asked about at the end.
   const { leak } = await make(l, [
@@ -675,7 +675,7 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   assert.deepEqual(((await VIEWS.needs_me.run(l, {})) as any).actionable.map((e: any) => e.title), ['Write unit tests']);
   assert.deepEqual(((await VIEWS.waiting_on.run(l, { person: sam })) as any).blocked_by_others.map((r: any) => r.waiting_on[0].title), ['Owner']);
   assert.ok(!((await VIEWS.available_now.run(l, {})) as any).waiting_on_resource.some((t: any) => t.id === made.offline), 'a person is not a resource');
-  const work = (await VIEWS.repo_work.run(l, { repo: made.repo })) as any;
+  const work = (await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
   assert.deepEqual(work.blocked.find((b: any) => b.id === made.offline).waiting_on, ['Owner']);
 
   // A session ending there is not asked about it: nothing it did could have settled it.
@@ -701,14 +701,14 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   // Once they have answered, the link is removed and the work is free again.
   const link = (await l.get(made.offline)).outgoing.find((r: any) => r.type === 'waits_on') as any;
   await make(l, [{ op: 'unlink', relation: link.relation }]);
-  assert.ok(((await VIEWS.repo_work.run(l, { repo: made.repo })) as any).ready.some((i: any) => i.id === made.offline));
+  assert.ok(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any).ready.some((i: any) => i.id === made.offline));
 });
 
 test('a handoff is read off the map: the note an agent wrote, and what has happened since it was written', async () => {
   const l = await fresh();
   const made = await laneSetup(l);
   // With no note, it looks back a week, and says there is none.
-  const bare = (await VIEWS.handoff.run(l, { repo: made.repo })) as any;
+  const bare = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo } })) as any;
   assert.equal(bare.note, null);
   assert.match(bare.how, new RegExp(`^Nobody has written a handoff note for this repository\\. To write the first, create a software\\.handoff and link it software\\.lives_in to ${made.repo}`));
   assert.deepEqual(bare.open.ready.map((i: any) => i.title).sort(), ['Capture probe', 'Write unit tests']);
@@ -730,7 +730,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   ]);
   await hookSessionEnd(l, { session_id: 'h0', reason: 'exit' });
 
-  const stand = (await VIEWS.handoff.run(l, { repo: 'aperture repo' })) as any;
+  const stand = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: 'aperture repo' } })) as any;
   assert.deepEqual([stand.note.id, stand.note.body], [note, 'Not seen\nThe probe has not been run on a real model.']);
   assert.match(stand.how, /^Everything but the note/);
   assert.equal(stand.note.characters, stand.note.body.length);
@@ -753,7 +753,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   // The next session is told how far the note is behind.
   assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: 'C:\\code\\Aperture' }), /Its note, "Aperture handoff" \(e_\w+\), was written \d{4}-\d\d-\d\d; since then: 1 push, 1 item settled, 1 item opened, 1 session ended\./);
   // Counted from another moment when asked.
-  assert.equal(((await VIEWS.handoff.run(l, { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() })) as any).since_then.settled.length, 0);
+  assert.equal(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() } })) as any).since_then.settled.length, 0);
 
   // A note every session adds to is read by every session after: an agent cannot grow it past its length, only rewrite it.
   const part = 'Next, and why\n' + 'Run the probe on a real model. '.repeat(40);
@@ -761,9 +761,9 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   for (let i = 0; i < 4; i++) await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
   await assert.rejects(grow(), /the handoff note would be \d+ characters: 3000 at most[^]*Rewrite it whole/);
   await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, body: 'x'.repeat(2500) }] });
-  assert.match(((await VIEWS.handoff.run(l, { repo: made.repo })) as any).how, /^The note is 2500 of the 3000 characters it may be: there is no room to add to it/);
+  assert.match(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo } })) as any).how, /^The note is 2500 of the 3000 characters it may be: there is no room to add to it/);
   await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part.repeat(2) }] });
-  assert.match(((await VIEWS.handoff.run(l, { repo: made.repo })) as any).how, /^The note is \d+ characters, and may be 3000 at most/);
+  assert.match(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo } })) as any).how, /^The note is \d+ characters, and may be 3000 at most/);
   await assert.rejects(grow(), /3000 at most/);
   // Over its length already, it can always be made shorter.
   const shorter = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, body: 'Next, and why\nRun the probe on a real model.' }] })) as any;
@@ -825,16 +825,16 @@ test('a re-check takes a feature that lives in a repository on its own, at its p
   ]);
   await l.db.query(`update entity set updated_at = now() - interval '5 days' where id = any($1::text[])`, [[made.old, made.chore]]);
   // In the repository where only the feature lives, it is what is re-checked, as often as its project says.
-  let due = (await VIEWS.recheck.run(l, { repo: made.side })) as any;
+  let due = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.side } })) as any;
   assert.deepEqual(due.projects.map((p: any) => [p.title, p.every_days, p.items.map((i: any) => i.title).sort()]), [['The add-in', 3, ['Ask for the certificate', 'Port the ribbon']]]);
   // Where its project lives too, a feature is that project's and is not listed beside it.
-  assert.deepEqual(((await VIEWS.recheck.run(l, { repo: made.home })) as any).projects.map((p: any) => p.title), ['Product']);
+  assert.deepEqual(((await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.home } })) as any).projects.map((p: any) => p.title), ['Product']);
   // What the code cannot tell is said to wait on someone, and is not asked of a re-check again.
   await make(l, [{ op: 'link', type: 'waits_on', from: made.chore, to: made.me, props: { for: 'the certificate' } }]);
-  due = (await VIEWS.recheck.run(l, { repo: made.side })) as any;
+  due = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.side } })) as any;
   assert.deepEqual(due.projects[0].items.map((i: any) => i.title), ['Port the ribbon']);
   assert.deepEqual(((await callTool(l, agent, 'rechecked', { repo: made.side })) as any).rechecked.map((p: any) => p.title), ['The add-in']);
-  assert.equal(((await VIEWS.recheck.run(l, { repo: made.side })) as any).due, false);
+  assert.equal(((await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.side } })) as any).due, false);
 });
 
 test('a secret is sealed with a key that is not in the database, and without that key it reads as not set', async () => {
@@ -999,7 +999,7 @@ test('a run in GitHub Actions reports what it used, once, and the repository add
   // A session on a machine in the same repository is counted beside it, apart.
   await sessionStart(l, agent, { session_id: 'local', cwd: 'C:\\code\\site', surface: 'claude-code' });
   await recordUsage(l, 'local', 100_000);
-  const usage = (await VIEWS.agent_usage.run(l, { repo: 'Site repo' })) as any;
+  const usage = (await callTool(l, human, 'view', { name: 'agent_usage', params: { repo: 'Site repo' } })) as any;
   assert.deepEqual(usage.week, { 'claude-code': { runs: 1, tokens: 100_000, cost_usd: 0 }, 'github-actions': { runs: 2, tokens: 50_000, cost_usd: 0.3134 } });
   assert.deepEqual(usage.runs.map((x: any) => [x.title, x.status, x.tokens]).sort(), [['Read the push to main (abc1234)', 'finished', 42_000], ['Scheduled re-check', 'failed', 8_000], ['Session in Site repo', 'running', 100_000]]);
   assert.equal((await l.proposals()).length, 0, 'a report is not a change to review');

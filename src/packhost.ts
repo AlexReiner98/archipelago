@@ -9,17 +9,15 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { handleRequests, type OutsideRequest } from './outside.ts';
-import type { Actor, Archipelago, Entity, Op } from './pelago.ts';
+import { answerRead, type Read } from './packreads.ts';
+import type { Actor, Archipelago, Op } from './pelago.ts';
 import { zoneOf } from './timeaxis.ts';
-import { VIEWS } from './views.ts';
 
 const RUNNER = join(import.meta.dirname, 'pack-runner.ts');
 /** How long a call may take unless its pack says otherwise, and the most it may say. */
 export const CALL_MS = 2000;
 const MAX_MS = 30_000;
 const MEMORY_MB = 64;
-/** The most items one read gives back. */
-const READ_LIMIT = 500;
 
 export interface Done {
   ops?: Op[];
@@ -30,56 +28,6 @@ export interface Done {
 }
 
 export type Call = 'action' | 'view' | 'answer' | 'webhook' | 'schedule';
-
-type Read = {
-  get?: string;
-  /** Items of a type (flavours included): with a status or one of several, fields equal to where's, and a field between two values. */
-  items?: { type: string; status?: string | string[]; where?: Record<string, unknown>; between?: { field: string; from?: string; to?: string } };
-  /** What an item is linked to by a kind of link (flavours included), each with the link's id. */
-  related?: string;
-  relation?: string;
-  direction?: 'out' | 'in';
-  /** What an item is part of, outermost first. */
-  trail?: string;
-  view?: string;
-  params?: Record<string, unknown>;
-};
-
-/** Answer one read from a handler, as the actor the call is made for. Every item comes with what it is (is: its type and those it extends), so the handler can ask what kind of thing it is. */
-async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
-  const typed = <T extends { type: string }>(e: T) => ({ ...e, is: l.registry.type(e.type)?.lineage ?? [e.type] });
-  if (q.get !== undefined) {
-    const e = await l.entity(q.get);
-    return e ? typed(e) : null;
-  }
-  if (q.items) {
-    const { type, status, where, between } = q.items;
-    const field = between?.field;
-    if (field !== undefined && !/^[a-z][a-z0-9_]*$/.test(field)) throw new Error('between.field is the name of a field');
-    const { rows } = await l.db.query<Entity>(
-      `select * from entity where type = any($1::text[]) and archived_at is null and ($2::text[] is null or status = any($2::text[])) and props @> $3::jsonb
-         and ($4::text is null or $5::text is null or props ->> $4 >= $5) and ($4::text is null or $6::text is null or props ->> $4 <= $6)
-       order by created_at limit ${READ_LIMIT}`,
-      [l.registry.family(type), status === undefined ? null : [status].flat(), JSON.stringify(where ?? {}), field ?? null, between?.from ?? null, between?.to ?? null],
-    );
-    return rows.map(typed);
-  }
-  if (q.related !== undefined) {
-    const [near, far] = q.direction === 'in' ? ['to_id', 'from_id'] : ['from_id', 'to_id'];
-    const { rows } = await l.db.query<Entity & { link: string }>(
-      `select e.*, r.id as link from relation r join entity e on e.id = r.${far} where r.${near} = $1 and r.type = any($2::text[]) and r.valid_to is null and e.archived_at is null order by r.id limit ${READ_LIMIT}`,
-      [q.related, l.registry.relationFamily(q.relation ?? 'relates_to')],
-    );
-    return rows.map(typed);
-  }
-  if (q.trail !== undefined) return (await l.trail(q.trail)).map(({ id, type, title }) => typed({ id, type, title }));
-  if (q.view !== undefined) {
-    const view = VIEWS[q.view];
-    if (!view) throw new Error(`No view "${q.view}"`);
-    return view.run(l, q.params ?? {});
-  }
-  throw new Error('A read is one of: get, items, related, trail, view.');
-}
 
 /** One pack's process, started when first called. */
 /** A running process, with the calls waiting on it: they end with it. */

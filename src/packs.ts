@@ -45,7 +45,11 @@ export interface TypeDef {
   public?: boolean;
   /** What the kernel computes from it, each naming the field it reads. A flavour inherits them. */
   capabilities?: Capabilities;
+  /** How long its note may grow by an agent's hand, and what to tell one that goes over: a note every session reads whole is kept short. A flavour inherits it. */
+  note_max?: NoteMax;
 }
+
+export type NoteMax = { chars: number; say?: string };
 
 export interface RelationDef {
   id: string;
@@ -123,6 +127,7 @@ export interface ResolvedType {
   deliverable: boolean;
   public: boolean;
   capabilities: Capabilities;
+  noteMax?: NoteMax;
   /** Kept from the type table: its pack is gone, its items are not. */
   dormant?: boolean;
 }
@@ -239,6 +244,7 @@ export class Registry {
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
         capabilities: { ...parent?.capabilities, ...def.capabilities },
+        ...((def.note_max ?? parent?.noteMax) && { noteMax: def.note_max ?? parent?.noteMax }),
       };
       types.set(id, resolved);
       return resolved;

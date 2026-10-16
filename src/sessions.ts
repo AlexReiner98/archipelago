@@ -4,9 +4,10 @@
 // release: they are the session's own operational state, not facts about the
 // world, and coordination that waits for approval is no coordination.
 
-import { livesIn, livesInFor, placeFor } from './places.ts';
+import { livesIn, livesInFor, placeFor, scopeOf } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
-import { blockGraph, handoff, toConfirm, UNCONFIRMED_DAYS, VIEWS } from './views.ts';
+import { askView, canAsk } from './askview.ts';
+import { blockGraph, toConfirm, UNCONFIRMED_DAYS, VIEWS } from './views.ts';
 
 const now = () => new Date().toISOString();
 
@@ -352,11 +353,11 @@ type Item = { id: string; type: string; title: string; status: string };
 async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
   const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = any($2::text[]) and from_id = $1 and valid_to is null`, [run.id, livesIn(l)]);
   if (!repos.length) return [];
-  const work = (await VIEWS.repo_work.run(l, { repo: repos[0].to_id })) as { ready: Item[]; blocked: Item[] };
+  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id))], ['task', 'decision', 'issue'].flatMap((t) => l.registry.family(t))]);
   const graph = await blockGraph(l);
   const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending'`);
   const proposed = new Set(held.flatMap((p) => p.ops.flatMap((o) => ('id' in o && o.id ? [o.id] : []))));
-  const open = [...work.ready, ...work.blocked].filter((i) => !graph.waitsOnSomeone(i.id) && !proposed.has(i.id));
+  const open = work.filter((i) => !graph.waitsOnSomeone(i.id) && !proposed.has(i.id));
   const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
   return open.filter((i) => untouched.some((u) => u.id === i.id)).map(({ id, type, title, status }) => ({ id, type, title, status }));
 }
@@ -438,14 +439,13 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code' });
   const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}.`];
   const repo = 'repo' in started ? started.repo : undefined;
-  if (repo) {
-    const work = (await VIEWS.repo_work.run(l, { repo: repo.id })) as {
-      ready: { id: string; title: string; type: string; last_confirmed: string | Date }[];
-      blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[];
-    };
-    lines.push(`Repository: ${repo.title} (${repo.id}).`);
+  if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
+  // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.
+  if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
+    const asker: Actor = { kind: 'agent', name: 'claude-code' };
+    const work = (await askView(l, asker, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
     // Where things stand is read off the map; the session is told how much has moved since someone last wrote it down.
-    const stand = await handoff(l, { repo: repo.id });
+    const stand = (await askView(l, asker, 'handoff', { repo: repo.id })) as { note: { id: string; title: string; written: string } | null; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]>; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
     const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
     const then = stand.since_then;
     const from = stand.note ? `Its note, "${stand.note.title}" (${stand.note.id}), was written ${new Date(stand.note.written).toISOString().slice(0, 10)}; since then` : 'Nobody has written a handoff note here; in the last week';
@@ -466,7 +466,7 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
         'Hubs here with no view of their own (each holds enough to be the hub of its problem; when you work in one, give it its views: lens items about it, named for the questions they answer. View "hubs" says how much each holds):',
         ...owed.slice(0, 8).map((h) => `- ${h.title} (${h.id}), holding ${h.inside}`),
       );
-  } else {
+  } else if (!repo) {
     lines.push(`Archipelago does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
   }
   // The owner is here, in chat, and mostly nowhere else: what agents settled since they last answered is put to them now.

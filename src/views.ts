@@ -1,11 +1,11 @@
 // Views: the questions the map exists to answer. Nothing here is stored;
 // blockers are derived from relations every time, so they cannot go stale.
 
-import { lastPushes, repoByName, repoName } from './github.ts';
 import { pastBounds } from './bounds.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { costs } from './costs.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
+import { findPlace, scopeOf } from './places.ts';
 import { changelog, proof } from './proof.ts';
 
 interface Edge {
@@ -397,152 +397,11 @@ async function brief(l: Archipelago, input: { task?: string }) {
   };
 }
 
-/**
- * A repository by its id, by its GitHub name (an agent run from the repository
- * itself knows only that), or by its title in the map (what a session is told).
- * Asked for none, or one that is not there, it says which there are.
- */
-async function findRepo(l: Archipelago, key: string | undefined, view: string): Promise<Entity> {
-  const { rows: repos } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null order by title`, [l.registry.family('software.repo')]);
-  const wanted = key?.trim().toLowerCase();
-  const repo = wanted && (repos.find((r) => r.id === wanted) ?? (await repoByName(l, repoName(key))) ?? repos.find((r) => r.title.toLowerCase() === wanted));
-  if (repo) return repo;
-  const known = repos.map((r) => `${r.title} (${r.id})`).join(', ') || 'none';
-  throw new Error(`${key ? `No repository "${key}" in the map` : `${view} needs "repo"`}: give its id, its GitHub name ("owner/name") or its title. Repositories here: ${known}`);
-}
-
-/**
- * Everything that lives in a repository, and all that is part of that or about
- * it, as a query over $1. An issue is often filed as about a project, not as
- * part of it, and is the repository's work all the same.
- */
-const REPO_SCOPE = `with recursive scope(id) as (
-       select from_id from relation where type = 'software.lives_in' and to_id = $1 and valid_to is null
-       union
-       select r.from_id from relation r join scope s on r.to_id = s.id where r.type in ('part_of', 'about') and r.valid_to is null
-     )`;
-
-/** The ids of everything that is a repository's: the repository, what lives in it, and all that is part of that or about it. */
-export async function repoScope(l: Archipelago, repo: string): Promise<Set<string>> {
-  const { rows } = await l.db.query<{ id: string }>(`${REPO_SCOPE} select id from scope`, [repo]);
-  return new Set([repo, ...rows.map((r) => r.id)]);
-}
-
-/** An item and all that is part of it or about it, as a query over $1; everything, when $1 is null. */
-const UNDER = `with recursive scope(id) as (
-       select $1::text
-       union
-       select r.from_id from relation r join scope s on r.to_id = s.id where r.type in ('part_of', 'about') and r.valid_to is null
-     )`;
-
-/** Open work that belongs to whatever lives in a repository, split by whether it can run now. */
-async function repoWork(l: Archipelago, input: { repo?: string }) {
-  const repo = await findRepo(l, input.repo, 'repo_work');
-  input = { repo: repo.id };
-  const graph = await blockGraph(l);
-  const { rows } = await l.db.query<Brief & { last_confirmed: Date }>(
-    `${REPO_SCOPE}
-     select e.id, e.type, e.title, e.status, e.owner, e.props->>'due' as due, e.updated_at as last_confirmed
-     from entity e join scope s on s.id = e.id
-     where e.is_open and e.archived_at is null and e.type = any($2::text[])
-     order by e.props->>'due' nulls last, e.updated_at desc`,
-    [input.repo, [...l.registry.family('task'), ...l.registry.family('decision'), ...l.registry.family('issue')]],
-  );
-  const names = await briefs(l, rows.flatMap((r) => graph.roots(r.id)));
-  return {
-    repo: { id: repo.id, title: repo.title },
-    last_push: (await lastPushes(l)).get(repo.id) ?? null,
-    ready: rows.filter((r) => !graph.isBlocked(r.id)),
-    blocked: rows.filter((r) => graph.isBlocked(r.id)).map((r) => ({ ...r, waiting_on: graph.roots(r.id).map((id) => names.get(id)?.title) })),
-  };
-}
-
 /** Days without a change, or a word that it is still true, before open work is said to be unconfirmed. */
 export const UNCONFIRMED_DAYS = 14;
 
 /** The kinds of thing that are true or not of the world, and so go stale: work, questions and problems. */
 const GOES_STALE = ['task', 'decision', 'issue', 'hypothesis', 'experiment', 'software.feature'];
-
-/** How far back a handoff looks when nobody has written a note to count from. */
-const HANDOFF_DAYS = 7;
-
-/**
- * Where a repository's work stands, for whoever picks it up next. Nearly all
- * of it is read off the map, so it cannot go stale: the last push, what is
- * open, and what has happened since the note was written (pushes, what was
- * settled or opened, the sessions that ended and what each said). The note is
- * the one part an agent writes, and holds only what the map cannot know.
- */
-export async function handoff(l: Archipelago, input: { repo?: string; since?: string }) {
-  const repo = await findRepo(l, input.repo, 'handoff');
-  if (input.since && Number.isNaN(Date.parse(input.since))) throw new Error('handoff: "since" must be an ISO date or date-time');
-  const work = await repoWork(l, { repo: repo.id });
-  const { rows: notes } = await l.db.query<Entity>(
-    `${REPO_SCOPE}
-     select e.* from entity e join scope s on s.id = e.id
-     where e.type = any($2::text[]) and e.is_open and e.archived_at is null order by e.updated_at desc limit 1`,
-    [repo.id, l.registry.family('software.handoff')],
-  );
-  const note = notes[0] as Entity | undefined;
-  const since = input.since ? new Date(input.since) : note ? new Date(note.updated_at) : new Date(Date.now() - HANDOFF_DAYS * 86_400_000);
-  const { rows: pushes } = await l.db.query<{ ts: Date; reason: string; detail: { branch?: string; after?: string } }>(
-    `select ts, reason, detail from event
-     where action = 'repo.push' and target_id = $1 and ts > $2::timestamptz and coalesce(detail->>'branch', '') <> '' and detail->>'deleted' is null
-     order by seq desc limit 20`,
-    [repo.id, since.toISOString()],
-  );
-  const moved = async (which: string) =>
-    (
-      await l.db.query<{ id: string; type: string; title: string; status: string }>(
-        `${REPO_SCOPE}
-         select e.id, e.type, e.title, e.status from entity e join scope s on s.id = e.id
-         where e.archived_at is null and e.type = any($2::text[]) and ${which} order by e.updated_at desc limit 40`,
-        [repo.id, GOES_STALE.flatMap((t) => l.registry.family(t)), since.toISOString()],
-      )
-    ).rows;
-  const { rows: ended } = await l.db.query<Entity>(
-    `select e.* from entity e join relation r on r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null
-     where r.to_id = $1 and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and e.updated_at > $3::timestamptz
-     order by e.updated_at desc limit 10`,
-    [repo.id, l.registry.family('sys.run'), since.toISOString()],
-  );
-  const slim = ({ id, type, title, status }: { id: string; type: string; title: string; status: string }) => ({ id, type, title, status });
-  const unconfirmed = await toConfirm(l, { limit: 15 });
-  const inRepo = await repoScope(l, repo.id);
-  const unshaped = (await hubs(l)).filter((h) => h.views === 0 && inRepo.has(h.id));
-  // What a session said when it ended is the last thing it was heard to say: the line that opens with the time.
-  const said = (body: string) => (body.split('\n').findLast((line) => /^\[\d{4}-/.test(line)) ?? '').replace(/^\[[^\]]*\]\s*/, '').slice(0, 400);
-  return {
-    repo: work.repo,
-    last_push: work.last_push,
-    note: note ? { id: note.id, title: note.title, written: note.updated_at, characters: note.body.length, body: note.body } : null,
-    // The owner is met in chat: what agents settled and they have not answered for comes with where things stand.
-    ...(unconfirmed.count > 0 && { for_owner: unconfirmed }),
-    since,
-    since_then: {
-      pushes: pushes.map((p) => ({ at: p.ts, branch: p.detail?.branch, head: p.detail?.after?.slice(0, 7), subject: p.reason })),
-      settled: await moved('not e.is_open and e.updated_at > $3::timestamptz'),
-      opened: await moved('e.is_open and e.created_at > $3::timestamptz'),
-      sessions: ended.map((r) => ({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said(r.body) })),
-    },
-    open: { ready: work.ready.map(slim), blocked: work.blocked.map((b) => ({ ...slim(b), waiting_on: b.waiting_on })) },
-    // Work that is owed though nobody wrote it down: an item here that has grown into a hub and has no view of its own.
-    ...(unshaped.length > 0 && {
-      to_shape: {
-        hubs: unshaped.slice(0, 15),
-        how: 'Each of these holds enough to be the hub of its problem and has no view of its own. Give it its views: for each, a lens item (change, type lens) linked about it, named for the question it answers, with place for its order, controls for what the person may change (lit, far, closed), and a style about it if it should look its own way. A lens with from set to another item is a shortcut to there. The view named hubs lists every hub.',
-      },
-    }),
-    how:
-      (note ? '' : `Nobody has written a handoff note for this repository. To write the first, create a software.handoff and link it software.lives_in to ${repo.id} in the same change; this view finds it from then on. `) +
-      (note && note.body.length > HANDOFF_MAX
-        ? `The note is ${note.body.length} characters, and may be ${HANDOFF_MAX} at most: sessions have added to it and none has taken away. Before you finish, rewrite it whole (body), with one of each part. `
-        : note && note.body.length > HANDOFF_MAX * 0.8
-          ? `The note is ${note.body.length} of the ${HANDOFF_MAX} characters it may be: there is no room to add to it, so replace its parts. `
-          : '') +
-      `Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be ${HANDOFF_MAX} characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.`,
-  };
-}
 
 /**
  * Open work nobody has changed, or said is still true, for longest. An item's
@@ -551,17 +410,19 @@ export async function handoff(l: Archipelago, input: { repo?: string; since?: st
  */
 async function oldest(l: Archipelago, input: { days?: number; repo?: string; project?: string; limit?: number }) {
   const days = input.days ?? UNCONFIRMED_DAYS;
-  const repo = input.repo ? await findRepo(l, input.repo, 'oldest') : undefined;
+  const repo = input.repo ? await findPlace(l, input.repo) : undefined;
+  const within = repo || input.project ? [...(await scopeOf(l, repo?.id ?? input.project!))] : null;
+  if (input.repo && !repo) throw new Error(`No place "${input.repo}" in the map: give a repository's id, its GitHub name ("owner/name") or its title.`);
   const { rows } = await l.db.query<Brief & { last_confirmed: Date; days: number }>(
-    `${repo ? REPO_SCOPE : UNDER}
+    `
      select e.id, e.type, e.title, e.status, e.owner, e.updated_at as last_confirmed,
             floor(extract(epoch from now() - e.updated_at) / 86400)::int as days
      from entity e
      where e.is_open and e.archived_at is null and e.type = any($2::text[])
        and e.updated_at <= now() - make_interval(days => $3::int)
-       and ($1::text is null or e.id in (select id from scope))
+       and ($1::text[] is null or e.id = any($1::text[]))
      order by e.updated_at limit $4`,
-    [repo?.id ?? input.project ?? null, GOES_STALE.flatMap((t) => l.registry.family(t)), days, input.limit ?? 20],
+    [within, GOES_STALE.flatMap((t) => l.registry.family(t)), days, input.limit ?? 20],
   );
   return {
     older_than_days: days,
@@ -569,124 +430,6 @@ async function oldest(l: Archipelago, input: { days?: number; repo?: string; pro
     items: rows,
     note: 'Check each against what is so. If it is done or no longer as written, change it. If it is still true as written, send an update for it that changes nothing: that records that you checked, and when.',
   };
-}
-
-/** How often a project's oldest items are re-checked when the project does not say: weekly. */
-const RECHECK_DAYS = 7;
-
-/**
- * How often, and whether it has waited that long since the last time. A
- * project says how often itself; a feature living in a repository on its own
- * takes the answer of the project it is part of.
- */
-async function recheckOf(l: Archipelago, project: Entity, now = Date.now()) {
-  let every = RECHECK_DAYS;
-  for (let at: Entity | undefined = project, depth = 0; at && depth < 6; depth++) {
-    if (typeof at.props.recheck_days === 'number') {
-      every = at.props.recheck_days;
-      break;
-    }
-    const up: { rows: Entity[] } = await l.db.query<Entity>(`select e.* from relation r join entity e on e.id = r.to_id where r.type = 'part_of' and r.from_id = $1 and r.valid_to is null and e.archived_at is null limit 1`, [at.id]);
-    at = up.rows[0];
-  }
-  const last = project.props.rechecked_at as string | undefined;
-  // Two hours of grace, so a daily asker that comes a little early one day does not wait another.
-  const waited = every > 0 && (!last || now - Date.parse(last) >= every * 86_400_000 - 7_200_000);
-  return { every, last: last ?? null, waited };
-}
-
-/**
- * The open projects that live in a repository, and the features that live
- * there on their own: a repository may hold one feature of a project that
- * lives elsewhere, and its work goes stale like any other. A feature whose
- * project lives here too is that project's, and is not listed twice.
- */
-export async function projectsIn(l: Archipelago, repo: string): Promise<Entity[]> {
-  const { rows } = await l.db.query<Entity>(
-    `select p.* from relation r join entity p on p.id = r.from_id
-     where r.type = 'software.lives_in' and r.to_id = $1 and r.valid_to is null and p.type = any($2::text[]) and p.is_open and p.archived_at is null
-       and not exists (
-         select 1 from relation up join relation there on there.from_id = up.to_id and there.type = 'software.lives_in' and there.to_id = $1 and there.valid_to is null
-         where up.type = 'part_of' and up.from_id = p.id and up.valid_to is null)
-     order by p.created_at`,
-    [repo, [...l.registry.family('project'), ...(l.registry.type('software.feature') ? l.registry.family('software.feature') : [])]],
-  );
-  return rows;
-}
-
-/**
- * What a scheduled agent should re-check in a repository now: for each
- * project there that has waited as long as it asks between re-checks, its
- * open items nobody has changed or confirmed in that time, oldest first. The
- * list is long on purpose: the oldest are often chores no repository can
- * settle, and the one re-checking has to be able to get past them. What is
- * said to wait on a person is left out: the code cannot tell, and that has
- * been recorded.
- */
-async function recheck(l: Archipelago, input: { repo?: string; limit?: number; now?: boolean }) {
-  const repo = await findRepo(l, input.repo, 'recheck');
-  const projects = [];
-  const graph = await blockGraph(l);
-  for (const p of await projectsIn(l, repo.id)) {
-    const { every, last, waited } = await recheckOf(l, p);
-    // Asked for now, the interval and the items' age are set aside: whatever is oldest is looked at.
-    const old = input.now || waited ? (await oldest(l, { project: p.id, days: input.now ? 0 : every, limit: (input.limit ?? 25) + 25 })).items : [];
-    const items = old.filter((i) => !graph.waitsOnSomeone(i.id)).slice(0, input.limit ?? 25);
-    projects.push({ id: p.id, title: p.title, every_days: every, rechecked_at: last, due: items.length > 0, items });
-  }
-  return {
-    repo: { id: repo.id, title: repo.title },
-    due: projects.some((p) => p.due),
-    projects,
-    note: 'For each item of a project that is due: check it against the repository. If it is done or no longer as written, change it. If it is still true as written, send an update for it that changes nothing. If the repository cannot tell because it is waiting on a person to answer or act, link it to them with waits_on (what for in props.for): it is then theirs to say, and is not asked of a re-check again. When you are done, call rechecked for the repository.',
-  };
-}
-
-/** Projects in a repository that have waited out their interval, whether or not anything in them is old. */
-export async function awaitingRecheck(l: Archipelago, repoKey: string): Promise<Entity[]> {
-  const repo = await findRepo(l, repoKey, 'rechecked');
-  const waiting = [];
-  for (const p of await projectsIn(l, repo.id)) if ((await recheckOf(l, p)).waited) waiting.push(p);
-  return waiting;
-}
-
-/**
- * What agents have used in a repository: every run there that counted its
- * tokens (a session on someone's machine, the sync agent in GitHub Actions),
- * newest first, and the sum for each place they ran over the last week and
- * the last thirty days.
- */
-async function agentUsage(l: Archipelago, input: { repo?: string; limit?: number }) {
-  const repo = await findRepo(l, input.repo, 'agent_usage');
-  const { rows } = await l.db.query<Entity>(
-    `select e.* from entity e join relation r on r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null
-     where r.to_id = $1 and e.type = any($2::text[]) and e.archived_at is null and (e.props->>'tokens_used') is not null
-     order by e.created_at desc limit 500`,
-    [repo.id, l.registry.family('sys.run')],
-  );
-  const runs = rows.map((e) => ({
-    id: e.id,
-    title: e.title,
-    status: e.status,
-    surface: (e.props.surface as string | undefined) ?? 'unknown',
-    tokens: Number(e.props.tokens_used ?? 0),
-    cost_usd: e.props.cost_usd as number | undefined,
-    turns: e.props.turns as number | undefined,
-    link: e.props.link as string | undefined,
-    at: e.created_at,
-  }));
-  const within = (days: number) => {
-    const since = Date.now() - days * 86_400_000;
-    const by: Record<string, { runs: number; tokens: number; cost_usd: number }> = {};
-    for (const run of runs.filter((x) => new Date(x.at).getTime() >= since)) {
-      const sum = (by[run.surface] ??= { runs: 0, tokens: 0, cost_usd: 0 });
-      sum.runs++;
-      sum.tokens += run.tokens;
-      sum.cost_usd = Math.round((sum.cost_usd + (run.cost_usd ?? 0)) * 10_000) / 10_000;
-    }
-    return by;
-  };
-  return { repo: { id: repo.id, title: repo.title }, week: within(7), month: within(30), runs: runs.slice(0, input.limit ?? 20) };
 }
 
 /** Which relations each preset draws: these roots, and every relation extending them. */
@@ -1268,11 +1011,7 @@ export const VIEWS: Record<string, View> = {
     description: 'Unread notifications for the human, newest first.',
     run: notifications,
   },
-  agent_usage: {
-    description:
-      'What agents have used in a repository: each run there that counted its tokens (a session on a machine, the sync agent in GitHub Actions), newest first, and the sum by where they ran over the last 7 and 30 days. Params: repo (required): its id, GitHub name or title; limit (runs listed, default 20).',
-    run: agentUsage,
-  },
+
   to_confirm: {
     description: 'What agents settled that the owner has not confirmed: each decision or hypothesis an agent closed since the owner last looked or last answered, with what was chosen and on what it rests; those settled on an agent\u2019s own judgment first, then those recorded on the owner\u2019s word. Show the first to the owner and record their answer with the confirmed tool. Params: limit (default 40).',
     run: toConfirm,
@@ -1285,25 +1024,14 @@ export const VIEWS: Record<string, View> = {
     description: 'Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required).',
     run: brief,
   },
-  handoff: {
-    description:
-      'Where a repository’s work stands, for the session picking it up: the last push, the handoff note (the part an agent wrote: what the map cannot know), what has happened since that note was written (pushes, what was settled, what was opened, the sessions that ended and what each said), and the open work, ready and blocked. Read this first. Params: repo (required): its id, GitHub name or title; since (an ISO date-time to count from, instead of when the note was written).',
-    run: handoff,
-  },
-  repo_work: {
-    description: 'Open tasks, decisions and issues belonging to whatever lives in a repository, split into ready and blocked, and when GitHub last reported a push to it. Params: repo (required): its id, its GitHub name "owner/name", or its title.',
-    run: repoWork,
-  },
+
+
   oldest: {
     description:
       'What may have gone stale: open tasks, decisions, issues, hypotheses, experiments and features nobody has changed or confirmed for longest, oldest first, each with when it was last known true. Params: days (only items older than this; default 14), repo (its id, GitHub name or title) or project (an id: only what is part of it), limit (default 20).',
     run: oldest,
   },
-  recheck: {
-    description:
-      'What is due for a scheduled re-check in a repository: each project living there says how often its oldest items are re-checked (its recheck_days; weekly when not set, 0 for never; a feature living there on its own takes its project\u2019s), and for each that has waited that long, its open items nobody has changed or confirmed in that time, oldest first, leaving out what waits on a person. Params: repo (required): its id, GitHub name or title, limit (items per project, default 25), now (true to be given the oldest items of every project there, whatever its interval and however new they are).',
-    run: recheck,
-  },
+
   available_now: {
     description: 'What can run right now: open tasks with nothing blocking them, tasks waiting only on a resource, and who holds each resource. Params: owner.',
     run: availableNow,

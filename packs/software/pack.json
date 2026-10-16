@@ -121,7 +121,70 @@
       "id": "software.handoff",
       "extends": "note",
       "title": "Handoff",
-      "description": "Where a working session left things for the next one."
+      "description": "Where a working session left things for the next one.",
+      "note_max": { "chars": 3000, "say": "It holds one of each part (not seen working, what bites here, next and why). Rewrite it whole with body: keep what is still so, drop what later work settled, and put what is true of one item in that item's note." }
+    }
+  ],
+  "views": [
+    {
+      "id": "software.handoff",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "Where a repository's work stands, for the session picking it up: the last push, the handoff note (the part an agent wrote: what the map cannot know), what has happened since that note was written (pushes, what was settled, what was opened, the sessions that ended and what each said), and the open work, ready and blocked. Read this first. Params: repo (required): its id, GitHub name or title; since (an ISO date-time to count from, instead of when the note was written).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "repo": { "type": "string", "description": "The repository: its id, its GitHub name \"owner/name\", or its title." },
+          "since": { "type": "string", "description": "An ISO date-time to count from, instead of when the note was written." },
+          "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "software.repo_work",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "Open tasks, decisions and issues belonging to whatever lives in a repository, split into ready and blocked, and when GitHub last reported a push to it. Params: repo (required): its id, its GitHub name \"owner/name\", or its title.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "repo": { "type": "string", "description": "The repository: its id, its GitHub name \"owner/name\", or its title." },
+          "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "software.recheck",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "What is due for a scheduled re-check in a repository: each project living there says how often its oldest items are re-checked (its recheck_days; weekly when not set, 0 for never; a feature living there on its own takes its project's), and for each that has waited that long (waited), its open items nobody has changed or confirmed in that time, oldest first, leaving out what waits on a person. Params: repo (required): its id, GitHub name or title, limit (items per project, default 25), now (true to be given the oldest items of every project there, whatever its interval and however new they are).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "repo": { "type": "string", "description": "The repository: its id, its GitHub name \"owner/name\", or its title." },
+          "limit": { "type": "integer", "description": "Items per project, 25 unless given." },
+          "now": { "type": "boolean", "description": "true for the oldest items of every project there, whatever its interval." },
+          "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "software.agent_usage",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "What agents have used in a repository: each run there that counted its tokens (a session on a machine, the sync agent in GitHub Actions), newest first, and the sum by where they ran over the last 7 and 30 days. Params: repo (required): its id, GitHub name or title; limit (runs listed, default 20).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "repo": { "type": "string", "description": "The repository: its id, its GitHub name \"owner/name\", or its title." },
+          "limit": { "type": "integer", "description": "Runs listed, 20 unless given." },
+          "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." }
+        },
+        "additionalProperties": false
+      }
     }
   ],
   "relations": [

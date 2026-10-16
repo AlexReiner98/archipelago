@@ -25,7 +25,8 @@ import { undo } from './undo.ts';
 import { withScreens } from './screens.ts';
 import { getPicture, putPicture, reportTests } from './proof.ts';
 import { pictureOf, readLens, shownIn } from './lens.ts';
-import { awaitingRecheck, HANDOFF_MAX, toConfirm, VIEWS } from './views.ts';
+import { askView, viewList } from './askview.ts';
+import { toConfirm, VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page; only a project, feature, release, proof question, test or test result can be, and only a human makes it so (from an agent it waits as a proposal).');
@@ -394,16 +395,14 @@ export const TOOLS: Record<string, Tool> = {
       'Answer one of the standing questions. Call with no name to list them. An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ' +
       Object.entries(VIEWS)
         .map(([name, v]) => `${name}: ${v.description}`)
-        .join(' '),
+        .join(' ') + ' The packs here add their own (the repository views handoff, repo_work, recheck and agent_usage are the software pack\u2019s): call with no name for all of them.',
     input: {
       name: z.string().optional(),
       params: props.optional(),
     },
     run: async (l, actor, input) => {
-      if (!input.name) return Object.fromEntries(Object.entries(VIEWS).map(([name, v]) => [name, v.description]));
-      const view = VIEWS[input.name];
-      if (!view) throw new Error(`No view "${input.name}". Views: ${Object.keys(VIEWS).join(', ')}`);
-      const answer = await view.run(l, input.params ?? {});
+      if (!input.name) return viewList(l);
+      const answer = await askView(l, actor, input.name, input.params ?? {});
       if (actor.kind !== 'agent' || input.params?.full) return answer;
       // A view that answers with events (changed_since) is history, and is cut for an agent as history is.
       const events = (answer as { events?: unknown } | null)?.events;
@@ -622,15 +621,17 @@ export const TOOLS: Record<string, Tool> = {
               ? [`op ${i + 1} (${o.op}): the title is ${o.title.trim().length} characters. A title is a name, not a sentence: ${TITLE_MAX} at most. Name the thing in a few words and put the rest in its note.`]
               : [],
           );
-          // A handoff note every session adds to is read whole by every session after it. It is held to a length an
-          // agent can only keep by rewriting it; one that is already over may always be made shorter.
+          // A note every session adds to (a handoff) is read whole by every session after it. Its type may hold it to a length
+          // an agent can only keep by rewriting it (note_max); one that is already over may always be made shorter.
           for (const [i, o] of (input.ops as { op: string; type?: string; id?: string; body?: string; append?: string; replace?: { find: string; with: string } }[]).entries()) {
             let before = 0;
             let after = 0;
-            if (o.op === 'create' && l.registry.isA(o.type ?? '', 'software.handoff')) after = o.body?.length ?? 0;
+            let type = o.op === 'create' ? l.registry.type(o.type ?? '') : undefined;
+            if (o.op === 'create') after = o.body?.length ?? 0;
             else if (o.op === 'update' && (o.body !== undefined || o.append !== undefined || o.replace)) {
               const target = await l.entity(o.id!);
-              if (!target || !l.registry.isA(target.type, 'software.handoff')) continue;
+              if (!target) continue;
+              type = l.registry.type(target.type);
               before = target.body.length;
               try {
                 after = bodyAfter(target.body, o as Parameters<typeof bodyAfter>[1]).length;
@@ -638,8 +639,7 @@ export const TOOLS: Record<string, Tool> = {
                 continue; // what is wrong with the op is said by the change itself
               }
             }
-            if (after > HANDOFF_MAX && after > before)
-              long.push(`op ${i + 1} (${o.op}): the handoff note would be ${after} characters: ${HANDOFF_MAX} at most. It holds one of each part (not seen working, what bites here, next and why). Rewrite it whole with body: keep what is still so, drop what later work settled, and put what is true of one item in that item's note.`);
+            if (type?.noteMax && after > type.noteMax.chars && after > before) long.push(`op ${i + 1} (${o.op}): the ${type.title.toLowerCase()} note would be ${after} characters: ${type.noteMax.chars} at most.${type.noteMax.say ? ` ${type.noteMax.say}` : ''}`);
           }
           if (long.length) throw new Error(`Change rejected:\n- ${long.join('\n- ')}`);
         }
@@ -834,7 +834,7 @@ export const TOOLS: Record<string, Tool> = {
       summary: z.string().optional().describe('What was checked and what was found.'),
     },
     run: async (l, actor, input) => {
-      const projects = await awaitingRecheck(l, input.repo);
+      const projects = ((await askView(l, actor, 'recheck', { repo: input.repo, limit: 0 })) as { projects: { id: string; title: string; waited: boolean }[] }).projects.filter((p) => p.waited);
       const at = new Date().toISOString();
       for (const p of projects) {
         // Bookkeeping stays out of the project's history; the re-check itself is the event.

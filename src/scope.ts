@@ -8,16 +8,15 @@
 
 import { repoByName, repoName } from './github.ts';
 import { packTool } from './packtools.ts';
-import { livesIn } from './places.ts';
+import { livesIn, scopeOf } from './places.ts';
 import type { Actor, Archipelago, Op } from './pelago.ts';
 import { resolveRun } from './sessions.ts';
-import { repoScope } from './views.ts';
 
 export async function withinScope(l: Archipelago, actor: Actor, tool: string, input: Record<string, unknown>): Promise<void> {
   const repos = actor.repos ?? [];
   if (!repos.length) return;
   const scope = new Set<string>();
-  for (const repo of repos) for (const id of await repoScope(l, repo)) scope.add(id);
+  for (const repo of repos) for (const id of await scopeOf(l, repo)) scope.add(id);
   const titles = (await Promise.all(repos.map(async (id) => (await l.entity(id))?.title ?? id))).join(' and ');
   const refuse = (what: string): never => {
     throw new Error(`This token is limited to the work of ${titles}. ${what}`);
