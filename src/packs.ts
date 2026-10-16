@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
 import { checkDeclared, KERNEL_VERBS, toolName, type ActionDef, type VerbDef, type ViewDef } from './declared.ts';
 import { checkValue } from './fields.ts';
+import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { PACK_TOOLS } from './pack-tools.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 
@@ -121,9 +122,6 @@ export interface ResolvedType {
 /** A relation as loaded: `root` names the root it extends (itself, for a root). */
 export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root: string; dormant?: boolean };
 
-/** Packs whose types make up the kernel: the kinds, the root relations and the system tier. */
-const KERNEL_PACKS = ['core', 'sys'];
-
 /** The pack that approved type proposals are written to. */
 export const LOCAL_PACK = 'local';
 
@@ -140,6 +138,11 @@ export class Registry {
   verbs: VerbDef[] = [];
   /** Each pack's actions and views by the tool name they are offered as. */
   tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
+  /** Every pack found, active, waiting or off, with why. */
+  states = new Map<string, PackState>();
+  found: PackFile[] = [];
+  /** Packs the owner turned off in this workspace. */
+  private turnedOff: string[] = [];
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
@@ -162,25 +165,14 @@ export class Registry {
       if (!existsSync(file)) continue;
       const pack = JSON.parse(readFileSync(file, 'utf8')) as PackFile;
       if (pack.id !== name) throw new Error(`Pack folder "${name}" contains pack id "${pack.id}"`);
-      if (this.only && !this.only.includes(pack.id) && pack.id !== 'core') continue;
       found.set(pack.id, pack);
     }
     if (!found.has('core')) throw new Error(`No core pack in ${this.dir}`);
 
-    // Load in dependency order.
-    const ordered: PackFile[] = [];
-    const visit = (pack: PackFile, trail: string[]) => {
-      if (ordered.includes(pack)) return;
-      if (trail.includes(pack.id)) throw new Error(`Pack dependency cycle: ${[...trail, pack.id].join(' -> ')}`);
-      for (const dep of pack.requires ?? []) {
-        const required = found.get(dep);
-        if (!required) throw new Error(`Pack "${pack.id}" requires "${dep}", which is not enabled`);
-        visit(required, [...trail, pack.id]);
-      }
-      ordered.push(pack);
-    };
-    visit(found.get('core')!, []);
-    for (const pack of [...found.values()].sort((a, b) => a.id.localeCompare(b.id))) visit(pack, []);
+    // Load in dependency order what is on and has what it requires; the rest waits or is off.
+    const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
+    for (const id of this.turnedOff) off.set(id, 'turned off here');
+    const { ordered, states } = orderPacks(found, off, LOCAL_PACK);
 
     const raw = new Map<string, TypeDef & { pack: string }>();
     const relations = new Map<string, ResolvedRelation>();
@@ -242,7 +234,14 @@ export class Registry {
       types.set(id, resolved);
       return resolved;
     };
-    for (const id of raw.keys()) resolve(id, []);
+    for (const id of raw.keys()) {
+      try {
+        resolve(id, []);
+      } catch (err) {
+        // A workspace's own type may extend one whose pack is not active: it is left to the type table.
+        if (raw.get(id)!.pack !== LOCAL_PACK) throw err;
+      }
+    }
 
     for (const rel of relations.values()) {
       for (const end of [...rel.from, ...rel.to]) {
@@ -294,6 +293,8 @@ export class Registry {
     }
 
     this.packs = ordered;
+    this.states = states;
+    this.found = [...found.values()];
     this.rules = ordered.flatMap((pack) => (pack.rules ?? []).map((rule) => ({ ...rule, pack: pack.id })));
     this.types = types;
     this.relations = relations;
@@ -315,6 +316,12 @@ export class Registry {
 
   type(id: string): ResolvedType | undefined {
     return this.types.get(id);
+  }
+
+  /** Turn packs off in this workspace (the rest on), and load again. The kernel's packs stay on. */
+  turnOff(packs: string[]): void {
+    this.turnedOff = packs.filter((p) => !KERNEL_PACKS.includes(p));
+    this.reload();
   }
 
   /** The seven kinds, in the core pack's order. */

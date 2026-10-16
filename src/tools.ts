@@ -6,7 +6,9 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
-import { createShare, listShares, readDocument, revokeShare } from './documents.ts';
+import { readDocument } from './documents.ts';
+import { PACK_STATE_TOOLS } from './packstate.ts';
+import { SHARE_TOOLS } from './share-tools.ts';
 import { TIME_TOOLS } from './time-tools.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
@@ -884,24 +886,8 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => readDocument(l, input.id),
   },
   ...TIME_TOOLS,
-  share_create: {
-    description: 'Make a link that lets someone with no login read one document and the items it brings in. The link is shown once.',
-    humanOnly: true,
-    input: { id: z.string().describe('The document.') },
-    run: async (l, actor, input) => createShare(l, actor, input.id),
-  },
-  share_list: {
-    description: 'The links made to a document, standing ones first. Secrets are never shown.',
-    humanOnly: true,
-    input: { id: z.string().describe('The document.') },
-    run: async (l, _actor, input) => listShares(l, input.id),
-  },
-  share_revoke: {
-    description: 'Stop a link to a document from working, at once.',
-    humanOnly: true,
-    input: { id: z.string().describe('The link, from share_list.') },
-    run: async (l, actor, input) => revokeShare(l, actor, input.id),
-  },
+  ...PACK_STATE_TOOLS,
+  ...SHARE_TOOLS,
   token_create: {
     description:
       'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once. ' +

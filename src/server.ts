@@ -27,14 +27,11 @@
 // every request carries a token that names its workspace and its identity,
 // and the surface no longer matters.
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
-import { z } from 'zod';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { notify } from './notify.ts';
 import { backupAll, newestBackup, parseBackup } from './backup.ts';
@@ -43,6 +40,7 @@ import { SETUP_VERSION, setupCommand, setupScript } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
+import { serveMcp } from './mcp.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
 import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.ts';
@@ -52,48 +50,8 @@ import { publicPage, publicPicture } from './public.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
-import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, toolsFor } from './tools.ts';
+import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
-
-const actorField = {
-  actor: z.string().optional().describe('Who you are, e.g. "claude-code:aperture". Recorded against everything you do.'),
-};
-
-/**
- * A client keeps the tool list it was given when it connected. An input added
- * since is one it does not know the type of, and it sends it as a string:
- * "true", "[...]". Where an input is not a string and what arrived is one
- * that spells a value the input takes, it is taken as that value.
- */
-export function lenient<T extends z.ZodType>(schema: T) {
-  return z.preprocess((value) => {
-    if (typeof value !== 'string' || schema.safeParse(value).success) return value;
-    try {
-      const spelt = JSON.parse(value);
-      return schema.safeParse(spelt).success ? spelt : value;
-    } catch {
-      return value;
-    }
-  }, schema);
-}
-
-function buildMcp(pelago: Archipelago, actorFor: (label?: string) => Actor): McpServer {
-  const mcp = new McpServer({ name: 'pelago', version: '0.1.0' });
-  for (const [name, tool] of toolsFor(pelago.registry)) {
-    if (tool.humanOnly || (tool.devOnly && !devMode())) continue;
-    const inputSchema = { ...Object.fromEntries(Object.entries(tool.input).map(([key, schema]) => [key, lenient(schema as z.ZodType)])), ...actorField };
-    mcp.registerTool(name, { description: tool.description, inputSchema }, async (args: Record<string, unknown>) => {
-      const { actor, ...input } = args;
-      try {
-        const result = await callTool(pelago, actorFor(actor as string | undefined), name, input);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: (err as Error).message }], isError: true };
-      }
-    });
-  }
-  return mcp;
-}
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
 const BODY_MAX = 32_000_000;
@@ -130,6 +88,7 @@ const UI_FILES: Record<string, string> = {
   '/public.css': 'public.css',
   '/doc.js': 'doc.js',
   '/doc.css': 'doc.css',
+  '/packs.js': 'packs.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
@@ -151,6 +110,8 @@ class Refused extends Error {
     this.status = status;
   }
 }
+
+export { lenient } from './mcp.ts';
 
 export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
@@ -330,20 +291,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       }
 
       if (url.pathname === '/mcp') {
-        if (req.method !== 'POST') return send(res, 405, { error: 'This server is stateless: POST only.' });
-        const { pelago, actor } = await resolve(req, res, 'agent');
-        const mcp = buildMcp(pelago, actor);
-        const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: undefined,
-          enableDnsRebindingProtection: true,
-          allowedHosts: hosts,
-        });
-        res.on('close', () => {
-          void transport.close();
-          void mcp.close();
-        });
-        await mcp.connect(transport);
-        return await transport.handleRequest(req, res, await readJson(req));
+        const { ws, pelago, actor } = await resolve(req, res, 'agent');
+        return await serveMcp(req, res, { workspace: ws.id, pelago, actor }, hosts, req.method === 'POST' ? await readJson(req) : undefined);
       }
 
       const surface = url.pathname.startsWith('/api/') ? 'api' : url.pathname.startsWith('/agent/') ? 'agent' : undefined;

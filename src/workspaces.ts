@@ -11,6 +11,7 @@ import { restore, type Dump } from './backup.ts';
 import { openDb } from './db.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { Registry } from './packs.ts';
+import { packsOff } from './packstate.ts';
 import { syncTypes } from './typetable.ts';
 
 export const DEFAULT_WORKSPACE = 'default';
@@ -149,6 +150,8 @@ export class Workspaces {
       });
     }
     const pelago = new Archipelago(db, new Registry(packsDir, packs, localPack), policy, id);
+    // The packs the owner turned off here stay off; what they made is dormant.
+    pelago.registry.turnOff(await packsOff(pelago));
     await syncTypes(pelago);
     const automations = new Automations(pelago);
     if (this.config.runAutomations) automations.start();
