@@ -1,9 +1,8 @@
 // The Workspace screen.
 
-import { api, ask, authHeaders, h, main, part, tell } from './base.js';
-import { tokensText } from './graph.js';
+import { api, ask, authHeaders, h, part, tell } from './base.js';
 import { packsCard } from './packs.js';
-import { RAN, ago, card, chip, hint, label, link, named, titles, when } from './words.js';
+import { RAN, ago, card, chip, hint, link, named, titles, tokensText, when } from './words.js';
 import { connectBox, githubCard, importCard, operatorCard, ownerCard, secretBox } from './workspace-cards.js';
 
 export async function workspace() {

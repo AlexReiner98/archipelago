@@ -27,6 +27,7 @@
     },
     {
       "id": "software.feature",
+      "public": true,
       "capabilities": { "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Feature",
@@ -47,6 +48,7 @@
     },
     {
       "id": "software.release",
+      "public": true,
       "extends": "event",
       "title": "Release",
       "description": "A version shipped or planned.",
@@ -58,6 +60,7 @@
     },
     {
       "id": "software.proof",
+      "public": true,
       "extends": "question",
       "title": "Proof",
       "description": "Something a user would ask before trusting the software, such as how we know the sun is correct. The title is the question. It is answered on a build when every test of it passed there: that is worked out from the results, not stored.",
@@ -65,6 +68,7 @@
     },
     {
       "id": "software.test",
+      "public": true,
       "extends": "procedure",
       "title": "Test",
       "description": "One check that helps answer a proof question. A draft is a test that is wanted and not yet written. What it found is kept per build, as test results.",
@@ -76,6 +80,7 @@
     },
     {
       "id": "software.test_result",
+      "public": true,
       "extends": "result",
       "title": "Test result",
       "description": "What one test found on one build. There is one for each test on each build; a later run on the same build replaces it.",
@@ -123,6 +128,11 @@
     { "id": "software.uses", "extends": "relates_to", "title": "uses", "inverse": "is used by", "from": ["*"], "to": ["software.application"], "description": "An application the work depends on or targets." },
     { "id": "software.answers", "extends": "bears_on", "title": "helps answer", "inverse": "is answered by", "from": ["software.test"], "to": ["software.proof"], "description": "The test is part of how we know. A proof question is answered on a build when every test that helps answer it passed there." },
     { "id": "software.ships", "extends": "relates_to", "title": "ships", "inverse": "ships in", "from": ["software.release"], "to": ["*"], "description": "What a release contains." }
+  ],
+  "screens": [
+    { "id": "software.roadmap", "title": "Roadmap", "on": ["project"], "pieces": [{ "piece": "tree", "tree": "software.roadmap" }] },
+    { "id": "software.proof", "title": "How we know", "on": ["project", "software.feature", "software.proof"], "pieces": [{ "piece": "proof" }] },
+    { "id": "software.usage", "title": "Tokens used here", "on": ["software.repo"], "pieces": [{ "piece": "usage" }] }
   ],
   "trees": [
     {

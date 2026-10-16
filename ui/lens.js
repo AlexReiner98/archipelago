@@ -1,9 +1,9 @@
-import { api, h, part, state } from './base.js';
+import { api, h, part } from './base.js';
 import { BLOCKING, isOf } from './graph.js';
 import { drawGrid } from './grid.js';
 import { drawCode, drawNest } from './nest.js';
 import { drawTime } from './timeline.js';
-import { ago, hint, idsAsLinks, kept, label, link, named, relations, titles, typeTitle } from './words.js';
+import { ago, idsAsLinks, link, relations, titles, typeTitle } from './words.js';
 
 // ---- A session's story -----------------------------------------------------
 

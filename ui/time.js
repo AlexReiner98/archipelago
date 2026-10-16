@@ -1,6 +1,6 @@
 // The Time screen.
 
-import { api, ask, h, main, part, state, tell } from './base.js';
+import { api, ask, h, part, state, tell } from './base.js';
 import { CAL_FULL, LAST_WORK, atHour, blockDialog, calHidden, choose, clockText, confirmEntryOps, confirmRoutineOps, dayName, happenedDialog, hoursText, localDay, mondayOf, moneyText, remember, shiftDay, timeState, weekCalendar, workPicker } from './week.js';
 import { menu } from './words.js';
 

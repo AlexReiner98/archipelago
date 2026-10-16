@@ -1,6 +1,6 @@
 import { api, h } from './base.js';
 import { drawGraph, timeline } from './graph-draw.js';
-import { label, menu, relations } from './words.js';
+import { menu, relations } from './words.js';
 
 // ---- Graph ---------------------------------------------------------------
 
@@ -132,7 +132,7 @@ export function shapeGraph(data, focus, prefs, extras = {}) {
   // What a thing in sight waits on is in sight too, though it is a step further out: a thing marked as blocked shows what by.
   if (focus) for (const e of all) if (isOf(BLOCKING, e.type) && rank.has(e.from) && !rank.has(e.to)) rank.set(e.to, rank.get(e.from) - 1);
   // A project's chart is one level: its features, and its work that is under none of them. A task that is part of a feature is on that feature's page.
-  if (extras.workOnly) for (const e of walk) if (e.type === 'part_of' && e.to !== focus && rank.has(e.to) && rank.has(e.from)) rank.delete(e.from);
+  if (extras.workOnly) for (const e of walk) if (isOf(['part_of'], e.type) && e.to !== focus && rank.has(e.to) && rank.has(e.from)) rank.delete(e.from);
   const nodes = [...rank.keys()].map((id) => byId.get(id));
   // What waits on what is drawn whatever the filter, among the things in sight.
   const edges = all.filter((e) => rank.has(e.from) && rank.has(e.to) && (counts(e) || isOf(BLOCKING, e.type)));
@@ -191,8 +191,6 @@ export function shapeGraph(data, focus, prefs, extras = {}) {
   return { nodes, edges, byId, focus };
 }
 
-/** A count of tokens as a person says it: 1.2M, 340k. */
-export const tokensText = (t) => (t >= 1e6 ? `${+(t / 1e6).toFixed(1)}M` : t >= 1000 ? `${Math.round(t / 1000)}k` : `${Math.round(t)}`);
 
 /**
  * Where there is work in sight, across is tokens. Work is laid end to end in

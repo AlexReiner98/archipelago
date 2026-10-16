@@ -3,7 +3,7 @@
 import { h } from './base.js';
 import { BLOCKING, isOf, s } from './graph.js';
 import { STYLE_COLORS, lensTree, litCount, litSwitch } from './lens.js';
-import { kept, link, relations, typeTitle } from './words.js';
+import { link, relations, typeTitle } from './words.js';
 
 export function drawNest(host, answer, style, keep, kept) {
   const { me, byId, root } = lensTree(answer);

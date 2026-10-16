@@ -1,7 +1,7 @@
 // Forms built from a type's schema.
 
-import { api, h, main, part, state } from './base.js';
-import { hint, label, statusesOf, types, when } from './words.js';
+import { api, h, part, state } from './base.js';
+import { label, statusesOf, types } from './words.js';
 
 /** A form for any type, built from its schema. System-kept fields are left out. */
 export function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {

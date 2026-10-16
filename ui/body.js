@@ -1,7 +1,7 @@
 // A note as a page: its first paragraph and the titles of its sections, each one click away.
 
 import { h } from './base.js';
-import { idsAsLinks, titles } from './words.js';
+import { idsAsLinks } from './words.js';
 
 /**
  * A body as a page, not a block, and never a wall of text. Agents write notes

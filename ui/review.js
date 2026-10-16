@@ -1,7 +1,7 @@
 // Changes: what is held for the owner and what has happened, newest first.
 
-import { api, ask, h, known, main, part, tell } from './base.js';
-import { ago, changeRow, chip, eventLine, gist, label, link, loadSchema, refreshReviewCount, relations, statusesOf, unfolded, who } from './words.js';
+import { api, ask, h, part, tell } from './base.js';
+import { ago, changeRow, chip, eventLine, gist, link, loadSchema, refreshReviewCount, relations, statusesOf, who } from './words.js';
 
 // ---- Review --------------------------------------------------------------
 

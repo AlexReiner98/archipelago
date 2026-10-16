@@ -1,6 +1,6 @@
-import { api, h, main, tell } from './base.js';
+import { api, h, tell } from './base.js';
 import { progressBar } from './roadmap.js';
-import { chip, label, link, pill, unfolded } from './words.js';
+import { chip, link, pill, unfolded } from './words.js';
 
 // ---- Gate ----------------------------------------------------------------
 

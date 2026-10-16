@@ -19,6 +19,8 @@ export interface ActionDef {
   verb: string;
   /** The kinds or types it acts on, which decides whose page shows its form. */
   on?: string[];
+  /** The input the item's id goes in, when its form is opened from an item's page. */
+  item?: string;
   /** JSON Schema of an object. */
   input: Record<string, unknown>;
   /** How long a call may take, in milliseconds: 2000 unless said, 30000 at most. */
@@ -68,6 +70,38 @@ export interface ViewDef {
   limit_ms?: number;
 }
 
+/** One piece of a screen, drawn by the kernel: what it draws and from what. */
+export interface PieceDef {
+  piece: keyof typeof PIECES;
+  /** For a tree: the tree it draws. */
+  tree?: string;
+  /** For rows from a view: the pack's view. */
+  view?: string;
+  /** For rows from a view: the input the item's id goes in. */
+  item?: string;
+  /** For an action's form: the pack's action. */
+  action?: string;
+  /** For a short note: what it says. */
+  text?: string;
+}
+
+/** What a pack shows on the page of every item of the kinds or types it is on: one column of pieces. */
+export interface ScreenDef {
+  id: string;
+  title: string;
+  on: string[];
+  pieces: PieceDef[];
+}
+
+/**
+ * The pieces the kernel draws, each with what it must be told. A tree, a gate, proof, usage and a document draw the
+ * kernel's views of the item; a figure is the picture it keeps; rows and a form are the pack's own view and action.
+ */
+export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'] } as const;
+
+/** Every screen the packs declare, in the order the packs load. */
+export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.screens ?? []).map((s) => ({ ...s, pack: pack.id })));
+
 /**
  * The kernel's own tools that are one of the six verbs in all but name. change, the generic op, stays beneath them
  * all, as do the tools that only read.
@@ -113,6 +147,20 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
         for (const t of action.on ?? []) if (!types.has(t)) problems.push(`${at} acts on unknown type "${t}"`);
         for (const act of action.acts ?? []) if (!(pack.hosts ?? []).some((h) => h.id === act.host)) problems.push(`${at}: act "${act.id}" goes to undeclared host "${act.host}"`);
       } else if (!['rows', 'data'].includes((def as ViewDef).shape)) problems.push(`${at}: shape is rows or data`);
+    }
+  }
+  for (const screen of pack.screens ?? []) {
+    const at = `screen "${screen.id}"`;
+    if (!own(screen.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
+    if (!screen.title || !screen.on?.length || !screen.pieces?.length) problems.push(`${at} needs a title, the kinds or types it is on, and its pieces`);
+    for (const t of screen.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);
+    for (const piece of screen.pieces ?? []) {
+      const needs: readonly string[] | undefined = PIECES[piece.piece];
+      if (!needs) problems.push(`${at}: "${piece.piece}" is not a piece: one of ${Object.keys(PIECES).join(', ')}`);
+      for (const key of needs ?? []) if (!piece[key as keyof PieceDef]) problems.push(`${at}: a ${piece.piece} piece names its ${key}`);
+      if (piece.tree && !(pack.trees ?? []).some((tree) => tree.id === piece.tree)) problems.push(`${at}: the pack declares no tree "${piece.tree}"`);
+      if (piece.view && !(pack.views ?? []).some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
+      if (piece.action && !(pack.actions ?? []).some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
     }
   }
   for (const host of pack.hosts ?? []) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);

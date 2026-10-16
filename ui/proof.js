@@ -1,5 +1,5 @@
-import { api, h, main } from './base.js';
-import { ago, kept, link, menu, pill, unfolded } from './words.js';
+import { api, h } from './base.js';
+import { ago, link, menu, pill, unfolded } from './words.js';
 
 // ---- Proof ---------------------------------------------------------------
 

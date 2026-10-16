@@ -1,13 +1,15 @@
-import { api, ask, h, main, state, tell } from './base.js';
+import { api, ask, h, state, tell } from './base.js';
 import { renderBody } from './body.js';
 import { graphView } from './graph.js';
-import { chip, isClosed, label, link, menu, named, pill, refreshReviewCount, statusesOf, types } from './words.js';
+import { treeFor } from './screens.js';
+import { chip, isClosed, link, menu, named, pill, refreshReviewCount, statusesOf, types } from './words.js';
 
 // ---- Projects ------------------------------------------------------------
 
-/** Each project's roadmap tree, by project id. `all` is the project list of the `questions` view. */
+/** Each project's roadmap tree, by project id: the tree a screen draws on it, if one does. `all` is the project list of the `questions` view. */
 export async function projectTrees(all) {
-  return new Map(await Promise.all(all.map(async (pr) => [pr.id, await api('view', { name: 'tree', params: { root: pr.id, tree: 'software.roadmap' } }).catch(() => null)])));
+  const tree = (pr) => treeFor(pr.type ?? 'project');
+  return new Map(await Promise.all(all.map(async (pr) => [pr.id, tree(pr) ? await api('view', { name: 'tree', params: { root: pr.id, tree: tree(pr) } }).catch(() => null) : null])));
 }
 
 // ---- Roadmap -------------------------------------------------------------
@@ -100,9 +102,12 @@ export async function projectNeeds(rootId, data, change, redraw) {
 
 export async function roadmap(rootId) {
   const main = document.getElementById('roadmap');
-  // Drawn only on the page of the project it is the roadmap of.
+  // Drawn only on the page of the project it is the roadmap of, from the tree its screen names.
   if (main?.dataset.root !== rootId) return;
-  const data = await api('view', { name: 'tree', params: { tree: 'software.roadmap', root: rootId } });
+  const tree = main.dataset.tree;
+  // What its branches are: a new one is made of the first of them.
+  const branchType = state.schema.trees.find((t) => t.id === tree)?.branches[0];
+  const data = await api('view', { name: 'tree', params: { tree, root: rootId } });
   const change = async (ops, reason) => {
     try {
       await api('change', { ops, reason });
@@ -150,12 +155,12 @@ export async function roadmap(rootId) {
     title.value.trim() &&
     change(
       [
-        { op: 'create', ref: 'f', type: 'software.feature', title: title.value.trim(), props: { order: data.branches.length + 1 } },
+        { op: 'create', ref: 'f', type: branchType, title: title.value.trim(), props: { order: data.branches.length + 1 } },
         { op: 'link', type: 'part_of', from: 'f', to: rootId },
       ],
       'Feature added to the roadmap in the UI',
     );
-  const statuses = statusesOf('software.feature').filter((st) => data.by_status[st]);
+  const statuses = statusesOf(branchType).filter((st) => data.by_status[st]);
   const asGraph = roadmapState.graph;
   // What the roadmap knows that the graph does not: each feature's progress and place, what is being worked on,
   // and a feature that waits on another only through their tasks.
@@ -193,7 +198,7 @@ export async function roadmap(rootId) {
           { class: 'bar' },
           h('h2', {}, 'Features'),
           progressBar(data.progress),
-          statuses.map((st) => h('span', { class: `pill${isClosed('software.feature', st) ? ' closed' : ''}` }, `${data.by_status[st]} ${st}`)),
+          statuses.map((st) => h('span', { class: `pill${isClosed(branchType, st) ? ' closed' : ''}` }, `${data.by_status[st]} ${st}`)),
           h('span', { class: 'grow' }),
           // What is being worked on is marked in the drawing; the names are one click away, not a paragraph of links.
           data.now.length > 0 && inProgress,

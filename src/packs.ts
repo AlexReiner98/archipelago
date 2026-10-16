@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
-import { checkDeclared, KERNEL_VERBS, toolName, type ActionDef, type HostDef, type ScheduleDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
+import { checkDeclared, KERNEL_VERBS, screensOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
 import { checkValue } from './fields.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { PACK_TOOLS } from './pack-tools.ts';
@@ -42,6 +42,8 @@ export interface TypeDef {
   fields?: Record<string, FieldDef>;
   /** What is made for a reader or a customer (a document, a file, a release): named under the title of what it is part of. A flavour inherits it. */
   deliverable?: boolean;
+  /** What anyone may see, with no login, once a person makes it public (a product, what it has built, how we know). A flavour inherits it. */
+  public?: boolean;
   /** What the kernel computes from it, each naming the field it reads. A flavour inherits them. */
   capabilities?: Capabilities;
 }
@@ -95,6 +97,8 @@ export interface PackFile {
   /** What agents and people can do and read through it, run by its handler. */
   actions?: ActionDef[];
   views?: ViewDef[];
+  /** What it shows on the page of every item of a kind or type: one column of pieces the kernel draws. */
+  screens?: ScreenDef[];
   /** What comes from and goes to the world outside: hosts it may reach, webhooks it receives, what it runs by itself. */
   hosts?: HostDef[];
   webhooks?: WebhookDef[];
@@ -118,6 +122,7 @@ export interface ResolvedType {
   statuses: Statuses;
   fields: Record<string, FieldDef>;
   deliverable: boolean;
+  public: boolean;
   capabilities: Capabilities;
   /** Kept from the type table: its pack is gone, its items are not. */
   dormant?: boolean;
@@ -233,6 +238,7 @@ export class Registry {
         statuses,
         fields: { ...parent?.fields, ...def.fields, ...extra.get(id) },
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
+        public: def.public ?? parent?.public ?? false,
         capabilities: { ...parent?.capabilities, ...def.capabilities },
       };
       types.set(id, resolved);
@@ -478,13 +484,15 @@ export class Registry {
         statuses: t.statuses,
         fields: t.fields,
         ...(t.deliverable && { deliverable: true }),
+        ...(t.public && { public: true }),
         ...(Object.keys(t.capabilities).length && { capabilities: t.capabilities }),
         ...(t.dormant && { dormant: true }),
       })),
       relations: [...this.relations.values()],
       trees: [...this.trees.values()],
       verbs: this.verbs.map((v) => ({ ...v, kernel_tools: Object.keys(KERNEL_VERBS).filter((t) => KERNEL_VERBS[t] === v.id) })),
-      pack_tools: [...this.tools].map(([tool, { pack, call, def }]) => ({ tool, pack, [call]: def.id, ...('verb' in def && { verb: def.verb }) })),
+      pack_tools: [...this.tools].map(([tool, { pack, call, def }]) => ({ tool, pack, [call]: def.id, ...('verb' in def ? { verb: def.verb, title: def.title, on: def.on, item: def.item, input: def.input } : { shape: def.shape }) })),
+      screens: screensOf(this.packs),
     };
   }
 }

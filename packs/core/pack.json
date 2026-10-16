@@ -100,6 +100,7 @@
     },
     {
       "id": "project",
+      "public": true,
       "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Project",
@@ -342,6 +343,11 @@
         "code": { "type": "string", "description": "The drawing itself, as a JavaScript module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the lens view answered; style is this style's other fields; theme is the page's colours (sea, land, inner, line, text, muted, blocked, you, session, done) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl }) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer. With code, shape is not used." }
       }
     }
+  ],
+  "screens": [
+    { "id": "gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
+    { "id": "figure", "title": "Figure", "on": ["note", "file"], "pieces": [{ "piece": "figure" }] },
+    { "id": "reading", "title": "Reading", "on": ["document"], "pieces": [{ "piece": "document" }] }
   ],
   "relations": [
     { "id": "depends_on", "root": true, "title": "depends on", "inverse": "blocks", "from": ["*"], "to": ["*"], "description": "The source cannot finish until the target is closed. Drives the blockers view." },

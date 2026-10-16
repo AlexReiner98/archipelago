@@ -1,6 +1,6 @@
 import { api, h, state } from './base.js';
 import { GRID_HUES } from './grid.js';
-import { chip, label, when } from './words.js';
+import { chip } from './words.js';
 
 // ---- Time ------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 import { api, h, main, route, state } from './base.js';
-import { kept, label, refreshReviewCount } from './words.js';
+import { refreshReviewCount } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 

@@ -73,8 +73,6 @@ test(`no file is over ${MAX_LINES} lines`, () => {
 
 // 2. The kernel never names a pack's types or relations: it works from kinds and capabilities.
 const NAMES_PACKS: Record<string, number> = {
-  'ui/item.js': 11,
-  'ui/roadmap.js': 5,
   'ui/time.js': 2,
   'ui/week.js': 1,
   'ui/workspace.js': 1,
@@ -82,14 +80,12 @@ const NAMES_PACKS: Record<string, number> = {
   'src/time.ts': 15,
   'src/proof.ts': 12,
   'src/demo.ts': 10,
-  'src/pelago.ts': 5,
   'src/sessions.ts': 6,
   'src/scope.ts': 4,
   'src/github.ts': 3,
   'src/tools.ts': 3,
   'src/db.ts': 2,
   'src/github-app.ts': 1,
-  'src/public.ts': 1,
   'src/reader.ts': 1,
   'ui/doc.js': 1,
 };

@@ -1,8 +1,8 @@
 // Home, and the projects at the top of Search.
 
-import { api, h, main, part, tell } from './base.js';
+import { api, h, part, tell } from './base.js';
 import { progressBar, projectTrees, questionItem } from './roadmap.js';
-import { chip, entityRow, label, link, pill, refreshReviewCount } from './words.js';
+import { chip, entityRow, link, pill, refreshReviewCount } from './words.js';
 
 // ---- Projects, at the top of Search ----------------------------------------
 

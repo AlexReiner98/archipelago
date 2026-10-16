@@ -1,13 +1,13 @@
 // The graph's drawing: work along a scale of tokens, or boxes joined by lines.
 
-import { h, known, route, state } from './base.js';
-import { BLOCKING, KINDS, groupOf, isOf, s, tokensText } from './graph.js';
-import { hint, relations, typeTitle } from './words.js';
+import { h } from './base.js';
+import { BLOCKING, KINDS, groupOf, isOf, s } from './graph.js';
+import { relations, tokensText, typeTitle } from './words.js';
 
 export function timeline(nodes, edges, byId, focus, prefs) {
   const ROW = { h: 30, gap: 10, top: 28 };
   // What a thing is part of. Part of two things in sight (a feature and its project), it sits under the nearer: the one that is itself part of something.
-  const parts = edges.filter((e) => e.type === 'part_of' && byId.get(e.from).work && byId.get(e.to).work);
+  const parts = edges.filter((e) => isOf(['part_of'], e.type) && byId.get(e.from).work && byId.get(e.to).work);
   const inner = new Set(parts.map((e) => e.from));
   const parentOf = new Map();
   for (const e of parts) if (!parentOf.has(e.from) || (inner.has(e.to) && !inner.has(parentOf.get(e.from)))) parentOf.set(e.from, e.to);
@@ -135,7 +135,7 @@ export function timeline(nodes, edges, byId, focus, prefs) {
   // What a thing is part of is said by its bar spanning it, not by a line as well.
   // Nor is waiting that is over drawn: the order along the scale already says what came first.
   const over = (e) => isOf(BLOCKING, e.type) && !byId.get(e.to).open;
-  const belongs = (e) => parts.includes(e) || (e.type === 'part_of' && rows.includes(byId.get(e.from)) && rows.includes(byId.get(e.to)));
+  const belongs = (e) => parts.includes(e) || (isOf(['part_of'], e.type) && rows.includes(byId.get(e.from)) && rows.includes(byId.get(e.to)));
   // Nor a wait that another already says: if it waits on B, and B on A, the line to A adds nothing but a crossing.
   const on = new Map();
   for (const e of waits) on.set(e.from, [...(on.get(e.from) ?? []), e.to]);
@@ -226,7 +226,7 @@ export function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const blocking = isOf(BLOCKING, e.type);
     // An arrow runs from what is needed to what needs it; any other line from the thing to what it belongs to.
     const [a, b] = blocking ? [byId.get(e.to), byId.get(e.from)] : [byId.get(e.from), byId.get(e.to)];
-    const structure = KINDS.structure.includes(e.type);
+    const structure = isOf(KINDS.structure, e.type);
     seen.waiting ||= blocking && a.open;
     seen.met ||= blocking && !a.open;
     seen.lifted ||= Boolean(e.lifted) && !axis;

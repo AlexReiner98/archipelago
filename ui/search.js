@@ -1,6 +1,6 @@
 // Search: the search box and what it finds.
 
-import { api, h, main, part, state } from './base.js';
+import { api, h, part, state } from './base.js';
 import { projects } from './home.js';
 import { ago, chip, link, pill, typeTitle } from './words.js';
 

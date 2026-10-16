@@ -249,3 +249,6 @@ export function describeEvent(ev) {
   if (ev.action.startsWith('resource.')) return d.holder_title ?? d.holder ?? '';
   return '';
 }
+
+/** A count of tokens as a person says it: 1.2M, 340k. */
+export const tokensText = (t) => (t >= 1e6 ? `${+(t / 1e6).toFixed(1)}M` : t >= 1000 ? `${Math.round(t / 1000)}k` : `${Math.round(t)}`);

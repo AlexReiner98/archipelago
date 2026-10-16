@@ -666,7 +666,7 @@ details.menu > .menu-items > button:hover { background: var(--accent-soft); }
 .part + .part:not([hidden]) { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
 /* One thing at a time under the search box, and a section under a page has a section's heading. */
 .part[data-part="map"] ~ .part:not([hidden]) { margin-top: 16px; padding-top: 0; border-top: 0; }
-#roadmap:not(:empty) { margin-bottom: 14px; }
+.screens { display: grid; gap: 14px; margin-bottom: 14px; } .screens:empty, .screens > :empty { display: none; }
 .part[data-part="item"]:not([hidden]) ~ .part[data-part="graph"] .page-head h1 { font-size: 16px; }
 .part[data-part="automations"] .page-head h1 { font-size: 16px; }
 .projects-top { margin-bottom: 14px; }

@@ -1,7 +1,7 @@
 // The Workspace screen's cards: tokens, connecting an agent, importing, GitHub, the operator.
 
 import { api, ask, h } from './base.js';
-import { chip, hint, label, link, menu, titles, when } from './words.js';
+import { chip, hint, link, menu, when } from './words.js';
 
 // ---- Workspace -----------------------------------------------------------
 

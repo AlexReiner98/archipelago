@@ -8,7 +8,7 @@ import type { Entity, Archipelago } from './pelago.ts';
 import { changelog, proof } from './proof.ts';
 
 /**
- * A public product (a project or a feature), as its page shows it: the proof
+ * A public product (public work: a project or a feature), as its page shows it: the proof
  * questions asked of it with their tests and what each found on one build,
  * and its changelog. Null when there is no such public product.
  */
@@ -16,7 +16,8 @@ export async function publicPage(l: Archipelago, product: string, build?: string
   const pub = l.forAnyone();
   const { rows } = await pub.db.query<Entity>(`select id, type, title, status from entity where id = $1 and visibility = 'public' and archived_at is null`, [product]);
   const root = rows[0];
-  if (!root || !['project', 'software.feature'].some((kind) => l.registry.isA(root.type, kind))) return null;
+  const type = root && l.registry.type(root.type);
+  if (!type?.public || type.kind !== 'work') return null;
   // Everything public that belongs to it, through whatever lies between that is not.
   const under = new Set([root.id, ...(await pub.db.query<{ id: string }>(`select pelago_public_under($1) as id`, [root.id])).rows.map((r) => r.id)]);
   const proven = await proof(pub, { build }, under);

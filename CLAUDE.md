@@ -88,7 +88,9 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
   `src/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
 - **Types live in pack files** under `packs/`. Fields the system maintains are
-  marked `"system": true`.
+  marked `"system": true`. What a pack adds to the page of an item of a kind
+  or type is a screen there too (`screens`: pieces the kernel draws, listed in
+  `src/declared.ts`); the item page (`ui/item.js`) names no pack's type.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 9 Oct 2026
@@ -170,7 +172,8 @@ else a pack"). These rules keep it composable while that happens, and
   ops out.
 - **Kernel modules import one way.** No cycles; type-only imports do not
   count.
-- **The UI loads as modules,** with no build step.
+- **The UI loads as modules,** with no build step: each part of the page its
+  own module under `ui/`, served by name from `src/ui-files.ts`.
 - **Four dependencies,** as above.
 
 Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may
@@ -184,5 +187,5 @@ npm test
 npm run typecheck
 ```
 
-The UI asks its questions in the page (`ask` and `tell` in `ui/app.js`), so
+The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.

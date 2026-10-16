@@ -2,7 +2,7 @@
 
 import { h } from './base.js';
 import { lensTree, litCount } from './lens.js';
-import { card, kept, link, named, relations, types } from './words.js';
+import { relations, types } from './words.js';
 
 /** The colours a grid gives the values of the field it colours by, in the order the field declares them, when the style names none. */
 export const GRID_HUES = ['#2e7d4f', '#2f5fb3', '#a86a12', '#6f43b0', '#59636e', '#0f7c86', '#b23a48', '#7a6a1c'];

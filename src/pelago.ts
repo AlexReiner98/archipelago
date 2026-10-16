@@ -180,11 +180,11 @@ export const BLOCKING_RELATIONS = ['depends_on', 'needs'];
 export const ACTIVE_HOLDS = `pelago_active_holds(current_user = 'pelago_member', current_setting('pelago.viewer', true))`;
 
 /**
- * What can be made public: a product, what it has built, and how we know it
- * is correct. Nothing else, so that a slip cannot put a decision, a person or
- * a note in front of everyone.
+ * What can be made public: the types their packs mark so (a product, what it
+ * has built, and how we know it is correct). Nothing else, so that a slip
+ * cannot put a decision, a person or a note in front of everyone.
  */
-export const PUBLIC_KINDS = ['project', 'software.feature', 'software.release', 'software.proof', 'software.test', 'software.test_result'];
+export const publicTypes = (reg: Registry) => [...reg.types.values()].filter((t) => t.public && !t.dormant).map((t) => t.id);
 
 export class Archipelago {
   readonly db: Db;
@@ -402,7 +402,7 @@ export class Archipelago {
           if (op.owner) await checkOwner(op.owner, where);
           const type = reg.type(op.type);
           if (!type) break;
-          if (op.visibility === 'public' && !PUBLIC_KINDS.some((kind) => reg.isA(op.type, kind))) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${PUBLIC_KINDS.join(', ')}.`);
+          if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
           errors.push(...checkWritten(reg, op.type, op.props ?? {}).map((p) => `${where}: ${p}`));
           if (op.ref) {
             if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
@@ -423,7 +423,7 @@ export class Archipelago {
           const target = await existing(op.id, where);
           if (!target) break;
           errors.push(...reg.check(target.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
-          if (op.visibility === 'public' && !PUBLIC_KINDS.some((kind) => reg.isA(target.type, kind))) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${PUBLIC_KINDS.join(', ')}.`);
+          if (op.visibility === 'public' && !reg.type(target.type)?.public) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
           if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
           try {
             bodyAfter(target.body, op);
