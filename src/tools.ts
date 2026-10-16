@@ -9,6 +9,7 @@ import { createToken, listTokens, revokeToken } from './auth.ts';
 import { readDocument } from './documents.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
+import { BACKUP_TOOLS } from './backup-tools.ts';
 import { TIME_TOOLS } from './time-tools.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
@@ -885,9 +886,7 @@ export const TOOLS: Record<string, Tool> = {
     input: { id: z.string() },
     run: async (l, _actor, input) => readDocument(l, input.id),
   },
-  ...TIME_TOOLS,
-  ...PACK_STATE_TOOLS,
-  ...SHARE_TOOLS,
+  ...TIME_TOOLS, ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS,
   token_create: {
     description:
       'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once. ' +
@@ -1007,7 +1006,7 @@ export const TOOLS: Record<string, Tool> = {
     input: {},
     run: async (l) => {
       const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on to_jsonb(e.id) = s.value where s.key = 'me'`);
-      return { id: l.workspace, owner: rows[0] ?? null, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l) };
+      return { id: l.workspace, owner: rows[0] ?? null, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups: (await l.setting<boolean>('agent_backups')) === true };
     },
   },
   workspace_set: {
@@ -1017,6 +1016,7 @@ export const TOOLS: Record<string, Tool> = {
       default_visibility: z.enum(['private', 'shared']).optional(),
       agent_changes: z.enum(['apply', 'hold']).optional(),
       accepts_from: z.array(z.string()).optional().describe('Ids of the workspaces allowed to send this one notifications. Replaces the list.'),
+      agent_backups: z.boolean().optional().describe('Whether agents may download the whole workspace as a backup file (backup_download), private items included.'),
     },
     run: async (l, actor, input) => {
       needAdmin(actor, 'change workspace settings');
@@ -1024,7 +1024,7 @@ export const TOOLS: Record<string, Tool> = {
         await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
         await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${key} set to ${JSON.stringify(value)}` });
       }
-      return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l) };
+      return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups: (await l.setting<boolean>('agent_backups')) === true };
     },
   },
   seen: {

@@ -11,8 +11,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { basename, join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { openDb, type Db } from './db.ts';
-import { LOCAL_PACK } from './packs.ts';
-import type { Workspace, Workspaces } from './workspaces.ts';
+import { LOCAL_PACK, type Registry } from './packs.ts';
+import type { Workspaces } from './workspaces.ts';
 
 /** Every table, parents before the rows that point at them. */
 const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'setting', 'picture', 'type_def', 'act'] as const;
@@ -194,8 +194,8 @@ async function upload(file: string, workspace: string, target: UploadTarget): Pr
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
 }
 
-const localPackOf = (ws: Workspace) => {
-  const { registry } = ws.pelago;
+/** The types a workspace defined for itself, as its local pack file, if it has any. */
+export const localPackOf = (registry: Registry) => {
   const file = registry.localDir ? join(registry.localDir, 'pack.json') : join(registry.dir, LOCAL_PACK, 'pack.json');
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined;
 };
@@ -220,7 +220,7 @@ export async function backupAll(
     const release = workspaces.hold(id);
     try {
       const ws = await workspaces.get(id);
-      const taken = await dump(ws.pelago.db, { id, name }, localPackOf(ws));
+      const taken = await dump(ws.pelago.db, { id, name }, localPackOf(ws.pelago.registry));
       const folder = join(dir, id);
       mkdirSync(folder, { recursive: true });
       const file = join(folder, `${taken.taken.replaceAll(':', '-')}.json.gz`);
