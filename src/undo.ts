@@ -84,6 +84,9 @@ export async function undo(l: Archipelago, actor: Actor, input: { changeset: str
   }
   if (!ops.length) throw new Error(`Nothing to undo.${skipped.length ? `\n- ${skipped.join('\n- ')}` : ' Everything in it has already been reversed or replaced.'}`);
 
+  // What it had done outside the map was done there: an act is never undone, and the undo says so.
+  const { rows: acts } = await l.db.query<{ act: string; pack: string }>(`select act, pack from act where changeset = $1 and status = 'done'`, [input.changeset]);
+  for (const a of acts) skipped.push(`the ${a.pack} pack's act "${a.act}" was made outside the map and cannot be undone`);
   const original = events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? input.changeset;
   const result = await l.change(actor, { ops, reason: `Undo: ${original}` });
   // An agent's undo is only a proposal; mark it undone when it has really happened.

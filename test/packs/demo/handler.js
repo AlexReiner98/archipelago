@@ -21,6 +21,34 @@ export default {
     const visits = await ctx.read({ items: { type: 'demo.visit', where: { site: input.site } } });
     return { answer: visits.map((v) => v.title) };
   },
+  // Reads the price list, then asks to buy (held: it moves money) and to leave a note (made at once).
+  async 'demo.order'(input) {
+    return {
+      ops: [{ op: 'create', type: 'task', title: `Order ${input.item}` }],
+      requests: [
+        { host: 'shop', path: 'prices', then: 'demo.priced' },
+        { host: 'shop', path: 'orders', body: { item: input.item }, act: 'buy', then: 'demo.bought' },
+        { host: 'shop', path: 'notes', body: { text: `ordering ${input.item}` }, act: 'note' },
+        ...(input.peek ? [{ host: input.peek, path: 'x' }] : []),
+      ],
+    };
+  },
+  // Told the price list: records it.
+  async 'demo.priced'(input) {
+    return { ops: [{ op: 'create', type: 'note', title: `Prices: ${Object.keys(input.body).join(', ')}` }] };
+  },
+  // Told the order went through.
+  async 'demo.bought'(input) {
+    return { ops: [{ op: 'create', type: 'note', title: `Bought, order ${input.body.order}` }] };
+  },
+  // A delivery came in from outside.
+  async 'demo.delivered'(input) {
+    return { ops: [{ op: 'create', type: 'note', title: `Delivered: ${input.payload.item}` }] };
+  },
+  // Runs by itself: reads the prices.
+  async 'demo.tick'() {
+    return { requests: [{ host: 'shop', path: 'prices', then: 'demo.priced' }] };
+  },
   // Never ends.
   async 'demo.spin'() {
     for (;;);

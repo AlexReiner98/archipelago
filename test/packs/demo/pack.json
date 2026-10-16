@@ -46,6 +46,40 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "demo.order",
+      "title": "Order supplies",
+      "description": "Read the price list, then order (held: it moves money) and leave a note (made at once).",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "peek": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      },
+      "acts": [
+        {
+          "id": "buy",
+          "host": "shop",
+          "does": "buy supplies",
+          "money": true
+        },
+        {
+          "id": "note",
+          "host": "shop",
+          "does": "leave a note"
+        }
+      ]
     }
   ],
   "views": [
@@ -65,6 +99,25 @@
         ],
         "additionalProperties": false
       }
+    }
+  ],
+  "hosts": [
+    {
+      "id": "shop",
+      "base": "http://127.0.0.1:1/api/",
+      "secret": "shop_key"
+    }
+  ],
+  "webhooks": [
+    {
+      "id": "demo.delivered",
+      "secret": "hook_key"
+    }
+  ],
+  "schedules": [
+    {
+      "id": "demo.tick",
+      "every_minutes": 60
     }
   ]
 }

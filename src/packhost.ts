@@ -8,6 +8,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { handleRequests, type OutsideRequest } from './outside.ts';
 import type { Actor, Archipelago, Op } from './pelago.ts';
 import { VIEWS } from './views.ts';
 
@@ -23,7 +24,11 @@ export interface Done {
   ops?: Op[];
   answer?: unknown;
   reason?: string;
+  /** What it asks to have done outside the map, by the kernel. */
+  requests?: OutsideRequest[];
 }
+
+export type Call = 'action' | 'view' | 'answer' | 'webhook' | 'schedule';
 
 type Read = { get?: string; items?: { type: string; status?: string; where?: Record<string, unknown> }; related?: string; relation?: string; direction?: 'out' | 'in'; view?: string; params?: Record<string, unknown> };
 
@@ -151,7 +156,7 @@ export class PackHost {
   }
 
   /** Call one entry of a pack's handler and give back what it answered, writing nothing. */
-  async call(l: Archipelago, actor: Actor, pack: string, call: 'action' | 'view', name: string, input: unknown, ms = CALL_MS): Promise<Done> {
+  async call(l: Archipelago, actor: Actor, pack: string, call: Call, name: string, input: unknown, ms = CALL_MS): Promise<Done> {
     const folder = this.folderOf(pack);
     if (!existsSync(join(folder, 'handler.js'))) throw new Error(`Pack "${pack}" has no handler.`);
     const box = this.boxes.get(pack) ?? new Sandbox(folder);
@@ -160,12 +165,17 @@ export class PackHost {
     return box.call(l, { call, name, input, actor: { name: actor.name, kind: actor.kind }, now: new Date().toISOString(), present }, Math.min(ms, MAX_MS));
   }
 
-  /** Run an action: its handler answers ops, and the kernel applies them as one change set with the action's name. */
-  async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number) {
-    const done = await this.call(l, actor, pack, 'action', name, input, ms);
-    if (!done.ops?.length) return { answer: done.answer ?? null };
-    const changed = await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name });
-    return { answer: done.answer ?? null, ...changed };
+  /**
+   * Run a handler entry that may write: its ops are applied as one change set naming it, and what it asks of the
+   * world outside is made, held or refused. Only an action may act; a webhook or a schedule may only read.
+   */
+  async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' = 'action') {
+    const done = await this.call(l, actor, pack, call, name, input, ms);
+    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name }) : undefined;
+    const file = l.registry.packs.find((p) => p.id === pack)!;
+    const action = call === 'action' ? file.actions?.find((a) => a.id === name) : undefined;
+    const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
+    return { answer: done.answer ?? null, ...changed, ...(outside && { requests: outside }) };
   }
 
   stop(): void {

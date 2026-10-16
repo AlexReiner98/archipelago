@@ -136,6 +136,24 @@ create table if not exists type_def (
   def     jsonb not null,
   changed timestamptz not null default now()
 );
+
+-- What a pack asked to be done outside the map: a request to a host it declared, made with a secret the kernel
+-- holds. One that moves money or cannot be taken back waits here for a person; once made it is logged, never undone.
+create table if not exists act (
+  id         text primary key,
+  workspace  text not null default 'default',
+  pack       text not null,
+  action     text not null,
+  act        text not null,
+  request    jsonb not null,
+  actor      jsonb not null,
+  made_for   text,
+  changeset  text,
+  status     text not null check (status in ('held', 'done', 'refused', 'failed')),
+  result     jsonb,
+  created_at timestamptz not null default now(),
+  decided_at timestamptz
+);
 `;
 
 // Who may see what, enforced by the database itself. A request made on behalf
@@ -155,6 +173,7 @@ alter table token    add column if not exists seen jsonb;
 do $$ begin create role pelago_member nologin; exception when duplicate_object then null; end $$;
 grant select, insert, update on entity, relation, event, proposal, setting, token to pelago_member;
 grant select on type_def to pelago_member;
+grant select, insert, update on act to pelago_member;
 grant usage, select on all sequences in schema public to pelago_member;
 
 alter table entity   enable row level security;
@@ -211,6 +230,15 @@ language sql stable security definer set search_path = public as $fn$
 $fn$;
 
 grant execute on function pelago_active_holds(boolean, text), pelago_external_dependents(text, text) to pelago_member;
+
+-- A pack's secret as it is kept, sealed. The kernel opens it with a key the database does not hold, to add it to a
+-- request the pack asked for; whoever the request is made for cannot read settings, so it crosses here. Pack
+-- secrets only.
+create or replace function pelago_pack_secret(name text) returns text
+language sql stable security definer set search_path = public as $fn$
+  select value #>> '{}' from setting where key = name and left(name, 12) = 'pack_secret:'
+$fn$;
+grant execute on function pelago_pack_secret(text) to pelago_member;
 
 -- Public: a third level, for anyone, with no login. A request for a public page runs as the role below, which may
 -- read only what is public, and only some columns of it: never a note, an event, a proposal, a token or a setting,
@@ -273,6 +301,13 @@ create policy public_picture on picture for select to pelago_public using (pelag
 alter table token   enable row level security;
 alter table setting enable row level security;
 grant delete on setting to pelago_member;
+
+-- An act is seen by whoever it was made for, and by an admin, who decides the held ones.
+alter table act enable row level security;
+drop policy if exists member_act on act;
+create policy member_act on act for all to pelago_member
+  using (current_setting('pelago.admin', true) = '1' or made_for = current_setting('pelago.viewer', true))
+  with check (true);
 
 drop policy if exists member_token on token;
 create policy member_token on token for all to pelago_member

@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
-import { checkDeclared, KERNEL_VERBS, toolName, type ActionDef, type VerbDef, type ViewDef } from './declared.ts';
+import { checkDeclared, KERNEL_VERBS, toolName, type ActionDef, type HostDef, type ScheduleDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
 import { checkValue } from './fields.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { PACK_TOOLS } from './pack-tools.ts';
@@ -95,6 +95,10 @@ export interface PackFile {
   /** What agents and people can do and read through it, run by its handler. */
   actions?: ActionDef[];
   views?: ViewDef[];
+  /** What comes from and goes to the world outside: hosts it may reach, webhooks it receives, what it runs by itself. */
+  hosts?: HostDef[];
+  webhooks?: WebhookDef[];
+  schedules?: ScheduleDef[];
   /** Extra fields a pack adds to types owned by another pack. */
   extend?: Record<string, { fields: Record<string, FieldDef> }>;
 }

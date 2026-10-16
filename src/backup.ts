@@ -15,7 +15,7 @@ import { LOCAL_PACK } from './packs.ts';
 import type { Workspace, Workspaces } from './workspaces.ts';
 
 /** Every table, parents before the rows that point at them. */
-const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'setting', 'picture', 'type_def'] as const;
+const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'setting', 'picture', 'type_def', 'act'] as const;
 
 export interface Dump {
   format: 1;
@@ -60,7 +60,7 @@ export async function restore(db: Db, backup: Dump, as?: string): Promise<Record
     }
     await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), 1))`);
     if (as !== undefined && as !== backup.workspace?.id) {
-      for (const table of ['entity', 'relation', 'event', 'proposal', 'picture']) await tx.query(`update ${table} set workspace = $1`, [as]);
+      for (const table of ['entity', 'relation', 'event', 'proposal', 'picture', 'act']) await tx.query(`update ${table} set workspace = $1`, [as]);
       await tx.query(`update token set revoked_at = now() where revoked_at is null`);
     }
   });

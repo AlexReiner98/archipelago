@@ -8,10 +8,12 @@ import { join } from 'node:path';
 import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceId } from './auth.ts';
 import { Automations } from './automations.ts';
 import { restore, type Dump } from './backup.ts';
+import { startSchedules, stopSchedules } from './hooks.ts';
 import { openDb } from './db.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { Registry } from './packs.ts';
 import { packsOff } from './packstate.ts';
+import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
 
 export const DEFAULT_WORKSPACE = 'default';
@@ -121,6 +123,8 @@ export class Workspaces {
     if (rows[0].busy || this.held.get(id) || this.open.get(id) !== opening) return false;
     this.open.delete(id);
     ws.automations.stop();
+    stopSchedules(ws.pelago.registry);
+    hostFor(ws.pelago.registry).stop();
     const closing = ws.pelago.db.close().finally(() => this.closing.delete(id));
     this.closing.set(id, closing);
     await closing;
@@ -153,6 +157,7 @@ export class Workspaces {
     // The packs the owner turned off here stay off; what they made is dormant.
     pelago.registry.turnOff(await packsOff(pelago));
     await syncTypes(pelago);
+    if (this.config.runAutomations) startSchedules(pelago);
     const automations = new Automations(pelago);
     if (this.config.runAutomations) automations.start();
     return { id, name: this.list().find((w) => w.id === id)!.name, pelago, automations };
@@ -226,6 +231,10 @@ export class Workspaces {
     for (const opening of this.open.values()) {
       const ws = await opening.catch(() => undefined);
       ws?.automations.stop();
+      if (ws) {
+        stopSchedules(ws.pelago.registry);
+        hostFor(ws.pelago.registry).stop();
+      }
       await ws?.pelago.db.close();
     }
     this.open.clear();

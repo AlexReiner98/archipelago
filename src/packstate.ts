@@ -4,6 +4,7 @@
 // still edit. Turning it on again brings it all back. It is the owner's: a pack carries rules and code.
 
 import { z } from 'zod';
+import { decideAct, listActs, setPackSecret } from './outside.ts';
 import { hostFor } from './packtools.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
@@ -44,7 +45,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated };
 }
 
-/** The owner’s switch for packs, and what anyone may read of their states. */
+/** The owner’s tools for packs: their states and switch, their secrets, and the acts they ask for. */
 export const PACK_STATE_TOOLS: Record<string, Tool> = {
   packs: {
     description: 'The packs on this server and the state of each here: active, waiting (with what it needs) or off.',
@@ -56,5 +57,22 @@ export const PACK_STATE_TOOLS: Record<string, Tool> = {
     input: { pack: z.string(), on: z.boolean() },
     humanOnly: true,
     run: async (l, actor, input) => setPack(l, actor, input),
+  },
+  acts: {
+    description: 'What packs asked to have done outside the map: those held for a person first, then the latest made or declined.',
+    input: {},
+    run: async (l) => listActs(l),
+  },
+  act_decide: {
+    description: 'Allow an act a pack asked for that was held (it moves money or cannot be taken back): it is made at once and never undone. Or decline it.',
+    input: { act: z.string(), allow: z.boolean() },
+    humanOnly: true,
+    run: async (l, actor, input) => decideAct(hostFor(l.registry), l, actor, input),
+  },
+  pack_secret_set: {
+    description: 'Give a pack a secret its host needs (an API key), kept sealed. The pack never sees it: the kernel adds it to the requests it makes.',
+    input: { pack: z.string(), name: z.string(), value: z.string() },
+    humanOnly: true,
+    run: async (l, _actor, input) => setPackSecret(l, input),
   },
 };

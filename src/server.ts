@@ -40,6 +40,7 @@ import { SETUP_VERSION, setupCommand, setupScript } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
+import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
@@ -51,6 +52,7 @@ import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq } from './tools.ts';
+import { UI_FILES } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -80,21 +82,6 @@ function send(res: ServerResponse, status: number, body: unknown): void {
 }
 
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
-const UI_FILES: Record<string, string> = {
-  '/': 'index.html',
-  '/app.js': 'app.js',
-  '/style.css': 'style.css',
-  '/public.js': 'public.js',
-  '/public.css': 'public.css',
-  '/doc.js': 'doc.js',
-  '/doc.css': 'doc.css',
-  '/packs.js': 'packs.js',
-  // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
-  '/draw.html': 'draw.html',
-  '/draw.js': 'draw.js',
-  // three.js as its authors build it (MIT), offered to a style's code; loaded only when one asks for it.
-  '/three.js': 'three.module.min.js',
-};
 // The page itself: its own script and stylesheet, this server, and the one frame a style's code is drawn in.
 const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 // The frame a style's code runs in. `sandbox` gives it an origin of its own, so it has no way to the page's token or storage, cannot open
@@ -289,6 +276,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const { ws, actor } = await resolve(req, res, 'human');
         return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: actor() });
       }
+
+      // A pack's webhook: /hook/<pack>/<id> in the default workspace, /hook/<workspace>/<pack>/<id> in another.
+      const hook = req.method === 'POST' && /^\/hook\/(?:([a-z0-9-]+)\/)?([a-z0-9_]+)\/([a-z0-9_.]+)$/.exec(url.pathname);
+      if (hook) return workspaces.has(hook[1] ?? DEFAULT_WORKSPACE) ? await serveHook(req, res, (await workspaces.get(hook[1] ?? DEFAULT_WORKSPACE)).pelago, hook[2], hook[3]) : send(res, 410, { error: 'No such workspace.' });
 
       if (url.pathname === '/mcp') {
         const { ws, pelago, actor } = await resolve(req, res, 'agent');

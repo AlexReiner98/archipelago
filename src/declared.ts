@@ -23,6 +23,40 @@ export interface ActionDef {
   input: Record<string, unknown>;
   /** How long a call may take, in milliseconds: 2000 unless said, 30000 at most. */
   limit_ms?: number;
+  /** What it may ask to be done outside the map. A request to act that is not declared here is refused. */
+  acts?: ActDef[];
+}
+
+/** A service outside the map a pack may reach, and the name of the secret the kernel adds (the pack never sees it). */
+export interface HostDef {
+  id: string;
+  base: string;
+  secret?: string;
+  /** The header the secret goes in: authorization (as a bearer token) unless said. */
+  header?: string;
+}
+
+/** Something an action may have done outside the map. One that moves money or cannot be taken back waits for a person. */
+export interface ActDef {
+  id: string;
+  host: string;
+  does: string;
+  money?: boolean;
+  final?: boolean;
+}
+
+/** A route the kernel serves at /hook/<pack>/<id>, checking the payload's signature with a secret it holds. */
+export interface WebhookDef {
+  id: string;
+  secret: string;
+  /** The header with the signature, as sha256=<hex of an HMAC of the body>: x-signature-256 unless said. */
+  header?: string;
+}
+
+/** A handler entry the kernel runs by itself every so often, as the pack. */
+export interface ScheduleDef {
+  id: string;
+  every_minutes: number;
 }
 
 export interface ViewDef {
@@ -77,8 +111,12 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
         const action = def as ActionDef;
         if (!verbs.includes(action.verb)) problems.push(`${at} specialises "${action.verb}", which is not a verb: one of ${verbs.join(', ')}`);
         for (const t of action.on ?? []) if (!types.has(t)) problems.push(`${at} acts on unknown type "${t}"`);
+        for (const act of action.acts ?? []) if (!(pack.hosts ?? []).some((h) => h.id === act.host)) problems.push(`${at}: act "${act.id}" goes to undeclared host "${act.host}"`);
       } else if (!['rows', 'data'].includes((def as ViewDef).shape)) problems.push(`${at}: shape is rows or data`);
     }
   }
+  for (const host of pack.hosts ?? []) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);
+  for (const hook of pack.webhooks ?? []) if (!handler || !hook.secret) problems.push(`webhook "${hook.id}" needs the handler and the name of its secret`);
+  for (const s of pack.schedules ?? []) if (!handler || !(s.every_minutes >= 1)) problems.push(`schedule "${s.id}" needs the handler and every_minutes of 1 or more`);
   return problems;
 }
