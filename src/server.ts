@@ -51,6 +51,7 @@ import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from
 import { publicPage, publicPicture } from './public.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
+import { serveBackupFile } from './backup-tools.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
 import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq, TOOLS } from './tools.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
@@ -129,7 +130,7 @@ const UI_FILES: Record<string, string> = {
   '/public.js': 'public.js',
   '/public.css': 'public.css',
   '/doc.js': 'doc.js',
-  '/doc.css': 'doc.css',
+  '/doc.css': 'doc.css', '/backups.js': 'backups.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
@@ -241,9 +242,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
-
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running });
-
+      if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) return serveBackupFile(url.pathname.slice(13), res);
       // What a project needs to work with this server, as one script to run in its folder. It holds no secret,
       // so it needs no token; it is given only under a name this server answers to, which it then writes down.
       if (req.method === 'GET' && url.pathname === '/connect/setup.mjs') {

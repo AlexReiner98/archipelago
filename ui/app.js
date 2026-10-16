@@ -1,6 +1,6 @@
 // The pelago web UI. No framework and no build step: it calls the same
 // tools as the CLI through /api/<tool>.
-
+import { backupCard } from './backups.js';
 const main = document.getElementById('main');
 /**
  * Where a screen draws. A page in the menu is made of parts, one under the
@@ -3262,7 +3262,7 @@ async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, costsCard(), ownerCard(owner, workspace)),
+      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, costsCard(), ownerCard(owner, workspace), backupCard({ h, api, ask })),
       h(
         'section',
         { class: 'card' },
@@ -3337,7 +3337,7 @@ async function workspace() {
     h(
       'div',
       { class: 'grid' },
-      costsCard(),
+      costsCard(), me.actor.admin && backupCard({ h, api, ask }),
       (me.actor.admin || !info.owner) && ownerCard(info.owner, workspace),
       h(
         'section',

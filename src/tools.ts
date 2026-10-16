@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
+import { BACKUP_TOOLS } from './backup-tools.ts';
 import { createShare, listShares, readDocument, revokeShare } from './documents.ts';
 import { draftInvoice, logTime, payInvoice, timesheet, voidInvoice, week } from './time.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
@@ -356,8 +357,7 @@ const refused = new Map<string, { at: number; who: string; input: Record<string,
 
 export const TOOLS: Record<string, Tool> = {
   schema: {
-    description:
-      'Describe the map\'s model: enabled packs, every entity type with its statuses and fields, and every relation type. Read this before writing.',
+    description: 'Describe the map\'s model: enabled packs, every entity type with its statuses and fields, and every relation type. Read this before writing.',
     input: {},
     run: async (l) => l.registry.describe(),
   },
@@ -425,8 +425,7 @@ export const TOOLS: Record<string, Tool> = {
     },
   },
   proposals: {
-    description:
-      'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so). Agents can read these but only a human can decide them.',
+    description: 'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so). Agents can read these but only a human can decide them.',
     input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded']).optional() },
     run: async (l, _actor, input) => l.proposals(input),
   },
@@ -669,8 +668,7 @@ export const TOOLS: Record<string, Tool> = {
     },
   },
   undo: {
-    description:
-      'Reverse one change set (its id is on every event it logged) by applying the opposite as a new change: created entities are archived, edits put back, links removed or restored. An edit changed again since is left alone and reported. Subject to the same policy as any change.',
+    description: 'Reverse one change set (its id is on every event it logged) by applying the opposite as a new change: created entities are archived, edits put back, links removed or restored. An edit changed again since is left alone and reported. Subject to the same policy as any change.',
     input: { changeset: z.string() },
     run: async (l, actor, input) => undo(l, actor, input),
   },
@@ -1078,7 +1076,7 @@ export const TOOLS: Record<string, Tool> = {
     input: {},
     run: async (l) => {
       const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on to_jsonb(e.id) = s.value where s.key = 'me'`);
-      return { id: l.workspace, owner: rows[0] ?? null, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l) };
+      return { id: l.workspace, owner: rows[0] ?? null, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups: (await l.setting<boolean>('agent_backups')) === true };
     },
   },
   workspace_set: {
@@ -1088,6 +1086,7 @@ export const TOOLS: Record<string, Tool> = {
       default_visibility: z.enum(['private', 'shared']).optional(),
       agent_changes: z.enum(['apply', 'hold']).optional(),
       accepts_from: z.array(z.string()).optional().describe('Ids of the workspaces allowed to send this one notifications. Replaces the list.'),
+      agent_backups: z.boolean().optional().describe('Whether agents may download the whole workspace as a backup file (backup_download), private items included.'),
     },
     run: async (l, actor, input) => {
       needAdmin(actor, 'change workspace settings');
@@ -1095,7 +1094,7 @@ export const TOOLS: Record<string, Tool> = {
         await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
         await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${key} set to ${JSON.stringify(value)}` });
       }
-      return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l) };
+      return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups: (await l.setting<boolean>('agent_backups')) === true };
     },
   },
   seen: {
@@ -1163,6 +1162,7 @@ export const TOOLS: Record<string, Tool> = {
       return result;
     },
   },
+  ...BACKUP_TOOLS,
 };
 
 /** Validate input and run a tool. */
