@@ -152,6 +152,31 @@ spatial where it can be):
 Look at what you changed in a browser before you push it: the local server
 serves the working tree.
 
+## Code shape
+
+The kernel is being cut down to what keeps humans in control, with every way
+of working as a pack (the design is on the map: "A minimal kernel; everything
+else a pack"). These rules keep it composable while that happens, and
+`test/structure.test.ts` checks each one in `npm test`:
+
+- **No file over 500 lines.** Split it into modules, each one thing.
+- **The kernel names no pack.** No pack's type or relation by name in `src/`
+  or `ui/`: ask the registry for a kind or a capability.
+- **One write path, checked.** Items and relations are written in
+  `src/pelago.ts`; the operational state named above is the only exception.
+- **A pack's code imports nothing of the kernel.** It is handed what it reads
+  and answers with ops and requests.
+- **A pack's code comes with its tests,** run without a database: input in,
+  ops out.
+- **Kernel modules import one way.** No cycles; type-only imports do not
+  count.
+- **The UI loads as modules,** with no build step.
+- **Four dependencies,** as above.
+
+Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may
+only shrink and goes once the rule is met: when your change brings a number
+down, lower it in the test, in the same commit. Never raise one.
+
 ## Checks before committing
 
 ```bash
