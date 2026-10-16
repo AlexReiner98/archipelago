@@ -32,10 +32,15 @@ export interface When {
   repeat?: Repeat;
 }
 
-/** Is somewhere: by a field (an address, a name) or by a link to a place. */
+/**
+ * Is somewhere: by a field (an address, a name) or by a link to a place. A place says what it is known by instead:
+ * an address (a remote, a URL) and a folder on a machine, the keys a session finds it by (src/places.ts).
+ */
 export interface Where {
   field?: string;
   link?: string;
+  address?: string;
+  folder?: string;
 }
 
 /** How many at once: a number field, a boolean field (true for one, false for any number), or a fixed number. */
@@ -91,8 +96,13 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     }
   }
   if (where) {
-    if (Boolean(where.field) === Boolean(where.link)) problems.push('where reads a field or a link, one of them');
+    const known = Boolean(where.address || where.folder);
+    if (where.field && where.link) problems.push('where reads a field or a link, one of them');
+    if (!where.field && !where.link && !known) problems.push('where reads a field or a link, or names the address or folder a place is known by');
+    if (known && (where.field || where.link)) problems.push('a place is known by its address or folder; where it is itself is another thing');
     has('where', where.field, ['string', 'json']);
+    has('where.address', where.address, ['string', 'url']);
+    has('where.folder', where.folder, ['string']);
     if (where.link && !relations.has(where.link)) problems.push(`where follows "${where.link}", which is no relation`);
   }
   if (capacity !== undefined) {

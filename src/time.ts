@@ -333,11 +333,11 @@ export async function week(l: Archipelago, input: { from?: string }) {
   const { rows: runs } = await l.db.query<{ id: string; title: string; is_open: boolean; status: string; created_at: Date; updated_at: Date; last_seen: string | null; active: unknown; busy: boolean | null; story: unknown; repo: string | null }>(
     `select e.id, e.title, e.is_open, e.status, e.created_at, e.updated_at, e.props ->> 'last_seen' as last_seen,
             e.props -> 'active' as active, (e.props ->> 'busy')::boolean as busy, e.props -> 'story' as story, r.to_id as repo
-     from entity e left join relation r on r.from_id = e.id and r.type = 'software.lives_in' and r.valid_to is null
+     from entity e left join relation r on r.from_id = e.id and r.type = any($4::text[]) and r.valid_to is null
      where e.type = any($1::text[]) and e.archived_at is null and e.created_at < $3
        and greatest(e.updated_at, coalesce((e.props ->> 'last_seen')::timestamptz, e.created_at)) >= $2
      order by e.created_at`,
-    [l.registry.family('sys.run'), new Date(edges[0]).toISOString(), new Date(edges[7]).toISOString()],
+    [l.registry.family('sys.run'), new Date(edges[0]).toISOString(), new Date(edges[7]).toISOString(), l.registry.relationFamily('lives_in')],
   );
   const runIds = runs.map((r) => r.id);
   const { rows: tasks } = runIds.length

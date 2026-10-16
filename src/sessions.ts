@@ -4,12 +4,11 @@
 // release: they are the session's own operational state, not facts about the
 // world, and coordination that waits for approval is no coordination.
 
-import { repoByName, repoName } from './github.ts';
+import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { blockGraph, handoff, toConfirm, UNCONFIRMED_DAYS, VIEWS } from './views.ts';
 
 const now = () => new Date().toISOString();
-const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
 
 /** Find a run by its entity id or by the session id its surface gave it. */
 export async function resolveRun(l: Archipelago, key: string, openOnly = false): Promise<Entity | undefined> {
@@ -24,35 +23,17 @@ export async function resolveRun(l: Archipelago, key: string, openOnly = false):
 }
 
 /**
- * The repository a session is in, if the map knows one: the one cloned from
- * this address, which is the same on every machine, or failing that the one
- * whose checkout on this machine contains the directory.
- */
-async function repoFor(l: Archipelago, cwd: string | undefined, remote?: string): Promise<Entity | undefined> {
-  if (!l.registry.type('software.repo')) return undefined;
-  const named = remote ? await repoByName(l, repoName(remote)) : undefined;
-  if (named || !cwd) return named;
-  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and props ? 'path'`, [
-    l.registry.family('software.repo'),
-  ]);
-  const here = norm(cwd);
-  return rows
-    .filter((r) => here === norm(r.props.path as string) || here.startsWith(norm(r.props.path as string) + '/'))
-    .sort((a, b) => (b.props.path as string).length - (a.props.path as string).length)[0];
-}
-
-/**
  * Whether a hook may speak for the session it names, when the token it came with is limited to some repositories:
  * a session that is starting has to be in one of them, and any other has to be one that was registered there.
  */
 export async function hookWithin(l: Archipelago, repos: string[], input: { session_id?: string; cwd?: string; remote?: string }, starting: boolean): Promise<boolean> {
   if (starting) {
-    const repo = await repoFor(l, input.cwd, typeof input.remote === 'string' ? input.remote : undefined);
+    const repo = await placeFor(l, { cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined });
     return Boolean(repo && repos.includes(repo.id));
   }
   const run = input.session_id ? await resolveRun(l, input.session_id, true) : undefined;
   if (!run) return true; // nothing to speak for: the hook does nothing either way
-  const { rows } = await l.db.query(`select 1 from relation where type = 'software.lives_in' and from_id = $1 and to_id = any($2::text[]) and valid_to is null`, [run.id, repos]);
+  const { rows } = await l.db.query(`select 1 from relation where type = any($3::text[]) and from_id = $1 and to_id = any($2::text[]) and valid_to is null`, [run.id, repos, livesIn(l)]);
   return rows.length > 0;
 }
 
@@ -73,12 +54,12 @@ export async function sessionStart(
     if (existing) {
       await touch(l, existing.id);
       // Its repository is said again: the hook tells a resumed session where things stand, as it told it at first.
-      return { run: existing.id, status: existing.status, resumed: true, repo: (await repoFor(l, input.cwd, input.remote)) ?? undefined };
+      return { run: existing.id, status: existing.status, resumed: true, repo: (await placeFor(l, input)) ?? undefined };
     }
   }
   const task = input.task ? await l.entity(input.task) : undefined;
   if (input.task && !task) throw new Error(`No entity "${input.task}" to work on`);
-  const repo = await repoFor(l, input.cwd, input.remote);
+  const repo = await placeFor(l, input);
 
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   if (input.surface) props.surface = input.surface;
@@ -87,7 +68,7 @@ export async function sessionStart(
   const title = input.title ?? (task ? `Session: ${task.title}` : `Session in ${repo?.title ?? input.cwd ?? 'unknown folder'}`);
   const ops: Op[] = [{ op: 'create', ref: 'run', type: 'sys.run', title, status: 'running', props }];
   if (task) ops.push({ op: 'link', type: 'sys.works_on', from: 'run', to: task.id });
-  if (repo) ops.push({ op: 'link', type: 'software.lives_in', from: 'run', to: repo.id });
+  if (repo) ops.push({ op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id });
   const { created } = await l.apply(actorId(actor), { ops, reason: 'Session started' });
   const run = created.run;
 
@@ -214,7 +195,7 @@ export async function recordRun(
   actor: Actor,
   input: { repo: string; title: string; ok?: boolean; tokens?: number; cost_usd?: number; turns?: number; link?: string; summary?: string; surface?: string },
 ) {
-  const repo = /^e_[a-z0-9]{8}$/.test(input.repo) ? await l.entity(input.repo) : await repoByName(l, repoName(input.repo));
+  const repo = /^e_[a-z0-9]{8}$/.test(input.repo) ? await l.entity(input.repo) : await placeFor(l, { remote: input.repo });
   if (!repo) throw new Error(`No repository "${input.repo}" in the map`);
   if (input.link) {
     const { rows } = await l.db.query<{ id: string }>(`select id from entity where type = any($1::text[]) and props->>'link' = $2 and title = $3 and archived_at is null limit 1`, [l.registry.family('sys.run'), input.link, input.title]);
@@ -229,7 +210,7 @@ export async function recordRun(
   const { created } = await l.apply(actorId(actor), {
     ops: [
       { op: 'create', ref: 'run', type: 'sys.run', title: input.title, status: input.ok === false ? 'failed' : 'finished', body: input.summary?.slice(0, 4000), props },
-      { op: 'link', type: 'software.lives_in', from: 'run', to: repo.id },
+      { op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id },
     ],
     reason: 'Run reported',
   });
@@ -369,7 +350,7 @@ type Item = { id: string; type: string; title: string; status: string };
  * waiting for the human: what was found has been said, and is theirs to confirm.
  */
 async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
-  const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'software.lives_in' and from_id = $1 and valid_to is null`, [run.id]);
+  const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = any($2::text[]) and from_id = $1 and valid_to is null`, [run.id, livesIn(l)]);
   if (!repos.length) return [];
   const work = (await VIEWS.repo_work.run(l, { repo: repos[0].to_id })) as { ready: Item[]; blocked: Item[] };
   const graph = await blockGraph(l);

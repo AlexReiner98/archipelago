@@ -63,7 +63,7 @@ const LONG_FILES: Record<string, number> = {
   'src/server.ts': 653,
   'src/time.ts': 626,
   'src/lens.ts': 523,
-  'src/sessions.ts': 522,
+  'src/sessions.ts': 503,
 };
 
 test(`no file is over ${MAX_LINES} lines`, () => {
@@ -77,11 +77,10 @@ const NAMES_PACKS: Record<string, number> = {
   'ui/week.js': 1,
   'ui/workspace.js': 1,
   'src/views.ts': 18,
-  'src/time.ts': 15,
+  'src/time.ts': 14,
   'src/proof.ts': 12,
   'src/demo.ts': 10,
-  'src/sessions.ts': 6,
-  'src/scope.ts': 4,
+  'src/scope.ts': 3,
   'src/github.ts': 3,
   'src/tools.ts': 3,
   'src/db.ts': 2,

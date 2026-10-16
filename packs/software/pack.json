@@ -15,6 +15,7 @@
     },
     {
       "id": "software.repo",
+      "capabilities": { "where": { "address": "remote", "folder": "path" } },
       "extends": "place",
       "title": "Repository",
       "description": "A source repository.",
