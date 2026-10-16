@@ -255,7 +255,7 @@ create policy public_picture on picture for select to pelago_public using (pelag
 
 -- Tokens and settings. A member sees and changes the tokens that are their own; an admin, all of them. Of the
 -- settings a member reads the few every request needs (who the owner is, whether new things are private, whether
--- agents' changes are held) and keeps the place it has read a connection's log up to; the rest, the sealed secrets
+-- agents' changes are held, whether agents may download backups) and keeps the place it has read a connection's log up to; the rest, the sealed secrets
 -- among them, is an admin's. Whether the viewer is an admin is said with the viewer, by the server, from the token.
 alter table token   enable row level security;
 alter table setting enable row level security;
@@ -268,7 +268,7 @@ create policy member_token on token for all to pelago_member
 
 drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member
-  using (key in ('me', 'default_visibility', 'agent_changes'));
+  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups'));
 drop policy if exists member_setting on setting;
 create policy member_setting on setting for all to pelago_member
   using (current_setting('pelago.admin', true) = '1' or key like 'audit_cursor:%')
