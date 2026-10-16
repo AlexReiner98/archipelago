@@ -309,7 +309,8 @@
         "lanes": { "type": "string", "description": "What each item is filed under: stage, link, person, or field:<name> for the value of one of its fields (e.g. field:phase)." },
         "order": { "type": "string", "description": "The number field that orders things beside each other." },
         "measure": { "type": "enum", "values": ["work", "tokens"], "description": "What size counts." },
-        "fold": { "type": "json", "description": "What is left out, as a list of: closed, system, unlinked." }
+        "fold": { "type": "json", "description": "What is left out, as a list of: closed, system, unlinked." },
+        "time": { "type": "json", "description": "A time axis: {from, to} as dates or date-times, and by: [\"when\", \"bound\"] if not both. Only what falls in the window is in the picture, each item with its spans (time)." }
       }
     },
     {
@@ -319,8 +320,10 @@
       "description": "How a picture of the map is drawn. About a project or item, it is how that thing's picture looks; about nothing, the workspace's. A field left empty comes from the level above. Read only by the page that draws.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
-        "shape": { "type": "enum", "values": ["nest", "boxes", "grid"], "description": "One of the drawings that come built in, used when the style has no code of its own. grid: rows by what the start holds, columns by the lens's lanes, each thing a card, links as numbered lines with their words in a key. nest: circles in circles, opened by zooming. boxes: titled boxes in boxes, each thing one line." },
+        "shape": { "type": "enum", "values": ["nest", "boxes", "grid", "time"], "description": "One of the drawings that come built in, used when the style has no code of its own. time: along a time axis (the lens's time), as a calendar of days with hours down (layout: calendar) or as bars across days (layout: bars, a Gantt chart), each lane a row; the one a lens on a time axis is drawn in unless said. grid: rows by what the start holds, columns by the lens's lanes, each thing a card, links as numbered lines with their words in a key. nest: circles in circles, opened by zooming. boxes: titled boxes in boxes, each thing one line." },
         "lit": { "type": "enum", "values": ["all", "you", "blocked"], "description": "What stays lit as it opens." },
+        "layout": { "type": "enum", "values": ["calendar", "bars"], "description": "time: a calendar of days, hours running down (calendar), or each lane a row of bars across the days (bars, a Gantt chart). calendar unless said." },
+        "hours": { "type": "json", "description": "time, calendar: the hours of the day shown, as [from, to], e.g. [6, 22]. The whole day unless said." },
         "open": { "type": "number", "description": "How many levels are open as it first draws." },
         "show": { "type": "json", "description": "What a thing says beside its name, as a list of: count, blocked, you, sessions, status, type, bar." },
         "leaf": { "type": "enum", "values": ["row", "chip", "dot"], "description": "How a thing with nothing inside it is drawn in boxes." },

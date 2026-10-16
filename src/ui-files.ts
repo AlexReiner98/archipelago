@@ -9,6 +9,7 @@ export const UI_FILES: Record<string, string> = {
   '/doc.js': 'doc.js',
   '/doc.css': 'doc.css',
   '/packs.js': 'packs.js',
+  '/timeline.js': 'timeline.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',

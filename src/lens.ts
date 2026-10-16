@@ -4,7 +4,9 @@
 // is drawn; nothing here knows about it. A thing with parts carries the same
 // keys as a thing without, so one drawing can serve at every scale.
 
+import { sayLens } from './lens-words.ts';
 import type { Archipelago } from './pelago.ts';
+import { readAxis, spansOf, zoneOf, type TimeAxis } from './timeaxis.ts';
 import { blockGraph } from './views.ts';
 
 export interface Lens {
@@ -30,11 +32,13 @@ export interface Lens {
   measure: 'work' | 'tokens';
   /** What is left out until asked for. */
   fold: string[];
+  /** A time axis: only what falls in the window, each item with where (time). */
+  time?: TimeAxis;
 }
 
 export const LENS_DEFAULT: Lens = { by: 'part_of', over: ['depends_on', 'waits_on'], order: 'order', measure: 'work', fold: ['closed', 'system', 'unlinked'] };
 /** The fields a lens kept on the map may name: all but where it starts, which is what it is about. */
-const LENS_KEPT = { kinds: 1, by: 1, over: 1, far: 1, lanes: 1, order: 1, measure: 1, fold: 1 };
+const LENS_KEPT = { kinds: 1, by: 1, over: 1, far: 1, lanes: 1, order: 1, measure: 1, fold: 1, time: 1 };
 /** What a view may let the person looking change on the page. */
 const CONTROLS = ['lit', 'far', 'closed'];
 const FOLDS = ['closed', 'system', 'unlinked'];
@@ -106,6 +110,7 @@ export function readLens(l: Archipelago, input: Record<string, unknown>, under: 
     if (input.measure !== 'work' && input.measure !== 'tokens') throw new Error('measure must be one of: work, tokens');
     lens.measure = input.measure;
   }
+  if (input.time !== undefined) lens.time = readAxis(input.time);
   if (input.fold !== undefined) {
     lens.fold = list(input.fold, 'fold');
     const unknown = lens.fold.filter((f) => !FOLDS.includes(f));
@@ -149,19 +154,6 @@ async function keptOf(l: Archipelago, type: 'lens' | 'style', named: unknown): P
   if (typeof named === 'string' && !rows.some((r) => r.id === named)) throw new Error(`No ${type} "${named}"`);
   const { rows: links } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'about' and valid_to is null and from_id = any($1::text[])`, [rows.map((r) => r.id)]);
   return rows.map((r) => ({ ...r, about: links.filter((link) => link.from_id === r.id).map((link) => link.to_id) }));
-}
-
-/** A lens in words, so a person and an agent read the same rule: what is in the picture and what is not. */
-function sayLens(l: Archipelago, asked: Lens, startTitle: string | undefined): string {
-  const link = (kind: string) => l.registry.relations.get(kind)?.title ?? kind;
-  const parts = [asked.story ? `What "${startTitle}" told of, with the ties it drew` : startTitle ? `"${startTitle}" and what ${link(asked.by)} it` : `Everything, by what ${link(asked.by)} what`];
-  if (asked.far !== undefined) parts.push(asked.far === 0 ? 'nothing below it' : `${asked.far} step${asked.far === 1 ? '' : 's'} down`);
-  if (asked.kinds?.length) parts.push(`only ${asked.kinds.map((k) => (k.startsWith('-') ? `not ${k.slice(1)}` : k)).join(', ')}`);
-  parts.push(asked.over === 'all' ? 'with every kind of link' : asked.over.length ? `with links: ${asked.over.map(link).join(', ')}` : 'with no links');
-  if (asked.lanes) parts.push(`filed by ${asked.lanes.startsWith('field:') ? `its ${asked.lanes.slice(6).replaceAll('_', ' ')}` : asked.lanes}`);
-  const out = asked.fold.map((f) => ({ closed: 'what is finished', system: 'the system\u2019s own records', unlinked: 'what is linked to nothing this way' })[f] ?? f);
-  parts.push(out.length ? `without ${out.join(', ')}` : 'with nothing left out');
-  return parts.join('; ') + '.';
 }
 
 /** How many open things an item holds before it is a hub, unless its project says otherwise (hub_at). */
@@ -310,6 +302,11 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     else if ((wanted.length && !wanted.some((k) => is(e.type, k))) || unwanted.some((k) => is(e.type, k))) (rest.kinds++, standing.add(e.id));
     else (eligible.set(e.id, e), standing.add(e.id));
   }
+  // On a time axis, only what falls in its window stays (and where it starts).
+  const zone = asked.time && (await zoneOf(l));
+  const spans = asked.time && new Map([...eligible.values()].map((e) => [e.id, spansOf(l, e, asked.time!, zone!)]));
+  let untimed = 0;
+  if (spans) for (const [id, found] of spans) if (!found.length && id !== asked.from) (eligible.delete(id), untimed++);
   const live = relations.filter((r) => eligible.has(r.from_id) && eligible.has(r.to_id));
 
   // What a thing is inside: where its organising link leads. Led to two things (a task of a feature, linked
@@ -514,12 +511,13 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
         size: size(e),
         state: state(e),
         within: within(id),
+        ...(spans && { time: spans.get(id) }),
         // In a story: the beats that are about it.
         ...(told && { told: beatsOf(id) }),
       };
     }),
     links: [...lines.values()],
     ...(laneOrder && { lanes: laneOrder }),
-    rest,
+    rest: spans ? { ...rest, time: untimed } : rest,
   };
 }

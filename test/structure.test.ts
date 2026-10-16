@@ -63,7 +63,7 @@ const LONG_FILES: Record<string, number> = {
   'ui/style.css': 891,
   'src/server.ts': 653,
   'src/time.ts': 626,
-  'src/lens.ts': 525,
+  'src/lens.ts': 523,
   'src/sessions.ts': 522,
 };
 

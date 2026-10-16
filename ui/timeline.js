@@ -1,0 +1,146 @@
+// The kernel's drawing of a lens on a time axis. Two layouts of the same answer: a calendar (a column for each day,
+// hours running down, each item a block where it falls) and bars (each lane a row, each item a bar across the
+// days it covers: a Gantt chart). Colour is the item's kind; a name too long for its block is cut, and is whole in
+// its tooltip. Nothing is written here: an item opens on its own page.
+
+const SVG = 'http://www.w3.org/2000/svg';
+const DAY = 86_400_000;
+const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
+
+/** How the drawing's parts look, set through the CSSOM (the page allows no inline style attributes). Colours are the page's. */
+const LOOK = {
+  't-rule': 'stroke: var(--line); stroke-width: 1',
+  't-head': 'fill: var(--muted); font-size: 11px',
+  't-hour': 'fill: var(--muted); font-size: 10px',
+  't-label': 'fill: #fff; font-size: 11px; pointer-events: none',
+  't-row': 'fill: var(--text); font-size: 12px',
+};
+
+const svg = (tag, attrs = {}, ...kids) => {
+  const el = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) el.setAttribute(k, v);
+  const look = LOOK[attrs.class] ?? (String(attrs.class).startsWith('t-block') ? 'cursor: pointer' : undefined);
+  if (look) el.style.cssText = look;
+  el.append(...kids.filter(Boolean));
+  return el;
+};
+const tip = (text) => svg('title', {}, text);
+/** The start of a day in this browser's time, from a date or a date-time. */
+const dayOf = (value) => {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+};
+const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+const fmtTime = (t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+/** As many letters as fit a width, at about 6.5 px a letter. */
+const cut = (text, width) => {
+  const n = Math.max(0, Math.floor(width / 6.5));
+  return text.length <= n ? text : n > 1 ? `${text.slice(0, n - 1)}…` : '';
+};
+
+/** Every block an answer places: one for each span of each item. */
+function blocks(answer) {
+  return answer.items.flatMap((item) =>
+    (item.time ?? []).map((span) => ({ item, start: Date.parse(span.start), end: Math.max(Date.parse(span.end), Date.parse(span.start)), by: span.by })),
+  );
+}
+
+const group = (item) => `t-block group-${KINDS.includes(item.kind) ? item.kind : 'system'}${item.open ? '' : ' closed'}`;
+const open = (item) => () => (location.hash = `#/e/${item.id}`);
+const said = (b) => `${b.item.title}\n${b.end - b.start >= DAY ? fmtDay(b.start) : `${fmtDay(b.start)}, ${fmtTime(b.start)}`}${b.end > b.start ? ` to ${b.end - b.start >= DAY ? fmtDay(b.end - 1) : fmtTime(b.end)}` : ''}${b.by === 'bound' ? ' (due)' : ''}`;
+
+/** A column for each day, hours running down. Blocks that overlap in a day sit side by side. */
+function calendar(host, answer, style) {
+  const from = dayOf(answer.lens.time.from);
+  const days = Math.max(1, Math.round((dayOf(answer.lens.time.to) - from) / DAY) + 1);
+  const [h0, h1] = Array.isArray(style.hours) && style.hours.length === 2 ? style.hours.map(Number) : [0, 24];
+  const width = Math.max(host.clientWidth || 800, 320);
+  const gutter = 38;
+  const hourPx = 34;
+  const colW = (width - gutter) / days;
+  const chip = 18;
+  const all = blocks(answer);
+  // A whole day or more (a due date, a week away) is not hours: it goes in a strip along the top, as calendars do.
+  const whole = (b) => b.end - b.start >= DAY || b.by === 'bound';
+  const daysOf = (b) => [...Array(days).keys()].filter((d) => b.end > from + d * DAY && b.start < from + (d + 1) * DAY);
+  const tops = all.filter(whole);
+  const strip = Math.max(0, ...[...Array(days).keys()].map((d) => tops.filter((b) => daysOf(b).includes(d)).length));
+  const head = 22 + strip * chip;
+  const height = head + (h1 - h0) * hourPx;
+  const out = svg('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` });
+  for (let d = 0; d < days; d++) {
+    const x = gutter + d * colW;
+    out.append(svg('line', { class: 't-rule', x1: x, x2: x, y1: 0, y2: height }), svg('text', { class: 't-head', x: x + 4, y: 15 }, cut(fmtDay(from + d * DAY), colW - 6)));
+  }
+  for (let hr = h0; hr <= h1; hr++) {
+    const y = head + (hr - h0) * hourPx;
+    out.append(svg('line', { class: 't-rule', x1: gutter, x2: width, y1: y, y2: y }), hr < h1 && svg('text', { class: 't-hour', x: 2, y: y + 11 }, `${String(hr).padStart(2, '0')}:00`));
+  }
+  const place = (b, x, y, w, hgt) => {
+    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(said(b)), svg('rect', { class: 'dot', x, y, width: Math.max(w, 3), height: hgt, rx: 3 }), svg('text', { class: 't-label', x: x + 4, y: y + 12 }, cut(b.item.title, w - 8))));
+    out.lastChild.addEventListener('click', open(b.item));
+  };
+  // The strip: each whole-day thing a bar across the days it covers, on the first row free on all of them.
+  const rows = [];
+  for (const b of tops) {
+    const covers = daysOf(b);
+    let row = 0;
+    while (covers.some((d) => rows[row]?.has(d))) row++;
+    rows[row] ??= new Set();
+    for (const d of covers) rows[row].add(d);
+    place(b, gutter + covers[0] * colW + 2, 21 + row * chip, covers.length * colW - 4, chip - 3);
+  }
+  for (let d = 0; d < days; d++) {
+    const dayStart = from + d * DAY;
+    // What falls on this day within the hours shown; things at the same time sit side by side.
+    const today = all
+      .filter((b) => !whole(b))
+      .map((b) => ({ ...b, s: Math.max(b.start, dayStart + h0 * 3_600_000), e: Math.min(b.end, dayStart + h1 * 3_600_000) }))
+      .filter((b) => b.end > dayStart && b.start < dayStart + DAY && (b.e > b.s || b.start === b.end))
+      .sort((a, b) => a.s - b.s);
+    const cols = [];
+    for (const b of today) {
+      const col = cols.findIndex((end) => end <= b.s);
+      b.col = col < 0 ? cols.push(b.e) - 1 : col;
+      cols[b.col] = Math.max(cols[b.col], b.e);
+    }
+    const w = (colW - 4) / Math.max(cols.length, 1);
+    for (const b of today) place(b, gutter + d * colW + 2 + b.col * w, head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, w - 2, Math.max(((b.e - b.s) / 3_600_000) * hourPx, 16));
+  }
+  host.replaceChildren(out);
+}
+
+/** Each lane a row (each item its own when there are no lanes), its spans as bars across the days. */
+function bars(host, answer) {
+  const from = dayOf(answer.lens.time.from);
+  const to = dayOf(answer.lens.time.to) + DAY;
+  const width = Math.max(host.clientWidth || 800, 320);
+  const label = Math.min(220, width * 0.3);
+  const rowH = 24;
+  const head = 22;
+  const all = blocks(answer);
+  const rows = answer.lanes?.length ? answer.lanes.map((lane) => ({ key: lane.key ?? lane, title: lane.title ?? lane.key ?? String(lane) })) : answer.items.filter((i) => i.time?.length).map((i) => ({ key: i.id, title: i.title }));
+  const rowOf = (b) => rows.findIndex((r) => r.key === (answer.lanes?.length ? (b.item.lane?.key ?? b.item.lane) : b.item.id));
+  const height = head + rows.length * rowH + 4;
+  const x = (t) => label + ((Math.min(Math.max(t, from), to) - from) / (to - from)) * (width - label - 4);
+  const out = svg('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` });
+  const days = Math.round((to - from) / DAY);
+  const every = Math.max(1, Math.ceil(days / Math.floor((width - label) / 70)));
+  for (let d = 0; d <= days; d += every) out.append(svg('line', { class: 't-rule', x1: x(from + d * DAY), x2: x(from + d * DAY), y1: 0, y2: height }), d < days && svg('text', { class: 't-head', x: x(from + d * DAY) + 3, y: 15 }, fmtDay(from + d * DAY)));
+  rows.forEach((r, i) => out.append(svg('text', { class: 't-row', x: 4, y: head + i * rowH + 16 }, tip(r.title), cut(r.title, label - 10))));
+  for (const b of all) {
+    const i = rowOf(b);
+    if (i < 0) continue;
+    const x0 = x(b.start);
+    const w = Math.max(x(b.end) - x0, 6);
+    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(said(b)), svg('rect', { class: 'dot', x: x0, y: head + i * rowH + 4, width: w, height: rowH - 8, rx: 3 })));
+    out.lastChild.addEventListener('click', open(b.item));
+  }
+  host.replaceChildren(out);
+}
+
+/** Draw a lens's answer along its time axis, in the style's layout. */
+export function drawTime(host, answer, style) {
+  if (!answer.lens.time) return host.replaceChildren(Object.assign(document.createElement('div'), { className: 'empty', textContent: 'This view has no time axis.' }));
+  (style.layout === 'bars' ? bars : calendar)(host, answer, style);
+}

@@ -1,7 +1,7 @@
-// The pelago web UI. No framework and no build step: it calls the same
-// tools as the CLI through /api/<tool>.
+// The pelago web UI. No framework and no build step: it calls the same tools as the CLI through /api/<tool>.
 
 import { packsCard } from './packs.js';
+import { drawTime } from './timeline.js';
 
 const main = document.getElementById('main');
 /**
@@ -2279,7 +2279,7 @@ function lensView({ lens = {}, style = {}, key = lens.story ? `story:${lens.stor
     Object.assign(chosen, LENS_STYLE, answer.style, keptStyle(key), style, { noLit: !answer.controls.includes('lit') });
     dress(body, chosen);
     // A style with code of its own is the drawing; without, one of those that come built in.
-    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.nest))(body, answer, chosen, keep, place);
+    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[answer.lens.time && !style.shape ? 'time' : chosen.shape] ?? LENS_SHAPES.nest))(body, answer, chosen, keep, place);
   };
   host.ready = load();
   // Light only these items (a beat's, pointed at beside the picture), or everything as the style says again: the shape draws itself anew.
@@ -2911,7 +2911,7 @@ function drawGrid(host, answer, style, keep, kept) {
   };
 }
 
-const LENS_SHAPES = { nest: drawNest, boxes: drawBoxes, grid: drawGrid };
+const LENS_SHAPES = { nest: drawNest, boxes: drawBoxes, grid: drawGrid, time: drawTime };
 
 /**
  * The map as a picture: the lens its address names (what follows a ?), or
