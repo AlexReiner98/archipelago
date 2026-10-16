@@ -5,7 +5,7 @@
 // is there: names, states and what the tests found, and nothing else.
 
 import type { Entity, Archipelago } from './pelago.ts';
-import { changelog, proof } from './proof.ts';
+import { askView } from './askview.ts';
 
 /**
  * A public product (public work: a project or a feature), as its page shows it: the proof
@@ -20,8 +20,18 @@ export async function publicPage(l: Archipelago, product: string, build?: string
   if (!type?.public || type.kind !== 'work') return null;
   // Everything public that belongs to it, through whatever lies between that is not.
   const under = new Set([root.id, ...(await pub.db.query<{ id: string }>(`select pelago_public_under($1) as id`, [root.id])).rows.map((r) => r.id)]);
-  const proven = await proof(pub, { build }, under);
-  const log = await changelog(pub, { of: root.id }, under);
+  // Its proof and changelog are the software pack's to say, read as anyone reads them.
+  const anyone = { kind: 'human' as const, name: 'anyone' };
+  type Found = { passed: boolean; value: string | null; build: string; at: string; stored: boolean; id: string };
+  type Proven = {
+    build?: string | null;
+    builds?: string[];
+    counts?: Record<'questions' | 'answered' | 'tests' | 'passed' | 'failed' | 'not_run', number>;
+    proofs?: { id: string; title: string; total: number; passed: number; failed: number; not_run: number; answered: boolean; tests: { id: string; title: string; status: string; compares: string | null; tolerance: string | null; environment: string | null; result: Found | null; before: Found | null }[] }[];
+  };
+  const proven = ((await askView(pub, anyone, 'proof', { build, within: [...under] }).catch(() => ({}))) ?? {}) as Proven;
+  type Logged = { features: { title: string; status: string; at: string; release: { title: string; version: string | null } | null }[] };
+  const log = ((await askView(pub, anyone, 'changelog', { of: root.id, within: [...under] }).catch(() => ({ features: [] }))) ?? { features: [] }) as Logged;
   return {
     title: root.title,
     build: proven.build ?? null,

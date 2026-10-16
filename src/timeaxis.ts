@@ -107,7 +107,9 @@ export async function placeAll(l: Archipelago, items: (Placed & { updated_at?: D
   return placed;
 }
 
+export const DEFAULT_ZONE = 'America/Toronto';
+
 /** The time zone days are counted in: the workspace's, or Toronto's as the time pack always has. */
 export async function zoneOf(l: Archipelago): Promise<string> {
-  return (await l.setting<string>('time_zone')) || 'America/Toronto';
+  return (await l.setting<string>('time_zone')) || DEFAULT_ZONE;
 }

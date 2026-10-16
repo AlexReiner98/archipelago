@@ -6,7 +6,6 @@ import { ACTIVE_HOLDS, type Entity, type Archipelago, type Op } from './pelago.t
 import { costs } from './costs.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
 import { findPlace, scopeOf } from './places.ts';
-import { changelog, proof } from './proof.ts';
 
 interface Edge {
   x: string;
@@ -86,6 +85,14 @@ class BlockGraph {
     return [...roots];
   }
 }
+
+/**
+ * How a kernel view asks a question a pack answers (the gate asks proof of the software pack). Handed in by
+ * src/askview.ts, which needs these views itself; without a pack that answers, there is no answer.
+ */
+type PackAsker = (l: Archipelago, name: string, params: Record<string, unknown>) => Promise<unknown>;
+let askPack: PackAsker | undefined;
+export const setPackAsker = (asker: PackAsker) => void (askPack = asker);
 
 export async function blockGraph(l: Archipelago): Promise<BlockGraph> {
   const { rows } = await l.db.query<Edge>(EDGES, ['depends_on', 'waits_on', 'needs'].map((root) => l.registry.relationFamily(root)));
@@ -838,7 +845,7 @@ async function gate(l: Archipelago, input: { event?: string }) {
   // a release that names its version is not helped by what passed on an earlier one.
   const asked = new Set([...from('software.ships', event.id), ...held.filter((r) => isA(byId.get(r.to_id)!, containers))].flatMap((r) => [r.to_id, ...under(r.to_id)]));
   const version = typeof event.props.version === 'string' && event.props.version.trim() ? event.props.version.trim() : undefined;
-  const proven = asked.size ? await proof(l, { build: version }, asked) : undefined;
+  const proven = asked.size && askPack ? ((await askPack(l, 'proof', { build: version, within: [...asked] }).catch(() => undefined)) as { build?: string | null; counts?: Record<string, number> & { answered: number; questions: number }; proofs?: (Record<string, unknown> & { tests: unknown })[] } | undefined) : undefined;
   const known = proven?.proofs?.length && proven.counts ? { build: proven.build ?? null, counts: proven.counts, proofs: proven.proofs } : undefined;
 
   const rank = (i: Item) => (i.done ? 2 : i.yours ? 0 : 1);
@@ -993,20 +1000,13 @@ export const VIEWS: Record<string, View> = {
       'An event as a gate (a release, a launch): what it waits for (everything it depends_on), grouped by stream (the feature or project each is part of) with progress and what the owner owes; what it goes ahead without (what it defers); what is not yet sorted (open tasks, issues and decisions under what it ships, on neither side); and how we know (the proof questions of what it ships and of what holds it, answered or not on the release\u2019s build: its version). Params: event (an entity id; without it, the open events that have a gate).',
     run: gate,
   },
-  changelog: {
-    description: 'What a product has to show: its features that are built or shipped, each with the release it went out in; built and not yet released first, then the newest. Planned work is not in it. Params: of (required): a project or feature.',
-    run: changelog,
-  },
+
   costs: {
     description:
       'What the work costs: what agents spent over the last days (dollars where a run says what it cost, tokens where it does not, by where they ran), each regular payment (a cost item: hosting, a subscription) with its share of the period, the total, and the rate per month. Nothing is guessed: a payment with no amount is named as not priced. Params: days (default 30).',
     run: costs,
   },
-  proof: {
-    description:
-      'How we know the software is correct: the proof questions of a product (a project or feature; a question is a software.proof that is part of it or about it), each with the tests that help answer it and what every test found on one build, with its picture. A question is answered on a build when all its tests passed there. Params: of (an entity id; without it, the projects that have proof questions), build (a version or commit; without it, the build last reported).',
-    run: proof,
-  },
+
   notifications: {
     description: 'Unread notifications for the human, newest first.',
     run: notifications,

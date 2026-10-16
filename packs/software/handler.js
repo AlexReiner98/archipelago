@@ -1,8 +1,9 @@
 // The software pack's handler: run in its own sandboxed process by the kernel's pack host. Its views read the map
 // through ctx.read and write nothing; the kernel's view tool answers them by their short names (handoff, repo_work,
-// recheck, agent_usage).
+// recheck, agent_usage, proof, changelog).
 
 import { handoff } from './handoff.js';
+import { changelog, proof } from './proof.js';
 import { agentUsage, recheck } from './recheck.js';
 import { repoWork } from './repo.js';
 
@@ -13,4 +14,6 @@ export default {
   'software.repo_work': view(repoWork),
   'software.recheck': view(recheck),
   'software.agent_usage': view(agentUsage),
+  'software.proof': view(proof),
+  'software.changelog': view(changelog),
 };

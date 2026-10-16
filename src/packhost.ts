@@ -11,7 +11,8 @@ import { createInterface } from 'node:readline';
 import { handleRequests, type OutsideRequest } from './outside.ts';
 import { answerRead, type Read } from './packreads.ts';
 import type { Actor, Archipelago, Op } from './pelago.ts';
-import { zoneOf } from './timeaxis.ts';
+// Anyone with no login cannot read the workspace's settings: a public page is counted in the default zone.
+import { DEFAULT_ZONE, zoneOf } from './timeaxis.ts';
 
 const RUNNER = join(import.meta.dirname, 'pack-runner.ts');
 /** How long a call may take unless its pack says otherwise, and the most it may say. */
@@ -135,7 +136,7 @@ export class PackHost {
     const box = this.boxes.get(pack) ?? new Sandbox(folder);
     this.boxes.set(pack, box);
     const present = l.registry.packs.map((p) => p.id);
-    return box.call(l, { call, name, input, actor: { name: actor.name, kind: actor.kind }, now: new Date().toISOString(), zone: await zoneOf(l), present }, Math.min(ms, MAX_MS));
+    return box.call(l, { call, name, input, actor: { name: actor.name, kind: actor.kind }, now: new Date().toISOString(), zone: await zoneOf(l).catch(() => DEFAULT_ZONE), present }, Math.min(ms, MAX_MS));
   }
 
   /**

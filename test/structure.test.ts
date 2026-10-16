@@ -76,7 +76,7 @@ const NAMES_PACKS: Record<string, number> = {
   'ui/week.js': 1,
   'ui/workspace.js': 1,
   'src/views.ts': 9,
-  'src/proof.ts': 12,
+  'src/proof.ts': 5,
   'src/demo.ts': 10,
   'src/scope.ts': 3,
   'src/github.ts': 3,

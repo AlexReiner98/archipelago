@@ -1843,7 +1843,7 @@ test('a proof question is answered on a build when every test of it passed there
     counts: Record<string, number>;
     proofs: { id: string; answered: boolean; passed: number; failed: number; not_run: number; tests: { id: string; result: { id: string; passed: boolean; value: string | null; picture: string | null } | null; before: { build: string } | null }[] }[];
   };
-  const view = async (build?: string) => (await VIEWS.proof.run(l, { of: made.app, build })) as Proof;
+  const view = async (build?: string) => (await callTool(l, human, 'view', { name: 'proof', params: { of: made.app, build } })) as Proof;
   const none = await view();
   assert.equal(none.build, null);
   assert.deepEqual(none.counts, { questions: 2, answered: 0, tests: 3, passed: 0, failed: 0, not_run: 3 });
@@ -1886,7 +1886,7 @@ test('a proof question is answered on a build when every test of it passed there
   assert.equal(later.tests.find((t) => t.id === made.pole)!.before!.build, '1.0.0');
   assert.equal((await view('1.0.0')).proofs.find((p) => p.id === made.sun)!.answered, true);
 
-  const listed = (await VIEWS.proof.run(l, {})) as { products: { id: string; questions: number }[] };
+  const listed = (await callTool(l, human, 'view', { name: 'proof', params: {} })) as { products: { id: string; questions: number }[] };
   assert.deepEqual(listed.products.map((p) => [p.id, p.questions]), [[made.app, 2]]);
   await assert.rejects(callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: made.noaa, passed: true }, { test: 'Sun.MatchesNoaa', passed: true }] }), /reported twice/);
 });
@@ -1901,7 +1901,7 @@ test('a picture is kept for a result only when sent, travels in a backup, and go
     { op: 'link', type: 'software.answers', from: 'noaa', to: 'sun' },
   ]);
   type Found = { id: string; picture: string | null; stored: boolean };
-  const found = async () => ((await VIEWS.proof.run(l, { of: made.app })) as { proofs: { tests: { result: Found | null }[] }[] }).proofs[0].tests[0].result!;
+  const found = async () => ((await callTool(l, human, 'view', { name: 'proof', params: { of: made.app } })) as { proofs: { tests: { result: Found | null }[] }[] }).proofs[0].tests[0].result!;
 
   // A report says where the picture is in the repository; the file stays there.
   await callTool(l, human, 'test_report', { build: '1.0.0', results: [{ test: 'Sun.MatchesNoaa', passed: true, picture: '.proof/1.0.0/Sun.MatchesNoaa.png' }] });
@@ -1971,7 +1971,7 @@ test('a release is not clear until what it ships is proven on its own build, and
   assert.deepEqual([after.proof!.counts.answered, after.proof!.questions[0].answered, after.clear], [1, true, true]);
 
   // A changelog is what is built or shipped, with the release each went out in; what is only planned is not in it.
-  const log = (await VIEWS.changelog.run(l, { of: made.app })) as { counts: Record<string, number>; features: { id: string; status: string; release: { version: string | null } | null }[] };
+  const log = (await callTool(l, human, 'view', { name: 'changelog', params: { of: made.app } })) as { counts: Record<string, number>; features: { id: string; status: string; release: { version: string | null } | null }[] };
   assert.deepEqual(log.counts, { built: 3, shipped: 1 });
   assert.deepEqual(log.features.map((f) => f.id).sort(), [made.addin, made.old, made.panel, made.proofs].sort());
   assert.equal(log.features.at(-1)!.id, made.old, 'what is built and not yet released comes first');
@@ -2046,7 +2046,7 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   })) as { send_pictures: unknown[] };
   assert.deepEqual(report.send_pictures, [], 'nothing is public yet, so no picture is asked for');
   type View = { proofs: { id: string; public: boolean; tests: { result: { id: string } }[] }[]; to_send: { result: string; picture: string }[] };
-  const view = async () => (await VIEWS.proof.run(l, { of: made.app })) as View;
+  const view = async () => (await callTool(l, human, 'view', { name: 'proof', params: { of: made.app } })) as View;
   const results = Object.fromEntries((await view()).proofs.map((p) => [p.id, p.tests[0].result.id]));
   for (const id of Object.values(results)) await callTool(l, human, 'picture_put', { result: id, data: png.toString('base64'), content_type: 'image/png' });
 

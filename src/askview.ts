@@ -5,7 +5,7 @@
 import type { ViewDef } from './declared.ts';
 import { hostFor } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
-import { VIEWS } from './views.ts';
+import { setPackAsker, VIEWS } from './views.ts';
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);
 
@@ -27,6 +27,9 @@ export function viewList(l: Archipelago): Record<string, string> {
 
 /** Whether a question of this name can be asked here. */
 export const canAsk = (l: Archipelago, name: string) => Boolean(VIEWS[name] ?? packView(l, name));
+
+/** The kernel's own views ask what a pack answers (the gate, a pack's proof) through this. */
+setPackAsker((l, name, params) => askView(l, { kind: 'agent', name: 'kernel' }, name, params));
 
 /** Answer a question by its name. */
 export async function askView(l: Archipelago, actor: Actor, name: string, params: Record<string, unknown> = {}): Promise<unknown> {

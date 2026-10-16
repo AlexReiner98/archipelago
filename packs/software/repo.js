@@ -1,6 +1,9 @@
 // Repositories as the software pack reads them: one found by its id, its GitHub name or its title, its last push,
 // and the open work that is its: what lives in it, and all that is part of that or about it.
 
+/** Whether an item read from the map is of a type, flavours included: every item comes with what it is. */
+export const isA = (item, type) => Boolean(item?.is?.includes(type));
+
 /**
  * "owner/name" from any way of writing a GitHub repository's address, or from the name itself. An address copied
  * from the browser on some page of the repository (.../tree/main, .../issues/3) is the repository's too.

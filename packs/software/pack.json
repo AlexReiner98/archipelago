@@ -172,6 +172,38 @@
       }
     },
     {
+      "id": "software.proof",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "How we know the software is correct: the proof questions of a product (a project or feature; a question is a software.proof that is part of it or about it), each with the tests that help answer it and what every test found on one build, with its picture. A question is answered on a build when all its tests passed there. Params: of (an entity id; without it, the projects that have proof questions), build (a version or commit; without it, the build last reported).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "of": { "type": "string", "description": "A project or feature; without it, the projects that have proof questions." },
+          "build": { "type": "string", "description": "A version or commit; without it, the build last reported." },
+          "within": { "type": "array", "items": { "type": "string" }, "description": "In place of of: only these items and what is part of them (a gate's stake, a public page's items)." },
+          "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "software.changelog",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "What a product has to show: its features that are built or shipped, each with the release it went out in; built and not yet released first, then the newest. Planned work is not in it. Params: of (required): a project or feature.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "of": { "type": "string", "description": "A project or feature." },
+          "within": { "type": "array", "items": { "type": "string" }, "description": "Only these items, as a public page gives them." },
+          "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." }
+        },
+        "required": ["of"],
+        "additionalProperties": false
+      }
+    },
+    {
       "id": "software.agent_usage",
       "shape": "data",
       "limit_ms": 30000,
