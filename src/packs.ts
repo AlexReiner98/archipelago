@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
+import { checkRules, type RuleDef } from './rules.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
 
@@ -83,6 +84,8 @@ export interface PackFile {
   types?: TypeDef[];
   relations?: RelationDef[];
   trees?: TreeDef[];
+  /** What tightens writes to the map: holds, refusals, required fields, unique values. */
+  rules?: RuleDef[];
   /** Extra fields a pack adds to types owned by another pack. */
   extend?: Record<string, { fields: Record<string, FieldDef> }>;
 }
@@ -123,6 +126,7 @@ export class Registry {
   types = new Map<string, ResolvedType>();
   relations = new Map<string, ResolvedRelation>();
   trees = new Map<string, TreeDef & { pack: string }>();
+  rules: (RuleDef & { pack: string })[] = [];
 
   constructor(dir: string, only?: string[], localDir?: string) {
     this.dir = dir;
@@ -262,7 +266,13 @@ export class Registry {
       }
     }
 
+    for (const pack of ordered) {
+      const problems = checkRules(pack.rules ?? [], { types });
+      if (problems.length) throw new Error(`Pack "${pack.id}": ${problems.join('; ')}`);
+    }
+
     this.packs = ordered;
+    this.rules = ordered.flatMap((pack) => (pack.rules ?? []).map((rule) => ({ ...rule, pack: pack.id })));
     this.types = types;
     this.relations = relations;
     this.trees = trees;

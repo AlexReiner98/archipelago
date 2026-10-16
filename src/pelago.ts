@@ -3,7 +3,8 @@
 // applied or stored as a proposal for a human, and always logged.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { checkAutomation } from './automation-rules.ts';
+import { checkWritten } from './automation-rules.ts';
+import { clashes, judge, type Target, type Written } from './rules.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
@@ -247,6 +248,18 @@ export class Archipelago {
 
   // ---- writes ----------------------------------------------------------
 
+  /** What the packs' rules make of each op: whether it waits for a person, and what refuses it. */
+  private async judgeOps(actor: Actor, ops: Op[]) {
+    const on = (op: Op) => (op.op === 'merge' ? [op.keep, op.drop] : 'id' in op ? [op.id] : []);
+    const ids = ops.flatMap(on);
+    const found = new Map((ids.length ? (await this.db.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ids])).rows : []).map((e) => [e.id, e]));
+    return Promise.all(ops.map(async (op) => {
+      const targets = on(op).flatMap((id) => found.get(id) ?? []);
+      const judged = judge(this.registry, actor.kind === 'human', op as Written, targets);
+      return { ...judged, refused: [...judged.refused, ...(await clashes(this.db, this.registry, op as Written, targets[0]))] };
+    }));
+  }
+
   async change(actor: Actor, input: ChangeInput) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
     const { warnings } = await this.plan(input.ops);
@@ -259,31 +272,15 @@ export class Archipelago {
     // The workspace's own choice, when it has made one, stands in for the
     // server's policy on everything the policy does not forbid outright.
     const chosen = actor.kind === 'human' ? undefined : await this.setting<string>(AGENT_CHANGES);
-    // An automation acts later with the authority of the human who approved it, and can launch a session: making
-    // one, changing one or bringing one back is the human's, whatever else agents may do unreviewed.
-    const automations = new Set<string>();
-    if (actor.kind !== 'human' && this.registry.type('sys.automation')) {
-      const ids = input.ops.flatMap((op) => (op.op === 'update' || op.op === 'restore' ? [op.id] : []));
-      const kinds = this.registry.family('sys.automation');
-      if (ids.length) for (const row of (await this.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and type = any($2::text[])`, [ids, kinds])).rows) automations.add(row.id);
-    }
-    // A style may carry code that runs in the browser of whoever looks at the picture. That it runs is the human's
-    // to allow: an agent that writes such code, or folds one style into another, proposes it.
-    const styles = new Set<string>();
-    if (actor.kind !== 'human' && this.registry.type('style')) {
-      const ids = input.ops.flatMap((op) => (op.op === 'merge' ? [op.keep, op.drop] : []));
-      if (ids.length) for (const row of (await this.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and type = any($2::text[])`, [ids, this.registry.family('style')])).rows) styles.add(row.id);
-    }
-    const levels = input.ops.map((op): Level => {
+    // The packs' rules: what waits for a person, whatever else agents may do unreviewed, and what is refused.
+    const judged = await this.judgeOps(actor, input.ops);
+    const refused = judged.flatMap((j) => j.refused);
+    if (refused.length) throw new Error(`Change rejected:\n${refused.map((r) => `- ${r}`).join('\n')}`);
+    const levels = input.ops.map((op, i): Level => {
       if (actor.kind === 'human') return 'auto';
       const level = this.policy[op.op];
       if (level === 'forbidden') return level;
-      if ((op.op === 'create' || op.op === 'update') && typeof op.props?.code === 'string' && op.props.code.trim()) return 'propose';
-      if (op.op === 'merge' && (styles.has(op.keep) || styles.has(op.drop))) return 'propose';
-      if (op.op === 'create' && this.registry.isA(op.type, 'sys.automation')) return 'propose';
-      if ((op.op === 'update' || op.op === 'restore') && automations.has(op.id)) return 'propose';
-      // What anyone can see is the human's to decide, whatever else agents may do unreviewed: an agent proposes it.
-      if ((op.op === 'create' || op.op === 'update') && op.visibility === 'public') return 'propose';
+      if (judged[i].hold) return 'propose';
       // An agent may always ask for a look before its change takes effect.
       if (input.hold) return 'propose';
       return chosen === 'apply' ? 'auto' : chosen === 'hold' ? 'propose' : level;
@@ -297,23 +294,6 @@ export class Archipelago {
     // record has to stand on its own: a decision says what was chosen and why,
     // and the human is told (see `answered`).
     const answered: { id: string; title: string; status: string; outcome?: string; authority: Authority }[] = [];
-    // Time set aside becomes time worked only on a person's word: an agent may plan it and move it, never confirm it.
-    if (actor.kind !== 'human' && this.registry.type('time.entry')) {
-      const entries = new Set(this.registry.family('time.entry'));
-      const routines = new Set(this.registry.family('time.routine'));
-      for (const op of input.ops) {
-        if (op.op !== 'update') continue;
-        // A day of a routine for some work is confirmed by marking it done.
-        if (op.props && 'done' in op.props) {
-          const e = await this.entity(op.id);
-          if (e && routines.has(e.type)) throw new Error(`Change rejected:\n- "${e.title}" is a routine: only a person confirms a day of it, on the Time screen. Its days wait there under To confirm.`);
-        }
-        if (!op.status || op.status === 'planned') continue;
-        const e = await this.entity(op.id);
-        if (e && entries.has(e.type) && e.status === 'planned')
-          throw new Error(`Change rejected:\n- "${e.title}" is planned time: only a person confirms that it happened, on the Time screen. It waits there under To confirm.`);
-      }
-    }
     if (actor.kind !== 'human') {
       const questions = new Set(this.registry.having('settles'));
       const decisions = new Set([...questions].filter((t) => this.registry.type(t)!.capabilities.settles!.by === 'word'));
@@ -423,7 +403,7 @@ export class Archipelago {
           const type = reg.type(op.type);
           if (!type) break;
           if (op.visibility === 'public' && !PUBLIC_KINDS.some((kind) => reg.isA(op.type, kind))) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${PUBLIC_KINDS.join(', ')}.`);
-          if (reg.isA(op.type, 'sys.automation')) errors.push(...checkAutomation(op.props ?? {}).map((p) => `${where}: ${p}`));
+          errors.push(...checkWritten(reg, op.type, op.props ?? {}).map((p) => `${where}: ${p}`));
           if (op.ref) {
             if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
             refs.set(op.ref, op.type);

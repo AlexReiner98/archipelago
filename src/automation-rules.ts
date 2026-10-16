@@ -1,8 +1,15 @@
-// What makes an automation's definition complete. Kept free of imports so the
+// What makes an automation's definition complete. Kept free of runtime imports so the
 // write path can check a definition before it is stored.
+
+import type { Registry } from './packs.ts';
 
 /** Tools an automation may call. Anything that decides or approves is left out on purpose. */
 export const AUTOMATION_TOOLS = ['check_connections', 'import_audit'];
+
+/** Problems with what an automation is to do, when the type written is one. */
+export function checkWritten(reg: Registry, type: string, props: Record<string, unknown>): string[] {
+  return reg.isA(type, 'sys.automation') ? checkAutomation(props) : [];
+}
 
 export function checkAutomation(props: Record<string, unknown>): string[] {
   const problems: string[] = [];

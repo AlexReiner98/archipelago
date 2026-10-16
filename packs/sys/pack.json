@@ -261,5 +261,8 @@
       ],
       "description": "What a run or actor is doing right now."
     }
+  ],
+  "rules": [
+    { "id": "automations", "when": { "actor": "agent", "op": ["create", "update", "restore"], "type": "sys.automation" }, "then": "hold", "say": "An automation acts later on the authority of the human who approved it: making, changing or bringing one back is theirs." }
   ]
 }

@@ -89,5 +89,10 @@
         "payment": { "type": "string", "description": "How to pay, as it goes on invoices: one way per line, e.g. \"Interac e-Transfer to pay@example.com (autodeposit)\" and \"EFT: institution 004, transit 12345, account 1234567\"." }
       }
     }
-  }
+  },
+  "rules": [
+    { "id": "routine_days", "when": { "actor": "agent", "op": "update", "type": "time.routine", "fields": ["done"] }, "then": "refuse", "say": "\"{title}\" is a routine: only a person confirms a day of it, on the Time screen. Its days wait there under To confirm." },
+    { "id": "planned_time", "when": { "actor": "agent", "op": "update", "type": "time.entry", "status": { "from": "planned" } }, "then": "refuse", "say": "\"{title}\" is planned time: only a person confirms that it happened, on the Time screen. It waits there under To confirm." },
+    { "id": "invoice_numbers", "unique": ["billed_by", "number"], "type": "time.invoice", "say": "\"{title}\" already has that number from the same biller: invoice numbers are not reused." }
+  ]
 }
