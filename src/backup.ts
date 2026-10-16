@@ -15,7 +15,7 @@ import { LOCAL_PACK } from './packs.ts';
 import type { Workspace, Workspaces } from './workspaces.ts';
 
 /** Every table, parents before the rows that point at them. */
-const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'setting', 'picture'] as const;
+const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'setting', 'picture', 'type_def'] as const;
 
 export interface Dump {
   format: 1;

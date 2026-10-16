@@ -124,6 +124,18 @@ create table if not exists picture (
   size         int not null,
   created_at   timestamptz not null default now()
 );
+
+-- Every type and relation the workspace has used, as it was last loaded: active while its pack is, dormant after.
+-- A dormant type's items keep their kind, statuses, fields and capabilities from here. Written when a workspace
+-- opens; read by everyone, since a type says nothing private.
+create table if not exists type_def (
+  id      text primary key,
+  what    text not null check (what in ('type', 'relation')),
+  pack    text not null,
+  state   text not null default 'active' check (state in ('active', 'dormant')),
+  def     jsonb not null,
+  changed timestamptz not null default now()
+);
 `;
 
 // Who may see what, enforced by the database itself. A request made on behalf
@@ -142,6 +154,7 @@ alter table token    add column if not exists seen jsonb;
 
 do $$ begin create role pelago_member nologin; exception when duplicate_object then null; end $$;
 grant select, insert, update on entity, relation, event, proposal, setting, token to pelago_member;
+grant select on type_def to pelago_member;
 grant usage, select on all sequences in schema public to pelago_member;
 
 alter table entity   enable row level security;

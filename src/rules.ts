@@ -109,6 +109,9 @@ export function judge(reg: Registry, human: boolean, w: Written, targets: Target
   const refused: string[] = [];
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
   const said = (rule: RuleDef, fallback: string) => (rule.say ?? fallback).replaceAll('{title}', title);
+  // A dormant type's pack is gone, and its rules with it: an agent's write to one waits for a person.
+  const asleep = [w.op === 'create' || w.op === 'link' ? w.type : undefined, ...targets.map((t) => t.type)].some((t) => t && (reg.types.get(t)?.dormant || reg.relations.get(t)?.dormant));
+  if (asleep && !human) hold = true;
   for (const rule of reg.rules) {
     if (rule.unique || !applies(rule, reg, human, w, targets)) continue;
     if (rule.then === 'hold') hold = hold || !human;

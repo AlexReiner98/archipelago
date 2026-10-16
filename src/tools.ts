@@ -1168,7 +1168,7 @@ export const TOOLS: Record<string, Tool> = {
 /** Validate input and run a tool. */
 export async function callTool(l: Archipelago, actor: Actor, name: string, input: unknown): Promise<unknown> {
   const tool = TOOLS[name];
-  if (!tool) throw new Error(`No tool "${name}". Tools: ${Object.keys(TOOLS).join(', ')}`);
+  if (!tool || !l.registry.offers(name)) throw new Error(`No tool "${name}". Tools: ${Object.keys(TOOLS).filter((t) => l.registry.offers(t)).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
   const parsed = z.strictObject(tool.input).safeParse(input ?? {});

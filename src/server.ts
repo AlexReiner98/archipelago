@@ -80,7 +80,7 @@ export function lenient<T extends z.ZodType>(schema: T) {
 function buildMcp(pelago: Archipelago, actorFor: (label?: string) => Actor): McpServer {
   const mcp = new McpServer({ name: 'pelago', version: '0.1.0' });
   for (const [name, tool] of Object.entries(TOOLS)) {
-    if (tool.humanOnly || (tool.devOnly && !devMode())) continue;
+    if (tool.humanOnly || (tool.devOnly && !devMode()) || !pelago.registry.offers(name)) continue;
     const inputSchema = { ...Object.fromEntries(Object.entries(tool.input).map(([key, schema]) => [key, lenient(schema as z.ZodType)])), ...actorField };
     mcp.registerTool(name, { description: tool.description, inputSchema }, async (args: Record<string, unknown>) => {
       const { actor, ...input } = args;

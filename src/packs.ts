@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
+import { PACK_TOOLS } from './pack-tools.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -106,10 +107,12 @@ export interface ResolvedType {
   fields: Record<string, FieldDef>;
   deliverable: boolean;
   capabilities: Capabilities;
+  /** Kept from the type table: its pack is gone, its items are not. */
+  dormant?: boolean;
 }
 
 /** A relation as loaded: `root` names the root it extends (itself, for a root). */
-export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root: string };
+export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root: string; dormant?: boolean };
 
 /** Packs whose types make up the kernel: the kinds, the root relations and the system tier. */
 const KERNEL_PACKS = ['core', 'sys'];
@@ -127,6 +130,8 @@ export class Registry {
   relations = new Map<string, ResolvedRelation>();
   trees = new Map<string, TreeDef & { pack: string }>();
   rules: (RuleDef & { pack: string })[] = [];
+  /** Definitions kept from the type table whose packs are gone, put back after every reload. */
+  private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
   constructor(dir: string, only?: string[], localDir?: string) {
     this.dir = dir;
@@ -276,6 +281,17 @@ export class Registry {
     this.types = types;
     this.relations = relations;
     this.trees = trees;
+    this.keep(this.kept);
+  }
+
+  /**
+   * Take in definitions the workspace kept whose packs are not loaded, as dormant: their items keep kind, statuses,
+   * fields and capabilities. One that a pack defines again is the pack's.
+   */
+  keep(kept: { types: ResolvedType[]; relations: ResolvedRelation[] }): void {
+    this.kept = kept;
+    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, dormant: true });
+    for (const r of kept.relations) if (!this.relations.has(r.id)) this.relations.set(r.id, { ...r, dormant: true });
   }
 
   type(id: string): ResolvedType | undefined {
@@ -306,6 +322,11 @@ export class Registry {
   /** How many may hold an item at once: Infinity for any number, undefined when it cannot be held. */
   capacity(item: { type: string; props: Record<string, unknown> }): number | undefined {
     return capacityOf(this.types.get(item.type)?.capabilities, item.props);
+  }
+
+  /** Whether a tool is offered: one that is a pack's only while that pack is loaded. */
+  offers(tool: string): boolean {
+    return Object.entries(PACK_TOOLS).every(([pack, tools]) => !tools.includes(tool) || this.packs.some((p) => p.id === pack));
   }
 
   /** Every type that has this capability, its own or its parent's. */
@@ -428,6 +449,7 @@ export class Registry {
         fields: t.fields,
         ...(t.deliverable && { deliverable: true }),
         ...(Object.keys(t.capabilities).length && { capabilities: t.capabilities }),
+        ...(t.dormant && { dormant: true }),
       })),
       relations: [...this.relations.values()],
       trees: [...this.trees.values()],

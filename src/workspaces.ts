@@ -11,6 +11,7 @@ import { restore, type Dump } from './backup.ts';
 import { openDb } from './db.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { Registry } from './packs.ts';
+import { syncTypes } from './typetable.ts';
 
 export const DEFAULT_WORKSPACE = 'default';
 
@@ -148,6 +149,7 @@ export class Workspaces {
       });
     }
     const pelago = new Archipelago(db, new Registry(packsDir, packs, localPack), policy, id);
+    await syncTypes(pelago);
     const automations = new Automations(pelago);
     if (this.config.runAutomations) automations.start();
     return { id, name: this.list().find((w) => w.id === id)!.name, pelago, automations };
