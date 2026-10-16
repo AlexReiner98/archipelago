@@ -1984,11 +1984,11 @@ test('costs: dollars where a run says, tokens where it does not, and each regula
   const longAgo = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
   const made = await make(l, [
     { op: 'create', ref: 'repo', type: 'software.repo', title: 'Repo' },
-    { op: 'create', ref: 'host', type: 'cost', title: 'Hosting', props: { amount: 25, since: longAgo, vendor: 'Render' } },
-    { op: 'create', ref: 'domain', type: 'cost', title: 'Domain', props: { amount: 120, every: 'year', since: longAgo } },
-    { op: 'create', ref: 'unknown', type: 'cost', title: 'Subscription' },
-    { op: 'create', ref: 'euro', type: 'cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: longAgo } },
-    { op: 'create', ref: 'ended', type: 'cost', title: 'Old host', status: 'ended', props: { amount: 50, since: longAgo, until: longAgo } },
+    { op: 'create', ref: 'host', type: 'money.cost', title: 'Hosting', props: { amount: 25, since: longAgo, vendor: 'Render' } },
+    { op: 'create', ref: 'domain', type: 'money.cost', title: 'Domain', props: { amount: 120, every: 'year', since: longAgo } },
+    { op: 'create', ref: 'unknown', type: 'money.cost', title: 'Subscription' },
+    { op: 'create', ref: 'euro', type: 'money.cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: longAgo } },
+    { op: 'create', ref: 'ended', type: 'money.cost', title: 'Old host', status: 'ended', props: { amount: 50, since: longAgo, until: longAgo } },
   ]);
   await callTool(l, human, 'run_report', { repo: made.repo, title: 'Read a push', tokens: 40_000, cost_usd: 0.31, surface: 'server', link: 'https://example.com/1' });
   await callTool(l, human, 'run_report', { repo: made.repo, title: 'Read another', tokens: 10_000, cost_usd: 0.09, surface: 'server', link: 'https://example.com/2' });
@@ -2000,7 +2000,7 @@ test('costs: dollars where a run says, tokens where it does not, and each regula
     agents: { cost_usd: number; tokens: number; unpriced_tokens: number; by: { surface: string; runs: number; cost_usd: number }[] };
     recurring: { cost_usd: number; per_month: number; items: { id: string; per_month: number | null; share: number | null }[]; unpriced: { id: string }[]; other_currencies: { id: string }[] };
   };
-  const c = (await VIEWS.costs.run(l, { days: 30 })) as Costs;
+  const c = (await callTool(l, human, 'view', { name: 'costs', params: { days: 30 } })) as Costs;
   assert.deepEqual([c.agents.cost_usd, c.agents.tokens, c.agents.unpriced_tokens], [0.4, 950_000, 900_000]);
   assert.deepEqual(c.agents.by.map((s) => [s.surface, s.runs, s.cost_usd]), [['server', 2, 0.4], ['claude-code', 1, 0]]);
   // A month's payment, and a twelfth of a year's, over thirty days of a month of 30.44.

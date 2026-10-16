@@ -1,0 +1,43 @@
+{
+  "id": "money",
+  "version": "0.1.0",
+  "title": "Money",
+  "description": "What the work costs: what is paid regularly (hosting, a subscription, a licence), beside what agents spent, which the kernel measures from their runs.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "money.cost",
+      "moved_from": ["cost"],
+      "capabilities": { "when": { "start": "since", "end": "until" } },
+      "extends": "occurrence",
+      "title": "Cost",
+      "description": "Something paid for regularly: hosting, a subscription, a licence, a domain. What agents spend per token is not kept here: it is measured from their runs.",
+      "statuses": { "open": ["paying"], "closed": ["ended"] },
+      "fields": {
+        "amount": { "type": "number", "description": "What is paid each time, in the currency below. Left out when nobody has said: it is then shown as not priced." },
+        "currency": { "type": "string", "default": "USD" },
+        "every": { "type": "enum", "values": ["month", "year"], "default": "month" },
+        "since": { "type": "date", "description": "The first day it was paid for. Left out: the day it was written down." },
+        "until": { "type": "date", "description": "The last day it is paid for, when that is known." },
+        "vendor": { "type": "string", "description": "Who is paid." },
+        "url": { "type": "url", "description": "Where the bill or the plan can be looked at." }
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "money.costs",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "What the work costs: what agents spent over the last days (dollars where a run says what it cost, tokens where it does not, by where they ran), each regular payment (a cost item: hosting, a subscription) with its share of the period, the total, and the rate per month. Nothing is guessed: a payment with no amount is named as not priced. Params: days (default 30).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "days": { "type": "number", "description": "The period, in days back from today: 30 unless given." },
+          "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." }
+        },
+        "additionalProperties": false
+      }
+    }
+  ]
+}

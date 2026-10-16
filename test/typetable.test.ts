@@ -1,7 +1,7 @@
 // The type table: a pack removed under live items leaves them dormant, not frozen. They keep their kind, statuses,
 // fields and capabilities; a person may edit and close them; an agent's edit waits; the pack's tools are gone.
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -21,7 +21,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
   const db = await openDb();
   const all = new Archipelago(db, new Registry(dir));
-  assert.deepEqual(await syncTypes(all), { activated: [], dormant: [], changed: {} }, 'the first sync only records');
+  assert.deepEqual(await syncTypes(all), { activated: [], dormant: [], changed: {}, moved: {} }, 'the first sync only records');
   const soon = new Date(Date.now() + 4 * 86_400_000).toISOString().slice(0, 10);
   const made = (await all.change(human, {
     reason: 'test',
@@ -68,4 +68,35 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   assert.equal(back.registry.type('funding.program')!.dormant, undefined);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from event where action = 'types.sync'`);
   assert.equal(rows[0].n, 2);
+});
+
+test('a type a pack took over takes its items with it, once, when no pack defines the old one', async () => {
+  // A map made while the core pack still kept cost, before the money pack took it over.
+  const before = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), before, { recursive: true });
+  const money = JSON.parse(readFileSync(join(before, 'money', 'pack.json'), 'utf8'));
+  const core = JSON.parse(readFileSync(join(before, 'core', 'pack.json'), 'utf8'));
+  const { moved_from: _, ...cost } = money.types[0];
+  core.types.push({ ...cost, id: 'cost' });
+  writeFileSync(join(before, 'core', 'pack.json'), JSON.stringify(core));
+  rmSync(join(before, 'money'), { recursive: true });
+  const db = await openDb();
+  const old = new Archipelago(db, new Registry(before));
+  await syncTypes(old);
+  const made = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'host', type: 'cost', title: 'Hosting', props: { amount: 25 } }, { op: 'create', ref: 'gone', type: 'cost', title: 'Old host', status: 'ended', props: { amount: 7 } }] })) as { created: Record<string, string> };
+
+  // Opened with the packs as they are now: the items are the money pack's, with all they had.
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
+  const now = new Archipelago(db, new Registry(dir));
+  const synced = await syncTypes(now);
+  assert.deepEqual([synced.moved, synced.dormant.includes('cost')], [{ cost: 2 }, true]);
+  const host = (await now.entity(made.created.host))!;
+  assert.deepEqual([host.type, host.status, host.props.amount], ['money.cost', 'paying', 25]);
+  assert.equal((await now.entity(made.created.gone))!.status, 'ended');
+  const { rows } = await db.query<{ detail: { from: string; to: string; items: string[] } }>(`select detail from event where action = 'type.moved'`);
+  assert.deepEqual([rows.length, rows[0].detail.from, rows[0].detail.to, rows[0].detail.items.length], [1, 'cost', 'money.cost', 2]);
+  const costs = (await callTool(now, human, 'view', { name: 'costs', params: { days: 30 } })) as { recurring: { items: { title: string }[] } };
+  assert.deepEqual(costs.recurring.items.map((i) => i.title), ['Hosting'], 'the costs view reads them where they are now');
+  assert.deepEqual((await syncTypes(now)).moved, {}, 'once moved, nothing moves again');
 });

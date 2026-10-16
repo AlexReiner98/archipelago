@@ -241,7 +241,7 @@ export function costsCard() {
           h('span', { class: 'fact', title: 'Hosting, subscriptions and the like: their share of these days' }, h('span', { class: 'muted' }, 'regular '), h('strong', {}, money(d.recurring.cost_usd))),
           d.agents.unpriced_tokens > 0 && h('span', { class: 'fact', title: 'Used by runs that count tokens and do not say what they cost, such as a session on a subscription: not in the dollars' }, h('span', { class: 'muted' }, 'not priced '), tokensText(d.agents.unpriced_tokens)),
           h('span', { class: 'grow' }),
-          h('a', { class: 'button', href: '#/new/cost', title: 'Hosting, a subscription, a licence, a domain' }, 'Add a cost'),
+          d.adds && h('a', { class: 'button', href: `#/new/${d.adds}`, title: 'Hosting, a subscription, a licence, a domain' }, 'Add a cost'),
         ),
         (paid.length > 0 || spent.length > 0) && h('ul', { class: 'rows costs' }, paid, spent),
       );

@@ -4,7 +4,8 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { actorId, bodyAfter, type Actor, type Archipelago } from './pelago.ts';
+import { bodyAfter } from './ops.ts';
+import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { readDocument } from './documents.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
@@ -630,8 +631,7 @@ export const TOOLS: Record<string, Tool> = {
             if (o.op === 'create') after = o.body?.length ?? 0;
             else if (o.op === 'update' && (o.body !== undefined || o.append !== undefined || o.replace)) {
               const target = await l.entity(o.id!);
-              if (!target) continue;
-              type = l.registry.type(target.type);
+              if (!target || !(type = l.registry.type(target.type))) continue;
               before = target.body.length;
               try {
                 after = bodyAfter(target.body, o as Parameters<typeof bodyAfter>[1]).length;

@@ -3,7 +3,7 @@
 
 import { pastBounds } from './bounds.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago, type Op } from './pelago.ts';
-import { costs } from './costs.ts';
+import { spent } from './spent.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
 import { findPlace, scopeOf } from './places.ts';
 
@@ -1001,11 +1001,11 @@ export const VIEWS: Record<string, View> = {
     run: gate,
   },
 
-  costs: {
-    description:
-      'What the work costs: what agents spent over the last days (dollars where a run says what it cost, tokens where it does not, by where they ran), each regular payment (a cost item: hosting, a subscription) with its share of the period, the total, and the rate per month. Nothing is guessed: a payment with no amount is named as not priced. Params: days (default 30).',
-    run: costs,
+  spent: {
+    description: 'What agents spent over the last days, read from their runs: dollars where a run says what it cost, tokens where it does not, by where they ran. The money pack\u2019s costs view adds what is paid regularly. Params: days (default 30).',
+    run: spent,
   },
+
 
   notifications: {
     description: 'Unread notifications for the human, newest first.',

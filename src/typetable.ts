@@ -2,6 +2,7 @@
 // what the packs define now is written there as active; what is there and no pack defines any more turns dormant,
 // and the registry takes it back in, so the items of a removed pack keep their kind, statuses, fields and
 // capabilities. A definition that changed (a pack upgraded, or added back after a while) is logged with what changed.
+// A type that took another over (moved_from) takes its items once the old one is defined by no pack.
 
 import type { Archipelago } from './pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
@@ -45,7 +46,7 @@ export function differences(was: Record<string, unknown>, now: Record<string, un
 }
 
 /** Bring the table in line with the packs, and the registry in line with the table. Returns what it changed. */
-export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; dormant: string[]; changed: Record<string, string[]> }> {
+export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; dormant: string[]; changed: Record<string, string[]>; moved: Record<string, number> }> {
   const reg = l.registry;
   const { rows } = await l.db.query<Row>(`select id, what, pack, state, def from type_def`);
   const kept = new Map(rows.map((r) => [r.id, r]));
@@ -76,10 +77,13 @@ export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; 
     if (dormant.length || activated.length || Object.keys(changed).length)
       await l.log(tx, { actor: 'system', action: 'types.sync', reason: 'The packs loaded differ from the types the workspace kept.', detail: { dormant, activated, changed } });
   });
+  // A type a pack took over brings its items with it, once no pack defines the old one (a migration, run once).
+  const moved: Record<string, number> = {};
+  for (const t of reg.types.values()) for (const old of t.dormant ? [] : (t.movedFrom ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, t.id)) === 0) delete moved[old];
   const asleep = rows.filter((r) => !now.has(r.id));
   reg.keep({
     types: asleep.filter((r) => r.what === 'type').map((r) => r.def as ResolvedType),
     relations: asleep.filter((r) => r.what === 'relation').map((r) => r.def as ResolvedRelation),
   });
-  return { activated, dormant, changed };
+  return { activated, dormant, changed, moved };
 }

@@ -47,6 +47,7 @@ export interface TypeDef {
   capabilities?: Capabilities;
   /** How long its note may grow by an agent's hand, and what to tell one that goes over: a note every session reads whole is kept short. A flavour inherits it. */
   note_max?: NoteMax;
+  moved_from?: string[]; // Types whose items are this one's now, moved once no pack defines them (cost became money.cost).
 }
 
 export type NoteMax = { chars: number; say?: string };
@@ -127,7 +128,7 @@ export interface ResolvedType {
   deliverable: boolean;
   public: boolean;
   capabilities: Capabilities;
-  noteMax?: NoteMax;
+  noteMax?: NoteMax; movedFrom?: string[];
   /** Kept from the type table: its pack is gone, its items are not. */
   dormant?: boolean;
 }
@@ -245,6 +246,7 @@ export class Registry {
         public: def.public ?? parent?.public ?? false,
         capabilities: { ...parent?.capabilities, ...def.capabilities },
         ...((def.note_max ?? parent?.noteMax) && { noteMax: def.note_max ?? parent?.noteMax }),
+        ...(def.moved_from?.length && { movedFrom: def.moved_from }),
       };
       types.set(id, resolved);
       return resolved;
