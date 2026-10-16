@@ -3,6 +3,7 @@
 // how it is drawn is the style's. A session falls where it ran. A date is a whole day in the workspace's time zone.
 
 import { occurs } from './capabilities.ts';
+import { runSpans } from './sessiontime.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** A lens's time axis: the window, and what places an item in it. */
@@ -18,6 +19,8 @@ export interface Span {
   end: string;
   /** What placed it: when, bound, or a repeat's day. */
   by: 'when' | 'bound' | 'repeat';
+  /** For a session: the work it was on then, or the place it ran in (src/sessiontime.ts). */
+  on?: string | null;
 }
 
 interface Placed {
@@ -60,10 +63,13 @@ export function dayStart(day: string, zone: string): number {
 const instant = (value: unknown, zone: string): number | undefined =>
   typeof value !== 'string' ? undefined : DATE.test(value) ? dayStart(value, zone) : Number.isNaN(Date.parse(value)) ? undefined : Date.parse(value);
 
-/** Where one item falls in the window, given its type's capabilities. Empty when it does not. */
-export function spansOf(l: Archipelago, e: Placed, axis: TimeAxis, zone: string, now = Date.now()): Span[] {
+/** The window as instants: from its first moment to the end of its last day (or its last moment, given a date-time). */
+export const windowOf = (axis: TimeAxis, zone: string): [number, number] => [instant(axis.from, zone)!, (instant(axis.to, zone) ?? 0) + (DATE.test(axis.to) ? DAY : 0)];
+
+/** Where one item falls in the window, given its type's capabilities. Empty when it does not. A session is placed apart, where it was at work (runSpans). */
+export function spansOf(l: Archipelago, e: Placed, axis: TimeAxis, zone: string): Span[] {
   const caps = l.registry.type(e.type)?.capabilities ?? {};
-  const [from, to] = [instant(axis.from, zone)!, (instant(axis.to, zone) ?? 0) + (DATE.test(axis.to) ? DAY : 0)];
+  const [from, to] = windowOf(axis, zone);
   const by = axis.by ?? ['when', 'bound'];
   const out: Span[] = [];
   const add = (start: number, end: number, kind: Span['by']) => {
@@ -91,12 +97,14 @@ export function spansOf(l: Archipelago, e: Placed, axis: TimeAxis, zone: string,
     const at = instant(e.props[bound.field], zone);
     if (at !== undefined) add(at, at + wholeDay(bound.field), 'bound');
   }
-  // A session falls where it ran: from when it began to when it was last heard of, or now while it runs.
-  if (!out.length && e.type === 'sys.run' && by.includes('when')) {
-    const seen = instant(e.props.last_seen, zone);
-    add(new Date(e.created_at).getTime(), e.is_open ? now : (seen ?? new Date(e.created_at).getTime()), 'when');
-  }
   return out;
+}
+
+/** Where each item falls in the window; a session where it was at work, each stretch with what it was on. */
+export async function placeAll(l: Archipelago, items: (Placed & { updated_at?: Date })[], axis: TimeAxis, zone: string): Promise<Map<string, Span[]>> {
+  const placed = new Map(items.map((e) => [e.id, spansOf(l, e, axis, zone)]));
+  if ((axis.by ?? ['when']).includes('when')) for (const [id, found] of await runSpans(l, items.filter((e) => l.registry.isA(e.type, 'sys.run')), ...windowOf(axis, zone))) placed.set(id, found);
+  return placed;
 }
 
 /** The time zone days are counted in: the workspace's, or Toronto's as the time pack always has. */

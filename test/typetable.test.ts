@@ -52,8 +52,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   const blocked = (await VIEWS.blockers.run(l, {})) as { entity: { id: string } }[];
   assert.ok(!blocked.some((b) => b.entity.id === task), 'closing it unblocked the task');
   // The pack's tools are gone, not answering wrong.
-  assert.equal(l.registry.offers('timesheet'), false);
-  await assert.rejects(callTool(l, human, 'timesheet', {}), /No tool "timesheet"/);
+  await assert.rejects(callTool(l, human, 'time_timesheet', {}), /No tool "time_timesheet"/);
 
   // The kept definitions travel in a backup, and a fresh map restoring it keeps them dormant.
   const copy = await openDb();

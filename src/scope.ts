@@ -123,7 +123,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
 }
 
 /** Kernel tools a limited token may call that change nothing in the map: reading it, listening for the owner, pointing their screen. A pack's views are reads too. */
-const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show', 'document', 'timesheet'];
+const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show', 'document'];
 
 /** The tests of some work: those in it, and those that help answer a proof question in it. */
 async function testsOf(l: Archipelago, scope: Set<string>): Promise<Set<string>> {

@@ -10,7 +10,6 @@ import { readDocument } from './documents.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
 import { BACKUP_TOOLS } from './backup-tools.ts';
-import { TIME_TOOLS } from './time-tools.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -886,7 +885,7 @@ export const TOOLS: Record<string, Tool> = {
     input: { id: z.string() },
     run: async (l, _actor, input) => readDocument(l, input.id),
   },
-  ...TIME_TOOLS, ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS,
+  ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS,
   token_create: {
     description:
       'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once. ' +
@@ -1095,11 +1094,11 @@ export const TOOLS: Record<string, Tool> = {
 };
 
 /** Every tool offered in a workspace: the kernel's, then those its packs declare (a kernel tool's name wins). */
-export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(TOOLS).filter(([t]) => reg.offers(t)), ...packTools(reg).filter(([t]) => !TOOLS[t])];
+export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(TOOLS), ...packTools(reg).filter(([t]) => !TOOLS[t])];
 
 /** Validate input and run a tool. */
 export async function callTool(l: Archipelago, actor: Actor, name: string, input: unknown): Promise<unknown> {
-  const tool: Tool | undefined = l.registry.offers(name) ? (TOOLS[name] ?? packTool(l.registry, name)) : undefined;
+  const tool: Tool | undefined = TOOLS[name] ?? packTool(l.registry, name);
   if (!tool) throw new Error(`No tool "${name}". Tools: ${toolsFor(l.registry).map(([t]) => t).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);

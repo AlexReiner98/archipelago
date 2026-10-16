@@ -8,7 +8,6 @@ import { capacityOf, checkCapabilities, type Capabilities } from './capabilities
 import { checkDeclared, KERNEL_VERBS, screensOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
 import { checkValue } from './fields.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
-import { PACK_TOOLS } from './pack-tools.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -358,11 +357,6 @@ export class Registry {
   /** How many may hold an item at once: Infinity for any number, undefined when it cannot be held. */
   capacity(item: { type: string; props: Record<string, unknown> }): number | undefined {
     return capacityOf(this.types.get(item.type)?.capabilities, item.props);
-  }
-
-  /** Whether a tool is offered: one that is a pack's only while that pack is loaded. */
-  offers(tool: string): boolean {
-    return Object.entries(PACK_TOOLS).every(([pack, tools]) => !tools.includes(tool) || this.packs.some((p) => p.id === pack));
   }
 
   /** Every type that has this capability, its own or its parent's. */

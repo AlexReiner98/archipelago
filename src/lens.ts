@@ -6,7 +6,7 @@
 
 import { sayLens } from './lens-words.ts';
 import type { Archipelago } from './pelago.ts';
-import { readAxis, spansOf, zoneOf, type TimeAxis } from './timeaxis.ts';
+import { placeAll, readAxis, zoneOf, type TimeAxis } from './timeaxis.ts';
 import { blockGraph } from './views.ts';
 
 export interface Lens {
@@ -58,7 +58,7 @@ interface Row {
   is_open: boolean;
   owner: string | null;
   props: Record<string, unknown>;
-  created_at: Date;
+  created_at: Date; updated_at: Date;
 }
 
 interface Counts {
@@ -275,7 +275,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const drawn = styles.filter((one) => weight(one) >= 0).sort((a, b) => weight(a) - weight(b));
   const style: Record<string, unknown> = {};
   for (const one of drawn) for (const [key, value] of Object.entries(one.props)) if (value != null) style[key] = value;
-  const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at from entity where archived_at is null`);
+  const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at, updated_at from entity where archived_at is null`);
   const all = new Map(entities.map((e) => [e.id, e]));
   if (asked.from && !all.has(asked.from)) throw new Error(`No entity "${asked.from}"`);
   const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null }>(
@@ -304,7 +304,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   }
   // On a time axis, only what falls in its window stays (and where it starts).
   const zone = asked.time && (await zoneOf(l));
-  const spans = asked.time && new Map([...eligible.values()].map((e) => [e.id, spansOf(l, e, asked.time!, zone!)]));
+  const spans = asked.time && (await placeAll(l, [...eligible.values()], asked.time, zone!));
   let untimed = 0;
   if (spans) for (const [id, found] of spans) if (!found.length && id !== asked.from) (eligible.delete(id), untimed++);
   const live = relations.filter((r) => eligible.has(r.from_id) && eligible.has(r.to_id));

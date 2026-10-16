@@ -11,7 +11,7 @@ export async function time() {
   const to = shiftDay(from, 6);
   let sheet, wk;
   try {
-    [sheet, wk] = await Promise.all([api('timesheet', { from, to }), api('week', { from })]);
+    [sheet, wk] = await Promise.all([api('time_timesheet', { from, to }), api('time_week', { from })]);
   } catch (err) {
     return main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
@@ -42,7 +42,7 @@ export async function time() {
         const work = picker.get();
         if (!work) return tell('Which work was it for?', 'Choose a project, task or client from the list as you type.');
         try {
-          const made = await api('time_log', { work: work.id, hours: Number(hours.value), what: what.value.trim(), note: note.value.trim() || undefined, date: date.value, billable: billable.checked ? undefined : false });
+          const { answer: made } = await api('time_log', { work: work.id, hours: Number(hours.value), what: what.value.trim(), note: note.value.trim() || undefined, date: date.value, billable: billable.checked ? undefined : false });
           if (!made.client) await tell('Logged, with no client', made.note ?? 'This work involves no company, so it is not invoiced.');
           (state.selfDrawn = true), again();
         } catch (err) {
@@ -222,7 +222,7 @@ export async function time() {
   const inv = sheet.invoices;
   const draft = async (client) => {
     try {
-      const made = await api('invoice_draft', { client: client.id });
+      const made = await api('time_invoice_draft', { client: client.id });
       location.hash = `#/e/${made.created.inv}`;
     } catch (err) {
       tell('No invoice was drafted', err.message);
@@ -234,7 +234,7 @@ export async function time() {
     const amount = /^\s*\$?([\d,]+(?:\.\d+)?)/.exec(said)?.[1];
     const method = said.replace(/^\s*\$?[\d,]+(?:\.\d+)?\s*/, '').trim();
     try {
-      await api('invoice_paid', { id: i.id, ...(amount && { amount: Number(amount.replaceAll(',', '')) }), ...(method && { method }) });
+      await api('time_invoice_paid', { id: i.id, ...(amount && { amount: Number(amount.replaceAll(',', '')) }), ...(method && { method }) });
       (state.selfDrawn = true), again();
     } catch (err) {
       tell('The payment was not recorded', err.message);
