@@ -83,13 +83,24 @@ export interface PieceDef {
   action?: string;
   /** For a short note: what it says. */
   text?: string;
+  /** For a picture: a lens's id, or the params of the lens view. From the item the page is of, unless it says. */
+  lens?: string | Record<string, unknown>;
+  /** For a picture: a style's id, or its fields (code aside: code runs only from a style kept on the map). */
+  style?: string | Record<string, unknown>;
+  /** For fields: the item's fields shown, in order. */
+  fields?: string[];
+  /** For a page the kernel still draws itself, until its pack draws it from pieces: its name. */
+  page?: string;
 }
 
 /** What a pack shows on the page of every item of the kinds or types it is on: one column of pieces. */
 export interface ScreenDef {
   id: string;
   title: string;
-  on: string[];
+  /** The kinds or types on whose page it is shown. */
+  on?: string[];
+  /** Offered for the nav: a page of its own there once the owner adds it. */
+  nav?: boolean;
   pieces: PieceDef[];
 }
 
@@ -97,7 +108,10 @@ export interface ScreenDef {
  * The pieces the kernel draws, each with what it must be told. A tree, a gate, proof, usage and a document draw the
  * kernel's views of the item; a figure is the picture it keeps; rows and a form are the pack's own view and action.
  */
-export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'] } as const;
+export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'] } as const;
+
+/** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
+export const PAGES = ['time'];
 
 /** Every screen the packs declare, in the order the packs load. */
 export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.screens ?? []).map((s) => ({ ...s, pack: pack.id })));
@@ -152,7 +166,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   for (const screen of pack.screens ?? []) {
     const at = `screen "${screen.id}"`;
     if (!own(screen.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
-    if (!screen.title || !screen.on?.length || !screen.pieces?.length) problems.push(`${at} needs a title, the kinds or types it is on, and its pieces`);
+    if (!screen.title || !(screen.on?.length || screen.nav) || !screen.pieces?.length) problems.push(`${at} needs a title, the kinds or types it is on or a place offered in the nav, and its pieces`);
     for (const t of screen.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);
     for (const piece of screen.pieces ?? []) {
       const needs: readonly string[] | undefined = PIECES[piece.piece];
@@ -161,6 +175,8 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (piece.tree && !(pack.trees ?? []).some((tree) => tree.id === piece.tree)) problems.push(`${at}: the pack declares no tree "${piece.tree}"`);
       if (piece.view && !(pack.views ?? []).some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
       if (piece.action && !(pack.actions ?? []).some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
+      if (piece.page && !PAGES.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}`);
+      if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a picture's style has no code: code runs only from a style kept on the map`);
     }
   }
   for (const host of pack.hosts ?? []) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);

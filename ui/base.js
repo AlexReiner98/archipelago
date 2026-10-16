@@ -11,7 +11,8 @@ export const main = document.getElementById('main');
  * other; a screen that is one of them draws in its own, and can draw itself
  * again without touching the rest.
  */
-export const part = (name) => main.querySelector(`:scope > .part[data-part="${name}"]`) ?? main;
+// A part may be inside another: a screen holds the page the kernel still draws itself as a part of its own.
+export const part = (name) => main.querySelector(`.part[data-part="${name}"]`) ?? main;
 
 export function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);

@@ -1,6 +1,7 @@
 // The Workspace screen.
 
 import { api, ask, authHeaders, h, part, tell } from './base.js';
+import { screensCard } from './nav.js';
 import { packsCard } from './packs.js';
 import { RAN, ago, card, chip, hint, link, named, titles, tokensText, when } from './words.js';
 import { connectBox, githubCard, importCard, operatorCard, ownerCard, secretBox } from './workspace-cards.js';
@@ -13,7 +14,7 @@ export async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, costsCard(), ownerCard(owner, workspace), packsCard({ h, api, ask, tell, then: workspace })),
+      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, costsCard(), ownerCard(owner, workspace), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace)),
       h('section', { class: 'card' },
         h('div', { class: 'empty' },
           h('strong', {}, 'Single user'), h('span', { class: 'muted', title: 'One workspace, no sign-in; everything done here is done as its owner. To share it, set "auth": "tokens" in pelago.config.json and restart: the first start prints your token.' }, ' \u00b7 no sign-in on this server'),
@@ -87,6 +88,7 @@ export async function workspace() {
       costsCard(),
       (me.actor.admin || !info.owner) && ownerCard(info.owner, workspace),
       me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
+      me.actor.admin && screensCard(workspace),
       h(
         'section',
         { class: 'card wide' },

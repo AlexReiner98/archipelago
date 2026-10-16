@@ -22,6 +22,7 @@ import { packTool, packTools } from './packtools.ts';
 import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { undo } from './undo.ts';
+import { withScreens } from './screens.ts';
 import { getPicture, putPicture, reportTests } from './proof.ts';
 import { pictureOf, readLens, shownIn } from './lens.ts';
 import { awaitingRecheck, HANDOFF_MAX, toConfirm, VIEWS } from './views.ts';
@@ -359,10 +360,9 @@ const refused = new Map<string, { at: number; who: string; input: Record<string,
 
 export const TOOLS: Record<string, Tool> = {
   schema: {
-    description:
-      'Describe the map\'s model: enabled packs, every entity type with its statuses and fields, and every relation type. Read this before writing.',
+    description: 'Describe the map\'s model: enabled packs, every entity type with its statuses and fields, and every relation type. Read this before writing.',
     input: {},
-    run: async (l) => l.registry.describe(),
+    run: async (l) => withScreens(l, l.registry.describe()),
   },
   search: {
     description: 'Find entities by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. Always search before creating, to avoid duplicates.',

@@ -342,6 +342,19 @@
         "mark": { "type": "string", "description": "grid: the shown date field marked on a card, with the field <name>_note before it when there is one, e.g. deadline." },
         "code": { "type": "string", "description": "The drawing itself, as a JavaScript module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the lens view answered; style is this style's other fields; theme is the page's colours (sea, land, inner, line, text, muted, blocked, you, session, done) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl }) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer. With code, shape is not used." }
       }
+    },
+    {
+      "id": "screen",
+      "tier": "system",
+      "title": "Screen",
+      "description": "A page the kernel draws as one column of pieces: a picture (a lens in a style), rows from a pack's view, an action's form, an item's fields, a short note. On kinds or types (on), it is shown on the page of every such item; given a place in the nav (nav), it is a page of its own there. A pack ships screens as presets; one kept on the map with the preset's id (preset) is the owner's version of it, and retired, the preset is not shown. Only a person changes a screen: an agent's change waits for them.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "pieces": { "type": "json", "description": "The column, in order: each {piece, ...what it needs}. picture: lens (a lens's id, or the params of the lens view) and style (a style's id, or its fields, code aside); view: view (a pack's view of rows) and item (the input the item's id goes in); action: action (a pack's action); fields: fields (a list of the item's fields); note: text. Left empty, the preset's." },
+        "on": { "type": "json", "description": "The kinds or types on whose page it is shown, as a list. Left empty, the preset's." },
+        "nav": { "type": "number", "description": "Its place in the nav, after Home and Search: the lowest first. Left empty, it is not in the nav." },
+        "preset": { "type": "string", "description": "The id of the pack's screen this is the owner's version of.", "system": true }
+      }
     }
   ],
   "screens": [
@@ -386,6 +399,7 @@
   ],
   "rules": [
     { "id": "code_runs", "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code"] }, "then": "hold", "say": "Code that runs in the browser of whoever looks is the human's to allow." },
+    { "id": "screens_human", "when": { "actor": "agent", "type": "screen" }, "then": "hold", "say": "What a screen shows, and where, is the human's to change." },
     { "id": "styles_merge", "when": { "actor": "agent", "op": "merge", "type": "style" }, "then": "hold", "say": "Folding one style into another can bring its code along: the human's to allow." },
     { "id": "public", "when": { "actor": "agent", "op": ["create", "update"], "visibility": "public" }, "then": "hold", "say": "What anyone can see is the human's to decide." }
   ]

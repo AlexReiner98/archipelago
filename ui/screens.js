@@ -7,11 +7,13 @@ import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
 import { gate } from './gate.js';
 import { proofPart } from './proof.js';
+import { lensView } from './lens.js';
 import { roadmap } from './roadmap.js';
+import { time } from './time.js';
 import { RAN, ago, chip, isA, label, link, pill, tokensText, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
-export const screensFor = (typeId) => (state.schema?.screens ?? []).filter((s) => s.on.some((t) => isA(typeId, t)));
+export const screensFor = (typeId) => (state.schema?.screens ?? []).filter((s) => s.on?.some((t) => isA(typeId, t)));
 /** The pieces of those screens, each with the screen it is part of. */
 const piecesFor = (typeId) => screensFor(typeId).flatMap((s) => s.pieces.map((p) => ({ ...p, screen: s })));
 /** The tree a screen draws on an item of this type, if one does. */
@@ -134,8 +136,8 @@ async function rows(host, id, p) {
  */
 const PIECES = {
   tree: (ctx, p) => ({ node: h('div', { id: 'roadmap', 'data-root': ctx.id, 'data-tree': p.tree }), later: () => roadmap(ctx.id) }),
-  gate: (ctx) => !ctx.e.archived_at && { node: h('div', { id: 'gate', 'data-root': ctx.id }), later: () => gate(ctx.id) },
-  proof: (ctx) => !ctx.e.archived_at && { node: h('div', { id: 'proof', 'data-root': ctx.id }), later: () => proofPart(ctx.id, true) },
+  gate: (ctx) => !ctx.e?.archived_at && { node: h('div', { id: 'gate', 'data-root': ctx.id }), later: () => gate(ctx.id) },
+  proof: (ctx) => !ctx.e?.archived_at && { node: h('div', { id: 'proof', 'data-root': ctx.id }), later: () => proofPart(ctx.id, true) },
   usage: (ctx) => {
     const node = h('div');
     return { node, later: () => usage(node, ctx.id) };
@@ -146,23 +148,59 @@ const PIECES = {
   },
   action: (ctx, p) => {
     const tool = (state.schema?.pack_tools ?? []).find((t) => t.action === p.action);
-    return tool && !ctx.e.archived_at && { node: actionForm(tool, ctx.id, ctx.redraw) };
+    return tool && !ctx.e?.archived_at && { node: actionForm(tool, ctx.id, ctx.redraw) };
   },
   note: (ctx, p) => ({ node: h('section', { class: 'card wide note' }, renderBody(p.text)) }),
+  // A picture: from the item the page is of, unless the lens says where. A style named by id is read by the server;
+  // one written into the screen is its fields only, never code.
+  picture: (ctx, p) => {
+    const lens = typeof p.lens === 'string' ? { lens: p.lens } : { ...p.lens };
+    if (ctx.id && !lens.from) lens.from = ctx.id;
+    if (typeof p.style === 'string') lens.style = p.style;
+    const { code, ...style } = typeof p.style === 'object' && p.style ? p.style : {};
+    const view = lensView({ lens, style, key: `screen:${p.screen.id}:${ctx.id ?? ''}`, quiet: true });
+    return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: 14px' }, h('header', {}, h('h2', {}, p.screen.title)), view) };
+  },
+  // Some of the item's fields, together under the screen's name.
+  fields: (ctx, p) => {
+    const set = (p.fields ?? []).filter((f) => ctx.e && ctx.e.props[f] !== undefined && ctx.e.props[f] !== null && ctx.e.props[f] !== '');
+    return set.length > 0 && { node: h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, p.screen.title)), h('dl', { class: 'fields' }, set.map((f) => [h('dt', {}, label(f)), h('dd', { class: 'gist', title: String(ctx.e.props[f]) }, String(ctx.e.props[f]))]))) };
+  },
+  // A page the kernel still draws itself, as its own part, until a pack draws it from pieces.
+  page: (ctx, p) => PAGES[p.page] && { node: h('div', { class: 'part', 'data-part': p.page }), later: PAGES[p.page] },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,
   document: () => null,
 };
+
+/** The pages the kernel still draws itself (src/declared.ts lists them). */
+const PAGES = { time };
+
+/** A piece that draws something of an item has nothing to draw on a screen of its own. */
+const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields'];
+
+/** The column a screen of its own draws: its pieces, with no item. */
+export function drawScreen(screen, redraw) {
+  const ctx = { e: null, id: null, redraw };
+  const drawn = screen.pieces
+    .filter((p) => !OF_ITEM.includes(p.piece) && !(p.piece === 'view' && p.item))
+    .map((p) => PIECES[p.piece]?.(ctx, { ...p, screen }))
+    .filter(Boolean);
+  return settle(drawn);
+}
+
+/** The nodes in a column, and what to run once it is on the page. */
+const settle = (drawn) => ({
+  column: h('div', { class: 'screens' }, drawn.map((d) => d.node)),
+  after: () => {
+    for (const d of drawn) Promise.resolve(d.later?.()).catch((err) => d.node.isConnected && d.node.replaceChildren(h('div', { class: 'error' }, err.message)));
+  },
+});
 
 /** The column of pieces the screens on this item draw, and what to run once it is on the page. */
 export function drawScreens(ctx) {
   const drawn = piecesFor(ctx.e.type)
     .map((p) => PIECES[p.piece]?.(ctx, p))
     .filter(Boolean);
-  return {
-    column: h('div', { class: 'screens' }, drawn.map((d) => d.node)),
-    after: () => {
-      for (const d of drawn) d.later?.()?.catch?.((err) => d.node.isConnected && d.node.replaceChildren(h('div', { class: 'error' }, err.message)));
-    },
-  };
+  return settle(drawn);
 }
