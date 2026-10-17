@@ -16,6 +16,13 @@ const DIR = join(ROOT, 'demo-approvals');
 const PORT = 3201;
 const BASE = `http://127.0.0.1:${PORT}`;
 
+/** The process map's style as the one module a style keeps: its layout (layout.js) joined in before its drawing. */
+function processCode(): string {
+  const read = (name: string) => readFileSync(join(ROOT, 'examples', 'approvals', name), 'utf8');
+  const layout = read('layout.js').replace(/^export function layout/m, 'function layout');
+  return `${layout}\n${read('process.js').replace(/^import \{ layout \} from '\.\/layout\.js';\n/m, '')}`;
+}
+
 if (process.argv.includes('--fresh')) rmSync(DIR, { recursive: true, force: true });
 mkdirSync(DIR, { recursive: true });
 
@@ -272,7 +279,7 @@ async function fill(): Promise<void> {
       // The project opens on the process, drawn from the top down (examples/approvals/process.js).
       { op: 'create', ref: 'lens', type: 'lens', title: 'Process', status: 'current', props: { place: 0, far: 2, over: ['depends_on'], kinds: ['-actor', '-local.comment'], fold: ['system'] } },
       { op: 'link', type: 'about', from: 'lens', to: 'p' },
-      { op: 'create', ref: 'style', type: 'style', title: 'Process', status: 'current', props: { code: readFileSync(join(ROOT, 'examples', 'approvals', 'process.js'), 'utf8') } },
+      { op: 'create', ref: 'style', type: 'style', title: 'Process', status: 'current', props: { code: processCode() } },
       { op: 'link', type: 'about', from: 'style', to: 'lens' },
     ],
   });
