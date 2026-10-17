@@ -295,6 +295,8 @@ export function drawCode(host, answer, style, keep) {
     else if (said.type === 'error' && error.hidden) ((error.textContent =`This style's code stopped: ${String(said.message).slice(0, 300)}`), (error.title = error.textContent), (error.hidden = false));
   };
   window.addEventListener('message', hear);
-  host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), litSwitch(answer.viewer, style, (change) => (keep(change), Object.assign(fields, change)), draw)), error, stage);
+  // A bar only for the switch, when the view offers it.
+  const lit = litSwitch(answer.viewer, style, (change) => (keep(change), Object.assign(fields, change)), draw);
+  host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), error, stage].filter(Boolean));
   draw();
 }

@@ -2,7 +2,8 @@
 // item with a preset's id is the owner's version of it (its fields over the preset's, retired to take it away); one
 // with none is the owner's own. A screen with a place in the nav is a page there; one on kinds or types is drawn on
 // the page of every such item; one on Home is drawn there, after those before it. A pack's screen for Home is on it
-// until the owner takes it off (home: false on their version), and can be put back. Read each time the schema is asked for, so a change shows on the next look.
+// once the workspace holds something of that pack's types, until the owner takes it off (home: false on their
+// version), and can be put back; the owner putting it there (home: true) needs no such thing. Read each time the schema is asked for, so a change shows on the next look.
 
 import type { PieceDef, ScreenDef } from './declared.ts';
 import type { Archipelago } from './pelago.ts';
@@ -25,6 +26,8 @@ export interface Screen {
   at?: 'home';
   /** A preset the pack made for Home, on it or taken off. */
   homeable?: boolean;
+  /** A preset for Home whose pack nothing here uses yet: it waits for the first such item. */
+  idle?: boolean;
 }
 
 interface Kept {
@@ -36,13 +39,15 @@ interface Kept {
 
 const list = <T>(v: unknown): T[] | undefined => (Array.isArray(v) && v.length ? (v as T[]) : undefined);
 
-/** Presets overlaid by what the map keeps, in the order the packs load, then the owner's own in the order made. */
-export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[]): Screen[] {
+/** Presets overlaid by what the map keeps, in the order the packs load, then the owner's own in the order made. Used: the packs the map holds anything of (all, when not said). */
+export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[], used?: Set<string>): Screen[] {
   const byPreset = new Map(kept.filter((k) => k.props.preset).map((k) => [k.props.preset!, k]));
   const out: Screen[] = [];
   for (const p of presets) {
     const k = byPreset.get(p.id);
     if (k && !k.is_open) continue;
+    const idle = p.at === 'home' && p.pack !== 'core' && used !== undefined && !used.has(p.pack);
+    const home = typeof k?.props.home === 'boolean' ? k.props.home : p.at === 'home' && !idle;
     out.push({
       id: p.id,
       pack: p.pack,
@@ -52,8 +57,9 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[])
       ...(typeof k?.props.nav === 'number' && { nav: k.props.nav }),
       ...(k && { item: k.id }),
       ...(p.nav && { offered: true }),
-      ...((typeof k?.props.home === 'boolean' ? k.props.home : p.at === 'home') && { at: 'home' as const }),
+      ...(home && { at: 'home' as const }),
       ...(p.at === 'home' && { homeable: true }),
+      ...(idle && !home && { idle: true }),
     });
   }
   const known = new Set(presets.map((p) => p.id));
@@ -70,5 +76,7 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[])
 /** The schema as the registry describes it, with its screens as the asker's map keeps them. */
 export async function withScreens<T extends { screens: (ScreenDef & { pack: string })[] }>(l: Archipelago, described: T): Promise<Omit<T, 'screens'> & { screens: Screen[] }> {
   const { rows } = await l.db.query<Kept>(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by created_at, id`, [l.registry.family('screen')]);
-  return { ...described, screens: overlay(described.screens, rows) };
+  const held = await l.db.query<{ type: string }>(`select distinct type from entity where archived_at is null`);
+  const used = new Set(held.rows.flatMap((r) => (l.registry.types.get(r.type)?.lineage ?? []).map((t) => l.registry.types.get(t)!.pack)));
+  return { ...described, screens: overlay(described.screens, rows, used) };
 }

@@ -13,6 +13,7 @@
     "start": "node src/server.ts",
     "dev": "node src/dev.ts",
     "demo": "node scripts/demo.ts",
+    "demo:approvals": "node scripts/demo-approvals.ts",
     "pelago": "node src/cli.ts",
     "test": "node --test \"test/*.test.ts\" \"packs/*/*.test.ts\"",
     "typecheck": "tsc --noEmit"

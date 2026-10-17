@@ -207,8 +207,27 @@ const settle = (drawn) => ({
 });
 
 /** The column of pieces the screens on this item draw, and what to run once it is on the page. */
+/** The packs an item uses: those of its type and what it is a flavour of, and of what it is linked to and by what. */
+function packsUsed(data) {
+  const types = new Map((state.schema?.types ?? []).map((t) => [t.id, t]));
+  const relations = new Map((state.schema?.relations ?? []).map((r) => [r.id, r]));
+  const used = new Set();
+  const take = (typeId) => {
+    for (let t = types.get(typeId); t; t = types.get(t.flavour_of)) used.add(t.pack);
+  };
+  take(data.entity.type);
+  for (const r of [...(data.outgoing ?? []), ...(data.incoming ?? [])]) {
+    take(r.entity_type);
+    used.add(relations.get(r.type)?.pack);
+  }
+  return used;
+}
+
+/** A pack's pieces show on an item only once the item uses that pack; the core's and the owner's own always do. */
 export function drawScreens(ctx) {
+  const used = packsUsed(ctx.data);
   const drawn = piecesFor(ctx.e.type)
+    .filter((p) => !p.screen.pack || p.screen.pack === 'core' || used.has(p.screen.pack))
     .map((p) => PIECES[p.piece]?.(ctx, p))
     .filter(Boolean);
   return settle(drawn);

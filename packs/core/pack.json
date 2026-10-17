@@ -136,7 +136,7 @@
       "fields": {
         "place": { "type": "number", "description": "Its order among the views of the item it is about: the lowest is the one the page opens on." },
         "from": { "type": "string", "description": "The id of the item this view starts from, when that is not the item it is about. Such a view is a shortcut: the page shows it as a way to that item." },
-        "controls": { "type": "json", "description": "What the person looking may change on the page, as a list of: lit (what stays lit), far (how many steps down), closed (whether what is finished shows). Only lit when not set." },
+        "controls": { "type": "json", "description": "What the person looking may change on the page, as a list of: lit (what stays lit), far (how many steps down), closed (whether what is finished shows). None when not set." },
         "kinds": { "type": "json", "description": "Types to keep, as a list: a type (flavours included) or \"work\"; with a leading \"-\", to leave out." },
         "by": { "type": "string", "description": "The kind of link that says what is inside what, e.g. part_of." },
         "over": { "type": "json", "description": "The kinds of link sent along as links, as a list, or \"all\"." },

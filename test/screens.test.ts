@@ -67,9 +67,19 @@ test("the owner's own screen and their version of a preset", () => {
   ]);
 });
 
-test("a pack's screen for Home is on it until the owner takes it off, and can be put back", async () => {
+test("a pack's screen for Home is on it once its pack is used, until the owner takes it off, and can be put back", async () => {
   const l = await map();
   const onHome = async () => (await screens(l)).filter((s) => s.at === 'home').map((s) => s.id);
+  assert.deepEqual(await onHome(), ['home'], "a pack's screen waits for the first item of its pack");
+  assert.equal((await one(l, 'time.today'))!.idle, true);
+  await l.change(human, {
+    reason: 'test',
+    ops: [
+      { op: 'create', type: 'inquiry.hypothesis', title: 'H', status: 'untested' },
+      { op: 'create', type: 'software.release', title: 'R', status: 'upcoming' },
+      { op: 'create', type: 'time.entry', title: 'T', status: 'logged', props: { date: '2026-10-17', hours: 1 } },
+    ],
+  });
   assert.deepEqual(await onHome(), ['home', 'inquiry.undermined', 'software.releases', 'time.today'], "the core pack's first, then each pack's in the order they load");
 
   const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'screen', title: 'Today', status: 'current', props: { preset: 'time.today', home: false } }] })) as { created: Record<string, string> };

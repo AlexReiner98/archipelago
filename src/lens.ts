@@ -492,7 +492,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     }),
     // What the person looking may change on the page, where the view says.
     // A story is what the session chose to show: there is nothing to light by but what it says.
-    controls: told ? [] : Array.isArray(view?.props.controls) ? (view!.props.controls as unknown[]).filter((c) => CONTROLS.includes(c as string)) : ['lit'],
+    controls: told ? [] : Array.isArray(view?.props.controls) ? (view!.props.controls as unknown[]).filter((c) => CONTROLS.includes(c as string)) : [],
     // Who it was answered for, so a style can light what waits on them.
     viewer: l.viewer || (await l.setting<string>('me')) || null,
     items: [...sent].sort((a, b) => (told ? about.indexOf(a) - about.indexOf(b) : 0)).map((id) => {

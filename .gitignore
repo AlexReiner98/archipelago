@@ -5,6 +5,7 @@ runs/
 workspaces/
 data.lock
 /demo/
+/demo-approvals/
 data-damaged/
 backups/
 .proof/

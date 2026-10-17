@@ -141,7 +141,7 @@ export async function entity(id, here) {
         long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
         e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       );
-  const screens = drawScreens({ e, id, redraw: again });
+  const screens = drawScreens({ e, data, id, redraw: again });
 
   page.replaceChildren(
     h(

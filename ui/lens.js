@@ -137,16 +137,14 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
     const empty = answer.items.length < (lens.from || lens.lens ? 2 : 1);
     if (empty && !views.length && quiet) return void ((host.closest('.lens-card') ?? host).hidden = true);
     const again = (change) => () => (Object.assign(place.ask, change), load());
-    const pictures = views.filter((view) => !view.to);
     const far = answer.lens.far;
     const finished = !answer.lens.fold.includes('closed');
+    // The picture is the one the item opens on, as its owner or their agent made it: no other views offered beside it, and
+    // nothing to change on it but what its lens offers. Its rule in words is the bar's tooltip.
     const parts = [
-      // The views of the item, one click apart.
-      pictures.length > 1 && h('span', { class: 'switch' }, pictures.map((view) => h('button', { class: view.id === answer.view ? 'on' : '', title: view.title, onclick: again({ lens: view.id, far: undefined, fold: undefined }) }, view.title))),
       // Its shortcuts: views that start somewhere else.
       views.filter((view) => view.to).map((view) => h('a', { class: 'chip lens-pin', href: `#/e/${view.to.id}`, title: `Goes to ${view.to.title}` }, view.title)),
-      // The rule of this view, in words: what is in the picture and what is not.
-      h('span', { class: 'lens-rule grow', title: answer.said }, answer.said),
+      h('span', { class: 'grow' }),
       answer.controls.includes('far') &&
         h(
           'span',
@@ -158,8 +156,9 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
       answer.controls.includes('closed') && h('button', { class: finished ? 'on' : '', title: finished ? 'Leave out what is finished' : 'Show what is finished too', onclick: again({ fold: finished ? [...answer.lens.fold, 'closed'] : answer.lens.fold.filter((f) => f !== 'closed') }) }, 'Finished'),
     ];
     bar.replaceChildren(...parts.flat().filter(Boolean));
-    // A picture that says what it is in words of its own (a finding) has no bar of rules over it, and is not there when it has nothing to draw.
-    bar.hidden = bare;
+    bar.title = answer.said;
+    // A picture that says what it is in words of its own (a finding) has no bar over it, and is not there when it has nothing to draw; nor has one with nothing on its bar.
+    bar.hidden = bare || bar.children.length < 2;
     if (empty && bare) return void (host.hidden = true);
     if (empty) return body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this view.'));
     // Nearest wins, field by field: built in, what the map keeps for this view, what this person chose, what the address asks.
@@ -305,7 +304,8 @@ export function drawBoxes(host, answer, style, keep, kept) {
       ...[...lanes].map(([lane, things]) => h('section', { class: 'lb-box lane' }, h('header', {}, h('span', { class: 'lb-name' }, said(lane)), h('span', { class: 'lb-mark lb-count' }, String(things.length))), h('div', { class: 'lb-leaves row' }, things.map(thing)))),
     );
   };
-  host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), litSwitch(me, style, keep, draw)), body);
+  const lit = litSwitch(me, style, keep, draw);
+  host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), body].filter(Boolean));
   host.redraw = draw;
   draw();
 }
