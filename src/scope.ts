@@ -17,6 +17,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
   if (!repos.length) return;
   const scope = new Set<string>();
   for (const repo of repos) for (const id of await scopeOf(l, repo)) scope.add(id);
+  await widen(l, scope);
   const titles = (await Promise.all(repos.map(async (id) => (await l.entity(id))?.title ?? id))).join(' and ');
   const refuse = (what: string): never => {
     throw new Error(`This token is limited to the work of ${titles}. ${what}`);
@@ -48,7 +49,8 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
           }
         }
       }
-      for (const op of ops) {
+      // What it touches first, then what it makes: a link to what is not there is the better reason to give.
+      for (const op of [...ops.filter((o) => o.op !== 'create'), ...ops.filter((o) => o.op === 'create')]) {
         if (op.op === 'create' && !(op.ref && tied.has(op.ref))) refuse(`"${op.title}" is made without being tied to anything there: give it a ref and link it (is part of, is about) to something of that work in the same change.`);
         if (op.op === 'update') await mustBeIn(op.id, 'change it');
         if (op.op === 'archive' || op.op === 'restore') await mustBeIn(op.id, `${op.op} it`);
@@ -98,38 +100,41 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
       if (tool === 'claim') await mustBeIn(input.for, 'hold a resource for it');
       return;
     }
-    // A test is this work's when it is part of it, or helps answer a question that is; a result is its test's.
-    case 'test_report': {
-      const { rows: tests } = await l.db.query<{ id: string; entrypoint: string | null }>(`select id, props->>'entrypoint' as entrypoint from entity where type = any($1::text[]) and archived_at is null`, [l.registry.family('software.test')]);
-      const mine = await testsOf(l, scope);
-      for (const result of (input.results ?? []) as { test: string }[]) {
-        // Found as the report itself finds it: by id, then by the name the harness knows it by. One the map does not know is not recorded at all.
-        const test = tests.find((t) => t.id === result.test) ?? tests.find((t) => t.entrypoint === result.test);
-        if (test && !mine.has(test.id)) refuse(`${await named(test.id)} is not a test of it, so this token cannot report what it found.`);
-      }
-      return;
-    }
-    case 'picture_put': {
-      const { rows } = await l.db.query<{ from_id: string }>(`select from_id from relation where type = 'produced' and to_id = $1 and valid_to is null`, [input.result]);
-      const mine = await testsOf(l, scope);
-      if (!rows.some((r) => mine.has(r.from_id))) refuse(`${await named(String(input.result))} is not the result of a test of it, so this token cannot keep a picture for it.`);
-      return;
-    }
+    case 'picture_put':
+      return mustBeIn(input.result, 'keep a picture for it');
     default:
-      // Everything else is refused unless it only reads: a tool added later is not open to a limited token until it is named here.
-      if (!READS.includes(tool) && !packTool(l.registry, tool)?.reads) refuse(`It cannot call ${tool}.`);
+      // Everything else is refused unless it only reads: a tool added later is not open to a limited token until it is
+      // named here. A pack's action is let through: what it would write is checked as a change is, before it is applied.
+      if (!READS.includes(tool) && !packTool(l.registry, tool)) refuse(`It cannot call ${tool}.`);
   }
 }
 
 /** Kernel tools a limited token may call that change nothing in the map: reading it, listening for the owner, pointing their screen. A pack's views are reads too. */
 const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show', 'document'];
 
-/** The tests of some work: those in it, and those that help answer a proof question in it. */
-async function testsOf(l: Archipelago, scope: Set<string>): Promise<Set<string>> {
-  const { rows } = await l.db.query<{ id: string; question: string | null }>(
-    `select e.id, a.to_id as question from entity e left join relation a on a.from_id = e.id and a.type = 'software.answers' and a.valid_to is null
-     where e.type = any($1::text[]) and e.archived_at is null`,
-    [l.registry.family('software.test')],
-  );
-  return new Set(rows.filter((r) => scope.has(r.id) || (r.question !== null && scope.has(r.question))).map((r) => r.id));
+/**
+ * What goes with the work as well: an item whose type belongs_with something in it (a test with the question it
+ * helps answer, a result with its test), and so on out.
+ */
+async function widen(l: Archipelago, scope: Set<string>): Promise<void> {
+  const rules = new Map<string, { relation: string; direction: 'out' | 'in'; types: string[] }>();
+  for (const t of l.registry.types.values())
+    for (const b of t.belongs_with ?? []) {
+      const key = `${b.relation} ${b.direction}`;
+      const rule = rules.get(key) ?? { ...b, types: [] };
+      rule.types.push(t.id);
+      rules.set(key, rule);
+    }
+  for (let grew = true, rounds = 0; grew && rounds < 4; rounds++) {
+    grew = false;
+    for (const { relation, direction, types } of rules.values()) {
+      const [item, owner] = direction === 'out' ? ['from_id', 'to_id'] : ['to_id', 'from_id'];
+      const { rows } = await l.db.query<{ id: string }>(
+        `select r.${item} as id from relation r join entity e on e.id = r.${item}
+         where r.type = any($1::text[]) and r.valid_to is null and r.${owner} = any($2::text[]) and e.type = any($3::text[]) and e.archived_at is null`,
+        [l.registry.relationFamily(relation), [...scope], types],
+      );
+      for (const { id } of rows) if (!scope.has(id)) grew = Boolean(scope.add(id));
+    }
+  }
 }

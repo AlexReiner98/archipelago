@@ -21,7 +21,7 @@ test("an action reads the map and its ops are applied as one change set with the
   const l = new Archipelago(await openDb(), new Registry(dir));
   const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Survey the barn' }] })) as { created: Record<string, string> };
   const result = (await host.act(l, human, 'demo', 'demo.plan_visit', { task: made.created.t, site: 'Barn' })) as { answer: { earlier: number; by: string }; changeset: string; created: Record<string, string> };
-  assert.deepEqual(result.answer, { earlier: 0, by: 'test' });
+  assert.deepEqual(result.answer, { earlier: 0, by: 'test', visit: result.created.v }, 'a {ref} in its answer is the id of what it made');
   const visit = await l.entity(result.created.v);
   assert.equal(visit!.type, 'demo.visit');
   const { rows } = await l.db.query<{ action: string; reason: string; detail: { action?: string } }>(`select action, reason, detail from event where changeset = $1`, [result.changeset]);

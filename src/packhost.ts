@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { handleRequests, type OutsideRequest } from './outside.ts';
 import { answerRead, type Read } from './packreads.ts';
-import type { Actor, Archipelago, Op } from './pelago.ts';
+import { actorId, type Actor, type Archipelago, type Op } from './pelago.ts';
 // Anyone with no login cannot read the workspace's settings: a public page is counted in the default zone.
 import { DEFAULT_ZONE, zoneOf } from './timeaxis.ts';
 
@@ -26,7 +26,12 @@ export interface Done {
   reason?: string;
   /** What it asks to have done outside the map, by the kernel. */
   requests?: OutsideRequest[];
+  /** Items whose kept pictures no longer show what they are, removed once its ops are applied. */
+  drop_pictures?: string[];
 }
+
+/** What is asked of an action's ops before they are applied: a token limited to some work is held to it. */
+export type Check = (done: Done) => Promise<void>;
 
 export type Call = 'action' | 'view' | 'answer' | 'webhook' | 'schedule';
 
@@ -141,19 +146,31 @@ export class PackHost {
 
   /**
    * Run a handler entry that may write: its ops are applied as one change set naming it, and what it asks of the
-   * world outside is made, held or refused. Only an action may act; a webhook or a schedule may only read.
+   * world outside is made, held or refused. Only an action may act; a webhook or a schedule may only read. A {ref}
+   * in its answer is the id of what its change made.
    */
-  async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' = 'action') {
+  async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' = 'action', check?: Check) {
     const done = await this.call(l, actor, pack, call, name, input, ms);
+    await check?.(done);
     const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name }) : undefined;
     const file = l.registry.packs.find((p) => p.id === pack)!;
     const action = call === 'action' ? file.actions?.find((a) => a.id === name) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
-    return { answer: done.answer ?? null, ...changed, ...(outside && { requests: outside }) };
+    const made = (changed as { created?: Record<string, string> } | undefined)?.created ?? {};
+    const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));
+    const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
+    return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }) };
   }
 
   stop(): void {
     for (const box of this.boxes.values()) box.stop();
     this.boxes.clear();
   }
+}
+
+/** Remove the kept pictures of these items, those the actor can see, each logged. */
+async function dropPictures(l: Archipelago, actor: Actor, ids: string[], reason: string): Promise<number> {
+  const { rows } = await l.db.query<{ entity_id: string }>(`delete from picture where entity_id = any($1::text[]) and entity_id in (select id from entity) returning entity_id`, [ids]);
+  for (const row of rows) await l.log(l.db, { actor: actorId(actor), action: 'picture.removed', target: row.entity_id, reason });
+  return rows.length;
 }

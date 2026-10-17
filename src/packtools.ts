@@ -5,7 +5,7 @@
 import { join } from 'node:path';
 import { z } from 'zod';
 import type { ActionDef } from './declared.ts';
-import { PackHost } from './packhost.ts';
+import { PackHost, type Check } from './packhost.ts';
 import type { Registry } from './packs.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 
@@ -24,7 +24,8 @@ export interface PackTool {
   input: z.ZodRawShape;
   /** A view only reads, so a token limited to reading may call it. */
   reads: boolean;
-  run(l: Archipelago, actor: Actor, input: unknown): Promise<unknown>;
+  /** check: asked of an action's ops before they are applied. */
+  run(l: Archipelago, actor: Actor, input: unknown, check?: Check): Promise<unknown>;
 }
 
 /** The tool a pack offers under this name, if one does. */
@@ -38,11 +39,20 @@ export function packTool(reg: Registry, name: string): PackTool | undefined {
     description: def.description + verb,
     input: schema.shape ?? {},
     reads: call === 'view',
-    run: async (l, actor, input) =>
+    run: async (l, actor, input, check) =>
       call === 'action'
-        ? hostFor(reg).act(l, actor, pack, def.id, input, def.limit_ms)
+        ? hostFor(reg).act(l, actor, pack, def.id, input, def.limit_ms, 'action', check)
         : (await hostFor(reg).call(l, actor, pack, 'view', def.id, input, def.limit_ms)).answer ?? null,
   };
+}
+
+/**
+ * The name of the pack action a short name stands for (software.test_report answers as test_report), when one loaded
+ * pack declares it, so what other repositories call does not change as tools move into packs.
+ */
+export function packActionByShort(reg: Registry, name: string): string | undefined {
+  const found = [...reg.tools].filter(([, t]) => t.call === 'action' && t.def.id.slice(t.def.id.indexOf('.') + 1) === name);
+  return found.length === 1 ? found[0][0] : undefined;
 }
 
 /** Every tool the packs offer, by name. */

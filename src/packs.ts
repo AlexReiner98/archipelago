@@ -43,6 +43,8 @@ export interface TypeDef {
   deliverable?: boolean;
   /** What anyone may see, with no login, once a person makes it public (a product, what it has built, how we know). A flavour inherits it. */
   public?: boolean;
+  /** What it goes with (linked by relation, out from it or in to it): public when that is, a limited token's when that is. A flavour inherits it. */
+  belongs_with?: BelongsWith[];
   /** What the kernel computes from it, each naming the field it reads. A flavour inherits them. */
   capabilities?: Capabilities;
   /** How long its note may grow by an agent's hand, and what to tell one that goes over: a note every session reads whole is kept short. A flavour inherits it. */
@@ -51,6 +53,7 @@ export interface TypeDef {
 }
 
 export type NoteMax = { chars: number; say?: string };
+export type BelongsWith = { relation: string; direction: 'out' | 'in' };
 
 export interface RelationDef {
   id: string;
@@ -108,6 +111,7 @@ export interface ResolvedType {
   fields: Record<string, FieldDef>;
   deliverable: boolean;
   public: boolean;
+  belongs_with?: BelongsWith[];
   capabilities: Capabilities;
   noteMax?: NoteMax; movedFrom?: string[];
   /** Kept from the type table: its pack is gone, its items are not. */
@@ -225,6 +229,7 @@ export class Registry {
         fields: { ...parent?.fields, ...def.fields, ...extra.get(id) },
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
+        ...((def.belongs_with ?? parent?.belongs_with)?.length && { belongs_with: def.belongs_with ?? parent?.belongs_with }),
         capabilities: { ...parent?.capabilities, ...def.capabilities },
         ...((def.note_max ?? parent?.noteMax) && { noteMax: def.note_max ?? parent?.noteMax }),
         ...(def.moved_from?.length && { movedFrom: def.moved_from }),
@@ -241,6 +246,9 @@ export class Registry {
       }
     }
 
+    for (const t of types.values())
+      for (const b of t.belongs_with ?? [])
+        if (!relations.has(b.relation) || !['out', 'in'].includes(b.direction)) throw new Error(`Type "${t.id}" goes with what "${b.relation}" links it to: that needs a relation the packs define, and a direction, out or in`);
     for (const rel of relations.values()) {
       for (const end of [...rel.from, ...rel.to]) {
         if (end !== '*' && !types.has(end)) throw new Error(`Relation "${rel.id}" refers to unknown type "${end}"`);
@@ -476,6 +484,7 @@ export class Registry {
         fields: t.fields,
         ...(t.deliverable && { deliverable: true }),
         ...(t.public && { public: true }),
+        ...(t.belongs_with && { belongs_with: t.belongs_with }),
         ...(Object.keys(t.capabilities).length && { capabilities: t.capabilities }),
         ...(t.dormant && { dormant: true }),
       })),

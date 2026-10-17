@@ -243,19 +243,24 @@ grant execute on function pelago_pack_secret(text) to pelago_member;
 -- Public: a third level, for anyone, with no login. A request for a public page runs as the role below, which may
 -- read only what is public, and only some columns of it: never a note, an event, a proposal, a token or a setting,
 -- and of an item's fields only the few named below.
--- What is public: an item marked so; a test that helps answer a public proof question; and a result of such a test,
--- so that a question is made public once and brings its proof with it.
+-- What is public: an item marked so, and what goes with a public one (its type's belongs_with in the type table: a
+-- test with the question it helps answer, a result with its test), so that a question is made public once and
+-- brings its proof with it. Followed four steps out at most; each step through what is not archived.
 create or replace function pelago_is_public(target text) returns boolean
 language sql stable security definer set search_path = public as $fn$
-  select exists (
-    select 1 from entity e where e.id = target and e.archived_at is null and (
-      e.visibility = 'public'
-      or exists (select 1 from relation a join entity q on q.id = a.to_id
-                 where a.type = 'software.answers' and a.valid_to is null and a.from_id = e.id and q.visibility = 'public' and q.archived_at is null)
-      or exists (select 1 from relation p
-                 join relation a on a.from_id = p.from_id and a.type = 'software.answers' and a.valid_to is null
-                 join entity q on q.id = a.to_id
-                 where p.type = 'produced' and p.valid_to is null and p.to_id = e.id and q.visibility = 'public' and q.archived_at is null)))
+  with recursive up(id, depth) as (
+    select e.id, 0 from entity e where e.id = target and e.archived_at is null
+    union
+    select n.id, u.depth + 1 from up u
+      join entity c on c.id = u.id
+      join type_def t on t.id = c.type and t.what = 'type'
+      cross join lateral jsonb_array_elements(coalesce(t.def->'belongs_with', '[]'::jsonb)) w
+      join relation r on r.type = w->>'relation' and r.valid_to is null
+                     and (case when w->>'direction' = 'out' then r.from_id else r.to_id end) = c.id
+      join entity n on n.id = (case when w->>'direction' = 'out' then r.to_id else r.from_id end) and n.archived_at is null
+    where u.depth < 4
+  )
+  select exists (select 1 from up join entity e on e.id = up.id where e.visibility = 'public')
 $fn$;
 
 -- The public items that belong to a public one, through whatever lies between: a public question in a feature that

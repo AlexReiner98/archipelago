@@ -12,7 +12,7 @@ export default {
         { op: 'create', ref: 'v', type: 'demo.visit', title: `Visit ${input.site}`, props: { site: input.site } },
         { op: 'link', type: 'part_of', from: 'v', to: task.id },
       ],
-      answer: { earlier: same.length, by: ctx.actor.name },
+      answer: { earlier: same.length, by: ctx.actor.name, visit: '{v}' },
       reason: `Plan a visit to ${input.site} for "${task.title}"`,
     };
   },

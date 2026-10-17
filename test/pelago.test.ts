@@ -17,6 +17,7 @@ import { publicPage, publicPicture } from '../src/public.ts';
 import { configureSecrets, isSealed, seal, unseal } from '../src/secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
+import { syncTypes } from '../src/typetable.ts';
 import { VIEWS } from '../src/views.ts';
 import { Workspaces } from '../src/workspaces.ts';
 
@@ -27,7 +28,8 @@ const agent: Actor = { kind: 'agent', name: 'test' };
 async function fresh() {
   const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  return new Archipelago(await openDb(), new Registry(packs));
+  const l = new Archipelago(await openDb(), new Registry(packs));
+  return (await syncTypes(l), l); // as a workspace is opened: the type table holds what the public rule reads
 }
 
 const attend = async (l: Archipelago, params: Record<string, unknown>) => (await callTool(l, human, 'view', { name: 'attention', params })) as any;
@@ -1829,8 +1831,8 @@ test('a proof question is answered on a build when every test of it passed there
       { test: made.pole, passed: false, value: '3 mm out' },
       { test: 'Sun.Nobody', passed: true },
     ],
-  })) as { recorded: number; passed: number; failed: number; unknown: string[] };
-  assert.deepEqual({ recorded: first.recorded, passed: first.passed, failed: first.failed, unknown: first.unknown }, { recorded: 2, passed: 1, failed: 1, unknown: ['Sun.Nobody'] });
+  })) as { answer: { recorded: number; passed: number; failed: number; unknown: string[] } };
+  assert.deepEqual({ recorded: first.answer.recorded, passed: first.answer.passed, failed: first.answer.failed, unknown: first.answer.unknown }, { recorded: 2, passed: 1, failed: 1, unknown: ['Sun.Nobody'] });
   const one = await view();
   assert.equal(one.build, '1.0.0');
   const sun = one.proofs.find((p) => p.id === made.sun)!;
@@ -2010,14 +2012,11 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
     { op: 'link', type: 'software.answers', from: 'square', to: 'areas' },
   ]);
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 8, 7]);
-  const report = (await callTool(l, human, 'test_report', {
-    build: '1.0.0',
-    results: [
-      { test: 'Sun.MatchesNoaa', passed: true, value: '0.004 degrees', picture: '.proof/1.0.0/Sun.MatchesNoaa.png' },
-      { test: 'Area.Square', passed: true, picture: '.proof/1.0.0/Area.Square.png' },
-    ],
-  })) as { send_pictures: unknown[] };
-  assert.deepEqual(report.send_pictures, [], 'nothing is public yet, so no picture is asked for');
+  const report = (await callTool(l, human, 'test_report', { build: '1.0.0', results: [
+    { test: 'Sun.MatchesNoaa', passed: true, value: '0.004 degrees', picture: '.proof/1.0.0/Sun.MatchesNoaa.png' },
+    { test: 'Area.Square', passed: true, picture: '.proof/1.0.0/Area.Square.png' },
+  ] })) as { answer: { send_pictures: unknown[] } };
+  assert.deepEqual(report.answer.send_pictures, [], 'nothing is public yet, so no picture is asked for');
   type View = { proofs: { id: string; public: boolean; tests: { result: { id: string } }[] }[]; to_send: { result: string; picture: string }[] };
   const view = async () => (await callTool(l, human, 'view', { name: 'proof', params: { of: made.app } })) as View;
   const results = Object.fromEntries((await view()).proofs.map((p) => [p.id, p.tests[0].result.id]));
@@ -2067,8 +2066,8 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   assert.equal((await anyoneDb.query<{ n: number }>(`select count(*)::int as n from picture`)).rows[0].n, 1);
 
   // Once a question is public, a run says which pictures to send, and the view lists what is still owed.
-  const next = (await callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: 'Sun.MatchesNoaa', passed: true, picture: '.proof/1.0.1/Sun.MatchesNoaa.png' }] })) as { send_pictures: { picture: string }[]; pictures_removed: number };
-  assert.deepEqual([next.pictures_removed, next.send_pictures.map((p) => p.picture)], [1, ['.proof/1.0.1/Sun.MatchesNoaa.png']]);
+  const next = (await callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: 'Sun.MatchesNoaa', passed: true, picture: '.proof/1.0.1/Sun.MatchesNoaa.png' }] })) as { answer: { send_pictures: { result: string; picture: string }[] }; pictures_removed: number };
+  assert.deepEqual([next.pictures_removed, next.answer.send_pictures.map((p) => p.picture)], [1, ['.proof/1.0.1/Sun.MatchesNoaa.png']]);
   assert.deepEqual((await view()).to_send.map((p) => p.picture), ['.proof/1.0.1/Sun.MatchesNoaa.png']);
 
   // Taken back, it is gone from the page at once.

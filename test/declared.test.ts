@@ -47,12 +47,24 @@ test("a pack's action and view are offered as tools and run by its handler", asy
   await assert.rejects(callTool(l, human, 'demo_plan_visit', { task: made.created.t }), /Invalid input for demo_plan_visit/);
 });
 
-test('a token limited to some work may call a pack view but not its action', async () => {
+test("a token limited to some work may call a pack's action on that work only", async () => {
   const l = await map();
-  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'r', type: 'software.repo', title: 'Repo' }, { op: 'create', ref: 't', type: 'work.task', title: 'Survey' }] })) as { created: Record<string, string> };
+  const made = (await l.change(human, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'r', type: 'software.repo', title: 'Repo' },
+      { op: 'create', ref: 't', type: 'work.task', title: 'Survey' },
+      { op: 'create', ref: 'in', type: 'work.task', title: 'Survey here' },
+      { op: 'link', type: 'software.lives_in', from: 'in', to: 'r' },
+    ],
+  })) as { created: Record<string, string> };
   const limited: Actor = { kind: 'agent', name: 'limited', repos: [made.created.r] };
   assert.deepEqual(await callTool(l, limited, 'demo_visits', { site: 'Mill' }), []);
-  await assert.rejects(callTool(l, limited, 'demo_plan_visit', { task: made.created.t, site: 'Mill' }), /cannot call demo_plan_visit/);
+  // What it would write is checked as a change is, before anything is applied.
+  await assert.rejects(callTool(l, limited, 'demo_plan_visit', { task: made.created.t, site: 'Mill' }), /"Visit Mill" is made without being tied/);
+  assert.deepEqual(await callTool(l, human, 'demo_visits', { site: 'Mill' }), []);
+  assert.equal(((await callTool(l, limited, 'demo_plan_visit', { task: made.created.in, site: 'Mill' })) as { status: string }).status, 'proposed', 'its own work passes, and waits as any agent change does');
+  await assert.rejects(callTool(l, limited, 'demo_order', { item: 'nails' }), /act outside the map/);
 });
 
 test('a declared action with no handler, or of no verb, stops its pack from loading', () => {

@@ -19,12 +19,12 @@ import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
 import type { Registry, TypeDef } from './packs.ts';
-import { packTool, packTools } from './packtools.ts';
+import { packActionByShort, packTool, packTools } from './packtools.ts';
 import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { undo } from './undo.ts';
 import { withScreens } from './screens.ts';
-import { getPicture, putPicture, reportTests } from './proof.ts';
+import { getPicture, putPicture } from './pictures.ts';
 import { pictureOf, readLens, shownIn } from './lens.ts';
 import { askView, viewList } from './askview.ts';
 import { toConfirm } from './confirm.ts';
@@ -746,26 +746,6 @@ export const TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => recordRun(l, actor, input),
   },
-  test_report: {
-    description:
-      'Say what a test run found on one build. Each result names its test by id or by its entrypoint (the name the harness knows it by) and says whether it passed, with the measured value, where the evidence is and the picture the test drew. One result is kept per test per build: reported again, it is replaced. Where a test answers a public question, the answer names the pictures to send now (send_pictures: each with picture_put). A test the map does not know is named in the answer (unknown) and nothing is made for it: create the software.test first and link it to the proof question it helps answer. Subject to the same policy as any change.',
-    input: {
-      build: z.string().min(1).describe('The version or commit the tests ran on.'),
-      results: z
-        .array(
-          z.object({
-            test: z.string().describe('The test: its id, or its entrypoint.'),
-            passed: z.boolean(),
-            value: z.string().optional().describe('The headline number or outcome, e.g. "0.004 degrees".'),
-            evidence: z.string().optional().describe('Where the proof is: a path, URL or commit.'),
-            picture: z.string().optional().describe('Where the picture the test drew is: a path in the repository, under its .proof folder (which git ignores), e.g. ".proof/1.0.0/Sun.MatchesNoaa.png". The file is not sent here.'),
-          }),
-        )
-        .min(1),
-      link: z.string().optional().describe('Where the run can be looked at.'),
-    },
-    run: async (l, actor, input) => reportTests(l, actor, input),
-  },
   picture_put: {
     description:
       'Keep a picture for one item: the picture a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text, or a still of a lens, which a link to a document shows where the app draws the lens live. A test result\u2019s only when the result is shown in public: until then the picture stays in the repository it was made in, and the result says where (its picture field). One picture per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
@@ -1086,16 +1066,26 @@ export const TOOLS: Record<string, Tool> = {
 export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(TOOLS), ...packTools(reg).filter(([t]) => !TOOLS[t])];
 
 /** Validate input and run a tool. */
-export async function callTool(l: Archipelago, actor: Actor, name: string, input: unknown): Promise<unknown> {
-  const tool: Tool | undefined = TOOLS[name] ?? packTool(l.registry, name);
+export async function callTool(l: Archipelago, actor: Actor, asked: string, input: unknown): Promise<unknown> {
+  const name = TOOLS[asked] || l.registry.tools.has(asked) ? asked : (packActionByShort(l.registry, asked) ?? asked);
+  const pack = packTool(l.registry, name);
+  const tool: Tool | undefined = TOOLS[name] ?? pack;
   if (!tool) throw new Error(`No tool "${name}". Tools: ${toolsFor(l.registry).map(([t]) => t).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
   const parsed = z.strictObject(tool.input).safeParse(input ?? {});
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);
   // An agent whose token is limited to some repositories is held to them here, whatever the tool.
-  if (actor.kind === 'agent' && actor.repos?.length) await withinScope(l, actor, name, parsed.data as Record<string, unknown>);
-  const answer = await tool.run(l, actor, parsed.data);
+  const limited = actor.kind === 'agent' && Boolean(actor.repos?.length);
+  if (limited) await withinScope(l, actor, name, parsed.data as Record<string, unknown>);
+  // A pack's action is held to the token's work by what it would write, checked as a change is.
+  const answer =
+    pack && !TOOLS[name] && limited
+      ? await pack.run(l, actor, parsed.data, async (done) => {
+          if (done.requests?.length) throw new Error(`This token is limited to some repositories: ${name} asks to act outside the map, which it cannot.`);
+          if (done.ops?.length) await withinScope(l, actor, 'change', { ops: done.ops });
+        })
+      : await tool.run(l, actor, parsed.data);
   if (actor.kind === 'agent') step(l, actor, name, parsed.data as Record<string, unknown>);
   return answer;
 }

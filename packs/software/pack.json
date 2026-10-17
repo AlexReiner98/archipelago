@@ -70,6 +70,7 @@
     {
       "id": "software.test",
       "public": true,
+      "belongs_with": [{ "relation": "software.answers", "direction": "out" }],
       "extends": "work.procedure",
       "title": "Test",
       "description": "One check that helps answer a proof question. A draft is a test that is wanted and not yet written. What it found is kept per build, as test results.",
@@ -82,6 +83,7 @@
     {
       "id": "software.test_result",
       "public": true,
+      "belongs_with": [{ "relation": "produced", "direction": "in" }],
       "extends": "record",
       "title": "Test result",
       "description": "What one test found on one build. There is one for each test on each build; a later run on the same build replaces it.",
@@ -127,6 +129,40 @@
       "title": "Handoff",
       "description": "Where a working session left things for the next one.",
       "note_max": { "chars": 3000, "say": "It holds one of each part (not seen working, what bites here, next and why). Rewrite it whole with body: keep what is still so, drop what later work settled, and put what is true of one item in that item's note." }
+    }
+  ],
+  "actions": [
+    {
+      "id": "software.test_report",
+      "title": "Report a test run",
+      "verb": "report",
+      "limit_ms": 10000,
+      "description": "Say what a test run found on one build. Each result names its test by id or by its entrypoint (the name the harness knows it by) and says whether it passed, with the measured value, where the evidence is and the picture the test drew. One result is kept per test per build: reported again, it is replaced, and the pictures kept for that test's results are removed. Where a test answers a public question, the answer names the pictures to send now (answer.send_pictures: each with picture_put). A test the map does not know is named in the answer (answer.unknown) and nothing is made for it: create the software.test first and link it to the proof question it helps answer. Called as test_report.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "build": { "type": "string", "minLength": 1, "description": "The version or commit the tests ran on." },
+          "results": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "test": { "type": "string", "description": "The test: its id, or its entrypoint." },
+                "passed": { "type": "boolean" },
+                "value": { "type": "string", "description": "The headline number or outcome, e.g. \"0.004 degrees\"." },
+                "evidence": { "type": "string", "description": "Where the proof is: a path, URL or commit." },
+                "picture": { "type": "string", "description": "Where the picture the test drew is: a path in the repository, under its .proof folder (which git ignores), e.g. \".proof/1.0.0/Sun.MatchesNoaa.png\". The file is not sent here." }
+              },
+              "required": ["test", "passed"],
+              "additionalProperties": false
+            }
+          },
+          "link": { "type": "string", "description": "Where the run can be looked at." }
+        },
+        "required": ["build", "results"],
+        "additionalProperties": false
+      }
     }
   ],
   "views": [
@@ -233,7 +269,8 @@
     { "id": "software.releases", "title": "Releases", "at": "home", "pieces": [{ "piece": "picture", "lens": { "kinds": ["software.release"], "fold": ["closed", "system"] }, "style": { "shape": "boxes" } }] },
     { "id": "software.roadmap", "title": "Roadmap", "on": ["work.project"], "pieces": [{ "piece": "tree", "tree": "software.roadmap" }] },
     { "id": "software.proof", "title": "How we know", "on": ["work.project", "software.feature", "software.proof"], "pieces": [{ "piece": "proof" }] },
-    { "id": "software.usage", "title": "Tokens used here", "on": ["software.repo"], "pieces": [{ "piece": "usage" }] }
+    { "id": "software.usage", "title": "Tokens used here", "on": ["software.repo"], "pieces": [{ "piece": "usage" }] },
+    { "id": "software.drawn", "title": "What it drew", "on": ["software.test_result"], "pieces": [{ "piece": "figure" }] }
   ],
   "trees": [
     {

@@ -1295,15 +1295,15 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
   for (const tool of ['schema', 'search', 'proposals']) assert.equal((await call(`/agent/${tool}`, site, {})).status, 200, `${tool} only reads`);
   // A test's results: for a test that helps answer a question of its work, not for another's.
   const report = (results: unknown[]) => call('/agent/test_report', site, { build: '1.0.0', results });
-  assert.match((await report([{ test: 'Books.Balance', passed: true }])).error, /"Books balance" is not a test of it/);
-  assert.match((await report([{ test: 'Footer.StaysDown', passed: true }, { test: more.theirs, passed: true }])).error, /not a test of it/);
+  assert.match((await report([{ test: 'Books.Balance', passed: true }])).error, /"Books balance" is not part of it/);
+  assert.match((await report([{ test: 'Footer.StaysDown', passed: true }, { test: more.theirs, passed: true }])).error, /is not part of it/);
   assert.equal((await report([{ test: 'Footer.StaysDown', passed: true }])).status, 200);
-  assert.deepEqual((await report([{ test: 'Nobody.KnowsThis', passed: true }])).result.unknown, ['Nobody.KnowsThis'], 'a test the map does not know is named, as for any token');
+  assert.deepEqual((await report([{ test: 'Nobody.KnowsThis', passed: true }])).result.answer.unknown, ['Nobody.KnowsThis'], 'a test the map does not know is named, as for any token');
   const theirResult = (await call('/api/test_report', admin, { build: '1.0.0', results: [{ test: 'Books.Balance', passed: true }] })).result;
-  assert.equal(theirResult.recorded, 1);
+  assert.equal(theirResult.answer.recorded, 1);
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64');
   const resultOf = async (test: string) => (await call('/api/get', admin, { id: test })).result.outgoing.find((r: any) => r.type === 'produced')?.id;
-  assert.match((await call('/agent/picture_put', site, { result: await resultOf(more.theirs), data: png, content_type: 'image/png' })).error, /not the result of a test of it/);
+  assert.match((await call('/agent/picture_put', site, { result: await resultOf(more.theirs), data: png, content_type: 'image/png' })).error, /is not part of it, so this token cannot keep a picture/);
   // A resource: one its work needs or that no work is said to need, held for its work; not one that is other work's.
   assert.equal((await call('/agent/claim', site, { resource: more.shared, holder: run, reason: 'x' })).status, 200);
   assert.equal((await call('/agent/release', site, { resource: more.shared, holder: run, reason: 'x' })).status, 200);
