@@ -32,7 +32,9 @@ export async function handoff(input, ctx) {
   const ran = (await ctx.read({ related: repo.id, relation: 'lives_in', direction: 'in', types: ['sys.run'], newest: 'updated', fields: [] })).filter((r) => !r.is_open && after(r.updated_at)).slice(0, 10);
   const ended = [];
   for (const r of ran) ended.push({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said((await ctx.read({ get: r.id }))?.body) });
-  const unconfirmed = await ctx.read({ view: 'to_confirm', params: { limit: 15 } });
+  // What agents settled and the owner has not confirmed, as attention gives it to the owner.
+  const asked = await ctx.read({ view: 'attention', params: { reasons: ['to_confirm'], limit: 15 } });
+  const unconfirmed = asked.to_confirm ? { ...asked.to_confirm, questions: asked.items.map((i) => ({ id: i.id, title: i.title, ...Object.fromEntries(Object.entries(i.reasons[0]).filter(([k]) => k !== 'why')) })) } : { count: 0 };
   const inRepo = new Set([repo.id, ...(await ctx.read({ scope: repo.id, fields: [] })).map((e) => e.id)]);
   const unshaped = (await ctx.read({ view: 'hubs' })).hubs.filter((h) => h.views === 0 && inRepo.has(h.id));
   const length = note?.body.length ?? 0;

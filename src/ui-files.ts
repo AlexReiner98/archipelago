@@ -1,7 +1,7 @@
 // The files the web UI is served from, by the path a browser asks for.
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'review', 'search', 'item', 'item-doc', 'item-links', 'screens', 'nav', 'graph', 'graph-draw', 'lens', 'nest', 'grid', 'gate', 'proof', 'roadmap', 'live', 'week', 'time', 'workspace', 'workspace-cards'];
+const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'review', 'search', 'item', 'item-doc', 'item-links', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'lens', 'nest', 'grid', 'gate', 'proof', 'roadmap', 'live', 'week', 'time', 'workspace', 'workspace-cards'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),

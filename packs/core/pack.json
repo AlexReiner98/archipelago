@@ -341,6 +341,16 @@
     }
   ],
   "screens": [
+    {
+      "id": "home",
+      "title": "Home",
+      "at": "home",
+      "pieces": [
+        { "piece": "attention", "title": "Needs you", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] },
+        { "piece": "picture", "title": "Your work", "lens": { "far": 1 }, "style": { "shape": "boxes", "lit": "you" } }
+      ]
+    },
+    { "id": "needs", "title": "Needs you", "on": ["work", "aim"], "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] }] },
     { "id": "gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
     { "id": "figure", "title": "Figure", "on": ["note", "file"], "pieces": [{ "piece": "figure" }] },
     { "id": "reading", "title": "Reading", "on": ["document"], "pieces": [{ "piece": "document" }] }

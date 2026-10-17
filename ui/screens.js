@@ -5,6 +5,7 @@
 
 import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
+import { attentionCard } from './attention.js';
 import { gate } from './gate.js';
 import { proofPart } from './proof.js';
 import { lensView } from './lens.js';
@@ -150,6 +151,12 @@ const PIECES = {
     const tool = (state.schema?.pack_tools ?? []).find((t) => t.action === p.action);
     return tool && !ctx.e?.archived_at && { node: actionForm(tool, ctx.id, ctx.redraw) };
   },
+  // What needs attention: for you, and on an item's page only what is that item's.
+  attention: (ctx, p) => {
+    const node = h('div');
+    const params = { ...(p.person && { person: p.person }), ...(p.reasons && { reasons: p.reasons }), ...(ctx.id && { within: ctx.id }) };
+    return { node, later: () => attentionCard(node, params, p.title ?? p.screen.title, Boolean(ctx.id)) };
+  },
   note: (ctx, p) => ({ node: h('section', { class: 'card wide note' }, renderBody(p.text)) }),
   // A picture: from the item the page is of, unless the lens says where. A style named by id is read by the server;
   // one written into the screen is its fields only, never code.
@@ -159,7 +166,7 @@ const PIECES = {
     if (typeof p.style === 'string') lens.style = p.style;
     const { code, ...style } = typeof p.style === 'object' && p.style ? p.style : {};
     const view = lensView({ lens, style, key: `screen:${p.screen.id}:${ctx.id ?? ''}`, quiet: true });
-    return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: 14px' }, h('header', {}, h('h2', {}, p.screen.title)), view) };
+    return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: 14px' }, h('header', {}, h('h2', {}, p.title ?? p.screen.title)), view) };
   },
   // Some of the item's fields, together under the screen's name.
   fields: (ctx, p) => {

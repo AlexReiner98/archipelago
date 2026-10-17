@@ -1,7 +1,6 @@
 // Search: the search box and what it finds.
 
 import { api, h, part, state } from './base.js';
-import { projects } from './home.js';
 import { ago, chip, link, pill, typeTitle } from './words.js';
 
 // ---- Search --------------------------------------------------------------
@@ -66,7 +65,6 @@ export function map() {
       for (const e of rows) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
       // Drawn once and kept while the kinds under it are counted again, so the list does not blink.
       const top = rest.querySelector('.projects-top') ?? h('div', { class: 'projects-top' });
-      projects(top).catch((err) => top.replaceChildren(h('div', { class: 'error' }, err.message)));
       rest.replaceChildren(
         top,
         h(

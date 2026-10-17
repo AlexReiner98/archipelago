@@ -105,12 +105,11 @@ async function main(): Promise<void> {
       const [pending, connections, now] = await Promise.all([
         call<ProposalRow[]>('proposals'),
         call<{ title: string; status: string; url: string }[]>('check_connections'),
-        call<{ ready: unknown[]; waiting_on_resource: unknown[]; held_resources: { title: string; held_by_title: string; since: string }[] }>('view', { name: 'available_now' }),
+        call<{ counts: { ready: number; blocked: number } }>('view', { name: 'attention', params: { reasons: ['ready', 'blocked'], limit: 1 } }),
       ]);
       console.log(`Proposals awaiting review: ${pending.length}`);
-      console.log(`Tasks ready to run: ${now.ready.length}   waiting on a resource: ${now.waiting_on_resource.length}`);
+      console.log(`Work ready to take up: ${now.counts.ready}   blocked: ${now.counts.blocked}`);
       for (const c of connections) console.log(`Connection ${c.title}: ${c.status}  (${c.url})`);
-      for (const h of now.held_resources) console.log(`Held: ${h.title} by ${h.held_by_title} since ${new Date(h.since).toLocaleString()}`);
       return;
     }
 

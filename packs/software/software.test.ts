@@ -32,7 +32,7 @@ function ctxOver(items: Item[], opts: { scope?: Record<string, string[]>; lives?
       if (q.related && q.relation === 'part_of') return opts.parts?.[q.related] ? [byId.get(opts.parts[q.related])] : [];
       if (q.events) return opts.pushes ?? [];
       if (q.blocked) return Object.fromEntries(q.blocked.map((id: string) => [id, { blocked: Boolean(opts.blocked?.[id]), waits_on_someone: Boolean(opts.blocked?.[id]?.waits), roots: (opts.blocked?.[id]?.roots ?? []).map((r) => ({ id: r, title: byId.get(r)?.title })) }]));
-      if (q.view === 'to_confirm') return { count: 0 };
+      if (q.view === 'attention') return { items: [], counts: {} };
       if (q.view === 'hubs') return { hubs: [] };
       throw new Error(`no read ${JSON.stringify(q)}`);
     },

@@ -222,8 +222,9 @@ test('inside a workspace, private things are hidden from other members by the da
   assert.match((await call('/api/picture_put', sam, { result: shot.created.r, data: png, content_type: 'image/png' })).error, /not a test result/);
 
   // Each person's views are their own.
-  assert.deepEqual((await api(sam, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title), ['Sam private']);
-  assert.deepEqual((await api(alex, 'view', { name: 'needs_me' })).actionable.map((t: any) => t.title).sort(), ['Alex private', 'Shared task']);
+  const ready = async (who: string) => (await api(who, 'view', { name: 'attention', params: { person: 'me', reasons: ['ready'] } })).items.map((t: any) => t.title).sort();
+  assert.deepEqual(await ready(sam), ['Sam private']);
+  assert.deepEqual(await ready(alex), ['Alex private', 'Shared task']);
 
   // Sharing is an explicit edit, and it works both ways.
   await api(alex, 'change', { reason: 'x', ops: [{ op: 'update', id: mine.created.x, visibility: 'shared' }] });
@@ -312,11 +313,9 @@ test('nothing can depend on a private item from outside it, and a held resource 
   const alexRun = await api(alex, 'session_start', { title: 'Alex wants the lane', task: made.live });
   assert.equal(alexRun.status, 'waiting');
   assert.match(alexRun.blocked[0].why, /"Live lane" is held by "someone's private session"/);
-  const now = await api(alex, 'view', { name: 'available_now' });
-  assert.equal(now.held_resources[0].held_by_title, "someone's private session");
-  assert.ok(!now.ready.some((t: any) => t.title === 'Other live work'), 'other work needing the lane is not shown as ready');
-  assert.deepEqual(now.waiting_on_resource.map((t: any) => t.title), ['Other live work']);
-  assert.equal((await api(sam, 'view', { name: 'available_now' })).held_resources[0].held_by_title, 'Sam debugging');
+  const other = (await api(alex, 'view', { name: 'attention', params: { reasons: ['ready', 'blocked'] } })).items.find((t: any) => t.title === 'Other live work');
+  assert.deepEqual(other.reasons.map((r: any) => [r.why, r.held_by]), [['blocked', ["someone's private session"]]], 'not ready: the lane is held, by a session Alex may not see');
+  assert.deepEqual((await api(sam, 'view', { name: 'attention', params: { reasons: ['blocked'] } })).items.find((t: any) => t.title === 'Other live work').reasons[0].held_by, ['Sam debugging']);
 });
 
 test('a workspace receives notifications only from workspaces its admin accepts', async () => {
@@ -1381,19 +1380,20 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   assert.deepEqual([answer.status, answer.answered], ['applied', [{ id: made.d, title: 'Which colour?', status: 'decided', outcome: 'Green', authority: onWord }]]);
   // The human is not sent a notification for each: what agents settled is put to them in one list, by the next session they talk to.
   assert.deepEqual((await call('/api/view', admin, { name: 'notifications' })).result, []);
-  const asked = (await call('/agent/view', robot, { name: 'to_confirm' })).result;
-  assert.deepEqual(asked.questions.map((q: any) => [q.title, q.answer, q.on, q.basis]), [['Which colour?', 'Green', 'the owner\u2019s word, as the agent reports it', word.basis]]);
+  const toConfirm = async () => (await call('/agent/view', robot, { name: 'attention', params: { reasons: ['to_confirm'] } })).result;
+  const asked = await toConfirm();
+  assert.deepEqual(asked.items.map((q: any) => [q.title, q.reasons[0].answer, q.reasons[0].on, q.reasons[0].basis]), [['Which colour?', 'Green', 'the owner\u2019s word, as the agent reports it', word.basis]]);
   // Their answer is recorded as their word, as the agent reports it: not as a human having looked.
-  assert.match((await call('/agent/confirmed', robot, { upto: asked.upto })).error, /basis/);
-  const said = (await call('/agent/confirmed', robot, { upto: asked.upto, basis: 'Alex, in chat on 9 Oct: "yes, green"' })).result;
+  assert.match((await call('/agent/confirmed', robot, { upto: asked.to_confirm.upto })).error, /basis/);
+  const said = (await call('/agent/confirmed', robot, { upto: asked.to_confirm.upto, basis: 'Alex, in chat on 9 Oct: "yes, green"' })).result;
   assert.deepEqual([said.questions, said.left], [1, 0]);
   // What an agent settled on its own judgment comes first and is counted apart: it is what the owner has not seen.
   const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
   await change(robot, [{ op: 'update', id: guessed.d, status: 'decided', props: { outcome: 'The wide one', rationale: 'It is the one we have.' } }], word);
   await change(robot, [{ op: 'update', id: guessed.h, status: 'refuted' }], { of: 'agent', basis: 'A month of photos' });
   await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }]);
-  const sorted = (await call('/agent/view', robot, { name: 'to_confirm' })).result;
-  assert.deepEqual([sorted.on_agents_judgment, sorted.on_owners_word, sorted.questions.map((q: any) => q.title)], [1, 1, ['Green fades', 'Which brush?']]);  const relayed = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).find((e) => e.action === 'questions.confirmed');
+  const sorted = await toConfirm();
+  assert.deepEqual([sorted.to_confirm.on_agents_judgment, sorted.to_confirm.on_owners_word, sorted.items.map((q: any) => q.title)], [1, 1, ['Green fades', 'Which brush?']]);  const relayed = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).find((e) => e.action === 'questions.confirmed');
   assert.deepEqual(relayed.detail.authority, { of: 'human', basis: 'Alex, in chat on 9 Oct: "yes, green"', stated_by: 'agent:robot/script' });
   // An agent reads what one actor did by naming them, and reads the log back by page.
   const byRobot = (await call('/agent/events', robot, { by: 'agent:robot/script', limit: 50 })).result as any[];

@@ -2,7 +2,7 @@ import { api, ask, h, state, tell } from './base.js';
 import { renderBody } from './body.js';
 import { graphView } from './graph.js';
 import { treeFor } from './screens.js';
-import { chip, isClosed, link, menu, named, pill, refreshReviewCount, statusesOf, types } from './words.js';
+import { chip, isClosed, link, menu, pill, statusesOf, types } from './words.js';
 
 // ---- Projects ------------------------------------------------------------
 
@@ -40,65 +40,6 @@ export const roadmapState = {
   // Features alone are the overview; their tasks are one tick away.
   work: false,
 };
-
-/** Which roadmaps show the whole of what needs the owner. */
-export const roadmapAll = new Set();
-
-/**
- * What in one project needs the owner: answers to confirm, questions to
- * decide (what holds up the most first), work that is theirs, and what
- * others are waiting on them for. The same list Home shows across every
- * project, here for one. Nothing, when nothing does.
- */
-export async function projectNeeds(rootId, data, change, redraw) {
-  const [pending, asked, needs, mine] = await Promise.all([api('proposals'), api('view', { name: 'questions', params: { project: rootId } }), api('view', { name: 'needs_me' }), api('view', { name: 'blocked_on_me' })]);
-  const inside = new Set([rootId]);
-  const walk = (b) => {
-    inside.add(b.id);
-    for (const w of b.work ?? []) inside.add(w.id);
-    for (const inner of b.branches ?? []) walk(inner);
-  };
-  data.branches.forEach(walk);
-  for (const w of data.unplaced) inside.add(w.id);
-  const questions = asked.open;
-  for (const q of questions) inside.add(q.id);
-  const byId = new Map(questions.map((q) => [q.id, q]));
-  const answerOf = (pr) => (pr.ops.length === 1 && pr.ops[0].op === 'update' && pr.ops[0].status && inside.has(pr.ops[0].id) ? pr.ops[0] : null);
-  const answers = pending.filter(answerOf);
-  const answered = new Set(answers.map((pr) => answerOf(pr).id));
-  const decide = async (pr, yes) => {
-    try {
-      await api('decide', { proposal: pr.id, approve: yes });
-    } catch (err) {
-      await tell('That was not done', err.message);
-    }
-    redraw();
-    refreshReviewCount();
-  };
-  const shown = new Set([...answered, ...questions.map((q) => q.id)]);
-  const todo = needs.actionable.filter((e) => inside.has(e.id) && !shown.has(e.id));
-  for (const e of todo) shown.add(e.id);
-  const holding = mine.filter((r) => inside.has(r.entity.id) && !shown.has(r.entity.id));
-  const rows = [
-    ...answers.map((pr) => {
-      const op = answerOf(pr);
-      const e = byId.get(op.id) ?? { id: op.id, title: named(op.id) };
-      return h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'grow', title: pr.reason }, link(e), ' ', h('span', { class: 'arrow' }, '\u2192'), ' ', h('strong', {}, op.props?.outcome ?? op.status)), h('button', { class: 'primary', onclick: () => decide(pr, true) }, 'Confirm'), h('button', { onclick: () => decide(pr, false) }, 'No')));
-    }),
-    ...questions.filter((q) => !answered.has(q.id)).map((q) => questionItem(q, change, null, true)),
-    ...todo.map((e) => h('li', {}, h('div', { class: 'row-top' }, chip(e.type), h('span', { class: 'grow' }, link(e)), e.due && h('span', { class: 'pill warn' }, `due ${e.due}`)))),
-    ...holding.map((r) => h('li', {}, h('div', { class: 'row-top' }, chip(r.entity.type), h('span', { class: 'grow' }, link(r.entity)), h('span', { class: 'muted small', title: r.holding_up.map((x) => x.title).join('\n') }, `holds up ${r.holding_up.length}`)))),
-  ];
-  if (!rows.length) return null;
-  const NOW = 5;
-  const all = roadmapAll.has(rootId);
-  return h(
-    'section',
-    { class: 'card wide needs' },
-    h('header', {}, h('h2', {}, 'Needs you'), h('span', { class: 'n' }, rows.length)),
-    h('ul', { class: 'rows' }, all ? rows : rows.slice(0, NOW), rows.length > NOW && h('li', { class: 'more' }, h('button', { class: 'quiet', onclick: () => ((all ? roadmapAll.delete(rootId) : roadmapAll.add(rootId)), redraw()) }, all ? 'fewer' : `${rows.length - NOW} more`))),
-  );
-}
 
 export async function roadmap(rootId) {
   const main = document.getElementById('roadmap');
@@ -182,15 +123,13 @@ export async function roadmap(rootId) {
     .map((d) => ({ id: `through:${d.from}:${d.to}`, type: 'depends_on', from: d.from, to: d.to, lifted: true }));
   const inProgress = menu(`${data.now.length} in progress`, data.now.map((n) => [`${n.title}${n.sessions?.length ? '  · session open' : ''}`, () => (location.hash = `#/e/${n.id}`)]));
   inProgress.classList.add('ok');
-  const needsYou = await projectNeeds(rootId, data, change, () => roadmap(rootId)).catch(() => null);
   if (!main.isConnected) return;
 
   main.replaceChildren(
     h(
       'div',
       { class: 'grid' },
-      needsYou,
-      h(
+        h(
         'section',
         { class: 'card wide' },
         h(

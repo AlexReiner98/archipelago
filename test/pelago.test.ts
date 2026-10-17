@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { Automations } from '../src/automations.ts';
 import { backupAll, dump, merge, newestBackup, readBackup, restore } from '../src/backup.ts';
+import { heldResources } from '../src/blocking.ts';
 import { openDb } from '../src/db.ts';
 import { configureLauncher, launch } from '../src/launcher.ts';
 import { pictureOf } from '../src/lens.ts';
@@ -28,6 +29,8 @@ async function fresh() {
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
   return new Archipelago(await openDb(), new Registry(packs));
 }
+
+const attend = async (l: Archipelago, params: Record<string, unknown>) => (await callTool(l, human, 'view', { name: 'attention', params })) as any;
 
 async function make(l: Archipelago, ops: Op[]) {
   const result = await l.change(human, { ops, reason: 'test' });
@@ -202,23 +205,18 @@ test('blockers are derived, and roots are what has to move first', async () => {
     { op: 'link', type: 'depends_on', from: 'sign', to: 'cert' },
   ]);
 
-  const blockers = (await VIEWS.blockers.run(l, {})) as any[];
-  const ship = blockers.find((b) => b.entity.id === made.ship);
-  assert.deepEqual(ship.blocked_by.map((b: any) => b.entity.title), ['Sign installer']);
-  assert.deepEqual(ship.root_blockers.map((b: any) => b.title), ['Which certificate?']);
+  const ship = (await attend(l, { reasons: ['blocked'] })).items.find((i: any) => i.id === made.ship);
+  assert.deepEqual(ship.reasons[0].by, ['Which certificate?'], 'what has to move first, at the root of the chain');
 
-  const needs = (await VIEWS.needs_me.run(l, { person: made.me })) as any;
-  assert.deepEqual(needs.actionable.map((t: any) => t.title), ['Write notes']);
-  const waiting = (await VIEWS.waiting_on.run(l, { person: made.me })) as any;
-  assert.equal(waiting.blocked_by_others.length, 2);
-  const onSam = (await VIEWS.blocked_on_me.run(l, { person: made.sam })) as any[];
-  assert.equal(onSam[0].holding_up.length, 2);
+  assert.deepEqual((await attend(l, { person: made.me, reasons: ['ready'] })).items.map((t: any) => t.title), ['Write notes']);
+  assert.equal((await attend(l, { person: made.me, reasons: ['blocked'] })).items.length, 2);
+  assert.equal((await attend(l, { person: made.sam, reasons: ['holding_up'] })).items[0].reasons[0].count, 2);
 
   // Closing the decision unblocks the next task in the chain, with nothing else to update.
   await make(l, [{ op: 'update', id: made.cert, status: 'decided', props: { outcome: 'EV cert' } }]);
-  const after = (await VIEWS.needs_me.run(l, { person: made.me })) as any;
-  assert.deepEqual(after.actionable.map((t: any) => t.title).sort(), ['Sign installer', 'Write notes']);
-  await assert.rejects(VIEWS.needs_me.run(l, {}), /pelago init/);
+  const after = await attend(l, { person: made.me, reasons: ['ready'] });
+  assert.deepEqual(after.items.map((t: any) => t.title).sort(), ['Sign installer', 'Write notes']);
+  await assert.rejects(attend(l, { person: 'me' }), /pelago init/);
 });
 
 test('a dependency cycle does not hang the views', async () => {
@@ -229,7 +227,7 @@ test('a dependency cycle does not hang the views', async () => {
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
     { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
   ]);
-  assert.equal(((await VIEWS.blockers.run(l, {})) as any[]).length, 2);
+  assert.equal((await attend(l, { reasons: ['blocked'] })).items.length, 2);
 });
 
 test('an exclusive resource has one holder, and blocks other work that needs it', async () => {
@@ -244,39 +242,31 @@ test('an exclusive resource has one holder, and blocks other work that needs it'
     { op: 'link', type: 'needs', from: 'live1', to: 'lane' },
     { op: 'link', type: 'needs', from: 'live2', to: 'lane' },
   ]);
-  const before = (await VIEWS.available_now.run(l, {})) as any;
-  assert.equal(before.ready.length, 3);
+  assert.equal((await attend(l, { reasons: ['ready'] })).items.length, 3);
 
   // Agents claim directly: no proposal.
   const claimed = await l.claim(agent, { resource: made.lane, holder: made.run1, for: made.live1, reason: 'Running the probe' });
   assert.equal(claimed.status, 'claimed');
   await assert.rejects(l.claim(agent, { resource: made.lane, holder: made.run2, reason: 'Me too' }), /held by "Session one"/);
 
-  const during = (await VIEWS.available_now.run(l, {})) as any;
-  assert.deepEqual(during.ready.map((t: any) => t.title).sort(), ['Capture parity probe', 'Write unit tests']);
-  assert.deepEqual(during.waiting_on_resource.map((t: any) => t.title), ['Debug conduit']);
-  assert.equal(during.held_resources[0].held_by_title, 'Session one');
+  const during = await attend(l, { reasons: ['ready', 'blocked'] });
+  assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'ready').map((t: any) => t.title).sort(), ['Capture parity probe', 'Write unit tests']);
+  assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'blocked').map((t: any) => [t.title, t.reasons[0].by]), [['Debug conduit', ['Live Rhino lane']]]);
+  assert.equal((await heldResources(l))[0].held_by_title, 'Session one');
 
   assert.deepEqual(await l.release(agent, { resource: made.lane, holder: made.run1, reason: 'Done' }), { released: 1 });
   assert.equal((await l.claim(agent, { resource: made.lane, holder: made.run2, reason: 'My turn' })).status, 'claimed');
 });
 
-test('work resting on a refuted hypothesis, and overdue work, show as at risk', async () => {
+test('overdue work is due, and what is far off is not', async () => {
   const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'h', type: 'hypothesis', title: 'Architects will pay per study' },
-    { op: 'create', ref: 'p', type: 'project', title: 'Per-study pricing' },
-    { op: 'create', ref: 'late', type: 'task', title: 'File return', props: { due: '2020-01-01' } },
+  await make(l, [
+    { op: 'create', type: 'task', title: 'File return', props: { due: '2020-01-01' } },
     { op: 'create', type: 'task', title: 'Far off', props: { due: '2999-01-01' } },
-    { op: 'link', type: 'assumes', from: 'p', to: 'h' },
   ]);
-  let risk = (await VIEWS.at_risk.run(l, {})) as any;
-  assert.equal(risk.resting_on_refuted_hypothesis.length, 0);
-  assert.deepEqual(risk.due_soon_or_overdue.map((t: any) => [t.title, t.overdue]), [['File return', true]]);
-
-  await make(l, [{ op: 'update', id: made.h, status: 'refuted' }]);
-  risk = (await VIEWS.at_risk.run(l, {})) as any;
-  assert.equal(risk.resting_on_refuted_hypothesis[0].title, 'Per-study pricing');
+  // Work resting on a refuted hypothesis is the inquiry pack's to show, not the kernel's.
+  const due = await attend(l, { reasons: ['due'] });
+  assert.deepEqual(due.items.map((t: any) => [t.title, t.reasons[0].overdue]), [['File return', true]]);
 });
 
 test('merge moves relations to the kept entity and archives the other', async () => {
@@ -335,7 +325,7 @@ test('tool input is validated before anything runs', async () => {
   await assert.rejects(callTool(l, agent, 'change', { ops: [{ op: 'explode' }], reason: 'x' }), /Invalid input for change/);
   await assert.rejects(callTool(l, agent, 'search', { query: 'x' }), /Invalid input for search/);
   await assert.rejects(callTool(l, agent, 'nope', {}), /No tool "nope"/);
-  assert.ok(Object.keys((await callTool(l, agent, 'view', {})) as object).includes('needs_me'));
+  assert.ok(Object.keys((await callTool(l, agent, 'view', {})) as object).includes('attention'));
 });
 
 test('each fact can carry its own source within one change', async () => {
@@ -430,7 +420,7 @@ test('a session registers, takes the lane its task needs, and gives it back when
   await assert.rejects(sessionUpdate(l, agent, { run: one.run, note: 'late' }), /already ended/);
 });
 
-test('Home gives each project its open questions and where it stands against its next release', async () => {
+test('a project’s open questions are what needs the owner in it, and its next release says where it stands', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'p', type: 'project', title: 'Shadows', status: 'active' },
@@ -447,15 +437,12 @@ test('Home gives each project its open questions and where it stands against its
     { op: 'link', type: 'depends_on', from: 'r', to: 'b' },
     { op: 'create', ref: 'quiet', type: 'project', title: 'Quiet one', status: 'active' },
   ]);
-  const { projects } = (await VIEWS.home.run(l, {})) as any;
-  assert.deepEqual(projects.map((p: any) => p.title), ['Shadows', 'Quiet one'], 'what needs the owner most comes first');
-  const [shadows, quiet] = projects;
-  assert.deepEqual(shadows.questions.map((q: any) => [q.title, q.options]), [['Which licence?', ['MIT', 'Apache']]]);
-  assert.deepEqual([shadows.release.title, shadows.release.done, shadows.release.total, shadows.release.blocked], ['First release', 1, 2, 1]);
-  assert.deepEqual(shadows.release.still.map((i: any) => [i.title, i.blocked, i.waiting_on]), [['Write the installer', true, ['Which licence?']]]);
-  assert.equal(quiet.release, null);
-  assert.deepEqual(quiet.questions, []);
-  assert.ok(made.p);
+  const asked = await attend(l, { reasons: ['unsettled'], within: made.p });
+  assert.deepEqual(asked.items.map((q: any) => [q.title, q.reasons[0].by, q.top.title]), [['Which licence?', 'word', 'Shadows']]);
+  assert.deepEqual((await attend(l, { reasons: ['unsettled'], within: made.quiet })).items, []);
+  const gate = (await VIEWS.gate.run(l, { event: made.r })) as any;
+  const items = gate.streams.flatMap((s: any) => s.items);
+  assert.deepEqual([items.filter((i: any) => i.done).length, items.length, items.filter((i: any) => i.blocked).map((i: any) => i.title)], [1, 2, ['Write the installer']]);
 });
 
 test('a session tells the story of its work, beat by beat, and can take a beat back', async () => {
@@ -594,15 +581,15 @@ test('a session that finishes says where the repository\'s open work stands', as
   // What nobody has changed or confirmed for longest comes first, with its age; the session is told of it at the start.
   await l.db.query(`update entity set updated_at = now() - interval '40 days' where id = $1`, [made.gated]);
   await l.db.query(`update entity set updated_at = now() - interval '20 days' where id = $1`, [made.live]);
-  const old = (await VIEWS.oldest.run(l, { repo: made.repo })) as any;
-  assert.deepEqual(old.items.map((i: any) => [i.title, i.days]), [['Tune the solver', 40], ['Capture probe', 20]]);
-  assert.equal(((await VIEWS.oldest.run(l, { days: 30 })) as any).items.length, 1, 'only those older than asked for');
+  const old = await attend(l, { reasons: ['stale'], within: made.repo });
+  assert.deepEqual(old.items.map((i: any) => [i.title, i.reasons[0].days]).sort(), [['Capture probe', 20], ['Tune the solver', 40]]);
+  assert.equal((await attend(l, { reasons: ['stale'], stale_days: 30 })).items.length, 1, 'only those older than asked for');
   const told = await hookSessionStart(l, { session_id: 'r0', cwd: 'C:\\code\\Aperture' });
   assert.match(told, /Capture probe \(e_\w+\), not confirmed for 20 days/);
   assert.doesNotMatch(told, /Write unit tests.*not confirmed/);
   // Saying it is still true takes it off the list.
   await make(l, [{ op: 'update', id: made.gated }]);
-  assert.deepEqual(((await VIEWS.oldest.run(l, {})) as any).items.map((i: any) => i.title), ['Capture probe']);
+  assert.deepEqual((await attend(l, { reasons: ['stale'] })).items.map((i: any) => i.title), ['Capture probe']);
   await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r0', outcome: 'cancelled' });
 
   // A scheduled re-check asks what is due: a project says how often, weekly when it does not.
@@ -670,11 +657,11 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   ]);
 
   // It is blocked, by the person; it needs them though it is not theirs; and its owner is waiting on them.
-  const blocked = ((await VIEWS.blockers.run(l, {})) as any[]).find((b) => b.entity.id === made.offline);
-  assert.deepEqual(blocked.blocked_by.map((b: any) => [b.why, b.entity.title]), [['waits_on', 'Owner']]);
-  assert.deepEqual(((await VIEWS.needs_me.run(l, {})) as any).actionable.map((e: any) => e.title), ['Write unit tests']);
-  assert.deepEqual(((await VIEWS.waiting_on.run(l, { person: sam })) as any).blocked_by_others.map((r: any) => r.waiting_on[0].title), ['Owner']);
-  assert.ok(!((await VIEWS.available_now.run(l, {})) as any).waiting_on_resource.some((t: any) => t.id === made.offline), 'a person is not a resource');
+  const offline = (await attend(l, {})).items.find((b: any) => b.id === made.offline);
+  assert.deepEqual(offline.reasons.map((r: any) => [r.why, r.who ?? r.by]), [['waits_on', 'Owner'], ['blocked', ['Owner']]]);
+  assert.deepEqual((await attend(l, { person: 'me', reasons: ['waits_on'] })).items.map((e: any) => e.title), ['Write unit tests']);
+  assert.deepEqual((await attend(l, { person: sam, reasons: ['blocked'] })).items.map((r: any) => r.reasons[0].by), [['Owner']]);
+  assert.ok(!(await attend(l, { reasons: ['ready'] })).items.some((t: any) => t.id === made.offline), 'what waits on a person is not ready');
   const work = (await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
   assert.deepEqual(work.blocked.find((b: any) => b.id === made.offline).waiting_on, ['Owner']);
 
@@ -740,8 +727,8 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   const forAgent = (await callTool(l, agent, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
   assert.deepEqual([forPerson.ready[0].due, 'due' in forAgent.ready[0], forAgent.ready[0].id], [null, false, forPerson.ready[0].id]);
   assert.equal(((await callTool(l, agent, 'view', { name: 'repo_work', params: { repo: made.repo, full: true } })) as any).ready[0].due, null, 'whole when asked');
-  const blocked = (await callTool(l, agent, 'view', { name: 'blockers' })) as any[];
-  assert.deepEqual([typeof blocked[0].blocked_by[0].why, typeof blocked[0].blocked_by[0].id, 'root_blockers' in blocked[0]], ['string', 'string', false], 'what blocks it directly is the root: said once');
+  const blocked = (await callTool(l, agent, 'view', { name: 'attention', params: { reasons: ['blocked'] } })) as any;
+  assert.deepEqual([blocked.items[0].reasons[0].why, 'due' in blocked.items[0], 'owner' in blocked.items[0]], ['blocked', false, false], 'an agent is given no empty fields');
   const told = (await callTool(l, agent, 'view', { name: 'handoff', params: { repo: made.repo } })) as any;
   assert.deepEqual([told.note.id, told.open.ready.length, 'ready_count' in told.open], [note, stand.open.ready.length, false], 'a short list is given whole');
   assert.deepEqual(stand.last_push.head, 'abcdef0');
@@ -925,7 +912,7 @@ test('launching runs a headless session on a task, holding the lane and recordin
   assert.match(done.body, /3 turns, \$0\.50; transcript: /);
   assert.ok(done.body.toLowerCase().includes(`cwd=${dir}`.toLowerCase()), 'it ran in the repository');
   assert.match(readFileSync(first.transcript, 'utf8'), /"type":"result"/);
-  assert.equal(((await VIEWS.available_now.run(l, {})) as any).held_resources.length, 0, 'the lane came back');
+  assert.equal((await heldResources(l)).length, 0, 'the lane came back');
 
   const planned = await ended((await launch(l, human, { task: made.live, instructions: 'PLANONLY' })).run);
   assert.match(planned.body, /finished: The plan: do X then Y/, 'a plan-mode answer is found even though the result is empty');
@@ -1045,7 +1032,7 @@ test('an agent can notify the human; a stale session raises one notification', a
   assert.deepEqual([gone.status, (await l.entity(idle))!.status], ['finished', 'finished']);
   assert.match(gone.body, /Not heard from for over 12 hours: ended for it/);
   assert.equal(await quiet(), 0, 'withdrawn when the session ends');
-  assert.equal(((await VIEWS.available_now.run(l, {})) as any).held_resources.length, 0, 'the lane is free');
+  assert.equal((await heldResources(l)).length, 0, 'the lane is free');
   assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, 1, 'other notifications are left alone');
 });
 
@@ -1456,7 +1443,7 @@ test('the roadmap tree orders a project\'s features, rolls up progress, and show
   assert.deepEqual([placed.unplaced.length, placed.branches[1].work.map((w: any) => w.title).sort()], [0, ['Loose', 'T3']], 'work given a feature sits under it, though still part of the project');
 });
 
-test('a project\'s questions are its open decisions and hypotheses, most-blocking first, with what waits on each', async () => {
+test('a project\'s unsettled questions are what needs settling in it, what holds up the most first', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
@@ -1474,38 +1461,27 @@ test('a project\'s questions are its open decisions and hypotheses, most-blockin
     { op: 'link', type: 'part_of', from: 'small', to: 'p' },
     { op: 'link', type: 'part_of', from: 'old', to: 'p' },
     { op: 'link', type: 'part_of', from: 'else', to: 'other' },
+    // A question is a project's when it is part of it: one its work only depends on is named as what blocks that work.
+    { op: 'link', type: 'part_of', from: 'big', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'hyp', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'f', to: 'big' },
     { op: 'link', type: 'depends_on', from: 't', to: 'f' },
     { op: 'link', type: 'assumes', from: 't', to: 'hyp' },
     { op: 'link', type: 'tests', from: 'exp', to: 'hyp' },
   ]);
 
-  const all = (await VIEWS.questions.run(l, {})) as any;
-  assert.deepEqual(all.projects.map((p: any) => [p.title, p.questions]), [['Proj', 3], ['Other', 1]]);
-
-  const q = (await VIEWS.questions.run(l, { project: made.p })) as any;
-  assert.deepEqual(q.open.map((x: any) => x.title), ['Big', 'Hyp', 'Small'], 'what holds up the most comes first; another project\'s question is left out');
-  const big = q.open[0];
-  assert.deepEqual([big.kind, big.options, big.holds_up, big.waiting.map((w: any) => w.title)], ['decision', ['A', 'B'], 2, ['Feature']], 'found through what depends on it, counting what waits behind that');
-  const hyp = q.open[1];
-  assert.deepEqual([hyp.kind, hyp.assumed_by[0].title, hyp.tests[0].title], ['hypothesis', 'Task', 'Try it']);
-  assert.deepEqual(q.settled.map((x: any) => [x.title, x.outcome, x.rationale]), [['Old', 'Yes', 'Because']]);
-
-  await make(l, [
-    { op: 'create', ref: 'ask', type: 'task', title: 'Compare A and B first' },
-    { op: 'create', ref: 'aside', type: 'note', title: 'A note about it' },
-    { op: 'link', type: 'about', from: 'ask', to: made.big },
-    { op: 'link', type: 'about', from: 'aside', to: made.big },
-  ]);
-  const asked = (await VIEWS.questions.run(l, { project: made.p })) as any;
-  assert.deepEqual(asked.open[0].asks.map((a: any) => [a.title, a.status]), [['Compare A and B first', 'todo']], 'a task about a question is something asked of an agent; a note is not');
+  const unsettled = async (within: string) => (await attend(l, { within, reasons: ['unsettled', 'holding_up'] })).items.filter((x: any) => x.reasons.some((r: any) => r.why === 'unsettled'));
+  const q = await unsettled(made.p);
+  assert.deepEqual([q[0].title, ...q.slice(1).map((x: any) => x.title).sort()], ['Big', 'Hyp', 'Small'], 'what holds up the most comes first; another project\'s question is left out, and a settled one');
+  assert.deepEqual(q[0].reasons, [{ why: 'holding_up', count: 2 }, { why: 'unsettled', by: 'word' }], 'found through what depends on it, counting what waits behind that');
+  assert.deepEqual(q.find((x: any) => x.title === 'Hyp').reasons, [{ why: 'unsettled', by: 'evidence' }]);
+  assert.deepEqual((await unsettled(made.other)).map((x: any) => x.title), ['Elsewhere']);
 
   await make(l, [{ op: 'update', id: made.big, status: 'decided', props: { outcome: 'A', decided_on: '2026-10-07' } }]);
-  const after = (await VIEWS.questions.run(l, { project: made.p })) as any;
-  assert.deepEqual([after.open.map((x: any) => x.title), after.settled[0].title, after.settled[0].outcome], [['Hyp', 'Small'], 'Big', 'A']);
+  assert.deepEqual((await unsettled(made.p)).map((x: any) => x.title).sort(), ['Hyp', 'Small']);
 });
 
-test('a project inside another open project is not listed on its own; its questions count in its parent', async () => {
+test('a question in a project inside another is both projects\', and sits in the outer one at the top', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'p', type: 'project', title: 'Parent' },
@@ -1514,12 +1490,9 @@ test('a project inside another open project is not listed on its own; its questi
     { op: 'link', type: 'part_of', from: 'sub', to: 'p' },
     { op: 'link', type: 'part_of', from: 'd', to: 'sub' },
   ]);
-  const listed = async () => ((await VIEWS.questions.run(l, {})) as any).projects.map((p: any) => [p.title, p.questions]);
-  assert.deepEqual(await listed(), [['Parent', 1]]);
-  assert.equal(((await VIEWS.questions.run(l, { project: made.sub })) as any).open[0].title, 'Which way?', 'its own page still answers');
-
-  await make(l, [{ op: 'update', id: made.p, status: 'done' }]);
-  assert.deepEqual(await listed(), [['Area', 1], ['Parent', 1]], 'once the parent is finished, the area is listed again');
+  const within = async (id: string) => (await attend(l, { within: id, reasons: ['unsettled'] })).items.map((x: any) => [x.title, x.top.title]);
+  assert.deepEqual(await within(made.p), [['Which way?', 'Parent']]);
+  assert.deepEqual(await within(made.sub), [['Which way?', 'Parent']], 'its own page still answers');
 });
 
 test('an agent may settle its own work unreviewed, but only proposes the answer to a question', async () => {

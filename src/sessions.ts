@@ -7,7 +7,10 @@
 import { livesIn, livesInFor, placeFor, scopeOf } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts';
-import { blockGraph, toConfirm, UNCONFIRMED_DAYS, VIEWS } from './views.ts';
+import { blockGraph, heldResources } from './blocking.ts';
+import { toConfirm } from './confirm.ts';
+import { STALE_DAYS } from './attention.ts';
+import { VIEWS } from './views.ts';
 
 const now = () => new Date().toISOString();
 
@@ -442,10 +445,9 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
   // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.
   if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
-    const asker: Actor = { kind: 'agent', name: 'claude-code' };
-    const work = (await askView(l, asker, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
+    const work = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
     // Where things stand is read off the map; the session is told how much has moved since someone last wrote it down.
-    const stand = (await askView(l, asker, 'handoff', { repo: repo.id })) as { note: { id: string; title: string; written: string } | null; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]>; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
+    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { note: { id: string; title: string; written: string } | null; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]>; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
     const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
     const then = stand.since_then;
     const from = stand.note ? `Its note, "${stand.note.title}" (${stand.note.id}), was written ${new Date(stand.note.written).toISOString().slice(0, 10)}; since then` : 'Nobody has written a handoff note here; in the last week';
@@ -454,7 +456,7 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
     // What nobody has touched for a while is said to be so: it may no longer be true.
     const age = (t: { last_confirmed: string | Date }) => {
       const days = Math.floor((Date.now() - new Date(t.last_confirmed).getTime()) / 86_400_000);
-      return days >= UNCONFIRMED_DAYS ? `, not confirmed for ${days} days: check it before relying on it` : '';
+      return days >= STALE_DAYS ? `, not confirmed for ${days} days: check it before relying on it` : '';
     };
     if (work.ready.length) lines.push('', 'Open work and issues here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${kind(t)}${t.title} (${t.id})${age(t)}`));
     if (work.blocked.length) lines.push('', 'Blocked work here:', ...work.blocked.slice(0, 15).map((t) => `- ${t.title} (${t.id}), waiting on: ${t.waiting_on.join('; ')}`));
@@ -475,15 +477,13 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   if (ask.on_agents_judgment)
     lines.push(
       '',
-      `For the owner, in your first reply: since they last looked, agents have settled ${ask.on_agents_judgment} ${ask.on_agents_judgment === 1 ? 'question' : 'questions'} on their own judgment${ask.on_owners_word ? ` (and recorded ${ask.on_owners_word} more as the owner's own answers in chat: say how many, and list them only if asked, with view "to_confirm")` : ''}. Show them these, a line for each, and ask them to confirm or correct. When they have answered, call confirmed with upto ${ask.upto} and what they said; change or reopen what they correct.`,
+      `For the owner, in your first reply: since they last looked, agents have settled ${ask.on_agents_judgment} ${ask.on_agents_judgment === 1 ? 'question' : 'questions'} on their own judgment${ask.on_owners_word ? ` (and recorded ${ask.on_owners_word} more as the owner's own answers in chat: say how many, and list them only if asked, with view "attention", reason to_confirm)` : ''}. Show them these, a line for each, and ask them to confirm or correct. When they have answered, call confirmed with upto ${ask.upto} and what they said; change or reopen what they correct.`,
       ...judged.map((q) => `- ${q.title}: ${q.answer} (${q.id})`),
-      ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: view "to_confirm".`] : []),
+      ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: view "attention" with person "me" and reasons ["to_confirm"].`] : []),
     );
-  const now = (await VIEWS.available_now.run(l, {})) as { held_resources: { title: string; held_by_title: string }[] };
-  const { rows: holdable } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [l.registry.having('capacity')]);
-  const exclusive = holdable.filter((res) => l.registry.capacity(res) !== Infinity);
-  for (const res of exclusive) {
-    const held = now.held_resources.find((h) => h.title === res.title);
+  const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [l.registry.having('capacity')])]);
+  for (const res of holdable.filter((one) => l.registry.capacity(one) !== Infinity)) {
+    const held = heldNow.find((h) => h.resource === res.id);
     lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago claim tool (holder ${started.run}) before using it and release it after.`);
   }
   lines.push(

@@ -20,6 +20,8 @@ export interface Screen {
   nav?: number;
   /** A preset the pack offers for the nav. */
   offered?: boolean;
+  /** One of the kernel's own pages it draws: Home. */
+  at?: 'home';
 }
 
 interface Kept {
@@ -47,6 +49,7 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[])
       ...(typeof k?.props.nav === 'number' && { nav: k.props.nav }),
       ...(k && { item: k.id }),
       ...(p.nav && { offered: true }),
+      ...(p.at && { at: p.at }),
     });
   }
   const known = new Set(presets.map((p) => p.id));

@@ -7,7 +7,7 @@
 import { sayLens } from './lens-words.ts';
 import type { Archipelago } from './pelago.ts';
 import { placeAll, readAxis, zoneOf, type TimeAxis } from './timeaxis.ts';
-import { blockGraph } from './views.ts';
+import { blockGraph } from './blocking.ts';
 
 export interface Lens {
   /** Where it starts: one item. Without it, the whole map. */

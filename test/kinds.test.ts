@@ -80,10 +80,10 @@ test("a pack's relation extending depends_on blocks as depends_on does", async (
     ],
   });
   const { a, b } = (made as { created: Record<string, string> }).created;
-  const answer = (await VIEWS.blockers.run(l, {})) as { entity: { id: string }; blocked_by: { why: string; entity: { id: string } }[] }[];
-  const framed = answer.find((x) => x.entity.id === b);
+  const answer = (await VIEWS.attention.run(l, { reasons: ['blocked'] })) as { items: { id: string; reasons: { why: string; by: string[] }[] }[] };
+  const framed = answer.items.find((x) => x.id === b);
   assert.ok(framed, 'the later task is blocked');
-  assert.deepEqual(framed.blocked_by.map((x) => [x.why, x.entity.id]), [['depends_on', a]]);
+  assert.deepEqual(framed.reasons.map((x) => [x.why, x.by]), [['blocked', [(await l.entity(a))!.title]]]);
 });
 
 test('a new type extends a kind or a type of one', async () => {

@@ -69,10 +69,11 @@ test('at risk is what crosses its bound, whatever the field is called', async ()
     { op: 'create', ref: 'low', type: 'shop.stock', title: 'Flour', props: { on_hand: 3, reorder_at: 10 } },
     { op: 'create', ref: 'ok', type: 'shop.stock', title: 'Salt', props: { on_hand: 30, reorder_at: 10 } },
   ]);
-  const risk = (await VIEWS.at_risk.run(l, {})) as { due_soon_or_overdue: { id: string; due: string }[]; under_limit: { id: string }[] };
-  assert.deepEqual(risk.due_soon_or_overdue.map((r) => r.id).sort(), [made.grant, made.task].sort());
-  assert.equal(risk.due_soon_or_overdue.find((r) => r.id === made.grant)!.due, soon);
-  assert.deepEqual(risk.under_limit.map((r) => r.id), [made.low]);
+  type Due = { items: { id: string; reasons: { on?: string; limit?: number }[] }[] };
+  const due = (await VIEWS.attention.run(l, { reasons: ['due'] })) as Due;
+  assert.deepEqual(due.items.filter((r) => r.reasons[0].on).map((r) => r.id).sort(), [made.grant, made.task].sort());
+  assert.equal(due.items.find((r) => r.id === made.grant)!.reasons[0].on, soon);
+  assert.deepEqual(due.items.filter((r) => r.reasons[0].limit !== undefined).map((r) => r.id), [made.low]);
 });
 
 test('a resource holds as many as its capacity, and blocks what needs it once full', async () => {
@@ -83,8 +84,8 @@ test('a resource holds as many as its capacity, and blocks what needs it once fu
   ]);
   for (const t of ['a', 'b']) assert.equal((await l.claim(human, { resource: made.room, holder: made[t], reason: 'test' })).status, 'claimed');
   await assert.rejects(l.claim(human, { resource: made.room, holder: made.c, reason: 'test' }), /is held by/);
-  const blocked = (await VIEWS.blockers.run(l, {})) as { entity: { id: string } }[];
-  assert.deepEqual(blocked.map((b) => b.entity.id), [made.c]);
+  const blocked = (await VIEWS.attention.run(l, { reasons: ['blocked'] })) as { items: { id: string }[] };
+  assert.deepEqual(blocked.items.map((b) => b.id), [made.c]);
   await assert.rejects(l.claim(human, { resource: made.a, holder: made.b, reason: 'test' }), /nothing of its type can be held/);
 });
 

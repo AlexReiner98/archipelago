@@ -27,7 +27,8 @@ import { withScreens } from './screens.ts';
 import { getPicture, putPicture, reportTests } from './proof.ts';
 import { pictureOf, readLens, shownIn } from './lens.ts';
 import { askView, viewList } from './askview.ts';
-import { toConfirm, VIEWS } from './views.ts';
+import { toConfirm } from './confirm.ts';
+import { VIEWS } from './views.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page; only a project, feature, release, proof question, test or test result can be, and only a human makes it so (from an agent it waits as a proposal).');
@@ -315,14 +316,6 @@ function forAgent(name: string, answer: unknown): unknown {
     return Object.fromEntries(entries.map(([k, v]) => [k, bare(v)]));
   };
   const out = bare(answer) as Record<string, unknown>;
-  if (name === 'blockers' && Array.isArray(out)) {
-    // What blocks an item at the root is named; it is in the list in full where it is itself blocked, or one get away.
-    return (out as { blocked_by?: { why: string; entity: Record<string, unknown> }[]; root_blockers?: { id: string; title: string }[] }[]).map(({ root_blockers, blocked_by, ...b }) => {
-      const direct = new Set(blocked_by?.map((d) => d.entity.id));
-      const further = root_blockers?.filter((r) => !direct.has(r.id)).map((r) => ({ id: r.id, title: r.title })) ?? [];
-      return { ...b, blocked_by: blocked_by?.map((d) => ({ why: d.why, ...d.entity })), ...(further.length && { root_blockers: further }) };
-    });
-  }
   if (name === 'tree' && Array.isArray(out?.branches)) {
     // A branch as an agent reads it: what is open under it by name, what is finished by count, and a mark only when it is set.
     type Node = Record<string, unknown> & { branches?: Node[]; work?: (Record<string, unknown> & { open?: boolean })[] };
@@ -333,10 +326,6 @@ function forAgent(name: string, answer: unknown): unknown {
       return { ...light(node), ...(node.branches && { branches: node.branches.map(prune) }), ...(node.work && { work: open.map((w) => light(w)), ...(work.length > open.length && { finished_work: work.length - open.length }) }) };
     };
     out.branches = (out.branches as Node[]).map(prune);
-  }
-  if (name === 'questions' && Array.isArray(out?.settled)) {
-    const cut = (s: unknown) => (typeof s === 'string' && s.length > 200 ? `${s.slice(0, 200)}…` : s);
-    out.settled = (out.settled as Record<string, unknown>[]).map((q) => ({ id: q.id, title: q.title, status: q.status, outcome: cut(q.outcome), decided_on: q.decided_on }));
   }
   if (name === 'handoff' && out?.open) {
     const open = out.open as { ready: unknown[]; blocked: unknown[] };
@@ -576,7 +565,7 @@ export const TOOLS: Record<string, Tool> = {
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
       'A change that is refused is kept for a few minutes under a name the refusal gives: correct it with retry and fixes (the ops that were wrong, by number) instead of sending it all again. ' +
       'Keep the map true as you work: when what you did or found settles something that is still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, instead of leaving it open with a note. ' +
-      'Closing a decision or a hypothesis is held for the human to confirm, so propose the answer freely: it costs them one click. Only in a workspace set to apply agents\u2019 changes does it take effect at once: then a decision must carry what was chosen (props.outcome) and why (props.rationale), it is put to the owner by the next session they talk to (the view to_confirm), and it is yours to get right. Settle what the work or the owner has in fact settled; a choice that is still the owner\u2019s to make stays open.',
+      'Closing a decision or a hypothesis is held for the human to confirm, so propose the answer freely: it costs them one click. Only in a workspace set to apply agents\u2019 changes does it take effect at once: then a decision must carry what was chosen (props.outcome) and why (props.rationale), it is put to the owner by the next session they talk to (attention, reason to_confirm), and it is yours to get right. Settle what the work or the owner has in fact settled; a choice that is still the owner\u2019s to make stays open.',
     input: {
       ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
       reason: z.string().min(1).optional().describe('Why this change is being made. Shown in the activity log. Needed, except with retry.'),
@@ -657,7 +646,7 @@ export const TOOLS: Record<string, Tool> = {
       }
       if (retry) refused.delete(retry);
       // A question an agent settled is not left for the human to come across: it is put to them by the next session
-      // they talk to (the view to_confirm, and the handoff), all of them in one list, not a notification for each.
+      // they talk to (attention, reason to_confirm, and the handoff), all of them in one list, not a notification for each.
       // The human's screen follows an agent's change: to Review when it waits
       // there, otherwise to the first thing it made or touched.
       if (actor.kind === 'agent') {
@@ -1037,7 +1026,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   confirmed: {
     description:
-      'Record what the owner said, in chat, about the questions agents settled (the view to_confirm, or for_owner in the handoff): that they have been put to the owner and answered, up to an event. It is the owner\u2019s word as you report it, logged as that, and never the mark that a human looked. Change or reopen what they corrected with change, on their authority, before or after.',
+      'Record what the owner said, in chat, about the questions agents settled (view attention with reason to_confirm, or for_owner in the handoff): that they have been put to the owner and answered, up to an event. It is the owner\u2019s word as you report it, logged as that, and never the mark that a human looked. Change or reopen what they corrected with change, on their authority, before or after.',
     input: {
       upto: z.number().int().nonnegative().describe('The upto the list gave: the newest settling the owner was shown.'),
       basis: z.string().min(1).describe('What the owner said and where, in their words: "Owner in chat, 12 Oct: all fine but the pricing one".'),

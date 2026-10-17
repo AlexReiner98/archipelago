@@ -2,6 +2,7 @@
 // (reads that write nothing), declared in its pack.json with JSON Schema inputs and run by its handler. The six
 // verbs are declared by the core pack the same way. Checked when the pack loads.
 
+import { REASONS } from './attention.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
 
 export interface VerbDef {
@@ -91,6 +92,11 @@ export interface PieceDef {
   fields?: string[];
   /** For a page the kernel still draws itself, until its pack draws it from pieces: its name. */
   page?: string;
+  /** Its own heading, where the screen's title is not it. */
+  title?: string;
+  /** For attention: whose ("me", or nobody for everyone) and which reasons; on an item's page, only what is that item's. */
+  person?: string;
+  reasons?: string[];
 }
 
 /** What a pack shows on the page of every item of the kinds or types it is on: one column of pieces. */
@@ -101,6 +107,8 @@ export interface ScreenDef {
   on?: string[];
   /** Offered for the nav: a page of its own there once the owner adds it. */
   nav?: boolean;
+  /** One of the kernel's own pages it draws: Home. */
+  at?: 'home';
   pieces: PieceDef[];
 }
 
@@ -108,7 +116,7 @@ export interface ScreenDef {
  * The pieces the kernel draws, each with what it must be told. A tree, a gate, proof, usage and a document draw the
  * kernel's views of the item; a figure is the picture it keeps; rows and a form are the pack's own view and action.
  */
-export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'] } as const;
+export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [] } as const;
 
 /** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
 export const PAGES = ['time'];
@@ -166,7 +174,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   for (const screen of pack.screens ?? []) {
     const at = `screen "${screen.id}"`;
     if (!own(screen.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
-    if (!screen.title || !(screen.on?.length || screen.nav) || !screen.pieces?.length) problems.push(`${at} needs a title, the kinds or types it is on or a place offered in the nav, and its pieces`);
+    if (!screen.title || !(screen.on?.length || screen.nav || screen.at) || !screen.pieces?.length) problems.push(`${at} needs a title, the kinds or types it is on or a place offered in the nav, and its pieces`);
     for (const t of screen.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);
     for (const piece of screen.pieces ?? []) {
       const needs: readonly string[] | undefined = PIECES[piece.piece];
@@ -176,6 +184,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (piece.view && !(pack.views ?? []).some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
       if (piece.action && !(pack.actions ?? []).some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
       if (piece.page && !PAGES.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}`);
+      for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
       if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a picture's style has no code: code runs only from a style kept on the map`);
     }
   }

@@ -5,7 +5,8 @@
 
 import { livesIn, SCOPE } from './places.ts';
 import type { Archipelago, Entity } from './pelago.ts';
-import { blockGraph, VIEWS } from './views.ts';
+import { blockGraph } from './blocking.ts';
+import { VIEWS } from './views.ts';
 
 /** The most items one read gives back. */
 const READ_LIMIT = 500;

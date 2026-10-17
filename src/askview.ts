@@ -5,6 +5,7 @@
 import type { ViewDef } from './declared.ts';
 import { hostFor } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
+import { REPLACED } from './attention.ts';
 import { setPackAsker, VIEWS } from './views.ts';
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);
@@ -36,6 +37,7 @@ export async function askView(l: Archipelago, actor: Actor, name: string, params
   const view = VIEWS[name];
   if (view) return view.run(l, params);
   const found = packView(l, name);
+  if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask view attention with params ${REPLACED[name]}.`);
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(l)).join(', ')}`);
   return (await hostFor(l.registry).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;
 }
