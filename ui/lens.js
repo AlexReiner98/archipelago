@@ -133,7 +133,8 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
     }
     host.answer = answer;
     const views = answer.views ?? [];
-    const empty = answer.items.length < 2;
+    // From an item, the item itself is one of them; over the whole map, there is no such one.
+    const empty = answer.items.length < (lens.from || lens.lens ? 2 : 1);
     if (empty && !views.length && quiet) return void ((host.closest('.lens-card') ?? host).hidden = true);
     const again = (change) => () => (Object.assign(place.ask, change), load());
     const pictures = views.filter((view) => !view.to);

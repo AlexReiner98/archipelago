@@ -66,3 +66,23 @@ test("the owner's own screen and their version of a preset", () => {
     { id: 'e_1', item: 'e_1', title: 'Mine', on: [], pieces: [{ piece: 'note', text: 'm' }], nav: 2 },
   ]);
 });
+
+test("a pack's screen for Home is on it until the owner takes it off, and can be put back", async () => {
+  const l = await map();
+  const onHome = async () => (await screens(l)).filter((s) => s.at === 'home').map((s) => s.id);
+  assert.deepEqual(await onHome(), ['home', 'software.releases', 'time.today'], "the core pack's first, then each pack's in the order they load");
+
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'screen', title: 'Today', status: 'current', props: { preset: 'time.today', home: false } }] })) as { created: Record<string, string> };
+  assert.deepEqual(await onHome(), ['home', 'software.releases']);
+  assert.deepEqual([(await one(l, 'time.today'))!.homeable, (await one(l, 'time.today'))!.at], [true, undefined], 'taken off, it is still listed, to be put back');
+  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: made.created.s, props: { home: null } }] });
+  assert.ok((await onHome()).includes('time.today'));
+});
+
+test("the owner's own screen is on Home only when they put it there", () => {
+  const kept = [
+    { id: 'e_1', title: 'Mine', is_open: true, props: { home: true, pieces: [{ piece: 'note' as const, text: 'm' }] } },
+    { id: 'e_2', title: 'Other', is_open: true, props: { nav: 1, pieces: [{ piece: 'note' as const, text: 'o' }] } },
+  ];
+  assert.deepEqual(overlay([], kept).map((s) => [s.id, s.at, s.homeable]), [['e_1', 'home', undefined], ['e_2', undefined, undefined]]);
+});

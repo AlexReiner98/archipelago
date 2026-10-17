@@ -167,6 +167,13 @@
   ],
   "views": [
     {
+      "id": "time.today",
+      "shape": "rows",
+      "limit_ms": 30000,
+      "description": "Today for Home: the owner's blocks today (time entries and the days routines fall on), in the order they fall, each with its hours and the work it is for, then how many planned blocks wait to be confirmed on the Time screen.",
+      "input": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
       "id": "time.timesheet",
       "shape": "data",
       "limit_ms": 30000,
@@ -195,6 +202,7 @@
     }
   ],
   "screens": [
+    { "id": "time.today", "title": "Today", "at": "home", "pieces": [{ "piece": "view", "view": "time.today" }] },
     { "id": "time.week", "title": "Time", "nav": true, "pieces": [{ "piece": "page", "page": "time" }] },
     { "id": "time.invoices", "title": "Invoices", "on": ["company"], "pieces": [{ "piece": "picture", "lens": { "kinds": ["time.invoice"], "far": 1 }, "style": { "shape": "boxes", "show": ["status"] } }] }
   ],

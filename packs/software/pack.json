@@ -226,6 +226,7 @@
     { "id": "software.ships", "extends": "relates_to", "title": "ships", "inverse": "ships in", "from": ["software.release"], "to": ["*"], "description": "What a release contains." }
   ],
   "screens": [
+    { "id": "software.releases", "title": "Releases", "at": "home", "pieces": [{ "piece": "picture", "lens": { "kinds": ["software.release"], "fold": ["closed", "system"] }, "style": { "shape": "boxes" } }] },
     { "id": "software.roadmap", "title": "Roadmap", "on": ["project"], "pieces": [{ "piece": "tree", "tree": "software.roadmap" }] },
     { "id": "software.proof", "title": "How we know", "on": ["project", "software.feature", "software.proof"], "pieces": [{ "piece": "proof" }] },
     { "id": "software.usage", "title": "Tokens used here", "on": ["software.repo"], "pieces": [{ "piece": "usage" }] }

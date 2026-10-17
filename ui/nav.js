@@ -33,8 +33,10 @@ export async function screenPage(id) {
   drawn.after();
 }
 
-/** Where a screen is: its place in the nav, or the kinds whose pages it is on. */
-const where = (s) => [typeof s.nav === 'number' && 'in the nav', s.on.length > 0 && `on ${s.on.map(typeTitle).join(', ')}`].filter(Boolean).join(' · ') || (s.offered ? 'offered for the nav' : 'not shown');
+/** Where a screen is: on Home, its place in the nav, or the kinds whose pages it is on. */
+const where = (s) =>
+  [s.at === 'home' && 'on Home', typeof s.nav === 'number' && 'in the nav', s.on.length > 0 && `on ${s.on.map(typeTitle).join(', ')}`].filter(Boolean).join(' · ') ||
+  (s.homeable ? 'taken off Home' : s.offered ? 'offered for the nav' : 'not shown');
 
 /** The Workspace card: every screen, and the switch that puts one in the nav or takes it out. */
 export function screensCard(then) {
@@ -55,6 +57,15 @@ export function screensCard(then) {
       ? write([{ op: 'update', id: s.item, props: { nav: last + 1 } }], `${s.title} put in the nav`)
       : write([{ op: 'create', type: 'screen', title: s.title, status: 'current', props: { preset: s.id, nav: last + 1 } }], `${s.title} added to the nav`);
   const remove = async (s) => (await ask({ title: `Take ${s.title} out of the nav?`, message: 'It stays here, to be put back.', action: 'Take out' })) && write([{ op: 'update', id: s.item, props: { nav: null } }], `${s.title} taken out of the nav`);
+  // On Home or off it: a preset for Home is on it unless the owner's version says false; their own screen only when it says true.
+  const home = (s, on) =>
+    s.item
+      ? write([{ op: 'update', id: s.item, props: { home: s.homeable ? (on ? null : false) : on || null } }], `${s.title} ${on ? 'put on' : 'taken off'} Home`)
+      : write([{ op: 'create', type: 'screen', title: s.title, status: 'current', props: { preset: s.id, home: on } }], `${s.title} ${on ? 'put on' : 'taken off'} Home`);
+  const homeButton = (s) =>
+    s.at === 'home'
+      ? h('button', { style: 'white-space: nowrap', title: 'It stays here, to be put back', onclick: () => home(s, false) }, 'Take off Home')
+      : s.homeable && h('button', { style: 'white-space: nowrap', title: 'Draw it on Home again, where its pack put it', onclick: () => home(s, true) }, 'Put on Home');
   // What could be a page in the nav: what is there, what a pack offers, and the owner's own.
   const navable = (s) => typeof s.nav === 'number' || Boolean(s.offered) || Boolean(s.item && !s.pack && !s.on.length);
   const row = (s) =>
@@ -65,9 +76,10 @@ export function screensCard(then) {
         'div',
         { class: 'row-top', style: 'flex-wrap: nowrap; align-items: center' },
         h('span', { class: 'grow gist', title: `${s.title}${s.pack ? `, from the ${s.pack} pack` : ''}: ${where(s)}` }, s.item ? h('a', { href: `#/e/${s.item}` }, h('strong', {}, s.title)) : h('strong', {}, s.title), ' ', h('span', { class: 'muted small' }, where(s))),
+        homeButton(s),
         navable(s) && (typeof s.nav === 'number' ? h('button', { style: 'white-space: nowrap', onclick: () => remove(s) }, 'Take out') : h('button', { style: 'white-space: nowrap', title: 'Give it a place in the nav, after the others', onclick: () => add(s) }, 'Add to nav')),
       ),
     );
-  const sorted = [...screens].sort((a, b) => (typeof a.nav === 'number' ? a.nav : 1e9) - (typeof b.nav === 'number' ? b.nav : 1e9) || Number(navable(b)) - Number(navable(a)));
-  return h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: 'hinted', title: 'Pages drawn from pieces: in the nav, or on every item of a kind. Packs offer them; you choose what shows.' }, 'Screens')), h('ul', { class: 'rows' }, sorted.map(row)));
+  const sorted = [...screens].sort((a, b) => Number(b.at === 'home' || Boolean(b.homeable)) - Number(a.at === 'home' || Boolean(a.homeable)) || (typeof a.nav === 'number' ? a.nav : 1e9) - (typeof b.nav === 'number' ? b.nav : 1e9) || Number(navable(b)) - Number(navable(a)));
+  return h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: 'hinted', title: 'Pages drawn from pieces: on Home, in the nav, or on every item of a kind. Packs offer them; you choose what shows.' }, 'Screens')), h('ul', { class: 'rows' }, sorted.map(row)));
 }

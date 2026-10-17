@@ -177,3 +177,18 @@ test('sessions at work at once take as few lanes as hold them', () => {
   const b = (id: string, from_hour: number, to_hour: number) => ({ id, from_hour, to_hour });
   assert.deepEqual(lanes([b('a', 9, 10), b('b', 9.5, 11), b('c', 10, 12), b('a', 13, 14)]).map((lane) => lane.map((x) => x.id)), [['a', 'a'], ['b'], ['c']], 'a session keeps to one lane all day');
 });
+
+test('today for Home: the owner’s blocks in the order they fall, and what waits to be confirmed', async () => {
+  const items: Item[] = [
+    ...MAP,
+    { id: 'late', type: 'time.entry', title: 'Late call', status: 'logged', props: { date: '2026-10-16', start: '2026-10-16T19:00:00Z', end: '2026-10-16T20:30:00Z' } },
+    { id: 'plan', type: 'time.entry', title: 'Site visit', status: 'planned', props: { date: '2026-10-13', start: '2026-10-13T13:00:00Z', end: '2026-10-13T15:00:00Z' } },
+  ];
+  const lens = { items: [{ id: 'deep', type: 'time.routine', title: 'Deep work', open: true, time: [{ start: '2026-10-16T13:00:00Z', end: '2026-10-16T15:00:00Z', by: 'repeat' }] }] };
+  const { ctx } = ctxOver(items, [...LINKS], lens);
+  const { answer } = await handler['time.today']({}, ctx);
+  const titles = answer.map((r: { title?: string } | string) => (typeof r === 'string' ? r : r.title));
+  assert.equal(titles[0], '9:00–11:00 Deep work', 'a routine’s day, at the hour it falls in Toronto');
+  assert.ok(titles.includes('15:00–16:30 Late call'));
+  assert.equal(titles.at(-1), '1 to confirm on Time');
+});

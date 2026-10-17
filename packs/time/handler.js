@@ -3,12 +3,14 @@
 // writes as one change set naming the action. It never writes itself.
 
 import { draftInvoice, log, payInvoice, timesheet, voidInvoice } from './money.js';
+import { todayRows } from './today.js';
 import { week } from './week.js';
 
 export default {
   'time.log': log,
   'time.timesheet': timesheet,
   'time.week': async (input, ctx) => ({ answer: await week(input, ctx) }),
+  'time.today': async (input, ctx) => ({ answer: await todayRows(input, ctx) }),
   'time.invoice_draft': draftInvoice,
   'time.invoice_paid': payInvoice,
   'time.invoice_void': voidInvoice,

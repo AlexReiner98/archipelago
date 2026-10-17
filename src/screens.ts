@@ -1,7 +1,8 @@
 // Screens as the page meets them: what the packs ship as presets, under what the owner has kept on the map. A screen
 // item with a preset's id is the owner's version of it (its fields over the preset's, retired to take it away); one
 // with none is the owner's own. A screen with a place in the nav is a page there; one on kinds or types is drawn on
-// the page of every such item. Read each time the schema is asked for, so a change shows on the next look.
+// the page of every such item; one on Home is drawn there, after those before it. A pack's screen for Home is on it
+// until the owner takes it off (home: false on their version), and can be put back. Read each time the schema is asked for, so a change shows on the next look.
 
 import type { PieceDef, ScreenDef } from './declared.ts';
 import type { Archipelago } from './pelago.ts';
@@ -20,15 +21,17 @@ export interface Screen {
   nav?: number;
   /** A preset the pack offers for the nav. */
   offered?: boolean;
-  /** One of the kernel's own pages it draws: Home. */
+  /** One of the kernel's own pages it is drawn on: Home. */
   at?: 'home';
+  /** A preset the pack made for Home, on it or taken off. */
+  homeable?: boolean;
 }
 
 interface Kept {
   id: string;
   title: string;
   is_open: boolean;
-  props: { pieces?: PieceDef[]; on?: string[]; nav?: number | null; preset?: string };
+  props: { pieces?: PieceDef[]; on?: string[]; nav?: number | null; home?: boolean | null; preset?: string };
 }
 
 const list = <T>(v: unknown): T[] | undefined => (Array.isArray(v) && v.length ? (v as T[]) : undefined);
@@ -49,7 +52,8 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[])
       ...(typeof k?.props.nav === 'number' && { nav: k.props.nav }),
       ...(k && { item: k.id }),
       ...(p.nav && { offered: true }),
-      ...(p.at && { at: p.at }),
+      ...((typeof k?.props.home === 'boolean' ? k.props.home : p.at === 'home') && { at: 'home' as const }),
+      ...(p.at === 'home' && { homeable: true }),
     });
   }
   const known = new Set(presets.map((p) => p.id));
@@ -58,7 +62,7 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[])
     const pieces = list<PieceDef>(k.props.pieces);
     // The owner's version of a preset whose pack is not here has nothing to draw until it is.
     if (!pieces) continue;
-    out.push({ id: k.id, item: k.id, title: k.title, on: list<string>(k.props.on) ?? [], pieces, ...(typeof k.props.nav === 'number' && { nav: k.props.nav }) });
+    out.push({ id: k.id, item: k.id, title: k.title, on: list<string>(k.props.on) ?? [], pieces, ...(typeof k.props.nav === 'number' && { nav: k.props.nav }), ...(k.props.home === true && { at: 'home' as const }) });
   }
   return out;
 }
