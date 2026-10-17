@@ -61,7 +61,7 @@ const shownOf = (l: Archipelago, type: string, props: Record<string, unknown>) =
 /** A document whole, as the one asking may see it. */
 export async function readDocument(l: Archipelago, id: string) {
   const doc = await l.entity(id);
-  if (!doc || !l.registry.isA(doc.type, 'document')) throw new Error(`"${id}" is not a document`);
+  if (!doc || !l.registry.drawnWith('document').includes(doc.type)) throw new Error(`"${id}" is not a document`);
   const items = new Map<string, Section>();
   const ids = sectionIds(doc.body);
   const pictured = new Set((await l.db.query<{ entity_id: string }>(`select entity_id from picture where entity_id = any($1::text[])`, [ids])).rows.map((r) => r.entity_id));
@@ -85,7 +85,7 @@ export const sharePath = (workspace: string, secret: string) => `/s/${workspace}
 /** A link to a document for someone with no login. The secret is in the path it returns, shown once. */
 export async function createShare(l: Archipelago, actor: Actor, id: string) {
   const doc = await l.entity(id);
-  if (!doc || !l.registry.isA(doc.type, 'document')) throw new Error(`"${id}" is not a document: only a document can be given as a link.`);
+  if (!doc || !l.registry.drawnWith('document').includes(doc.type)) throw new Error(`"${id}" is not a document: only a document can be given as a link.`);
   if (doc.archived_at) throw new Error(`"${doc.title}" is archived.`);
   const secret = randomBytes(24).toString('hex');
   const share = newId('s');

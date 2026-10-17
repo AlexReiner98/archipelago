@@ -11,13 +11,13 @@ type Link = { id: string; type: string; from: string; to: string };
 
 /** What each type is, as the kernel says it with every item read. */
 const LINEAGE: Record<string, string[]> = {
-  project: ['project', 'aim'],
-  task: ['task', 'work'],
+  'work.project': ['work.project', 'work'],
+  'work.task': ['work.task', 'work'],
   company: ['company', 'actor'],
   person: ['person', 'actor'],
   'software.repo': ['software.repo', 'place'],
   'time.entry': ['time.entry', 'occurrence'],
-  'time.invoice': ['time.invoice', 'document', 'record'],
+  'time.invoice': ['time.invoice', 'work.document', 'record'],
 };
 
 /** A context over fixtures: the reads the kernel answers (get, items, related, trail, view), at a fixed moment in Toronto. */
@@ -69,8 +69,8 @@ function ctxOver(items: Item[], links: Link[], lens: unknown = { items: [] }, no
 const MAP: Item[] = [
   { id: 'me', type: 'company', title: 'Aperture Design Tools Inc.', props: { address: '1 King St' } },
   { id: 'nw', type: 'company', title: 'Northwind', props: { rate: 80, hst: true, terms_days: 30, billed_by: 'me' } },
-  { id: 'p', type: 'project', title: 'Northwind research' },
-  { id: 't', type: 'task', title: 'Funding research' },
+  { id: 'p', type: 'work.project', title: 'Northwind research' },
+  { id: 't', type: 'work.task', title: 'Funding research' },
   { id: 'e1', type: 'time.entry', title: 'Read the program', status: 'logged', props: { date: '2026-10-14', hours: 3 } },
   { id: 'e2', type: 'time.entry', title: 'Call with Sam', status: 'logged', props: { date: '2026-10-15', start: '2026-10-15T13:00:00Z', end: '2026-10-15T14:30:00Z', hours: 9 } },
   { id: 'e3', type: 'time.entry', title: 'Internal', status: 'logged', props: { date: '2026-10-15', hours: 2, billable: false } },
@@ -139,7 +139,7 @@ test('a payment in part says the invoice was sent; voiding frees its entries', a
 test('the week draws the owner’s blocks, routine days and the agents’ stretches from the kernel’s time axis', async () => {
   const items: Item[] = [
     ...MAP,
-    { id: 'ar', type: 'project', title: 'Archipelago' },
+    { id: 'ar', type: 'work.project', title: 'Archipelago' },
     { id: 'repo', type: 'software.repo', title: 'Archipelago repo' },
     { id: 'late', type: 'time.entry', title: 'Late night', status: 'logged', props: { date: '2026-10-16', start: '2026-10-17T03:00:00Z', end: '2026-10-17T05:00:00Z' } },
     { id: 'plan', type: 'time.entry', title: 'Site visit', status: 'planned', props: { date: '2026-10-13', start: '2026-10-13T13:00:00Z', end: '2026-10-13T15:00:00Z' } },

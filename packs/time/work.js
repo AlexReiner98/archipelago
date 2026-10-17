@@ -91,13 +91,13 @@ export class Reader {
     // Work that has been archived counts toward nothing.
     if (!self || self.archived_at) return this.projects.set(id, null), null;
     const chain = [...(await this.read({ trail: id })), self];
-    let project = chain.find((c) => isA(c, 'project'))?.id ?? null;
+    let project = chain.find((c) => isA(c, 'work.project'))?.id ?? null;
     if (!project) {
       // A place it sits in comes before one it only lives in.
       const places = chain.filter((c) => isA(c, 'place')).reverse();
       for (const c of [...chain].reverse()) for (const p of await this.read({ related: c.id, relation: 'lives_in' })) if (isA(p, 'place') && !places.some((x) => x.id === p.id)) places.push(p);
       for (const place of places) {
-        const living = (await this.read({ related: place.id, relation: 'lives_in', direction: 'in' })).filter((e) => isA(e, 'project')).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+        const living = (await this.read({ related: place.id, relation: 'lives_in', direction: 'in' })).filter((e) => isA(e, 'work.project')).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
         if (living.length) {
           project = living[0].id;
           break;

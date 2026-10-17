@@ -70,7 +70,7 @@ test('with auth off, one workspace and the surface decides who is calling', asyn
   assert.equal((await call('/api/workspace_info')).result.owner, null, 'a new workspace has no owner');
   assert.equal((await call('/api/init', undefined, { name: 'Alex' })).status, 200, '/api is the human');
   assert.equal((await call('/api/workspace_info')).result.owner.title, 'Alex');
-  const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'note', title: 'N' }] });
+  const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'N' }] });
   assert.equal(proposed.result.status, 'proposed', '/agent is an agent');
   assert.match((await call('/agent/decide', undefined, { proposal: proposed.result.proposal, approve: true })).error, /humans only/);
   const who = await call('/whoami', undefined, undefined, 'GET');
@@ -107,7 +107,7 @@ test('a token fixes identity and authority, whichever surface is used', async ()
   assert.match(made.result.note, /cannot be shown again/);
 
   // An agent token is an agent on every surface, including the one the CLI uses.
-  const proposed = await call('/api/change', agent, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'From the agent' }] });
+  const proposed = await call('/api/change', agent, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'From the agent' }] });
   assert.equal(proposed.result.status, 'proposed');
   assert.match((await call('/api/decide', agent, { proposal: proposed.result.proposal, approve: true })).error, /humans only/);
   assert.match((await call('/api/token_create', agent, { kind: 'human', name: 'sneaky' })).error, /humans only/);
@@ -155,8 +155,8 @@ test('each workspace is its own database: tokens, data and local types do not cr
   assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.map((w: any) => w.id), ['default', 'acme']);
   assert.equal((await call('/api/search', operator)).status, 401, 'the operator cannot read any map');
 
-  await call('/api/change', mine, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'My secret plan' }] });
-  await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Acme bid' }] });
+  await call('/api/change', mine, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'My secret plan' }] });
+  await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'Acme bid' }] });
   const titles = async (token: string) => ((await call('/api/search', token)).result as any[]).map((e) => e.title);
   assert.deepEqual(await titles(mine), ['My secret plan']);
   assert.deepEqual(await titles(theirs), ['Acme bid']);
@@ -182,7 +182,7 @@ test('inside a workspace, private things are hidden from other members by the da
     if (r.status !== 200) throw new Error(r.error);
     return r.result;
   };
-  const titles = async (token: string, type = 'task') => ((await api(token, 'search', { type })) as any[]).map((e) => e.title).sort();
+  const titles = async (token: string, type = 'work.task') => ((await api(token, 'search', { type })) as any[]).map((e) => e.title).sort();
 
   // The first admin becomes a person; then adds a colleague.
   const me = (await api(alex, 'init', { name: 'Alex' })).me;
@@ -192,13 +192,13 @@ test('inside a workspace, private things are hidden from other members by the da
 
   // New things are private to their author unless they say otherwise.
   const mine = await api(alex, 'change', { reason: 'x', ops: [
-    { op: 'create', ref: 'p', type: 'project', title: 'Launch', visibility: 'shared' },
-    { op: 'create', ref: 's', type: 'task', title: 'Shared task', visibility: 'shared', owner: me },
-    { op: 'create', ref: 'x', type: 'task', title: 'Alex private', owner: me },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Launch', visibility: 'shared' },
+    { op: 'create', ref: 's', type: 'work.task', title: 'Shared task', visibility: 'shared', owner: me },
+    { op: 'create', ref: 'x', type: 'work.task', title: 'Alex private', owner: me },
     { op: 'link', type: 'part_of', from: 's', to: 'p' },
     { op: 'link', type: 'part_of', from: 'x', to: 'p' },
   ] });
-  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Sam private', owner: added.person }] });
+  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Sam private', owner: added.person }] });
   assert.deepEqual(await titles(alex), ['Alex private', 'Shared task']);
   assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
 
@@ -235,7 +235,7 @@ test('inside a workspace, private things are hidden from other members by the da
   // Someone's agent acts for them: it sees what they see and proposes to them alone.
   const samAgent = (await api(sam, 'token_create', { kind: 'agent', name: 'sam-claude' })).token as string;
   assert.deepEqual(await titles(samAgent), ['Sam private', 'Shared task']);
-  const proposed = await api(samAgent, 'change', { reason: 'From Sam\'s inbox', ops: [{ op: 'create', type: 'task', title: 'Reply to the client' }] });
+  const proposed = await api(samAgent, 'change', { reason: 'From Sam\'s inbox', ops: [{ op: 'create', type: 'work.task', title: 'Reply to the client' }] });
   assert.equal((await api(alex, 'proposals')).length, 0, 'not Alex\'s to review');
   assert.equal((await api(sam, 'proposals')).length, 1);
   assert.match((await call('/api/decide', alex, { proposal: proposed.proposal, approve: true })).error, /No proposal/);
@@ -257,7 +257,7 @@ test('inside a workspace, private things are hidden from other members by the da
 
   // A team that prefers openness can flip the default.
   await api(alex, 'workspace_set', { default_visibility: 'shared' });
-  await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Open by default' }] });
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Open by default' }] });
   assert.ok((await titles(sam)).includes('Open by default'));
 });
 
@@ -275,22 +275,22 @@ test('nothing can depend on a private item from outside it, and a held resource 
   const sam = (await api(alex, 'member_add', { name: 'Sam' })).token as string;
 
   const made = (await api(alex, 'change', { reason: 'x', ops: [
-    { op: 'create', ref: 'pub', type: 'task', title: 'Public task', visibility: 'shared' },
-    { op: 'create', ref: 'priv', type: 'task', title: 'Private prep' },
-    { op: 'create', ref: 'priv2', type: 'task', title: 'Private follow-up' },
-    { op: 'create', ref: 'base', type: 'task', title: 'Shared base', visibility: 'shared' },
+    { op: 'create', ref: 'pub', type: 'work.task', title: 'Public task', visibility: 'shared' },
+    { op: 'create', ref: 'priv', type: 'work.task', title: 'Private prep' },
+    { op: 'create', ref: 'priv2', type: 'work.task', title: 'Private follow-up' },
+    { op: 'create', ref: 'base', type: 'work.task', title: 'Shared base', visibility: 'shared' },
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane', visibility: 'shared' },
-    { op: 'create', ref: 'live', type: 'task', title: 'Live work', visibility: 'shared' },
+    { op: 'create', ref: 'live', type: 'work.task', title: 'Live work', visibility: 'shared' },
     { op: 'link', type: 'depends_on', from: 'priv2', to: 'priv' },
     { op: 'link', type: 'depends_on', from: 'priv', to: 'base' },
-    { op: 'create', ref: 'other', type: 'task', title: 'Other live work', visibility: 'shared' },
+    { op: 'create', ref: 'other', type: 'work.task', title: 'Other live work', visibility: 'shared' },
     { op: 'link', type: 'needs', from: 'live', to: 'lane' },
     { op: 'link', type: 'needs', from: 'other', to: 'lane' },
   ] })).created;
 
   // A shared item cannot wait on a private one: colleagues would see it as ready.
   assert.match(await refused(alex, [{ op: 'link', type: 'depends_on', from: made.pub, to: made.priv }]), /"Public task" is shared, so it cannot depend on "Private prep", which is private/);
-  assert.match(await refused(alex, [{ op: 'create', ref: 'n', type: 'task', title: 'New shared', visibility: 'shared' }, { op: 'link', type: 'depends_on', from: 'n', to: made.priv }]), /cannot depend on "Private prep"/);
+  assert.match(await refused(alex, [{ op: 'create', ref: 'n', type: 'work.task', title: 'New shared', visibility: 'shared' }, { op: 'link', type: 'depends_on', from: 'n', to: made.priv }]), /cannot depend on "Private prep"/);
   // Private on private (same person) and private on shared are both fine: they were created above.
   // A looser relation is not a dependency, so it is allowed.
   await api(alex, 'change', { reason: 'x', ops: [{ op: 'link', type: 'relates_to', from: made.pub, to: made.priv }] });
@@ -301,7 +301,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
 
   // Something others depend on cannot be made private, even when the dependent is hidden from you.
   assert.match(await refused(alex, [{ op: 'update', id: made.priv, visibility: 'private' }]), /cannot be made private while other work depends on it: "Private follow-up"/);
-  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'mine', type: 'task', title: 'Sam secret' }, { op: 'link', type: 'depends_on', from: 'mine', to: made.base }] });
+  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'mine', type: 'work.task', title: 'Sam secret' }, { op: 'link', type: 'depends_on', from: 'mine', to: made.base }] });
   const hidden = await refused(alex, [{ op: 'update', id: made.base, visibility: 'private' }]);
   assert.match(hidden, /"Private prep", 1 item private to someone else/);
   assert.ok(!hidden.includes('Sam secret'), 'the hidden dependent is counted, not named');
@@ -390,12 +390,12 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   const shown = (await call('/api/pulse')).result.focus;
   assert.deepEqual([shown.hash, shown.actor, shown.note], ['roadmap/e_x', 'robot', 'Look here']);
 
-  await call('/agent/change', undefined, { actor: 'robot', reason: 'A note', ops: [{ op: 'create', type: 'note', title: 'N' }] });
+  await call('/agent/change', undefined, { actor: 'robot', reason: 'A note', ops: [{ op: 'create', type: 'work.note', title: 'N' }] });
   const proposed = (await call('/api/pulse')).result.focus;
   assert.deepEqual([proposed.hash, proposed.note], ['review', 'A note'], 'a change that waits for review points at Review');
   assert.ok(proposed.at >= shown.at);
 
-  await call('/api/change', undefined, { reason: 'mine', ops: [{ op: 'create', type: 'note', title: 'M' }] });
+  await call('/api/change', undefined, { reason: 'mine', ops: [{ op: 'create', type: 'work.note', title: 'M' }] });
   assert.equal((await call('/api/pulse')).result.focus.hash, 'review', 'the human\'s own changes do not move their screen');
 
   // Every step an agent takes is kept, the last few of them, each with its kind: the page follows the kinds the person chose.
@@ -425,7 +425,7 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
 
 test('an agent hears what the human does: by waiting for it, and with the owner\'s next message', async () => {
   const { call } = await serve('off');
-  const made = await call('/api/change', undefined, { reason: 'seed', ops: [{ op: 'create', type: 'decision', title: 'Which?' }] });
+  const made = await call('/api/change', undefined, { reason: 'seed', ops: [{ op: 'create', type: 'work.decision', title: 'Which?' }] });
   const id = made.result.created['#1'];
   const { latest } = (await call('/agent/watch')).result;
   assert.deepEqual((await call('/agent/watch', undefined, { after: latest })).result.changes, [], 'nothing yet, and no waiting when none is asked for');
@@ -435,14 +435,14 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   const waiting = call('/agent/watch', undefined, { after: latest, wait_seconds: 20 });
   await new Promise((r) => setTimeout(r, 300));
   assert.equal((await call('/api/pulse')).result.listening, 1, 'the UI can see someone is listening');
-  await call('/agent/change', undefined, { actor: 'robot', reason: 'noise', ops: [{ op: 'create', type: 'note', title: 'An agent\'s own change' }] });
+  await call('/agent/change', undefined, { actor: 'robot', reason: 'noise', ops: [{ op: 'create', type: 'work.note', title: 'An agent\'s own change' }] });
   await call('/api/change', undefined, { reason: 'Decided in the UI', ops: [{ op: 'update', id, status: 'decided', props: { outcome: 'This one' } }] });
   const heard = (await waiting).result;
   assert.deepEqual([heard.changes.length, heard.changes[0].target.title, heard.changes[0].changes['props.outcome'].to], [1, 'Which?', 'This one'], 'woken by the human\'s change, not the agent\'s');
   assert.equal((await call('/api/pulse')).result.listening, 0);
 
   const told = await call('/hooks/prompt', undefined, { session_id: 's1' });
-  assert.match(told.hookSpecificOutput.additionalContext, /entity\.update decision "Which\?".*props\.outcome: nothing -> "This one"/s);
+  assert.match(told.hookSpecificOutput.additionalContext, /entity\.update work\.decision "Which\?".*props\.outcome: nothing -> "This one"/s);
   assert.deepEqual(await call('/hooks/prompt', undefined, { session_id: 's1' }), { status: 200 }, 'told once');
 
   // A session that began before this server did has lived through a restart: it is told, once, that its tools may be old.
@@ -842,7 +842,7 @@ test('the operator can create a workspace from a backup file: the map, its types
   assert.deepEqual(tokens.filter((t) => !t.revoked_at).map((t) => t.name), ['owner']);
 
   // It carries on from there, and the original is untouched.
-  await call('/api/change', made.owner_token, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Written after the move' }] });
+  await call('/api/change', made.owner_token, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'Written after the move' }] });
   assert.equal(((await call('/api/search', old, { q: 'Written after the move' })).result as any[]).length, 0);
   assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup })).error, /already exists/);
 });
@@ -874,7 +874,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   // Where the file comes from: another map, with a type of its own and things its owner did.
   const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
-  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'task', title: 'Order the stone' }] });
+  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'work.task', title: 'Order the stone' }] });
   const laptop = await workspaces.get('laptop');
   const taken = await dump(laptop.pelago.db, { id: 'laptop', name: 'Laptop' }, JSON.parse(readFileSync(join(workspaces.config.rootDir, 'laptop', 'local-pack', 'pack.json'), 'utf8')));
   const backup = gzipSync(JSON.stringify(taken)).toString('base64');
@@ -883,7 +883,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   const admin = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const member = (await call('/api/member_add', admin, { name: 'Sam' })).result.token as string;
   const robot = (await createToken(main.pelago.db, 'default', { kind: 'agent', name: 'robot' })).token;
-  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Already here', visibility: 'shared' }] });
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'Already here', visibility: 'shared' }] });
   assert.match((await call('/api/import_backup', member, { backup })).error, /Only a workspace admin/);
   assert.match((await call('/agent/import_backup', robot, { backup })).error, /humans only/);
   assert.match((await call('/api/import_backup', admin, { backup: 'bm90IGEgYmFja3Vw' })).error, /not an Archipelago backup/);
@@ -908,13 +908,13 @@ test('an import can make the owner in the file and the owner here one person, an
   const operator = workspaces.ensureOperator()!;
   const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
   const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
-  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'From the laptop', owner: theirs }] });
+  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'From the laptop', owner: theirs }] });
   const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).pelago.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');
 
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const mine = (await call('/api/init', alex, { name: 'Alex R' })).result.me as string;
-  await call('/api/change', alex, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Mine alone' }] });
+  await call('/api/change', alex, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Mine alone' }] });
 
   const preview = (await call('/api/import_backup', alex, { backup })).result;
   assert.deepEqual(preview.owners, { here: { id: mine, title: 'Alex R' }, file: { id: theirs, title: 'Alex Reiner' }, made_one: false });
@@ -927,7 +927,7 @@ test('an import can make the owner in the file and the owner here one person, an
   assert.deepEqual([done.owners.made_one, done.entities.added], [true, 0]);
   assert.equal((await call('/whoami', alex, undefined, 'GET')).actor.person, theirs, 'the token is now the person from the file');
   assert.equal((await call('/api/workspace_info', alex)).result.owner.id, theirs, 'who owns the workspace');
-  const tasks = ((await call('/api/search', alex, { type: 'task' })).result as any[]).map((e) => e.title).sort();
+  const tasks = ((await call('/api/search', alex, { type: 'work.task' })).result as any[]).map((e) => e.title).sort();
   assert.deepEqual(tasks, ['From the laptop', 'Mine alone'], 'and still sees what was private to them');
   const people = ((await call('/api/search', alex, { type: 'person' })).result as any[]).map((e) => e.title);
   assert.deepEqual(people, ['Alex Reiner'], 'one person, not two');
@@ -944,8 +944,8 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
       reason: 'x',
       ops: [
         { op: 'create', ref: 'r', type: 'software.repo', title: 'Site repo', visibility: 'shared', props: { remote: 'https://github.com/Acme/Site.git' } },
-        { op: 'create', ref: 't', type: 'task', title: 'Fix the footer', visibility: 'shared' },
-        { op: 'create', ref: 'd', type: 'decision', title: 'Which font?', visibility: 'shared' },
+        { op: 'create', ref: 't', type: 'work.task', title: 'Fix the footer', visibility: 'shared' },
+        { op: 'create', ref: 'd', type: 'work.decision', title: 'Which font?', visibility: 'shared' },
         { op: 'link', type: 'software.lives_in', from: 't', to: 'r' },
       ],
     })
@@ -1032,7 +1032,7 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   assert.equal((await deliver(null, { raw: 'ref=x', form: true })).status, 400);
 
   // Only what a commit says in its own words counts: not a denial, a quotation or a revert.
-  const header = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'h', type: 'task', title: 'Fix the header', visibility: 'shared' }] })).result.created.h;
+  const header = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'h', type: 'work.task', title: 'Fix the header', visibility: 'shared' }] })).result.created.h;
   for (const message of [
     `Start on the header\n\nThis does not fix ${header} yet.`,
     `Header, first half\n\nOnly partly fixes ${header}`,
@@ -1133,12 +1133,12 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.equal(heard.reading, false, 'without a key a push is recorded and not read');
   assert.match((await call('/agent/github_app', robot, { key: 'sk-ant-' + 'x'.repeat(30) })).error, /humans only/);
   // Something that is not this repository's: the reader is held to the repository it reads, whatever it is told there.
-  const outside = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Pay the invoice' }] })).result.created['#1'];
+  const outside = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Pay the invoice' }] })).result.created['#1'];
   const asks: any[] = [];
   const script = [
     { stop_reason: 'tool_use', content: [{ type: 'text', text: 'Reading the push.' }, { type: 'tool_use', id: 'tu_1', name: 'commits', input: { base: 'a'.repeat(40), head: 'b'.repeat(40) } }, { type: 'tool_use', id: 'tu_2', name: 'view', input: { name: 'repo_work', params: { repo: 'acme/tools' } } }, { type: 'tool_use', id: 'tu_3', name: 'no_such_tool', input: {} }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }, { op: 'update', id: outside, title: 'Steered by a file in the repository' }] } }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }] } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }, { op: 'update', id: outside, title: 'Steered by a file in the repository' }] } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }] } }] },
     { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Made one task: Oil the whetstone.' }] },
   ];
   configureReader((key) => async (params) => {
@@ -1232,9 +1232,9 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
       ops: [
         { op: 'create', ref: 'r', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site' } },
         { op: 'create', ref: 'other', type: 'software.repo', title: 'Books repo', props: { remote: 'https://github.com/acme/books' } },
-        { op: 'create', ref: 'p', type: 'project', title: 'Site' },
-        { op: 'create', ref: 't', type: 'task', title: 'Fix the footer' },
-        { op: 'create', ref: 'o', type: 'task', title: 'Close the year' },
+        { op: 'create', ref: 'p', type: 'work.project', title: 'Site' },
+        { op: 'create', ref: 't', type: 'work.task', title: 'Fix the footer' },
+        { op: 'create', ref: 'o', type: 'work.task', title: 'Close the year' },
         { op: 'link', type: 'software.lives_in', from: 'p', to: 'r' },
         { op: 'link', type: 'part_of', from: 't', to: 'p' },
       ],
@@ -1255,8 +1255,8 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
   assert.equal((await call('/agent/get', site, { id: made.o })).result.entity.title, 'Close the year');
   assert.equal((await change(free, [{ op: 'update', id: made.o, status: 'doing' }])).result.status, 'proposed', 'a token with no limit is as before');
   // What it makes has to be tied into that work in the same change; then it may be.
-  assert.match((await change(site, [{ op: 'create', type: 'task', title: 'Loose' }])).error, /made without being tied to anything there/);
-  assert.equal((await change(site, [{ op: 'create', ref: 'n', type: 'task', title: 'Test the footer' }, { op: 'create', ref: 'q', type: 'decision', title: 'Which footer?' }, { op: 'link', type: 'part_of', from: 'n', to: made.p }, { op: 'link', type: 'depends_on', from: 'n', to: 'q' }])).result.status, 'proposed');
+  assert.match((await change(site, [{ op: 'create', type: 'work.task', title: 'Loose' }])).error, /made without being tied to anything there/);
+  assert.equal((await change(site, [{ op: 'create', ref: 'n', type: 'work.task', title: 'Test the footer' }, { op: 'create', ref: 'q', type: 'work.decision', title: 'Which footer?' }, { op: 'link', type: 'part_of', from: 'n', to: made.p }, { op: 'link', type: 'depends_on', from: 'n', to: 'q' }])).result.status, 'proposed');
   // It may say its work waits on something outside, but not hang anything on what is outside, nor merge, archive or retype the map.
   assert.equal((await change(site, [{ op: 'link', type: 'depends_on', from: made.t, to: made.o }])).result.status, 'proposed');
   assert.match((await change(site, [{ op: 'link', type: 'depends_on', from: made.o, to: made.t }])).error, /cannot change what it is linked to/);
@@ -1354,18 +1354,18 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
   const change = (token: string, ops: unknown[], authority?: unknown) => call(token === admin ? '/api/change' : '/agent/change', token, { reason: 'x', ops, authority });
   const made = (await change(admin, [
-    { op: 'create', ref: 'a', type: 'task', title: 'Paint the fence', visibility: 'shared' },
-    { op: 'create', ref: 'b', type: 'task', title: 'Paint the fence again', visibility: 'shared' },
-    { op: 'create', ref: 'd', type: 'decision', title: 'Which colour?', visibility: 'shared' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'Paint the fence', visibility: 'shared' },
+    { op: 'create', ref: 'b', type: 'work.task', title: 'Paint the fence again', visibility: 'shared' },
+    { op: 'create', ref: 'd', type: 'work.decision', title: 'Which colour?', visibility: 'shared' },
   ])).result.created;
 
   assert.equal((await call('/api/workspace_info', admin)).result.agent_changes, 'hold', 'held unless the workspace says otherwise');
-  assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'One', visibility: 'shared' }])).result.status, 'proposed');
+  assert.equal((await change(robot, [{ op: 'create', type: 'work.note', title: 'One', visibility: 'shared' }])).result.status, 'proposed');
   assert.match((await call('/api/workspace_set', member, { agent_changes: 'apply' })).error, /admin/);
   assert.match((await call('/agent/workspace_set', robot, { agent_changes: 'apply' })).error, /humans only/, 'an agent cannot let itself through');
 
   assert.equal((await call('/api/workspace_set', admin, { agent_changes: 'apply' })).result.agent_changes, 'apply');
-  const applied = (await change(robot, [{ op: 'create', type: 'note', title: 'Two', visibility: 'shared' }])).result;
+  const applied = (await change(robot, [{ op: 'create', type: 'work.note', title: 'Two', visibility: 'shared' }])).result;
   assert.equal(applied.status, 'applied');
   assert.equal((await change(robot, [{ op: 'merge', keep: made.a, drop: made.b }])).result.status, 'applied', 'merging too');
   assert.equal((await change(robot, [{ op: 'archive', id: made.a }])).result.status, 'applied', 'and archiving');
@@ -1388,10 +1388,10 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const said = (await call('/agent/confirmed', robot, { upto: asked.to_confirm.upto, basis: 'Alex, in chat on 9 Oct: "yes, green"' })).result;
   assert.deepEqual([said.questions, said.left], [1, 0]);
   // What an agent settled on its own judgment comes first and is counted apart: it is what the owner has not seen.
-  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
+  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'work.decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
   await change(robot, [{ op: 'update', id: guessed.d, status: 'decided', props: { outcome: 'The wide one', rationale: 'It is the one we have.' } }], word);
   await change(robot, [{ op: 'update', id: guessed.h, status: 'refuted' }], { of: 'agent', basis: 'A month of photos' });
-  await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }]);
+  await change(robot, [{ op: 'create', type: 'work.note', title: 'Three', visibility: 'shared' }]);
   const sorted = await toConfirm();
   assert.deepEqual([sorted.to_confirm.on_agents_judgment, sorted.to_confirm.on_owners_word, sorted.items.map((q: any) => q.title)], [1, 1, ['Green fades', 'Which brush?']]);  const relayed = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).find((e) => e.action === 'questions.confirmed');
   assert.deepEqual(relayed.detail.authority, { of: 'human', basis: 'Alex, in chat on 9 Oct: "yes, green"', stated_by: 'agent:robot/script' });
@@ -1406,7 +1406,7 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   assert.deepEqual(await authorityOf(made.d), onWord);
   assert.deepEqual(await authorityOf(guess), { of: 'agent', who: 'agent:robot/script', basis: 'Two weeks of photos' });
   assert.deepEqual(await authorityOf(applied.created['#1']), { of: 'agent', who: 'agent:robot/script' }, 'unsaid, it is the agent\u2019s own');
-  const mine = (await change(admin, [{ op: 'create', ref: 'n', type: 'note', title: 'Mine', visibility: 'shared' }], { of: 'agent' })).result.created.n;
+  const mine = (await change(admin, [{ op: 'create', ref: 'n', type: 'work.note', title: 'Mine', visibility: 'shared' }], { of: 'agent' })).result.created.n;
   assert.deepEqual([(await authorityOf(mine)).of, /alex/.test((await authorityOf(mine)).who)], ['human', true], 'a human\u2019s own change is theirs, whatever it claims');
 
   // What was applied is on the record, with who made it, and can be put back.
@@ -1417,10 +1417,10 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   assert.match((await call('/agent/seen', robot, { upto: logged[0].seq })).error, /humans only/);
   assert.equal((await call('/api/seen', admin, { upto: logged[0].seq })).result.seen_upto, logged[0].seq);
   const looked = ((await call('/api/events', admin, { limit: 5 })).result as any[]).find((e) => e.action === 'changes.seen');
-  assert.deepEqual([looked.detail.upto, /alex/.test(looked.actor), logged[0].target_type], [logged[0].seq, true, 'note']);
+  assert.deepEqual([looked.detail.upto, /alex/.test(looked.actor), logged[0].target_type], [logged[0].seq, true, 'work.note']);
 
   await call('/api/workspace_set', admin, { agent_changes: 'hold' });
-  assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
+  assert.equal((await change(robot, [{ op: 'create', type: 'work.note', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
   const [held] = (await call('/api/proposals', admin)).result as any[];
   const let_in = (await call('/api/decide', admin, { proposal: held.id, approve: true })).result;
   const by = (await authorityOf(Object.values(let_in.created)[0] as string)) as any;
@@ -1434,7 +1434,7 @@ test('a product\u2019s public page is open to anyone, and says nothing until som
   const made = await call('/api/change', undefined, {
     reason: 'x',
     ops: [
-      { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'An internal note' },
+      { op: 'create', ref: 'app', type: 'work.project', title: 'App', body: 'An internal note' },
       { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
       { op: 'link', type: 'part_of', from: 'sun', to: 'app' },
     ],
@@ -1624,8 +1624,8 @@ test('a link to a document opens its page and its text with no login, until it i
   const made = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'n', type: 'note', title: 'IRAP', body: 'Call first.' },
-      { op: 'create', ref: 'd', type: 'document', title: 'Funding', body: 'Intro.\n\n{n}' },
+      { op: 'create', ref: 'n', type: 'work.note', title: 'IRAP', body: 'Call first.' },
+      { op: 'create', ref: 'd', type: 'work.document', title: 'Funding', body: 'Intro.\n\n{n}' },
     ],
   });
   const { d } = made.result.created;
@@ -1649,7 +1649,7 @@ test('a link to a document opens its page and its text with no login, until it i
   assert.equal((await fetch(`${base}/read/not-an-id`)).status === 200, false);
   // A section's figure is shown through the link; a figure of anything the document does not bring in is not.
   const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
-  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'note', title: 'Not in it' }] })).result.created.o;
+  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'work.note', title: 'Not in it' }] })).result.created.o;
   for (const id of [made.result.created.n, other]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: png, content_type: 'image/png' })).status, 200);
   assert.match((await call('/api/picture_put', undefined, { result: d, data: png, content_type: 'image/png' })).error, /not a test result, a note, a file or a lens/);
   const pictured = (await (await fetch(`${base}${link.path}/data`)).json()) as { parts: { section?: { picture: boolean } }[] };

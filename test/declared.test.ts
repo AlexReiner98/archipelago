@@ -40,7 +40,7 @@ test("a pack's action and view are offered as tools and run by its handler", asy
   assert.match(tools.get('demo_plan_visit')!.description, /capture, from the demo pack/);
   assert.ok(tools.get('demo_visits'), 'the view is a tool');
   assert.ok(tools.get('search'), "the kernel's tools are still there");
-  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Survey' }] })) as { created: Record<string, string> };
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Survey' }] })) as { created: Record<string, string> };
   const done = (await callTool(l, human, 'demo_plan_visit', { task: made.created.t, site: 'Mill' })) as { status: string };
   assert.equal(done.status, 'applied');
   assert.deepEqual(await callTool(l, human, 'demo_visits', { site: 'Mill' }), ['Visit Mill']);
@@ -49,7 +49,7 @@ test("a pack's action and view are offered as tools and run by its handler", asy
 
 test('a token limited to some work may call a pack view but not its action', async () => {
   const l = await map();
-  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'r', type: 'software.repo', title: 'Repo' }, { op: 'create', ref: 't', type: 'task', title: 'Survey' }] })) as { created: Record<string, string> };
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'r', type: 'software.repo', title: 'Repo' }, { op: 'create', ref: 't', type: 'work.task', title: 'Survey' }] })) as { created: Record<string, string> };
   const limited: Actor = { kind: 'agent', name: 'limited', repos: [made.created.r] };
   assert.deepEqual(await callTool(l, limited, 'demo_visits', { site: 'Mill' }), []);
   await assert.rejects(callTool(l, limited, 'demo_plan_visit', { task: made.created.t, site: 'Mill' }), /cannot call demo_plan_visit/);
@@ -67,13 +67,13 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   type Described = { screens: { id: string; pack: string; on: string[]; pieces: { piece: string; tree?: string }[] }[]; pack_tools: { tool: string; on?: string[]; item?: string; input?: unknown }[]; types: { id: string; public?: boolean }[] };
   const schema = l.registry.describe() as unknown as Described;
   const roadmap = schema.screens.find((s) => s.id === 'software.roadmap')!;
-  assert.deepEqual([roadmap.pack, roadmap.on, roadmap.pieces], ['software', ['project'], [{ piece: 'tree', tree: 'software.roadmap' }]]);
+  assert.deepEqual([roadmap.pack, roadmap.on, roadmap.pieces], ['software', ['work.project'], [{ piece: 'tree', tree: 'software.roadmap' }]]);
   // What a page needs to draw a pack action's form: what it is on and its input.
   const plan = schema.pack_tools.find((t) => t.tool === 'demo_plan_visit')!;
   assert.deepEqual(plan.on, ['work']);
   assert.ok(plan.input, 'the form is drawn from its input');
   // What can be made public is said by the types themselves, and a flavour inherits it.
-  assert.deepEqual(schema.types.filter((t) => t.public).map((t) => t.id).sort(), ['project', 'software.feature', 'software.proof', 'software.release', 'software.test', 'software.test_result']);
+  assert.deepEqual(schema.types.filter((t) => t.public).map((t) => t.id).sort(), ['software.feature', 'software.proof', 'software.release', 'software.test', 'software.test_result', 'work.project']);
 
   const dir = packs();
   const bad = (screens: unknown[]) => {
@@ -81,12 +81,12 @@ test('screens are declared in pack files, checked when the pack loads, and liste
     return () => new Registry(dir);
   };
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['nothing'], pieces: [{ piece: 'gate' }] }]), /is on unknown type "nothing"/);
-  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'chart' }] }]), /"chart" is not a piece/);
-  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'tree' }] }]), /a tree piece names its tree/);
-  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'view', view: 'demo.none' }] }]), /declares no view "demo.none" of rows/);
-  assert.throws(bad([{ id: 's', title: 'S', on: ['task'], pieces: [{ piece: 'gate' }] }]), /must be named "demo.<name>"/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['work.task'], pieces: [{ piece: 'chart' }] }]), /"chart" is not a piece/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['work.task'], pieces: [{ piece: 'tree' }] }]), /a tree piece names its tree/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['work.task'], pieces: [{ piece: 'view', view: 'demo.none' }] }]), /declares no view "demo.none" of rows/);
+  assert.throws(bad([{ id: 's', title: 'S', on: ['work.task'], pieces: [{ piece: 'gate' }] }]), /must be named "demo.<name>"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', nav: true, pieces: [{ piece: 'page', page: 'nowhere' }] }]), /draws no page "nowhere"/);
-  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'picture', lens: {}, style: { code: 'x' } }] }]), /a picture's style has no code/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['work.task'], pieces: [{ piece: 'picture', lens: {}, style: { code: 'x' } }] }]), /a picture's style has no code/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', pieces: [{ piece: 'note', text: 'Hi' }] }]), /the kinds or types it is on or a place offered in the nav/);
   assert.doesNotThrow(bad([{ id: 'demo.s', title: 'S', on: ['work'], pieces: [{ piece: 'note', text: 'Hello' }] }]));
 });

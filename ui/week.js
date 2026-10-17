@@ -39,7 +39,7 @@ export function workPicker(initial, onPick) {
     const mine = ++turn;
     const q = input.value.trim();
     if (!q) return void (list.hidden = true);
-    const hits = (await Promise.all(['project', 'task', 'company'].map((type) => api('search', { q, type, open: true, limit: 6 }).catch(() => [])))).flat();
+    const hits = (await Promise.all(['work', 'company'].map((type) => api('search', { q, type, open: true, limit: 6 }).catch(() => [])))).flat();
     if (mine !== turn) return;
     list.replaceChildren(
       ...hits.slice(0, 8).map((x) =>

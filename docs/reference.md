@@ -93,7 +93,7 @@ of its own, each named for the question it answers. A style may carry its own
 drawing code, which runs in a sandboxed worker with no page and no network
 (`ui/draw.html`).
 
-**Documents.** A `document` is made of the map: its sections can be notes or
+**Documents.** A `work.document` is made of the map: its sections can be notes or
 live pictures. It can be printed or saved as a PDF, and shared by a link that
 needs no login.
 
@@ -282,9 +282,14 @@ seen working, what bites when working here, what to do next and why.
 
 Types live in files under `packs/`, one folder per pack:
 
-- `core`: the native types (person, company, agent, goal, area, project, task,
-  experiment, decision, issue, hypothesis, result, event, meeting, resource,
-  cost, procedure, file, idea, note, document, lens, style) and relations.
+- `core`: the seven kinds, the types the root relations name (person,
+  company, agent, goal, area, event, resource), the system's own (lens,
+  style, screen) and the root relations.
+- `work`, on in every workspace: project, task, decision, issue, meeting,
+  idea, note, file, document and procedure, as `work.task` and so on.
+- `inquiry`: hypothesis, experiment and result, with tests, supports,
+  refutes, assumes and explains.
+- `money`: what is paid regularly (`money.cost`).
 - `sys`: the system's own primitives (source, connection, run, notification,
   automation).
 - `software`: application, repo, feature, bug, release, proof question, test,
@@ -293,9 +298,11 @@ Types live in files under `packs/`, one folder per pack:
 - `funding`: funding programs, tied to the work they could pay for.
 - `local`: created when you approve a `define_type` proposal.
 
-A type can extend another. A `software.bug` is a flavour of `issue`: it inherits
-the parent's fields and statuses, and anything that searches or views issues
-sees bugs too. Types outside `core` are named `<pack>.<name>`.
+A type can extend another. A `software.bug` is a flavour of `work.issue`: it
+inherits the parent's fields and statuses, and anything that searches or views
+issues sees bugs too. Types outside `core` are named `<pack>.<name>`. When a
+pack takes a type over (`moved_from`), its items move once, and the old name
+is refused with the new one in the message.
 
 ## Not built yet
 

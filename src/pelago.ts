@@ -7,6 +7,7 @@ import { checkWritten } from './automation-rules.ts';
 import { clashes, judge, type Target, type Written } from './rules.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts';
+import { readEvents, type EventQuery } from './eventlog.ts';
 import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 
@@ -743,12 +744,21 @@ export class Archipelago {
 
   /**
    * Move every item of a type (or link of a relation) no pack defines any more to the one that took it over
-   * (moved_from): a one-time migration as a pack takes it out of another, logged as one event. All else stays.
+   * (moved_from): a one-time migration as a pack takes it out of another, logged as one event. All else stays. The
+   * lenses and screens that name the old one in their settings (kinds and on, or over) name the new one.
    */
   async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity'): Promise<number> {
     return this.db.transaction(async (tx) => {
       const { rows } = await tx.query<{ id: string }>(`update ${what === 'entity' ? 'entity' : 'relation'} set type = $2 where type = $1 returning id`, [from, to]);
-      if (rows.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason: `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`, detail: { from, to, items: rows.map((r) => r.id) } });
+      const names = `jsonb_typeof(e.props -> k) = 'array' and (e.props -> k ? $1 or e.props -> k ? ('-' || $1))`;
+      const swap = `case when x = to_jsonb($1::text) then to_jsonb($2::text) when x = to_jsonb('-' || $1) then to_jsonb('-' || $2) else x end`;
+      const { rows: named } = await tx.query<{ id: string }>(
+        `update entity e set props = e.props || (select jsonb_object_agg(k, (select jsonb_agg(${swap} order by i) from jsonb_array_elements(e.props -> k) with ordinality a(x, i))) from unnest($3::text[]) k where ${names})
+         where e.type = any($4::text[]) and exists (select 1 from unnest($3::text[]) k where ${names}) returning e.id`,
+        [from, to, what === 'entity' ? ['kinds', 'on'] : ['over'], [...this.registry.family('lens'), ...this.registry.family('screen')]],
+      );
+      const settings = named.length ? { settings: named.map((r) => r.id) } : {};
+      if (rows.length || named.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason: `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`, detail: { from, to, items: rows.map((r) => r.id), ...settings } });
       return rows.length;
     });
   }
@@ -1039,31 +1049,13 @@ export class Archipelago {
       `select id, type, title, status from entity
        where id <> $1 and archived_at is null and type not like 'sys.%' and position($1 in body || ' ' || props::text) > 0
        order by type = any($2::text[]) desc, updated_at desc limit 30`,
-      [id, this.registry.family('document')],
+      [id, this.registry.drawnWith('document')],
     );
     return rows;
   }
 
-  async events(input: { since?: string; before?: number; target?: string; actor?: string; origin?: string; limit?: number }) {
-    const where: string[] = [];
-    const params: unknown[] = [];
-    const add = (sql: string, value: unknown) => {
-      params.push(value);
-      where.push(sql.replace('?', `$${params.length}`));
-    };
-    if (input.since) add(`ev.ts >= ?::timestamptz`, input.since);
-    if (input.before) add(`ev.seq < ?`, input.before);
-    if (input.target) add(`ev.target_id = ?`, input.target);
-    if (input.actor) add(`ev.actor = ?`, input.actor);
-    if (input.origin) add(`ev.origin = ?`, input.origin);
-    params.push(Math.min(input.limit ?? 50, 500));
-    const { rows } = await this.db.query(
-      `select ev.seq, ev.ts, ev.origin, ev.actor, ev.action, ev.target_id, e.title as target_title, e.type as target_type, ev.changeset, ev.reason, ev.detail
-       from event ev left join entity e on e.id = ev.target_id
-       ${where.length ? 'where ' + where.join(' and ') : ''} order by ev.seq desc limit $${params.length}`,
-      params,
-    );
-    return rows;
+  async events(input: EventQuery) {
+    return readEvents(this.db, input);
   }
 
   /** A stamp that moves whenever the map or the review queue does, as this viewer sees them. */

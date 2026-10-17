@@ -27,7 +27,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
     reason: 'test',
     ops: [
       { op: 'create', ref: 'grant', type: 'funding.program', title: 'Seed grant', status: 'open', props: { deadline: soon } },
-      { op: 'create', ref: 'task', type: 'task', title: 'Write the application' },
+      { op: 'create', ref: 'task', type: 'work.task', title: 'Write the application' },
       { op: 'link', type: 'depends_on', from: 'task', to: 'grant' },
       { op: 'create', ref: 'hours', type: 'time.entry', title: 'Drafting', props: { date: soon, hours: 3 } },
     ],
@@ -118,8 +118,10 @@ test('a relation a pack took over takes its links with it, and the work at risk 
     reason: 'test',
     ops: [
       { op: 'create', ref: 'h', type: 'hypothesis', title: 'People read the blog', status: 'refuted' },
-      { op: 'create', ref: 't', type: 'task', title: 'Write a post' },
+      { op: 'create', ref: 't', type: 'work.task', title: 'Write a post' },
       { op: 'link', type: 'assumes', from: 't', to: 'h' },
+      { op: 'create', ref: 'lens', type: 'lens', title: 'Open questions', props: { kinds: ['work.decision', 'hypothesis'], over: ['assumes', 'depends_on'] } },
+      { op: 'create', ref: 'quiet', type: 'lens', title: 'No questions', props: { kinds: ['-hypothesis'] } },
     ],
   })) as { created: Record<string, string> };
 
@@ -129,11 +131,13 @@ test('a relation a pack took over takes its links with it, and the work at risk 
   const synced = await syncTypes(now);
   assert.deepEqual([synced.moved.hypothesis, synced.moved.assumes], [1, 1]);
   assert.equal((await now.entity(made.created.h))!.type, 'inquiry.hypothesis');
+  assert.deepEqual((await now.entity(made.created.lens))!.props, { kinds: ['work.decision', 'inquiry.hypothesis'], over: ['inquiry.assumes', 'depends_on'] }, 'a lens that named them names them still, in its order');
+  assert.deepEqual((await now.entity(made.created.quiet))!.props.kinds, ['-inquiry.hypothesis']);
   const { rows } = await db.query<{ type: string }>(`select type from relation where from_id = $1 and to_id = $2`, [made.created.t, made.created.h]);
   assert.deepEqual(rows.map((r) => r.type), ['inquiry.assumes']);
   const risk = (await callTool(now, human, 'inquiry_undermined', {})) as { id: string }[];
   assert.deepEqual(risk.map((r) => r.id), [made.created.t], 'the pack finds the work through the moved link');
   const brief = (await callTool(now, human, 'view', { name: 'brief', params: { task: made.created.t } })) as { text: string };
-  assert.match(brief.text, /## Rests on\n- People read the blog \(refuted\)/);
+  assert.match(brief.text, /## Assumes\n- People read the blog \(refuted\)/);
   await assert.rejects(now.change(human, { reason: 'test', ops: [{ op: 'create', type: 'hypothesis', title: 'x' }] }), /it is inquiry\.hypothesis now/);
 });

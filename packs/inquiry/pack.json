@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "title": "Inquiry",
   "description": "Beliefs that could be wrong and the evidence on them: hypotheses, the experiments that test them and the results that bear them out or refute them, and the work that rests on them.",
-  "requires": ["core"],
+  "requires": ["core", "work"],
   "types": [
     {
       "id": "inquiry.hypothesis",
@@ -17,7 +17,7 @@
     {
       "id": "inquiry.experiment",
       "moved_from": ["experiment"],
-      "extends": "task",
+      "extends": "work.task",
       "title": "Experiment",
       "description": "A task that tests a hypothesis and produces a result."
     },
@@ -36,11 +36,11 @@
     }
   ],
   "relations": [
-    { "id": "inquiry.tests", "moved_from": ["tests"], "extends": "bears_on", "title": "tests", "inverse": "is tested by", "from": ["task"], "to": ["inquiry.hypothesis"], "description": "The work that will settle the hypothesis." },
+    { "id": "inquiry.tests", "moved_from": ["tests"], "extends": "bears_on", "title": "tests", "inverse": "is tested by", "from": ["work.task"], "to": ["inquiry.hypothesis"], "description": "The work that will settle the hypothesis." },
     { "id": "inquiry.supports", "moved_from": ["supports"], "extends": "bears_on", "title": "supports", "inverse": "is supported by", "from": ["inquiry.result"], "to": ["inquiry.hypothesis"], "description": "Evidence for." },
     { "id": "inquiry.refutes", "moved_from": ["refutes"], "extends": "bears_on", "title": "refutes", "inverse": "is refuted by", "from": ["inquiry.result"], "to": ["inquiry.hypothesis"], "description": "Evidence against." },
     { "id": "inquiry.assumes", "moved_from": ["assumes"], "extends": "relates_to", "title": "assumes", "inverse": "is assumed by", "from": ["*"], "to": ["inquiry.hypothesis"], "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted." },
-    { "id": "inquiry.explains", "moved_from": ["explains"], "extends": "about", "title": "would explain", "inverse": "may be explained by", "from": ["inquiry.hypothesis"], "to": ["issue"], "description": "A suspected cause." }
+    { "id": "inquiry.explains", "moved_from": ["explains"], "extends": "about", "title": "would explain", "inverse": "may be explained by", "from": ["inquiry.hypothesis"], "to": ["work.issue"], "description": "A suspected cause." }
   ],
   "views": [
     {

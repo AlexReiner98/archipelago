@@ -164,7 +164,7 @@ export async function entity(id, here) {
           h('span', { class: 'muted small' }, 'Shown in'),
           data.shown_in.map((v) => [
             h('a', { class: 'trail-view', href: `#/graph?from=${v.of.id}&lens=${v.id}&here=${id}`, title: `Open "${v.title}" of ${v.of.title}, with this marked in it` }, v.title),
-            v.documents.map((d) => h('a', { class: 'deliverable', href: `#/e/${d.id}?here=${id}`, title: `"${v.title}" is drawn in this document; it opens with this marked` }, chip('document'), h('span', { class: 'gist' }, d.title))),
+            v.documents.map((d) => h('a', { class: 'deliverable', href: `#/e/${d.id}?here=${id}`, title: `"${v.title}" is drawn in this document; it opens with this marked` }, chip(d.type), h('span', { class: 'gist' }, d.title))),
           ]),
         ),
       // What names it in its text: a link written as an id has its way back here.

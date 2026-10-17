@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "title": "Software",
   "description": "Types for building and shipping software.",
-  "requires": ["core"],
+  "requires": ["core", "work"],
   "types": [
     {
       "id": "software.application",
@@ -42,7 +42,7 @@
     },
     {
       "id": "software.bug",
-      "extends": "issue",
+      "extends": "work.issue",
       "title": "Bug",
       "description": "A defect in software.",
       "fields": { "repro": { "type": "string", "description": "How to reproduce it." } }
@@ -70,7 +70,7 @@
     {
       "id": "software.test",
       "public": true,
-      "extends": "procedure",
+      "extends": "work.procedure",
       "title": "Test",
       "description": "One check that helps answer a proof question. A draft is a test that is wanted and not yet written. What it found is kept per build, as test results.",
       "fields": {
@@ -116,14 +116,14 @@
     },
     {
       "id": "software.spec",
-      "extends": "file",
+      "extends": "work.file",
       "title": "Spec",
       "description": "A design or requirements document.",
       "deliverable": false
     },
     {
       "id": "software.handoff",
-      "extends": "note",
+      "extends": "work.note",
       "title": "Handoff",
       "description": "Where a working session left things for the next one.",
       "note_max": { "chars": 3000, "say": "It holds one of each part (not seen working, what bites here, next and why). Rewrite it whole with body: keep what is still so, drop what later work settled, and put what is true of one item in that item's note." }
@@ -231,8 +231,8 @@
   ],
   "screens": [
     { "id": "software.releases", "title": "Releases", "at": "home", "pieces": [{ "piece": "picture", "lens": { "kinds": ["software.release"], "fold": ["closed", "system"] }, "style": { "shape": "boxes" } }] },
-    { "id": "software.roadmap", "title": "Roadmap", "on": ["project"], "pieces": [{ "piece": "tree", "tree": "software.roadmap" }] },
-    { "id": "software.proof", "title": "How we know", "on": ["project", "software.feature", "software.proof"], "pieces": [{ "piece": "proof" }] },
+    { "id": "software.roadmap", "title": "Roadmap", "on": ["work.project"], "pieces": [{ "piece": "tree", "tree": "software.roadmap" }] },
+    { "id": "software.proof", "title": "How we know", "on": ["work.project", "software.feature", "software.proof"], "pieces": [{ "piece": "proof" }] },
     { "id": "software.usage", "title": "Tokens used here", "on": ["software.repo"], "pieces": [{ "piece": "usage" }] }
   ],
   "trees": [
@@ -240,9 +240,9 @@
       "id": "software.roadmap",
       "title": "Roadmap",
       "description": "A project's features in the order they are to be built, the work under each, and where work is happening now.",
-      "roots": ["project"],
+      "roots": ["work.project"],
       "branches": ["software.feature"],
-      "work": ["task", "issue"],
+      "work": ["work.task", "work.issue"],
       "order": "order",
       "active": ["building", "doing"]
     }

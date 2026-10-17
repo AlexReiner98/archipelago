@@ -25,7 +25,7 @@ function ctxOver(hypotheses: Item[], assuming: Record<string, Item[]>) {
 
 test('open work resting on a refuted hypothesis, once each, named with what it assumed', async () => {
   const h = (id: string, title: string, status: string): Item => ({ id, type: 'inquiry.hypothesis', title, status, is_open: status === 'untested' });
-  const t = (id: string, title: string, is_open = true): Item => ({ id, type: 'task', title, status: is_open ? 'todo' : 'done', is_open });
+  const t = (id: string, title: string, is_open = true): Item => ({ id, type: 'work.task', title, status: is_open ? 'todo' : 'done', is_open });
   const { ctx } = ctxOver(
     [h('h1', 'People read the blog', 'refuted'), h('h2', 'Gas is cheaper', 'refuted'), h('h3', 'Still open', 'untested')],
     { h1: [t('a', 'Write a post'), t('b', 'Old post', false)], h2: [t('a', 'Write a post'), t('c', 'Buy the van')], h3: [t('d', 'Not at risk')] },

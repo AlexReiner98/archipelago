@@ -353,6 +353,12 @@ export class Registry {
     return [...this.types.values()].filter((t) => t.capabilities[capability] !== undefined).map((t) => t.id);
   }
 
+  /** The types a pack's screen draws this piece on (a document read whole, a figure kept), flavours included. */
+  drawnWith(piece: string): string[] {
+    const on = screensOf(this.packs).filter((s) => s.pieces.some((p) => p.piece === piece)).flatMap((s) => s.on ?? []);
+    return [...new Set(on.flatMap((t) => this.family(t)))];
+  }
+
   /** The type and every flavour of it. */
   family(typeId: string): string[] {
     return [...this.types.values()].filter((t) => t.lineage.includes(typeId)).map((t) => t.id);

@@ -124,12 +124,12 @@ export function readLens(l: Archipelago, input: Record<string, unknown>, under: 
  * has it, with the documents that bring the view in. The way back from an item to the picture it was reached from.
  */
 export async function shownIn(l: Archipelago, id: string, trail: { id: string; title: string; views: { id: string; title: string }[] }[]) {
-  const shown: { id: string; title: string; of: { id: string; title: string }; documents: { id: string; title: string }[] }[] = [];
+  const shown: { id: string; title: string; of: { id: string; title: string }; documents: { id: string; type: string; title: string }[] }[] = [];
   for (const step of trail)
     for (const view of step.views) {
       const answer = await lens(l, { lens: view.id }).catch(() => undefined);
       if (!answer?.items.some((item) => item.id === id)) continue;
-      const documents = (await l.mentionedIn(view.id)).filter((m) => l.registry.isA(m.type, 'document')).map((m) => ({ id: m.id, title: m.title }));
+      const documents = (await l.mentionedIn(view.id)).filter((m) => l.registry.drawnWith('document').includes(m.type)).map((m) => ({ id: m.id, type: m.type, title: m.title }));
       shown.push({ id: view.id, title: view.title, of: { id: step.id, title: step.title }, documents });
     }
   return shown;
@@ -190,7 +190,7 @@ export async function hubs(l: Archipelago) {
   const at = (id: string): number => {
     for (let cur: string | undefined = id, steps = 0; cur !== undefined && steps < 64; cur = up.get(cur), steps++) {
       const e = byId.get(cur)!;
-      if (l.registry.isA(e.type, 'project') && typeof e.props.hub_at === 'number') return e.props.hub_at;
+      if (typeof e.props.hub_at === 'number') return e.props.hub_at;
     }
     return HUB_AT;
   };
@@ -286,7 +286,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   // A lens and a style are how the map is looked at, not part of what is seen.
   const system = (type: string) => (type.startsWith('sys.') && !isA(type, 'resource')) || isA(type, 'lens') || isA(type, 'style');
   // What is work: what can be estimated, and what such things are part of.
-  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || isA(type, 'project');
+  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || isA(type, 'work');
   const wanted = (asked.kinds ?? []).filter((k) => !k.startsWith('-'));
   const unwanted = (asked.kinds ?? []).filter((k) => k.startsWith('-')).map((k) => k.slice(1));
   const is = (type: string, kind: string) => (kind === 'work' ? work(type) : isA(type, kind));

@@ -19,7 +19,7 @@ export default function draw({ canvas, answer, theme, size, tree, on, open, tip,
   const ordered = (list) => list.sort((a, b) => a.place - b.place);
 
   const features = ordered(items.filter((i) => inProject(i) && i.root === 'software.feature'));
-  const questions = ordered(items.filter((i) => inProject(i) && i.root === 'decision' && i.open));
+  const questions = ordered(items.filter((i) => inProject(i) && i.root === 'work.decision' && i.open));
   const release = items.find((i) => inProject(i) && i.type === 'software.release' && i.open);
   const near = new Set(answer.links.flatMap((l) => (l.from === root.id ? [l.to] : l.to === root.id ? [l.from] : [])));
   for (const l of answer.links) if (l.kind === 'waits_on' && byId.get(l.from)?.inside === root.id) near.add(l.to);

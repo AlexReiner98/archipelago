@@ -58,7 +58,7 @@ test('a database made while this was called Lattice is opened under the new name
   const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
   const l = new Archipelago(db, new Registry(packs));
-  await make(l, [{ op: 'create', type: 'task', title: 'Seen after the move' }]);
+  await make(l, [{ op: 'create', type: 'work.task', title: 'Seen after the move' }]);
   assert.equal((await l.as('nobody').db.query(`select 1 from entity where title = 'Seen after the move'`)).rows.length, 1);
   await db.close();
 });
@@ -66,16 +66,16 @@ test('a database made while this was called Lattice is opened under the new name
 test('flavours inherit fields and statuses, and are found through the parent', async () => {
   const l = await fresh();
   const bug = l.registry.type('software.bug')!;
-  assert.deepEqual(bug.lineage, ['software.bug', 'issue', 'work']);
+  assert.deepEqual(bug.lineage, ['software.bug', 'work.issue', 'work']);
   assert.ok(bug.fields.severity, 'inherits issue.severity');
   assert.ok(bug.fields.repro, 'adds its own field');
-  assert.deepEqual(bug.statuses, l.registry.type('issue')!.statuses);
+  assert.deepEqual(bug.statuses, l.registry.type('work.issue')!.statuses);
 
   await make(l, [
     { op: 'create', type: 'software.bug', title: 'Crash on load', props: { severity: 'high' } },
-    { op: 'create', type: 'issue', title: 'Slow builds' },
+    { op: 'create', type: 'work.issue', title: 'Slow builds' },
   ]);
-  assert.equal((await l.search({ type: 'issue' })).length, 2);
+  assert.equal((await l.search({ type: 'work.issue' })).length, 2);
   assert.equal((await l.search({ type: 'software.bug' })).length, 1);
 });
 
@@ -95,9 +95,9 @@ test('invalid changes are rejected whole, with every problem listed', async () =
     l.change(human, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 't', type: 'task', title: 'Good task' },
-        { op: 'create', type: 'task', title: 'Bad status', status: 'finished' },
-        { op: 'create', type: 'task', title: 'Bad field', props: { colour: 'red', due: 'tomorrow' } },
+        { op: 'create', ref: 't', type: 'work.task', title: 'Good task' },
+        { op: 'create', type: 'work.task', title: 'Bad status', status: 'finished' },
+        { op: 'create', type: 'work.task', title: 'Bad field', props: { colour: 'red', due: 'tomorrow' } },
         { op: 'link', type: 'works_at', from: 't', to: 'nope' },
         { op: 'create', type: 'unicorn', title: 'x' },
       ],
@@ -111,11 +111,11 @@ test('invalid changes are rejected whole, with every problem listed', async () =
   );
   assert.equal((await l.search({})).length, 0, 'nothing was written');
   await assert.rejects(make(l, [
-    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
     { op: 'create', ref: 'c', type: 'company', title: 'C' },
     { op: 'link', type: 'works_at', from: 'a', to: 'c' },
-  ]), /must start from person, not task/);
-  await assert.rejects(l.change(human, { ops: [{ op: 'create', type: 'task', title: 'A' }], reason: ' ' }), /needs a reason/);
+  ]), /must start from person, not work\.task/);
+  await assert.rejects(l.change(human, { ops: [{ op: 'create', type: 'work.task', title: 'A' }], reason: ' ' }), /needs a reason/);
 });
 
 test('an agent change becomes a proposal; a human approves it, minus exclusions', async () => {
@@ -124,9 +124,9 @@ test('an agent change becomes a proposal; a human approves it, minus exclusions'
     reason: 'Read the handoff doc',
     source: { uri: 'docs/handoff.md', kind: 'file' },
     ops: [
-      { op: 'create', ref: 'proj', type: 'project', title: 'Shadow' },
-      { op: 'create', ref: 'a', type: 'task', title: 'Fix parity' },
-      { op: 'create', ref: 'b', type: 'task', title: 'Wrong guess' },
+      { op: 'create', ref: 'proj', type: 'work.project', title: 'Shadow' },
+      { op: 'create', ref: 'a', type: 'work.task', title: 'Fix parity' },
+      { op: 'create', ref: 'b', type: 'work.task', title: 'Wrong guess' },
       { op: 'link', type: 'part_of', from: 'a', to: 'proj' },
       { op: 'link', type: 'part_of', from: 'b', to: 'proj' },
       { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
@@ -141,7 +141,7 @@ test('an agent change becomes a proposal; a human approves it, minus exclusions'
 
   const decided = await l.decide(human, { proposal: id, approve: true, except: ['b'] });
   assert.equal(decided.status, 'approved');
-  const tasks = await l.search({ type: 'task' });
+  const tasks = await l.search({ type: 'work.task' });
   assert.deepEqual(tasks.map((t) => t.title), ['Fix parity']);
   const task = await l.get(tasks[0].id);
   assert.deepEqual(task.outgoing.map((r: any) => r.type), ['part_of'], 'links to the excluded entity were dropped');
@@ -161,11 +161,11 @@ test('the pulse moves when a change is proposed, decided or applied, and not oth
   const seen = [await stamp()];
   assert.equal(await stamp(), seen[0], 'reading does not move it');
 
-  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'A' }] });
+  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'A' }] });
   seen.push(await stamp());
   await l.decide(human, { proposal: (proposed as { proposal: string }).proposal, approve: false });
   seen.push(await stamp());
-  await make(l, [{ op: 'create', type: 'task', title: 'B' }]);
+  await make(l, [{ op: 'create', type: 'work.task', title: 'B' }]);
   seen.push(await stamp());
   assert.equal(new Set(seen).size, seen.length, `each write gives a new stamp: ${seen.join(', ')}`);
 });
@@ -173,13 +173,13 @@ test('the pulse moves when a change is proposed, decided or applied, and not oth
 test('policy can let agents apply some ops directly, or forbid them', async () => {
   const l = await fresh();
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', merge: 'forbidden' });
-  const made = await loose.change(agent, { ops: [{ op: 'create', ref: 'x', type: 'note', title: 'X' }], reason: 'test' });
+  const made = await loose.change(agent, { ops: [{ op: 'create', ref: 'x', type: 'work.note', title: 'X' }], reason: 'test' });
   assert.equal(made.status, 'applied');
   const x = (made as { created: Record<string, string> }).created.x;
-  const y = (await make(l, [{ op: 'create', ref: 'y', type: 'note', title: 'Y' }])).y;
+  const y = (await make(l, [{ op: 'create', ref: 'y', type: 'work.note', title: 'Y' }])).y;
   await assert.rejects(loose.change(agent, { ops: [{ op: 'merge', keep: x, drop: y }], reason: 'test' }), /forbids/);
   const mixed = await loose.change(agent, {
-    ops: [{ op: 'create', type: 'note', title: 'Z' }, { op: 'archive', id: y }],
+    ops: [{ op: 'create', type: 'work.note', title: 'Z' }, { op: 'archive', id: y }],
     reason: 'test',
   });
   assert.equal(mixed.status, 'proposed', 'one op needing approval holds the whole change');
@@ -187,9 +187,9 @@ test('policy can let agents apply some ops directly, or forbid them', async () =
 
 test('possible duplicates are flagged, across flavours', async () => {
   const l = await fresh();
-  await make(l, [{ op: 'create', type: 'issue', title: 'Mask misregistration' }]);
+  await make(l, [{ op: 'create', type: 'work.issue', title: 'Mask misregistration' }]);
   const result = await l.change(agent, { ops: [{ op: 'create', type: 'software.bug', title: 'mask misregistration' }], reason: 'test' });
-  assert.match(result.warnings[0], /possible duplicate of existing issue "Mask misregistration"/);
+  assert.match(result.warnings[0], /possible duplicate of existing work\.issue "Mask misregistration"/);
 });
 
 test('blockers are derived, and roots are what has to move first', async () => {
@@ -197,10 +197,10 @@ test('blockers are derived, and roots are what has to move first', async () => {
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Me' },
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
-    { op: 'create', ref: 'ship', type: 'task', title: 'Ship release', owner: 'me' },
-    { op: 'create', ref: 'sign', type: 'task', title: 'Sign installer', owner: 'me' },
-    { op: 'create', ref: 'cert', type: 'decision', title: 'Which certificate?', owner: 'sam' },
-    { op: 'create', ref: 'free', type: 'task', title: 'Write notes', owner: 'me' },
+    { op: 'create', ref: 'ship', type: 'work.task', title: 'Ship release', owner: 'me' },
+    { op: 'create', ref: 'sign', type: 'work.task', title: 'Sign installer', owner: 'me' },
+    { op: 'create', ref: 'cert', type: 'work.decision', title: 'Which certificate?', owner: 'sam' },
+    { op: 'create', ref: 'free', type: 'work.task', title: 'Write notes', owner: 'me' },
     { op: 'link', type: 'depends_on', from: 'ship', to: 'sign' },
     { op: 'link', type: 'depends_on', from: 'sign', to: 'cert' },
   ]);
@@ -222,8 +222,8 @@ test('blockers are derived, and roots are what has to move first', async () => {
 test('a dependency cycle does not hang the views', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', ref: 'a', type: 'task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'task', title: 'B' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
     { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
   ]);
@@ -236,9 +236,9 @@ test('an exclusive resource has one holder, and blocks other work that needs it'
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live Rhino lane' },
     { op: 'create', ref: 'run1', type: 'sys.run', title: 'Session one' },
     { op: 'create', ref: 'run2', type: 'sys.run', title: 'Session two' },
-    { op: 'create', ref: 'live1', type: 'task', title: 'Capture parity probe' },
-    { op: 'create', ref: 'live2', type: 'task', title: 'Debug conduit' },
-    { op: 'create', ref: 'offline', type: 'task', title: 'Write unit tests' },
+    { op: 'create', ref: 'live1', type: 'work.task', title: 'Capture parity probe' },
+    { op: 'create', ref: 'live2', type: 'work.task', title: 'Debug conduit' },
+    { op: 'create', ref: 'offline', type: 'work.task', title: 'Write unit tests' },
     { op: 'link', type: 'needs', from: 'live1', to: 'lane' },
     { op: 'link', type: 'needs', from: 'live2', to: 'lane' },
   ]);
@@ -261,8 +261,8 @@ test('an exclusive resource has one holder, and blocks other work that needs it'
 test('overdue work is due, and what is far off is not', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', type: 'task', title: 'File return', props: { due: '2020-01-01' } },
-    { op: 'create', type: 'task', title: 'Far off', props: { due: '2999-01-01' } },
+    { op: 'create', type: 'work.task', title: 'File return', props: { due: '2020-01-01' } },
+    { op: 'create', type: 'work.task', title: 'Far off', props: { due: '2999-01-01' } },
   ]);
   // Work resting on a refuted hypothesis is the inquiry pack's to show, not the kernel's.
   const due = await attend(l, { reasons: ['due'] });
@@ -275,7 +275,7 @@ test('merge moves relations to the kept entity and archives the other', async ()
     { op: 'create', ref: 's1', type: 'person', title: 'Sam Patel', props: { email: 'sam@example.com' } },
     { op: 'create', ref: 's2', type: 'person', title: 'S. Patel', props: { role: 'Planner' } },
     { op: 'create', ref: 'co', type: 'company', title: 'Acme' },
-    { op: 'create', ref: 't', type: 'task', title: 'Reply to Sam', owner: 's2' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Reply to Sam', owner: 's2' },
     { op: 'link', type: 'works_at', from: 's2', to: 'co' },
     // Both are said to work at the same place: the kept one is linked to it once, not twice.
     { op: 'link', type: 'works_at', from: 's1', to: 'co' },
@@ -334,9 +334,9 @@ test('each fact can carry its own source within one change', async () => {
     reason: 'test',
     source: { uri: 'docs/roadmap.md' },
     ops: [
-      { op: 'create', ref: 'a', type: 'note', title: 'From the roadmap' },
-      { op: 'create', ref: 'b', type: 'note', title: 'From the readme', source: { uri: 'README.md', kind: 'file' } },
-      { op: 'create', ref: 'c', type: 'note', title: 'Also from the readme', source: { uri: 'README.md' } },
+      { op: 'create', ref: 'a', type: 'work.note', title: 'From the roadmap' },
+      { op: 'create', ref: 'b', type: 'work.note', title: 'From the readme', source: { uri: 'README.md', kind: 'file' } },
+      { op: 'create', ref: 'c', type: 'work.note', title: 'Also from the readme', source: { uri: 'README.md' } },
     ],
   });
   const made = (result as { created: Record<string, string> }).created;
@@ -370,20 +370,20 @@ test('a reviewer can correct a proposal while approving it', async () => {
 async function laneSetup(l: Archipelago) {
   return make(l, [
     { op: 'create', ref: 'repo', type: 'software.repo', title: 'Aperture repo', props: { path: 'C:\\code\\Aperture' } },
-    { op: 'create', ref: 'proj', type: 'project', title: 'Aperture' },
+    { op: 'create', ref: 'proj', type: 'work.project', title: 'Aperture' },
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
-    { op: 'create', ref: 'rule', type: 'decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives Rhino.' } },
-    { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
-    { op: 'create', ref: 'offline', type: 'task', title: 'Write unit tests' },
-    { op: 'create', ref: 'q', type: 'decision', title: 'Which target?' },
-    { op: 'create', ref: 'gated', type: 'task', title: 'Tune the solver' },
+    { op: 'create', ref: 'rule', type: 'work.decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives Rhino.' } },
+    { op: 'create', ref: 'live', type: 'work.task', title: 'Capture probe' },
+    { op: 'create', ref: 'offline', type: 'work.task', title: 'Write unit tests' },
+    { op: 'create', ref: 'q', type: 'work.decision', title: 'Which target?' },
+    { op: 'create', ref: 'gated', type: 'work.task', title: 'Tune the solver' },
     { op: 'link', type: 'software.lives_in', from: 'proj', to: 'repo' },
     { op: 'link', type: 'part_of', from: 'live', to: 'proj' },
     { op: 'link', type: 'part_of', from: 'offline', to: 'proj' },
     { op: 'link', type: 'part_of', from: 'gated', to: 'proj' },
     { op: 'link', type: 'depends_on', from: 'gated', to: 'q' },
     { op: 'link', type: 'needs', from: 'live', to: 'lane' },
-    { op: 'link', type: 'governed_by', from: 'lane', to: 'rule' },
+    { op: 'link', type: 'work.governed_by', from: 'lane', to: 'rule' },
   ]);
 }
 
@@ -423,11 +423,11 @@ test('a session registers, takes the lane its task needs, and gives it back when
 test('a project’s open questions are what needs the owner in it, and its next release says where it stands', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Shadows', status: 'active' },
-    { op: 'create', ref: 'q', type: 'decision', title: 'Which licence?', status: 'open', props: { options: ['MIT', 'Apache'] } },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Shadows', status: 'active' },
+    { op: 'create', ref: 'q', type: 'work.decision', title: 'Which licence?', status: 'open', props: { options: ['MIT', 'Apache'] } },
     { op: 'link', type: 'part_of', from: 'q', to: 'p' },
-    { op: 'create', ref: 'a', type: 'task', title: 'Write the installer', status: 'todo' },
-    { op: 'create', ref: 'b', type: 'task', title: 'Sign the package', status: 'done' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'Write the installer', status: 'todo' },
+    { op: 'create', ref: 'b', type: 'work.task', title: 'Sign the package', status: 'done' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'b', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'q' },
@@ -435,7 +435,7 @@ test('a project’s open questions are what needs the owner in it, and its next 
     { op: 'link', type: 'part_of', from: 'r', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'r', to: 'a' },
     { op: 'link', type: 'depends_on', from: 'r', to: 'b' },
-    { op: 'create', ref: 'quiet', type: 'project', title: 'Quiet one', status: 'active' },
+    { op: 'create', ref: 'quiet', type: 'work.project', title: 'Quiet one', status: 'active' },
   ]);
   const asked = await attend(l, { reasons: ['unsettled'], within: made.p });
   assert.deepEqual(asked.items.map((q: any) => [q.title, q.reasons[0].by, q.top.title]), [['Which licence?', 'word', 'Shadows']]);
@@ -448,10 +448,10 @@ test('a project’s open questions are what needs the owner in it, and its next 
 test('a session tells the story of its work, beat by beat, and can take a beat back', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'a', type: 'task', title: 'Fix the halo' },
-    { op: 'create', ref: 'b', type: 'issue', title: 'Labels clip' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'Fix the halo' },
+    { op: 'create', ref: 'b', type: 'work.issue', title: 'Labels clip' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
-    { op: 'create', ref: 'c', type: 'task', title: 'Unrelated' },
+    { op: 'create', ref: 'c', type: 'work.task', title: 'Unrelated' },
   ]);
   const { run } = await sessionStart(l, agent, { title: 'Storyteller', session_id: 's-story' });
   const one = await tell(l, agent, { run: 's-story', said: 'The halo is blocked by the clipping: fix that first.', links: [{ from: made.b, to: made.a, says: 'is why' }] });
@@ -510,7 +510,7 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
   const brief = (await VIEWS.brief.run(l, { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Aperture');
   assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
-  assert.deepEqual(brief.rules.map((r: any) => r.title), ['One live lane.']);
+  assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['work.governed_by', 'One live lane.']]);
   for (const part of ['# Capture probe', 'Part of: Aperture', 'held by Other session', 'Only one session drives Rhino.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
@@ -613,14 +613,14 @@ test('a session that finishes says where the repository\'s open work stands', as
   assert.deepEqual([atOnce.due, atOnce.projects[0].items.length], [true, 2]);
   // An issue filed as about a project, not as part of it, is the repository's work all the same.
   const { drift } = await make(l, [
-    { op: 'create', ref: 'drift', type: 'issue', title: 'The carve reads origins' },
+    { op: 'create', ref: 'drift', type: 'work.issue', title: 'The carve reads origins' },
     { op: 'link', type: 'about', from: 'drift', to: made.proj },
   ]);
   assert.ok(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any).ready.some((i: any) => i.id === drift));
 
   // An open issue in the repository is its work too: shown at the start, asked about at the end.
   const { leak } = await make(l, [
-    { op: 'create', ref: 'leak', type: 'issue', title: 'The probe leaks handles' },
+    { op: 'create', ref: 'leak', type: 'work.issue', title: 'The probe leaks handles' },
     { op: 'link', type: 'part_of', from: 'leak', to: made.proj },
   ]);
   assert.match(await hookSessionStart(l, { session_id: 'r5', cwd: 'C:\\code\\Aperture' }), new RegExp(`- Issue: The probe leaks handles \\(${leak}\\)`));
@@ -712,7 +712,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   await l.log(l.db, { actor: 'github:someone', action: 'repo.push', target: made.repo, origin: 'github', reason: '1 commit to main: Tests for the solver', detail: { branch: 'main', after: 'abcdef0123456789' } });
   await make(l, [
     { op: 'update', id: made.offline, status: 'done' },
-    { op: 'create', ref: 'new', type: 'issue', title: 'The solver diverges on thin walls' },
+    { op: 'create', ref: 'new', type: 'work.issue', title: 'The solver diverges on thin walls' },
     { op: 'link', type: 'about', from: 'new', to: made.proj },
   ]);
   await hookSessionEnd(l, { session_id: 'h0', reason: 'exit' });
@@ -759,11 +759,11 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
 
 test('a note can name what the same change makes, and an agent can ask for its change to be held', async () => {
   const l = await fresh();
-  const { note } = await make(l, [{ op: 'create', ref: 'note', type: 'note', title: 'Handoff', body: 'Open: nothing.' }]);
+  const { note } = await make(l, [{ op: 'create', ref: 'note', type: 'work.note', title: 'Handoff', body: 'Open: nothing.' }]);
   const made = await make(l, [
     { op: 'update', id: note, append: 'Next: {t}, as {t} says. Not a ref: {x} and { t }.' },
-    { op: 'create', ref: 't', type: 'task', title: 'Connect the repository', body: 'Written up in {t} itself.' },
-    { op: 'create', ref: 'q', type: 'decision', title: 'Before {t}?' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Connect the repository', body: 'Written up in {t} itself.' },
+    { op: 'create', ref: 'q', type: 'work.decision', title: 'Before {t}?' },
   ]);
   assert.match(made.t, /^e_\w{8}$/);
   // The id is there though the note was written before the item it names, and other braces are left as they were.
@@ -771,7 +771,7 @@ test('a note can name what the same change makes, and an agent can ask for its c
   assert.equal((await l.entity(made.t))!.body, `Written up in ${made.t} itself.`);
   assert.equal((await l.entity(made.q))!.title, `Before ${made.t}?`);
   // Held, a change keeps its refs as written, and they become ids when it is applied.
-  const held = (await l.change(agent, { ops: [{ op: 'create', ref: 'n', type: 'note', title: 'Later', body: 'This is {n}.' }], reason: 'test' })) as any;
+  const held = (await l.change(agent, { ops: [{ op: 'create', ref: 'n', type: 'work.note', title: 'Later', body: 'This is {n}.' }], reason: 'test' })) as any;
   const applied = (await l.decide(human, { proposal: held.proposal, approve: true })) as any;
   assert.equal((await l.entity(applied.created.n))!.body, `This is ${applied.created.n}.`);
 
@@ -785,9 +785,9 @@ test('a note can name what the same change makes, and an agent can ask for its c
 
   // An agent names a thing in a few words: a sentence for a title is refused, on a new thing or an old one. A person names as they like.
   const sentence = 'A session finds its repository by its GitHub address, not by a folder path on one machine';
-  await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: sentence }] }), /op 1 \(create\): the title is 89 characters\. A title is a name, not a sentence: 60 at most/);
+  await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: sentence }] }), /op 1 \(create\): the title is 89 characters\. A title is a name, not a sentence: 60 at most/);
   await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: made.t, title: sentence }] }), /op 1 \(update\): the title is 89 characters/);
-  assert.equal(((await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Find a repository by its remote' }] })) as any).status, 'proposed');
+  assert.equal(((await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Find a repository by its remote' }] })) as any).status, 'proposed');
   assert.equal(((await callTool(l, human, 'change', { reason: 'test', ops: [{ op: 'update', id: made.t, title: sentence }] })) as any).status, 'applied');
 });
 
@@ -796,11 +796,11 @@ test('a re-check takes a feature that lives in a repository on its own, at its p
   const made = await make(l, [
     { op: 'create', ref: 'home', type: 'software.repo', title: 'Main repo', props: { path: 'C:\\code\\main' } },
     { op: 'create', ref: 'side', type: 'software.repo', title: 'Add-in repo', props: { path: 'C:\\code\\addin' } },
-    { op: 'create', ref: 'proj', type: 'project', title: 'Product', props: { recheck_days: 3 } },
+    { op: 'create', ref: 'proj', type: 'work.project', title: 'Product', props: { recheck_days: 3 } },
     { op: 'create', ref: 'inside', type: 'software.feature', title: 'Core' },
     { op: 'create', ref: 'addin', type: 'software.feature', title: 'The add-in' },
-    { op: 'create', ref: 'old', type: 'task', title: 'Port the ribbon' },
-    { op: 'create', ref: 'chore', type: 'task', title: 'Ask for the certificate' },
+    { op: 'create', ref: 'old', type: 'work.task', title: 'Port the ribbon' },
+    { op: 'create', ref: 'chore', type: 'work.task', title: 'Ask for the certificate' },
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
     { op: 'link', type: 'software.lives_in', from: 'proj', to: 'home' },
     { op: 'link', type: 'software.lives_in', from: 'inside', to: 'home' },
@@ -880,10 +880,10 @@ test('launching runs a headless session on a task, holding the lane and recordin
   configureLauncher({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), command: [process.execPath, cli] });
   const made = await make(l, [
     { op: 'create', ref: 'repo', type: 'software.repo', title: 'Repo', props: { path: dir } },
-    { op: 'create', ref: 'proj', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'proj', type: 'work.project', title: 'Proj' },
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
-    { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
-    { op: 'create', ref: 'homeless', type: 'task', title: 'No repo' },
+    { op: 'create', ref: 'live', type: 'work.task', title: 'Capture probe' },
+    { op: 'create', ref: 'homeless', type: 'work.task', title: 'No repo' },
     { op: 'link', type: 'software.lives_in', from: 'proj', to: 'repo' },
     { op: 'link', type: 'part_of', from: 'live', to: 'proj' },
     { op: 'link', type: 'needs', from: 'live', to: 'lane' },
@@ -926,11 +926,11 @@ test('launching runs a headless session on a task, holding the lane and recordin
 test('tokens: an estimate is asked for, what a session uses goes to its work, and the graph adds up what is part of what', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
     { op: 'create', ref: 'f', type: 'software.feature', title: 'Feature', props: { tokens_estimated: 100_000 } },
-    { op: 'create', ref: 'a', type: 'task', title: 'Task A', props: { tokens_estimated: 80_000 } },
-    { op: 'create', ref: 'b', type: 'task', title: 'Task B' },
-    { op: 'create', ref: 'n', type: 'note', title: 'A note' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'Task A', props: { tokens_estimated: 80_000 } },
+    { op: 'create', ref: 'b', type: 'work.task', title: 'Task B' },
+    { op: 'create', ref: 'n', type: 'work.note', title: 'A note' },
     { op: 'link', type: 'part_of', from: 'f', to: 'p' },
     { op: 'link', type: 'part_of', from: 'a', to: 'f' },
     { op: 'link', type: 'part_of', from: 'b', to: 'f' },
@@ -960,12 +960,12 @@ test('tokens: an estimate is asked for, what a session uses goes to its work, an
   const once = ((await VIEWS.graph.run(l, { focus: made.p, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
   assert.deepEqual(once.find((n: any) => n.id === made.p).tokens, { estimated: 80_000, used: 40_000, partial: true });
   // What is finished counts as used: by its estimate when no session was measured on it, and its feature and project with it.
-  const { c } = await make(l, [{ op: 'create', ref: 'c', type: 'task', title: 'Task C', status: 'done', props: { tokens_estimated: 30_000 } }, { op: 'link', type: 'part_of', from: 'c', to: made.f }]);
+  const { c } = await make(l, [{ op: 'create', ref: 'c', type: 'work.task', title: 'Task C', status: 'done', props: { tokens_estimated: 30_000 } }, { op: 'link', type: 'part_of', from: 'c', to: made.f }]);
   const again = ((await VIEWS.graph.run(l, { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
   assert.deepEqual(again.find((n: any) => n.id === c).tokens, { estimated: 30_000, used: 30_000, assumed: true });
   assert.deepEqual(again.find((n: any) => n.id === made.f).tokens, { estimated: 110_000, used: 70_000, assumed: true, partial: true });
   // Its own estimate stands only while none of its tasks has one.
-  const { g } = await make(l, [{ op: 'create', ref: 'g', type: 'software.feature', title: 'Bare', props: { tokens_estimated: 50_000 } }, { op: 'create', ref: 'x', type: 'task', title: 'Unsized' }, { op: 'link', type: 'part_of', from: 'x', to: 'g' }]);
+  const { g } = await make(l, [{ op: 'create', ref: 'g', type: 'software.feature', title: 'Bare', props: { tokens_estimated: 50_000 } }, { op: 'create', ref: 'x', type: 'work.task', title: 'Unsized' }, { op: 'link', type: 'part_of', from: 'x', to: 'g' }]);
   assert.deepEqual(((await VIEWS.graph.run(l, { focus: g, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === g).tokens, { estimated: 50_000, used: 0 });
   await make(l, [{ op: 'archive', id: c }]);
   await make(l, [{ op: 'update', id: made.b, props: { tokens_estimated: 70_000 } }]);
@@ -994,7 +994,7 @@ test('a run in GitHub Actions reports what it used, once, and the repository add
 
 test('an agent can notify the human; a stale session raises one notification', async () => {
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Ship it' }]);
+  const made = await make(l, [{ op: 'create', ref: 't', type: 'work.task', title: 'Ship it' }]);
   await callTool(l, agent, 'notify', { title: 'Blocked on a certificate', level: 'warning', about: made.t });
   assert.equal((await l.proposals()).length, 0);
   let unread = (await VIEWS.notifications.run(l, {})) as any[];
@@ -1056,7 +1056,7 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   // making one, changing one or bringing one back waits for the human.
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', archive: 'auto', restore: 'auto', link: 'auto' });
   const launches = { trigger: 'every', every_minutes: 1, action: 'launch', input: { task: made.hourly, mode: 'acceptEdits', instructions: 'anything' } };
-  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'An ordinary thing' }] })).status, 'applied');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'An ordinary thing' }] })).status, 'applied');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'sys.automation', title: 'Launches', status: 'enabled', props: launches }] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.morning, props: launches }] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.any, status: 'enabled' }] })).status, 'proposed');
@@ -1093,7 +1093,7 @@ test('a note is added to, or one passage of it replaced, without sending it agai
   const { undo } = await import('../src/undo.ts');
   const l = await fresh();
   const note = 'Seen\n- once, on Monday.\n\nWhat would help\nA smaller answer.';
-  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Trim the answer', body: note }]);
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'work.task', title: 'Trim the answer', body: note }]);
   const body = async () => (await l.entity(t))!.body;
 
   const added = await l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, status: 'done', append: 'Outcome\nTrimmed to a tenth.\n' }] });
@@ -1137,8 +1137,8 @@ test('a note is added to, or one passage of it replaced, without sending it agai
 test('a refused change is kept and corrected by its one wrong op; history says a change set’s reason once', async () => {
   const l = await fresh();
   const ops = [
-    { op: 'create', ref: 'a', type: 'task', title: 'Draw the plan' },
-    { op: 'create', ref: 'b', type: 'issue', title: 'The plan is drawn twice', props: { repro: 'Open it twice' } },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'Draw the plan' },
+    { op: 'create', ref: 'b', type: 'work.issue', title: 'The plan is drawn twice', props: { repro: 'Open it twice' } },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
   ];
   // The refusal names the flavour that has the field, and the name the change is kept under.
@@ -1146,7 +1146,7 @@ test('a refused change is kept and corrected by its one wrong op; history says a
     () => assert.fail('an issue has no repro'),
     (e: Error) => e.message,
   );
-  assert.match(said, /op 2 \(create\): issue has no field "repro".*software\.bug, a flavour of issue, has it/);
+  assert.match(said, /op 2 \(create\): work\.issue has no field "repro".*software\.bug, a flavour of work\.issue, has it/);
   const name = /kept for 10 minutes as "(k_\w+)"/.exec(said)![1];
   // A fix that is wrong again is refused again, under the same name.
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], title: 'x'.repeat(61) } }] }), new RegExp(`the title is 61 characters[^]*as "${name}"`));
@@ -1156,7 +1156,7 @@ test('a refused change is kept and corrected by its one wrong op; history says a
   assert.equal(sent.status, 'proposed');
   const held = (await l.proposals()).at(-1)!;
   assert.equal(held.reason, 'A plan to draw');
-  assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'software.bug', 'depends_on']);
+  assert.deepEqual(held.ops.map((o: any) => o.type), ['work.task', 'software.bug', 'depends_on']);
   // Once it has gone through it is no longer kept; nor is it anyone else's to send.
   await assert.rejects(callTool(l, agent, 'change', { retry: name }), /No refused change is kept/);
   await assert.rejects(callTool(l, agent, 'change', { reason: 'nothing' }), /needs ops/);
@@ -1164,8 +1164,8 @@ test('a refused change is kept and corrected by its one wrong op; history says a
   // What changed since: one change set says its reason and authority on the first of its events, and long notes are cut.
   const long = 'A long note. '.repeat(100);
   const made = await make(l, [
-    { op: 'create', ref: 'x', type: 'task', title: 'First', body: long },
-    { op: 'create', ref: 'y', type: 'task', title: 'Second' },
+    { op: 'create', ref: 'x', type: 'work.task', title: 'First', body: long },
+    { op: 'create', ref: 'y', type: 'work.task', title: 'Second' },
   ]);
   await make(l, [{ op: 'update', id: made.x, body: `${long}More.` }]);
   const since = { name: 'changed_since', params: { since: '2000-01-01' } };
@@ -1182,15 +1182,15 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   const { undo } = await import('../src/undo.ts');
   const l = await fresh();
   const base = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
-    { op: 'create', ref: 'old', type: 'task', title: 'Old task', body: 'x'.repeat(500), props: { priority: 'low' } },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
+    { op: 'create', ref: 'old', type: 'work.task', title: 'Old task', body: 'x'.repeat(500), props: { priority: 'low' } },
     { op: 'link', type: 'part_of', from: 'old', to: 'p' },
   ]);
   const rel = (await l.get(base.old)).outgoing[0] as any;
   const second = await l.change(human, {
     reason: 'Reshuffle',
     ops: [
-      { op: 'create', ref: 'n', type: 'task', title: 'New task' },
+      { op: 'create', ref: 'n', type: 'work.task', title: 'New task' },
       { op: 'link', type: 'part_of', from: 'n', to: base.p },
       { op: 'update', id: base.old, status: 'doing', body: 'short', props: { priority: 'high', due: '2026-12-01' } },
       { op: 'unlink', relation: rel.relation },
@@ -1211,7 +1211,7 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   assert.deepEqual([old.status, old.body.length, old.props.priority, old.props.due], ['todo', 500, 'urgent', undefined], 'long text comes back whole');
   assert.equal((await l.entity(base.p))!.archived_at, null, 'the archived project is restored');
   assert.deepEqual((await l.get(base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
-  assert.deepEqual((await l.search({ type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
+  assert.deepEqual((await l.search({ type: 'work.task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
 
   await assert.rejects(undo(l, human, { changeset: set }), /already been undone/);
   await assert.rejects(undo(l, human, { changeset: 'c_nope' }), /No change set/);
@@ -1223,12 +1223,12 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
 test('the graph view returns a preset of the whole map, or one entity\'s neighbourhood', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
-    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
     { op: 'create', ref: 'b', type: 'software.bug', title: 'B' },
-    { op: 'create', ref: 'c', type: 'task', title: 'C', status: 'done' },
-    { op: 'create', ref: 'lonely', type: 'note', title: 'Lonely' },
-    { op: 'create', ref: 'far', type: 'task', title: 'Far' },
+    { op: 'create', ref: 'c', type: 'work.task', title: 'C', status: 'done' },
+    { op: 'create', ref: 'lonely', type: 'work.note', title: 'Lonely' },
+    { op: 'create', ref: 'far', type: 'work.task', title: 'Far' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'far', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
@@ -1240,8 +1240,8 @@ test('the graph view returns a preset of the whole map, or one entity\'s neighbo
   assert.deepEqual(titles(blocking), ['A', 'B'], 'only what blocking relations connect; finished work left out');
   assert.deepEqual(blocking.edges.map((e: any) => e.type), ['depends_on']);
   const a = blocking.nodes.find((n: any) => n.title === 'A');
-  assert.deepEqual([a.blocked, a.root], [true, 'task']);
-  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'issue', 'a flavour reports its root type');
+  assert.deepEqual([a.blocked, a.root], [true, 'work.task']);
+  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'work.issue', 'a flavour reports its root type');
 
   assert.deepEqual(titles(await VIEWS.graph.run(l, { relations: 'all', include_closed: true })), ['A', 'B', 'C', 'Far', 'Proj']);
   assert.deepEqual(titles(await VIEWS.graph.run(l, { focus: made.far, depth: 1 })), ['Far', 'Proj']);
@@ -1253,16 +1253,16 @@ test('the graph view returns a preset of the whole map, or one entity\'s neighbo
 test('a lens answers with one shape of data: what is inside what, the same counts at every depth, links moved up, and what was left out', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'P' },
-    { op: 'create', ref: 'q', type: 'project', title: 'Q' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
+    { op: 'create', ref: 'q', type: 'work.project', title: 'Q' },
     { op: 'create', ref: 'late', type: 'software.feature', title: 'Late', props: { order: 2 } },
     { op: 'create', ref: 'early', type: 'software.feature', title: 'Early', status: 'building', props: { order: 1 } },
-    { op: 'create', ref: 'a', type: 'task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'task', title: 'B' },
-    { op: 'create', ref: 'c', type: 'task', title: 'C' },
-    { op: 'create', ref: 'd', type: 'task', title: 'D' },
-    { op: 'create', ref: 'e', type: 'task', title: 'E', status: 'done' },
-    { op: 'create', ref: 'x', type: 'task', title: 'X' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'c', type: 'work.task', title: 'C' },
+    { op: 'create', ref: 'd', type: 'work.task', title: 'D' },
+    { op: 'create', ref: 'e', type: 'work.task', title: 'E', status: 'done' },
+    { op: 'create', ref: 'x', type: 'work.task', title: 'X' },
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
     { op: 'link', type: 'part_of', from: 'early', to: 'p' },
     { op: 'link', type: 'part_of', from: 'late', to: 'p' },
@@ -1308,16 +1308,16 @@ test('a lens answers with one shape of data: what is inside what, the same count
   assert.deepEqual(['A', 'P', 'C'].map((t) => item(around, t).lane), ['part_of:in', 'part_of', null], 'the kind of link and which way it runs');
   const asItOpens = await run({ from: made.early });
   assert.deepEqual([asItOpens.lens.over, asItOpens.lens.lanes, titles(asItOpens)], ['all', 'link', titles(around)], 'around one item, every kind of link and lanes by link are what it opens on');
-  await make(l, [{ op: 'create', ref: 'n', type: 'note', title: 'About A' }, { op: 'link', type: 'about', from: 'n', to: made.a }, { op: 'create', ref: 'm', type: 'note', title: 'About Early' }, { op: 'link', type: 'about', from: 'm', to: made.early }]);
+  await make(l, [{ op: 'create', ref: 'n', type: 'work.note', title: 'About A' }, { op: 'link', type: 'about', from: 'n', to: made.a }, { op: 'create', ref: 'm', type: 'work.note', title: 'About Early' }, { op: 'link', type: 'about', from: 'm', to: made.early }]);
   assert.deepEqual(titles(await run({ from: made.early })).filter((t: string) => t.startsWith('About')), ['About Early'], 'what is linked to the start is brought in; what is only linked to something inside it is not');
   assert.deepEqual(links(around), ['A depends_on C x1', 'B waits_on Sam x1', 'X depends_on A x1'], 'what is inside what is said by inside, not by a link as well');
 
   // Lanes by stage, with what is finished unfolded; and kinds.
   const staged = await run({ from: made.p, lanes: 'stage', fold: [] });
   assert.deepEqual(['Early', 'Late', 'E'].map((t) => item(staged, t).lane), ['under_way', 'to_come', 'done']);
-  const tasks = await run({ kinds: ['task'], fold: ['closed', 'system'] });
+  const tasks = await run({ kinds: ['work.task'], fold: ['closed', 'system'] });
   assert.deepEqual([titles(tasks), tasks.rest.kinds], [['A', 'B', 'C', 'D', 'X'], 7], 'the two projects, two features, Sam and the two notes are not tasks');
-  const tasksOfP = await run({ from: made.p, kinds: ['task'], over: [] });
+  const tasksOfP = await run({ from: made.p, kinds: ['work.task'], over: [] });
   assert.deepEqual([titles(tasksOfP), item(tasksOfP, 'A').inside, item(tasksOfP, 'P').within.items], [['A', 'B', 'C', 'P'], made.p, 3], 'of some kinds only, a thing sits in the nearest thing kept above it: the feature between is not drawn, and its tasks are not lost');
 
   await assert.rejects(run({ by: 'nope' }), /unknown kind of link/);
@@ -1395,17 +1395,17 @@ test('a lens answers with one shape of data: what is inside what, the same count
 test('the roadmap tree orders a project\'s features, rolls up progress, and shows where work is happening', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
-    { op: 'create', ref: 'other', type: 'project', title: 'Other' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
+    { op: 'create', ref: 'other', type: 'work.project', title: 'Other' },
     { op: 'create', ref: 'late', type: 'software.feature', title: 'Late', props: { order: 2 } },
     { op: 'create', ref: 'early', type: 'software.feature', title: 'Early', status: 'building', props: { order: 1 } },
     { op: 'create', ref: 'unplaced', type: 'software.feature', title: 'No place yet' },
     { op: 'create', ref: 'sub', type: 'software.feature', title: 'Sub' },
-    { op: 'create', ref: 't1', type: 'task', title: 'T1', status: 'done' },
-    { op: 'create', ref: 't2', type: 'task', title: 'T2', status: 'doing' },
+    { op: 'create', ref: 't1', type: 'work.task', title: 'T1', status: 'done' },
+    { op: 'create', ref: 't2', type: 'work.task', title: 'T2', status: 'doing' },
     { op: 'create', ref: 't3', type: 'software.bug', title: 'T3' },
-    { op: 'create', ref: 'loose', type: 'task', title: 'Loose' },
-    { op: 'create', ref: 'note', type: 'note', title: 'Not work' },
+    { op: 'create', ref: 'loose', type: 'work.task', title: 'Loose' },
+    { op: 'create', ref: 'note', type: 'work.note', title: 'Not work' },
     ...['late', 'early', 'unplaced', 'loose'].map((from): Op => ({ op: 'link', type: 'part_of', from, to: 'p' })),
     { op: 'link', type: 'part_of', from: 'sub', to: 'early' },
     { op: 'link', type: 'part_of', from: 't1', to: 'early' },
@@ -1446,16 +1446,16 @@ test('the roadmap tree orders a project\'s features, rolls up progress, and show
 test('a project\'s unsettled questions are what needs settling in it, what holds up the most first', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
-    { op: 'create', ref: 'other', type: 'project', title: 'Other' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
+    { op: 'create', ref: 'other', type: 'work.project', title: 'Other' },
     { op: 'create', ref: 'f', type: 'software.feature', title: 'Feature' },
-    { op: 'create', ref: 't', type: 'task', title: 'Task' },
-    { op: 'create', ref: 'big', type: 'decision', title: 'Big', props: { options: ['A', 'B'] } },
-    { op: 'create', ref: 'small', type: 'decision', title: 'Small' },
-    { op: 'create', ref: 'old', type: 'decision', title: 'Old', status: 'decided', props: { outcome: 'Yes', rationale: 'Because' } },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Task' },
+    { op: 'create', ref: 'big', type: 'work.decision', title: 'Big', props: { options: ['A', 'B'] } },
+    { op: 'create', ref: 'small', type: 'work.decision', title: 'Small' },
+    { op: 'create', ref: 'old', type: 'work.decision', title: 'Old', status: 'decided', props: { outcome: 'Yes', rationale: 'Because' } },
     { op: 'create', ref: 'hyp', type: 'inquiry.hypothesis', title: 'Hyp' },
     { op: 'create', ref: 'exp', type: 'inquiry.experiment', title: 'Try it' },
-    { op: 'create', ref: 'else', type: 'decision', title: 'Elsewhere' },
+    { op: 'create', ref: 'else', type: 'work.decision', title: 'Elsewhere' },
     { op: 'link', type: 'part_of', from: 'f', to: 'p' },
     { op: 'link', type: 'part_of', from: 't', to: 'f' },
     { op: 'link', type: 'part_of', from: 'small', to: 'p' },
@@ -1484,9 +1484,9 @@ test('a project\'s unsettled questions are what needs settling in it, what holds
 test('a question in a project inside another is both projects\', and sits in the outer one at the top', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Parent' },
-    { op: 'create', ref: 'sub', type: 'project', title: 'Area' },
-    { op: 'create', ref: 'd', type: 'decision', title: 'Which way?' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Parent' },
+    { op: 'create', ref: 'sub', type: 'work.project', title: 'Area' },
+    { op: 'create', ref: 'd', type: 'work.decision', title: 'Which way?' },
     { op: 'link', type: 'part_of', from: 'sub', to: 'p' },
     { op: 'link', type: 'part_of', from: 'd', to: 'sub' },
   ]);
@@ -1498,13 +1498,13 @@ test('a question in a project inside another is both projects\', and sits in the
 test('an agent may settle its own work unreviewed, but only proposes the answer to a question', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'd', type: 'decision', title: 'Where do backups go?' },
+    { op: 'create', ref: 'd', type: 'work.decision', title: 'Where do backups go?' },
     { op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Hooks run in the desktop app' },
-    { op: 'create', ref: 't', type: 'task', title: 'Wire the upload' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Wire the upload' },
   ]);
   // As in dev mode: nothing an agent does is reviewed.
   const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
-  const decided = l.registry.type('decision')!.statuses.closed[0];
+  const decided = l.registry.type('work.decision')!.statuses.closed[0];
   const settled = l.registry.type('inquiry.hypothesis')!.statuses.closed[0];
 
   assert.equal((await free.change(agent, { reason: 'did it', ops: [{ op: 'update', id: made.t, status: 'done' }] })).status, 'applied', 'its own task');
@@ -1523,9 +1523,9 @@ test('an agent may settle its own work unreviewed, but only proposes the answer 
 test('a held change that asks only for what is already so leaves the queue as superseded', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'd', type: 'decision', title: 'Where do backups go?' },
-    { op: 'create', ref: 't', type: 'task', title: 'Wire the upload' },
-    { op: 'create', ref: 'u', type: 'task', title: 'Prune old copies' },
+    { op: 'create', ref: 'd', type: 'work.decision', title: 'Where do backups go?' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Wire the upload' },
+    { op: 'create', ref: 'u', type: 'work.task', title: 'Prune old copies' },
   ]);
   const hold = async (ops: any[]) => ((await l.change(agent, { reason: 'held', ops })) as { proposal: string }).proposal;
   const answer = await hold([{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Supabase' } }]);
@@ -1551,11 +1551,11 @@ test('a backup holds every row, and restores into an empty database that then ca
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj', owner: 'me' },
-    { op: 'create', ref: 't', type: 'task', title: 'Task', props: { due: '2026-11-01' } },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj', owner: 'me' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Task', props: { due: '2026-11-01' } },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
-  await l.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
+  await l.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'work.note', title: 'Proposed' }] });
 
   const taken = await dump(l.db, { id: 'default', name: 'Default' }, { id: 'local', types: [] });
   const copy = new Archipelago(await openDb(), l.registry);
@@ -1567,7 +1567,7 @@ test('a backup holds every row, and restores into an empty database that then ca
   assert.deepEqual([task.entity.title, task.entity.props.due, task.outgoing[0].title], ['Task', '2026-11-01', 'Proj']);
   assert.equal((await copy.proposals()).length, 1, 'what was waiting for review still is');
   const before = Math.max(...taken.tables.event.map((e) => e.seq as number));
-  await make(copy, [{ op: 'create', type: 'note', title: 'After the restore' }]);
+  await make(copy, [{ op: 'create', type: 'work.note', title: 'After the restore' }]);
   const { rows } = await copy.db.query<{ seq: number }>(`select max(seq)::int as seq from event`);
   assert.ok(rows[0].seq > before, 'new events are numbered after the restored ones');
   await assert.rejects(restore(copy.db, taken), /not empty/);
@@ -1576,24 +1576,24 @@ test('a backup holds every row, and restores into an empty database that then ca
 test('a backup merges into a map that has moved on: nothing is lost, the later edit wins, and twice is the same as once', async () => {
   const a = await fresh();
   const made = await make(a, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
-    { op: 'create', ref: 't', type: 'task', title: 'Task' },
-    { op: 'create', ref: 'u', type: 'task', title: 'Other task' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Task' },
+    { op: 'create', ref: 'u', type: 'work.task', title: 'Other task' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
-  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
+  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'work.note', title: 'Proposed' }] });
   const snapshot = async (l: Archipelago) => JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' })));
   // b starts as a copy of a, then each goes its own way.
   const b = new Archipelago(await openDb(), a.registry);
   await restore(b.db, await snapshot(a));
   const partOf = ((await a.get(made.t)) as any).outgoing[0].relation;
 
-  await make(b, [{ op: 'update', id: made.p, title: 'Proj, renamed in b' }, { op: 'create', type: 'note', title: 'Only in b' }]);
+  await make(b, [{ op: 'update', id: made.p, title: 'Proj, renamed in b' }, { op: 'create', type: 'work.note', title: 'Only in b' }]);
   await make(a, [
     { op: 'update', id: made.t, title: 'Task, renamed in a' },
     { op: 'unlink', relation: partOf },
     { op: 'archive', id: made.u },
-    { op: 'create', ref: 'n', type: 'task', title: 'New in a' },
+    { op: 'create', ref: 'n', type: 'work.task', title: 'New in a' },
     { op: 'link', type: 'part_of', from: 'n', to: made.p },
   ]);
   const [pending] = await a.proposals();
@@ -1639,7 +1639,7 @@ test('backups are written per workspace, read back, and only the newest are kept
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
   await workspaces.create('acme', 'Acme');
-  await make((await workspaces.get('acme')).pelago, [{ op: 'create', type: 'task', title: 'Theirs' }]);
+  await make((await workspaces.get('acme')).pelago, [{ op: 'create', type: 'work.task', title: 'Theirs' }]);
   const dir = join(root, 'backups');
   assert.equal(newestBackup(dir), undefined);
   for (let i = 0; i < 3; i++) {
@@ -1680,10 +1680,10 @@ test('backups are written per workspace, read back, and only the newest are kept
 test('search puts the best match first and forgives a slip of the keys', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', type: 'note', title: 'Roadmap for the garden app' },
-    { op: 'create', type: 'note', title: 'Hosting', body: 'Where the deployment runs.' },
-    { op: 'create', type: 'note', title: 'Unrelated', body: 'Mentions hosting once, in passing, among many other words about something else entirely.' },
-    { op: 'create', type: 'note', title: 'Nothing to do with it' },
+    { op: 'create', type: 'work.note', title: 'Roadmap for the garden app' },
+    { op: 'create', type: 'work.note', title: 'Hosting', body: 'Where the deployment runs.' },
+    { op: 'create', type: 'work.note', title: 'Unrelated', body: 'Mentions hosting once, in passing, among many other words about something else entirely.' },
+    { op: 'create', type: 'work.note', title: 'Nothing to do with it' },
   ]);
   const titles = async (q: string) => (await l.search({ q })).map((e) => e.title);
   assert.deepEqual(await titles('hosting'), ['Hosting', 'Unrelated'], 'a title match outranks a newer mention in the notes');
@@ -1698,7 +1698,7 @@ test('a workspace nobody is using is closed, and opens again with its data', asy
   const workspaces = new Workspaces({ dataDir: join(root, 'data'), rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
   await workspaces.get('default');
   const acme = await workspaces.create('acme', 'Acme');
-  await make(acme.pelago, [{ op: 'create', type: 'task', title: 'Theirs' }]);
+  await make(acme.pelago, [{ op: 'create', type: 'work.task', title: 'Theirs' }]);
 
   const release = workspaces.hold('acme');
   assert.deepEqual(await workspaces.closeIdle(0), [], 'not while a request is in hand, and never the default workspace');
@@ -1708,7 +1708,7 @@ test('a workspace nobody is using is closed, and opens again with its data', asy
   assert.deepEqual([workspaces.isOpen('acme'), workspaces.isOpen('default')], [false, true]);
 
   const again = await workspaces.get('acme');
-  assert.deepEqual((await again.pelago.search({ type: 'task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
+  assert.deepEqual((await again.pelago.search({ type: 'work.task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
   const session = await sessionStart(again.pelago, agent, { title: 'Working' });
   assert.deepEqual(await workspaces.closeIdle(0), [], 'a workspace with an open session stays open, so the session can be seen to go quiet');
   await sessionEnd(again.pelago, agent, { run: session.run, outcome: 'finished', summary: 'done' });
@@ -1724,18 +1724,18 @@ test('an event is a gate: what holds it by stream, what can follow, and what is 
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
-    { op: 'create', ref: 'app', type: 'project', title: 'App' },
-    { op: 'create', ref: 'business', type: 'project', title: 'Business' },
+    { op: 'create', ref: 'app', type: 'work.project', title: 'App' },
+    { op: 'create', ref: 'business', type: 'work.project', title: 'Business' },
     { op: 'create', ref: 'addin', type: 'software.feature', title: 'Add-in' },
     { op: 'create', ref: 'installer', type: 'software.feature', title: 'Installer' },
     { op: 'create', ref: 'docs', type: 'software.feature', title: 'Docs' },
-    { op: 'create', ref: 'sign', type: 'task', title: 'Sign the package' },
-    { op: 'create', ref: 'cert', type: 'decision', title: 'Which certificate?', owner: 'me' },
-    { op: 'create', ref: 'clean', type: 'task', title: 'Uninstall leaves it clean', status: 'done' },
-    { op: 'create', ref: 'hover', type: 'task', title: 'Hover cards' },
-    { op: 'create', ref: 'extras', type: 'task', title: 'Capture extras' },
-    { op: 'create', ref: 'guide', type: 'task', title: 'Write the guide' },
-    { op: 'create', ref: 'pricing', type: 'decision', title: 'What does it cost?', owner: 'me' },
+    { op: 'create', ref: 'sign', type: 'work.task', title: 'Sign the package' },
+    { op: 'create', ref: 'cert', type: 'work.decision', title: 'Which certificate?', owner: 'me' },
+    { op: 'create', ref: 'clean', type: 'work.task', title: 'Uninstall leaves it clean', status: 'done' },
+    { op: 'create', ref: 'hover', type: 'work.task', title: 'Hover cards' },
+    { op: 'create', ref: 'extras', type: 'work.task', title: 'Capture extras' },
+    { op: 'create', ref: 'guide', type: 'work.task', title: 'Write the guide' },
+    { op: 'create', ref: 'pricing', type: 'work.decision', title: 'What does it cost?', owner: 'me' },
     { op: 'create', ref: 'release', type: 'software.release', title: 'Version 1.0' },
     { op: 'link', type: 'part_of', from: 'addin', to: 'app' },
     { op: 'link', type: 'part_of', from: 'installer', to: 'addin' },
@@ -1796,7 +1796,7 @@ test('an event is a gate: what holds it by stream, what can follow, and what is 
 test('a proof question is answered on a build when every test of it passed there', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'app', type: 'work.project', title: 'App' },
     { op: 'create', ref: 'solver', type: 'software.feature', title: 'Solver' },
     { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
     { op: 'create', ref: 'areas', type: 'software.proof', title: 'How do we know the areas are correct?' },
@@ -1867,7 +1867,7 @@ test('a proof question is answered on a build when every test of it passed there
 test('a picture is kept for a result only when sent, travels in a backup, and goes when the test is run again', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'app', type: 'work.project', title: 'App' },
     { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
     { op: 'create', ref: 'noaa', type: 'software.test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
     { op: 'link', type: 'part_of', from: 'sun', to: 'app' },
@@ -1912,7 +1912,7 @@ test('a picture is kept for a result only when sent, travels in a backup, and go
 test('a release is not clear until what it ships is proven on its own build, and a changelog is only what is built', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'app', type: 'work.project', title: 'App' },
     { op: 'create', ref: 'addin', type: 'software.feature', title: 'Add-in', status: 'built' },
     { op: 'create', ref: 'panel', type: 'software.feature', title: 'Panel', status: 'built' },
     { op: 'create', ref: 'old', type: 'software.feature', title: 'Presets', status: 'shipped' },
@@ -1991,7 +1991,7 @@ test('costs: dollars where a run says, tokens where it does not, and each regula
 test('public: only a human makes it so, only some kinds can be, and anyone then sees little of it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'Internal plan: the secret margin' },
+    { op: 'create', ref: 'app', type: 'work.project', title: 'App', body: 'Internal plan: the secret margin' },
     { op: 'create', ref: 'between', type: 'software.feature', title: 'Proof work', body: 'Not for anyone' },
     { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?', body: 'An internal note' },
     { op: 'create', ref: 'areas', type: 'software.proof', title: 'How do we know the areas are correct?' },
@@ -1999,7 +1999,7 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
     { op: 'create', ref: 'square', type: 'software.test', title: 'Area of a square', status: 'current', props: { entrypoint: 'Area.Square' } },
     { op: 'create', ref: 'panel', type: 'software.feature', title: 'Panel', status: 'built' },
     { op: 'create', ref: 'hidden', type: 'software.feature', title: 'Unannounced', status: 'built' },
-    { op: 'create', ref: 'choice', type: 'decision', title: 'What does it cost?' },
+    { op: 'create', ref: 'choice', type: 'work.decision', title: 'What does it cost?' },
     { op: 'link', type: 'part_of', from: 'between', to: 'app' },
     { op: 'link', type: 'part_of', from: 'sun', to: 'between' },
     { op: 'link', type: 'part_of', from: 'areas', to: 'between' },
@@ -2128,12 +2128,12 @@ test('a document brings items in by id, and a link shows it and them to anyone h
   const boActor: Actor = { kind: 'human', name: 'bo', person: people.bo };
   const theirs = async (who: Archipelago, actor: Actor, ops: Op[]) => ((await who.change(actor, { ops, reason: 'test' })) as { created: Record<string, string> }).created;
   const hers = await theirs(ann, annActor, [
-    { op: 'create', ref: 'mine', type: 'note', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
-    { op: 'create', ref: 'all', type: 'note', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
+    { op: 'create', ref: 'mine', type: 'work.note', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
+    { op: 'create', ref: 'all', type: 'work.note', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
   ]);
-  const his = await theirs(bo, boActor, [{ op: 'create', ref: 'n', type: 'note', title: 'Bo’s secret plan', body: 'Not for Ann’s readers.', visibility: 'private' }]);
+  const his = await theirs(bo, boActor, [{ op: 'create', ref: 'n', type: 'work.note', title: 'Bo’s secret plan', body: 'Not for Ann’s readers.', visibility: 'private' }]);
   const body = `# Funding\n\nTwo programs, and a third (${his.n}) the reader does not see.\n\n${hers.mine}\n\nBetween them, ${hers.mine} comes first.\n${hers.all}\n${his.n}\ne_nothing1\n`;
-  const { doc } = await theirs(ann, annActor, [{ op: 'create', ref: 'doc', type: 'document', title: 'Funding for Northwind', body, visibility: 'private', props: { for: 'Sam' } }]);
+  const { doc } = await theirs(ann, annActor, [{ op: 'create', ref: 'doc', type: 'work.document', title: 'Funding for Northwind', body, visibility: 'private', props: { for: 'Sam' } }]);
   assert.deepEqual(sectionIds(body), [hers.mine, hers.all, his.n, 'e_nothing1']);
 
   // Its author reads it whole; what she may not see is said as missing, in its place.
@@ -2180,12 +2180,12 @@ test('what is made for a reader is marked deliverable by its type, and a documen
   const l = await fresh();
   const marked = (await callTool(l, human, 'schema', {})) as { types: { id: string; deliverable?: boolean }[] };
   const deliverable = (id: string) => Boolean(marked.types.find((t) => t.id === id)?.deliverable);
-  assert.deepEqual(['document', 'file', 'software.release', 'software.spec', 'note', 'task'].map(deliverable), [true, true, true, false, false, false]);
+  assert.deepEqual(['work.document', 'work.file', 'software.release', 'software.spec', 'work.note', 'work.task'].map(deliverable), [true, true, true, false, false, false]);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Research' },
-    { op: 'create', ref: 'a', type: 'note', title: 'Inside' },
-    { op: 'create', ref: 'b', type: 'note', title: 'Beside' },
-    { op: 'create', ref: 'd', type: 'document', title: 'Brief', body: '{a}\n{b}' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Research' },
+    { op: 'create', ref: 'a', type: 'work.note', title: 'Inside' },
+    { op: 'create', ref: 'b', type: 'work.note', title: 'Beside' },
+    { op: 'create', ref: 'd', type: 'work.document', title: 'Brief', body: '{a}\n{b}' },
     { op: 'link', type: 'part_of', from: 'd', to: 'p' },
     { op: 'link', type: 'part_of', from: 'a', to: 'd' },
     { op: 'link', type: 'part_of', from: 'b', to: 'p' },
@@ -2199,8 +2199,8 @@ test('what is made for a reader is marked deliverable by its type, and a documen
 test('a lens files items by a field, sends the fields their pack shows, and says what a link says', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
-    { op: 'create', ref: 'ops', type: 'project', title: 'Business and operations' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Research project' },
+    { op: 'create', ref: 'ops', type: 'work.project', title: 'Business and operations' },
     { op: 'create', ref: 'irap', type: 'funding.program', title: 'NRC IRAP', status: 'open', props: { kind: 'grant', phase: 'research', amount: 'salaries ~80%', run_by: 'NRC' } },
     { op: 'create', ref: 'sred', type: 'funding.program', title: 'SR&ED', status: 'open', props: { kind: 'tax_credit', phase: 'prove', deadline: '2027-06-30', deadline_note: 'file by' } },
     { op: 'create', ref: 'lift', type: 'funding.program', title: 'BDC LIFT', status: 'open', props: { kind: 'loan', phase: 'build' } },
@@ -2231,11 +2231,11 @@ test('a lens files items by a field, sends the fields their pack shows, and says
 test('a lens asked for by its id alone starts from what it is kept about, and can keep a still', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
-    { op: 'create', ref: 'q', type: 'project', title: 'Something else' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Research project' },
+    { op: 'create', ref: 'q', type: 'work.project', title: 'Something else' },
     { op: 'create', ref: 'irap', type: 'funding.program', title: 'NRC IRAP', status: 'open', props: { kind: 'grant', phase: 'research' } },
-    { op: 'create', ref: 'other', type: 'task', title: 'Elsewhere' },
-    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { kinds: ['project', 'funding.program'], lanes: 'field:phase' } },
+    { op: 'create', ref: 'other', type: 'work.task', title: 'Elsewhere' },
+    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { kinds: ['work.project', 'funding.program'], lanes: 'field:phase' } },
     { op: 'link', type: 'part_of', from: 'irap', to: 'p' },
     { op: 'link', type: 'part_of', from: 'other', to: 'q' },
     { op: 'link', type: 'about', from: 'v', to: 'p' },
@@ -2250,8 +2250,8 @@ test('a lens asked for by its id alone starts from what it is kept about, and ca
 test('an item says where it sits: what it is part of, outermost first, with the views kept about each', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
-    { op: 'create', ref: 'area', type: 'project', title: 'Simulation tools' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Research project' },
+    { op: 'create', ref: 'area', type: 'work.project', title: 'Simulation tools' },
     { op: 'create', ref: 'prog', type: 'funding.program', title: 'Mitacs AI Advantage', status: 'upcoming' },
     { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { place: 1 } },
     { op: 'create', ref: 'cut', type: 'lens', title: 'Shortcut', props: { from: 'e_elsewhere' } },
@@ -2269,18 +2269,18 @@ test('an item knows what names it in its text or fields, documents first, and on
   const l = await fresh();
   const people = await make(l, [{ op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
   const made = await make(l, [
-    { op: 'create', ref: 'n', type: 'note', title: 'FedDev section', visibility: 'shared' },
-    { op: 'create', ref: 't', type: 'task', title: 'Send the document', body: 'Details in {n}.', visibility: 'shared' },
-    { op: 'create', ref: 'd', type: 'document', title: 'Funding document', body: 'Intro\n{n}', visibility: 'shared' },
+    { op: 'create', ref: 'n', type: 'work.note', title: 'FedDev section', visibility: 'shared' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Send the document', body: 'Details in {n}.', visibility: 'shared' },
+    { op: 'create', ref: 'd', type: 'work.document', title: 'Funding document', body: 'Intro\n{n}', visibility: 'shared' },
   ]);
-  Object.assign(made, await make(l, [{ op: 'create', ref: 'q', type: 'decision', title: 'Apply to RAII?', visibility: 'shared', props: { rationale: `See ${made.n}` } }]));
+  Object.assign(made, await make(l, [{ op: 'create', ref: 'q', type: 'work.decision', title: 'Apply to RAII?', visibility: 'shared', props: { rationale: `See ${made.n}` } }]));
   const mentions = async (who: Archipelago) => ((await callTool(who, human, 'get', { id: made.n })) as { mentioned_in: { id: string }[] }).mentioned_in.map((m) => m.id);
   const all = await mentions(l);
   assert.equal(all[0], made.d, 'the document comes first');
   assert.deepEqual([...all].sort(), [made.t, made.d, made.q].sort());
   // Bo's own private note naming it is his alone to see.
   const bo = l.as(people.bo);
-  await bo.change({ kind: 'human', name: 'bo', person: people.bo }, { ops: [{ op: 'create', type: 'note', title: 'Mine', body: `About ${made.n}`, visibility: 'private' }], reason: 'test' });
+  await bo.change({ kind: 'human', name: 'bo', person: people.bo }, { ops: [{ op: 'create', type: 'work.note', title: 'Mine', body: `About ${made.n}`, visibility: 'private' }], reason: 'test' });
   assert.equal((await mentions(bo)).length, 4);
   assert.equal((await mentions(l.as('someone else'))).length, 3);
 });
@@ -2288,17 +2288,17 @@ test('an item knows what names it in its text or fields, documents first, and on
 test('an item knows the pictures it is drawn in, and the documents that show them', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Research project' },
     { op: 'create', ref: 'in', type: 'funding.program', title: 'Mitacs Accelerate', status: 'open', props: { kind: 'wage_subsidy', phase: 'research' } },
-    { op: 'create', ref: 'out', type: 'task', title: 'Call IRAP' },
-    { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { kinds: ['project', 'funding.program'] } },
-    { op: 'create', ref: 'd', type: 'document', title: 'Funding document', body: 'Intro\n{map}' },
+    { op: 'create', ref: 'out', type: 'work.task', title: 'Call IRAP' },
+    { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { kinds: ['work.project', 'funding.program'] } },
+    { op: 'create', ref: 'd', type: 'work.document', title: 'Funding document', body: 'Intro\n{map}' },
     { op: 'link', type: 'part_of', from: 'in', to: 'p' },
     { op: 'link', type: 'part_of', from: 'out', to: 'p' },
     { op: 'link', type: 'about', from: 'map', to: 'p' },
   ]);
   const shown = async (id: string) => ((await callTool(l, human, 'get', { id })) as { shown_in: { title: string; of: { id: string }; documents: { id: string }[] }[] }).shown_in;
-  assert.deepEqual(await shown(made.in), [{ id: made.map, title: 'Funding map', of: { id: made.p, title: 'Research project' }, documents: [{ id: made.d, title: 'Funding document' }] }]);
+  assert.deepEqual(await shown(made.in), [{ id: made.map, title: 'Funding map', of: { id: made.p, title: 'Research project' }, documents: [{ id: made.d, type: 'work.document', title: 'Funding document' }] }]);
   assert.deepEqual(await shown(made.out), [], 'a task is not in a picture of programs');
 });
 

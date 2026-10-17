@@ -870,7 +870,7 @@ export const TOOLS: Record<string, Tool> = {
   document: {
     description:
       'A document read whole, as its reader meets it: its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. ' +
-      'To write one, make an item of type document whose note is the text, and put an item’s id alone on a line where that item belongs; a lens\u2019s id brings in its picture, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
+      'To write one, make an item of type work.document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens\u2019s id brings in its picture, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
     input: { id: z.string() },
     run: async (l, _actor, input) => readDocument(l, input.id),
   },

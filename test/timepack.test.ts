@@ -35,9 +35,9 @@ test('time is logged against work, summed by day and client, and billed on a num
   const made = await make(l, [
     { op: 'create', ref: 'ap', type: 'company', title: 'Aperture Design Tools Inc.', props: { address: '1 King St, Toronto', hst_number: '123456789RT0001' } },
     { op: 'create', ref: 'aa', type: 'company', title: 'Northwind', props: { rate: 80, hst: true, terms_days: 30, billed_by: 'PLACEHOLDER' } },
-    { op: 'create', ref: 'p', type: 'project', title: 'Northwind research project' },
-    { op: 'create', ref: 't', type: 'task', title: 'Funding research' },
-    { op: 'create', ref: 'mine', type: 'project', title: 'Archipelago' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Northwind research project' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Funding research' },
+    { op: 'create', ref: 'mine', type: 'work.project', title: 'Archipelago' },
     { op: 'link', type: 'involves', from: 'p', to: 'aa' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
@@ -82,9 +82,9 @@ test('time is logged against work, summed by day and client, and billed on a num
 test('a block of time has hours from its start and end, and a week holds the owner’s blocks beside the agents’ lanes', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'ap', type: 'project', title: 'Aperture' },
-    { op: 'create', ref: 't', type: 'task', title: 'Sun study loop' },
-    { op: 'create', ref: 'ar', type: 'project', title: 'Archipelago' },
+    { op: 'create', ref: 'ap', type: 'work.project', title: 'Aperture' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Sun study loop' },
+    { op: 'create', ref: 'ar', type: 'work.project', title: 'Archipelago' },
     { op: 'create', ref: 'repo', type: 'software.repo', title: 'Archipelago repo', props: { path: 'c:/code/arch' } },
     { op: 'link', type: 'part_of', from: 't', to: 'ap' },
     { op: 'link', type: 'software.lives_in', from: 'ar', to: 'repo' },
@@ -135,7 +135,7 @@ test('a block of time has hours from its start and end, and a week holds the own
   const told = await callTool(l, agent, 'run_report', { repo: made.repo, title: 'Read the push to main (abc1234)' }) as { run: string };
   await l.db.query(`update entity set created_at = '2026-10-16T13:00:00Z', updated_at = '2026-10-16T13:00:00Z' where id = $1`, [told.run]);
   // Work in no project and no repository counts toward nothing, not toward itself.
-  const loose = await make(l, [{ op: 'create', ref: 'q', type: 'decision', title: 'Which house' }]);
+  const loose = await make(l, [{ op: 'create', ref: 'q', type: 'work.decision', title: 'Which house' }]);
   await callTool(l, human, 'time_log', { work: loose.q, what: 'Looked at houses', start: '2026-10-17T10:00:00-04:00', end: '2026-10-17T11:00:00-04:00' });
   const last = (await callTool(l, human, 'time_week', { from: '2026-10-12' })) as typeof wk & { days: { reported: number }[] };
   assert.deepEqual([last.days[4].agents.length, last.days[4].reported], [0, 1]);
@@ -165,7 +165,7 @@ test('planned time counts toward nothing and is never invoiced until the owner c
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'company', title: 'Alex Reiner Consulting' },
     { op: 'create', ref: 'c', type: 'company', title: 'PARTISANS', props: { rate: 50, billed_by: 'PLACEHOLDER' } },
-    { op: 'create', ref: 'p', type: 'project', title: 'PARTISANS work' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'PARTISANS work' },
     { op: 'link', type: 'involves', from: 'p', to: 'c' },
   ]);
   await make(l, [{ op: 'update', id: made.c, props: { billed_by: made.me } }]);
@@ -190,7 +190,7 @@ test('planned time counts toward nothing and is never invoiced until the owner c
   assert.equal((await l.entity(past.created.e))!.status, 'planned');
 
   // Confirmed as it happened, as the page sends it: for other work, and for an hour and a half, not two.
-  const other = await make(l, [{ op: 'create', ref: 'o', type: 'project', title: 'Other work' }, { op: 'link', type: 'involves', from: 'o', to: made.c }]);
+  const other = await make(l, [{ op: 'create', ref: 'o', type: 'work.project', title: 'Other work' }, { op: 'link', type: 'involves', from: 'o', to: made.c }]);
   const row = (wk.to_confirm as unknown as { id: string; link: string }[])[0];
   await make(l, [
     { op: 'update', id: row.id, status: 'logged', title: 'Site visit, cut short', props: { date: '2026-10-13', start: '2026-10-13T13:00:00.000Z', end: '2026-10-13T14:30:00.000Z', hours: 1.5 } },
@@ -220,7 +220,7 @@ test('a routine is drawn on the days it falls on; one for work waits to be confi
   const now = today();
   const back = (n: number) => new Date(Date.parse(`${now}T12:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Aperture' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Aperture' },
     { op: 'create', ref: 'dinner', type: 'time.routine', title: 'Dinner', status: 'active', props: { ...dinner, starts: back(10) } },
     { op: 'create', ref: 'deep', type: 'time.routine', title: 'Deep work', status: 'active', props: { from_time: '09:00', to_time: '11:00', starts: back(2) } },
     { op: 'link', type: 'part_of', from: 'deep', to: 'p' },
@@ -256,7 +256,7 @@ test('an invoice says how to pay, takes payments in parts, and what is owed and 
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Alex', props: { address: '92 King St E', hst_number: '748361565RT0001', payment: 'Interac e-Transfer to pay@example.com (autodeposit)\n- EFT: institution 004, transit 12345, account 1234567' } },
     { op: 'create', ref: 'aa', type: 'company', title: 'Northwind', props: { rate: 50, hst: true } },
-    { op: 'create', ref: 'p', type: 'project', title: 'Research' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Research' },
     { op: 'link', type: 'involves', from: 'p', to: 'aa' },
   ]);
   await make(l, [{ op: 'update', id: made.aa, props: { billed_by: made.me } }]);

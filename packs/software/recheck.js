@@ -32,7 +32,7 @@ async function recheckOf(ctx, project, now) {
  * lives here too is that project's, and is not listed twice.
  */
 async function projectsIn(ctx, repo) {
-  const living = (await ctx.read({ related: repo, relation: 'lives_in', direction: 'in', types: ['project', 'software.feature'], fields: ['recheck_days', 'rechecked_at'] })).filter((p) => p.is_open);
+  const living = (await ctx.read({ related: repo, relation: 'lives_in', direction: 'in', types: ['work.project', 'software.feature'], fields: ['recheck_days', 'rechecked_at'] })).filter((p) => p.is_open);
   const out = [];
   for (const p of living) {
     let there = false;

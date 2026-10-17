@@ -9,10 +9,10 @@ type Item = { id: string; type: string; title: string; status?: string; is_open?
 
 const LINEAGE: Record<string, string[]> = {
   'software.repo': ['software.repo', 'place'],
-  project: ['project', 'aim'],
-  task: ['task', 'work'],
-  issue: ['issue', 'question'],
-  'software.handoff': ['software.handoff', 'note', 'record'],
+  'work.project': ['work.project', 'work'],
+  'work.task': ['work.task', 'work'],
+  'work.issue': ['work.issue', 'work'],
+  'software.handoff': ['software.handoff', 'work.note', 'record'],
   'sys.run': ['sys.run'],
 };
 
@@ -41,11 +41,11 @@ function ctxOver(items: Item[], opts: { scope?: Record<string, string[]>; lives?
 
 const ITEMS: Item[] = [
   { id: 'repo', type: 'software.repo', title: 'Aperture repo', props: { remote: 'https://github.com/AlexReiner98/Aperture.git' } },
-  { id: 'proj', type: 'project', title: 'Aperture', props: { recheck_days: 7 } },
-  { id: 'a', type: 'task', title: 'Write the probe', props: { due: '2026-10-20' }, updated_at: '2026-09-01T00:00:00Z' },
-  { id: 'b', type: 'task', title: 'Tune the solver', updated_at: '2026-10-15T00:00:00Z' },
-  { id: 'c', type: 'issue', title: 'Thin walls diverge', updated_at: '2026-10-10T00:00:00Z' },
-  { id: 'gone', type: 'task', title: 'Old chore', status: 'done', is_open: false, updated_at: '2026-10-14T00:00:00Z' },
+  { id: 'proj', type: 'work.project', title: 'Aperture', props: { recheck_days: 7 } },
+  { id: 'a', type: 'work.task', title: 'Write the probe', props: { due: '2026-10-20' }, updated_at: '2026-09-01T00:00:00Z' },
+  { id: 'b', type: 'work.task', title: 'Tune the solver', updated_at: '2026-10-15T00:00:00Z' },
+  { id: 'c', type: 'work.issue', title: 'Thin walls diverge', updated_at: '2026-10-10T00:00:00Z' },
+  { id: 'gone', type: 'work.task', title: 'Old chore', status: 'done', is_open: false, updated_at: '2026-10-14T00:00:00Z' },
   { id: 'who', type: 'person', title: 'Alex' },
   { id: 'note', type: 'software.handoff', title: 'Aperture handoff', body: 'Next\nRun the probe.', updated_at: '2026-10-12T00:00:00Z' },
   { id: 'run', type: 'sys.run', title: 'Read the push', status: 'finished', is_open: false, body: '[2026-10-13T10:00:00Z] finished: all good', updated_at: '2026-10-13T10:00:00Z', created_at: '2026-10-13T09:00:00Z', props: { tokens_used: 1200, surface: 'github-actions', cost_usd: 0.25 } },

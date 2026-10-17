@@ -38,7 +38,7 @@ test('every shipped type extends one of the seven kinds, or is of the system tie
   assert.equal(reg.type('inquiry.experiment')!.kind, 'work');
   assert.equal(reg.type('sys.connection')!.kind, 'place');
   assert.equal(reg.type('time.invoice')!.kind, 'record');
-  assert.deepEqual(reg.ancestry('inquiry.experiment'), { root: 'task', kind: 'work' });
+  assert.deepEqual(reg.ancestry('inquiry.experiment'), { root: 'work.task', kind: 'work' });
   assert.deepEqual(reg.ancestry('sys.run'), { root: 'sys.run', kind: null });
 });
 
@@ -62,7 +62,7 @@ test('a pack cannot leave a type without a kind, declare a kind, or stretch a ro
   assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel }]))), /must extend one of the root relations/);
   assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, root: true }]))), /only the core pack declares root/);
   // waits_on runs only to actors, so what extends it cannot run to a task.
-  assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, to: ['task'], extends: 'waits_on' }]))), /goes to task, which "waits_on" does not/);
+  assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, to: ['work.task'], extends: 'waits_on' }]))), /goes to work.task, which "waits_on" does not/);
 });
 
 test("a pack's relation extending depends_on blocks as depends_on does", async () => {
@@ -74,8 +74,8 @@ test("a pack's relation extending depends_on blocks as depends_on does", async (
   const made = await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'a', type: 'task', title: 'Pour the slab' },
-      { op: 'create', ref: 'b', type: 'task', title: 'Frame the walls' },
+      { op: 'create', ref: 'a', type: 'work.task', title: 'Pour the slab' },
+      { op: 'create', ref: 'b', type: 'work.task', title: 'Frame the walls' },
       { op: 'link', type: 'x.after', from: 'b', to: 'a' },
     ],
   });

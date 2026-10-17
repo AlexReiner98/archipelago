@@ -1,7 +1,7 @@
 // Search: the search box and what it finds.
 
 import { api, h, part, state } from './base.js';
-import { ago, chip, link, pill, typeTitle } from './words.js';
+import { ago, chip, link, pill, typeChoice, typeTitle, workType } from './words.js';
 
 // ---- Search --------------------------------------------------------------
 
@@ -83,8 +83,8 @@ export function map() {
       'div',
       { class: 'toolbar', style: 'margin-bottom: 12px' },
       h('input', { type: 'search', placeholder: 'Search titles and text', value: mapState.q, oninput: set('q'), autofocus: true, style: 'flex: 1; min-width: 200px' }),
-      h('select', { onchange: set('type') }, h('option', { value: '' }, 'All types'), state.schema.types.map((t) => h('option', { value: t.id, selected: t.id === mapState.type }, `${t.title}${t.pack === 'core' ? '' : ` (${t.pack})`}`))),
-      h('button', { onclick: () => (location.hash = `#/new/${mapState.type || 'task'}`) }, 'New'),
+      h('select', { onchange: set('type') }, h('option', { value: '' }, 'All types'), state.schema.types.filter((t) => !t.dormant).map((t) => h('option', { value: t.id, selected: t.id === mapState.type }, typeChoice(t)))),
+      h('button', { onclick: () => (location.hash = `#/new/${mapState.type || workType()}`) }, 'New'),
       h('button', { title: 'The whole map as a picture', onclick: () => (location.hash = '#/graph') }, 'Map'),
       h('select', { onchange: set('open') }, ['open', 'closed', 'all'].map((v) => h('option', { value: v, selected: v === mapState.open }, v === 'open' ? 'Unfinished' : v === 'closed' ? 'Finished' : 'Both'))),
     ),

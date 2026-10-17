@@ -100,7 +100,7 @@ async function dropPictures(l: Archipelago, actor: Actor, tests: string[], reaso
  */
 export async function putPicture(l: Archipelago, actor: Actor, input: { result: string; data: string; content_type: string }) {
   const result = await l.entity(input.result);
-  const figure = result && ['note', 'file', 'lens'].some((t) => l.registry.isA(result.type, t));
+  const figure = result && [...l.registry.drawnWith('figure'), ...l.registry.family('lens')].includes(result.type);
   if (!result || !(figure || l.registry.isA(result.type, 'software.test_result'))) throw new Error(`picture_put: "${input.result}" is not a test result, a note, a file or a lens.`);
   if (!PICTURE_TYPES.includes(input.content_type)) throw new Error(`picture_put: the picture must be one of ${PICTURE_TYPES.join(', ')}, not ${input.content_type}.`);
   const bytes = Buffer.from(input.data, 'base64');

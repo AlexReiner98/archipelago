@@ -52,7 +52,7 @@ async function map(base: string) {
   return l;
 }
 
-const titles = async (l: Archipelago) => (await l.db.query<{ title: string }>(`select title from entity where type = 'note' order by created_at`)).rows.map((r) => r.title);
+const titles = async (l: Archipelago) => (await l.db.query<{ title: string }>(`select title from entity where type = 'work.note' order by created_at`)).rows.map((r) => r.title);
 
 test('a read is made at once with the secret; an act that moves money waits for a person; undo says what it could not reach', async () => {
   const { seen, base } = await shop();

@@ -28,7 +28,7 @@ type Made = { path: string; rows: number };
 
 test('the owner downloads the whole map by a link that works once', async () => {
   const l = await map();
-  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Kept in the file' }] });
+  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Kept in the file' }] });
   const made = (await callTool(l, owner, 'backup_download', {})) as Made;
   const key = made.path.replace('/backup-file/', '');
   const file = takeBackup(key)!;

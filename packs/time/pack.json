@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "title": "Time",
   "description": "Hours worked, each tied to the work it was for, and invoices made from them. A client company says who bills it, its rate, terms and whether HST is charged.",
-  "requires": ["core"],
+  "requires": ["core", "work"],
   "types": [
     {
       "id": "time.entry",
@@ -42,7 +42,7 @@
     {
       "id": "time.invoice",
       "capabilities": { "bound": { "field": "due", "limit": "today" } },
-      "extends": "document",
+      "extends": "work.document",
       "title": "Invoice",
       "description": "A bill to a client for time entries, kept as a document: its note is the invoice as sent, fixed when made. Read, print or share it as any document.",
       "statuses": { "open": ["draft", "sent"], "closed": ["paid", "void"] },

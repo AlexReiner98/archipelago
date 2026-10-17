@@ -9,7 +9,7 @@ type Item = { id: string; type: string; title: string; status?: string; is_open?
 type Link = [string, string, string];
 
 const LINEAGE: Record<string, string[]> = {
-  project: ['project', 'aim'],
+  'work.project': ['work.project', 'work'],
   'software.feature': ['software.feature', 'work'],
   'software.release': ['software.release', 'event', 'occurrence'],
   'software.proof': ['software.proof', 'question'],
@@ -39,7 +39,7 @@ function ctxOver(items: Item[], links: Link[], pictures: string[] = []) {
 }
 
 const ITEMS: Item[] = [
-  { id: 'prod', type: 'project', title: 'Aperture' },
+  { id: 'prod', type: 'work.project', title: 'Aperture' },
   { id: 'sun', type: 'software.feature', title: 'Sun study', status: 'shipped', updated_at: '2026-10-05T00:00:00Z' },
   { id: 'shade', type: 'software.feature', title: 'Shade maps', status: 'built', updated_at: '2026-10-10T00:00:00Z' },
   { id: 'later', type: 'software.feature', title: 'Wind', status: 'planned' },
@@ -80,7 +80,7 @@ test('a proof question is answered on a build when every test of it passed there
   const older = (await handler['software.proof']({ of: 'prod', build: '0.9.0' }, ctx)).answer;
   assert.deepEqual([older.counts.passed, older.counts.failed, older.counts.not_run], [0, 1, 1]);
   const listed = (await handler['software.proof']({}, ctx)).answer;
-  assert.deepEqual(listed.products, [{ id: 'prod', type: 'project', title: 'Aperture', status: 'open', questions: 2 }]);
+  assert.deepEqual(listed.products, [{ id: 'prod', type: 'work.project', title: 'Aperture', status: 'open', questions: 2 }]);
   await assert.rejects(handler['software.proof']({ of: 'nowhere' }, ctx), /No entity "nowhere"/);
 });
 

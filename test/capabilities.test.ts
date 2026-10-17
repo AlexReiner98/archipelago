@@ -57,7 +57,7 @@ test('every shipped deadline is a bound, and a flavour inherits its parent capab
   assert.deepEqual(l.registry.type('funding.program')!.capabilities.bound, { field: 'deadline', limit: 'today' });
   assert.deepEqual(l.registry.type('inquiry.experiment')!.capabilities.bound, { field: 'due', limit: 'today' });
   assert.equal(l.registry.type('software.release')!.capabilities.when?.start, 'at');
-  assert.deepEqual(l.registry.having('settles').sort(), ['decision', 'inquiry.hypothesis']);
+  assert.deepEqual(l.registry.having('settles').sort(), ['inquiry.hypothesis', 'work.decision']);
 });
 
 test('at risk is what crosses its bound, whatever the field is called', async () => {
@@ -65,7 +65,7 @@ test('at risk is what crosses its bound, whatever the field is called', async ()
   const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   const made = await make(l, [
     { op: 'create', ref: 'grant', type: 'funding.program', title: 'Seed grant', props: { deadline: soon } },
-    { op: 'create', ref: 'task', type: 'task', title: 'Send the forms', props: { due: soon } },
+    { op: 'create', ref: 'task', type: 'work.task', title: 'Send the forms', props: { due: soon } },
     { op: 'create', ref: 'low', type: 'shop.stock', title: 'Flour', props: { on_hand: 3, reorder_at: 10 } },
     { op: 'create', ref: 'ok', type: 'shop.stock', title: 'Salt', props: { on_hand: 30, reorder_at: 10 } },
   ]);
@@ -80,7 +80,7 @@ test('a resource holds as many as its capacity, and blocks what needs it once fu
   const l = await map(SHOP);
   const made = await make(l, [
     { op: 'create', ref: 'room', type: 'shop.room', title: 'Studio', props: { seats: 2 } },
-    ...['a', 'b', 'c'].flatMap((t): Op[] => [{ op: 'create', ref: t, type: 'task', title: `Session ${t}` }, { op: 'link', type: 'needs', from: t, to: 'room' }]),
+    ...['a', 'b', 'c'].flatMap((t): Op[] => [{ op: 'create', ref: t, type: 'work.task', title: `Session ${t}` }, { op: 'link', type: 'needs', from: t, to: 'room' }]),
   ]);
   for (const t of ['a', 'b']) assert.equal((await l.claim(human, { resource: made.room, holder: made[t], reason: 'test' })).status, 'claimed');
   await assert.rejects(l.claim(human, { resource: made.room, holder: made.c, reason: 'test' }), /is held by/);
@@ -92,7 +92,7 @@ test('a resource holds as many as its capacity, and blocks what needs it once fu
 test('settling is held for a person on what declares settles, and by word needs what was chosen', async () => {
   const l = await map();
   const made = await make(l, [
-    { op: 'create', ref: 'd', type: 'decision', title: 'Which oven' },
+    { op: 'create', ref: 'd', type: 'work.decision', title: 'Which oven' },
     { op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Gas is cheaper' },
   ]);
   for (const id of [made.d, made.h]) {

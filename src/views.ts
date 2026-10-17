@@ -8,15 +8,7 @@ import { ACTIVE_HOLDS, type Entity, type Archipelago, type Op } from './pelago.t
 import { spent } from './spent.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
 import { findPlace, scopeOf } from './places.ts';
-
-interface Brief {
-  id: string;
-  type: string;
-  title: string;
-  status: string;
-  owner: string | null;
-  due: string | null;
-}
+import { brief } from './brief.ts';
 
 /**
  * How a kernel view asks a question a pack answers (the gate asks proof of the software pack). Handed in by
@@ -25,16 +17,6 @@ interface Brief {
 type PackAsker = (l: Archipelago, name: string, params: Record<string, unknown>) => Promise<unknown>;
 let askPack: PackAsker | undefined;
 export const setPackAsker = (asker: PackAsker) => void (askPack = asker);
-
-async function briefs(l: Archipelago, ids: Iterable<string>): Promise<Map<string, Brief>> {
-  const list = [...new Set(ids)];
-  if (!list.length) return new Map();
-  const { rows } = await l.db.query<Brief>(
-    `select id, type, title, status, owner, props->>'due' as due from entity where id = any($1::text[])`,
-    [list],
-  );
-  return new Map(rows.map((r) => [r.id, r]));
-}
 
 async function person(l: Archipelago, given?: string): Promise<string> {
   const id = given ?? (l.viewer || (await l.setting<string>('me')));
@@ -97,82 +79,6 @@ async function sessions(l: Archipelago) {
   };
 }
 
-/** Everything a session needs to start on a task, as data and as text to paste. */
-async function brief(l: Archipelago, input: { task?: string }) {
-  if (!input.task) throw new Error('brief needs "task": the id of the entity to work on');
-  const task = await l.entity(input.task);
-  if (!task) throw new Error(`No entity "${input.task}"`);
-
-  // The task, then what it is part of, outwards.
-  const chain: Entity[] = [task];
-  for (let at = task.id, depth = 0; depth < 6; depth++) {
-    const { rows } = await l.db.query<Entity>(
-      `select e.* from relation r join entity e on e.id = r.to_id where r.type = 'part_of' and r.from_id = $1 and r.valid_to is null limit 1`,
-      [at],
-    );
-    if (!rows[0] || chain.some((c) => c.id === rows[0].id)) break;
-    chain.push(rows[0]);
-    at = rows[0].id;
-  }
-  const ids = chain.map((c) => c.id);
-  const related = async (type: string, from: string[]) =>
-    (
-      await l.db.query<Entity>(
-        `select distinct e.* from relation r join entity e on e.id = r.to_id where r.type = any($1::text[]) and r.from_id = any($2::text[]) and r.valid_to is null and e.archived_at is null`,
-        [l.registry.relationFamily(type), from],
-      )
-    ).rows;
-
-  const [repo] = l.registry.relations.has('software.lives_in') ? await related('software.lives_in', ids) : [];
-  const needs = await related('needs', [task.id]);
-  const rules = await related('governed_by', [...ids, ...needs.map((n) => n.id)]);
-  const issues = await related('addresses', [task.id]);
-  const assumptions = (await Promise.all(['relates_to', 'bears_on'].map((r) => related(r, ids)))).flat().filter((e, i, all) => l.registry.type(e.type)?.capabilities.settles && all.findIndex((x) => x.id === e.id) === i);
-  const graph = await blockGraph(l);
-  const roots = graph.roots(task.id);
-  const names = await briefs(l, [...(graph.direct.get(task.id) ?? []).map((e) => e.y), ...roots]);
-  const blockedBy = (graph.direct.get(task.id) ?? []).map((e) => ({ why: e.why, entity: names.get(e.y) }));
-  const { rows: held } = await l.db.query<{ to_id: string; title: string }>(
-    `select h.to_id, h.holder_title as title from ${ACTIVE_HOLDS} h where h.to_id = any($1::text[])`,
-    [needs.map((n) => n.id)],
-  );
-
-  const lines = [`# ${task.title}`, `${l.registry.type(task.type)?.title ?? task.type}, ${task.status}. Archipelago id: ${task.id}`];
-  if (task.body) lines.push('', task.body);
-  if (chain.length > 1) lines.push('', `Part of: ${chain.slice(1).map((c) => c.title).join(' > ')}`);
-  if (repo) lines.push(`Repository: ${repo.title} (${repo.props.path ?? repo.props.remote ?? 'no path recorded'})`);
-  if (roots.length) {
-    lines.push('', '## Blocked', 'This cannot finish until:');
-    for (const id of roots) lines.push(`- ${names.get(id)?.title} (${names.get(id)?.type}, ${names.get(id)?.status})`);
-  }
-  if (needs.length) {
-    lines.push('', '## Needs');
-    for (const n of needs) {
-      const holder = held.find((h) => h.to_id === n.id);
-      lines.push(`- ${n.title}: ${n.status}${holder ? `, held by ${holder.title}` : ''}${l.registry.capacity(n) === Infinity ? '' : ' (exclusive: claim it before use, release it after)'}`);
-    }
-  }
-  if (rules.length) {
-    lines.push('', '## Rules that apply');
-    for (const r of rules) lines.push(`- ${r.title}${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && r.body ? ` ${r.body}` : ''}`);
-  }
-  if (issues.length) lines.push('', '## Addresses', ...issues.map((i) => `- ${i.title} (${i.status})${i.body ? `: ${i.body}` : ''}`));
-  if (assumptions.length) lines.push('', '## Rests on', ...assumptions.map((a) => `- ${a.title} (${a.status})`));
-  lines.push('', '## Reporting', `Register with pelago (session_start, task ${task.id}), note anything worth knowing with session_update, and call session_end with a summary when done.`);
-
-  const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
-  return {
-    task: slim(task),
-    part_of: chain.slice(1).map(slim),
-    repo: repo && { ...slim(repo), path: repo.props.path },
-    blocked_by: blockedBy,
-    root_blockers: roots.map((id) => names.get(id)),
-    needs: needs.map((n) => ({ ...slim(n), exclusive: l.registry.capacity(n) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
-    rules: rules.map(slim),
-    text: lines.join('\n'),
-  };
-}
-
 /** Which relations each preset draws: these roots, and every relation extending them. */
 const GRAPH_PRESETS: Record<string, string[] | undefined> = {
   blocking: ['depends_on', 'waits_on', 'needs', 'holds'],
@@ -232,7 +138,7 @@ async function graph(l: Archipelago, input: { focus?: string; depth?: number; re
   const partsOf = new Map<string, string[]>();
   for (const p of parts) if (all.has(p.from_id)) partsOf.set(p.to_id, [...(partsOf.get(p.to_id) ?? []), p.from_id]);
   // What is work, and so has a place on a scale of tokens: what can be estimated, and what such things are part of.
-  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'project');
+  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'work');
   type Tokens = { estimated: number; used: number; assumed?: boolean; partial?: boolean };
   const totals = new Map<string, Tokens>();
   // A feature that is built is done, though it stays open until it ships.
@@ -402,8 +308,8 @@ async function gate(l: Archipelago, input: { event?: string }) {
     parents.set(r.from_id, [...(parents.get(r.from_id) ?? []), r.to_id]);
   }
   const isA = (e: Entity, kinds: string[]) => kinds.some((kind) => l.registry.isA(e.type, kind));
-  // What holds work together: a project, and whatever a pack's tree is made of (a feature).
-  const containers = ['project', ...[...l.registry.trees.values()].flatMap((t) => t.branches)];
+  // What holds work together: whatever a pack's tree starts from or is made of (a project, a feature).
+  const containers = [...l.registry.trees.values()].flatMap((t) => [...t.roots, ...t.branches]);
   const under = (id: string) => {
     const seen = new Set<string>();
     const stack = [id];
@@ -432,7 +338,7 @@ async function gate(l: Archipelago, input: { event?: string }) {
 
   const graph = await blockGraph(l);
   const me = await person(l).catch(() => undefined);
-  const mine = (id: string) => id === me || (byId.get(id)?.owner === me && isA(byId.get(id)!, ['decision']) && byId.get(id)!.is_open);
+  const mine = (id: string) => id === me || (byId.get(id)?.owner === me && l.registry.type(byId.get(id)!.type)?.capabilities.settles?.by === 'word' && byId.get(id)!.is_open);
   // A feature that is built is ready for a release, though it stays open until it ships.
   const done = (e: Entity) => !e.is_open || e.status === 'built';
   const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });

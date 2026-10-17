@@ -22,7 +22,7 @@ async function projectOf(ctx, id) {
   while (level.length) {
     const up = [];
     for (const x of level) for (const rel of ['part_of', 'about']) for (const e of await ctx.read({ related: x, relation: rel, fields: [] })) if (!seen.has(e.id)) (seen.add(e.id), up.push(e));
-    const found = up.find((e) => isA(e, 'project'));
+    const found = up.find((e) => isA(e, 'work.project'));
     if (found) return found;
     level = up.map((e) => e.id);
   }

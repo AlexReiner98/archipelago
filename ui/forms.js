@@ -1,7 +1,7 @@
 // Forms built from a type's schema.
 
 import { api, h, part, state } from './base.js';
-import { label, statusesOf, types } from './words.js';
+import { label, statusesOf, typeChoice, types, workType } from './words.js';
 
 /** A form for any type, built from its schema. System-kept fields are left out. */
 export function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel }) {
@@ -96,7 +96,7 @@ export function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel })
 
 export function newEntity(typeId) {
   const main = part('item');
-  if (!types.has(typeId)) typeId = 'task';
+  if (!types.has(typeId)) typeId = workType();
   const draw = () => {
     const form = entityForm(typeId, {}, {
       submitLabel: 'Create',
@@ -120,7 +120,7 @@ export function newEntity(typeId) {
               draw();
             },
           },
-          state.schema.types.map((t) => h('option', { value: t.id, selected: t.id === typeId }, `${t.title}${t.pack === 'core' ? '' : ` (${t.pack})`}`)),
+          state.schema.types.filter((t) => !t.dormant).map((t) => h('option', { value: t.id, selected: t.id === typeId }, typeChoice(t))),
         ),
       ),
       h('div', { class: 'grid' }, form),

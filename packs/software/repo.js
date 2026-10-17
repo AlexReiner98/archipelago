@@ -39,7 +39,7 @@ export const lastPush = async (ctx, repo) => {
 /** Open tasks, decisions and issues that are the repository's, split by whether they can run now. */
 export async function repoWork(input, ctx) {
   const repo = await findRepo(ctx, input.repo, 'repo_work');
-  const rows = (await ctx.read({ scope: repo.id, types: ['task', 'decision', 'issue'], open: true, fields: ['due'] }))
+  const rows = (await ctx.read({ scope: repo.id, types: ['work.task', 'work.decision', 'work.issue'], open: true, fields: ['due'] }))
     .map((e) => ({ id: e.id, type: e.type, title: e.title, status: e.status, owner: e.owner, due: e.props.due ?? null, last_confirmed: e.updated_at }))
     .sort((a, b) => (a.due === b.due ? 0 : a.due === null ? 1 : b.due === null ? -1 : String(a.due).localeCompare(String(b.due))) || String(b.last_confirmed).localeCompare(String(a.last_confirmed)) || a.id.localeCompare(b.id));
   const state = rows.length ? await ctx.read({ blocked: rows.map((r) => r.id) }) : {};
