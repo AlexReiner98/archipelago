@@ -50,8 +50,8 @@
       "statuses": { "open": ["open"], "closed": ["decided", "reversed"] },
       "fields": {
         "due": { "type": "date" },
-        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"]." },
-        "outcome": { "type": "string", "description": "What was chosen." },
+        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
+        "outcome": { "type": "string", "description": "What was chosen.", "shown": true },
         "rationale": { "type": "string", "description": "Why." },
         "decided_on": { "type": "date" }
       }

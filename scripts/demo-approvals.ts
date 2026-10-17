@@ -165,7 +165,9 @@ async function fill(): Promise<void> {
       { op: 'link', type: 'produced', from: 'which', to: 'spa' },
       { op: 'link', type: 'depends_on', from: 'spa', to: 'zba' },
 
-      // Comments: one ask per commenter, some answered.
+      // The circulation: one step holding each commenter's comments, some answered.
+      { op: 'create', ref: 'circ', type: 'work.task', title: 'Circulation for comments', status: 'doing', owner: me, props: { due: DUE }, body: 'The town sent the concept to its departments and to the region, the conservation authority and MTO, with comments due on 13 October.' },
+      { op: 'link', type: 'part_of', from: 'circ', to: 'p' },
       ...[
         ['c_plan', 'plan', 'daniel', 'Planning', 'done', '2026-09-29'],
         ['c_parks', 'parks', 'tom', 'Parks', 'done', '2026-10-02'],
@@ -179,7 +181,7 @@ async function fill(): Promise<void> {
         ['c_mto', 'mto', 'nadia', 'MTO', 'waiting', null],
       ].flatMap(([ref, party, who, name, status, on]) => [
         { op: 'create', ref, type: 'work.task', title: `${name} comments`, status, props: { due: DUE } },
-        { op: 'link', type: 'part_of', from: ref, to: 'p' },
+        { op: 'link', type: 'part_of', from: ref, to: 'circ' },
         { op: 'link', type: 'work.owed_to', from: ref, to: 'firm' },
         ...(on
           ? [
@@ -199,7 +201,7 @@ async function fill(): Promise<void> {
         ['tis', 'Traffic impact study', 'scoping', 'region', 32000, 12, null],
         ['fsr', 'Functional servicing report', 'required', 'region', 28000, 10, null],
         ['noise', 'Noise and vibration study', 'required', 'region', 14000, 6, null],
-        ['arch', 'Archaeological assessment, stages 1–2', 'under way', 'region', 22000, 10, 'Stage 2 needs a ploughed field: April to November'],
+        ['arch', 'Archaeological assessment, stages 1–2', 'required', 'region', 22000, 10, 'Stage 2 needs a ploughed field: April to November'],
         ['esa', 'Phase one environmental site assessment', 'required', 'legal', 6500, 4, null],
         ['geo', 'Geotechnical investigation', 'required', 'bldg', 19000, 6, null],
         ['firep', 'Fire access and water supply plan', 'required', 'fire', 7500, 3, null],
@@ -243,7 +245,7 @@ async function fill(): Promise<void> {
 
       // Work on our side.
       { op: 'create', ref: 'chase', type: 'work.task', title: 'Chase the late comments', status: 'todo', owner: me, props: { due: '2026-10-20', priority: 'high' }, body: 'Engineering, Forestry, the conservation authority and MTO are past the 13 October date. The conservation authority wants a site visit first, so ask for a date.' },
-      { op: 'link', type: 'part_of', from: 'chase', to: 'p' },
+      { op: 'link', type: 'part_of', from: 'chase', to: 'circ' },
       { op: 'link', type: 'waits_on', from: 'chase', to: me, props: { for: 'emailing the four late commenters' } },
       {
         op: 'create', ref: 'go', type: 'work.decision', title: 'Go ahead with the applications?', status: 'open',
@@ -256,14 +258,19 @@ async function fill(): Promise<void> {
 
       // The order of the process: each step depends on the one before it.
       { op: 'link', type: 'depends_on', from: 'meet', to: 'concept' },
-      ...['c_plan', 'c_parks', 'c_legal', 'c_fire', 'c_bldg', 'c_region', 'c_eng', 'c_forest', 'c_ca', 'c_mto', 'which', 'chase'].map((x) => ({ op: 'link', type: 'depends_on', from: x, to: 'meet' })),
+      { op: 'link', type: 'depends_on', from: 'circ', to: 'meet' },
+      ...['c_plan', 'c_parks', 'c_legal', 'c_fire', 'c_bldg', 'c_region', 'c_eng', 'c_forest', 'c_ca', 'c_mto'].map((x) => ({ op: 'link', type: 'depends_on', from: x, to: 'circ' })),
+      // The checklist is written from every set of comments.
+      ...['c_plan', 'c_parks', 'c_legal', 'c_fire', 'c_bldg', 'c_region', 'c_eng', 'c_forest', 'c_ca', 'c_mto'].map((c) => ({ op: 'link', type: 'depends_on', from: 'list', to: c })),
+      { op: 'link', type: 'depends_on', from: 'which', to: 'meet' },
+      // The checklist is made for the applications the town named.
+      { op: 'link', type: 'depends_on', from: 'list', to: 'which' },
       ...[['pjr', 'c_plan'], ['tis', 'c_region'], ['fsr', 'c_region'], ['noise', 'c_region'], ['arch', 'c_region'], ['esa', 'c_legal'], ['geo', 'c_bldg'], ['firep', 'c_fire'], ['park', 'c_parks']].map(([s, c]) => ({ op: 'link', type: 'depends_on', from: s, to: c })),
-      { op: 'link', type: 'produced', from: 'which', to: 'caperm' },
-      { op: 'link', type: 'produced', from: 'which', to: 'mtoperm' },
-      ...['zba', 'caperm', 'mtoperm'].map((a) => ({ op: 'link', type: 'depends_on', from: a, to: 'go' })),
+      // The studies are commissioned, and the applications filed, only if Northfield goes ahead.
+      ...['pjr', 'tis', 'fsr', 'noise', 'arch', 'esa', 'geo', 'firep', 'park', 'eis', 'swm', 'zba', 'caperm', 'mtoperm'].map((a) => ({ op: 'link', type: 'depends_on', from: a, to: 'go', props: { says: 'Go ahead as proposed' } })),
 
       // The project opens on the process, drawn from the top down (examples/approvals/process.js).
-      { op: 'create', ref: 'lens', type: 'lens', title: 'Process', status: 'current', props: { place: 0, far: 2, over: ['depends_on', 'produced'], kinds: ['-actor', '-local.comment'], fold: ['system', 'unlinked'] } },
+      { op: 'create', ref: 'lens', type: 'lens', title: 'Process', status: 'current', props: { place: 0, far: 2, over: ['depends_on'], kinds: ['-actor', '-local.comment'], fold: ['system'] } },
       { op: 'link', type: 'about', from: 'lens', to: 'p' },
       { op: 'create', ref: 'style', type: 'style', title: 'Process', status: 'current', props: { code: readFileSync(join(ROOT, 'examples', 'approvals', 'process.js'), 'utf8') } },
       { op: 'link', type: 'about', from: 'style', to: 'lens' },
@@ -289,6 +296,7 @@ async function fill(): Promise<void> {
       { op: 'link', type: 'part_of', from: 'trees', to: m.list },
       { op: 'link', type: 'work.requested_by', from: 'trees', to: m.forest },
       { op: 'link', type: 'depends_on', from: m.spa, to: 'trees' },
+      { op: 'link', type: 'depends_on', from: 'trees', to: m.go, props: { says: 'Go ahead as proposed' } },
     ],
   });
   await call('agent', 'tell', {
