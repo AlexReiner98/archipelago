@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
-import { checkDeclared, KERNEL_VERBS, screensOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
+import { checkDeclared, KERNEL_VERBS, screensOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
 import { checkValue } from './fields.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
@@ -62,28 +62,9 @@ export interface RelationDef {
   inverse: string;
   from: string[];
   to: string[];
-  description: string;
+  description: string; moved_from?: string[]; // Relations whose links are this one's now, moved once no pack defines them.
 }
 
-/**
- * A tree a pack declares over "is part of": a roadmap, for one. The `tree`
- * view reads it; nothing here is code.
- */
-export interface TreeDef {
-  id: string;
-  title: string;
-  description: string;
-  /** Types a tree can start from. */
-  roots: string[];
-  /** Types that make up the tree's levels. */
-  branches: string[];
-  /** Types counted as the work under a branch: progress is how much of it is closed. */
-  work: string[];
-  /** The number field that orders branches among their siblings. */
-  order: string;
-  /** Statuses that mean someone is on it now. */
-  active: string[];
-}
 
 export interface PackFile {
   id: string;
@@ -384,7 +365,8 @@ export class Registry {
   /** Problems with a status and props for a type. Empty means valid. */
   check(typeId: string, status: string | undefined, props: Record<string, unknown>): string[] {
     const type = this.types.get(typeId);
-    if (!type) return [`unknown type "${typeId}". Known types: ${[...this.types.keys()].join(', ')}`];
+    const taken = [...this.types.values()].filter((t) => !t.dormant && t.movedFrom?.includes(typeId)).map((t) => `: it is ${t.id} now`).join('');
+    if (!type || (type.dormant && taken)) return [`unknown type "${typeId}"${taken}. Known types: ${[...this.types.keys()].join(', ')}`];
     const problems: string[] = [];
     const statuses = [...type.statuses.open, ...type.statuses.closed];
     if (status !== undefined && !statuses.includes(status)) {
@@ -418,7 +400,8 @@ export class Registry {
   /** Why a relation of this type cannot join these two entity types, if it cannot. */
   checkRelation(relId: string, fromType: string, toType: string): string | undefined {
     const rel = this.relations.get(relId);
-    if (!rel) return `unknown relation "${relId}". Known relations: ${[...this.relations.keys()].join(', ')}`;
+    const taken = [...this.relations.values()].filter((r) => !r.dormant && r.moved_from?.includes(relId)).map((r) => `: it is ${r.id} now`).join('');
+    if (!rel || (rel.dormant && taken)) return `unknown relation "${relId}"${taken}. Known relations: ${[...this.relations.keys()].join(', ')}`;
     const fits = (allowed: string[], type: string) => allowed.some((a) => a === '*' || this.isA(type, a));
     if (!fits(rel.from, fromType)) return `"${relId}" must start from ${rel.from.join(' or ')}, not ${fromType}`;
     if (!fits(rel.to, toType)) return `"${relId}" must point to ${rel.to.join(' or ')}, not ${toType}`;

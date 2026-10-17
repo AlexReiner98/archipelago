@@ -125,6 +125,8 @@ async function rows(host, id, p) {
   try {
     const answer = await api(tool.tool, p.item ? { [p.item]: id } : {});
     const list = Array.isArray(answer) ? answer : [];
+    // On a screen of its own (Home), a list with nothing in it is not drawn.
+    if (!list.length && !id) return host.remove();
     host.replaceWith(fold(id, p.screen.id, p.screen.title, list.length, true, list.length ? h('ul', { class: 'rows' }, list.map(viewRow)) : h('div', { class: 'empty' }, 'Nothing here.')));
   } catch (err) {
     host.replaceChildren(h('div', { class: 'error' }, err.message));

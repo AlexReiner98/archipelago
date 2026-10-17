@@ -1453,8 +1453,8 @@ test('a project\'s unsettled questions are what needs settling in it, what holds
     { op: 'create', ref: 'big', type: 'decision', title: 'Big', props: { options: ['A', 'B'] } },
     { op: 'create', ref: 'small', type: 'decision', title: 'Small' },
     { op: 'create', ref: 'old', type: 'decision', title: 'Old', status: 'decided', props: { outcome: 'Yes', rationale: 'Because' } },
-    { op: 'create', ref: 'hyp', type: 'hypothesis', title: 'Hyp' },
-    { op: 'create', ref: 'exp', type: 'experiment', title: 'Try it' },
+    { op: 'create', ref: 'hyp', type: 'inquiry.hypothesis', title: 'Hyp' },
+    { op: 'create', ref: 'exp', type: 'inquiry.experiment', title: 'Try it' },
     { op: 'create', ref: 'else', type: 'decision', title: 'Elsewhere' },
     { op: 'link', type: 'part_of', from: 'f', to: 'p' },
     { op: 'link', type: 'part_of', from: 't', to: 'f' },
@@ -1466,8 +1466,8 @@ test('a project\'s unsettled questions are what needs settling in it, what holds
     { op: 'link', type: 'part_of', from: 'hyp', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'f', to: 'big' },
     { op: 'link', type: 'depends_on', from: 't', to: 'f' },
-    { op: 'link', type: 'assumes', from: 't', to: 'hyp' },
-    { op: 'link', type: 'tests', from: 'exp', to: 'hyp' },
+    { op: 'link', type: 'inquiry.assumes', from: 't', to: 'hyp' },
+    { op: 'link', type: 'inquiry.tests', from: 'exp', to: 'hyp' },
   ]);
 
   const unsettled = async (within: string) => (await attend(l, { within, reasons: ['unsettled', 'holding_up'] })).items.filter((x: any) => x.reasons.some((r: any) => r.why === 'unsettled'));
@@ -1499,13 +1499,13 @@ test('an agent may settle its own work unreviewed, but only proposes the answer 
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'd', type: 'decision', title: 'Where do backups go?' },
-    { op: 'create', ref: 'h', type: 'hypothesis', title: 'Hooks run in the desktop app' },
+    { op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Hooks run in the desktop app' },
     { op: 'create', ref: 't', type: 'task', title: 'Wire the upload' },
   ]);
   // As in dev mode: nothing an agent does is reviewed.
   const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
   const decided = l.registry.type('decision')!.statuses.closed[0];
-  const settled = l.registry.type('hypothesis')!.statuses.closed[0];
+  const settled = l.registry.type('inquiry.hypothesis')!.statuses.closed[0];
 
   assert.equal((await free.change(agent, { reason: 'did it', ops: [{ op: 'update', id: made.t, status: 'done' }] })).status, 'applied', 'its own task');
   assert.equal((await free.change(agent, { reason: 'a note', ops: [{ op: 'update', id: made.d, body: 'Supabase is set up.' }] })).status, 'applied', 'a note on a question');

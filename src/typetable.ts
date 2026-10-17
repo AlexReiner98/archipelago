@@ -2,7 +2,7 @@
 // what the packs define now is written there as active; what is there and no pack defines any more turns dormant,
 // and the registry takes it back in, so the items of a removed pack keep their kind, statuses, fields and
 // capabilities. A definition that changed (a pack upgraded, or added back after a while) is logged with what changed.
-// A type that took another over (moved_from) takes its items once the old one is defined by no pack.
+// A type that took another over (moved_from) takes its items once the old one is defined by no pack; a relation, its links.
 
 import type { Archipelago } from './pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
@@ -80,6 +80,7 @@ export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; 
   // A type a pack took over brings its items with it, once no pack defines the old one (a migration, run once).
   const moved: Record<string, number> = {};
   for (const t of reg.types.values()) for (const old of t.dormant ? [] : (t.movedFrom ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, t.id)) === 0) delete moved[old];
+  for (const r of reg.relations.values()) for (const old of r.dormant ? [] : (r.moved_from ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, r.id, 'relation')) === 0) delete moved[old];
   const asleep = rows.filter((r) => !now.has(r.id));
   reg.keep({
     types: asleep.filter((r) => r.what === 'type').map((r) => r.def as ResolvedType),

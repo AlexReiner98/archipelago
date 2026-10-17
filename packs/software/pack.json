@@ -82,10 +82,14 @@
     {
       "id": "software.test_result",
       "public": true,
-      "extends": "result",
+      "extends": "record",
       "title": "Test result",
       "description": "What one test found on one build. There is one for each test on each build; a later run on the same build replaces it.",
+      "statuses": { "open": ["recorded"], "closed": ["superseded"] },
       "fields": {
+        "value": { "type": "string", "description": "The headline number or outcome." },
+        "measured_on": { "type": "date" },
+        "evidence": { "type": "string", "description": "Where the proof is: a path, URL or commit." },
         "build": { "type": "string", "description": "The version or commit the test ran on." },
         "passed": { "type": "boolean" },
         "picture": { "type": "string", "description": "Where the picture the test drew is: a path in the repository it ran in, under its .proof folder, which git ignores. The file itself is sent to Archipelago (picture_put) only when the result is shown in public." }

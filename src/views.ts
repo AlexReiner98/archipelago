@@ -127,7 +127,7 @@ async function brief(l: Archipelago, input: { task?: string }) {
   const needs = await related('needs', [task.id]);
   const rules = await related('governed_by', [...ids, ...needs.map((n) => n.id)]);
   const issues = await related('addresses', [task.id]);
-  const assumptions = await related('assumes', ids);
+  const assumptions = (await Promise.all(['relates_to', 'bears_on'].map((r) => related(r, ids)))).flat().filter((e, i, all) => l.registry.type(e.type)?.capabilities.settles && all.findIndex((x) => x.id === e.id) === i);
   const graph = await blockGraph(l);
   const roots = graph.roots(task.id);
   const names = await briefs(l, [...(graph.direct.get(task.id) ?? []).map((e) => e.y), ...roots]);
@@ -157,7 +157,7 @@ async function brief(l: Archipelago, input: { task?: string }) {
     for (const r of rules) lines.push(`- ${r.title}${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && r.body ? ` ${r.body}` : ''}`);
   }
   if (issues.length) lines.push('', '## Addresses', ...issues.map((i) => `- ${i.title} (${i.status})${i.body ? `: ${i.body}` : ''}`));
-  if (assumptions.length) lines.push('', '## Assumes', ...assumptions.map((a) => `- ${a.title} (${a.status})`));
+  if (assumptions.length) lines.push('', '## Rests on', ...assumptions.map((a) => `- ${a.title} (${a.status})`));
   lines.push('', '## Reporting', `Register with pelago (session_start, task ${task.id}), note anything worth knowing with session_update, and call session_end with a summary when done.`);
 
   const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });

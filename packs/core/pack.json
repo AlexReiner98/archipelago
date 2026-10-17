@@ -139,12 +139,6 @@
       }
     },
     {
-      "id": "experiment",
-      "extends": "task",
-      "title": "Experiment",
-      "description": "A task that tests a hypothesis and produces a result."
-    },
-    {
       "id": "decision",
       "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner" } },
       "extends": "question",
@@ -171,26 +165,6 @@
         "severity": { "type": "enum", "values": ["low", "medium", "high", "critical"] },
         "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects fixing this to take: input and output, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
         "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
-      }
-    },
-    {
-      "id": "hypothesis",
-      "capabilities": { "settles": { "by": "evidence", "whose": "owner" } },
-      "extends": "question",
-      "title": "Hypothesis",
-      "description": "A belief about the world that could be wrong. The title is the statement.",
-      "statuses": { "open": ["untested", "testing"], "closed": ["supported", "refuted"] }
-    },
-    {
-      "id": "result",
-      "extends": "record",
-      "title": "Result",
-      "description": "A recorded outcome with its evidence: a measurement, a test run, a reply.",
-      "statuses": { "open": ["recorded"], "closed": ["superseded"] },
-      "fields": {
-        "value": { "type": "string", "description": "The headline number or outcome." },
-        "measured_on": { "type": "date" },
-        "evidence": { "type": "string", "description": "Where the proof is: a path, URL or commit." }
       }
     },
     {
@@ -369,11 +343,6 @@
     { "id": "about", "root": true, "title": "is about", "inverse": "is described by", "from": ["*"], "to": ["*"], "description": "A note, file, decision or issue concerns the target." },
     { "id": "needs", "root": true, "title": "needs", "inverse": "is needed by", "from": ["*"], "to": ["resource"], "description": "The work cannot run without this resource. Drives the blockers view." },
     { "id": "holds", "root": true, "title": "holds", "inverse": "is held by", "from": ["*"], "to": ["resource"], "description": "Current occupancy of a resource. Created by claim, ended by release." },
-    { "id": "tests", "extends": "bears_on", "title": "tests", "inverse": "is tested by", "from": ["task"], "to": ["hypothesis"], "description": "The work that will settle the hypothesis." },
-    { "id": "supports", "extends": "bears_on", "title": "supports", "inverse": "is supported by", "from": ["result"], "to": ["hypothesis"], "description": "Evidence for." },
-    { "id": "refutes", "extends": "bears_on", "title": "refutes", "inverse": "is refuted by", "from": ["result"], "to": ["hypothesis"], "description": "Evidence against." },
-    { "id": "assumes", "extends": "relates_to", "title": "assumes", "inverse": "is assumed by", "from": ["*"], "to": ["hypothesis"], "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted." },
-    { "id": "explains", "extends": "about", "title": "would explain", "inverse": "may be explained by", "from": ["hypothesis"], "to": ["issue"], "description": "A suspected cause." },
     { "id": "addresses", "extends": "about", "title": "addresses", "inverse": "is addressed by", "from": ["*"], "to": ["issue"], "description": "Work meant to fix or reduce the issue." },
     { "id": "produced", "extends": "relates_to", "title": "produced", "inverse": "was produced by", "from": ["*"], "to": ["*"], "description": "The work led to this result, file or decision." },
     { "id": "based_on", "extends": "relates_to", "title": "is based on", "inverse": "informs", "from": ["*"], "to": ["*"], "description": "A decision or plan rests on this result or source." },

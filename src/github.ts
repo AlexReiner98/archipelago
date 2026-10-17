@@ -182,7 +182,7 @@ export async function receivePush(l: Archipelago, payload: PushPayload, delivery
 
   const settled: { id: string; title: string; status: string; result: string }[] = [];
   if (main) {
-    const questions = new Set([...l.registry.family('decision'), ...l.registry.family('hypothesis')]);
+    const questions = new Set(l.registry.having('settles'));
     const seen = new Set<string>();
     for (const c of commits) {
       for (const id of finishedBy(c.message)) {

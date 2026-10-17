@@ -29,7 +29,7 @@ export function scenario(soon: string): Op[] {
     { op: 'create', ref: 'contract', type: 'task', title: 'Sign the contract' },
     { op: 'link', type: 'depends_on', from: 'launch', to: 'contract' },
     { op: 'create', ref: 'host', type: 'decision', title: 'Which host?' },
-    { op: 'create', ref: 'blog', type: 'hypothesis', title: 'People read the blog' },
+    { op: 'create', ref: 'blog', type: 'inquiry.hypothesis', title: 'People read the blog' },
     { op: 'create', ref: 'chore', type: 'task', title: 'Tidy the old pages' },
     { op: 'create', ref: 'news', type: 'task', title: 'Draft the newsletter', props: { tokens_estimated: 20000 } },
     { op: 'create', ref: 'cms', type: 'decision', title: 'Which CMS?' },

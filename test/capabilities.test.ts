@@ -55,9 +55,9 @@ test('a capability naming a field the type lacks stops its pack from loading', (
 test('every shipped deadline is a bound, and a flavour inherits its parent capabilities', async () => {
   const l = await map();
   assert.deepEqual(l.registry.type('funding.program')!.capabilities.bound, { field: 'deadline', limit: 'today' });
-  assert.deepEqual(l.registry.type('experiment')!.capabilities.bound, { field: 'due', limit: 'today' });
+  assert.deepEqual(l.registry.type('inquiry.experiment')!.capabilities.bound, { field: 'due', limit: 'today' });
   assert.equal(l.registry.type('software.release')!.capabilities.when?.start, 'at');
-  assert.deepEqual(l.registry.having('settles').sort(), ['decision', 'hypothesis']);
+  assert.deepEqual(l.registry.having('settles').sort(), ['decision', 'inquiry.hypothesis']);
 });
 
 test('at risk is what crosses its bound, whatever the field is called', async () => {
@@ -93,7 +93,7 @@ test('settling is held for a person on what declares settles, and by word needs 
   const l = await map();
   const made = await make(l, [
     { op: 'create', ref: 'd', type: 'decision', title: 'Which oven' },
-    { op: 'create', ref: 'h', type: 'hypothesis', title: 'Gas is cheaper' },
+    { op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Gas is cheaper' },
   ]);
   for (const id of [made.d, made.h]) {
     const status = id === made.d ? 'decided' : 'supported';

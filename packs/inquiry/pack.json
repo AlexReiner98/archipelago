@@ -1,0 +1,56 @@
+{
+  "id": "inquiry",
+  "version": "0.1.0",
+  "title": "Inquiry",
+  "description": "Beliefs that could be wrong and the evidence on them: hypotheses, the experiments that test them and the results that bear them out or refute them, and the work that rests on them.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "inquiry.hypothesis",
+      "moved_from": ["hypothesis"],
+      "capabilities": { "settles": { "by": "evidence", "whose": "owner" } },
+      "extends": "question",
+      "title": "Hypothesis",
+      "description": "A belief about the world that could be wrong. The title is the statement.",
+      "statuses": { "open": ["untested", "testing"], "closed": ["supported", "refuted"] }
+    },
+    {
+      "id": "inquiry.experiment",
+      "moved_from": ["experiment"],
+      "extends": "task",
+      "title": "Experiment",
+      "description": "A task that tests a hypothesis and produces a result."
+    },
+    {
+      "id": "inquiry.result",
+      "moved_from": ["result"],
+      "extends": "record",
+      "title": "Result",
+      "description": "A recorded outcome with its evidence: a measurement, a test run, a reply.",
+      "statuses": { "open": ["recorded"], "closed": ["superseded"] },
+      "fields": {
+        "value": { "type": "string", "description": "The headline number or outcome." },
+        "measured_on": { "type": "date" },
+        "evidence": { "type": "string", "description": "Where the proof is: a path, URL or commit." }
+      }
+    }
+  ],
+  "relations": [
+    { "id": "inquiry.tests", "moved_from": ["tests"], "extends": "bears_on", "title": "tests", "inverse": "is tested by", "from": ["task"], "to": ["inquiry.hypothesis"], "description": "The work that will settle the hypothesis." },
+    { "id": "inquiry.supports", "moved_from": ["supports"], "extends": "bears_on", "title": "supports", "inverse": "is supported by", "from": ["inquiry.result"], "to": ["inquiry.hypothesis"], "description": "Evidence for." },
+    { "id": "inquiry.refutes", "moved_from": ["refutes"], "extends": "bears_on", "title": "refutes", "inverse": "is refuted by", "from": ["inquiry.result"], "to": ["inquiry.hypothesis"], "description": "Evidence against." },
+    { "id": "inquiry.assumes", "moved_from": ["assumes"], "extends": "relates_to", "title": "assumes", "inverse": "is assumed by", "from": ["*"], "to": ["inquiry.hypothesis"], "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted." },
+    { "id": "inquiry.explains", "moved_from": ["explains"], "extends": "about", "title": "would explain", "inverse": "may be explained by", "from": ["inquiry.hypothesis"], "to": ["issue"], "description": "A suspected cause." }
+  ],
+  "views": [
+    {
+      "id": "inquiry.undermined",
+      "shape": "rows",
+      "description": "Open work that rests on a refuted hypothesis (it assumes one), each with the hypothesis it rests on: what was planned on a belief the evidence has since gone against.",
+      "input": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  ],
+  "screens": [
+    { "id": "inquiry.undermined", "title": "Resting on what was refuted", "at": "home", "pieces": [{ "piece": "view", "view": "inquiry.undermined" }] }
+  ]
+}

@@ -35,10 +35,10 @@ test('every shipped type extends one of the seven kinds, or is of the system tie
       assert.ok(type.system);
     } else assert.ok(type.kind && KINDS.includes(type.kind), `${type.id} has a kind`);
   }
-  assert.equal(reg.type('experiment')!.kind, 'work');
+  assert.equal(reg.type('inquiry.experiment')!.kind, 'work');
   assert.equal(reg.type('sys.connection')!.kind, 'place');
   assert.equal(reg.type('time.invoice')!.kind, 'record');
-  assert.deepEqual(reg.ancestry('experiment'), { root: 'task', kind: 'work' });
+  assert.deepEqual(reg.ancestry('inquiry.experiment'), { root: 'task', kind: 'work' });
   assert.deepEqual(reg.ancestry('sys.run'), { root: 'sys.run', kind: null });
 });
 
@@ -47,7 +47,7 @@ test('every relation extends one of the thirteen roots', () => {
   assert.deepEqual([...reg.relations.values()].filter((r) => r.root === r.id).map((r) => r.id).sort(), [...ROOTS].sort());
   for (const rel of reg.relations.values()) assert.ok(ROOTS.includes(rel.root), `${rel.id} reads as ${rel.root}`);
   assert.equal(reg.relations.get('software.lives_in')!.root, 'lives_in');
-  assert.equal(reg.relations.get('supports')!.root, 'bears_on');
+  assert.equal(reg.relations.get('inquiry.supports')!.root, 'bears_on');
   assert.ok(reg.relationFamily('lives_in').includes('software.lives_in'));
 });
 

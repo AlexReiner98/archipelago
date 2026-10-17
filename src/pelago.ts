@@ -742,13 +742,13 @@ export class Archipelago {
   }
 
   /**
-   * Move every item of a type no pack defines any more to the type that took it over (moved_from): a one-time
-   * migration as a pack takes a type out of another, logged as one event. Notes, fields, links and history stay.
+   * Move every item of a type (or link of a relation) no pack defines any more to the one that took it over
+   * (moved_from): a one-time migration as a pack takes it out of another, logged as one event. All else stays.
    */
-  async retype(from: string, to: string): Promise<number> {
+  async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity'): Promise<number> {
     return this.db.transaction(async (tx) => {
-      const { rows } = await tx.query<{ id: string }>(`update entity set type = $2 where type = $1 returning id`, [from, to]);
-      if (rows.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason: `Every ${from} is a ${to} now: its pack took the type over.`, detail: { from, to, items: rows.map((r) => r.id) } });
+      const { rows } = await tx.query<{ id: string }>(`update ${what === 'entity' ? 'entity' : 'relation'} set type = $2 where type = $1 returning id`, [from, to]);
+      if (rows.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason: `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`, detail: { from, to, items: rows.map((r) => r.id) } });
       return rows.length;
     });
   }

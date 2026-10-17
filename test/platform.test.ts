@@ -1388,7 +1388,7 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const said = (await call('/agent/confirmed', robot, { upto: asked.to_confirm.upto, basis: 'Alex, in chat on 9 Oct: "yes, green"' })).result;
   assert.deepEqual([said.questions, said.left], [1, 0]);
   // What an agent settled on its own judgment comes first and is counted apart: it is what the owner has not seen.
-  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
+  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
   await change(robot, [{ op: 'update', id: guessed.d, status: 'decided', props: { outcome: 'The wide one', rationale: 'It is the one we have.' } }], word);
   await change(robot, [{ op: 'update', id: guessed.h, status: 'refuted' }], { of: 'agent', basis: 'A month of photos' });
   await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }]);
@@ -1399,7 +1399,7 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const byRobot = (await call('/agent/events', robot, { by: 'agent:robot/script', limit: 50 })).result as any[];
   assert.ok(byRobot.length > 0 && byRobot.every((e) => e.actor === 'agent:robot/script'));
   assert.ok(((await call('/agent/events', robot, { before: byRobot[0].seq, limit: 50 })).result as any[]).every((e) => e.seq < byRobot[0].seq));
-  const guess = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green hides dirt', visibility: 'shared' }])).result.created.h;
+  const guess = (await change(admin, [{ op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Green hides dirt', visibility: 'shared' }])).result.created.h;
   assert.equal((await change(robot, [{ op: 'update', id: guess, status: 'supported' }], { of: 'agent', basis: 'Two weeks of photos' })).result.status, 'applied', 'and a hypothesis');
   // Every change says on whose authority it was made: the human's own, a human's word as an agent reports it, or the agent's judgment.
   const authorityOf = async (id: string) => ((await call('/api/events', admin, { target: id, limit: 1 })).result as any[])[0].detail.authority;

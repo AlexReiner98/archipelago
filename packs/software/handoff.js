@@ -6,7 +6,7 @@
 import { findRepo, pushes, repoWork } from './repo.js';
 
 /** The kinds of thing that are true or not of the world, and so go stale: work, questions and problems. */
-export const GOES_STALE = ['task', 'decision', 'issue', 'hypothesis', 'experiment', 'software.feature'];
+export const GOES_STALE = ['task', 'decision', 'issue', 'inquiry.hypothesis', 'software.feature'];
 /** How long a handoff note may be: the type says so too (note_max), and the kernel holds agents to it. */
 export const HANDOFF_MAX = 3000;
 /** How far back a handoff looks when nobody has written a note to count from. */

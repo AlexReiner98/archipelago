@@ -71,6 +71,26 @@ export interface ViewDef {
   limit_ms?: number;
 }
 
+/**
+ * A tree a pack declares over "is part of": a roadmap, for one. The `tree`
+ * view reads it; nothing here is code.
+ */
+export interface TreeDef {
+  id: string;
+  title: string;
+  description: string;
+  /** Types a tree can start from. */
+  roots: string[];
+  /** Types that make up the tree's levels. */
+  branches: string[];
+  /** Types counted as the work under a branch: progress is how much of it is closed. */
+  work: string[];
+  /** The number field that orders branches among their siblings. */
+  order: string;
+  /** Statuses that mean someone is on it now. */
+  active: string[];
+}
+
 /** One piece of a screen, drawn by the kernel: what it draws and from what. */
 export interface PieceDef {
   piece: keyof typeof PIECES;

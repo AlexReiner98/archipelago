@@ -100,3 +100,40 @@ test('a type a pack took over takes its items with it, once, when no pack define
   assert.deepEqual(costs.recurring.items.map((i) => i.title), ['Hosting'], 'the costs view reads them where they are now');
   assert.deepEqual((await syncTypes(now)).moved, {}, 'once moved, nothing moves again');
 });
+test('a relation a pack took over takes its links with it, and the work at risk is still found', async () => {
+  // A map made while the core pack still kept hypotheses and assumes, before the inquiry pack took them over.
+  const before = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), before, { recursive: true });
+  const inquiry = JSON.parse(readFileSync(join(before, 'inquiry', 'pack.json'), 'utf8'));
+  const core = JSON.parse(readFileSync(join(before, 'core', 'pack.json'), 'utf8'));
+  const bare = (id: string) => id.replace('inquiry.', '');
+  for (const { moved_from: _, ...t } of inquiry.types) core.types.push({ ...t, id: bare(t.id) });
+  for (const { moved_from: _, ...r } of inquiry.relations) core.relations.push({ ...r, id: bare(r.id), from: r.from.map(bare), to: r.to.map(bare) });
+  writeFileSync(join(before, 'core', 'pack.json'), JSON.stringify(core));
+  rmSync(join(before, 'inquiry'), { recursive: true });
+  const db = await openDb();
+  const old = new Archipelago(db, new Registry(before));
+  await syncTypes(old);
+  const made = (await old.change(human, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'h', type: 'hypothesis', title: 'People read the blog', status: 'refuted' },
+      { op: 'create', ref: 't', type: 'task', title: 'Write a post' },
+      { op: 'link', type: 'assumes', from: 't', to: 'h' },
+    ],
+  })) as { created: Record<string, string> };
+
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
+  const now = new Archipelago(db, new Registry(dir));
+  const synced = await syncTypes(now);
+  assert.deepEqual([synced.moved.hypothesis, synced.moved.assumes], [1, 1]);
+  assert.equal((await now.entity(made.created.h))!.type, 'inquiry.hypothesis');
+  const { rows } = await db.query<{ type: string }>(`select type from relation where from_id = $1 and to_id = $2`, [made.created.t, made.created.h]);
+  assert.deepEqual(rows.map((r) => r.type), ['inquiry.assumes']);
+  const risk = (await callTool(now, human, 'inquiry_undermined', {})) as { id: string }[];
+  assert.deepEqual(risk.map((r) => r.id), [made.created.t], 'the pack finds the work through the moved link');
+  const brief = (await callTool(now, human, 'view', { name: 'brief', params: { task: made.created.t } })) as { text: string };
+  assert.match(brief.text, /## Rests on\n- People read the blog \(refuted\)/);
+  await assert.rejects(now.change(human, { reason: 'test', ops: [{ op: 'create', type: 'hypothesis', title: 'x' }] }), /it is inquiry\.hypothesis now/);
+});
