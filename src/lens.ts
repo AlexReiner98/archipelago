@@ -139,8 +139,6 @@ export async function shownIn(l: Archipelago, id: string, trail: { id: string; t
   return shown;
 }
 
-/** The view every item has: what it is tied to, by kind of link. Asked for by this name in place of a lens's id. */
-export const AROUND = 'around';
 /** The view every item that waits on something has: all it waits on, step by step, and nothing else, as a flow. */
 export const HOLDING = 'holding';
 
@@ -175,14 +173,15 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   }
   // The item the picture is asked for. Each lens kept about it is a view of it, with a name; the first in order is the one it opens on.
   const hub = input.from === undefined ? undefined : String(input.from);
-  // Around one item there is always the picture of what it is tied to, by kind of link: what it waits on and what waits on it.
-  const around = hub !== undefined && (input.lens === AROUND || input.lens === HOLDING);
-  const [lenses, styles] = [await keptOf(l, 'lens', around ? undefined : input.lens), await keptOf(l, 'style', input.style)];
+  // "around" (what an item is tied to, by every kind of link) was a view of its own until 18 Oct; asked for in an old address, it is no view at all.
+  if (input.lens === 'around') input = { ...input, lens: undefined };
+  const builtIn = hub !== undefined && input.lens === HOLDING;
+  const [lenses, styles] = [await keptOf(l, 'lens', builtIn ? undefined : input.lens), await keptOf(l, 'style', input.style)];
   const placed = (one: Kept) => (typeof one.props.place === 'number' ? one.props.place : Infinity);
-  // Every lens that applies can be chosen: those about the item, then what it is tied to, then the workspace's own (about nothing), each in its order.
+  // Every lens that applies can be chosen: those about the item, then what holds it, then the workspace's own (about nothing), each in its order.
   const own = hub === undefined ? [] : lenses.filter((one) => one.about.includes(hub)).sort((a, b) => placed(a) - placed(b));
   const shared = lenses.filter((one) => !one.about.length).sort((a, b) => placed(a) - placed(b));
-  const views = told ? [] : [...own, ...(hub === undefined ? [] : [{ id: AROUND, title: 'Around it', props: {}, about: [] }]), ...shared];
+  const views = told ? [] : [...own, ...shared];
   const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at, updated_at from entity where archived_at is null`);
   const all = new Map(entities.map((e) => [e.id, e]));
   const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null }>(
@@ -195,17 +194,16 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const held = new Set<string>();
   for (const queue = hub === undefined ? [] : [hub]; queue.length; ) for (const to of waitsOn.get(queue.pop()!) ?? []) if (to !== hub && !held.has(to)) (held.add(to), queue.push(to));
   const offered = !told && [...held].some((id) => all.get(id)?.is_open);
-  if (offered) views.splice(own.length + 1, 0, { id: HOLDING, title: 'What holds it', props: {}, about: [] });
+  if (offered) views.splice(own.length, 0, { id: HOLDING, title: 'What holds it', props: {}, about: [] });
   const holding = hub !== undefined && (input.lens === HOLDING || (offered && input.lens === undefined && !own.some((one) => typeof one.props.from !== 'string')));
-  // An item opens on its first picture of its own (not a shortcut, which leads away), else on what holds it, else on what it is tied to; the whole map on the workspace's first.
-  const view = around || holding || (told && typeof input.lens !== 'string') ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
+  // An item opens on its first picture of its own (not a shortcut, which leads away), else on what holds it, else on what is in it; the whole map on the workspace's first.
+  const view = holding || (told && typeof input.lens !== 'string') ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
   // A view may start somewhere else than the item it is kept about: tightly scoped, that is a shortcut.
   // Asked for by its id alone, a view kept about one item starts from that item, so it can be drawn anywhere: in a document, for one.
   const start = typeof view?.props.from === 'string' ? view.props.from : (hub ?? (view && view.about.length === 1 ? view.about[0] : undefined));
-  // Around one item the picture is its neighbourhood: every kind of link, each neighbour filed under the link that ties it.
   // A story's items are tied by whatever the map ties them by, and what is finished stays: it was told of.
   // What holds one item is what it waits on and what that waits on, tied by those links alone.
-  let under: Lens = told ? { ...LENS_DEFAULT, over: 'all', fold: ['system'] } : holding ? { ...LENS_DEFAULT, over: [...WAITS] } : start === undefined ? LENS_DEFAULT : { ...LENS_DEFAULT, over: 'all', lanes: 'link' };
+  let under: Lens = told ? { ...LENS_DEFAULT, over: 'all', fold: ['system'] } : holding ? { ...LENS_DEFAULT, over: [...WAITS] } : LENS_DEFAULT;
   // One view at a time, over what is built in: a field it does not name is the built-in one.
   const read = view ? [view] : [];
   for (const one of read) {
@@ -432,7 +430,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     said: holding ? `What "${all.get(hub!)?.title}" waits on, step by step` : sayLens(l, asked, told ? told.title : asked.from ? all.get(asked.from)?.title : undefined),
     // The lenses that can be chosen for this picture, in order, and which this is. One that starts somewhere else is a shortcut to there.
     views: views.map((one) => ({ id: one.id, title: one.title, ...(typeof one.props.from === 'string' && one.props.from !== hub && { to: { id: one.props.from, title: all.get(one.props.from)?.title ?? one.props.from } }) })),
-    view: view?.id ?? (holding ? HOLDING : hub !== undefined ? AROUND : null),
+    view: view?.id ?? (holding ? HOLDING : null),
     ...(hub !== undefined && {
       views_of_it: own.length,
       hub: await (async () => {

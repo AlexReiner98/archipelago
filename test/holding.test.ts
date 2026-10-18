@@ -44,7 +44,6 @@ test('what holds an item is all it waits on, step by step, and nothing beside it
   const opened = (await lens(l, { from: c.release })) as Answer;
   assert.ok(opened.views.some((v) => v.id === HOLDING));
   assert.equal(opened.view, HOLDING);
-  assert.equal(((await lens(l, { from: c.release, lens: 'around' })) as Answer).view, 'around', 'what it is tied to, when asked for');
 
   const held = (await lens(l, { from: c.release, lens: HOLDING })) as Answer;
   const ids = new Set(held.items.map((i) => i.id));
@@ -59,10 +58,10 @@ test('what holds an item is all it waits on, step by step, and nothing beside it
   const all = (await lens(l, { from: c.release, lens: HOLDING, fold: ['system'] })) as Answer;
   assert.ok(all.items.some((i) => i.id === c.done));
 
-  // An item that waits on nothing open is not offered it, and opens on what it is tied to.
+  // An item that waits on nothing open is not offered it, and opens on what is in it.
   const design = (await lens(l, { from: c.design })) as Answer;
   assert.ok(!design.views.some((v) => v.id === HOLDING));
-  assert.equal(design.view, 'around');
+  assert.equal(design.view, null);
 
   // An item with a view of its own opens on that, with what holds it still beside it.
   const { created: k } = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'Its own', status: 'current' }, { op: 'link', type: 'about', from: 'v', to: c.release }] })) as { created: Record<string, string> };
