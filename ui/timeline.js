@@ -1,7 +1,9 @@
 // The kernel's drawing of a lens on a time axis. Two layouts of the same answer: a calendar (a column for each day,
 // hours running down, each item a block where it falls) and bars (each lane a row, each item a bar across the
-// days it covers: a Gantt chart). Colour is the item's kind; a name too long for its block is cut, and is whole in
+// days it covers: a Gantt chart). Colour is what a block counts toward (the part of the item it is in), else its kind; a name too long for its block is cut, and is whole in
 // its tooltip. Nothing is written here: an item opens on its own page.
+
+import { GRID_HUES } from './grid.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const DAY = 86_400_000;
@@ -42,13 +44,15 @@ const cut = (text, width) => {
 /** Every block an answer places: one for each span of each item. */
 function blocks(answer) {
   return answer.items.flatMap((item) =>
-    (item.time ?? []).map((span) => ({ item, start: Date.parse(span.start), end: Math.max(Date.parse(span.end), Date.parse(span.start)), by: span.by })),
+    (item.time ?? []).map((span) => ({ item, start: Date.parse(span.start), end: Math.max(Date.parse(span.end), Date.parse(span.start)), by: span.by, on: span.on_title, stream: span.stream !== undefined ? span.stream : item.stream })),
   );
 }
 
 const group = (item) => `t-block group-${KINDS.includes(item.kind) ? item.kind : 'system'}${item.open ? '' : ' closed'}`;
 const open = (item) => () => (location.hash = `#/e/${item.id}`);
-const said = (b) => `${b.item.title}\n${b.end - b.start >= DAY ? fmtDay(b.start) : `${fmtDay(b.start)}, ${fmtTime(b.start)}`}${b.end > b.start ? ` to ${b.end - b.start >= DAY ? fmtDay(b.end - 1) : fmtTime(b.end)}` : ''}${b.by === 'bound' ? ' (due)' : ''}`;
+/** What a block is called: the work a session was on in that stretch, else the item itself. */
+const nameOf = (b) => b.on ?? b.item.title;
+const said = (b) => `${nameOf(b)}${b.on ? `\n${b.item.title}` : ''}\n${b.end - b.start >= DAY ? fmtDay(b.start) : `${fmtDay(b.start)}, ${fmtTime(b.start)}`}${b.end > b.start ? ` to ${b.end - b.start >= DAY ? fmtDay(b.end - 1) : fmtTime(b.end)}` : ''}${b.by === 'bound' ? ' (due)' : ''}`;
 
 /** The lanes of an answer, each with a name: lanes by person come named; any other lane is its value. */
 const lanesOf = (answer) => (answer.lanes ?? []).map((lane) => (lane && typeof lane === 'object' ? { key: lane.key, title: lane.title } : { key: lane, title: String(lane) }));
@@ -125,10 +129,15 @@ function calendar(host, answer, style) {
     const y = head + (hr - h0) * hourPx;
     out.append(svg('line', { class: 't-rule', x1: gutter, x2: width, y1: y, y2: y }), hr < h1 && svg('text', { class: 't-hour', x: 2, y: y + 11 }, `${String(hr).padStart(2, '0')}:00`));
   }
+  // What each block counts toward, as a colour of its own (the Time screen's colours, by project); none, the kind's colour.
+  const streams = answer.streams ?? [];
+  const hueOf = new Map(streams.map((st, k) => [st.key, GRID_HUES[k % GRID_HUES.length]]));
+  const streamTitle = new Map(streams.map((st) => [st.key, st.title]));
   const place = (b, x, y, w, hgt) => {
-    const title = lanes.length > 1 ? `${said(b)}
-${lanes[laneOf(b)].title}` : said(b);
-    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(title), svg('rect', { class: 'dot', x, y, width: Math.max(w, 3), height: hgt, rx: 3 }), svg('text', { class: 't-label', x: x + 4, y: y + 12 }, cut(b.item.title, w - 8))));
+    const title = [said(b), b.stream && streamTitle.get(b.stream), lanes.length > 1 && lanes[laneOf(b)].title].filter(Boolean).join('\n');
+    const box = svg('rect', { class: 'dot', x, y, width: Math.max(w, 3), height: hgt, rx: 3 });
+    if (streams.length) box.style.fill = hueOf.get(b.stream) ?? 'var(--muted)';
+    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(title), box, svg('text', { class: 't-label', x: x + 4, y: y + 12 }, cut(nameOf(b), w - 8))));
     out.lastChild.addEventListener('click', open(b.item));
   };
   // The strip: each whole-day thing a bar across the days it covers, on the first row free on all of them.
@@ -151,7 +160,16 @@ ${lanes[laneOf(b)].title}` : said(b);
       for (const b of mine) place(b, gutter + d * colW + lx + 2 + b.col * w, head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, w - 2, Math.max(((b.e - b.s) / 3_600_000) * hourPx, 16));
     }
   }
-  host.replaceChildren(out);
+  // The key: what the colours count toward this week, each a link to its page.
+  const used = streams.filter((st) => all.some((b) => b.stream === st.key));
+  const key = document.createElement('div');
+  key.style.cssText = 'display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 12px; font-size: 12px; color: var(--muted)';
+  for (const st of used) {
+    const a = Object.assign(document.createElement('a'), { href: `#/e/${st.key}`, title: st.title, textContent: st.title });
+    a.style.cssText = `color: inherit; text-decoration: none; white-space: nowrap; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; border-left: 10px solid ${hueOf.get(st.key)}; padding-left: 6px`;
+    key.append(a);
+  }
+  host.replaceChildren(out, ...(used.length ? [key] : []));
 }
 
 /** Each lane a row (each item its own when there are no lanes), its spans as bars across the days. */

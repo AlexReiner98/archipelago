@@ -38,6 +38,24 @@ export function insideOf(l: Archipelago, hub: string, by: string, relations: Lin
   return inside;
 }
 
+/**
+ * The stream each thing inside an item belongs to: the part of the item it sits in (a project's feature, say), so a
+ * calendar can colour what is done by what it counts toward, as the Time screen colours by project. A part is its
+ * own stream; what sits in the item directly has none.
+ */
+export function streamsOf(l: Archipelago, hub: string, by: string, relations: Link[]): Map<string, string> {
+  const root = (type: string) => l.registry.relations.get(type)?.root ?? type;
+  const kids = new Map<string, string[]>();
+  for (const r of relations) if (root(r.type) === by) kids.set(r.to_id, [...(kids.get(r.to_id) ?? []), r.from_id]);
+  const stream = new Map<string, string>();
+  for (const part of kids.get(hub) ?? []) {
+    if (!kids.has(part)) continue;
+    stream.set(part, part);
+    for (const queue = [part]; queue.length; ) for (const kid of kids.get(queue.pop()!) ?? []) if (!stream.has(kid)) (stream.set(kid, part), queue.push(kid));
+  }
+  return stream;
+}
+
 /** Today as a date in a zone. */
 const dayIn = (at: number, zone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
 

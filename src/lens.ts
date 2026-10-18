@@ -9,7 +9,7 @@ import type { Archipelago } from './pelago.ts';
 import { placeAll, readAxis, zoneOf, type TimeAxis } from './timeaxis.ts';
 import { blockGraph } from './blocking.ts';
 import { hubs, keptOf, type Kept } from './lens-kept.ts';
-import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, thisWeek } from './lens-when.ts';
+import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
 
 // Kept where they were first imported from.
 export { hubs, HUB_AT, pictureOf } from './lens-kept.ts';
@@ -201,6 +201,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const timed = !told && hub !== undefined && dated(l, hub, LENS_DEFAULT.by, entities, relations, zone);
   if (timed) views.splice(own.length + (offered ? 1 : 0), 0, { id: WHEN, title: 'When', props: {}, about: [] });
   const when = timed && input.lens === WHEN;
+  // In it, what each thing counts toward: a calendar colours by it. A session's stretch counts toward the work it was on.
+  const streamOf = when ? streamsOf(l, hub!, LENS_DEFAULT.by, relations) : undefined;
   const holding = hub !== undefined && (input.lens === HOLDING || (offered && input.lens === undefined && !own.some((one) => typeof one.props.from !== 'string')));
   // An item opens on its first picture of its own (not a shortcut, which leads away), else on what holds it, else on what is in it; the whole map on the workspace's first.
   const view = holding || when || (told && typeof input.lens !== 'string') ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
@@ -469,13 +471,15 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
         size: size(e),
         state: state(e),
         within: within(id),
-        ...(spans && { time: spans.get(id) }),
+        ...(spans && { time: spans.get(id)!.map((span) => (streamOf && span.on ? { ...span, on_title: all.get(span.on)?.title, stream: streamOf.get(span.on) ?? null } : span)) }),
+        ...(streamOf && { stream: streamOf.get(id) ?? null }),
         // In a story: the beats that are about it.
         ...(told && { told: beatsOf(id) }),
       };
     }),
     links: [...lines.values()],
     ...(laneOrder && { lanes: laneOrder }),
+    ...(streamOf && { streams: [...new Set(streamOf.values())].map((key) => ({ key, title: all.get(key)?.title ?? key })) }),
     rest: spans ? { ...rest, time: untimed } : rest,
   };
 }
