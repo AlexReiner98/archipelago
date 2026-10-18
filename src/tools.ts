@@ -532,7 +532,7 @@ export const TOOLS: Record<string, Tool> = {
       style: z
         .object({
           lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
-          shape: z.enum(['nest', 'boxes']).optional().describe('One of the built-in drawings. nest: circles in circles, opened by zooming. boxes: titled boxes in boxes, each thing one line.'),
+          shape: z.enum(['nest', 'boxes', 'flow']).optional().describe('One of the built-in drawings. nest: circles in circles, opened by zooming. boxes: titled boxes in boxes, each thing one line. flow: a process map, top down, wires at right angles.'),
           id: z.string().optional().describe('A style kept on the map (an item of type style), drawn with for this one look.'),
         })
         .optional()

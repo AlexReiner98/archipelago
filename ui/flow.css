@@ -1,0 +1,26 @@
+/* The flow shape (ui/flow.js): a process map, drawn in the lens's colours, which a style may set. */
+.lf-step { cursor: pointer; }
+.lf-step .lf-shape { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: 1.25; }
+.lf-step.scenario .lf-shape { stroke: var(--ln-muted); stroke-dasharray: 5 4; }
+.lf-step.you .lf-shape { stroke: var(--ln-you); }
+.lf-step.here .lf-shape, .lf-step:hover .lf-shape, .lf-step:focus .lf-shape { stroke: var(--ln-text); stroke-width: 2; }
+.lf-step text { fill: var(--ln-text); font: 13px system-ui, -apple-system, 'Segoe UI', sans-serif; dominant-baseline: middle; }
+.lf-step.closed text, .lf-step.stub text { fill: var(--ln-muted); }
+.lf-step.stub text { font-size: 12px; }
+.lf-step.dim { opacity: 0.32; }
+.lf-dot { fill: none; stroke: var(--ln-muted); stroke-width: 1.5; }
+.lf-dot.done { fill: var(--ln-done); stroke: none; } .lf-dot.you { fill: var(--ln-you); stroke: none; }
+.lf-dot.blocked { fill: var(--ln-blocked); stroke: none; } .lf-dot.session { fill: var(--ln-session); stroke: none; }
+.lf-badge circle { fill: var(--ln-inner); stroke: var(--ln-line); } .lf-badge.you circle { fill: var(--ln-you); }
+.lf-badge text { fill: var(--ln-text); font: 700 10.5px system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle; dominant-baseline: middle; }
+.lf-badge.you text { fill: var(--ln-sea); }
+.lf-wire { fill: none; stroke: var(--ln-muted); stroke-width: 1.25; }
+.lf-wire.dashed { stroke-dasharray: 6 5; }
+.lf-wire.lit { stroke: var(--ln-text); stroke-width: 2; }
+.lf-head { fill: var(--ln-muted); } .lf-head.lit { fill: var(--ln-text); }
+.lf-break rect { fill: var(--ln-sea); } .lf-break path { stroke: var(--ln-muted); stroke-width: 1.25; }
+.lf-says rect { fill: var(--ln-sea); } .lf-says text { fill: var(--ln-muted); font: 11.5px system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle; dominant-baseline: middle; }
+.lf-stage { overflow: auto; background: var(--ln-sea); }
+.lf-stage > svg { display: block; margin: 0 auto; }
+.lf-legend { display: flex; gap: 12px; align-items: center; white-space: nowrap; overflow: hidden; color: var(--ln-muted); font-size: 12px; }
+.lf-legend span { display: inline-flex; gap: 5px; align-items: center; }

@@ -16,11 +16,11 @@ const DIR = join(ROOT, 'demo-approvals');
 const PORT = 3201;
 const BASE = `http://127.0.0.1:${PORT}`;
 
-/** The process map's style as the one module a style keeps: its layout (layout.js) joined in before its drawing. */
+/** The process map's style as the one module a style keeps: the built-in flow layout joined in before its drawing. */
 function processCode(): string {
-  const read = (name: string) => readFileSync(join(ROOT, 'examples', 'approvals', name), 'utf8');
-  const layout = read('layout.js').replace(/^export function layout/m, 'function layout');
-  return `${layout}\n${read('process.js').replace(/^import \{ layout \} from '\.\/layout\.js';\n/m, '')}`;
+  const layout = readFileSync(join(ROOT, 'ui', 'flow-layout.js'), 'utf8').replace(/^export function layout/m, 'function layout');
+  const drawing = readFileSync(join(ROOT, 'examples', 'approvals', 'process.js'), 'utf8');
+  return `${layout}\n${drawing.replace(/^import \{ layout \} from .*\n/m, '')}`;
 }
 
 if (process.argv.includes('--fresh')) rmSync(DIR, { recursive: true, force: true });

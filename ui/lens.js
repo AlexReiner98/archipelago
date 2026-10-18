@@ -1,5 +1,6 @@
 import { api, h, part } from './base.js';
 import { BLOCKING, isOf } from './graph.js';
+import { drawFlow } from './flow.js';
 import { drawGrid } from './grid.js';
 import { drawCode, drawNest } from './nest.js';
 import { drawTime } from './timeline.js';
@@ -311,7 +312,7 @@ export function drawBoxes(host, answer, style, keep, kept) {
 }
 
 /** The nest: circles in circles, opened by zooming. Reads only what a lens answers with. */
-export const LENS_SHAPES = { nest: drawNest, boxes: drawBoxes, grid: drawGrid, time: drawTime };
+export const LENS_SHAPES = { nest: drawNest, boxes: drawBoxes, grid: drawGrid, time: drawTime, flow: drawFlow };
 
 /**
  * The map as a picture: the lens its address names (what follows a ?), or

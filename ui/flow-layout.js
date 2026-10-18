@@ -1,15 +1,23 @@
-// The layout of a process map, apart from its drawing: which items are steps, the wires between them, and where
-// each sits. Steps are laid out by Sugiyama’s method and wires routed at right angles; process.js says how, and
-// draws what this answers. It touches no canvas: `measure(text, px)` gives the width of a title at a size.
+// A process map’s layout, apart from its drawing: which items of a lens answer are steps, the wires between them,
+// and where each sits. A step leads to another when the other depends on it; the steps are laid out by Sugiyama’s
+// method (layers by longest path, a waypoint where a wire passes a layer, barycentre sweeps and sifting for the
+// order, a step with room to sit lower moved down where that takes crossings away) and the wires routed at right
+// angles, each on a track of its own. What follows an open question is a scenario, and a choice nothing follows yet
+// ends in a step of its own. Pure: an answer in, geometry out; `measure(text, px)` gives a title’s width at a size.
 
 const FLOW = new Set(['depends_on']);
+/** Past this many steps the layer search and the sifting are skipped: they grow with the square of the steps. */
+export const LARGE = 60;
 const LAYER_GAP = 84, NODE_GAP = 16, MARGIN = 24, MAX_TEXT = 140, TRACK = 8, SLOT = 9, LEAD_OUT = 12, LEAD_IN = 22;
 
+/** The steps (each with its place x, y and size w, h), the wires (each with its points), the breaks and the whole size. */
 export function layout({ items, links, rootId, measure }) {
   // ---- Steps: everything in the picture but the item it is of.
   const shapeOf = (i) => (i.kind === 'question' ? 'diamond' : i.kind === 'occurrence' ? 'pill' : i.kind === 'record' ? 'sheet' : 'box');
   const nodes = new Map();
   for (const i of [...items].sort((a, b) => a.place - b.place)) if (i.id !== rootId) nodes.set(i.id, { id: i.id, item: i, shape: shapeOf(i) });
+  if (!nodes.size) return { nodes, all: [], chains: [], breaks: [], potential: new Set(), x: new Map(), y: new Map(), width: 0, height: 0 };
+  const large = nodes.size > LARGE;
 
   // a leads to b when b depends on a; a line that says something says which option it follows.
   let edges = [];
@@ -44,10 +52,10 @@ export function layout({ items, links, rootId, measure }) {
       if (host) (host.notes ??= []).push(n.item);
     }
 
-  // An open decision's options: each one no wire follows yet ends in a pill of its own.
+  // An open question's choices: each one no wire follows yet ends in a pill of its own.
   const decisions = [...nodes.values()].filter((n) => n.shape === 'diamond' && n.item.open);
   for (const d of decisions) {
-    const options = Array.isArray(d.item.fields?.options) ? d.item.fields.options : [];
+    const options = Array.isArray(d.item.choices) ? d.item.choices : [];
     const taken = new Set(edges.filter((e) => e.a === d.id).map((e) => e.says));
     options.forEach((option, k) => {
       if (taken.has(option)) return;
@@ -136,7 +144,7 @@ export function layout({ items, links, rootId, measure }) {
     layers.splice(0, layers.length, ...best);
     index();
     // Sifting: each one tried at every place in its layer, and left where the fewest wires cross.
-    for (let better = fewest > 0; better; ) {
+    for (let better = fewest > 0 && !large; better; ) {
       better = false;
       layers.forEach((list, layer) => {
         // Only the crossings on either side of its layer can change.
@@ -167,7 +175,7 @@ export function layout({ items, links, rootId, measure }) {
   const bottom = Math.max(...asap.values());
   const score = (a) => a.crossings * 1e4 + a.span;
   let chosen = arrange(asap);
-  for (let pass = 0; pass < 2 && chosen.crossings > 0; pass++)
+  for (let pass = 0; pass < 2 && chosen.crossings > 0 && !large; pass++)
     for (const id of nodes.keys()) {
       const lo = Math.max(0, ...ins(id).map((a) => chosen.layerOf.get(a) + 1));
       const hi = outsOf(id).length ? Math.min(...outsOf(id).map((b) => chosen.layerOf.get(b) - 1)) : bottom + 2;

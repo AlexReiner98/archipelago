@@ -50,6 +50,9 @@ test('a capability naming a field the type lacks stops its pack from loading', (
   assert.throws(() => new Registry(packsWith(bad({ where: { link: 'next_to' } }))), /which is no relation/);
   assert.throws(() => new Registry(packsWith(bad({ colour: {} }))), /"colour" is not a capability/);
   assert.deepEqual(checkCapabilities({ settles: { by: 'word', whose: 'owner' } }, {}, new Set()), []);
+  // A question's choices are a list: a json field.
+  assert.deepEqual(checkCapabilities({ settles: { by: 'word', choices: 'options' } }, { options: { type: 'json' } }, new Set()), []);
+  assert.deepEqual(checkCapabilities({ settles: { by: 'word', choices: 'options' } }, { options: { type: 'string' } }, new Set()), ['settles.choices reads "options", a string, not a json']);
 });
 
 test('every shipped deadline is a bound, and a flavour inherits its parent capabilities', async () => {

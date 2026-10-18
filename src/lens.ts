@@ -438,11 +438,11 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     return (sessions.get(e.id) ?? 0) > 0 || Number(e.props.tokens_used ?? 0) > 0 || UNDER_WAY.includes(e.status) ? 'under_way' : 'to_come';
   };
 
-  // The fields a type's pack marks as shown travel with the item, so a style can draw by them.
+  // The fields a type's pack marks as shown travel with the item, so a style can draw by them; a question's choices too.
   const shownFields = (e: Row) => {
-    const defs = l.registry.type(e.type)?.fields ?? {};
+    const type = l.registry.type(e.type), defs = type?.fields ?? {}, choices = e.props[type?.capabilities.settles?.choices ?? ''];
     const fields = Object.fromEntries(Object.entries(e.props).filter(([key, value]) => defs[key]?.shown && value != null));
-    return Object.keys(fields).length ? { fields } : {};
+    return { ...(Object.keys(fields).length && { fields }), ...(Array.isArray(choices) && { choices: choices.map(String) }) };
   };
   // Filed by a field that has a set of values, the lanes come in that order: the first type that declares them says it.
   const laneOrder = byField === undefined ? undefined : [...l.registry.types.values()].find((t) => t.fields[byField]?.values)?.fields[byField].values;

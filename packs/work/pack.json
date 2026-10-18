@@ -43,7 +43,7 @@
     {
       "id": "work.decision",
       "moved_from": ["decision"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner" } },
+      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options" } },
       "extends": "question",
       "title": "Decision",
       "description": "Something decided, or still open, with its reasoning. The title is the question.",

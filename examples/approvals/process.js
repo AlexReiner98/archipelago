@@ -12,10 +12,10 @@
 // decision is a scenario: dashed, with the option it follows written under
 // the decision, and an option nothing follows yet ends in a dashed pill.
 //
-// The layout is layout.js; the seed joins the two into the one module a style keeps.
+// The layout is the built-in flow shape's (ui/flow-layout.js); the seed joins the two into the one module a style keeps.
 // It runs in a worker with a canvas and nothing else (see the style type's code field).
 
-import { layout } from './layout.js';
+import { layout } from '../../ui/flow-layout.js';
 
 const LEGEND = 128;
 

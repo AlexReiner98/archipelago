@@ -46,10 +46,11 @@ export interface Where {
 /** How many at once: a number field, a boolean field (true for one, false for any number), or a fixed number. */
 export type Capacity = number | { field: string };
 
-/** A question settled by someone's word or by evidence, and whose word it is. */
+/** A question settled by someone's word or by evidence, whose word it is, and the field that lists the choices weighed. */
 export interface Settles {
   by: 'word' | 'evidence';
   whose?: 'owner' | 'waits_on';
+  choices?: string;
 }
 
 export interface Capabilities {
@@ -113,6 +114,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
   if (settles) {
     if (!['word', 'evidence'].includes(settles.by)) problems.push('settles.by is "word" or "evidence"');
     if (settles.whose !== undefined && !['owner', 'waits_on'].includes(settles.whose)) problems.push('settles.whose is "owner" or "waits_on"');
+    has('settles.choices', settles.choices, ['json']);
   }
   return problems;
 }
