@@ -1,8 +1,10 @@
 import { api, h, part } from './base.js';
 import { drawFlow } from './flow.js';
+import { drawGrid } from './grid.js';
 import { dress } from './lens-base.js';
 import { drawList } from './list.js';
 import { drawCode } from './style-code.js';
+import { drawTime } from './timeline.js';
 import { ago, idsAsLinks, titles } from './words.js';
 
 // ---- A session's story -----------------------------------------------------
@@ -62,9 +64,10 @@ export function storyPart(data) {
 
 // A lens says what is in a picture and the server answers it with data of one
 // shape (the `lens` view). A style says how that data looks, and is only ever
-// read here: which shape, and what stays lit. The kernel draws two shapes and
-// no more: flow, a process map, and list, everything else. Any other look is a
-// style with code of its own, written for the project by its people or agents.
+// read here: which shape, and what stays lit. The kernel draws four shapes:
+// list, the default; flow, a process map; grid, rows by lanes; and time, along a
+// time axis. Any other look is a style with code of its own, written for the
+// project by its people or agents.
 export const LENS_STYLE = { shape: 'list', lit: 'all' };
 /** The fields a lens may carry in an address, and which of them are lists. */
 export const LENS_FIELDS = { from: false, story: false, by: false, far: false, lanes: false, order: false, measure: false, kinds: true, over: true, fold: true };
@@ -172,8 +175,8 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
     Object.assign(chosen, LENS_STYLE, answer.style, keptStyle(key), style, { noLit: !answer.controls.includes('lit') });
     dress(body, chosen);
     // A style with code of its own is the drawing; without, one of those that come built in.
-    // A shape kept from before there were two (nest, boxes, grid, time) is drawn as the list.
-    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, answer, chosen, keep, place);
+    // A lens on a time axis is drawn along it unless a shape is asked for here; a shape kept from before (nest, boxes) is drawn as the list.
+    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[answer.lens.time && !style.shape ? 'time' : chosen.shape] ?? LENS_SHAPES.list))(body, answer, chosen, keep, place);
   };
   host.ready = load();
   // Light only these items (a beat's, pointed at beside the picture), or everything as the style says again: the shape draws itself anew.
@@ -187,7 +190,7 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
 export const lensPlace = new Map();
 
 /** The shapes the kernel draws. Each reads only what a lens answers with. */
-export const LENS_SHAPES = { list: drawList, flow: drawFlow };
+export const LENS_SHAPES = { list: drawList, flow: drawFlow, grid: drawGrid, time: drawTime };
 
 /**
  * The map as a picture: the lens its address names (what follows a ?), or
