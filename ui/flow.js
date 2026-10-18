@@ -7,6 +7,7 @@
 import { h } from './base.js';
 import { layout } from './flow-layout.js';
 import { lensTree, litCount, litSwitch } from './lens.js';
+import { panZoom } from './pan-zoom.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif";
@@ -92,16 +93,18 @@ export function drawFlow(host, answer, style, keep) {
     const lx = g.x.get(d.id) + w / 2 + 6, ly = (g.y.get(d.id) + d.h / 2 + c.points[1][1]) / 2;
     return titled(svg('g', { class: 'lf-says' }, svg('rect', { x: lx - w / 2, y: ly - 10, width: w, height: 20, rx: 10 }), svg('text', { x: lx, y: ly + 0.5 }, text)), c.says);
   });
-  const picture = svg('svg', { width: g.width, height: g.height, viewBox: `0 0 ${g.width} ${g.height}`, role: 'img', 'aria-label': `A process of ${steps.length} steps` }, wireLayer, breakLayer, stepLayer, saysLayer);
+  const picture = svg('svg', { viewBox: `0 0 ${g.width} ${g.height}`, role: 'img', 'aria-label': `A process of ${steps.length} steps` }, wireLayer, breakLayer, stepLayer, saysLayer);
 
-  // The legend: only the marks this picture uses, on one line.
+  // The legend: only the marks this picture uses, one to a line, in a card over the picture's corner.
   const mark = (inner, label) => h('span', {}, svg('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label);
   const uses = (test) => steps.some(test);
   const legend = h(
     'div',
     { class: 'lf-legend' },
     [['box', 'Work'], ['diamond', 'Question'], ['pill', 'Event'], ['sheet', 'Record'], ['end', 'Possible end']].filter(([shape]) => uses((n) => n.shape === shape)).map(([shape, label]) => mark(svg('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 11)), label)),
-    [['done', 'Done'], ['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way']].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)).map(([dot, label]) => mark(svg('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
+    [['done', 'Done'], ['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way'], ['', 'Not started']].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)).map(([dot, label]) => mark(svg('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
+    uses((n) => n.notes) && mark(svg('g', { class: 'lf-badge' }, svg('circle', { cx: 11, cy: 7, r: 6 })), 'Work on it'),
+    mark(svg('path', { d: 'M1 7H21', class: 'lf-wire' }), 'Leads to'),
     g.chains.some((c) => c.dashed) && mark(svg('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
     g.breaks.length > 0 && mark(svg('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
   );
@@ -110,13 +113,22 @@ export function drawFlow(host, answer, style, keep) {
     for (const [id, el] of stepEls) el.classList.toggle('dim', !litCount(byId.get(id), style));
   };
   const lit = litSwitch(me, style, keep, redraw);
-  const stage = h('div', { class: 'lf-stage' }, picture);
-  // What does not fit on its one line is in its tooltip.
-  legend.title = [...legend.children].map((mark) => mark.textContent).join(' · ');
-  host.replaceChildren(h('div', { class: 'toolbar fold-bar' }, legend, h('span', { class: 'grow' }), lit), stage);
-  host.redraw = redraw;
-  redraw();
+  const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, legend);
+  host.replaceChildren(stage);
   // Opened from an item's page, the picture is brought to that item; else to where the process starts.
   const start = stepEls.has(style.here) ? style.here : steps.find((n) => !n.stub && n.layer === 0)?.id;
-  if (start) requestAnimationFrame(() => (stage.scrollLeft = Math.max(0, g.x.get(start) - stage.clientWidth / 2)));
+  // The key is open on a wide frame and folded on a narrow one, where it would hide too much of the picture.
+  legend.hidden = stage.clientWidth > 0 && stage.clientWidth < 720;
+  const moves = panZoom(stage, picture, { width: g.width, height: g.height, start: start ? [g.x.get(start), g.y.get(start)] : undefined, aside: legend.hidden ? 0 : legend.offsetWidth + 20 });
+  const key = h('button', { class: legend.hidden ? '' : 'on', title: 'What the marks mean', onclick: (ev) => ((legend.hidden = !legend.hidden), ev.currentTarget.classList.toggle('on', !legend.hidden)) }, 'Key');
+  const zoom = h(
+    'span',
+    { class: 'switch' },
+    h('button', { title: 'Zoom out', onclick: () => moves.zoomBy(1 / 1.25) }, '−'),
+    h('button', { title: 'All of it in sight', onclick: () => moves.fit() }, 'Fit'),
+    h('button', { title: 'Zoom in', onclick: () => moves.zoomBy(1.25) }, '+'),
+  );
+  host.prepend(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit, key, zoom));
+  host.redraw = redraw;
+  redraw();
 }
