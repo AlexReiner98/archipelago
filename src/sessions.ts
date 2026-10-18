@@ -418,6 +418,9 @@ export async function sessionEnd(
       authority: { of: 'agent', basis: `Named in still_true when session ${run.id} ended` },
     });
   }
+  // Whatever it held goes back first, so a finished session is never seen still keeping the lane.
+  const { rows: held } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'holds' and from_id = $1 and valid_to is null`, [run.id]);
+  for (const h of held) await l.release(actor, { resource: h.to_id, holder: run.id, reason: `Session ${outcome}` });
   await touch(l, run.id, 'close');
   const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'sys.works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
@@ -428,9 +431,6 @@ export async function sessionEnd(
     reason: input.summary ?? `Session ${outcome}`,
   });
   await heard(l, run, `Session "${run.title}" ended`);
-  // Whatever it held goes back, so a finished session can never keep the lane.
-  const { rows: held } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'holds' and from_id = $1 and valid_to is null`, [run.id]);
-  for (const h of held) await l.release(actor, { resource: h.to_id, holder: run.id, reason: `Session ${outcome}` });
   return { run: run.id, status: outcome, released: held.length };
 }
 
