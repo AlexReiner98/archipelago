@@ -39,7 +39,7 @@ interface WorkspacesConfig {
   packsDir: string;
   packs?: string[];
   policy?: Partial<Policy>;
-  /** Start each workspace's automation runner when it opens. */
+  /** Start each workspace's automation runner and schedules when it opens: while this process leads (lead). */
   runAutomations?: boolean;
 }
 
@@ -56,9 +56,11 @@ export class Workspaces {
   private readonly held = new Map<string, number>();
   private readonly touched = new Map<string, number>();
   private index: IndexFile;
+  private leading: boolean;
 
   constructor(config: WorkspacesConfig) {
     this.config = config;
+    this.leading = Boolean(config.runAutomations);
     const file = this.indexFile();
     this.index = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { workspaces: [] };
   }
@@ -128,8 +130,7 @@ export class Workspaces {
     // Asked again after waiting: a request may have arrived meanwhile.
     if (rows[0].busy || this.held.get(id) || this.open.get(id) !== opening) return false;
     this.open.delete(id);
-    ws.automations.stop();
-    stopSchedules(ws.pelago.registry);
+    this.clocks(ws, false);
     hostFor(ws.pelago.registry).stop();
     const closing = ws.pelago.db.close().finally(() => this.closing.delete(id));
     this.closing.set(id, closing);
@@ -164,10 +165,31 @@ export class Workspaces {
     // The packs the owner turned off here stay off; what they made is dormant.
     pelago.registry.turnOff(await packsOff(pelago));
     await syncTypes(pelago);
-    if (this.config.runAutomations) startSchedules(pelago);
-    const automations = new Automations(pelago);
-    if (this.config.runAutomations) automations.start();
-    return { id, name: this.list().find((w) => w.id === id)!.name, pelago, automations };
+    const ws = { id, name: this.list().find((w) => w.id === id)!.name, pelago, automations: new Automations(pelago) };
+    if (this.leading) this.clocks(ws, true);
+    return ws;
+  }
+
+  /** Start or stop what runs on a clock in one workspace: its automations and its packs' schedules. */
+  private clocks(ws: Workspace, on: boolean): void {
+    ws.automations.stop();
+    stopSchedules(ws.pelago.registry);
+    if (!on) return;
+    startSchedules(ws.pelago);
+    ws.automations.start();
+  }
+
+  /**
+   * Become the server that runs the clocks (src/leader.ts), or stop being it. On a Postgres server every workspace is
+   * opened as this one takes the lead, since a request may never come here to open one whose automations are due.
+   */
+  async lead(on: boolean): Promise<void> {
+    this.leading = on;
+    if (on && this.config.databaseUrl) for (const { id } of this.list()) await this.get(id).catch((err) => console.error(`opening ${id} to lead failed: ${(err as Error).message}`));
+    for (const opening of this.open.values()) {
+      const ws = await opening.catch(() => undefined);
+      if (ws) this.clocks(ws, this.leading);
+    }
   }
 
   /**
@@ -238,9 +260,8 @@ export class Workspaces {
   async closeAll(): Promise<void> {
     for (const opening of this.open.values()) {
       const ws = await opening.catch(() => undefined);
-      ws?.automations.stop();
       if (ws) {
-        stopSchedules(ws.pelago.registry);
+        this.clocks(ws, false);
         hostFor(ws.pelago.registry).stop();
       }
       await ws?.pelago.db.close();

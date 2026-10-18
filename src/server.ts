@@ -34,7 +34,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { notify } from './notify.ts';
-import { backupAll, newestBackup, parseBackup } from './backup.ts';
+import { backupAll, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { SETUP_VERSION, setupCommand, setupScript } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
@@ -44,7 +44,9 @@ import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
-import { hasReaderKey, readable, readPush, readUnread, recheck } from './reader.ts';
+import { hasReaderKey, readPush } from './reader.ts';
+import { pgLeader, soleLeader, type Leader } from './leader.ts';
+import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
 import { publicPage, publicPicture } from './public.ts';
@@ -101,7 +103,7 @@ class Refused extends Error {
 
 export { lenient } from './mcp.ts';
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   const named = options.publicHosts ?? [];
@@ -190,7 +192,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
-      if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running });
+      if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, leading: options.leading?.() ?? true });
       if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) return serveBackupFile(url.pathname.slice(13), res);
       // What a project needs to work with this server, as one script to run in its folder. It holds no secret,
       // so it needs no token; it is given only under a name this server answers to, which it then writes down.
@@ -513,7 +515,7 @@ if (import.meta.main) {
   const rootDir = join(config.dataDir, '..', 'workspaces');
   // Before anything reads a secret: where the key they are sealed with is kept.
   configureSecrets(rootDir);
-  const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy, runAutomations: true });
+  const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy });
   if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 
   // One server per data folder, whatever port each is on: two of them writing
@@ -541,51 +543,7 @@ If that process is not a pelago server, delete ${lock}.`);
   // The GitHub App is told this server's address: the name it is reached by from outside, when it has one.
   const origin = config.publicHosts[0] ? `https://${config.publicHosts[0]}` : `http://127.0.0.1:${config.port}`;
   const githubApp = new GithubApp({ dir: rootDir, origin });
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: githubApp, proxies: config.trustedProxies });
-  // Every hour each workspace that connected GitHub is asked, for each repository the app can read, whether a
-  // re-check is due (each project says how often); the agent on this server does the ones that are. An hour when
-  // nothing is due costs no run. Asked that often because a server that is deployed daily never sees a whole day.
-  const recheckAll = async () => {
-    // The same hour, and so at every start: what the app is called on GitHub now.
-    await githubApp.refresh().catch((err) => console.error(`The GitHub App could not be asked its name: ${(err as Error).message}`));
-    for (const { id } of workspaces.list()) {
-      const installation = githubApp.installationOf(id);
-      if (!installation) continue;
-      const release = workspaces.hold(id);
-      try {
-        const { pelago } = await workspaces.get(id);
-        for (const repo of await readable(pelago, githubApp, installation.id)) {
-          const about = (await githubApp.asInstallation(installation.id, `/repos/${repo.name}`)) as { default_branch?: string };
-          const r = await recheck(pelago, githubApp, repo, about.default_branch ?? 'main');
-          if (r.ran) console.log(`reader: re-check of ${repo.name}: ${r.ok ? 'done' : 'failed'}, ${r.tokens} tokens`);
-        }
-      } catch (err) {
-        console.error(`reader: re-check in ${id} failed: ${(err as Error).message}`);
-      } finally {
-        release();
-      }
-    }
-  };
-  const rechecks = setInterval(() => void recheckAll(), 3600_000);
-  rechecks.unref();
-  setTimeout(() => void recheckAll(), 120_000).unref();
-  // A push whose reading was cut off when the last server stopped is read by this one, soon after it is up.
-  const readLeftUnread = async () => {
-    for (const { id } of workspaces.list()) {
-      const installation = githubApp.installationOf(id);
-      if (!installation) continue;
-      const release = workspaces.hold(id);
-      try {
-        const { pelago } = await workspaces.get(id);
-        for (const r of await readUnread(pelago, githubApp, installation.id)) console.log(`reader: caught up on ${r.repo} ${r.branch} (${r.after.slice(0, 7)})`);
-      } catch (err) {
-        console.error(`reader: catching up in ${id} failed: ${(err as Error).message}`);
-      } finally {
-        release();
-      }
-    }
-  };
-  setTimeout(() => void readLeftUnread(), 20_000).unref();
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: githubApp, proxies: config.trustedProxies, leading: () => leader?.leading ?? false });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {
@@ -602,6 +560,12 @@ If that process is not a pelago server, delete ${lock}.`);
     console.log(`packs: ${main.pelago.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
     console.log(`auth: ${config.auth}`);
     if (config.dev) console.log('dev mode: agent changes are not reviewed, and agents can restart the server');
+    // Several servers may share a Postgres server: the one holding its lock runs the clocks (src/leader.ts).
+    leader = config.databaseUrl ? await pgLeader(config.databaseUrl) : soleLeader();
+    if (config.databaseUrl) console.log(leader.leading ? 'leading: this server runs the clocks' : 'following: another server runs the clocks');
+    leader.onChange((on) => void workspaces.lead(on));
+    await workspaces.lead(leader.leading);
+    stopDuties = serverDuties(leader, workspaces, githubApp, config.backup);
     if (config.idleMinutes > 0) {
       console.log(`workspaces unused for ${config.idleMinutes} minutes are closed until next needed`);
       idle = setInterval(() => void workspaces.closeIdle(config.idleMinutes * 60_000).then((closed) => closed.length && console.log(`closed idle workspaces: ${closed.join(', ')}`), (err) => console.error('closing idle workspaces failed:', err)), 60_000);
@@ -609,21 +573,7 @@ If that process is not a pelago server, delete ${lock}.`);
     if (config.backup) {
       const { dir, everyHours, keep, upload } = config.backup;
       console.log(`backups: every ${everyHours} hours to ${dir}, keeping ${keep}${upload ? ', each copied off the server' : ' (NOT copied off the server)'}`);
-      // Asked every few minutes whether one is due, going by the newest file,
-      // so restarting the server neither skips a backup nor piles them up.
-      const check = async () => {
-        const newest = newestBackup(dir);
-        if (newest && Date.now() - newest.getTime() < everyHours * 3600_000) return;
-        for (const r of await backupAll(workspaces, dir, keep, upload)) {
-          if (r.error) console.error(`backup of ${r.workspace} FAILED: ${r.error}`);
-          else if (r.copied === false) console.error(`backed up ${r.workspace}: ${r.rows} rows, but the copy off the server FAILED: ${r.copy_error}`);
-          else console.log(`backed up ${r.workspace}: ${r.rows} rows${r.copied ? ', copied off the server' : ''}`);
-        }
-      };
       configureBackup(() => backupAll(workspaces, dir, keep, upload));
-      const safely = () => void check().catch((err) => console.error('backup failed:', err));
-      safely();
-      backups = setInterval(safely, 5 * 60_000);
     }
     if (config.auth !== 'tokens') return;
     // First start with tokens on: there is nobody to ask for a token yet, so
@@ -635,11 +585,13 @@ If that process is not a pelago server, delete ${lock}.`);
       console.log(`\nYour token for the default workspace (shown once):\n  ${owner.token}\nPaste it into the web UI, and set PELAGO_TOKEN for the CLI.`);
     }
   });
-  let backups: ReturnType<typeof setInterval> | undefined;
   let idle: ReturnType<typeof setInterval> | undefined;
+  let leader: Leader | undefined;
+  let stopDuties = () => {};
   const stop = async (code = 0) => {
-    clearInterval(backups);
+    stopDuties();
     clearInterval(idle);
+    await leader?.stop();
     stopAllLaunched();
     server.close();
     await workspaces.closeAll();

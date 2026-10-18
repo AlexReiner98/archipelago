@@ -59,7 +59,7 @@ const LONG_FILES: Record<string, number> = {
   'src/tools.ts': 1091,
   'src/pelago.ts': 1072,
   'ui/style.css': 778,
-  'src/server.ts': 653,
+  'src/server.ts': 605,
   'src/sessions.ts': 503,
 };
 
