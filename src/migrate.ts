@@ -10,6 +10,7 @@
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
 import { ORDERED, SCHEMA, VISIBILITY } from './schema.ts';
+import { TRANSIENT } from './transient.ts';
 
 interface Migration {
   version: number;
@@ -25,6 +26,7 @@ export const MIGRATIONS: Migration[] = [
   // takes it as its first step without harm.
   { version: 1, name: 'the schema before versions', sql: `create extension if not exists pg_trgm;\n${SCHEMA}\n${VISIBILITY}` },
   { version: 2, name: 'writes in order on a server', sql: '', server: ORDERED },
+  { version: 3, name: 'what one request leaves for the next', sql: TRANSIENT },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

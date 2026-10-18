@@ -1,0 +1,93 @@
+// What Claude Code's hooks are answered (POST /hooks/<event>): a session started, was prompted, ended a turn, ended.
+// Where a session last heard up to is kept in the workspace's database (src/transient.ts), so its next prompt is
+// answered as well by a server it has not spoken to before.
+
+import { SETUP_VERSION, setupCommand } from './connect.ts';
+import type { Q } from './db.ts';
+import type { Archipelago } from './pelago.ts';
+import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
+import { describeChanges, humanChanges, latestSeq } from './tools.ts';
+import { keep, kept } from './transient.ts';
+
+export interface HookBody {
+  session_id?: string;
+  cwd?: string;
+  remote?: string;
+  reason?: string;
+  tokens?: number;
+  setup?: string;
+}
+
+export interface HookCall {
+  /** The whole workspace's database, where what one request leaves for the next is kept. */
+  whole: Q;
+  /** The map as the token's person sees it. */
+  pelago: Archipelago;
+  /** The repositories the token is limited to; none for any. */
+  repos: string[];
+  body: HookBody;
+  /** This server: the commit it runs and when it started. */
+  running: { commit?: string; started: string };
+  /** The address the hook called, for the setup command. */
+  origin: string;
+}
+
+/** How long a session's place is kept after it was last heard from. */
+const HEARD_MS = 7 * 86_400_000;
+const heardKey = (session: string | undefined) => `heard:${session ?? ''}`;
+
+const LIMITED =
+  'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one of them: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made on the Workspace screen.';
+
+const restarted = ({ started, commit }: HookCall['running']) =>
+  `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). If that was a deploy, its tools may have changed, and your client still holds the list from when it connected: a tool or an input that CLAUDE.md or a tool's answer names, but your list lacks, is there on the server. Ask the owner to reconnect the pelago MCP server, or until then call the tool as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
+
+/** The answer to one hook, or undefined for an event there is none for. */
+export async function answerHook(event: string, call: HookCall): Promise<object | undefined> {
+  const { whole, pelago, repos, body, running } = call;
+  // A token limited to some repositories registers and speaks for sessions in those, and for no others.
+  if (repos.length && !(await hookWithin(pelago, repos, body, event === 'session-start'))) {
+    return event === 'session-start' ? { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: LIMITED } } : {};
+  }
+  // Said in the server's log, so "did the hook run?" has an answer.
+  console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);
+  // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
+  if (event !== 'session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
+  if (event === 'prompt') {
+    // Each time the owner sends a session a message, the session is told what the owner has done in the map since
+    // it last heard: a decision made in the UI reaches the session with the next thing they say.
+    await sessionHeard(pelago, body.session_id, 'begin').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
+    const heard = await kept<number>(whole, heardKey(body.session_id));
+    const changes = heard === undefined ? [] : await humanChanges(pelago, heard);
+    await keep(whole, heardKey(body.session_id), changes.at(-1)?.seq ?? heard ?? (await latestSeq(pelago)), HEARD_MS);
+    const told: string[] = [];
+    // A session that began before this server did has lived through a restart: after a deploy its client still
+    // holds the tools as they were when it connected. Said once, at its first prompt after the restart.
+    const restartKey = `restart:${running.started}:${body.session_id ?? ''}`;
+    const began = (await kept(whole, restartKey)) ? undefined : await sessionBegan(pelago, body.session_id);
+    await keep(whole, restartKey, true, HEARD_MS);
+    if (began && began.getTime() < Date.parse(running.started)) told.push(restarted(running));
+    if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${describeChanges(changes)}`);
+    return told.length ? { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } } : {};
+  }
+  if (event === 'session-start') {
+    await keep(whole, heardKey(body.session_id), await latestSeq(pelago), HEARD_MS);
+    let additionalContext = await hookSessionStart(pelago, body);
+    // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
+    // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
+    if (body.setup !== SETUP_VERSION)
+      additionalContext += `\n\nThis folder's Archipelago files (hooks, working rules, the bump skill) are older than the server's. Tell the owner in your first reply, and with their yes bring them up to date by running this in the folder (it holds no secret, and with nobody at a terminal it renews only what Archipelago wrote there before):${setupCommand(call.origin)} . What it changes takes effect in the next session.`;
+    return { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext } };
+  }
+  if (event === 'session-end') {
+    await hookSessionEnd(pelago, body);
+    return {};
+  }
+  // The end of a turn: nothing to say back, but the session was heard from and its count (taken above) is
+  // up to date, so one long turn does not go a whole session without its tokens.
+  if (event === 'stop') {
+    await sessionHeard(pelago, body.session_id, 'until').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
+    return {};
+  }
+  return undefined;
+}

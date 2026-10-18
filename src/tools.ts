@@ -29,6 +29,7 @@ import { pictureOf, readLens, shownIn } from './lens.ts';
 import { askView, viewList } from './askview.ts';
 import { toConfirm } from './confirm.ts';
 import { VIEWS } from './views.ts';
+import { keep, kept as keptFor, take } from './transient.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page; only a project, feature, release, proof question, test or test result can be, and only a human makes it so (from an agent it waits as a proposal).');
@@ -342,12 +343,11 @@ function forAgent(name: string, answer: unknown): unknown {
 const FULL = z.boolean().optional().describe('true to be given the history whole: long notes, and the reason and authority on every event of a change set. Left out, an agent is given the start of each note and its length, and a change set’s reason and authority on the first of its events only.');
 
 /**
- * Changes an agent sent that were refused, kept for a few minutes so that
- * correcting one op does not mean writing seventy out again. In memory, like
- * the focus: it is a convenience, and means nothing after a restart.
+ * Changes an agent sent that were refused, kept for a few minutes so that correcting one op does not mean writing
+ * seventy out again. Kept in the workspace's database, so the retry may reach another server than the change did.
  */
 const REFUSED_MINUTES = 10;
-const refused = new Map<string, { at: number; who: string; input: Record<string, unknown> & { ops: unknown[] } }>();
+type Refused = { who: string; input: Record<string, unknown> & { ops: unknown[] } };
 
 export const TOOLS: Record<string, Tool> = {
   schema: {
@@ -589,8 +589,8 @@ export const TOOLS: Record<string, Tool> = {
       const who = `${l.workspace}:${actor.token ?? ''}`;
       let input = given;
       if (retry) {
-        const kept = refused.get(retry);
-        if (!kept || kept.who !== who || Date.now() - kept.at > REFUSED_MINUTES * 60_000) throw new Error(`No refused change is kept as "${retry}": one is kept for ${REFUSED_MINUTES} minutes, and not across a restart. Send the change whole.`);
+        const kept = await keptFor<Refused>((await wholeMap(l)).db, `refused:${retry}`);
+        if (!kept || kept.who !== who) throw new Error(`No refused change is kept as "${retry}": one is kept for ${REFUSED_MINUTES} minutes. Send the change whole.`);
         const ops = [...kept.input.ops];
         for (const fix of fixes ?? []) {
           if (fix.at > ops.length) throw new Error(`Change rejected:\n- fixes: the change kept as "${retry}" has ${ops.length} ops, so there is no op ${fix.at}.`);
@@ -637,14 +637,13 @@ export const TOOLS: Record<string, Tool> = {
         const message = (err as Error).message;
         if (actor.kind !== 'agent' || !message.startsWith('Change rejected')) throw err;
         // A refused change is kept, so that what is wrong with one op is all that has to be sent again.
-        for (const [name, old] of refused) if (Date.now() - old.at > REFUSED_MINUTES * 60_000) refused.delete(name);
         const name = retry ?? `k_${Math.random().toString(36).slice(2, 10)}`;
-        refused.set(name, { at: Date.now(), who, input });
+        await keep((await wholeMap(l)).db, `refused:${name}`, { who, input } satisfies Refused, REFUSED_MINUTES * 60_000);
         throw new Error(
           `${message}\nNothing was changed. The change is kept for ${REFUSED_MINUTES} minutes as "${name}": to correct it, send change with only retry: "${name}" and fixes: [{ at: <the op’s number>, op: <the whole op as it should be> }]. Every other op is sent as it was.`,
         );
       }
-      if (retry) refused.delete(retry);
+      if (retry) await take((await wholeMap(l)).db, `refused:${retry}`);
       // A question an agent settled is not left for the human to come across: it is put to them by the next session
       // they talk to (attention, reason to_confirm, and the handoff), all of them in one list, not a notification for each.
       // The human's screen follows an agent's change: to Review when it waits
@@ -957,9 +956,9 @@ export const TOOLS: Record<string, Tool> = {
       }
       if (input.create) {
         if (l.workspace !== 'default') throw new Error('The GitHub App belongs to the whole server: it is created from the default workspace, by its admin.');
-        return { ...(await status()), url: app.startCreate(l.workspace) };
+        return { ...(await status()), url: await app.startCreate(l.workspace) };
       }
-      if (input.connect) return { ...(await status()), url: app.startConnect(l.workspace) };
+      if (input.connect) return { ...(await status()), url: await app.startConnect(l.workspace) };
       const mine = app.installationOf(l.workspace);
       if (mine) {
         app.forget(mine.id);

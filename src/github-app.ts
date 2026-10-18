@@ -17,10 +17,12 @@
 import { createHmac, createSign, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Q } from './db.ts';
 import { repoByName } from './github.ts';
 import { env } from './env.ts';
 import type { Archipelago } from './pelago.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
+import { keep, kept, take } from './transient.ts';
 
 interface Credentials {
   id: number;
@@ -39,7 +41,6 @@ interface Kept {
 interface Pending {
   kind: 'create' | 'connect';
   workspace: string;
-  expires: number;
 }
 
 export interface GithubAppOptions {
@@ -50,6 +51,11 @@ export interface GithubAppOptions {
   /** GitHub's API and site. Elsewhere only in tests. */
   api?: string;
   web?: string;
+  /**
+   * The whole database of a workspace, where what was begun here waits for GitHub to send its reader back: that may
+   * be to another server than began it. None keeps it in this process (tests).
+   */
+  store?: (workspace: string) => Promise<Q | undefined>;
 }
 
 /** How long someone has to finish on GitHub what they started here. */
@@ -58,7 +64,7 @@ const PENDING_MINUTES = 15;
 export class GithubApp {
   private readonly options: GithubAppOptions;
   private kept: Kept;
-  private readonly pending = new Map<string, Pending>();
+  private readonly pending = new Map<string, Pending & { expires: number }>();
   private readonly tokens = new Map<string, { token: string; expires: number }>();
 
   constructor(options: GithubAppOptions) {
@@ -117,33 +123,50 @@ export class GithubApp {
     return installation === undefined ? undefined : this.kept.installations[String(installation)]?.workspace;
   }
 
-  /** A one-time word that ties what comes back from GitHub to what was started here. */
-  private begin(kind: Pending['kind'], workspace: string): string {
-    const now = Date.now();
-    for (const [state, p] of this.pending) if (p.expires < now) this.pending.delete(state);
-    const state = randomBytes(24).toString('hex');
-    this.pending.set(state, { kind, workspace, expires: now + PENDING_MINUTES * 60_000 });
+  /**
+   * A one-time word that ties what comes back from GitHub to what was started here. It begins with the workspace,
+   * whose database keeps what it stands for.
+   */
+  private async begin(kind: Pending['kind'], workspace: string): Promise<string> {
+    const state = `${workspace}.${randomBytes(24).toString('hex')}`;
+    const db = await this.options.store?.(workspace);
+    if (db) await keep(db, `github:${state}`, { kind, workspace } satisfies Pending, PENDING_MINUTES * 60_000);
+    else {
+      for (const [old, p] of this.pending) if (p.expires < Date.now()) this.pending.delete(old);
+      this.pending.set(state, { kind, workspace, expires: Date.now() + PENDING_MINUTES * 60_000 });
+    }
     return state;
   }
 
-  private finish(kind: Pending['kind'], state: string | null): Pending {
-    const found = state ? this.pending.get(state) : undefined;
-    if (state) this.pending.delete(state);
-    if (!found || found.kind !== kind || found.expires < Date.now()) throw new Error('This was not started from Archipelago, or was started too long ago. Start again from the Workspace screen.');
+  /** What a state stands for, if it is one begun here and not run out; `once` takes it, so it cannot be used again. */
+  private async pendingOf(state: string | null, once: boolean): Promise<Pending | undefined> {
+    if (!state) return undefined;
+    const db = this.options.store && (await this.options.store(state.split('.')[0]).catch(() => undefined));
+    if (db) {
+      return once ? (await take<Pending>(db, `github:${state}`))?.value : await kept<Pending>(db, `github:${state}`);
+    }
+    const found = this.pending.get(state);
+    if (once) this.pending.delete(state);
+    return found && found.expires >= Date.now() ? found : undefined;
+  }
+
+  private async finish(kind: Pending['kind'], state: string | null): Promise<Pending> {
+    const found = await this.pendingOf(state, true);
+    if (!found || found.kind !== kind) throw new Error('This was not started from Archipelago, or was started too long ago. Start again from the Workspace screen.');
     return found;
   }
 
   // ---- 1. creating the app ---------------------------------------------
 
   /** Where to send the server's owner to create the app: a page of ours that hands GitHub the manifest. */
-  startCreate(workspace: string): string {
+  async startCreate(workspace: string): Promise<string> {
     if (this.kept.app) throw new Error(`This server already has its GitHub App (${this.kept.app.name}).`);
-    return `${this.options.origin}/github/app/new?state=${this.begin('create', workspace)}`;
+    return `${this.options.origin}/github/app/new?state=${await this.begin('create', workspace)}`;
   }
 
   /** The page that hands GitHub the manifest: a form that sends itself. */
-  createPage(state: string | null): string {
-    if (!state || this.pending.get(state)?.kind !== 'create') throw new Error('This was not started from Archipelago. Start again from the Workspace screen.');
+  async createPage(state: string | null): Promise<string> {
+    if (!state || (await this.pendingOf(state, false))?.kind !== 'create') throw new Error('This was not started from Archipelago. Start again from the Workspace screen.');
     const { origin } = this.options;
     const manifest = {
       name: `Archipelago (${new URL(origin).host})`.slice(0, 34),
@@ -171,7 +194,7 @@ export class GithubApp {
 
   /** GitHub has made the app and sent its owner back with a code: exchanged, once, for what the app is. */
   async created(code: string | null, state: string | null): Promise<void> {
-    this.finish('create', state);
+    await this.finish('create', state);
     if (!code) throw new Error('GitHub sent no code back.');
     const res = await fetch(`${this.api}/app-manifests/${encodeURIComponent(code)}/conversions`, { method: 'POST', headers: { accept: 'application/vnd.github+json' } });
     const made = (await res.json().catch(() => ({}))) as Partial<Credentials> & { message?: string };
@@ -196,14 +219,14 @@ export class GithubApp {
   // ---- 2. connecting a workspace ----------------------------------------
 
   /** Where to send a workspace's admin to choose repositories. */
-  startConnect(workspace: string): string {
+  async startConnect(workspace: string): Promise<string> {
     if (!this.kept.app) throw new Error('This server has no GitHub App yet. Its owner creates one from the Workspace screen of the default workspace.');
-    return `${this.web}/apps/${this.kept.app.slug}/installations/new?state=${this.begin('connect', workspace)}`;
+    return `${this.web}/apps/${this.kept.app.slug}/installations/new?state=${await this.begin('connect', workspace)}`;
   }
 
   /** They chose, and GitHub sent them back: the installation is this workspace's from now on. */
   async installed(installation: string | null, state: string | null): Promise<{ workspace: string; installation: string }> {
-    const { workspace } = this.finish('connect', state);
+    const { workspace } = await this.finish('connect', state);
     if (!installation || !/^\d+$/.test(installation)) throw new Error('GitHub sent no installation back.');
     const taken = this.kept.installations[installation];
     if (taken && taken.workspace !== workspace) throw new Error('That installation is already connected to another workspace.');

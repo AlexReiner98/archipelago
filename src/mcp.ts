@@ -1,14 +1,15 @@
-// The MCP endpoint. A client that initializes gets a session, kept while it is used: its tool list follows the
-// workspace's packs, and when a pack is turned off or on the client is told the list changed, so it asks again
-// rather than holding the tools it was given when it connected. Every request is still checked on its own: its token
-// must be the session's. A request with no session (a client that does not keep one) is answered on its own, as
-// before.
+// The MCP endpoint, kept by no process. Every POST is answered on its own, by a server made for it with the tools its
+// workspace offers now: nothing a request needs was left in memory by the one before, so a client goes on through a
+// deploy, or from one server to another, with the session it has (an id it was given before is not looked at). Every
+// request is checked on its own: its token says whose it is.
+//
+// A client that opens the GET stream is told there when its workspace's tools change (a pack turned off or on), so
+// it asks again rather than holding the list it was given when it connected. The stream is this process's: after a
+// restart the client opens it again, on whichever server answers.
 
-import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { McpServer, type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { onToolsChanged } from './packstate.ts';
 import type { Actor, Archipelago } from './pelago.ts';
@@ -43,99 +44,76 @@ export interface Caller {
   actor: (label?: string) => Actor;
 }
 
-interface Session {
-  workspace: string;
-  /** The token's identity, which every request to the session must carry. */
-  who: string;
-  /** The map and actor of the latest request: a workspace closed and opened again is a new map. */
-  current: Caller;
-  mcp: McpServer;
-  transport?: StreamableHTTPServerTransport;
-  tools: Map<string, RegisteredTool>;
-  used: number;
-}
-
-const sessions = new Map<string, Session>();
-/** A session not used for this long is closed; its client starts another. */
-const IDLE_MS = 30 * 60_000;
-
 const offered = (registry: Archipelago['registry']) => toolsFor(registry).filter(([, tool]) => !tool.humanOnly && !(tool.devOnly && !devMode()));
 
-function register(mcp: McpServer, name: string, tool: Tool, caller: () => Caller): RegisteredTool {
-  const inputSchema = { ...Object.fromEntries(Object.entries(tool.input).map(([key, schema]) => [key, lenient(schema as z.ZodType)])), ...actorField };
-  return mcp.registerTool(name, { description: tool.description, inputSchema }, async (args: Record<string, unknown>) => {
-    const { actor, ...input } = args;
-    const { pelago, actor: actorFor } = caller();
-    try {
-      const result = await callTool(pelago, actorFor(actor as string | undefined), name, input);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: (err as Error).message }], isError: true };
-    }
-  });
+/** A tool's inputs as MCP is given them, made once per tool rather than for every request. */
+const schemas = new WeakMap<Tool, Record<string, z.ZodType>>();
+const inputsOf = (tool: Tool) => {
+  let made = schemas.get(tool);
+  if (!made) schemas.set(tool, (made = { ...Object.fromEntries(Object.entries(tool.input).map(([key, schema]) => [key, lenient(schema as z.ZodType)])), ...actorField }));
+  return made;
+};
+
+/** A server for one request, with the tools the caller's workspace offers now. */
+function serverFor(caller: Caller): McpServer {
+  const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true } } });
+  for (const [name, tool] of offered(caller.pelago.registry))
+    mcp.registerTool(name, { description: tool.description, inputSchema: inputsOf(tool) }, async (args: Record<string, unknown>) => {
+      const { actor, ...input } = args;
+      try {
+        const result = await callTool(caller.pelago, caller.actor(actor as string | undefined), name, input);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: (err as Error).message }], isError: true };
+      }
+    });
+  return mcp;
 }
 
-/** Bring a session's tools in line with what its workspace offers now; the SDK tells the client of each change. */
-function sync(session: Session): void {
-  const now = new Map(offered(session.current.pelago.registry));
-  for (const [name, registered] of session.tools) {
-    if (now.has(name)) continue;
-    registered.remove();
-    session.tools.delete(name);
-  }
-  for (const [name, tool] of now) if (!session.tools.has(name)) session.tools.set(name, register(session.mcp, name, tool, () => session.current));
-}
+/** The GET streams open on this process, by workspace: each is told when that workspace's tools change. */
+const streams = new Map<string, Set<ServerResponse>>();
+const event = (message: unknown) => `event: message\ndata: ${JSON.stringify(message)}\n\n`;
 
 onToolsChanged((workspace) => {
-  for (const session of sessions.values()) if (session.workspace === workspace) sync(session);
+  for (const res of streams.get(workspace) ?? []) res.write(event({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' }));
 });
 
+// A stream that says nothing for long is cut by the proxies in front: a comment now and then keeps it open.
 setInterval(() => {
-  for (const [id, session] of sessions) {
-    if (Date.now() - session.used < IDLE_MS) continue;
-    sessions.delete(id);
-    void session.mcp.close();
-  }
-}, 5 * 60_000).unref();
+  for (const open of streams.values()) for (const res of open) res.write(': still here\n\n');
+}, 25_000).unref();
 
 const fail = (res: ServerResponse, status: number, message: string) => {
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message }, id: null }));
 };
 
-/** Answer one request to /mcp: in its session, opening one, or on its own. `body` is the parsed JSON of a POST. */
-export async function serveMcp(req: IncomingMessage, res: ServerResponse, caller: Caller, allowedHosts: string[], body: unknown): Promise<void> {
-  const id = req.headers['mcp-session-id'];
-  const who = JSON.stringify(caller.actor());
-  if (typeof id === 'string') {
-    const session = sessions.get(id);
-    // Not found, as the protocol says, whether it ended or is someone else's: the client starts a new one.
-    if (!session || session.workspace !== caller.workspace || session.who !== who) return fail(res, 404, 'No such session. Initialize a new one.');
-    session.current = caller;
-    session.used = Date.now();
-    if (req.method === 'DELETE') sessions.delete(id);
-    return session.transport!.handleRequest(req, res, body);
-  }
-  if (req.method !== 'POST') return fail(res, 405, 'GET and DELETE need a session: POST an initialize request first.');
-  const keep = isInitializeRequest(body);
-  const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true } } });
-  const session: Session = { workspace: caller.workspace, who, current: caller, mcp, tools: new Map(), used: Date.now() };
-  sync(session);
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: keep ? randomUUID : undefined,
-    enableDnsRebindingProtection: true,
-    allowedHosts,
-    onsessioninitialized: (sid) => void sessions.set(sid, session),
+/** Open the stream a client hears of changes on. */
+function listen(req: IncomingMessage, res: ServerResponse, caller: Caller, allowedHosts: string[]): void {
+  if (!allowedHosts.includes(req.headers.host ?? '')) return fail(res, 403, `Invalid Host header: ${req.headers.host}`);
+  if (!String(req.headers.accept ?? '').includes('text/event-stream')) return fail(res, 406, 'Not Acceptable: the client must accept text/event-stream.');
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', connection: 'keep-alive' });
+  res.flushHeaders();
+  const open = streams.get(caller.workspace) ?? new Set();
+  streams.set(caller.workspace, open.add(res));
+  res.on('close', () => {
+    open.delete(res);
+    if (!open.size) streams.delete(caller.workspace);
   });
-  session.transport = transport;
-  transport.onclose = () => {
-    if (transport.sessionId) sessions.delete(transport.sessionId);
-  };
-  if (!keep)
-    res.on('close', () => {
-      void transport.close();
-      void mcp.close();
-    });
+}
+
+/** Answer one request to /mcp. `body` is the parsed JSON of a POST. */
+export async function serveMcp(req: IncomingMessage, res: ServerResponse, caller: Caller, allowedHosts: string[], body: unknown): Promise<void> {
+  if (req.method === 'GET') return listen(req, res, caller, allowedHosts);
+  // There is no session to end: each request stood on its own.
+  if (req.method === 'DELETE') return void res.writeHead(200).end();
+  if (req.method !== 'POST') return fail(res, 405, 'Method not allowed.');
+  const mcp = serverFor(caller);
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableDnsRebindingProtection: true, allowedHosts });
+  res.on('close', () => {
+    void transport.close();
+    void mcp.close();
+  });
   await mcp.connect(transport);
   return transport.handleRequest(req, res, body);
 }

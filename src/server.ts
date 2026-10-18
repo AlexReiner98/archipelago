@@ -36,7 +36,7 @@ import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './
 import { notify } from './notify.ts';
 import { backupAll, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
-import { SETUP_VERSION, setupCommand, setupScript } from './connect.ts';
+import { setupScript } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
@@ -53,8 +53,8 @@ import { publicPage, publicPicture } from './public.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
-import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
-import { callTool, configureBackup, configureGithubApp, configureRestart, describeChanges, devMode, humanChanges, latestSeq } from './tools.ts';
+import { answerHook } from './hook-answers.ts';
+import { callTool, configureBackup, configureGithubApp, configureRestart, devMode } from './tools.ts';
 import { UI_FILES } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
@@ -132,8 +132,6 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     return wait > 0;
   };
 
-  /** Per Claude Code session: the last event it has been told about by the prompt hook. */
-  const heardUpTo = new Map<string, number>();
 
   /** The workspace a request is for and who is making it. */
   async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent'): Promise<{ ws: Workspace; pelago: Archipelago; actor: (label?: string) => Actor }> {
@@ -193,7 +191,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, leading: options.leading?.() ?? true });
-      if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) return serveBackupFile(url.pathname.slice(13), res);
+      if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) {
+        const [wsId, key] = url.pathname.slice(13).split('/');
+        return await serveBackupFile(key && workspaces.has(wsId) ? (await workspaces.get(wsId)).pelago.db : undefined, key ?? '', res);
+      }
       // What a project needs to work with this server, as one script to run in its folder. It holds no secret,
       // so it needs no token; it is given only under a name this server answers to, which it then writes down.
       if (req.method === 'GET' && url.pathname === '/connect/setup.mjs') {
@@ -313,7 +314,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const page = (status: number, html: string) => res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }).end(html);
         const back = () => res.writeHead(302, { location: '/#/workspace' }).end();
         try {
-          if (url.pathname === '/github/app/new') return page(200, github.createPage(q.get('state')));
+          if (url.pathname === '/github/app/new') return page(200, await github.createPage(q.get('state')));
           if (url.pathname === '/github/app/created') {
             await github.created(q.get('code'), q.get('state'));
             return back();
@@ -395,60 +396,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {
         // Never from a web page, and only under a name this server answers to; with tokens on, the token says whose session it is.
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are called by Claude Code, not from a web page, and at an address this server is known by.' });
-        const { pelago, actor } = await resolve(req, res, 'agent');
+        const { ws, pelago, actor } = await resolve(req, res, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; remote?: string; reason?: string; tokens?: number; setup?: string };
-        // A token limited to some repositories registers and speaks for sessions in those, and for no others.
-        const limitedTo = actor().repos ?? [];
-        if (limitedTo.length && !(await hookWithin(pelago, limitedTo, body, url.pathname === '/hooks/session-start'))) {
-          if (url.pathname !== '/hooks/session-start') return send(res, 200, {});
-          return send(res, 200, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one of them: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made on the Workspace screen.' } });
-        }
-        // Said in the server's log, so "did the hook run?" has an answer.
-        console.log(`hook ${url.pathname.slice('/hooks/'.length)} from session ${body.session_id ?? 'unknown'}`);
-        // Each time the owner sends a session a message, the session is told what
-        // the owner has done in the map since it last heard: a decision made
-        // in the UI reaches the session with the next thing they say.
-        // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
-        if (url.pathname !== '/hooks/session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
-        if (url.pathname === '/hooks/prompt') {
-          await sessionHeard(pelago, body.session_id, 'begin').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
-          const key = body.session_id ?? '';
-          const heard = heardUpTo.get(key);
-          const changes = heard === undefined ? [] : await humanChanges(pelago, heard);
-          heardUpTo.set(key, changes.at(-1)?.seq ?? heard ?? (await latestSeq(pelago)));
-          const told: string[] = [];
-          // A session this server has no memory of, though it began before the server did, has lived through a
-          // restart: after a deploy its client still holds the tools as they were when it connected. Said once.
-          const began = heard === undefined ? await sessionBegan(pelago, body.session_id) : undefined;
-          if (began && began.getTime() < Date.parse(running.started))
-            told.push(
-              `The Archipelago server has restarted since this session began (at ${running.started}${running.commit ? `, now running commit ${running.commit.slice(0, 7)}` : ''}). If that was a deploy, its tools may have changed, and your client still holds the list from when it connected: a tool or an input that CLAUDE.md or a tool's answer names, but your list lacks, is there on the server. Ask the owner to reconnect the pelago MCP server, or until then call the tool as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`,
-            );
-          if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${describeChanges(changes)}`);
-          if (!told.length) return send(res, 200, {});
-          return send(res, 200, { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } });
-        }
-        if (url.pathname === '/hooks/session-start') {
-          heardUpTo.set(body.session_id ?? '', await latestSeq(pelago));
-          let additionalContext = await hookSessionStart(pelago, body);
-          // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
-          // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
-          if (body.setup !== SETUP_VERSION) {
-            const host = req.headers.host ?? '';
-            additionalContext += `\n\nThis folder's Archipelago files (hooks, working rules, the bump skill) are older than the server's. Tell the owner in your first reply, and with their yes bring them up to date by running this in the folder (it holds no secret, and with nobody at a terminal it renews only what Archipelago wrote there before):${setupCommand(`${named.includes(host) ? 'https' : 'http'}://${host}`)} . What it changes takes effect in the next session.`;
-          }
-          return send(res, 200, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext } });
-        }
-        if (url.pathname === '/hooks/session-end') {
-          await hookSessionEnd(pelago, body);
-          return send(res, 200, {});
-        }
-        // The end of a turn: nothing to say back, but the session was heard from and its count (taken above) is
-        // up to date, so one long turn does not go a whole session without its tokens.
-        if (url.pathname === '/hooks/stop') {
-          await sessionHeard(pelago, body.session_id, 'until').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
-          return send(res, 200, {});
-        }
+        const host = req.headers.host ?? '';
+        const answer = await answerHook(url.pathname.slice('/hooks/'.length), { whole: ws.pelago.db, pelago, repos: actor().repos ?? [], body, running, origin: `${named.includes(host) ? 'https' : 'http'}://${host}` });
+        if (answer) return send(res, 200, answer);
       }
 
       // The operator runs the installation: they create workspaces and hand
@@ -542,7 +494,7 @@ If that process is not a pelago server, delete ${lock}.`);
 
   // The GitHub App is told this server's address: the name it is reached by from outside, when it has one.
   const origin = config.publicHosts[0] ? `https://${config.publicHosts[0]}` : `http://127.0.0.1:${config.port}`;
-  const githubApp = new GithubApp({ dir: rootDir, origin });
+  const githubApp = new GithubApp({ dir: rootDir, origin, store: async (id) => (workspaces.has(id) ? (await workspaces.get(id)).pelago.db : undefined) });
   const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: githubApp, proxies: config.trustedProxies, leading: () => leader?.leading ?? false });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.

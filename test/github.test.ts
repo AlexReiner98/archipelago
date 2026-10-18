@@ -171,7 +171,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.match((await call('/api/github_app', admin, { connect: true })).error, /no GitHub App yet/);
   const create = (await call('/api/github_app', admin, { create: true })).result.url as string;
   const form = await (await page(create.slice(base.length))).text();
-  const state = /settings\/apps\/new\?state=([0-9a-f]+)/.exec(form)![1];
+  const state = /settings\/apps\/new\?state=([0-9a-z.-]+)/.exec(form)![1];
   assert.ok(form.includes('action="https://github.test/settings/apps/new?state='), 'the page sends its reader to GitHub with the manifest');
   const manifest = JSON.parse(/name="manifest" value="([^"]+)"/.exec(form)![1].replaceAll('&quot;', '"').replaceAll('&amp;', '&'));
   assert.deepEqual([manifest.hook_attributes.url, manifest.setup_url, manifest.default_permissions, manifest.default_events], [`${base}/github/app/hook`, `${base}/github/app/installed`, { contents: 'read', metadata: 'read' }, ['push']]);
@@ -182,7 +182,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
 
   // 2. A workspace connects: its admin is sent to choose repositories, and comes back with the installation.
   const connect = (await call('/api/github_app', admin, { connect: true })).result.url as string;
-  assert.match(connect, /^https:\/\/github\.test\/apps\/pelago-test\/installations\/new\?state=[0-9a-f]+$/);
+  assert.match(connect, /^https:\/\/github\.test\/apps\/pelago-test\/installations\/new\?state=[0-9a-z.-]+$/);
   assert.equal((await page('/github/app/installed?installation_id=42&state=guessed')).status, 400);
   assert.equal((await page(`/github/app/installed?installation_id=42&${connect.split('?')[1]}`)).status, 302);
   assert.deepEqual((await call('/api/github_app', admin)).result.installation, { id: '42', account: 'acme' });
@@ -277,7 +277,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   renamed = true;
   await theApp!.refresh();
   assert.deepEqual(theApp!.app, { slug: 'pelago-renamed', name: 'Archipelago (renamed)' });
-  assert.match(theApp!.startConnect('default'), /^https:\/\/github\.test\/apps\/pelago-renamed\/installations\/new\?state=/);
+  assert.match(await theApp!.startConnect('default'), /^https:\/\/github\.test\/apps\/pelago-renamed\/installations\/new\?state=/);
 
   // Its admin can ask for a re-check of a repository now; only of one the app was given, and no agent can.
   assert.match((await call('/agent/github_app', robot, { recheck: heard.repo.id })).error, /humans only/);
