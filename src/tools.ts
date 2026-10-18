@@ -30,6 +30,7 @@ import { askView, viewList } from './askview.ts';
 import { toConfirm } from './confirm.ts';
 import { VIEWS } from './views.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
+import { type Focus, point as setFocus, presence, tellStamp, took } from './presence.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page; only a project, feature, release, proof question, test or test result can be, and only a human makes it so (from an agent it waits as a proposal).');
@@ -207,58 +208,18 @@ export function describeChanges(changes: HumanChange[]): string {
 // can say whether anyone will hear a decision the moment it is made.
 let listening = 0;
 
-/** Where an agent last pointed the human's screen: a place in the web UI. */
-interface Focus {
-  /** When it was set; a new value is how the UI knows to move. */
-  at: number;
-  /** The UI address without its "#/", e.g. "e/e_abc" or "roadmap/e_abc". */
-  hash: string;
-  actor: string;
-  note?: string;
-}
-
-// Kept in memory, per workspace and per person: it is where to look right now,
-// not a fact about the map, and it means nothing after a restart.
-const focus = new Map<string, Focus>();
-const focusKey = (l: Archipelago) => `${l.workspace}:${l.viewer ?? ''}`;
-function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string): Focus {
+// Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
+async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string): Promise<Focus> {
   const next = { at: Date.now(), hash, actor: actor.name, note };
-  focus.set(focusKey(l), next);
-  took(l, { kind, actor: actor.name, did: note, hash });
+  const { db } = await wholeMap(l);
+  await setFocus(db, l, next);
+  await took(db, l, { kind, actor: actor.name, did: note, hash }, true);
   return next;
-}
-
-/**
- * One thing an agent did through a tool, whatever it was. The page is given
- * the last few and follows those the person has chosen to: by what kind of
- * step it is, and by whose it is.
- */
-interface Step {
-  /** Counts up: a higher number is how the page knows a step is new. */
-  at: number;
-  /** show: it pointed the page. change: it changed the map. story: it told a beat of its session's story. read: one item. view: a standing question or a picture. search. other: sessions, resources and the rest. */
-  kind: 'show' | 'change' | 'story' | 'read' | 'view' | 'search' | 'other';
-  actor: string;
-  /** What it did, in a few words; for a show or a change, the note or the reason it gave. */
-  did?: string;
-  /** The UI address of what it did it to, when that is one item or one picture. */
-  hash?: string;
-}
-/** How many steps are kept for a page to catch up on between two looks. */
-const STEPS_KEPT = 12;
-const steps = new Map<string, Step[]>();
-function took(l: Archipelago, step: Omit<Step, 'at'>): void {
-  const list = steps.get(focusKey(l)) ?? [];
-  // Two steps in one millisecond are still two.
-  list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step });
-  steps.set(focusKey(l), list.slice(-STEPS_KEPT));
 }
 /** Tools that are no step of their own: those that point the screen themselves, and the one that only waits. */
 const UNWATCHED = new Set(['show', 'change', 'tell', 'watch']);
-// Beats told, per workspace: the stamp a page watches moves with them, so a story being read grows as it is told.
-const told = new Map<string, number>();
 const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
-function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>): void {
+async function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>): Promise<void> {
   const params = (input.params ?? {}) as Record<string, unknown>;
   // A session saying only that it is alive has done nothing to see.
   if (UNWATCHED.has(name) || (name === 'session_update' && !input.task && !input.note)) return;
@@ -273,7 +234,7 @@ function step(l: Archipelago, actor: Actor, name: string, input: Record<string, 
           ? `asked ${input.name ? `for ${String(input.name).replaceAll('_', ' ')}` : 'what can be asked'}`
           : name.replaceAll('_', ' ');
   const kind = name === 'view' || name === 'search' ? name : READS.has(name) ? 'read' : 'other';
-  took(l, { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'lens' ? 'graph?lens' : undefined });
+  await took((await wholeMap(l)).db, l, { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'lens' ? 'graph?lens' : undefined });
 }
 
 /**
@@ -426,7 +387,10 @@ export const TOOLS: Record<string, Tool> = {
     description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
     humanOnly: true,
     input: {},
-    run: async (l) => ({ ...(await l.pulse().then((p) => ({ stamp: `${p.stamp}.${told.get(l.workspace) ?? 0}` }))), focus: focus.get(focusKey(l)), steps: steps.get(focusKey(l)) ?? [], ui: uiStamp(), listening }),
+    run: async (l) => {
+      const [p, { told, ...seen }] = await Promise.all([l.pulse(), presence((await wholeMap(l)).db, l)]);
+      return { stamp: `${p.stamp}.${told}`, ...seen, ui: uiStamp(), listening };
+    },
   },
   backup: {
     description: 'Back every workspace up now, without waiting for the schedule. Do this before anything that changes the database schema. Answers with what was written.',
@@ -654,7 +618,7 @@ export const TOOLS: Record<string, Tool> = {
         const target = made ?? touched;
         // A lens or a style that was changed is seen in the picture it changes, not on its own page.
         const picture = result.status !== 'proposed' && target ? await pictureOf(l, target) : undefined;
-        point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason);
+        await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason).catch(() => {});
       }
       return result;
     },
@@ -724,8 +688,9 @@ export const TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       const answer = await tell(l, actor, input);
-      told.set(l.workspace, (told.get(l.workspace) ?? 0) + 1);
-      took(l, { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}` });
+      const { db } = await wholeMap(l);
+      await tellStamp(db, l.workspace);
+      await took(db, l, { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}` }, true);
       return answer;
     },
   },
@@ -1085,6 +1050,7 @@ export async function callTool(l: Archipelago, actor: Actor, asked: string, inpu
           if (done.ops?.length) await withinScope(l, actor, 'change', { ops: done.ops });
         })
       : await tool.run(l, actor, parsed.data);
-  if (actor.kind === 'agent') step(l, actor, name, parsed.data as Record<string, unknown>);
+  // A step that could not be kept costs the page a step, never the agent its answer.
+  if (actor.kind === 'agent') await step(l, actor, name, parsed.data as Record<string, unknown>).catch(() => {});
   return answer;
 }

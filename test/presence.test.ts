@@ -1,0 +1,33 @@
+// Where an agent points the screen, and the steps it takes, reach a page that polls another server.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { openDb } from '../src/db.ts';
+import * as one from '../src/presence.ts';
+
+// The module loaded a second time is a second server: its own process, the same database.
+const other: typeof one = await import(`${new URL('../src/presence.ts', import.meta.url).href}?other`);
+
+test('a show on one server moves a page polling another; read steps follow within a flush', async () => {
+  const db = await openDb();
+  const w = { workspace: 'default', viewer: 'e_owner000' };
+  assert.deepEqual(await other.presence(db, w), { focus: undefined, steps: [], told: 0 });
+
+  await one.point(db, w, { at: 1, hash: 'e/e_x', actor: 'robot', note: 'Look' });
+  await one.took(db, w, { kind: 'show', actor: 'robot', did: 'Look', hash: 'e/e_x' }, true);
+  const seen = await other.presence(db, w);
+  assert.equal(seen.focus?.hash, 'e/e_x', 'the other server knows where the screen was pointed');
+  assert.deepEqual(seen.steps.map((s) => s.kind), ['show']);
+
+  await one.took(db, w, { kind: 'read', actor: 'robot', did: 'is reading this' });
+  assert.equal((await one.presence(db, w)).steps.length, 2, 'the server that took it sees it at once');
+  assert.equal((await other.presence(db, w)).steps.length, 1, 'a read waits for the flush: no write per call');
+  await one.flushAll();
+  assert.deepEqual((await other.presence(db, w)).steps.map((s) => s.kind), ['show', 'read']);
+
+  await other.took(db, w, { kind: 'search', actor: 'robot' }, true);
+  assert.deepEqual((await one.presence(db, w)).steps.map((s) => s.kind), ['show', 'read', 'search'], 'both servers\' steps, in order');
+  assert.deepEqual((await one.presence(db, { workspace: 'default', viewer: 'e_someone' })).steps, [], 'another person\'s screen is not this one');
+
+  await other.tellStamp(db, 'default');
+  assert.ok((await one.presence(db, w)).told > 0, 'a beat told on one server moves the stamp on the other');
+});
