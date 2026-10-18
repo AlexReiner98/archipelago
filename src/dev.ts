@@ -5,12 +5,14 @@
 // code now on disk. When it dies any other way, it is started again as soon as
 // a file under src/ or packs/ changes, so a session that broke the server can
 // repair it without anyone at the terminal. Everything the server prints is
-// also kept in runs/dev-server.log, where an agent can read why it fell over.
+// also kept in runs/dev-server.log, where an agent can read why it fell over. A copy of the live map that
+// `npm run pull` left waiting goes in place of the data folder before the server starts (src/pull.ts).
 
 import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
-import { RESTART_EXIT } from './config.ts';
+import { loadConfig, RESTART_EXIT } from './config.ts';
+import { takePulled } from './pull.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const LOG = join(ROOT, 'runs', 'dev-server.log');
@@ -26,6 +28,8 @@ let stopping = false;
 let waiting: (() => void) | undefined;
 
 function start(): void {
+  const kept = takePulled(loadConfig().dataDir);
+  if (kept) note(`the pulled copy of the live map is in place; what was there is kept as ${kept}`);
   note('starting the server');
   const child = spawn(process.execPath, [join(ROOT, 'src', 'server.ts')], { cwd: ROOT, env: { ...process.env, PELAGO_DEV: '1' }, stdio: ['inherit', 'pipe', 'pipe'] });
   child.stdout.on('data', say);

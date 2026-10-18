@@ -17,7 +17,9 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
   true as you go, and bring the handoff note up to date before you finish.
 - **The local server on port 3100 (`npm run dev`) is where the code is
   tried.** Its map is a scratch copy: do not record the state of the work
-  there. Make sure it is running before you change code.
+  there. Make sure it is running before you change code. `npm run pull`
+  replaces it with a copy of the live map (automations paused, the old
+  folder kept as `data-backup-*`), to try a change on real data.
 - **Never print the agent token.** `claude mcp get pelago` prints it in
   full; to see which server a session uses, print `PELAGO_URL` instead.
 

@@ -1,0 +1,78 @@
+// The live map, here: `npm run pull` copies the map this machine is connected to (PELAGO_URL, with its agent
+// token) into the local server's data folder, so a change is tried on real data before it is pushed.
+//
+// The copy acts on nothing outside: its automations are paused, and the secrets in it were sealed with the
+// hosted server's key, so here they read as not set. What was in the data folder is kept beside it, as
+// data-backup-<time>. The hosted workspace must let agents download backups (Workspace page, Backups).
+//
+// With the local server stopped, the copy goes in place at once. Under `npm run dev` the server is asked to
+// restart, and the copy goes in place while it is down. Under `npm start`, stop it first.
+
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { parseBackup, restore } from './backup.ts';
+import { loadConfig } from './config.ts';
+import { openDb } from './db.ts';
+
+/** Where a pulled copy waits until the data folder can be swapped for it. */
+export const pulledDir = (dataDir: string) => `${dataDir}.pulled`;
+
+/** Put a pulled copy in place of the data folder, keeping the old one beside it. Only with no server on the folder. */
+export function takePulled(dataDir: string): string | undefined {
+  const pulled = pulledDir(dataDir);
+  if (!existsSync(pulled)) return undefined;
+  const kept = `${dataDir}-backup-${new Date().toISOString().replaceAll(':', '-')}`;
+  if (existsSync(dataDir)) renameSync(dataDir, kept);
+  renameSync(pulled, dataDir);
+  return kept;
+}
+
+const fail = (why: string): never => {
+  console.error(why);
+  process.exit(1);
+};
+
+async function pull() {
+  const url = process.env.PELAGO_URL?.replace(/\/$/, '');
+  const token = process.env.PELAGO_AGENT_TOKEN;
+  if (!url || !token) return fail('This machine is not connected to a hosted map: PELAGO_URL and PELAGO_AGENT_TOKEN are set by the setup.');
+  if (['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname)) return fail(`PELAGO_URL is this machine (${url}): there is nothing to pull.`);
+  const { dataDir, port } = loadConfig();
+
+  const asked = await fetch(`${url}/agent/backup_download`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}' });
+  const answer = (await asked.json().catch(() => ({}))) as { result?: { path: string; name: string; taken: string }; error?: string };
+  if (!answer.result) return fail(`${url} gave no backup: ${answer.error ?? `HTTP ${asked.status}`}`);
+  const got = await fetch(url + answer.result.path);
+  if (!got.ok) return fail(`The backup link gave HTTP ${got.status}: ask again.`);
+  const file = Buffer.from(await got.arrayBuffer());
+  const saved = join(dirname(dataDir), 'backups', 'pulled', answer.result.name);
+  mkdirSync(dirname(saved), { recursive: true });
+  writeFileSync(saved, file);
+
+  const backup = parseBackup(file);
+  let paused = 0;
+  for (const row of backup.tables.entity ?? []) if (row.type === 'sys.automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
+  const target = pulledDir(dataDir);
+  rmSync(target, { recursive: true, force: true });
+  const db = await openDb(target);
+  const counts = await restore(db, backup, 'default');
+  await db.close();
+  console.log(`Pulled ${url} as of ${answer.result.taken}: ${counts.entity} items, ${counts.event} events; ${paused} automations paused. Kept as ${saved}`);
+
+  const health = () => fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json() as Promise<{ started: string }>, () => undefined);
+  const before = await health();
+  if (!before) return console.log(`In place in ${dataDir}; what was there is kept as ${takePulled(dataDir) ?? 'nothing'}.`);
+  const restart = await fetch(`http://127.0.0.1:${port}/agent/restart`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).then((r) => r.ok, () => false);
+  if (!restart) return console.log(`The local server is not in dev mode: stop it, and the copy waiting in ${target} goes in place when it next starts under npm run dev.`);
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const now = await health();
+    if (now && now.started !== before.started)
+      return existsSync(target)
+        ? console.log(`The local server restarted, but npm run dev was started before it knew to take the copy: stop it and start it again, and the copy in ${target} goes in place.`)
+        : console.log(`The local server restarted on the pulled map (http://127.0.0.1:${port}).`);
+  }
+  fail(`The local server did not come back within 30 seconds: see runs/dev-server.log. The copy is in ${existsSync(target) ? target : dataDir}.`);
+}
+
+if (import.meta.main) await pull();
