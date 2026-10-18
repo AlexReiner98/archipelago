@@ -87,3 +87,11 @@ test('nothing to draw is an empty picture', () => {
   assert.equal(g.all.length, 0);
   assert.equal(g.width, 0);
 });
+
+test('the item a picture is of is a step when it waits on the others, and only then', () => {
+  const g = run([item('a'), item('b')], [dep('b', 'a'), dep('r', 'b')]);
+  checks(g);
+  assert.ok(g.nodes.has('r'), 'a release that waits on the work is its last step');
+  assert.ok(g.y.get('r') > g.y.get('b'));
+  assert.equal(run([item('a'), item('b')], [dep('b', 'a')]).nodes.has('r'), false, 'a project that holds the work is not');
+});

@@ -12,10 +12,13 @@ const LAYER_GAP = 84, NODE_GAP = 16, MARGIN = 24, MAX_TEXT = 140, TRACK = 8, SLO
 
 /** The steps (each with its place x, y and size w, h), the wires (each with its points), the breaks and the whole size. */
 export function layout({ items, links, rootId, measure }) {
-  // ---- Steps: everything in the picture but the item it is of.
+  // ---- Steps: everything in the picture; the item it is of too, when it is a step of the process (a release that
+  // waits on the work before it), not only what holds it (a project).
   const shapeOf = (i) => (i.kind === 'question' ? 'diamond' : i.kind === 'occurrence' ? 'pill' : i.kind === 'record' ? 'sheet' : 'box');
   const nodes = new Map();
-  for (const i of [...items].sort((a, b) => a.place - b.place)) if (i.id !== rootId) nodes.set(i.id, { id: i.id, item: i, shape: shapeOf(i) });
+  const ids = new Set(items.map((i) => i.id));
+  const rootIsStep = links.some((l) => FLOW.has(l.kind) && (l.from === rootId ? ids.has(l.to) : l.to === rootId && ids.has(l.from)));
+  for (const i of [...items].sort((a, b) => a.place - b.place)) if (i.id !== rootId || rootIsStep) nodes.set(i.id, { id: i.id, item: i, shape: shapeOf(i) });
   if (!nodes.size) return { nodes, all: [], chains: [], breaks: [], potential: new Set(), x: new Map(), y: new Map(), width: 0, height: 0 };
   const large = nodes.size > LARGE;
 

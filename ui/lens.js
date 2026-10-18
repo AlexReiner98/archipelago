@@ -142,9 +142,19 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
     const finished = !answer.lens.fold.includes('closed');
     // The picture is the one the item opens on, as its owner or their agent made it: no other views offered beside it, and
     // nothing to change on it but what its lens offers. Its rule in words is the bar's tooltip.
+    // What holds the item, beside the view it opens on: offered while some of what it waits on is still open.
+    const holding = answer.view === 'holding';
+    if (!holding) place.home = views.find((view) => view.id === answer.view)?.title ?? 'Around it';
     const parts = [
       // Its shortcuts: views that start somewhere else.
       views.filter((view) => view.to).map((view) => h('a', { class: 'chip lens-pin', href: `#/e/${view.to.id}`, title: `Goes to ${view.to.title}` }, view.title)),
+      views.some((view) => view.id === 'holding') &&
+        h(
+          'span',
+          { class: 'switch', title: 'What this picture shows' },
+          h('button', { class: holding ? '' : 'on', onclick: again({ lens: undefined }) }, place.home),
+          h('button', { class: holding ? 'on' : '', title: 'Everything it waits on, step by step, and nothing else', onclick: again({ lens: 'holding' }) }, 'What holds it'),
+        ),
       h('span', { class: 'grow' }),
       answer.controls.includes('far') &&
         h(
