@@ -7,6 +7,7 @@
 // may only shrink, and goes once the rule is met: when you bring a number down, lower it here.
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
@@ -183,4 +184,10 @@ test('the UI loads as modules', () => {
 test('there are four dependencies', () => {
   const deps = Object.keys(JSON.parse(read('package.json')).dependencies ?? {}).sort();
   assert.deepEqual(deps, ['@anthropic-ai/sdk', '@electric-sql/pglite', '@modelcontextprotocol/sdk', 'zod']);
+});
+
+// 9. Every module the page loads parses: one that does not leaves the page blank, and most are not run by a test.
+test('every UI module parses', () => {
+  const bad = walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f)).filter((f) => spawnSync(process.execPath, ['--check', join(ROOT, f)]).status !== 0);
+  assert.deepEqual(bad, [], 'A module that does not parse leaves the page blank: run node --check on it.');
 });

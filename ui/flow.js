@@ -76,8 +76,7 @@ export function drawFlow(host, answer, style, keep) {
     const open = n.list.filter((i) => i.open).length;
     const rows = n.list.map((i, k) => {
       const y = top + LIST_HEAD + k * LIST_ROW + LIST_ROW / 2;
-      const row = titled(svg('a', { href: `#/e/${i.id}`, class: `lf-row${i.open ? '' : ' closed'}${yours(i) ? ' you' : ''}` }, svg('rect', { x: left + 2, y: y - LIST_ROW / 2, width: n.w - 4, height: LIST_ROW, class: 'lf-row-hit' }), svg('circle', { cx: left + 15, cy: y, r: 4, class: `lf-dot ${dotOf(i)}` }), svg('text', { x: left + 26, y: y + 0.5 }, fit(i.title, n.w - 36, 12))), [i.title, i.status, i.state.blocked && 'Blocked', yours(i) && 'Waits on you'].filter(Boolean).join('
-'));
+      const row = titled(svg('a', { href: `#/e/${i.id}`, class: `lf-row${i.open ? '' : ' closed'}${yours(i) ? ' you' : ''}` }, svg('rect', { x: left + 2, y: y - LIST_ROW / 2, width: n.w - 4, height: LIST_ROW, class: 'lf-row-hit' }), svg('circle', { cx: left + 15, cy: y, r: 4, class: `lf-dot ${dotOf(i)}` }), svg('text', { x: left + 26, y: y + 0.5 }, fit(i.title, n.w - 36, 12))), [i.title, i.status, i.state.blocked && 'Blocked', yours(i) && 'Waits on you'].filter(Boolean).join('\n'));
       stepEls.set(i.id, row);
       return row;
     });
