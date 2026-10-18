@@ -1,0 +1,60 @@
+// The schema in numbered steps, each applied once to a database and recorded in schema_version. Opening a database
+// applies the steps it lacks, one opener at a time (a server's opener holds a lock: src/pg.ts); once it has them all,
+// opening it is a check of its version, not the whole schema run again. `npm run migrate` (src/deploy.ts) applies them to the databases on a
+// Postgres server as the deploy step, before the new app starts, so no app serving requests runs DDL under another.
+//
+// During a switch the old app and the new one run on the same database, so every step must suit both: add a column
+// or a table in one step, use it in the next release, remove what is unused in a later one. Never rename or drop
+// something the app before still reads. A step, once released, is never edited: add another.
+
+import { createHash } from 'node:crypto';
+import type { Database } from './db.ts';
+import { ORDERED, SCHEMA, VISIBILITY } from './schema.ts';
+
+interface Migration {
+  version: number;
+  name: string;
+  /** Run on every database. */
+  sql: string;
+  /** Run on a Postgres server only, after sql: what many connections need and PGlite does not. */
+  server?: string;
+}
+
+export const MIGRATIONS: Migration[] = [
+  // What every database had before steps were numbered, written so it can run again over it: a database made then
+  // takes it as its first step without harm.
+  { version: 1, name: 'the schema before versions', sql: `create extension if not exists pg_trgm;\n${SCHEMA}\n${VISIBILITY}` },
+  { version: 2, name: 'writes in order on a server', sql: '', server: ORDERED },
+];
+
+export const LATEST = MIGRATIONS.at(-1)!.version;
+
+/** A name for the schema the steps make on each driver: a database made from them once can be copied for another. */
+export const schemaKey = (server: boolean) =>
+  createHash('sha256').update(MIGRATIONS.map((m) => m.sql + (server ? (m.server ?? '') : '')).join('\n')).digest('hex').slice(0, 12);
+
+/** The step a database is at: 0 when it has no record of steps. */
+export async function versionOf(db: Database): Promise<number> {
+  const [{ made }] = (await db.query<{ made: boolean }>(`select to_regclass('schema_version') is not null as made`)).rows;
+  if (!made) return 0;
+  return (await db.query<{ v: number | null }>(`select max(version) as v from schema_version`)).rows[0].v ?? 0;
+}
+
+/**
+ * Apply the steps a database lacks, each in a transaction of its own with its record. A database ahead of this code
+ * (the new app migrated it, and this is the old one, still serving) is left as it is.
+ */
+export async function migrate(db: Database, server: boolean): Promise<{ from: number; to: number }> {
+  const from = await versionOf(db);
+  if (from === 0) await db.exec(`create table if not exists schema_version (version int primary key, name text not null, applied_at timestamptz not null default now())`);
+  for (const m of MIGRATIONS.filter((m) => m.version > from)) {
+    const sql = m.sql + (server && m.server ? `\n${m.server}` : '');
+    try {
+      await db.exec(`begin;\n${sql}\ninsert into schema_version (version, name) values (${m.version}, '${m.name.replaceAll("'", "''")}');\ncommit;`);
+    } catch (err) {
+      await db.exec('rollback').catch(() => {});
+      throw new Error(`Migration ${m.version} (${m.name}) failed: ${(err as Error).message}`, { cause: err });
+    }
+  }
+  return { from, to: Math.max(from, LATEST) };
+}

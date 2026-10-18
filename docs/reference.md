@@ -310,8 +310,8 @@ is refused with the new one in the message.
 - Semantic search. Search matches words in any form in titles and notes, puts
   the best match first, and falls back to near-misses in titles when nothing
   matches; it does not match by meaning.
-- A Postgres server instead of the embedded database. Each workspace is one
-  embedded database on the server's disk (see Hosting below).
+- Several servers on one Postgres database: timers and automations would
+  run in each (see Hosting below).
 - Editing the same item from two imports at once: the later edit wins as a
   whole (see Backups).
 - Single sign-on.
@@ -336,6 +336,14 @@ it.
   the last address in `x-forwarded-for` that is not a trusted proxy; what
   stands before it he could have written himself (`src/address.ts`).
 - `PORT` is honoured when `PELAGO_PORT` is not set.
+- `PELAGO_DATABASE_URL=postgres://…` keeps the databases on a Postgres
+  server instead of the disk: the default workspace in that database, each
+  other one in a database of its own beside it. The schema is applied in
+  numbered steps (`src/migrate.ts`), recorded in `schema_version`; run
+  `npm run migrate` as the deploy step, before the new server starts, so no
+  server that is answering requests changes the schema under another. A
+  server also applies the steps a database lacks as it opens it, so a
+  database on the disk needs no deploy step.
 - Each workspace is its own database and costs about 200 MB of memory while
   open, on top of about 350 MB for the server. A workspace nobody has used for
   30 minutes (`PELAGO_IDLE_MINUTES`; 0 for never) is closed and opens again

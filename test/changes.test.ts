@@ -13,8 +13,9 @@ import { human, agent, fresh, attend, make } from './map.ts';
 test('a database made while this was called Lattice is opened under the new names, with nothing lost', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-before-'));
   const made = await openDb(dir);
-  // As it stood then: the two roles with what they were granted, a function of that name, and events said to be Lattice's own.
+  // As it stood then: no record of schema steps, the two roles with what they were granted, a function of that name, and events said to be Lattice's own.
   await made.exec(`
+    drop table schema_version;
     create role lattice_member nologin; grant select, insert, update on entity, event to lattice_member;
     create role lattice_public nologin; grant select (id, title) on entity to lattice_public;
     create function lattice_is_public(target text) returns boolean language sql stable as $fn$ select false $fn$;

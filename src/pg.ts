@@ -1,5 +1,6 @@
 // A Postgres server behind Db: a pool of connections per database, a transaction on one connection, and values
-// read back as PGlite gives them, so nothing else can tell which it has. The schema is applied as PGlite's is.
+// read back as PGlite gives them, so nothing else can tell which it has. The schema is applied as PGlite's is, with
+// the steps only a server needs (src/migrate.ts).
 //
 // Tests run on a server too when PELAGO_TEST_DATABASE_URL names one: each database they open in memory is a new
 // database copied from a template that holds the schema, dropped again when it is closed.
@@ -7,19 +8,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import pg from 'pg';
 import type { Database, Q } from './db.ts';
-
-// What only many connections need. Events are read in the order they are numbered (watch, the prompt hook,
-// automations): a transaction that writes them holds a lock until it commits, so none is seen before one numbered
-// ahead of it. The lock is taken by the first change to an item too, before any row is locked, so two writers never
-// wait on each other. And one claim of a resource at a time. PGlite needs none of it, and its locks keep a timer.
-const ORDERED = `
-create or replace function pelago_event_order() returns trigger language plpgsql as $fn$ begin perform pg_advisory_xact_lock(hashtext('pelago.event')); return null; end $fn$;
-create or replace trigger event_order before insert on event for each statement execute function pelago_event_order();
-create or replace trigger entity_order before insert or update or delete on entity for each statement execute function pelago_event_order();
-create or replace trigger relation_order before insert or update or delete on relation for each statement execute function pelago_event_order();
-create or replace trigger proposal_order before insert or update or delete on proposal for each statement execute function pelago_event_order();
-create or replace function pelago_hold_lock(resource text) returns void language sql as $fn$ select pg_advisory_xact_lock(hashtext('pelago.holds'), hashtext(resource)) $fn$;
-`;
 
 // int8 (event.seq, count(*)) is a number while it is exact, as PGlite gives it; numeric stays a string in both.
 const PARSERS: Record<number, (value: string) => unknown> = {
@@ -30,7 +18,7 @@ const types = { getTypeParser: (oid: number, format?: 'text' | 'binary') => PARS
 
 const rowsOf = async <T>(client: pg.Pool | pg.PoolClient, sql: string, params?: unknown[]) => ({ rows: (await client.query(sql, params)).rows as T[] });
 
-/** One database on a server, as a Database. Applies the schema with `prepare` under a lock, one opener at a time. */
+/** One database on a server, as a Database. Brings its schema up to date with `prepare` under a lock, one opener at a time. */
 export async function openPg(url: string, prepare: (db: Database) => Promise<unknown>): Promise<Database> {
   const pool = new pg.Pool({ connectionString: url, max: 5, types });
   pool.on('error', () => {}); // an idle connection that drops is replaced on the next query
@@ -53,20 +41,23 @@ export async function openPg(url: string, prepare: (db: Database) => Promise<unk
     },
     close: () => pool.end(),
   };
-  // Two servers opening the same database at once would run the schema's DDL against each other.
+  // Two openers at once (two servers, or the deploy step and a server) would apply the same step against each other.
   const client = await pool.connect();
   try {
     await client.query(`select pg_advisory_lock(hashtext('pelago.schema'))`);
     await prepare({ ...db, query: <T>(sql: string, params?: unknown[]) => rowsOf<T>(client, sql, params), exec: (sql: string) => client.query(sql) });
-    await client.query(ORDERED);
     // The login role switches to these per request (set local role): unless it is a superuser it must be a member.
     await client.query(`do $$ begin
       if not (select rolsuper from pg_roles where rolname = current_user) then execute format('grant pelago_member, pelago_public to %I', current_user); end if;
     end $$`);
-  } finally {
+  } catch (err) {
     await client.query(`select pg_advisory_unlock(hashtext('pelago.schema'))`).catch(() => {});
     client.release();
+    await pool.end();
+    throw err;
   }
+  await client.query(`select pg_advisory_unlock(hashtext('pelago.schema'))`).catch(() => {});
+  client.release();
   return db;
 }
 
