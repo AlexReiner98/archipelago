@@ -388,13 +388,43 @@ export interface Db extends Q {
 
 /** Open the database at a folder, or in memory when no folder is given. */
 export async function openDb(dataDir?: string): Promise<PGlite> {
-  if (dataDir) mkdirSync(dataDir, { recursive: true });
-  // pg_trgm matches near-misses and typos in search; a Postgres server has it too.
-  const db = dataDir ? new PGlite(dataDir, { extensions: { pg_trgm } }) : new PGlite({ extensions: { pg_trgm } });
+  if (!dataDir) return inMemory();
+  mkdirSync(dataDir, { recursive: true });
+  return prepared(new PGlite(dataDir, { extensions: { pg_trgm } }));
+}
+
+// pg_trgm matches near-misses and typos in search; a Postgres server has it too.
+async function prepared(db: PGlite) {
   await db.exec(`create extension if not exists pg_trgm`);
   await db.exec(SCHEMA);
   await db.exec(VISIBILITY);
   return db;
+}
+
+// Only the tests open databases in memory, hundreds of them. Making one runs initdb and the whole schema (about a
+// second); loading an image of one made once per process takes a fifth of that. Each holds a few hundred MB, so the
+// tests close what each one opened as it ends (test/each.ts).
+
+/** Databases in memory not yet closed. */
+export const openInMemory = new Set<PGlite>();
+let blank: Promise<File | Blob> | undefined;
+
+async function inMemory() {
+  const db = await PGlite.create({ loadDataDir: await (blank ??= blankImage()), extensions: { pg_trgm } });
+  openInMemory.add(db);
+  const close = db.close.bind(db);
+  db.close = async () => {
+    openInMemory.delete(db);
+    if (!db.closed) await close(); // closed by the test's end, then by its server's
+  };
+  return db;
+}
+
+async function blankImage() {
+  const db = await prepared(new PGlite({ extensions: { pg_trgm } }));
+  const image = await db.dumpDataDir('none');
+  await db.close();
+  return image;
 }
 
 /**

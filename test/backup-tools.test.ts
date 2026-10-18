@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { parseBackup } from '../src/backup.ts';
+import { parseBackup, restore } from '../src/backup.ts';
 import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
+import { createShare } from '../src/documents.ts';
 import { configureOutbox } from '../src/outbox.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
@@ -54,4 +55,14 @@ test("an agent's own view of the map reads whether the owner allows it a backup"
   await callTool(whole.as('e_owner', true), owner, 'workspace_set', { agent_backups: true });
   const made = (await callTool(whole.as('e_agentx'), agent, 'backup_download', {})) as Made;
   assert.ok(takeBackup(made.path.replace('/backup-file/', '')), 'a member reads the setting, as an agent token does');
+});
+test('a link given to a document is in the backup, and works again where the backup is restored', async () => {
+  const l = await map();
+  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.document', title: 'Shared plan' }] });
+  const doc = Object.values((made as { created: Record<string, string> }).created)[0];
+  await createShare(l, owner, doc);
+  const file = takeBackup(((await callTool(l, owner, 'backup_download', {})) as Made).path.replace('/backup-file/', ''))!;
+  const there = await openDb();
+  assert.equal((await restore(there, parseBackup(file.file))).share, 1);
+  assert.deepEqual((await there.query<{ entity_id: string }>(`select entity_id from share`)).rows, [{ entity_id: doc }]);
 });

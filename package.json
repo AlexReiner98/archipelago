@@ -12,10 +12,11 @@
   "scripts": {
     "start": "node src/server.ts",
     "dev": "node src/dev.ts",
+    "pull": "node src/pull.ts",
     "demo": "node scripts/demo.ts",
     "demo:approvals": "node scripts/demo-approvals.ts",
     "pelago": "node src/cli.ts",
-    "test": "node --test \"test/*.test.ts\" \"packs/*/*.test.ts\"",
+    "test": "node --test --test-force-exit --import ./test/each.ts \"test/*.test.ts\" \"packs/*/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
