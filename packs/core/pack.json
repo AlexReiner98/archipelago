@@ -155,25 +155,15 @@
       "description": "How a picture of the map is drawn. About a project or item, it is how that thing's picture looks; about nothing, the workspace's. A field left empty comes from the level above. Read only by the page that draws.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
-        "shape": { "type": "enum", "values": ["nest", "boxes", "grid", "time", "flow"], "description": "One of the drawings that come built in, used when the style has no code of its own. flow: a process map read from the top down, each item a step (work a box, a question a diamond, an occurrence a pill, a record a sheet), wires at right angles from what is depended on to what depends on it, an open question's choices as dashed scenarios. time: along a time axis (the lens's time), as a calendar of days with hours down (layout: calendar) or as bars across days (layout: bars, a Gantt chart), each lane a row; the one a lens on a time axis is drawn in unless said. grid: rows by what the start holds, columns by the lens's lanes, each thing a card, links as numbered lines with their words in a key. nest: circles in circles, opened by zooming. boxes: titled boxes in boxes, each thing one line." },
+        "shape": { "type": "enum", "values": ["list", "flow"], "description": "One of the two drawings that come built in, used when the style has no code of its own. list: each thing one line, a thing that holds others a titled box that folds. flow: a process map read from the top down, each item a step (work a box, a question a diamond, an occurrence a pill, a record a sheet), wires at right angles from what is depended on to what depends on it, an open question's choices as dashed scenarios. Any other look is code of its own. list unless said." },
         "lit": { "type": "enum", "values": ["all", "you", "blocked"], "description": "What stays lit as it opens." },
-        "layout": { "type": "enum", "values": ["calendar", "bars"], "description": "time: a calendar of days, hours running down (calendar), or each lane a row of bars across the days (bars, a Gantt chart). calendar unless said." },
-        "hours": { "type": "json", "description": "time, calendar: the hours of the day shown, as [from, to], e.g. [6, 22]. The whole day unless said." },
-        "open": { "type": "number", "description": "How many levels are open as it first draws." },
-        "show": { "type": "json", "description": "What a thing says beside its name, as a list of: count, blocked, you, sessions, status, type, bar." },
-        "leaf": { "type": "enum", "values": ["row", "chip", "dot"], "description": "How a thing with nothing inside it is drawn in boxes." },
+        "open": { "type": "number", "description": "list: how many levels are open as it first draws." },
+        "show": { "type": "json", "description": "list: what a thing says beside its name, as a list of: count, blocked, you, sessions, status, type." },
         "column": { "type": "number", "description": "The least width of a box, in pixels." },
         "text": { "type": "number", "description": "The size of names, in pixels." },
         "radius": { "type": "number", "description": "How round corners are, in pixels." },
         "gap": { "type": "number", "description": "The room between things, in pixels." },
-        "lines": { "type": "boolean", "description": "Whether links are drawn as lines." },
         "colors": { "type": "json", "description": "Colours by name, each a hex colour: sea, land, inner, line, text, muted, blocked, you, session, done." },
-        "color_by": { "type": "string", "description": "grid: the shown field each card is coloured by, e.g. kind." },
-        "rows": { "type": "string", "description": "grid: what the rows are. Left empty, what the start holds. link:<kind>, the things those links lead to, e.g. link:funding.could_fund: a thing is a card in each row its links lead to, with the link's words as its second line." },
-        "palette": { "type": "json", "description": "grid: a hex colour for each value of color_by, e.g. {\"grant\": \"#2e7d4f\"}. A value not named takes one of the built-in colours." },
-        "labels": { "type": "json", "description": "grid: what a lane or a value is called, e.g. {\"set_up\": \"Set up\"}. Not named, it is the value in words." },
-        "detail": { "type": "string", "description": "grid: the shown field written on each card's second line, e.g. amount." },
-        "mark": { "type": "string", "description": "grid: the shown date field marked on a card, with the field <name>_note before it when there is one, e.g. deadline." },
         "code": { "type": "string", "description": "The drawing itself, as a JavaScript module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the lens view answered; style is this style's other fields; theme is the page's colours (sea, land, inner, line, text, muted, blocked, you, session, done) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl }) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer. With code, shape is not used." }
       }
     },
@@ -199,7 +189,7 @@
       "at": "home",
       "pieces": [
         { "piece": "attention", "title": "Needs you", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] },
-        { "piece": "picture", "title": "Your work", "lens": { "far": 1 }, "style": { "shape": "boxes", "lit": "you" } }
+        { "piece": "picture", "title": "Your work", "lens": { "far": 1 }, "style": { "shape": "list", "lit": "you" } }
       ]
     },
     { "id": "needs", "title": "Needs you", "on": ["work", "aim"], "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] }] },

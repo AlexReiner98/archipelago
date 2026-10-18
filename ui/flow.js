@@ -6,7 +6,7 @@
 
 import { h } from './base.js';
 import { layout } from './flow-layout.js';
-import { lensTree, litCount, litSwitch } from './lens.js';
+import { lensTree, litCount, litSwitch } from './lens-base.js';
 import { panZoom } from './pan-zoom.js';
 
 const NS = 'http://www.w3.org/2000/svg';

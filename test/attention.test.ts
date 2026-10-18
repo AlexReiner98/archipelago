@@ -99,5 +99,5 @@ test('attention finds every reason, for the right person, within a scope, and th
   const { screens } = (await callTool(l, human, 'schema', {})) as { screens: { at?: string; pieces: { piece: string; title?: string; style?: { shape?: string } }[] }[] };
   const home = screens.find((s) => s.at === 'home')!;
   assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['attention', 'Needs you'], ['picture', 'Your work']]);
-  assert.equal(home.pieces[1].style?.shape, 'boxes');
+  assert.equal(home.pieces[1].style?.shape, 'list');
 });

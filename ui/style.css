@@ -97,7 +97,6 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .page-head .trail-sep { color: var(--muted); }
 .page-head .trail-view, .page-head .shown-in .trail-view { flex: none; padding: 1px 8px; border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); text-decoration: none; font-size: 12px; }
 .page-head .trail-view:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
-.lg-card.here { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* What an item delivers: one line under its title, each deliverable a way to its own page. */
 .page-head .delivers { display: flex; flex-basis: 100%; width: 100%; align-items: center; gap: 10px; margin-top: 8px; white-space: nowrap; overflow: hidden; }
 .page-head .delivers .deliverable { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; }
@@ -246,40 +245,9 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .lens-wrap { min-width: 0; contain: inline-size; }
 .lens-bar .switch button { padding: 3px 10px; font-size: 12.5px; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lens-pin { flex: none; text-decoration: none; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lens-rule { color: var(--muted); font-size: 12px; min-width: 0; flex: 1 1 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lens-view .fold-bar { padding: 10px 14px; flex-wrap: nowrap; }
-.lens-trail { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; white-space: nowrap; }
-.lens-trail button { border: 0; background: none; padding: 2px 4px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; flex: 0 1 auto; }
-.lens-trail button.here { color: var(--text); font-weight: 600; }
-.lens-trail .sep { color: var(--muted); }
 .lens-view .switch { flex: none; }
-/* The nest: a thing is a circle, and what is inside it is in it. */
-.ln-sea { display: block; width: 100%; height: min(calc(100vh - 190px), 780px); min-height: 360px; background: var(--ln-sea); touch-action: none; user-select: none; cursor: grab; }
-.ln-thing { cursor: pointer; }
-.ln-thing .land { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: 1.2; }
-.ln-thing.odd .land { fill: var(--ln-inner); }
-.ln-thing.leaf .land { fill: var(--ln-inner); stroke: var(--ln-line); }
-.ln-thing.leaf.blocked .land { fill: var(--ln-blocked); stroke: var(--ln-land); }
-.ln-thing.leaf.you .land { fill: var(--ln-you); stroke: var(--ln-land); }
-.ln-thing.leaf.you.blocked .land { stroke: var(--ln-blocked); stroke-width: 2.5; }
-.ln-thing.closed .land { stroke: var(--ln-done); }
-.ln-thing .arc { fill: none; stroke-linecap: butt; pointer-events: none; }
-.ln-thing .arc.you { stroke: var(--ln-you); }
-.ln-thing .arc.blocked { stroke: var(--ln-blocked); }
-.ln-thing .boat { fill: var(--ln-session); stroke: var(--ln-land); stroke-width: 2; pointer-events: none; }
-.ln-thing .name { font-size: calc(var(--ln-text-size) - 1px); fill: var(--ln-text); text-anchor: middle; pointer-events: none; }
-.ln-thing .name.mid, .ln-thing .name.top { font-weight: 600; }
-.ln-thing .name.top { pointer-events: auto; paint-order: stroke; stroke: var(--ln-sea); stroke-width: 4px; stroke-linejoin: round; }
-.ln-thing .name.top:hover { fill: var(--accent); }
-.ln-thing .name.leaf { font-size: calc(var(--ln-text-size) - 2px); }
-.ln-thing .name.beside { text-anchor: start; font-size: calc(var(--ln-text-size) - 2px); paint-order: stroke; stroke: var(--ln-sea); stroke-width: 4px; stroke-linejoin: round; }
-.ln-thing.leaf.blocked .name, .ln-thing.leaf.you .name { fill: #fff; }
-.ln-thing .name .count { font-size: calc(var(--ln-text-size) - 2px); font-weight: 400; fill: var(--ln-muted); }
-.ln-line { stroke: var(--ln-muted); stroke-width: 1.2; stroke-dasharray: 2 4; pointer-events: stroke; }
-.ln-line.waits { stroke: var(--ln-blocked); stroke-dasharray: 5 4; stroke-width: 1.5; }
-#ln-arrow path { fill: var(--ln-blocked); }
-#ln-arrow-said path { fill: var(--accent); }
-/* Boxes: a thing is a titled box with what is inside it in it; a thing with nothing inside is one line. */
+/* The list: a thing is a titled box with what is inside it in it; a thing with nothing inside is one line. */
 .lb-top { background: var(--ln-sea); padding: calc(var(--ln-gap-size) * 1.5); columns: var(--ln-column-size) auto; column-gap: var(--ln-gap-size); font-size: var(--ln-text-size); color: var(--ln-text); }
 .lb-box { break-inside: avoid; margin: 0 0 var(--ln-gap-size); background: var(--ln-land); border: 1px solid var(--ln-line); border-radius: var(--ln-radius-size); overflow: hidden; }
 .lb-box.odd { background: var(--ln-inner); }
@@ -297,9 +265,6 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .lb-mark.lb-blocked { background: var(--ln-blocked); }
 .lb-mark.lb-at { width: 8px; height: 8px; border-radius: 50%; background: var(--ln-session); }
 .lb-mark.lb-count, .lb-mark.lb-word { color: var(--ln-muted); }
-.lb-bar { display: flex; height: 3px; background: var(--ln-line); }
-.lb-bar .lb-you { background: var(--ln-you); }
-.lb-bar .lb-blocked { background: var(--ln-blocked); }
 .lb-kids { padding: var(--ln-gap-size) var(--ln-gap-size) 0; }
 .lb-box .lb-box { columns: auto; }
 .lb-leaves { padding: 4px 0; }
@@ -314,48 +279,11 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .lb-leaf.you.blocked .lb-dot { border-color: var(--ln-blocked); }
 .lb-leaf.closed .lb-dot { background: var(--ln-done); border-color: var(--ln-done); }
 .lb-leaf.closed .lb-name { color: var(--ln-muted); }
-.lb-leaves.chip { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; }
-.lb-leaves.chip .lb-leaf { border: 1px solid var(--ln-line); border-radius: 999px; padding: 2px 9px 2px 7px; max-width: 100%; box-sizing: border-box; }
-.lb-leaves.dot { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px; }
-.lb-leaves.dot .lb-leaf { padding: 0; }
-.lb-leaves.dot .lb-name, .lb-leaves.dot .lb-mark { display: none; }
-.lb-leaves.dot .lb-dot { width: 11px; height: 11px; }
 .lb-box.dim > header, .lb-leaf.dim { opacity: 0.28; }
 .lb-leaf.here { background: var(--ln-sea); }
 .lb-leaf.here .lb-name { font-weight: 600; }
 .lb-box.lane > header { padding-left: 12px; border-bottom: 1px solid var(--ln-line); }
 .lb-box.lane > header .lb-name { font-weight: 400; color: var(--ln-muted); }
-/* Space: the same picture in three dimensions. */
-/* The grid: rows by what the start holds, columns by lane, each thing a card coloured by one of its fields; links drawn over it. */
-.lg-stage { position: relative; background: var(--ln-sea); padding: 10px; overflow-x: auto; }
-.lg-grid { display: grid; gap: 6px; font-size: var(--ln-text-size); color: var(--ln-text); }
-.lg-corner { min-height: 1px; }
-.lg-lane { padding: 7px 10px; border-radius: var(--ln-radius-size); background: var(--ln-text); color: var(--ln-sea); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lg-row { padding: 8px 6px; font-weight: 600; color: var(--ln-text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid var(--ln-line); }
-a.lg-row:hover { text-decoration: underline; }
-.lg-row.loose { color: var(--ln-muted); font-weight: 500; }
-.lg-cell { display: flex; flex-direction: column; gap: 6px; padding: 6px 0; border-top: 1px solid var(--ln-line); min-width: 0; }
-.lg-card { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 2px; padding: 6px 9px 6px 11px; border-radius: var(--ln-radius-size); border: 1px solid color-mix(in srgb, var(--lg-hue) 55%, var(--ln-line)); border-left: 4px solid var(--lg-hue); background: color-mix(in srgb, var(--lg-hue) 13%, var(--ln-land)); color: var(--ln-text); text-decoration: none; min-width: 0; transition: opacity 0.15s; }
-.lg-card:hover { background: color-mix(in srgb, var(--lg-hue) 22%, var(--ln-land)); }
-.lg-card.dim, .lg-card.lg-off { opacity: 0.35; }
-.lg-card.closed .lg-title { text-decoration: line-through; color: var(--ln-muted); }
-.lg-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lg-detail { color: var(--ln-muted); font-size: 0.92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lg-marks { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
-.lg-due { padding: 0 7px; border-radius: 999px; background: var(--ln-blocked); color: #fff; font-size: 0.85em; font-weight: 600; white-space: nowrap; }
-.lg-num { min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--ln-text); color: var(--ln-sea); font-size: 0.8em; font-weight: 700; text-align: center; line-height: 18px; }
-.lg-lines { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; overflow: visible; }
-.lg-lines g { pointer-events: visiblePainted; cursor: help; }
-.lg-line { fill: none; stroke: var(--ln-text); stroke-width: 1.6; stroke-dasharray: 5 4; opacity: 0.55; }
-.lg-arrow { fill: var(--ln-text); opacity: 0.7; }
-.lg-dot { fill: var(--ln-text); stroke: var(--ln-sea); stroke-width: 2; }
-.lg-dotnum { fill: var(--ln-sea); font-size: 11px; font-weight: 700; text-anchor: middle; pointer-events: none; }
-.lg-lines g.lg-on .lg-line { opacity: 1; stroke-width: 2.4; stroke: var(--accent); }
-.lg-legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 12px; font-size: 12.5px; color: var(--ln-muted); }
-.lg-swatch::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 3px; background: color-mix(in srgb, var(--lg-hue) 30%, var(--ln-land)); border: 1px solid var(--lg-hue); }
-.lg-key { margin: 0; padding: 6px 12px 12px 34px; font-size: 13px; columns: 2 340px; column-gap: 28px; }
-.lg-key li { margin: 3px 0; break-inside: avoid; cursor: default; }
-.lg-key li::marker { font-weight: 700; }
 .lens-frame { display: block; width: 100%; height: min(calc(100vh - 190px), 820px); min-height: 380px; border: 0; background: var(--ln-sea); }
 .lens-view .lens-error { padding: 8px 14px; color: var(--bad); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* The one graph. */
@@ -813,10 +741,6 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .beat-more p { margin: 0 0 6px; }
 .beat-items { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
 .story-picture { min-width: 0; border-top: 1px solid var(--line); }
-.story-picture .ln-sea { height: 380px; min-height: 0; }
-/* A tie a session drew, with its words on it: in every shape that draws links. */
-.ln-line.said { stroke: var(--accent); stroke-dasharray: none; stroke-width: 1.6; }
-.ln-lines text.said { fill: var(--accent); font-size: 11px; paint-order: stroke; stroke: var(--ln-sea); stroke-width: 4px; pointer-events: none; }
 
 /* Home: a card per project, its questions beside its next release. */
 .home-project { margin-bottom: 14px; }

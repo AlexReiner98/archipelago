@@ -1331,20 +1331,20 @@ test('a lens answers with one shape of data: what is inside what, the same count
   const drawn = await make(l, [
     { op: 'create', ref: 'wl', type: 'lens', title: 'As it opens', props: { far: 1 } },
     { op: 'create', ref: 'pl', type: 'lens', title: 'P in full', props: { far: 2, over: ['depends_on'] } },
-    { op: 'create', ref: 'ws', type: 'style', title: 'House style', props: { shape: 'boxes', open: 1, colors: { sea: '#f0f4f5' } } },
+    { op: 'create', ref: 'ws', type: 'style', title: 'House style', props: { shape: 'list', open: 1, colors: { sea: '#f0f4f5' } } },
     { op: 'create', ref: 'ps', type: 'style', title: 'P opened', props: { open: 2 } },
-    { op: 'create', ref: 'spare', type: 'style', title: 'Spare', status: 'retired', props: { shape: 'nest' } },
+    { op: 'create', ref: 'spare', type: 'style', title: 'Spare', status: 'retired', props: { shape: 'flow' } },
     { op: 'link', type: 'about', from: 'pl', to: made.p },
     { op: 'link', type: 'about', from: 'ps', to: made.p },
   ]);
   const opened = await run();
-  assert.deepEqual([opened.lens.far, titles(opened), opened.style], [1, ['C', 'Early', 'Late', 'P', 'Q', 'X'], { shape: 'boxes', open: 1, colors: { sea: '#f0f4f5' } }], 'the workspace’s own, and they are not items of the picture');
+  assert.deepEqual([opened.lens.far, titles(opened), opened.style], [1, ['C', 'Early', 'Late', 'P', 'Q', 'X'], { shape: 'list', open: 1, colors: { sea: '#f0f4f5' } }], 'the workspace’s own, and they are not items of the picture');
   assert.deepEqual(opened.kept, { lens: [{ id: drawn.wl, title: 'As it opens' }], style: [{ id: drawn.ws, title: 'House style' }] });
   const ofP = await run({ from: made.p });
-  assert.deepEqual([ofP.lens.far, ofP.lens.over, ofP.style.open, ofP.style.shape], [2, ['depends_on'], 2, 'boxes'], 'a field the nearer one names replaces it; one it does not falls through');
+  assert.deepEqual([ofP.lens.far, ofP.lens.over, ofP.style.open, ofP.style.shape], [2, ['depends_on'], 2, 'list'], 'a field the nearer one names replaces it; one it does not falls through');
   assert.deepEqual(ofP.kept.style.map((k: any) => k.title), ['House style', 'P opened']);
   assert.equal((await run({ from: made.p, far: 0 })).lens.far, 0, 'what is asked for the moment weighs most');
-  assert.equal((await run({ style: drawn.spare })).style.shape, 'nest', 'a style named outright is used, retired or not');
+  assert.equal((await run({ style: drawn.spare })).style.shape, 'flow', 'a style named outright is used, retired or not');
   await assert.rejects(run({ style: 'e_nothing0' }), /No style/);
   // Each lens about an item is a view of it, in order; one that starts somewhere else is a shortcut; and the lens is said in words.
   const more = await make(l, [
