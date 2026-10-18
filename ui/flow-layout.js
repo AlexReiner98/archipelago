@@ -8,6 +8,10 @@
 const FLOW = new Set(['depends_on']);
 /** Past this many steps the layer search and the sifting are skipped: they grow with the square of the steps. */
 export const LARGE = 60;
+/** A step that this many plain steps lead into has them as checklists. */
+export const FOLD_AT = 4;
+/** A checklist: its head, and a row for each thing in it. */
+export const LIST_HEAD = 28, LIST_ROW = 20;
 const LAYER_GAP = 84, NODE_GAP = 16, MARGIN = 24, MAX_TEXT = 140, TRACK = 8, SLOT = 9, LEAD_OUT = 12, LEAD_IN = 22;
 
 /** The steps (each with its place x, y and size w, h), the wires (each with its points), the breaks and the whole size. */
@@ -44,6 +48,24 @@ export function layout({ items, links, rootId, measure }) {
     return false;
   };
   edges = edges.filter((e) => !implied(e.a, e.b));
+  // A step many plain steps lead into (each follows nothing and leads only there: a release's prerequisites) has
+  // them as checklists, one for each type of thing, each a single step that names its items in rows. Thirty
+  // independent things before a gate are a checklist, not a process; only the chains between them stay steps.
+  for (const b of new Set(edges.map((e) => e.b))) {
+    const plain = edges.filter((e) => e.b === b && nodes.get(e.a)?.shape === 'box' && !edges.some((f) => f.b === e.a) && edges.every((f) => f.a !== e.a || f.b === b)).map((e) => e.a);
+    if (plain.length < FOLD_AT) continue;
+    const kinds = new Map();
+    for (const a of plain) kinds.set(nodes.get(a).item.root ?? nodes.get(a).item.type, [...(kinds.get(nodes.get(a).item.root ?? nodes.get(a).item.type) ?? []), nodes.get(a).item]);
+    for (const [type, list] of kinds) {
+      if (list.length < 2) continue;
+      const id = `list:${b}:${type}`;
+      const folded = new Set(list.map((i) => i.id));
+      for (const i of list) nodes.delete(i.id);
+      edges = edges.filter((e) => !folded.has(e.a));
+      edges.push({ a: id, b });
+      nodes.set(id, { id, shape: 'list', list, type, item: { id, title: type, open: list.some((i) => i.open), state: { blocked: list.some((i) => i.state.blocked), waits_on: [...new Set(list.flatMap((i) => i.state.waits_on))], sessions: list.reduce((s, i) => s + i.state.sessions, 0) } } });
+    }
+  }
   // Work about a step rather than a step of the process (nothing leads to it or from it) is not drawn as a step: it
   // is a mark on the step it is part of, there when that step is.
   const wired = new Set(edges.flatMap((e) => [e.a, e.b]));
@@ -77,6 +99,7 @@ export function layout({ items, links, rootId, measure }) {
     const text = Math.min(measure(n.item.title, n.stub ? 12 : 13), MAX_TEXT);
     if (n.shape === 'diamond') [n.w, n.h] = [text + 96, 60];
     else if (n.shape === 'end') [n.w, n.h] = [text + 30, 30];
+    else if (n.shape === 'list') [n.w, n.h] = [Math.max(...n.list.map((i) => Math.min(measure(i.title, 12), MAX_TEXT + 40))) + 40, LIST_HEAD + n.list.length * LIST_ROW + 6];
     else [n.w, n.h] = [text + 42, n.shape === 'sheet' ? 40 : 34];
   }
 

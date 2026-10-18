@@ -28,3 +28,14 @@
 .lf-legend { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 3px; padding: 7px 10px; background: var(--ln-land); border: 1px solid var(--ln-line); border-radius: 8px; color: var(--ln-text); font-size: 12px; pointer-events: none; }
 .lf-legend span { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 .lf-legend[hidden] { display: none; }
+/* A checklist: plain things before one step, a row each. The head says the type and how many are left. */
+.lf-list { cursor: default; }
+.lf-list:hover .lf-shape { stroke: var(--ln-line); stroke-width: 1.25; }
+.lf-step text.lf-list-head { font-size: 12px; font-weight: 600; fill: var(--ln-muted); }
+.lf-list-rule { stroke: var(--ln-line); stroke-width: 1; }
+.lf-row { cursor: pointer; }
+.lf-row text { font-size: 12px; }
+.lf-row-hit { fill: transparent; }
+.lf-row:hover .lf-row-hit, .lf-row:focus .lf-row-hit { fill: var(--ln-sea); }
+.lf-row.closed text { fill: var(--ln-muted); }
+.lf-row.dim { opacity: 0.32; }

@@ -95,3 +95,21 @@ test('the item a picture is of is a step when it waits on the others, and only t
   assert.ok(g.y.get('r') > g.y.get('b'));
   assert.equal(run([item('a'), item('b')], [dep('b', 'a')]).nodes.has('r'), false, 'a project that holds the work is not');
 });
+
+test('many plain things before one step are checklists, one for each type; the chains between them stay steps', () => {
+  const tasks = ['t1', 't2', 't3', 't4', 't5'].map((id) => item(id, 'work', { root: 'work.task' }));
+  const issues = ['i1', 'i2', 'i3'].map((id) => item(id, 'work', { root: 'work.issue' }));
+  const lone = item('f1', 'work', { root: 'feature' });
+  const chain = [item('c1', 'work', { root: 'work.task' }), item('c2', 'work', { root: 'work.task' })];
+  const g = run([item('gate', 'occurrence'), ...tasks, ...issues, lone, ...chain], [...[...tasks, ...issues, lone].map((i) => dep('gate', i.id)), dep('gate', 'c2'), dep('c2', 'c1')]);
+  checks(g);
+  const lists = [...g.nodes.values()].filter((n: any) => n.shape === 'list');
+  assert.deepEqual(lists.map((n: any) => [n.type, n.list.map((i: any) => i.id)]), [['work.task', ['t1', 't2', 't3', 't4', 't5']], ['work.issue', ['i1', 'i2', 'i3']]]);
+  assert.ok(g.nodes.has('f1'), 'one of its type stays a step');
+  assert.ok(g.nodes.has('c1') && g.nodes.has('c2'), 'a chain is not plain');
+  assert.ok(lists.every((n: any) => g.chains.some((c: any) => c.a === n.id && c.b === 'gate')), 'each checklist leads to the step');
+  assert.ok(lists[0].h > lists[1].h, 'a row for each thing in it');
+  // Fewer than four plain things are left as they are.
+  const few = run([item('gate', 'occurrence'), ...tasks.slice(0, 3)], tasks.slice(0, 3).map((i) => dep('gate', i.id)));
+  assert.ok(![...few.nodes.values()].some((n: any) => n.shape === 'list'));
+});
