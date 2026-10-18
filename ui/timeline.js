@@ -7,6 +7,8 @@ import { GRID_HUES } from './grid.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const DAY = 86_400_000;
+/** The least height a block is drawn, in pixels: a stretch of minutes is still there to point at. */
+const MIN_BLOCK = 6;
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
 
 /** How the drawing's parts look, set through the CSSOM (the page allows no inline style attributes). Colours are the page's. */
@@ -14,7 +16,6 @@ const LOOK = {
   't-rule': 'stroke: var(--line); stroke-width: 1',
   't-head': 'fill: var(--muted); font-size: 11px',
   't-hour': 'fill: var(--muted); font-size: 10px',
-  't-label': 'fill: #fff; font-size: 11px; pointer-events: none',
   't-row': 'fill: var(--text); font-size: 12px',
   't-lane': 'stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3',
 };
@@ -91,11 +92,23 @@ function calendar(host, answer, style) {
       .sort((a, b) => a.s - b.s);
     return [...Array(Math.max(lanes.length, 1)).keys()].map((i) => {
       const mine = lanes.length ? today.filter((b) => laneOf(b) === i) : today;
-      const cols = [];
+      // Each thing keeps one strip all day (a session's stretches one under another), and two things share a strip
+      // only when they do not meet as drawn: a short stretch is drawn taller than it lasted.
+      const drawnEnd = (b) => Math.max(b.e, b.s + (MIN_BLOCK / hourPx) * 3_600_000);
+      const units = new Map();
       for (const b of mine) {
-        const col = cols.findIndex((end) => end <= b.s);
-        b.col = col < 0 ? cols.push(b.e) - 1 : col;
-        cols[b.col] = Math.max(cols[b.col], b.e);
+        const u = units.get(b.item.id) ?? { s: b.s, e: drawnEnd(b), blocks: [] };
+        u.s = Math.min(u.s, b.s);
+        u.e = Math.max(u.e, drawnEnd(b));
+        u.blocks.push(b);
+        units.set(b.item.id, u);
+      }
+      const cols = [];
+      for (const u of [...units.values()].sort((a, b) => a.s - b.s)) {
+        const col = cols.findIndex((end) => end <= u.s);
+        const at = col < 0 ? cols.push(u.e) - 1 : col;
+        cols[at] = Math.max(cols[at], u.e);
+        for (const b of u.blocks) b.col = at;
       }
       return { mine, cols: cols.length };
     });
@@ -137,7 +150,8 @@ function calendar(host, answer, style) {
     const title = [said(b), b.stream && streamTitle.get(b.stream), lanes.length > 1 && lanes[laneOf(b)].title].filter(Boolean).join('\n');
     const box = svg('rect', { class: 'dot', x, y, width: Math.max(w, 3), height: hgt, rx: 3 });
     if (streams.length) box.style.fill = hueOf.get(b.stream) ?? 'var(--muted)';
-    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(title), box, svg('text', { class: 't-label', x: x + 4, y: y + 12 }, cut(nameOf(b), w - 8))));
+    // A block is its colour; what it is, is said on hover.
+    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(title), box));
     out.lastChild.addEventListener('click', open(b.item));
   };
   // The strip: each whole-day thing a bar across the days it covers, on the first row free on all of them.
@@ -157,7 +171,7 @@ function calendar(host, answer, style) {
       const [lx, lw] = lanes.length ? laneX[i] : [0, colW];
       // The same width for a column all week, so one session reads the same on a quiet day as on a busy one.
       const w = (lw - 4) / Math.max(lanes.length ? weight[i] : packed[d][i].cols, 1);
-      for (const b of mine) place(b, gutter + d * colW + lx + 2 + b.col * w, head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, w - 2, Math.max(((b.e - b.s) / 3_600_000) * hourPx, 16));
+      for (const b of mine) place(b, gutter + d * colW + lx + 2 + b.col * w, head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, w - 2, Math.max(((b.e - b.s) / 3_600_000) * hourPx, MIN_BLOCK));
     }
   }
   // The key: what the colours count toward this week, each a link to its page.
