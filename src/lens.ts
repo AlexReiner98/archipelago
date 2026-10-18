@@ -177,15 +177,28 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const hub = input.from === undefined ? undefined : String(input.from);
   // Around one item there is always the picture of what it is tied to, by kind of link: what it waits on and what waits on it.
   const around = hub !== undefined && (input.lens === AROUND || input.lens === HOLDING);
-  const holding = hub !== undefined && input.lens === HOLDING;
   const [lenses, styles] = [await keptOf(l, 'lens', around ? undefined : input.lens), await keptOf(l, 'style', input.style)];
   const placed = (one: Kept) => (typeof one.props.place === 'number' ? one.props.place : Infinity);
   // Every lens that applies can be chosen: those about the item, then what it is tied to, then the workspace's own (about nothing), each in its order.
   const own = hub === undefined ? [] : lenses.filter((one) => one.about.includes(hub)).sort((a, b) => placed(a) - placed(b));
   const shared = lenses.filter((one) => !one.about.length).sort((a, b) => placed(a) - placed(b));
   const views = told ? [] : [...own, ...(hub === undefined ? [] : [{ id: AROUND, title: 'Around it', props: {}, about: [] }]), ...shared];
-  // An item opens on its first picture of its own (not a shortcut, which leads away), else on what it is tied to; the whole map on the workspace's first.
-  const view = around || (told && typeof input.lens !== 'string') ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
+  const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at, updated_at from entity where archived_at is null`);
+  const all = new Map(entities.map((e) => [e.id, e]));
+  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null }>(
+    `select id, type, from_id, to_id, props ->> 'says' as says from relation where valid_to is null order by id`,
+  );
+  // What the item waits on, step by step through what that waits on, finished or not: the view of what holds it,
+  // offered beside the others while some of it is still open, and the one an item opens on when it has none of its own.
+  const waitsOn = new Map<string, string[]>();
+  for (const r of relations) if (WAITS.includes(l.registry.relations.get(r.type)?.root ?? r.type)) waitsOn.set(r.from_id, [...(waitsOn.get(r.from_id) ?? []), r.to_id]);
+  const held = new Set<string>();
+  for (const queue = hub === undefined ? [] : [hub]; queue.length; ) for (const to of waitsOn.get(queue.pop()!) ?? []) if (to !== hub && !held.has(to)) (held.add(to), queue.push(to));
+  const offered = !told && [...held].some((id) => all.get(id)?.is_open);
+  if (offered) views.splice(own.length + 1, 0, { id: HOLDING, title: 'What holds it', props: {}, about: [] });
+  const holding = hub !== undefined && (input.lens === HOLDING || (offered && input.lens === undefined && !own.some((one) => typeof one.props.from !== 'string')));
+  // An item opens on its first picture of its own (not a shortcut, which leads away), else on what holds it, else on what it is tied to; the whole map on the workspace's first.
+  const view = around || holding || (told && typeof input.lens !== 'string') ? undefined : typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : hub === undefined ? shared[0] : own.find((one) => typeof one.props.from !== 'string');
   // A view may start somewhere else than the item it is kept about: tightly scoped, that is a shortcut.
   // Asked for by its id alone, a view kept about one item starts from that item, so it can be drawn anywhere: in a document, for one.
   const start = typeof view?.props.from === 'string' ? view.props.from : (hub ?? (view && view.about.length === 1 ? view.about[0] : undefined));
@@ -213,19 +226,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   for (const one of drawn) for (const [key, value] of Object.entries(one.props)) if (value != null) style[key] = value;
   // What holds an item is drawn as a flow, whatever the item's own pictures are drawn as.
   if (holding) (delete style.code, (style.shape = 'flow'));
-  const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at, updated_at from entity where archived_at is null`);
-  const all = new Map(entities.map((e) => [e.id, e]));
   if (asked.from && !all.has(asked.from)) throw new Error(`No entity "${asked.from}"`);
-  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null }>(
-    `select id, type, from_id, to_id, props ->> 'says' as says from relation where valid_to is null order by id`,
-  );
-  // What the item waits on, step by step through what that waits on, finished or not: the view of what holds it,
-  // offered beside the others while some of it is still open.
-  const waitsOn = new Map<string, string[]>();
-  for (const r of relations) if (WAITS.includes(l.registry.relations.get(r.type)?.root ?? r.type)) waitsOn.set(r.from_id, [...(waitsOn.get(r.from_id) ?? []), r.to_id]);
-  const held = new Set<string>();
-  for (const queue = hub === undefined ? [] : [hub]; queue.length; ) for (const to of waitsOn.get(queue.pop()!) ?? []) if (to !== hub && !held.has(to)) (held.add(to), queue.push(to));
-  if (!told && [...held].some((id) => all.get(id)?.is_open)) views.splice(own.length + 1, 0, { id: HOLDING, title: 'What holds it', props: {}, about: [] });
 
   const isA = (type: string, kind: string) => l.registry.isA(type, kind);
   // A lens and a style are how the map is looked at, not part of what is seen.
