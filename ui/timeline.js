@@ -173,11 +173,14 @@ function calendar(host, answer, style) {
       const w = (lw - 4) / Math.max(lanes.length ? weight[i] : packed[d][i].cols, 1);
       // Down each strip, a block ends where the next begins: back-to-back stretches touch, never lie on each other.
       const at = mine.map((b) => ({ b, y: head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, hgt: Math.max(((b.e - b.s) / 3_600_000) * hourPx, MIN_BLOCK) })).sort((p, q) => p.b.col - q.b.col || p.y - q.y);
+      // One too short to draw apart from the next (a session's minute here and minute there) is folded into it.
       at.forEach((p, k) => {
         const next = at[k + 1];
-        if (next && next.b.col === p.b.col && next.y < p.y + p.hgt) p.hgt = Math.max(next.y - p.y - 1, 2);
+        if (!next || next.b.col !== p.b.col || next.y >= p.y + p.hgt) return;
+        if (next.y - p.y < MIN_BLOCK) (next.hgt += next.y - p.y, next.y = p.y, p.gone = true);
+        else p.hgt = next.y - p.y - 1;
       });
-      for (const { b, y, hgt } of at) place(b, gutter + d * colW + lx + 2 + b.col * w, y, w - 2, hgt);
+      for (const { b, y, hgt, gone } of at) if (!gone) place(b, gutter + d * colW + lx + 2 + b.col * w, y, w - 2, hgt);
     }
   }
   // The key: what the colours count toward this week, each a link to its page.
