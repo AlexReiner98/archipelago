@@ -9,7 +9,7 @@ import type { Archipelago } from './pelago.ts';
 import { placeAll, readAxis, zoneOf, type TimeAxis } from './timeaxis.ts';
 import { blockGraph } from './blocking.ts';
 import { hubs, keptOf, type Kept } from './lens-kept.ts';
-import { IN, SESSIONS, WHEN, dated, personLanes, thisWeek } from './lens-when.ts';
+import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, thisWeek } from './lens-when.ts';
 
 // Kept where they were first imported from.
 export { hubs, HUB_AT, pictureOf } from './lens-kept.ts';
@@ -308,8 +308,9 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
       }
     };
     reach(asked.from, 0);
-    // When things happen: the sessions that worked on what is inside it too, where they were at work on it.
-    if (when && spans) for (const [id, found] of spans) if (found.some((span) => span.on && sent.has(span.on))) sent.add(id);
+    // When things happen: the sessions that worked on anything inside it too (dated or not), where they were at work on it.
+    const within = when && insideOf(l, asked.from, asked.by, relations);
+    if (within && spans) for (const [id, found] of spans) if (found.some((span) => span.on && within.has(span.on))) sent.add(id);
     const tree = new Set(sent);
     // Brought in: whatever a link ties to the start itself, and what blocks or is blocked by anything inside it.
     // Not every neighbour of everything inside: a project's picture is not its whole surroundings.

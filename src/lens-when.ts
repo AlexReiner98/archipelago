@@ -26,6 +26,18 @@ interface Row {
   created_at: Date;
 }
 
+type Link = { type: string; from_id: string; to_id: string };
+
+/** Everything inside an item, at any depth, down the links that say what is inside what, dated or not. */
+export function insideOf(l: Archipelago, hub: string, by: string, relations: Link[]): Set<string> {
+  const root = (type: string) => l.registry.relations.get(type)?.root ?? type;
+  const kids = new Map<string, string[]>();
+  for (const r of relations) if (root(r.type) === by) kids.set(r.to_id, [...(kids.get(r.to_id) ?? []), r.from_id]);
+  const inside = new Set<string>([hub]);
+  for (const queue = [hub]; queue.length; ) for (const kid of kids.get(queue.pop()!) ?? []) if (!inside.has(kid)) (inside.add(kid), queue.push(kid));
+  return inside;
+}
+
 /** Today as a date in a zone. */
 const dayIn = (at: number, zone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
 
@@ -41,12 +53,8 @@ export function thisWeek(zone: string, now = Date.now()): TimeAxis {
  * Whether anything inside an item has a place in time near today: a date of its own (when or bound), or a session
  * at work on it now. Inside is down the links that say what is inside what (`by`).
  */
-export function dated(l: Archipelago, hub: string, by: string, entities: Row[], relations: { type: string; from_id: string; to_id: string }[], zone: string): boolean {
-  const root = (type: string) => l.registry.relations.get(type)?.root ?? type;
-  const kids = new Map<string, string[]>();
-  for (const r of relations) if (root(r.type) === by) kids.set(r.to_id, [...(kids.get(r.to_id) ?? []), r.from_id]);
-  const inside = new Set<string>();
-  for (const queue = [hub]; queue.length; ) for (const kid of kids.get(queue.pop()!) ?? []) if (!inside.has(kid)) (inside.add(kid), queue.push(kid));
+export function dated(l: Archipelago, hub: string, by: string, entities: Row[], relations: Link[], zone: string): boolean {
+  const inside = insideOf(l, hub, by, relations);
   if (relations.some((r) => r.type === 'sys.works_on' && (inside.has(r.to_id) || r.to_id === hub))) return true;
   const axis = { from: dayIn(Date.now() - NEAR, zone), to: dayIn(Date.now() + NEAR, zone) };
   return entities.some((e) => inside.has(e.id) && spansOf(l, e, axis, zone).length > 0);
