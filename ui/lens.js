@@ -69,6 +69,11 @@ export function storyPart(data) {
 // time axis. Any other look is a style with code of its own, written for the
 // project by its people or agents.
 export const LENS_STYLE = { shape: 'list', lit: 'all' };
+/** The views every item may have beside its own, by the id the server gives each, with what each shows. */
+const BUILT_IN = { holding: 'Everything it waits on, step by step, and nothing else', when: 'When what is in it happens, by day, each person a lane' };
+/** A date some days on. */
+const dayAfter = (date, n) => new Date(Date.parse(`${date.slice(0, 10)}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const shortDay = (date) => new Date(`${date.slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 /** The fields a lens may carry in an address, and which of them are lists. */
 export const LENS_FIELDS = { from: false, story: false, by: false, far: false, lanes: false, order: false, measure: false, kinds: true, over: true, fold: true };
 
@@ -138,22 +143,34 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
     const finished = !answer.lens.fold.includes('closed');
     // The picture is the one the item opens on, as its owner or their agent made it: no other views offered beside it, and
     // nothing to change on it but what its lens offers. Its rule in words is the bar's tooltip.
-    // What holds the item, beside the view of its own it would open on: offered while some of what it waits on is
-    // still open, and what an item with no view of its own opens on (with nothing beside it to switch to).
-    const holding = answer.view === 'holding';
-    if (!holding) place.home = views.find((view) => view.id === answer.view);
+    // Beside the view of its own it would open on (or what is in it, when it has none): the views every item may have,
+    // what holds it (while some of what it waits on is open) and when what is in it happens (while any of it is dated).
+    const builtIn = views.filter((view) => view.id in BUILT_IN);
+    const current = answer.view in BUILT_IN ? answer.view : null;
+    if (!current) place.home = views.find((view) => view.id === answer.view) ?? null;
     const home = place.home;
+    const time = answer.lens.time;
+    const days = time && Math.round((Date.parse(time.to) - Date.parse(time.from)) / 86_400_000) + 1;
+    const shift = (n) => again({ time: { from: dayAfter(time.from, n * days), to: dayAfter(time.to, n * days) } });
     const parts = [
       // Its shortcuts: views that start somewhere else.
       views.filter((view) => view.to).map((view) => h('a', { class: 'chip lens-pin', href: `#/e/${view.to.id}`, title: `Goes to ${view.to.title}` }, view.title)),
-      home && views.some((view) => view.id === 'holding') &&
+      lens.from && builtIn.length > 0 &&
         h(
           'span',
           { class: 'switch', title: 'What this picture shows' },
-          h('button', { class: holding ? '' : 'on', onclick: again({ lens: home.id }) }, home.title),
-          h('button', { class: holding ? 'on' : '', title: 'Everything it waits on, step by step, and nothing else', onclick: again({ lens: 'holding' }) }, 'What holds it'),
+          h('button', { class: current ? '' : 'on', onclick: again({ lens: home?.id ?? 'in', time: undefined }) }, home?.title ?? 'What is in it'),
+          builtIn.map((view) => h('button', { class: current === view.id ? 'on' : '', title: BUILT_IN[view.id], onclick: again({ lens: view.id, time: undefined }) }, view.title)),
         ),
       h('span', { class: 'grow' }),
+      answer.controls.includes('time') && time &&
+        h(
+          'span',
+          { class: 'switch', title: 'Which days are drawn' },
+          h('button', { title: 'Earlier', onclick: shift(-1) }, '‹'),
+          h('button', { class: 'on', title: `${time.from} to ${time.to}` }, `${shortDay(time.from)} – ${shortDay(time.to)}`),
+          h('button', { title: 'Later', onclick: shift(1) }, '›'),
+        ),
       answer.controls.includes('far') &&
         h(
           'span',

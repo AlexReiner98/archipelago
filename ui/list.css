@@ -1,0 +1,39 @@
+/* The list: a table of one-line rows at the width it is given. The name takes what is left; each mark has a column of
+   its own, the same width on every row, so marks line up down the page. A row never wraps: what does not fit is cut. */
+.ll-table { background: var(--ln-sea); padding: 6px 0 10px; font-size: var(--ln-text-size); color: var(--ln-text); }
+.ll-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) repeat(var(--ll-columns, 3), auto); align-items: center; column-gap: 12px;
+  min-height: 30px; padding: 0 14px 0 calc(14px + var(--ll-depth, 0) * 22px); border-bottom: 1px solid var(--ln-line);
+  color: inherit; text-decoration: none; white-space: nowrap; min-width: 0;
+}
+a.ll-row:hover, .ll-row.here { background: var(--ln-land); }
+.ll-name { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+.ll-title { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; color: inherit; text-decoration: none; }
+.ll-row.here .ll-title { font-weight: 600; }
+.ll-said { flex: 0 10 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--accent); font-size: 12px; }
+.ll-dot { flex: none; width: 8px; height: 8px; margin: 0 4px 0 6px; border-radius: 50%; border: 1.5px solid var(--ln-muted); box-sizing: border-box; }
+.ll-row.blocked .ll-dot { background: var(--ln-blocked); border-color: var(--ln-blocked); }
+.ll-row.closed .ll-dot { background: var(--ln-done); border-color: var(--ln-done); }
+.ll-row.closed .ll-title { color: var(--ln-muted); }
+.ll-row.dim { opacity: 0.32; }
+/* A group: what holds others, its name bold, its counts at the end of its name. */
+.ll-group { background: var(--ln-land); min-height: 34px; }
+.ll-group .ll-title { font-weight: 600; }
+a.ll-title:hover { text-decoration: underline; }
+.ll-fold { flex: none; border: 0; background: none; padding: 0; width: 18px; height: 18px; color: var(--ln-muted); font-size: 12px; line-height: 1; cursor: pointer; }
+.ll-lane .ll-title { font-weight: 400; color: var(--ln-muted); padding-left: 26px; }
+.ll-counts { display: flex; gap: 4px; flex: none; margin-left: auto; padding-left: 8px; }
+.ll-n { min-width: 18px; padding: 1px 6px; border-radius: 999px; font-size: 11px; text-align: center; color: var(--ln-muted); background: var(--ln-sea); }
+.ll-n.blocked { background: var(--ln-blocked); color: #fff; }
+.ll-n.you { background: var(--ln-you); color: #fff; }
+/* The columns: each as wide as its widest, never more than a few words. */
+.ll-col { display: flex; align-items: center; justify-content: flex-end; min-width: 0; max-width: 18ch; overflow: hidden; font-size: 12px; color: var(--ln-muted); }
+.ll-status { width: 11ch; }
+.ll-waits { width: 14ch; }
+.ll-sessions { width: 10px; }
+.ll-who, .ll-blocked { overflow: hidden; text-overflow: ellipsis; padding: 1px 7px; border-radius: 999px; font-size: 11px; }
+.ll-who { background: var(--ln-inner); color: var(--ln-text); }
+.ll-who.you { background: var(--ln-you); color: #fff; }
+.ll-blocked { background: var(--ln-blocked); color: #fff; }
+.ll-at { width: 8px; height: 8px; border-radius: 50%; background: var(--ln-session); }
+@media (max-width: 640px) { .ll-type, .ll-waits { display: none; } .ll-row { column-gap: 8px; } }

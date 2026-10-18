@@ -14,6 +14,7 @@ const LOOK = {
   't-hour': 'fill: var(--muted); font-size: 10px',
   't-label': 'fill: #fff; font-size: 11px; pointer-events: none',
   't-row': 'fill: var(--text); font-size: 12px',
+  't-lane': 'stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3',
 };
 
 const svg = (tag, attrs = {}, ...kids) => {
@@ -49,35 +50,65 @@ const group = (item) => `t-block group-${KINDS.includes(item.kind) ? item.kind :
 const open = (item) => () => (location.hash = `#/e/${item.id}`);
 const said = (b) => `${b.item.title}\n${b.end - b.start >= DAY ? fmtDay(b.start) : `${fmtDay(b.start)}, ${fmtTime(b.start)}`}${b.end > b.start ? ` to ${b.end - b.start >= DAY ? fmtDay(b.end - 1) : fmtTime(b.end)}` : ''}${b.by === 'bound' ? ' (due)' : ''}`;
 
-/** A column for each day, hours running down. Blocks that overlap in a day sit side by side. */
+/** The lanes of an answer, each with a name: lanes by person come named; any other lane is its value. */
+const lanesOf = (answer) => (answer.lanes ?? []).map((lane) => (lane && typeof lane === 'object' ? { key: lane.key, title: lane.title } : { key: lane, title: String(lane) }));
+/** The lane the sessions on the work are filed in: drawn narrow, as many columns as were at work at once. */
+const SESSIONS = 'sessions';
+
+/**
+ * A column for each day, hours running down; within a day, a column for each lane (each person wide, the sessions
+ * narrow), so what you did and what the agents did sit side by side. Blocks that overlap in a lane sit side by side
+ * in it. The hours shown are those things fall in, the working day at least, unless the style says (hours).
+ */
 function calendar(host, answer, style) {
   const from = dayOf(answer.lens.time.from);
   const days = Math.max(1, Math.round((dayOf(answer.lens.time.to) - from) / DAY) + 1);
-  const [h0, h1] = Array.isArray(style.hours) && style.hours.length === 2 ? style.hours.map(Number) : [0, 24];
+  const all = blocks(answer);
+  // A whole day or more (a due date, a week away) is not hours: it goes in a strip along the top, as calendars do.
+  const whole = (b) => b.end - b.start >= DAY || b.by === 'bound';
+  const timed = all.filter((b) => !whole(b));
+  const hourOf = (t) => (t - dayOf(t)) / 3_600_000;
+  const [h0, h1] = Array.isArray(style.hours) && style.hours.length === 2
+    ? style.hours.map(Number)
+    : [Math.min(8, ...timed.map((b) => Math.floor(hourOf(b.start)))), Math.max(18, ...timed.map((b) => (dayOf(b.end) > dayOf(b.start) ? 24 : Math.ceil(hourOf(b.end)))))];
+  const lanes = lanesOf(answer);
+  const laneOf = (b) => Math.max(0, lanes.findIndex((l) => l.key === (b.item.lane ?? null)));
+  const weight = (l) => (l.key === SESSIONS ? 1 : 2);
+  const total = lanes.reduce((sum, l) => sum + weight(l), 0) || 1;
   const width = Math.max(host.clientWidth || 800, 320);
   const gutter = 38;
   const hourPx = 34;
   const colW = (width - gutter) / days;
+  // Each lane's left edge and width within a day.
+  const laneX = [];
+  lanes.reduce((x, l) => (laneX.push([x, (weight(l) / total) * colW]), x + (weight(l) / total) * colW), 0);
+  const named = lanes.length > 1 && Math.min(...laneX.map(([, w]) => w)) >= 28;
   const chip = 18;
-  const all = blocks(answer);
-  // A whole day or more (a due date, a week away) is not hours: it goes in a strip along the top, as calendars do.
-  const whole = (b) => b.end - b.start >= DAY || b.by === 'bound';
   const daysOf = (b) => [...Array(days).keys()].filter((d) => b.end > from + d * DAY && b.start < from + (d + 1) * DAY);
   const tops = all.filter(whole);
   const strip = Math.max(0, ...[...Array(days).keys()].map((d) => tops.filter((b) => daysOf(b).includes(d)).length));
-  const head = 22 + strip * chip;
+  const top = named ? 36 : 22;
+  const head = top + strip * chip;
   const height = head + (h1 - h0) * hourPx;
   const out = svg('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` });
   for (let d = 0; d < days; d++) {
     const x = gutter + d * colW;
     out.append(svg('line', { class: 't-rule', x1: x, x2: x, y1: 0, y2: height }), svg('text', { class: 't-head', x: x + 4, y: 15 }, cut(fmtDay(from + d * DAY), colW - 6)));
+    // The lanes, named under the day where there is room, and parted by a fainter rule.
+    lanes.forEach((l, i) => {
+      const [lx, lw] = laneX[i];
+      if (i > 0) out.append(svg('line', { class: 't-lane', x1: x + lx, x2: x + lx, y1: top, y2: height }));
+      if (named) out.append(svg('text', { class: 't-hour', x: x + lx + 3, y: 30 }, tip(l.title), cut(l.title, lw - 6)));
+    });
   }
   for (let hr = h0; hr <= h1; hr++) {
     const y = head + (hr - h0) * hourPx;
     out.append(svg('line', { class: 't-rule', x1: gutter, x2: width, y1: y, y2: y }), hr < h1 && svg('text', { class: 't-hour', x: 2, y: y + 11 }, `${String(hr).padStart(2, '0')}:00`));
   }
   const place = (b, x, y, w, hgt) => {
-    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(said(b)), svg('rect', { class: 'dot', x, y, width: Math.max(w, 3), height: hgt, rx: 3 }), svg('text', { class: 't-label', x: x + 4, y: y + 12 }, cut(b.item.title, w - 8))));
+    const title = lanes.length > 1 ? `${said(b)}
+${lanes[laneOf(b)].title}` : said(b);
+    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(title), svg('rect', { class: 'dot', x, y, width: Math.max(w, 3), height: hgt, rx: 3 }), svg('text', { class: 't-label', x: x + 4, y: y + 12 }, cut(b.item.title, w - 8))));
     out.lastChild.addEventListener('click', open(b.item));
   };
   // The strip: each whole-day thing a bar across the days it covers, on the first row free on all of them.
@@ -88,24 +119,27 @@ function calendar(host, answer, style) {
     while (covers.some((d) => rows[row]?.has(d))) row++;
     rows[row] ??= new Set();
     for (const d of covers) rows[row].add(d);
-    place(b, gutter + covers[0] * colW + 2, 21 + row * chip, covers.length * colW - 4, chip - 3);
+    place(b, gutter + covers[0] * colW + 2, top - 1 + row * chip, covers.length * colW - 4, chip - 3);
   }
   for (let d = 0; d < days; d++) {
     const dayStart = from + d * DAY;
-    // What falls on this day within the hours shown; things at the same time sit side by side.
-    const today = all
-      .filter((b) => !whole(b))
+    // What falls on this day within the hours shown, lane by lane; things at the same time in a lane sit side by side.
+    const today = timed
       .map((b) => ({ ...b, s: Math.max(b.start, dayStart + h0 * 3_600_000), e: Math.min(b.end, dayStart + h1 * 3_600_000) }))
       .filter((b) => b.end > dayStart && b.start < dayStart + DAY && (b.e > b.s || b.start === b.end))
       .sort((a, b) => a.s - b.s);
-    const cols = [];
-    for (const b of today) {
-      const col = cols.findIndex((end) => end <= b.s);
-      b.col = col < 0 ? cols.push(b.e) - 1 : col;
-      cols[b.col] = Math.max(cols[b.col], b.e);
+    for (let i = 0; i < Math.max(lanes.length, 1); i++) {
+      const mine = lanes.length ? today.filter((b) => laneOf(b) === i) : today;
+      const [lx, lw] = lanes.length ? laneX[i] : [0, colW];
+      const cols = [];
+      for (const b of mine) {
+        const col = cols.findIndex((end) => end <= b.s);
+        b.col = col < 0 ? cols.push(b.e) - 1 : col;
+        cols[b.col] = Math.max(cols[b.col], b.e);
+      }
+      const w = (lw - 4) / Math.max(cols.length, 1);
+      for (const b of mine) place(b, gutter + d * colW + lx + 2 + b.col * w, head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, w - 2, Math.max(((b.e - b.s) / 3_600_000) * hourPx, 16));
     }
-    const w = (colW - 4) / Math.max(cols.length, 1);
-    for (const b of today) place(b, gutter + d * colW + 2 + b.col * w, head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, w - 2, Math.max(((b.e - b.s) / 3_600_000) * hourPx, 16));
   }
   host.replaceChildren(out);
 }
@@ -119,8 +153,8 @@ function bars(host, answer) {
   const rowH = 24;
   const head = 22;
   const all = blocks(answer);
-  const rows = answer.lanes?.length ? answer.lanes.map((lane) => ({ key: lane.key ?? lane, title: lane.title ?? lane.key ?? String(lane) })) : answer.items.filter((i) => i.time?.length).map((i) => ({ key: i.id, title: i.title }));
-  const rowOf = (b) => rows.findIndex((r) => r.key === (answer.lanes?.length ? (b.item.lane?.key ?? b.item.lane) : b.item.id));
+  const rows = answer.lanes?.length ? lanesOf(answer) : answer.items.filter((i) => i.time?.length).map((i) => ({ key: i.id, title: i.title }));
+  const rowOf = (b) => rows.findIndex((r) => r.key === (answer.lanes?.length ? (b.item.lane ?? null) : b.item.id));
   const height = head + rows.length * rowH + 4;
   const x = (t) => label + ((Math.min(Math.max(t, from), to) - from) / (to - from)) * (width - label - 4);
   const out = svg('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` });

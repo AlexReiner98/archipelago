@@ -1,16 +1,23 @@
-// The list: the drawing for a picture that is not a process. Each thing is one line; a thing that holds others is a
-// titled box that folds, with what is inside it in it. Around one item, its neighbours are gathered under the link
-// that ties each to it.
+// The list: the drawing for a picture that is not a process. A table at the width it is given, one line a row: a
+// thing's name, then its marks in columns that line up down the page (its status, who it waits on, whether it is
+// blocked, whether a session is at it). A thing that holds others is a group header that folds, with its counts at
+// the end of its line. Around one item, its neighbours are grouped under the link that ties each to it.
 
 import { h } from './base.js';
 import { BLOCKING, isOf } from './graph.js';
 import { lensTree, litCount, litSwitch } from './lens-base.js';
-import { relations, typeTitle } from './words.js';
+import { isClosed, relations, titles, typeTitle } from './words.js';
 
-/** The list: a thing is a titled box, what is inside it is in it, and a thing with nothing inside is one line. Reads only what a lens answers with. */
+/** The columns a row may have, in the order they are drawn; a style's `show` picks among them. */
+const COLUMNS = ['type', 'status', 'waits', 'sessions'];
+const SHOWN = ['status', 'waits', 'sessions'];
+
+/** The list: a table of one-line rows, grouped by what holds what. Reads only what a lens answers with. */
 export function drawList(host, answer, style, keep, kept) {
   const { me, byId, root } = lensTree(answer);
-  const show = new Set(Array.isArray(style.show) ? style.show : ['you', 'blocked', 'count']);
+  // `show` names columns; the older words for marks (you, blocked, count) mean the waits column.
+  const asked = Array.isArray(style.show) ? style.show.map((s) => (['you', 'blocked'].includes(s) ? 'waits' : s)) : SHOWN;
+  const columns = COLUMNS.filter((c) => asked.includes(c));
   const levels = Number.isFinite(style.open) ? style.open : 1;
   const { opened } = kept;
   // Around one item, what it sits in is open down to it, and how far things open is counted from it.
@@ -18,45 +25,72 @@ export function drawList(host, answer, style, keep, kept) {
   const above = new Set();
   for (let n = here?.up; n && n !== root; n = n.up) above.add(n.id);
   const base = here?.depth ?? 0;
-  // What each thing waits on, by name, for its tooltip.
+  // What each thing waits on, by name: a person by their name, "you" for the one looking.
+  const named = (id) => (id === me ? 'you' : (byId.get(id)?.title ?? titles.get(id) ?? 'someone'));
   const waits = new Map();
   for (const link of answer.links) if (isOf(BLOCKING, link.kind) && byId.has(link.to)) waits.set(link.from, [...(waits.get(link.from) ?? []), byId.get(link.to).title]);
-  // What a session said ties a thing to another is written on its line, after its name: boxes draw no lines.
+  // What a session said ties a thing to another is written after its name: the list draws no lines.
   const ties = new Map();
   for (const link of answer.links) if (link.says && byId.has(link.to)) ties.set(link.from, [...(ties.get(link.from) ?? []), `${link.says} → ${byId.get(link.to).title}`]);
-  const tied = (n) => ties.has(n.id) && h('span', { class: 'lb-said', title: ties.get(n.id).join('\n') }, ties.get(n.id).join(' · '));
-  const body = h('div', { class: 'lb-top' });
-  const count = (n) => litCount(n, style);
-  const hint = (n) => `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.all > 1 ? `\n${n.work} open, ${n.blk} blocked${me ? `, ${n.you} need you` : ''}` : n.state.blocked ? ', blocked' : ''}${waits.has(n.id) ? `\nWaits on: ${waits.get(n.id).join('; ')}` : ''}${n.at ? '\nA session is at work here' : ''}`;
-  const mark = (cls, text, title) => h('span', { class: `lb-mark lb-${cls}`, title }, text);
-  const marks = (n) => [
-    show.has('you') && n.you > 0 && mark('you', n.all > 1 ? String(n.you) : '', n.all > 1 ? `${n.you} need you` : 'Waits on you'),
-    show.has('blocked') && n.blk > 0 && mark('blocked', n.all > 1 ? String(n.blk) : '', n.all > 1 ? `${n.blk} blocked` : 'Blocked'),
-    show.has('sessions') && n.at > 0 && mark('at', '', 'A session is at work here'),
-    show.has('count') && n.all > 1 && mark('count', String(n.work), `${n.work} open`),
-    show.has('type') && mark('word', typeTitle(n.type), 'What kind of thing it is'),
-    show.has('status') && mark('word', n.status, 'Its status'),
-  ];
-  const thing = (n) => {
-    const state = `${count(n) ? '' : ' dim'}${n.open ? '' : ' closed'}${n.state.blocked ? ' blocked' : ''}${me && n.state.waits_on.includes(me) ? ' you' : ''}${n === here || n.id === style.here ? ' here' : ''}`;
-    if (n.all === 1) return h('a', { class: `lb-leaf${state}`, href: `#/e/${n.id}`, title: hint(n) }, h('span', { class: 'lb-dot' }), h('span', { class: 'lb-name' }, n.title), tied(n), ...marks(n).slice(2));
-    const open = n.kids.length > 0 && (opened.get(n.id) ?? (above.has(n.id) || n.depth - base < levels));
-    const leaves = n.kids.filter((kid) => kid.all === 1);
-    const boxes = n.kids.filter((kid) => kid.all > 1);
-    return h(
-      'section',
-      { class: `lb-box${state}${open ? ' open' : ''}${n.depth % 2 ? ' odd' : ''}` },
-      h(
-        'header',
-        { title: hint(n) },
-        n.kids.length > 0 && h('button', { class: 'lb-fold', title: open ? 'Close it' : 'Open it', onclick: () => (opened.set(n.id, !open), draw()) }, open ? '▾' : '▸'),
-        h('a', { class: 'lb-name', href: `#/e/${n.id}` }, n.title),
-        tied(n),
-        ...marks(n),
-      ),
-      open && leaves.length > 0 && h('div', { class: 'lb-leaves' }, leaves.map(thing)),
-      open && boxes.length > 0 && h('div', { class: 'lb-kids' }, boxes.map(thing)),
+  const tied = (n) => ties.has(n.id) && h('span', { class: 'll-said', title: ties.get(n.id).join('\n') }, ties.get(n.id).join(' · '));
+  const hint = (n) => `${n.title}\n${typeTitle(n.type)}, ${n.status}${n.all > 1 ? `\n${n.work} open, ${n.blk} blocked${me ? `, ${n.you} need you` : ''}` : ''}${waits.has(n.id) ? `\nWaits on: ${waits.get(n.id).join('; ')}` : ''}${n.at ? '\nA session is at work here' : ''}`;
+  const cell = (cls, ...kids) => h('span', { class: `ll-col ll-${cls}` }, ...kids);
+  const cells = (n) =>
+    columns.map((c) =>
+      c === 'type'
+        ? cell('type', typeTitle(n.type))
+        : c === 'status'
+          ? cell('status', h('span', { class: `pill${isClosed(n.type, n.status) ? ' closed' : ''}` }, n.status))
+          : c === 'waits'
+            ? cell(
+                'waits',
+                n.state.waits_on.length > 0 && h('span', { class: `ll-who${me && n.state.waits_on.includes(me) ? ' you' : ''}`, title: `Waits on ${n.state.waits_on.map(named).join(', ')}` }, n.state.waits_on.map(named).join(', ')),
+                n.state.blocked && !n.state.waits_on.length && h('span', { class: 'll-blocked', title: waits.has(n.id) ? `Waits on: ${waits.get(n.id).join('; ')}` : 'Blocked' }, 'blocked'),
+              )
+            : cell('sessions', n.state.sessions > 0 && h('span', { class: 'll-at', title: 'A session is at work here' })),
     );
+  // A group's line says what is in it: how many are open, blocked, and waiting on the one looking.
+  const counts = (n) =>
+    h(
+      'span',
+      { class: 'll-counts' },
+      me && n.you > 0 && h('span', { class: 'll-n you', title: `${n.you} need you` }, String(n.you)),
+      n.blk > 0 && h('span', { class: 'll-n blocked', title: `${n.blk} blocked` }, String(n.blk)),
+      h('span', { class: 'll-n', title: `${n.work} open` }, String(n.work)),
+    );
+  const state = (n) => `${litCount(n, style) ? '' : ' dim'}${n.open ? '' : ' closed'}${n === here || n.id === style.here ? ' here' : ''}`;
+  const indent = (depth) => `--ll-depth: ${depth}`;
+  const rows = [];
+  const add = (n, depth) => {
+    if (n.all === 1 || !n.kids.length) {
+      rows.push(
+        h(
+          'a',
+          { class: `ll-row${state(n)}${n.state.blocked ? ' blocked' : ''}`, href: `#/e/${n.id}`, title: hint(n), style: indent(depth) },
+          h('span', { class: 'll-name' }, h('span', { class: 'll-dot' }), h('span', { class: 'll-title' }, n.title), tied(n)),
+          ...cells(n),
+        ),
+      );
+      return;
+    }
+    const open = opened.get(n.id) ?? (above.has(n.id) || n.depth - base < levels);
+    rows.push(
+      h(
+        'div',
+        { class: `ll-row ll-group${state(n)}${open ? ' open' : ''}`, title: hint(n), style: indent(depth) },
+        h(
+          'span',
+          { class: 'll-name' },
+          h('button', { class: 'll-fold', title: open ? 'Close it' : 'Open it', onclick: () => (opened.set(n.id, !open), draw()) }, open ? '▾' : '▸'),
+          h('a', { class: 'll-title', href: `#/e/${n.id}` }, n.title),
+          tied(n),
+          counts(n),
+        ),
+        ...cells(n),
+      ),
+    );
+    // Within a group, its own rows first, then the groups inside it.
+    if (open) for (const kid of [...n.kids.filter((k) => k.all === 1), ...n.kids.filter((k) => k.all > 1)]) add(kid, depth + 1);
   };
   // Around one item its neighbours are gathered under the link that ties each to it, said as that item would say it.
   const start = answer.lens.from;
@@ -65,15 +99,21 @@ export function drawList(host, answer, style, keep, kept) {
     const phrase = lane == null ? 'near it' : ((inward ? relations.get(kind)?.inverse : relations.get(kind)?.title) ?? kind);
     return phrase[0].toUpperCase() + phrase.slice(1);
   };
+  const body = h('div', { class: 'll-table' });
   const draw = () => {
+    rows.length = 0;
     const loose = start && answer.lens.lanes === 'link' ? root.kids.filter((n) => n.all === 1 && n.id !== start) : [];
     const lanes = new Map();
     for (const n of loose) lanes.set(n.lane ?? null, [...(lanes.get(n.lane ?? null) ?? []), n]);
-    body.replaceChildren(
-      // The item the page is about is not drawn again as a line of its own.
-      ...root.kids.filter((n) => !loose.includes(n) && !(n.id === start && n.all === 1)).map(thing),
-      ...[...lanes].map(([lane, things]) => h('section', { class: 'lb-box lane' }, h('header', {}, h('span', { class: 'lb-name' }, said(lane)), h('span', { class: 'lb-mark lb-count' }, String(things.length))), h('div', { class: 'lb-leaves' }, things.map(thing)))),
-    );
+    // The item the page is about is not drawn again as a row of its own.
+    const top = root.kids.filter((n) => !loose.includes(n) && !(n.id === start && n.all === 1));
+    for (const n of [...top.filter((k) => k.all === 1), ...top.filter((k) => k.all > 1)]) add(n, 0);
+    for (const [lane, things] of lanes) {
+      rows.push(h('div', { class: 'll-row ll-group ll-lane open', style: indent(0) }, h('span', { class: 'll-name' }, h('span', { class: 'll-title' }, said(lane)), h('span', { class: 'll-counts' }, h('span', { class: 'll-n' }, String(things.length))))));
+      for (const n of things) add(n, 1);
+    }
+    body.style.setProperty('--ll-columns', String(columns.length));
+    body.replaceChildren(...rows);
   };
   const lit = litSwitch(me, style, keep, draw);
   host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), body].filter(Boolean));

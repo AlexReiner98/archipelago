@@ -247,43 +247,6 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .lens-pin { flex: none; text-decoration: none; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lens-view .fold-bar { padding: 10px 14px; flex-wrap: nowrap; }
 .lens-view .switch { flex: none; }
-/* The list: a thing is a titled box with what is inside it in it; a thing with nothing inside is one line. */
-.lb-top { background: var(--ln-sea); padding: calc(var(--ln-gap-size) * 1.5); columns: var(--ln-column-size) auto; column-gap: var(--ln-gap-size); font-size: var(--ln-text-size); color: var(--ln-text); }
-.lb-box { break-inside: avoid; margin: 0 0 var(--ln-gap-size); background: var(--ln-land); border: 1px solid var(--ln-line); border-radius: var(--ln-radius-size); overflow: hidden; }
-.lb-box.odd { background: var(--ln-inner); }
-.lb-box > header { display: flex; align-items: center; gap: 6px; padding: 6px 10px 6px 6px; white-space: nowrap; min-width: 0; }
-.lb-box > header .lb-name { font-weight: 600; }
-.lb-box.open > header { border-bottom: 1px solid var(--ln-line); }
-.lb-top .lb-fold { border: 0; background: none; padding: 0; width: 20px; height: 20px; color: var(--ln-muted); flex: none; font-size: 13px; line-height: 1; }
-.lb-box > header > .lb-name:first-child { margin-left: 26px; }
-.lb-top a.lb-name, .lb-top a.lb-leaf { color: inherit; text-decoration: none; }
-.lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
-.lb-top a.lb-name:hover { text-decoration: underline; }
-.lb-mark { flex: none; font-size: calc(var(--ln-text-size) - 2px); line-height: 1; }
-.lb-mark.lb-you, .lb-mark.lb-blocked { color: #fff; border-radius: 999px; padding: 3px 7px; font-weight: 600; min-width: 8px; text-align: center; }
-.lb-mark.lb-you { background: var(--ln-you); }
-.lb-mark.lb-blocked { background: var(--ln-blocked); }
-.lb-mark.lb-at { width: 8px; height: 8px; border-radius: 50%; background: var(--ln-session); }
-.lb-mark.lb-count, .lb-mark.lb-word { color: var(--ln-muted); }
-.lb-kids { padding: var(--ln-gap-size) var(--ln-gap-size) 0; }
-.lb-box .lb-box { columns: auto; }
-.lb-leaves { padding: 4px 0; }
-.lb-leaf { display: flex; align-items: center; gap: 8px; padding: 3px 10px 3px 12px; color: inherit; text-decoration: none; white-space: nowrap; min-width: 0; }
-.lb-leaf:hover { background: var(--ln-sea); }
-.lb-leaf .lb-name { font-weight: 400; }
-/* A tie a session drew, after the name: it gives way first when the line is short. */
-.lb-said { flex: 0 10 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); font-size: 12px; }
-.lb-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--ln-muted); box-sizing: border-box; }
-.lb-leaf.blocked .lb-dot { background: var(--ln-blocked); border-color: var(--ln-blocked); }
-.lb-leaf.you .lb-dot { background: var(--ln-you); border-color: var(--ln-you); }
-.lb-leaf.you.blocked .lb-dot { border-color: var(--ln-blocked); }
-.lb-leaf.closed .lb-dot { background: var(--ln-done); border-color: var(--ln-done); }
-.lb-leaf.closed .lb-name { color: var(--ln-muted); }
-.lb-box.dim > header, .lb-leaf.dim { opacity: 0.28; }
-.lb-leaf.here { background: var(--ln-sea); }
-.lb-leaf.here .lb-name { font-weight: 600; }
-.lb-box.lane > header { padding-left: 12px; border-bottom: 1px solid var(--ln-line); }
-.lb-box.lane > header .lb-name { font-weight: 400; color: var(--ln-muted); }
 .lens-frame { display: block; width: 100%; height: min(calc(100vh - 190px), 820px); min-height: 380px; border: 0; background: var(--ln-sea); }
 .lens-view .lens-error { padding: 8px 14px; color: var(--bad); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* The one graph. */

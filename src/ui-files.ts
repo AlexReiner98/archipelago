@@ -10,6 +10,7 @@ export const UI_FILES: Record<string, string> = {
   '/style.css': 'style.css',
   '/flow.css': 'flow.css',
   '/grid.css': 'grid.css',
+  '/list.css': 'list.css',
   '/public.js': 'public.js',
   '/public.css': 'public.css',
   '/doc.js': 'doc.js',
