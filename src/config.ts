@@ -7,6 +7,8 @@ import { DEFAULT_AGENT_POLICY, type Policy } from './pelago.ts';
 export interface Config {
   port: number;
   dataDir: string;
+  /** A Postgres server holding the databases (PELAGO_DATABASE_URL); unset, each is a folder under dataDir. */
+  databaseUrl?: string;
   packsDir: string;
   /** Pack ids to enable. Omit to enable every pack in packsDir. */
   packs?: string[];
@@ -100,6 +102,8 @@ export function loadConfig(): Config {
   if (!local && dev) throw new Error('Dev mode does not listen beyond this machine.');
   const named = env('PUBLIC_HOST')?.split(',') ?? fromFile.publicHosts ?? [];
   const dataDir = resolve(ROOT, env('DATA') ?? fromFile.dataDir ?? 'data');
+  // A Postgres server for the databases, in place of folders: it carries a password, so from the environment only.
+  const databaseUrl = env('DATABASE_URL');
   // The key is a secret, so it comes from the environment only, never the config file.
   const [url, key] = [env('BACKUP_UPLOAD_URL'), env('BACKUP_UPLOAD_KEY')];
   const sendTo = url && key ? { url, key } : undefined;
@@ -120,6 +124,7 @@ export function loadConfig(): Config {
     // Hosting platforms say which port to use through PORT.
     port: Number(env('PORT') ?? process.env.PORT ?? fromFile.port ?? 3100),
     dataDir,
+    databaseUrl,
     backup,
     packsDir: resolve(ROOT, fromFile.packsDir ?? 'packs'),
   };

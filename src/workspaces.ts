@@ -10,6 +10,7 @@ import { Automations } from './automations.ts';
 import { restore, type Dump } from './backup.ts';
 import { startSchedules, stopSchedules } from './hooks.ts';
 import { openDb } from './db.ts';
+import { databaseFor, dropDatabaseFor } from './pg.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { Registry } from './packs.ts';
 import { packsOff } from './packstate.ts';
@@ -28,6 +29,11 @@ export interface Workspace {
 interface WorkspacesConfig {
   /** The default workspace's database folder. Null keeps every database in memory (tests). */
   dataDir: string | null;
+  /**
+   * A Postgres server holding every workspace's database instead of folders: the default workspace's is the
+   * database this names, another's that name and _<id> (src/pg.ts). Carries a password: from the environment only.
+   */
+  databaseUrl?: string;
   /** Where other workspaces and the operator secret are kept. */
   rootDir: string;
   packsDir: string;
@@ -141,9 +147,10 @@ export class Workspaces {
   }
 
   private async load(id: string, backup?: Dump): Promise<Workspace> {
-    const { dataDir, rootDir, packsDir, packs, policy } = this.config;
+    const { dataDir, databaseUrl, rootDir, packsDir, packs, policy } = this.config;
     const isDefault = id === DEFAULT_WORKSPACE;
-    const dbDir = dataDir === null ? undefined : isDefault ? dataDir : join(rootDir, id, 'db');
+    const onServer = databaseUrl && (isDefault ? databaseUrl : await databaseFor(databaseUrl, id));
+    const dbDir = dataDir === null ? undefined : onServer || (isDefault ? dataDir : join(rootDir, id, 'db'));
     // Types a workspace defines for itself stay with that workspace.
     const localPack = isDefault ? undefined : join(rootDir, id, 'local-pack');
     const db = await openDb(dbDir);
@@ -192,6 +199,7 @@ export class Workspaces {
       this.index.workspaces = this.index.workspaces.filter((w) => w.id !== id);
       this.save();
       rmSync(folder, { recursive: true, force: true });
+      if (this.config.databaseUrl) await dropDatabaseFor(this.config.databaseUrl, id).catch(() => {});
       throw err;
     }
   }

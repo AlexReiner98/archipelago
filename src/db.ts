@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
+import { openPg, scratchPg } from './pg.ts';
 
 /** Anything that can run a query: the database or a transaction on it. */
 export interface Q {
@@ -386,15 +387,23 @@ export interface Db extends Q {
   close(): Promise<void>;
 }
 
-/** Open the database at a folder, or in memory when no folder is given. */
-export async function openDb(dataDir?: string): Promise<PGlite> {
-  if (!dataDir) return inMemory();
-  mkdirSync(dataDir, { recursive: true });
-  return prepared(new PGlite(dataDir, { extensions: { pg_trgm } }));
+/** The database itself, PGlite's or a server's: a Db that can also run several statements at once. */
+export interface Database extends Db {
+  exec(sql: string): Promise<unknown>;
+}
+
+const isServer = (where: string) => /^postgres(ql)?:\/\//.test(where);
+
+/** Open the database at a folder or on a server (a postgres:// address), or in memory when neither is given. */
+export async function openDb(where?: string): Promise<Database> {
+  if (!where) return inMemory();
+  if (isServer(where)) return openPg(where, prepared);
+  mkdirSync(where, { recursive: true });
+  return prepared(new PGlite(where, { extensions: { pg_trgm } }));
 }
 
 // pg_trgm matches near-misses and typos in search; a Postgres server has it too.
-async function prepared(db: PGlite) {
+async function prepared<D extends Database>(db: D) {
   await db.exec(`create extension if not exists pg_trgm`);
   await db.exec(SCHEMA);
   await db.exec(VISIBILITY);
@@ -403,19 +412,20 @@ async function prepared(db: PGlite) {
 
 // Only the tests open databases in memory, hundreds of them. Making one runs initdb and the whole schema (about a
 // second); loading an image of one made once per process takes a fifth of that. Each holds a few hundred MB, so the
-// tests close what each one opened as it ends (test/each.ts).
+// tests close what each one opened as it ends (test/each.ts). With PELAGO_TEST_DATABASE_URL they are databases on
+// that server instead (src/pg.ts).
 
 /** Databases in memory not yet closed. */
-export const openInMemory = new Set<PGlite>();
+export const openInMemory = new Set<Database>();
 let blank: Promise<File | Blob> | undefined;
 
 async function inMemory() {
-  const db = await PGlite.create({ loadDataDir: await (blank ??= blankImage()), extensions: { pg_trgm } });
+  const server = process.env.PELAGO_TEST_DATABASE_URL;
+  const db: Database = server ? await scratchPg(server, SCHEMA + VISIBILITY, prepared) : await PGlite.create({ loadDataDir: await (blank ??= blankImage()), extensions: { pg_trgm } });
   openInMemory.add(db);
   const close = db.close.bind(db);
   db.close = async () => {
-    openInMemory.delete(db);
-    if (!db.closed) await close(); // closed by the test's end, then by its server's
+    if (openInMemory.delete(db)) await close(); // closed by the test's end, then by its server's: once
   };
   return db;
 }

@@ -1,7 +1,7 @@
 // The shape of the code, checked. Files stay small; the kernel names no pack; writes to items and
 // relations go through one path; a pack reaches the kernel only through what it is handed; a pack's
 // code is tested without a database; kernel modules import one way; the UI loads as modules; and
-// there are four dependencies.
+// there are five dependencies.
 //
 // Each rule keeps a list of what already broke it when the rule was made (16 Oct 2026). An entry
 // may only shrink, and goes once the rule is met: when you bring a number down, lower it here.
@@ -178,10 +178,10 @@ test('the UI loads as modules', () => {
   assert.deepEqual(ratchet(classic, CLASSIC_SCRIPTS), [], 'Load it with <script type="module"> and import what it needs.');
 });
 
-// 8. Four dependencies (CLAUDE.md); another only with the owner's agreement.
-test('there are four dependencies', () => {
+// 8. Five dependencies (CLAUDE.md); another only with the owner's agreement. Four again once @anthropic-ai/sdk goes (e_cxtcgtfg).
+test('there are five dependencies', () => {
   const deps = Object.keys(JSON.parse(read('package.json')).dependencies ?? {}).sort();
-  assert.deepEqual(deps, ['@anthropic-ai/sdk', '@electric-sql/pglite', '@modelcontextprotocol/sdk', 'zod']);
+  assert.deepEqual(deps, ['@anthropic-ai/sdk', '@electric-sql/pglite', '@modelcontextprotocol/sdk', 'pg', 'zod']);
 });
 
 // 9. Every module the page loads parses: one that does not leaves the page blank, and most are not run by a test.
