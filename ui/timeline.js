@@ -56,9 +56,10 @@ const lanesOf = (answer) => (answer.lanes ?? []).map((lane) => (lane && typeof l
 const SESSIONS = 'sessions';
 
 /**
- * A column for each day, hours running down; within a day, a column for each lane (each person wide, the sessions
- * narrow), so what you did and what the agents did sit side by side. Blocks that overlap in a lane sit side by side
- * in it. The hours shown are those things fall in, the working day at least, unless the style says (hours).
+ * A column for each day, hours running down; within a day, a column for each lane (each person, and the sessions), so
+ * what you did and what the agents did sit side by side. A lane is as wide as the most things it holds at once that
+ * week, so a busy lane has room and an empty one is a sliver. Blocks that overlap in a lane sit side by side in it.
+ * The hours shown are those things fall in, the working day at least, unless the style says (hours).
  */
 function calendar(host, answer, style) {
   const from = dayOf(answer.lens.time.from);
@@ -73,16 +74,35 @@ function calendar(host, answer, style) {
     : [Math.min(8, ...timed.map((b) => Math.floor(hourOf(b.start)))), Math.max(18, ...timed.map((b) => (dayOf(b.end) > dayOf(b.start) ? 24 : Math.ceil(hourOf(b.end)))))];
   const lanes = lanesOf(answer);
   const laneOf = (b) => Math.max(0, lanes.findIndex((l) => l.key === (b.item.lane ?? null)));
-  const weight = (l) => (l.key === SESSIONS ? 1 : 2);
-  const total = lanes.reduce((sum, l) => sum + weight(l), 0) || 1;
   const width = Math.max(host.clientWidth || 800, 320);
   const gutter = 38;
   const hourPx = 34;
   const colW = (width - gutter) / days;
+  // What falls on each day within the hours shown, lane by lane, packed: things at the same time in a lane sit side by side.
+  const packed = [...Array(days).keys()].map((d) => {
+    const dayStart = from + d * DAY;
+    const today = timed
+      .map((b) => ({ ...b, s: Math.max(b.start, dayStart + h0 * 3_600_000), e: Math.min(b.end, dayStart + h1 * 3_600_000) }))
+      .filter((b) => b.end > dayStart && b.start < dayStart + DAY && (b.e > b.s || b.start === b.end))
+      .sort((a, b) => a.s - b.s);
+    return [...Array(Math.max(lanes.length, 1)).keys()].map((i) => {
+      const mine = lanes.length ? today.filter((b) => laneOf(b) === i) : today;
+      const cols = [];
+      for (const b of mine) {
+        const col = cols.findIndex((end) => end <= b.s);
+        b.col = col < 0 ? cols.push(b.e) - 1 : col;
+        cols[b.col] = Math.max(cols[b.col], b.e);
+      }
+      return { mine, cols: cols.length };
+    });
+  });
+  // Each lane as wide as the most it holds at once that week; one with nothing in hours a sliver.
+  const weight = lanes.map((_, i) => Math.max(...packed.map((day) => day[i].cols)) || 0.25);
+  const total = weight.reduce((sum, w) => sum + w, 0) || 1;
   // Each lane's left edge and width within a day.
   const laneX = [];
-  lanes.reduce((x, l) => (laneX.push([x, (weight(l) / total) * colW]), x + (weight(l) / total) * colW), 0);
-  const named = lanes.length > 1 && Math.min(...laneX.map(([, w]) => w)) >= 28;
+  lanes.reduce((x, _, i) => (laneX.push([x, (weight[i] / total) * colW]), x + (weight[i] / total) * colW), 0);
+  const named = lanes.length > 1 && Math.min(...laneX.filter((_, i) => weight[i] >= 1).map(([, w]) => w)) >= 28;
   const chip = 18;
   const daysOf = (b) => [...Array(days).keys()].filter((d) => b.end > from + d * DAY && b.start < from + (d + 1) * DAY);
   const tops = all.filter(whole);
@@ -98,7 +118,7 @@ function calendar(host, answer, style) {
     lanes.forEach((l, i) => {
       const [lx, lw] = laneX[i];
       if (i > 0) out.append(svg('line', { class: 't-lane', x1: x + lx, x2: x + lx, y1: top, y2: height }));
-      if (named) out.append(svg('text', { class: 't-hour', x: x + lx + 3, y: 30 }, tip(l.title), cut(l.title, lw - 6)));
+      if (named && laneX[i][1] >= 28) out.append(svg('text', { class: 't-hour', x: x + lx + 3, y: 30 }, tip(l.title), cut(l.title, lw - 6)));
     });
   }
   for (let hr = h0; hr <= h1; hr++) {
@@ -123,21 +143,11 @@ ${lanes[laneOf(b)].title}` : said(b);
   }
   for (let d = 0; d < days; d++) {
     const dayStart = from + d * DAY;
-    // What falls on this day within the hours shown, lane by lane; things at the same time in a lane sit side by side.
-    const today = timed
-      .map((b) => ({ ...b, s: Math.max(b.start, dayStart + h0 * 3_600_000), e: Math.min(b.end, dayStart + h1 * 3_600_000) }))
-      .filter((b) => b.end > dayStart && b.start < dayStart + DAY && (b.e > b.s || b.start === b.end))
-      .sort((a, b) => a.s - b.s);
     for (let i = 0; i < Math.max(lanes.length, 1); i++) {
-      const mine = lanes.length ? today.filter((b) => laneOf(b) === i) : today;
+      const { mine } = packed[d][i];
       const [lx, lw] = lanes.length ? laneX[i] : [0, colW];
-      const cols = [];
-      for (const b of mine) {
-        const col = cols.findIndex((end) => end <= b.s);
-        b.col = col < 0 ? cols.push(b.e) - 1 : col;
-        cols[b.col] = Math.max(cols[b.col], b.e);
-      }
-      const w = (lw - 4) / Math.max(cols.length, 1);
+      // The same width for a column all week, so one session reads the same on a quiet day as on a busy one.
+      const w = (lw - 4) / Math.max(lanes.length ? weight[i] : packed[d][i].cols, 1);
       for (const b of mine) place(b, gutter + d * colW + lx + 2 + b.col * w, head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, w - 2, Math.max(((b.e - b.s) / 3_600_000) * hourPx, 16));
     }
   }
