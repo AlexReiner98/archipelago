@@ -782,6 +782,7 @@ export class Archipelago {
 
   async claim(actor: Actor, input: { resource: string; holder: string; for?: string; reason: string }) {
     return this.db.transaction(async (tx) => {
+      await tx.query(`select pelago_hold_lock($1)`, [input.resource]); // one claim of it at a time (src/db.ts): what is held is read after
       const resource = await this.entity(input.resource, tx);
       if (!resource || !this.registry.capacity(resource)) throw new Error(`"${input.resource}" is not a resource: nothing of its type can be held`);
       const holder = await this.entity(input.holder, tx);
@@ -817,9 +818,7 @@ export class Archipelago {
          and ($2::text is null or from_id = $2) returning from_id`,
       [input.resource, input.holder ?? null],
     );
-    for (const row of rows) {
-      await this.log(this.db, { actor: actorId(actor), action: 'resource.release', target: input.resource, reason: input.reason, detail: { holder: row.from_id } });
-    }
+    for (const row of rows) await this.log(this.db, { actor: actorId(actor), action: 'resource.release', target: input.resource, reason: input.reason, detail: { holder: row.from_id } });
     return { released: rows.length };
   }
 

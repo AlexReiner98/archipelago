@@ -68,6 +68,8 @@ alter table event alter column origin set default 'pelago';
 update event set origin = 'pelago' where origin = 'lattice';
 create index if not exists event_ts on event(ts);
 create index if not exists event_target on event(target_id);
+-- One claim of a resource at a time. PGlite has one connection, so nothing to wait for; a server makes it a lock (src/pg.ts).
+do $$ begin if to_regprocedure('pelago_hold_lock(text)') is null then create function pelago_hold_lock(resource text) returns void language plpgsql as $fn$ begin end $fn$; end if; end $$;
 
 create table if not exists proposal (
   id         text primary key,
