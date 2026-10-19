@@ -1,5 +1,5 @@
 // Capabilities: what the kernel computes from a type, declared by the type with the field each reads. There are
-// five and packs cannot add a sixth. A flavour inherits its parent's; a sibling does not. Each is checked against
+// six and packs cannot add a seventh. A flavour inherits its parent's; a sibling does not. Each is checked against
 // the type's own fields when its pack loads, so a capability naming a field the type lacks stops the pack.
 
 import type { FieldDef } from './packs.ts';
@@ -53,20 +53,33 @@ export interface Settles {
   choices?: string;
 }
 
+/**
+ * Its health is watched from outside: a monitor reports on the address in `field`, and the item's status follows,
+ * to `down` when it fails and back to `up` when it answers. Only while its status is `up`, `down` or one of `also`:
+ * a part still being built is left alone.
+ */
+export interface Watch {
+  field: string;
+  up: string;
+  down: string;
+  also?: string[];
+}
+
 export interface Capabilities {
   bound?: Bound;
   when?: When;
   where?: Where;
   capacity?: Capacity;
   settles?: Settles;
+  watch?: Watch;
 }
 
-export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles'] as const;
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch'] as const;
 
 const DATES = ['date', 'datetime'];
 
-/** Problems with a type's capabilities, given its resolved fields and the relations known. Empty means they hold. */
-export function checkCapabilities(caps: Capabilities, fields: Record<string, FieldDef>, relations: Set<string>): string[] {
+/** Problems with a type's capabilities, given its resolved fields, statuses and the relations known. Empty means they hold. */
+export function checkCapabilities(caps: Capabilities, fields: Record<string, FieldDef>, relations: Set<string>, statuses: string[] = []): string[] {
   const problems: string[] = [];
   const has = (what: string, field: string | undefined, types: string[]) => {
     if (field === undefined) return;
@@ -75,7 +88,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     else if (!types.includes(def.type)) problems.push(`${what} reads "${field}", a ${def.type}, not a ${types.join(' or ')}`);
   };
   for (const name of Object.keys(caps)) if (!(CAPABILITIES as readonly string[]).includes(name)) problems.push(`"${name}" is not a capability: one of ${CAPABILITIES.join(', ')}`);
-  const { bound, when, where, capacity, settles } = caps;
+  const { bound, when, where, capacity, settles, watch } = caps;
   if (bound) {
     if (!bound.field) problems.push('bound needs a field');
     if (bound.limit !== undefined && bound.below !== undefined) problems.push('bound has a limit or a field it stays above, not both');
@@ -115,6 +128,11 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     if (!['word', 'evidence'].includes(settles.by)) problems.push('settles.by is "word" or "evidence"');
     if (settles.whose !== undefined && !['owner', 'waits_on'].includes(settles.whose)) problems.push('settles.whose is "owner" or "waits_on"');
     has('settles.choices', settles.choices, ['json']);
+  }
+  if (watch) {
+    if (!watch.field) problems.push('watch needs the field its address is in');
+    has('watch', watch.field, ['url', 'string']);
+    for (const s of [watch.up, watch.down, ...(watch.also ?? [])]) if (!statuses.includes(s)) problems.push(`watch names "${s}", which is no status of it`);
   }
   return problems;
 }

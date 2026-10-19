@@ -271,7 +271,7 @@ export class Registry {
     for (const rel of relations.values()) rel.root = rootOf(declared.get(rel.id)!, []);
 
     for (const type of types.values()) {
-      const problems = checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()));
+      const problems = checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed]);
       if (problems.length) throw new Error(`Type "${type.id}" in pack "${type.pack}": ${problems.join('; ')}`);
     }
 

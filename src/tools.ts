@@ -10,7 +10,7 @@ import { createToken, listTokens, revokeToken } from './auth.ts';
 import { readDocument } from './documents.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
-import { BACKUP_TOOLS } from './backup-tools.ts';
+import { BACKUP_TOOLS } from './backup-tools.ts'; import { HEALTH_TOOLS } from './health.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -816,7 +816,7 @@ export const TOOLS: Record<string, Tool> = {
     input: { id: z.string() },
     run: async (l, _actor, input) => readDocument(l, input.id),
   },
-  ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS,
+  ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...HEALTH_TOOLS,
   token_create: {
     description:
       'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once. ' +
