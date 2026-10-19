@@ -194,6 +194,33 @@ const PIECES = {
   document: () => null,
 };
 
+/** The commit the server ran when this page's code was loaded: a piece this code does not know is newer than it. */
+const loadedWith = fetch('/health').then((r) => r.json()).then((x) => x.commit, () => undefined);
+
+/** A piece this page cannot draw is never skipped in silence: newer than the page's code, it asks for a reload. */
+const unknownPiece = (p) => {
+  const node = h('div');
+  const later = async () => {
+    const [then, now] = await Promise.all([loadedWith, fetch('/health').then((r) => r.json()).then((x) => x.commit, () => undefined)]);
+    const stale = Boolean(now && then !== now);
+    node.replaceChildren(
+      h(
+        'section',
+        { class: 'card wide', style: 'margin-bottom: 14px' },
+        h(
+          'div',
+          { class: 'toolbar fold-bar' },
+          h('span', { class: 'grow gist muted', title: stale ? `The server runs ${now.slice(0, 7)}; this page was loaded with ${then?.slice(0, 7) ?? 'older code'}` : `No piece named "${p.piece}" here` }, `${p.title ?? p.screen?.title ?? p.piece}: not drawn`),
+          stale ? h('button', { class: 'primary', title: 'This page is older than the server', onclick: () => location.reload() }, 'Reload') : h('span', { class: 'pill warn' }, p.piece),
+        ),
+      ),
+    );
+  };
+  return { node, later };
+};
+/** A piece drawn as the kernel draws it, or as a stub when this page does not know it. */
+const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, p) : unknownPiece(p));
+
 /** The pages the kernel still draws itself (src/declared.ts lists them). */
 const PAGES = { time };
 
@@ -205,7 +232,7 @@ export function drawScreen(screen, redraw) {
   const ctx = { e: null, id: null, redraw };
   const drawn = screen.pieces
     .filter((p) => !OF_ITEM.includes(p.piece) && !(p.piece === 'view' && p.item))
-    .map((p) => PIECES[p.piece]?.(ctx, { ...p, screen }))
+    .map((p) => draw(ctx, { ...p, screen }))
     .filter(Boolean);
   return settle(drawn);
 }
@@ -240,7 +267,7 @@ export function drawScreens(ctx) {
   const used = packsUsed(ctx.data);
   const drawn = piecesFor(ctx.e.type)
     .filter((p) => !p.screen.pack || p.screen.pack === 'core' || used.has(p.screen.pack))
-    .map((p) => PIECES[p.piece]?.(ctx, p))
+    .map((p) => draw(ctx, p))
     .filter(Boolean);
   return settle(drawn);
 }

@@ -2,6 +2,7 @@
 
 import { api, h, part, state } from './base.js';
 import { ago, chip, link, pill, typeChoice, typeTitle, workType } from './words.js';
+import { seekTokens } from './token-piece.js';
 
 // ---- Search --------------------------------------------------------------
 
@@ -19,6 +20,20 @@ export function searchBar() {
   // Typing here is not an edit that a redraw would lose.
   part('map').replaceChildren(h('div', { class: 'toolbar' }, h('input', { type: 'search', placeholder: 'Search titles and text', style: 'flex: 1; min-width: 200px', onkeydown: go, oninput: (e) => e.stopPropagation() })));
 }
+
+/** A token found by name: it leads to the item it is within, whose Tokens for this lists it, or to the Workspace screen. */
+const tokenRow = (t) => {
+  const where = t.within?.length ? `#/e/${t.within[0]}` : '#/workspace';
+  const on = t.within?.length ? `Under Tokens for this on ${(t.within_titles ?? t.within).join(', ')}` : 'On the Workspace screen';
+  return h(
+    'tr',
+    {},
+    h('td', { class: 'nowrap' }, h('span', { class: 'chip' }, 'Token')),
+    h('td', {}, h('a', { href: where, title: on, onclick: t.within?.length ? seekTokens(t.within[0]) : undefined }, t.name), t.within?.length > 0 && h('span', { class: 'muted small', title: on }, `  ${t.within_titles?.[0] ?? t.within[0]}${t.within.length > 1 ? ` +${t.within.length - 1}` : ''}`)),
+    h('td', {}, h('span', { class: `pill${t.revoked_at ? ' closed' : ''}` }, t.revoked_at ? 'revoked' : t.may === 'report' ? 'reports' : t.may === 'propose' ? 'proposes' : t.kind)),
+    h('td', { class: 'nowrap muted' }, t.last_used ? ago(t.last_used) : 'never used'),
+  );
+};
 
 export function map() {
   const main = part('map');
@@ -40,13 +55,15 @@ export function map() {
       });
       // Sources are provenance, not work: list them only when asked for.
       if (!mapState.type) rows = rows.filter((e) => !e.type.startsWith('sys.') || e.type === 'sys.connection');
+      // Tokens are not items: found by name, each leading to the page that lists it.
+      const tokens = mapState.q.trim() && !mapState.type ? (await api('token_list', { q: mapState.q }).catch(() => [])).filter((t) => (mapState.open === 'closed') === Boolean(t.revoked_at) || mapState.open === 'all') : [];
       results.replaceChildren(
-        rows.length
+        rows.length || tokens.length
           ? h(
               'table',
               { class: 'list' },
               h('thead', {}, h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Title'), h('th', {}, 'Status'), h('th', {}, 'Changed'))),
-              h('tbody', {}, rows.map((e) => h('tr', {}, h('td', { class: 'nowrap' }, chip(e.type)), h('td', {}, link(e), e.confidence < 1 && h('span', { class: 'muted small' }, `  confidence ${e.confidence}`)), h('td', {}, pill(e.type, e.status)), h('td', { class: 'nowrap muted' }, ago(e.updated_at))))),
+              h('tbody', {}, rows.map((e) => h('tr', {}, h('td', { class: 'nowrap' }, chip(e.type)), h('td', {}, link(e), e.confidence < 1 && h('span', { class: 'muted small' }, `  confidence ${e.confidence}`)), h('td', {}, pill(e.type, e.status)), h('td', { class: 'nowrap muted' }, ago(e.updated_at)))), tokens.map(tokenRow)),
             )
           : h('div', { class: 'empty' }, 'Nothing matches.'),
       );

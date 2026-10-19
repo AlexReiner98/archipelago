@@ -114,12 +114,12 @@ const shown = async (l: Archipelago, a: Ask) => {
 
 export const ASK_TOOLS: Record<string, Tool> = {
   token_requests: {
-    description: 'The systems that have asked for a token (POST /connect/request) and wait for a person to approve or refuse, each with its code and the item watched at each address it named. Only for humans.',
+    description: 'The systems that have asked for a token (POST /connect/request) and wait for a person to approve or refuse, each with its code and the item watched at each address it named. With answered, also those answered and not yet run out: state approved, refused, or handed (the system has collected its token). Only for humans.',
     humanOnly: true,
-    input: { within: z.string().optional().describe('Only the requests about this item.') },
+    input: { within: z.string().optional().describe('Only the requests about this item.'), answered: z.boolean().optional().describe('Also the requests answered in their ten minutes.') },
     run: async (l, _actor, input) => {
       const whole = await wholeMap(l);
-      const listed = await Promise.all((await asks(whole.db)).filter((a) => a.state === 'pending').map((a) => shown(l, a)));
+      const listed = await Promise.all((await asks(whole.db)).filter((a) => input.answered || a.state === 'pending').map((a) => shown(l, a)));
       return listed.filter((a) => !input.within || a.items.some((e) => e?.id === input.within));
     },
   },

@@ -4,7 +4,7 @@
 // the Workspace screen.
 
 import { api, ask, authHeaders, h } from './base.js';
-import { ago, when } from './words.js';
+import { ago, unfolded, when } from './words.js';
 import { connectBox, secretBox } from './workspace-cards.js';
 
 /** What an agent's token may write, as pills: within what, by name, and whether it only reports or proposes. */
@@ -12,6 +12,14 @@ export const scopePills = (t) => [
   t.within?.length && [' ', h('span', { class: 'pill', title: `It writes only within: ${(t.within_titles ?? t.within).join(', ')}` }, `${t.within.length === 1 ? (t.within_titles?.[0] ?? t.within[0]) : `${t.within.length} items`} only`)],
   t.may && t.may !== 'change' && [' ', h('span', { class: 'pill', title: t.may === 'report' ? 'It can only send what a system measured' : 'Every change it sends waits for you' }, t.may === 'report' ? 'reports' : 'proposes')],
 ];
+
+/** The item whose tokens a link led to: its page opens with them unfolded and in sight. */
+let sought;
+/** What a link to an item's tokens does on its click, so they are what its page opens on. */
+export const seekTokens = (id) => () => {
+  unfolded.set(`${id}:tokens`, true);
+  sought = id;
+};
 
 const MAY = [
   ['report', 'Reports only', 'For a system (a monitor, a deploy): it can only send what it measured, about what is in this'],
@@ -54,4 +62,8 @@ export async function tokenPiece(host, e, fold, made) {
       error,
     ]),
   );
+  if (sought === e.id) {
+    sought = undefined;
+    host.scrollIntoView({ block: 'start' });
+  }
 }

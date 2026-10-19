@@ -553,7 +553,7 @@ details.menu > .menu-items > button:hover { background: var(--accent-soft); }
 
 /* Home: what needs the owner as one short list, then each project as a tile that says where it stands. */
 .page-head { display: flex; align-items: center; gap: 12px; }
-.part[hidden] { display: none; }
+.part[hidden], .inbox[hidden] { display: none; }
 .part + .part:not([hidden]) { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
 /* One thing at a time under the search box, and a section under a page has a section's heading. */
 .part[data-part="map"] ~ .part:not([hidden]) { margin-top: 16px; padding-top: 0; border-top: 0; }
