@@ -185,8 +185,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const views = told ? [] : [...own, ...shared];
   const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at, updated_at from entity where archived_at is null`);
   const all = new Map(entities.map((e) => [e.id, e]));
-  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null }>(
-    `select id, type, from_id, to_id, props ->> 'says' as says from relation where valid_to is null order by id`,
+  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null; state: string | null }>(
+    `select id, type, from_id, to_id, props ->> 'says' as says, props ->> 'state' as state from relation where valid_to is null order by id`,
   );
   // What the item waits on, step by step through what that waits on, finished or not: the view of what holds it,
   // offered beside the others while some of it is still open, and the one an item opens on when it has none of its own.
@@ -412,7 +412,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     for (let cur: string | undefined = id, steps = 0; cur !== undefined && steps < 64; cur = parent.get(cur), steps++) if (sent.has(cur)) return cur;
     return undefined;
   };
-  const lines = new Map<string, { kind: string; from: string; to: string; n: number; says?: string; beat?: number }>();
+  const lines = new Map<string, { kind: string; from: string; to: string; n: number; says?: string; state?: string; beat?: number }>();
   // The ties the session drew are links of their own kind, each with its words and the beat that said it.
   if (told)
     for (const b of told.beats)
@@ -426,9 +426,10 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     // What is inside what is already said by `inside`.
     if (r.type === asked.by && inside(from) === to) continue;
     const key = `${r.type} ${from} ${to}`;
-    const line = lines.get(key) ?? { kind: r.type, from, to, n: 0, ...(r.says && { says: r.says }) };
-    // A line that stands for several links says something only when they all say the same.
+    const line = lines.get(key) ?? { kind: r.type, from, to, n: 0, ...(r.says && { says: r.says }), ...(r.state && { state: r.state }) };
+    // A line that stands for several links says something, or is in a state, only when they all are the same.
     if (line.n > 0 && line.says !== (r.says ?? undefined)) delete line.says;
+    if (line.n > 0 && line.state !== (r.state ?? undefined)) delete line.state;
     line.n++;
     lines.set(key, line);
   }

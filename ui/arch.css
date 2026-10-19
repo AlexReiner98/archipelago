@@ -1,0 +1,40 @@
+/* The architecture shape (ui/arch.js): a system, drawn in the lens's colours, which a style may set. The frame,
+   the key and the breaks are the flow's (ui/flow.css). */
+.ar-part { cursor: pointer; }
+.ar-part .ar-shape { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: 1.25; }
+.ar-part .ar-lid { fill: none; stroke: var(--ln-line); stroke-width: 1.25; }
+.ar-part.planned .ar-shape, .ar-part.building .ar-shape { stroke: var(--ln-muted); stroke-dasharray: 5 4; }
+.ar-part.down .ar-shape { stroke: var(--ln-blocked); stroke-width: 1.75; }
+.ar-part.warn .ar-shape { stroke: var(--warn); stroke-width: 1.5; }
+.ar-part.you .ar-shape { stroke: var(--ln-you); }
+.ar-part.here .ar-shape, .ar-part:hover .ar-shape, .ar-part:focus .ar-shape { stroke: var(--ln-text); stroke-width: 2; }
+.ar-part text { fill: var(--ln-text); font: 13px system-ui, -apple-system, 'Segoe UI', sans-serif; dominant-baseline: middle; }
+.ar-part.planned text, .ar-part.gone text { fill: var(--ln-muted); }
+.ar-part.dim, .ar-place.dim { opacity: 0.32; }
+/* Health: a dot. Up is the colour of done, down of blocked, being wired of a session at work; planned is hollow. */
+.ar-dot { fill: none; stroke: var(--ln-muted); stroke-width: 1.5; }
+.ar-dot.ok { fill: var(--ln-done); stroke: none; } .ar-dot.down { fill: var(--ln-blocked); stroke: none; }
+.ar-dot.warn { fill: var(--warn); stroke: none; } .ar-dot.building { fill: var(--ln-session); stroke: none; }
+.ar-dot.planned { stroke-dasharray: 2 2; } .ar-dot.gone { stroke: var(--ln-line); }
+.ar-badge circle { fill: var(--ln-inner); stroke: var(--ln-line); } .ar-badge.you circle { fill: var(--ln-you); }
+.ar-badge text { fill: var(--ln-text); font: 700 10.5px system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle; dominant-baseline: middle; }
+/* Where it runs: a box around its parts, its name on its top edge. */
+.ar-place { cursor: pointer; }
+.ar-place-box { fill: var(--ln-inner); fill-opacity: 0.55; stroke: var(--ln-line); stroke-width: 1; }
+.ar-place-box.planned, .ar-place-box.building { stroke-dasharray: 6 4; }
+.ar-place-box.down { stroke: var(--ln-blocked); }
+.ar-place-name { fill: var(--ln-inner); }
+.ar-place:hover text { fill: var(--ln-text); }
+.ar-place text { fill: var(--ln-muted); font: 600 12px system-ui, -apple-system, 'Segoe UI', sans-serif; dominant-baseline: middle; }
+/* Wires: wired solid, not yet wired dashed, broken in the colour of blocked. */
+.ar-wire { fill: none; stroke: var(--ln-muted); stroke-width: 1.25; }
+.ar-wire.planned { stroke-dasharray: 6 5; stroke-opacity: 0.8; }
+.ar-wire.broken { stroke: var(--ln-blocked); stroke-width: 1.5; }
+.ar-wire.lit { stroke: var(--ln-text); stroke-width: 2; }
+.ar-head { fill: var(--ln-muted); } .ar-head.broken { fill: var(--ln-blocked); } .ar-head.lit { fill: var(--ln-text); }
+.ar-hit { fill: none; stroke: transparent; stroke-width: 9; cursor: default; }
+.ar-break rect { fill: var(--ln-sea); } .ar-break path { stroke: var(--ln-muted); stroke-width: 1.25; }
+.ar-says rect { fill: var(--ln-sea); stroke: var(--ln-line); stroke-width: 0.75; }
+.ar-says text { fill: var(--ln-muted); font: 10.5px system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle; dominant-baseline: middle; }
+.ar-says.broken text { fill: var(--ln-blocked); }
+.ar-tally { display: flex; gap: 6px; align-items: center; min-width: 0; overflow: hidden; }

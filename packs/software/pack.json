@@ -117,6 +117,18 @@
       "fields": { "host": { "type": "string" } }
     },
     {
+      "id": "software.component",
+      "extends": "place",
+      "title": "Component",
+      "description": "A part of a running system: a service, a store, a proxy, a model endpoint, a client. Part of the environment it runs in; it calls (software.calls) what it sends to, the link's says naming how (HTTPS, SQL) and its state saying whether it is wired, planned or broken. Its status is its health, kept true as it is wired up and watched. Drawn by the architecture shape.",
+      "statuses": { "open": ["planned", "wiring", "up", "degraded", "down"], "closed": ["retired"] },
+      "fields": {
+        "role": { "type": "enum", "values": ["client", "edge", "app", "data", "storage", "model", "monitor", "network", "tool", "service"], "shown": true, "description": "What it does in the system. data and storage are drawn as a cylinder, client as a pill." },
+        "host": { "type": "string", "shown": true, "description": "Where it runs, as its operator names it: a container, a machine, a region." },
+        "url": { "type": "url", "description": "The address its health is read from." }
+      }
+    },
+    {
       "id": "software.spec",
       "extends": "work.file",
       "title": "Spec",
@@ -263,6 +275,7 @@
     { "id": "software.lives_in", "extends": "lives_in", "title": "lives in", "inverse": "hosts", "from": ["*"], "to": ["software.repo"], "description": "The repository that holds the work." },
     { "id": "software.uses", "extends": "relates_to", "title": "uses", "inverse": "is used by", "from": ["*"], "to": ["software.application"], "description": "An application the work depends on or targets." },
     { "id": "software.answers", "extends": "bears_on", "title": "helps answer", "inverse": "is answered by", "from": ["software.test"], "to": ["software.proof"], "description": "The test is part of how we know. A proof question is answered on a build when every test that helps answer it passed there." },
+    { "id": "software.calls", "extends": "relates_to", "title": "calls", "inverse": "is called by", "from": ["*"], "to": ["*"], "description": "A wire of a running system: the one part sends to the other (a request, a query, a backup). It blocks nothing. props.says names how (HTTPS, SQL); props.state is wired, planned or broken, and left out it is read from the health of the two ends." },
     { "id": "software.ships", "extends": "relates_to", "title": "ships", "inverse": "ships in", "from": ["software.release"], "to": ["*"], "description": "What a release contains." }
   ],
   "screens": [
