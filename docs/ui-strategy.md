@@ -106,7 +106,7 @@ judgment (an issue, a task, a question it noticed in passing) arrives
   search still finds them).
 
 This is the one part of the strategy that changes what the map records, not
-only what the screen draws; it is the owner's decision before it is built.
+only what the screen draws; the owner agreed to it as written on 19 Oct 2026.
 
 ## How a change is judged against this
 
@@ -127,10 +127,11 @@ Before adding or changing a screen, check:
 3. The Atlas page, picture titles required, pins, search grouped by level
    with pictures first. Give the architecture picture its title and pin it.
 4. Item pages list one level down, with pills; "loose" fold.
-5. Noticed items (after the owner decides section 4).
+5. Noticed items.
 
-## Open questions for the owner
+## Settled by the owner, 19 Oct 2026
 
-- The cap on your move: five, or another number?
-- Noticed items: yes as written, or only for issues?
-- Is "Atlas" the name for the page of pictures?
+- Your move is capped at five.
+- Noticed items as written in section 4, for everything an agent raises on
+  its own judgment.
+- The page of pictures is called Atlas.

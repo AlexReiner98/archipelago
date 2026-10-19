@@ -13,6 +13,7 @@
     },
     {
       "id": "aim",
+      "altitude": "workspace",
       "title": "Aim",
       "kind": true,
       "description": "Why work exists: what serves points at, such as a goal or an area. One of the seven kinds every type extends.",
@@ -20,6 +21,7 @@
     },
     {
       "id": "work",
+      "altitude": "step",
       "title": "Work",
       "kind": true,
       "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. One of the seven kinds every type extends.",
@@ -27,6 +29,7 @@
     },
     {
       "id": "question",
+      "altitude": "step",
       "title": "Question",
       "kind": true,
       "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. One of the seven kinds every type extends.",
@@ -34,6 +37,7 @@
     },
     {
       "id": "record",
+      "altitude": "step",
       "title": "Record",
       "kind": true,
       "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. One of the seven kinds every type extends.",
@@ -41,6 +45,7 @@
     },
     {
       "id": "occurrence",
+      "altitude": "step",
       "title": "Occurrence",
       "kind": true,
       "description": "Happens at a time, and can be a gate: an event, a meeting, a release. One of the seven kinds every type extends.",

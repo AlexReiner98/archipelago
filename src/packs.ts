@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
 import { checkDeclared, KERNEL_VERBS, screensOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
+import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
@@ -40,6 +41,7 @@ export interface TypeDef {
   fields?: Record<string, FieldDef>;
   /** What is made for a reader or a customer (a document, a file, a release): named under the title of what it is part of. A flavour inherits it. */
   deliverable?: boolean;
+  /** How high its items sit (ALTITUDES): a project, a stream in it, a step in that. A flavour inherits it. */ altitude?: Altitude;
   /** What anyone may see, with no login, once a person makes it public (a product, what it has built, how we know). A flavour inherits it. */
   public?: boolean;
   /** What it goes with (linked by relation, out from it or in to it): public when that is, a limited token's when that is. A flavour inherits it. */
@@ -66,7 +68,6 @@ export interface RelationDef {
   to: string[];
   description: string; moved_from?: string[]; // Relations whose links are this one's now, moved once no pack defines them.
 }
-
 
 export interface PackFile {
   id: string;
@@ -108,20 +109,18 @@ export interface ResolvedType {
   system: boolean;
   statuses: Statuses;
   fields: Record<string, FieldDef>;
-  deliverable: boolean;
+  deliverable: boolean; altitude?: Altitude;
   public: boolean;
   belongs_with?: BelongsWith[];
   capabilities: Capabilities;
   noteMax?: NoteMax; movedFrom?: string[];
-  /** Kept from the type table: its pack is gone, its items are not. */
-  dormant?: boolean;
+  /** Kept from the type table: its pack is gone, its items are not. */ dormant?: boolean;
 }
 
 /** A relation as loaded: `root` names the root it extends (itself, for a root). */
 export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root: string; dormant?: boolean };
 
-/** The pack that approved type proposals are written to. */
-export const LOCAL_PACK = 'local';
+/** The pack that approved type proposals are written to. */ export const LOCAL_PACK = 'local';
 
 export class Registry {
   readonly dir: string;
@@ -229,6 +228,7 @@ export class Registry {
         fields: { ...parent?.fields, ...def.fields, ...extra.get(id) },
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
+        ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
         ...((def.belongs_with ?? parent?.belongs_with)?.length && { belongs_with: def.belongs_with ?? parent?.belongs_with }),
         capabilities: { ...parent?.capabilities, ...def.capabilities },
         ...((def.note_max ?? parent?.noteMax) && { noteMax: def.note_max ?? parent?.noteMax }),
@@ -484,7 +484,7 @@ export class Registry {
         kind: t.kind,
         statuses: t.statuses,
         fields: t.fields,
-        ...(t.deliverable && { deliverable: true }),
+        ...(t.deliverable && { deliverable: true }), ...(t.altitude && { altitude: t.altitude }),
         ...(t.public && { public: true }),
         ...(t.belongs_with && { belongs_with: t.belongs_with }),
         ...(Object.keys(t.capabilities).length && { capabilities: t.capabilities }),

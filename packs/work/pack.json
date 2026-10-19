@@ -7,6 +7,7 @@
   "types": [
     {
       "id": "work.project",
+      "altitude": "project",
       "moved_from": ["project"],
       "public": true,
       "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
@@ -112,6 +113,7 @@
     },
     {
       "id": "work.document",
+      "altitude": "stream",
       "moved_from": ["document"],
       "extends": "record",
       "title": "Document",
