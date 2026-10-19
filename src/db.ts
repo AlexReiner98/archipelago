@@ -2,8 +2,10 @@
 
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
-import { randomBytes } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { migrate, schemaKey } from './migrate.ts';
 import { openPg, scratchPg } from './pg.ts';
 
@@ -30,7 +32,8 @@ export async function openDb(where?: string): Promise<Database> {
   if (!where) return inMemory();
   if (isServer(where)) return openPg(where, (db) => prepared(db, true));
   mkdirSync(where, { recursive: true });
-  return prepared(new PGlite(where, { extensions: { pg_trgm } }));
+  const image = process.env.PELAGO_TEST_IMAGE && !existsSync(join(where, 'PG_VERSION')) ? await (blank ??= blankImage()) : undefined;
+  return prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm } }));
 }
 
 // The steps of the schema this database lacks (src/migrate.ts). pg_trgm, which search uses for near-misses and typos,
@@ -44,9 +47,10 @@ async function prepared<D extends Database>(db: D, server = false) {
 }
 
 // Only the tests open databases in memory, hundreds of them. Making one runs initdb and the whole schema (about a
-// second); loading an image of one made once per process takes a fifth of that. Each holds a few hundred MB, so the
-// tests close what each one opened as it ends (test/each.ts). With PELAGO_TEST_DATABASE_URL they are databases on
-// that server instead (src/pg.ts).
+// second); loading an image of one takes a fifth of that. npm test makes the image once for all its processes and
+// names it in PELAGO_TEST_IMAGE (test/global.ts), and the new folders a test opens start from it too. Each database
+// holds a few hundred MB, so the tests close what each one opened as it ends (test/each.ts). With
+// PELAGO_TEST_DATABASE_URL they are databases on that server instead (src/pg.ts).
 
 /** Databases in memory not yet closed. */
 export const openInMemory = new Set<Database>();
@@ -63,11 +67,42 @@ async function inMemory() {
   return db;
 }
 
-async function blankImage() {
-  const db = await prepared(new PGlite({ extensions: { pg_trgm } }));
+async function blankImage(): Promise<File | Blob> {
+  const file = process.env.PELAGO_TEST_IMAGE;
+  return file && existsSync(file) ? new Blob([readFileSync(file)]) : makeImage();
+}
+
+async function makeImage() {
+  // With the log in segments of 1 MB, not 16, and without the two template databases nothing here uses, an image is
+  // 14 MB, not 41, and loads in three fifths of the time.
+  const db = await prepared(new PGlite({ extensions: { pg_trgm }, initDbStartParams: ['--wal-segsize=1'] }));
+  await db.query(`update pg_database set datistemplate = false where datname in ('template0', 'template1')`);
+  for (const name of ['template0', 'template1']) await db.query(`drop database ${name}`);
+  await db.query('checkpoint');
   const image = await db.dumpDataDir('none');
   await db.close();
   return image;
+}
+
+/** The blank image kept in the temp folder, named for the schema, PGlite and how it is made: made when it is not there yet. */
+export async function blankImageFile() {
+  const made = createHash('sha256').update(`${schemaKey(false)} ${pgliteVersion()} ${makeImage}`).digest('hex').slice(0, 12);
+  const file = join(tmpdir(), `pelago-blank-${made}.tar`);
+  if (existsSync(file)) return file;
+  const image = await makeImage();
+  const part = `${file}.${process.pid}`; // written whole, then renamed: a test never reads half of one
+  writeFileSync(part, Buffer.from(await image.arrayBuffer()));
+  renameSync(part, file);
+  for (const old of readdirSync(tmpdir())) if (/^pelago-blank-\w+\.tar$/.test(old) && join(tmpdir(), old) !== file) rmSync(join(tmpdir(), old), { force: true });
+  return file;
+}
+
+function pgliteVersion() {
+  try {
+    return JSON.parse(readFileSync(new URL('../node_modules/@electric-sql/pglite/package.json', import.meta.url), 'utf8')).version as string;
+  } catch {
+    return 'unknown';
+  }
 }
 
 /**

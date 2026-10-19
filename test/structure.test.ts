@@ -185,7 +185,13 @@ test('there are five dependencies', () => {
 });
 
 // 9. Every module the page loads parses: one that does not leaves the page blank, and most are not run by a test.
+// One process parses them all as modules, without running them: a process each took seconds.
+const PARSE = `const { readFileSync } = await import('node:fs'); const { SourceTextModule } = await import('node:vm');
+for (const f of process.argv.slice(1)) try { new SourceTextModule(readFileSync(f, 'utf8'), { identifier: f }); } catch { console.log(f); }`;
 test('every UI module parses', () => {
-  const bad = walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f)).filter((f) => spawnSync(process.execPath, ['--check', join(ROOT, f)]).status !== 0);
+  const files = walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f));
+  const run = spawnSync(process.execPath, ['--experimental-vm-modules', '--no-warnings', '--input-type=module', '-e', PARSE, ...files.map((f) => join(ROOT, f))], { encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const bad = run.stdout.split(/\r?\n/).filter(Boolean).map((f) => files.find((g) => join(ROOT, g) === f) ?? f);
   assert.deepEqual(bad, [], 'A module that does not parse leaves the page blank: run node --check on it.');
 });

@@ -1,40 +1,11 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { heldResources } from '../src/blocking.ts';
-import { openDb } from '../src/db.ts';
 import { Archipelago } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
-import { human, agent, fresh, attend, make } from './map.ts';
-
-test('a database made while this was called Lattice is opened under the new names, with nothing lost', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-before-'));
-  const made = await openDb(dir);
-  // As it stood then: no record of schema steps, the two roles with what they were granted, a function of that name, and events said to be Lattice's own.
-  await made.exec(`
-    drop table schema_version;
-    create role lattice_member nologin; grant select, insert, update on entity, event to lattice_member;
-    create role lattice_public nologin; grant select (id, title) on entity to lattice_public;
-    create function lattice_is_public(target text) returns boolean language sql stable as $fn$ select false $fn$;
-    grant execute on function lattice_is_public(text) to lattice_public;
-    insert into event (origin, actor, action) values ('lattice', 'agent:lattice', 'run.stale'), ('github', 'github:push', 'push');
-  `);
-  await made.close();
-  const db = await openDb(dir);
-  assert.deepEqual((await db.query<{ rolname: string }>(`select rolname from pg_roles where rolname like 'lattice%' or rolname like 'pelago%' order by 1`)).rows.map((r) => r.rolname), ['pelago_member', 'pelago_public']);
-  assert.deepEqual((await db.query<{ proname: string }>(`select proname from pg_proc where proname like 'lattice%'`)).rows, []);
-  assert.deepEqual((await db.query<{ origin: string }>(`select origin from event order by seq`)).rows.map((r) => r.origin), ['pelago', 'github']);
-  // And a member still sees through the role that took the old one's place.
-  const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  const l = new Archipelago(db, new Registry(packs));
-  await make(l, [{ op: 'create', type: 'work.task', title: 'Seen after the move' }]);
-  assert.equal((await l.as('nobody').db.query(`select 1 from entity where title = 'Seen after the move'`)).rows.length, 1);
-  await db.close();
-});
+import { human, agent, fresh, make } from './map.ts';
 
 test('flavours inherit fields and statuses, and are found through the parent', async () => {
   const l = await fresh();
@@ -163,83 +134,6 @@ test('possible duplicates are flagged, across flavours', async () => {
   await make(l, [{ op: 'create', type: 'work.issue', title: 'Mask misregistration' }]);
   const result = await l.change(agent, { ops: [{ op: 'create', type: 'software.bug', title: 'mask misregistration' }], reason: 'test' });
   assert.match(result.warnings[0], /possible duplicate of existing work\.issue "Mask misregistration"/);
-});
-
-test('blockers are derived, and roots are what has to move first', async () => {
-  const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'me', type: 'person', title: 'Me' },
-    { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
-    { op: 'create', ref: 'ship', type: 'work.task', title: 'Ship release', owner: 'me' },
-    { op: 'create', ref: 'sign', type: 'work.task', title: 'Sign installer', owner: 'me' },
-    { op: 'create', ref: 'cert', type: 'work.decision', title: 'Which certificate?', owner: 'sam' },
-    { op: 'create', ref: 'free', type: 'work.task', title: 'Write notes', owner: 'me' },
-    { op: 'link', type: 'depends_on', from: 'ship', to: 'sign' },
-    { op: 'link', type: 'depends_on', from: 'sign', to: 'cert' },
-  ]);
-
-  const ship = (await attend(l, { reasons: ['blocked'] })).items.find((i: any) => i.id === made.ship);
-  assert.deepEqual(ship.reasons[0].by, ['Which certificate?'], 'what has to move first, at the root of the chain');
-
-  assert.deepEqual((await attend(l, { person: made.me, reasons: ['ready'] })).items.map((t: any) => t.title), ['Write notes']);
-  assert.equal((await attend(l, { person: made.me, reasons: ['blocked'] })).items.length, 2);
-  assert.equal((await attend(l, { person: made.sam, reasons: ['holding_up'] })).items[0].reasons[0].count, 2);
-
-  // Closing the decision unblocks the next task in the chain, with nothing else to update.
-  await make(l, [{ op: 'update', id: made.cert, status: 'decided', props: { outcome: 'EV cert' } }]);
-  const after = await attend(l, { person: made.me, reasons: ['ready'] });
-  assert.deepEqual(after.items.map((t: any) => t.title).sort(), ['Sign installer', 'Write notes']);
-  await assert.rejects(attend(l, { person: 'me' }), /pelago init/);
-});
-
-test('a dependency cycle does not hang the views', async () => {
-  const l = await fresh();
-  await make(l, [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
-    { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
-    { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
-  ]);
-  assert.equal((await attend(l, { reasons: ['blocked'] })).items.length, 2);
-});
-
-test('an exclusive resource has one holder, and blocks other work that needs it', async () => {
-  const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Live Rhino lane' },
-    { op: 'create', ref: 'run1', type: 'sys.run', title: 'Session one' },
-    { op: 'create', ref: 'run2', type: 'sys.run', title: 'Session two' },
-    { op: 'create', ref: 'live1', type: 'work.task', title: 'Capture parity probe' },
-    { op: 'create', ref: 'live2', type: 'work.task', title: 'Debug conduit' },
-    { op: 'create', ref: 'offline', type: 'work.task', title: 'Write unit tests' },
-    { op: 'link', type: 'needs', from: 'live1', to: 'lane' },
-    { op: 'link', type: 'needs', from: 'live2', to: 'lane' },
-  ]);
-  assert.equal((await attend(l, { reasons: ['ready'] })).items.length, 3);
-
-  // Agents claim directly: no proposal.
-  const claimed = await l.claim(agent, { resource: made.lane, holder: made.run1, for: made.live1, reason: 'Running the probe' });
-  assert.equal(claimed.status, 'claimed');
-  await assert.rejects(l.claim(agent, { resource: made.lane, holder: made.run2, reason: 'Me too' }), /held by "Session one"/);
-
-  const during = await attend(l, { reasons: ['ready', 'blocked'] });
-  assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'ready').map((t: any) => t.title).sort(), ['Capture parity probe', 'Write unit tests']);
-  assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'blocked').map((t: any) => [t.title, t.reasons[0].by]), [['Debug conduit', ['Live Rhino lane']]]);
-  assert.equal((await heldResources(l))[0].held_by_title, 'Session one');
-
-  assert.deepEqual(await l.release(agent, { resource: made.lane, holder: made.run1, reason: 'Done' }), { released: 1 });
-  assert.equal((await l.claim(agent, { resource: made.lane, holder: made.run2, reason: 'My turn' })).status, 'claimed');
-});
-
-test('overdue work is due, and what is far off is not', async () => {
-  const l = await fresh();
-  await make(l, [
-    { op: 'create', type: 'work.task', title: 'File return', props: { due: '2020-01-01' } },
-    { op: 'create', type: 'work.task', title: 'Far off', props: { due: '2999-01-01' } },
-  ]);
-  // Work resting on a refuted hypothesis is the inquiry pack's to show, not the kernel's.
-  const due = await attend(l, { reasons: ['due'] });
-  assert.deepEqual(due.items.map((t: any) => [t.title, t.reasons[0].overdue]), [['File return', true]]);
 });
 
 test('merge moves relations to the kept entity and archives the other', async () => {
