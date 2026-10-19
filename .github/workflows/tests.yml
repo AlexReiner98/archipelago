@@ -1,6 +1,7 @@
-# The tests and the type check, on every push and on every change someone
-# else proposes, on Linux and on Windows. Needs nothing set in the
-# repository's settings.
+# The gate: the type check and the tests on Linux, on every push and on every
+# change someone else proposes, once on PGlite and once on a Postgres server.
+# Windows runs nightly (nightly.yml). Needs nothing set in the repository's
+# settings.
 
 name: Tests
 
@@ -18,16 +19,12 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  pglite:
     # A branch of this repository is already tested by its push: only a
     # change from a fork needs the pull request's own run.
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -39,5 +36,48 @@ jobs:
       - run: npm ci
 
       - run: npm run typecheck
+
+      - run: npm test
+
+  postgres:
+    # The engine that runs live. Each test gets a database copied from a
+    # template the run builds once (scratchPg in src/pg.ts).
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: pelago
+          POSTGRES_PASSWORD: pelago
+          POSTGRES_DB: pelago
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pelago"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      PELAGO_TEST_DATABASE_URL: postgres://pelago:pelago@127.0.0.1:5432/pelago
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # A scratch server: durability buys nothing here and costs time.
+      - name: Postgres without fsync
+        run: >-
+          psql "$PELAGO_TEST_DATABASE_URL"
+          -c "alter system set fsync = off"
+          -c "alter system set synchronous_commit = off"
+          -c "alter system set full_page_writes = off"
+          -c "select pg_reload_conf()"
 
       - run: npm test

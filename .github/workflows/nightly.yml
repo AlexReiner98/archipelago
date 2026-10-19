@@ -1,0 +1,38 @@
+# Windows, where the owner develops: the type check and the tests on PGlite,
+# each night, on demand, and on a change proposed from a fork (which no
+# nightly run of this repository would see). Linux gates every push
+# (tests.yml).
+
+name: Windows
+
+on:
+  schedule:
+    - cron: '17 7 * * *' # 07:17 UTC
+  workflow_dispatch:
+  pull_request:
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # package.json: engines
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
