@@ -3,15 +3,18 @@
 // of the database's files is not a backup: taken while the server runs it may
 // not open again, which is how the map was nearly lost on 7 Oct 2026.
 //
-// Restore, with the server stopped, into a data folder that does not exist yet:
-//   node src/backup.ts restore <backup file> <new data folder>
+// Restore, with the server stopped, into a data folder that does not exist yet, or into an empty database on a
+// Postgres server (the address the server is given as PELAGO_DATABASE_URL; a workspace other than the default one
+// goes in that database's own beside it, as the server looks for it):
+//   node src/backup.ts restore <backup file> <new data folder | postgres://...>
 
 import { isSealed, seal, SECRET_SETTINGS } from './secrets.ts';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { openDb, type Db } from './db.ts';
+import { isServer, openDb, type Db } from './db.ts';
 import { LOCAL_PACK, type Registry } from './packs.ts';
+import { databaseFor } from './pg.ts';
 import type { Workspaces } from './workspaces.ts';
 
 /** Every table, parents before the rows that point at them. */
@@ -276,21 +279,36 @@ export function readBackup(file: string): Dump {
   return parseBackup(readFileSync(file));
 }
 
+/**
+ * Restore a backup from the command line: into a data folder that does not exist yet, or into a Postgres server
+ * (postgres://...), where the default workspace goes in the database named and any other in its own beside it.
+ * Answers with where it went, without the server's password, and how many rows of each table.
+ */
+export async function restoreTo(backup: Dump, target: string): Promise<{ where: string; counts: Record<string, number> }> {
+  const id = backup?.workspace?.id ?? 'default';
+  if (!isServer(target) && existsSync(target)) throw new Error(`${target} already exists. Restore into a folder that does not, then put it in place with the server stopped.`);
+  const where = !isServer(target) ? target : id === 'default' ? target : await databaseFor(target, id);
+  const db = await openDb(where);
+  try {
+    return { where: isServer(where) ? `database ${new URL(where).pathname.slice(1)} on ${new URL(where).host}` : where, counts: await restore(db, backup) };
+  } finally {
+    await db.close();
+  }
+}
+
 if (import.meta.main) {
   const [command, file, target] = process.argv.slice(2);
   if (command !== 'restore' || !file || !target) {
-    console.error('Usage: node src/backup.ts restore <backup file> <new data folder>');
-    process.exit(1);
-  }
-  if (existsSync(target)) {
-    console.error(`${target} already exists. Restore into a folder that does not, then put it in place with the server stopped.`);
+    console.error('Usage: node src/backup.ts restore <backup file> <new data folder | postgres://...>');
     process.exit(1);
   }
   const backup = readBackup(file);
-  const db = await openDb(target);
-  const counts = await restore(db, backup);
-  await db.close();
-  console.log(`Restored workspace "${backup.workspace.name}" (${backup.workspace.id}) as of ${backup.taken} into ${target}`);
-  console.log(Object.entries(counts).map(([table, n]) => `${table}: ${n}`).join(', '));
+  const done = await restoreTo(backup, target).catch((err: Error) => {
+    console.error(err.message);
+    process.exit(1);
+  });
+  console.log(`Restored workspace "${backup.workspace.name}" (${backup.workspace.id}) as of ${backup.taken} into ${done.where}`);
+  console.log(Object.entries(done.counts).map(([table, n]) => `${table}: ${n}`).join(', '));
+  if (backup.workspace.id !== 'default') console.log(`A server finds it once the workspace is listed in its workspaces/index.json.`);
   if (backup.local_pack) console.log('This workspace defined types of its own. They are in the backup under "local_pack"; write them to its local pack file.');
 }

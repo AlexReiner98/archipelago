@@ -23,7 +23,7 @@ export interface Database extends Db {
   exec(sql: string): Promise<unknown>;
 }
 
-const isServer = (where: string) => /^postgres(ql)?:\/\//.test(where);
+export const isServer = (where: string) => /^postgres(ql)?:\/\//.test(where);
 
 /** Open the database at a folder or on a server (a postgres:// address), or in memory when neither is given. */
 export async function openDb(where?: string): Promise<Database> {

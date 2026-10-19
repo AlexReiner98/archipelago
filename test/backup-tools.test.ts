@@ -1,10 +1,13 @@
 // The whole map as a file: the owner downloads it by a link good once; an agent only once the owner allows it.
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { parseBackup, restore } from '../src/backup.ts';
+import { dump, parseBackup, restore, restoreTo } from '../src/backup.ts';
 import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
+import { databaseFor, dropDatabaseFor } from '../src/pg.ts';
 import { createShare } from '../src/documents.ts';
 import { configureOutbox } from '../src/outbox.ts';
 import { hostFor } from '../src/packtools.ts';
@@ -67,4 +70,41 @@ test('a link given to a document is in the backup, and works again where the bac
   const there = await openDb();
   assert.equal((await restore(there, parseBackup(file.file))).share, 1);
   assert.deepEqual((await there.query<{ entity_id: string }>(`select entity_id from share`)).rows, [{ entity_id: doc }]);
+});
+
+test('a backup is restored from the command line into a new folder, and never over one', async () => {
+  const l = await map();
+  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Carried over' }] });
+  const taken = await dump(l.db, { id: 'default', name: 'Default' });
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-restore-'));
+  try {
+    const done = await restoreTo(taken, join(dir, 'data'));
+    assert.equal(done.counts.entity, taken.tables.entity.length);
+    await assert.rejects(restoreTo(taken, join(dir, 'data')), /already exists/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const server = process.env.PELAGO_TEST_DATABASE_URL;
+test('a backup is restored into a Postgres server where the server looks for its workspace', { skip: !server && 'PELAGO_TEST_DATABASE_URL is not set' }, async () => {
+  const l = await map();
+  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Carried over' }] });
+  const base = `r${Date.now().toString(36)}`;
+  const url = await databaseFor(server!, base); // stands for the server's own database: an empty one
+  try {
+    const home = await dump(l.db, { id: 'default', name: 'Default' });
+    const done = await restoreTo(home, url);
+    assert.match(done.where, new RegExp(`database \\w+_${base} on `), 'the default workspace goes in the database named');
+    assert.doesNotMatch(done.where, /:[^@/]+@/, 'the password is not said');
+    await assert.rejects(restoreTo(home, url), /not empty/);
+    const other = await restoreTo({ ...home, workspace: { id: 'acme', name: 'Acme' } }, url);
+    assert.match(other.where, new RegExp(`_${base}_acme on `), 'another workspace goes in its own database beside it');
+    const there = await openDb(await databaseFor(url, 'acme', false));
+    assert.equal((await there.query<{ n: number }>(`select count(*)::int as n from entity where title = 'Carried over'`)).rows[0].n, 1);
+    await there.close();
+  } finally {
+    await dropDatabaseFor(url, 'acme');
+    await dropDatabaseFor(server!, base);
+  }
 });
