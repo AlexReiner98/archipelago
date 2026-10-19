@@ -178,10 +178,10 @@ test('the UI loads as modules', () => {
   assert.deepEqual(ratchet(classic, CLASSIC_SCRIPTS), [], 'Load it with <script type="module"> and import what it needs.');
 });
 
-// 8. Five dependencies (CLAUDE.md); another only with the owner's agreement. Four again once @anthropic-ai/sdk goes (e_cxtcgtfg).
-test('there are five dependencies', () => {
+// 8. Four dependencies (CLAUDE.md); another only with the owner's agreement. Model calls are plain fetch (src/model.ts).
+test('there are four dependencies', () => {
   const deps = Object.keys(JSON.parse(read('package.json')).dependencies ?? {}).sort();
-  assert.deepEqual(deps, ['@anthropic-ai/sdk', '@electric-sql/pglite', '@modelcontextprotocol/sdk', 'pg', 'zod']);
+  assert.deepEqual(deps, ['@electric-sql/pglite', '@modelcontextprotocol/sdk', 'pg', 'zod']);
 });
 
 // 9. Every module the page loads parses: one that does not leaves the page blank, and most are not run by a test.

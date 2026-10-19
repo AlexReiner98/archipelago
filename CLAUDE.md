@@ -94,11 +94,9 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
   or type is a screen there too (`screens`: pieces the kernel draws, listed in
   `src/declared.ts`); the item page (`ui/item.js`) names no pack's type.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
-- **Dependencies stay at five** (`@electric-sql/pglite`,
-  `@modelcontextprotocol/sdk`, `zod`, since 9 Oct 2026 `@anthropic-ai/sdk`,
-  for the agent on the server that reads pushes, and since 18 Oct 2026 `pg`,
-  for a Postgres server; four again when model calls go through LiteLLM)
-  unless the owner agrees to another. One library is kept as a file, not a
+- **Dependencies stay at four** (`@electric-sql/pglite`,
+  `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
+  Postgres server; model calls are plain fetch, in `src/model.ts`) unless the owner agrees to another. One library is kept as a file, not a
   dependency: `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
   2026 at the owner's asking), offered to a style's own drawing code and
   loaded only when one asks for it. The app's own pages do not use it.
@@ -177,7 +175,7 @@ else a pack"). These rules keep it composable while that happens, and
   count.
 - **The UI loads as modules,** with no build step: each part of the page its
   own module under `ui/`, served by name from `src/ui-files.ts`.
-- **Five dependencies,** as above.
+- **Four dependencies,** as above.
 
 Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may
 only shrink and goes once the rule is met: when your change brings a number
