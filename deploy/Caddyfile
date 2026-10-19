@@ -3,6 +3,8 @@
 # Caddy's own (a browser warns) until a name points here, then an email address for Let's Encrypt.
 {
 	admin 127.0.0.1:2019
+	# A client that sends no server name (most do not for an IP address) is given this site's certificate.
+	default_sni {$PELAGO_SITE}
 }
 
 {$PELAGO_SITE} {
