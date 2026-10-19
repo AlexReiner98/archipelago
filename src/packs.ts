@@ -1,6 +1,5 @@
-// Packs: versioned bundles of types and relation types, stored as files.
-// A type may extend another (a "flavour"); it inherits the parent's fields and
-// statuses, and anything that queries the parent also sees its flavours.
+// Packs: versioned bundles of types and relation types, stored as files. A type may extend another (a "flavour"); it
+// inherits the parent's fields and statuses, and anything that queries the parent also sees its flavours.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -154,8 +153,7 @@ export class Registry {
 
   reload(): void {
     const found = new Map<string, PackFile>();
-    // With its own local folder, a workspace must not pick up the types
-    // another workspace defined in the shared one.
+    // With its own local folder, a workspace must not pick up the types another workspace defined in the shared one.
     const folders = readdirSync(this.dir)
       .filter((name) => !(this.localDir && name === LOCAL_PACK))
       .map((name) => [name, join(this.dir, name, 'pack.json')]);
@@ -324,10 +322,14 @@ export class Registry {
     return this.types.get(id);
   }
 
-  /** Turn packs off in this workspace (the rest on), and load again. The kernel's packs stay on. */
-  turnOff(packs: string[]): void {
-    this.turnedOff = packs.filter((p) => !KERNEL_PACKS.includes(p));
+  /** Turn packs off in this workspace (the rest on), and load again if that changed anything. The kernel's packs stay on. Says what was newly turned off, or undefined when nothing changed. */
+  turnOff(packs: string[]): string[] | undefined {
+    const next = packs.filter((p) => !KERNEL_PACKS.includes(p));
+    const newly = next.filter((p) => !this.turnedOff.includes(p));
+    if (!newly.length && next.length === this.turnedOff.length) return undefined;
+    this.turnedOff = next;
     this.reload();
+    return newly;
   }
 
   /** The seven kinds, in the core pack's order. */

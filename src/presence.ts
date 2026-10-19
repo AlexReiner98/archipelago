@@ -2,7 +2,9 @@
 // workspace's transient table (src/transient.ts), so a page that polls one server follows a show made on another. A
 // show, a change and a told beat are kept at once, as they come with a write of their own; the steps of read tools
 // are gathered in this process and kept at most once a FLUSH_MS, so reading the map costs no write per call. A page
-// asking this process sees its own steps as they are taken, and another server's within FLUSH_MS.
+// asking this process sees its own steps as they are taken, and another server's within FLUSH_MS. The agents waiting in
+// watch are counted per process, kept for LISTEN_MS and kept again while they wait, and summed: a server that stops
+// stops counting within LISTEN_MS.
 
 import { randomBytes } from 'node:crypto';
 import type { Q } from './db.ts';
@@ -44,6 +46,9 @@ const KEPT_MS = 24 * 3600_000;
 /** This process, among the servers sharing a database. */
 const PROCESS = randomBytes(4).toString('hex');
 
+/** How long a server's count of agents listening holds unless it is kept again. */
+export const LISTEN_MS = 15_000;
+
 /** Whose screen: per workspace and per person. */
 export type Whose = { workspace: string; viewer?: string };
 const whose = (w: Whose) => `${w.workspace}:${w.viewer ?? ''}`;
@@ -84,20 +89,40 @@ export async function flushAll(): Promise<void> {
   await Promise.all([...unkept.keys()].map(flush));
 }
 
+// The agents waiting in watch on this process, per workspace.
+const waiting = new Map<string, { db: Q; count: number }>();
+let beat: NodeJS.Timeout | undefined;
+const keepWaiting = (workspace: string, w: { db: Q; count: number }) => keep(w.db, `listening:${workspace}:${PROCESS}`, w.count, LISTEN_MS);
+
+/** An agent begins (1) or stops (-1) waiting in watch on this process. */
+export async function listening(db: Q, workspace: string, by: 1 | -1): Promise<void> {
+  const w = waiting.get(workspace) ?? { db, count: 0 };
+  w.count += by;
+  if (w.count > 0) waiting.set(workspace, w);
+  else waiting.delete(workspace);
+  if (waiting.size) beat ??= setInterval(() => void Promise.all([...waiting].map(([ws, w]) => keepWaiting(ws, w))).catch(() => {}), LISTEN_MS / 3).unref();
+  else {
+    clearInterval(beat);
+    beat = undefined;
+  }
+  await keepWaiting(workspace, w);
+}
+
 /** A beat told in a workspace: the stamp a page watches moves with it. */
 export async function tellStamp(db: Q, workspace: string): Promise<void> {
   await keep(db, `told:${workspace}`, Date.now(), KEPT_MS);
 }
 
-/** What a page polling for this screen is given: where it was pointed, the last steps on any server, and the tell stamp. */
-export async function presence(db: Q, w: Whose): Promise<{ focus?: Focus; steps: Step[]; told: number }> {
+/** What a page polling for this screen is given: where it was pointed, the last steps on any server, the tell stamp and how many agents are listening. */
+export async function presence(db: Q, w: Whose): Promise<{ focus?: Focus; steps: Step[]; told: number; listening: number }> {
   const key = whose(w);
   const { rows } = await db.query<{ key: string; value: unknown }>(
-    `select key, value from transient where until >= now() and (key = $1 or key = $2 or (starts_with(key, $3) and key <> $4))`,
-    [`focus:${key}`, `told:${w.workspace}`, `steps:${key}:`, `steps:${key}:${PROCESS}`],
+    `select key, value from transient where until >= now() and (key = $1 or key = $2 or (starts_with(key, $3) and key <> $4) or (starts_with(key, $5) and key <> $6))`,
+    [`focus:${key}`, `told:${w.workspace}`, `steps:${key}:`, `steps:${key}:${PROCESS}`, `listening:${w.workspace}:`, `listening:${w.workspace}:${PROCESS}`],
   );
   const value = (k: string) => rows.find((r) => r.key === k)?.value;
   const theirs = rows.filter((r) => r.key.startsWith('steps:')).flatMap((r) => r.value as Step[]);
   const steps = [...theirs, ...(mine.get(key) ?? [])].sort((a, b) => a.at - b.at).slice(-STEPS_KEPT);
-  return { focus: value(`focus:${key}`) as Focus | undefined, steps, told: (value(`told:${w.workspace}`) as number | undefined) ?? 0 };
+  const listeners = rows.filter((r) => r.key.startsWith('listening:')).reduce((sum, r) => sum + Number(r.value), waiting.get(w.workspace)?.count ?? 0);
+  return { focus: value(`focus:${key}`) as Focus | undefined, steps, told: (value(`told:${w.workspace}`) as number | undefined) ?? 0, listening: listeners };
 }

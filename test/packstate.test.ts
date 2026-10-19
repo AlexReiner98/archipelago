@@ -9,7 +9,10 @@ import { after, test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { Archipelago } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
+import { followPacks, setPack } from '../src/packstate.ts';
+import { fresh, human } from './map.ts';
 import { orderPacks } from '../src/packorder.ts';
 import { createHttpServer } from '../src/server.ts';
 import { Workspaces } from '../src/workspaces.ts';
@@ -93,4 +96,18 @@ test("a pack turned off and on again on a running server: a connected agent's to
   assert.ok((await names()).includes('time_log'), 'the tool is back');
   assert.equal(changed >= 2, true);
   assert.equal((await api('packs')).result.find((p: { id: string }) => p.id === 'time').state, 'active');
+});
+
+test('a pack turned off on one server is followed by another on the same database', async () => {
+  const one = await fresh();
+  const other = new Archipelago(one.db, new Registry(one.registry.dir));
+  assert.equal(await followPacks(other), false, 'nothing to follow yet');
+  await setPack(one, human, { pack: 'time', on: false });
+  assert.equal(other.registry.states.get('time')!.state, 'active', 'the other server has not looked yet');
+  assert.equal(await followPacks(other), true);
+  assert.equal(other.registry.states.get('time')!.state, 'off');
+  assert.equal(await followPacks(other), false, 'no reload when nothing changed');
+  await setPack(one, human, { pack: 'time', on: true });
+  assert.equal(await followPacks(other), true);
+  assert.equal(other.registry.states.get('time')!.state, 'active');
 });

@@ -30,7 +30,7 @@ import { askView, viewList } from './askview.ts';
 import { toConfirm } from './confirm.ts';
 import { VIEWS } from './views.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
-import { type Focus, point as setFocus, presence, tellStamp, took } from './presence.ts';
+import { type Focus, listening, point as setFocus, presence, tellStamp, took } from './presence.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page; only a project, feature, release, proof question, test or test result can be, and only a human makes it so (from an agent it waits as a proposal).');
@@ -203,10 +203,6 @@ export function describeChanges(changes: HumanChange[]): string {
     })
     .join('\n');
 }
-
-// Agents waiting in `watch` to hear what the human does. Counted so the web UI
-// can say whether anyone will hear a decision the moment it is made.
-let listening = 0;
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
 async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string): Promise<Focus> {
@@ -389,7 +385,7 @@ export const TOOLS: Record<string, Tool> = {
     input: {},
     run: async (l) => {
       const [p, { told, ...seen }] = await Promise.all([l.pulse(), presence((await wholeMap(l)).db, l)]);
-      return { stamp: `${p.stamp}.${told}`, ...seen, ui: uiStamp(), listening };
+      return { stamp: `${p.stamp}.${told}`, ...seen, ui: uiStamp() };
     },
   },
   backup: {
@@ -468,7 +464,9 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => {
       if (input.after === undefined) return { latest: await latestSeq(l), changes: [] };
       const until = Date.now() + (input.wait_seconds ?? 0) * 1000;
-      listening++;
+      // Counted on every server, so the web UI can say whether anyone will hear a decision the moment it is made.
+      const { db } = await wholeMap(l);
+      await listening(db, l.workspace, 1);
       try {
         for (;;) {
           const changes = await humanChanges(l, input.after);
@@ -476,7 +474,7 @@ export const TOOLS: Record<string, Tool> = {
           await new Promise((r) => setTimeout(r, 1000));
         }
       } finally {
-        listening--;
+        await listening(db, l.workspace, -1).catch(() => {});
       }
     },
   },

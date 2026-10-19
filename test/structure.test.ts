@@ -56,7 +56,7 @@ const count = (files: string[], pattern: RegExp) =>
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
   'src/views.ts': 509,
-  'src/tools.ts': 1056,
+  'src/tools.ts': 1054,
   'src/pelago.ts': 1072,
   'ui/style.css': 778,
   'src/server.ts': 557,

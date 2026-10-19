@@ -13,11 +13,13 @@ import { openDb } from './db.ts';
 import { databaseFor, dropDatabaseFor } from './pg.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { Registry } from './packs.ts';
-import { packsOff } from './packstate.ts';
+import { followPacks, packsOff } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
 
 export const DEFAULT_WORKSPACE = 'default';
+/** How soon a pack switched on another server is followed here. */
+const FOLLOW_MS = 5_000;
 
 export interface Workspace {
   id: string;
@@ -63,6 +65,16 @@ export class Workspaces {
     this.leading = Boolean(config.runAutomations);
     const file = this.indexFile();
     this.index = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { workspaces: [] };
+    // Other servers on the same Postgres may turn a pack off or on: each open workspace here follows within FOLLOW_MS.
+    if (config.databaseUrl) setInterval(() => void this.follow(), FOLLOW_MS).unref();
+  }
+
+  /** Catch every open workspace up with what other servers changed in it that this process keeps in memory. */
+  async follow(): Promise<void> {
+    for (const [id, opening] of this.open) {
+      const ws = await opening.catch(() => undefined);
+      if (ws) await followPacks(ws.pelago).catch((err) => console.error(`following packs in ${id} failed: ${(err as Error).message}`));
+    }
   }
 
   private indexFile(): string {

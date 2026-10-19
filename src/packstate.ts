@@ -45,6 +45,18 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated };
 }
 
+/**
+ * Catch up with a pack turned off or on by another server on the same database: its types in the type table are
+ * already synced there, so here the registry loads again, its process stops, and the agents connected here are told.
+ */
+export async function followPacks(l: Archipelago): Promise<boolean> {
+  const newly = l.registry.turnOff(await packsOff(l));
+  if (!newly) return false;
+  if (newly.length) hostFor(l.registry).stop();
+  toolsChanged(l.workspace);
+  return true;
+}
+
 /** The owner’s tools for packs: their states and switch, their secrets, and the acts they ask for. */
 export const PACK_STATE_TOOLS: Record<string, Tool> = {
   packs: {

@@ -10,7 +10,7 @@ const other: typeof one = await import(`${new URL('../src/presence.ts', import.m
 test('a show on one server moves a page polling another; read steps follow within a flush', async () => {
   const db = await openDb();
   const w = { workspace: 'default', viewer: 'e_owner000' };
-  assert.deepEqual(await other.presence(db, w), { focus: undefined, steps: [], told: 0 });
+  assert.deepEqual(await other.presence(db, w), { focus: undefined, steps: [], told: 0, listening: 0 });
 
   await one.point(db, w, { at: 1, hash: 'e/e_x', actor: 'robot', note: 'Look' });
   await one.took(db, w, { kind: 'show', actor: 'robot', did: 'Look', hash: 'e/e_x' }, true);
@@ -30,4 +30,19 @@ test('a show on one server moves a page polling another; read steps follow withi
 
   await other.tellStamp(db, 'default');
   assert.ok((await one.presence(db, w)).told > 0, 'a beat told on one server moves the stamp on the other');
+});
+
+test('agents listening on two servers are counted on both', async () => {
+  const db = await openDb();
+  const w = { workspace: 'default' };
+  await one.listening(db, 'default', 1);
+  await other.listening(db, 'default', 1);
+  await other.listening(db, 'default', 1);
+  assert.equal((await one.presence(db, w)).listening, 3);
+  assert.equal((await other.presence(db, { workspace: 'elsewhere' })).listening, 0, 'another workspace hears none of them');
+  await other.listening(db, 'default', -1);
+  await one.listening(db, 'default', -1);
+  assert.equal((await other.presence(db, w)).listening, 1);
+  await other.listening(db, 'default', -1);
+  assert.equal((await one.presence(db, w)).listening, 0);
 });
