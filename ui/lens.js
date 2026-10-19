@@ -1,4 +1,4 @@
-import { api, h, part } from './base.js';
+import { api, h } from './base.js';
 import { drawArch } from './arch.js';
 import { drawFlow } from './flow.js';
 import { drawGrid } from './grid.js';
@@ -209,15 +209,3 @@ export const lensPlace = new Map();
 
 /** The shapes the kernel draws. Each reads only what a lens answers with. */
 export const LENS_SHAPES = { list: drawList, flow: drawFlow, grid: drawGrid, time: drawTime, architecture: drawArch };
-
-/**
- * The map as a picture: the lens its address names (what follows a ?), or
- * the whole map as it opens, drawn in the style kept for it.
- */
-export async function graph(query = '') {
-  const { lens, style } = readLens(query);
-  const view = lensView({ lens, style });
-  // One already there stays until the new one is drawn: the map changing under it does not blank the page.
-  if (part('graph').querySelector('.lens-wrap')) await view.ready;
-  part('graph').replaceChildren(h('section', { class: 'card lens-card' }, view));
-}
