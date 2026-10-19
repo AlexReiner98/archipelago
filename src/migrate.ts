@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
-import { ORDERED, SCHEMA, VISIBILITY } from './schema.ts';
+import { ORDERED, SCHEMA, TOKEN_SCOPE, VISIBILITY } from './schema.ts';
 import { CONTROL } from './control.ts';
 import { TRANSIENT } from './transient.ts';
 
@@ -29,6 +29,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 2, name: 'writes in order on a server', sql: '', server: ORDERED },
   { version: 3, name: 'what one request leaves for the next', sql: TRANSIENT },
   { version: 4, name: 'what the server kept on its disk', sql: CONTROL },
+  { version: 5, name: 'a token is within some items, and may report, propose or change', sql: TOKEN_SCOPE },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

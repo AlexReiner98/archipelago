@@ -4,7 +4,7 @@
 
 import { SETUP_VERSION, setupCommand } from './connect.ts';
 import type { Q } from './db.ts';
-import type { Archipelago } from './pelago.ts';
+import type { Archipelago, May } from './pelago.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { keep, kept } from './transient.ts';
@@ -23,8 +23,10 @@ export interface HookCall {
   whole: Q;
   /** The map as the token's person sees it. */
   pelago: Archipelago;
-  /** The repositories the token is limited to; none for any. */
-  repos: string[];
+  /** The items the token writes within; none for everything. */
+  within: string[];
+  /** A token that may only report speaks for no session. */
+  may?: May;
   body: HookBody;
   /** This server: the commit it runs and when it started. */
   running: { commit?: string; started: string };
@@ -37,16 +39,17 @@ const HEARD_MS = 7 * 86_400_000;
 const heardKey = (session: string | undefined) => `heard:${session ?? ''}`;
 
 const LIMITED =
-  'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one of them: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made on the Workspace screen.';
+  'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one that is theirs: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made on the Workspace screen.';
 
 const restarted = ({ started, commit }: HookCall['running']) =>
   `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). If that was a deploy, its tools may have changed, and your client still holds the list from when it connected: a tool or an input that CLAUDE.md or a tool's answer names, but your list lacks, is there on the server. Ask the owner to reconnect the pelago MCP server, or until then call the tool as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
 
 /** The answer to one hook, or undefined for an event there is none for. */
 export async function answerHook(event: string, call: HookCall): Promise<object | undefined> {
-  const { whole, pelago, repos, body, running } = call;
-  // A token limited to some repositories registers and speaks for sessions in those, and for no others.
-  if (repos.length && !(await hookWithin(pelago, repos, body, event === 'session-start'))) {
+  const { whole, pelago, within, body, running } = call;
+  if (call.may === 'report') return {};
+  // A token within some items registers and speaks for sessions in the places that are theirs, and for no others.
+  if (within.length && !(await hookWithin(pelago, within, body, event === 'session-start'))) {
     return event === 'session-start' ? { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: LIMITED } } : {};
   }
   // Said in the server's log, so "did the hook run?" has an answer.

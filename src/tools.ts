@@ -6,11 +6,11 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { bodyAfter } from './ops.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
-import { createToken, listTokens, revokeToken } from './auth.ts';
+import { createToken } from './auth.ts';
 import { readDocument } from './documents.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
-import { BACKUP_TOOLS } from './backup-tools.ts'; import { HEALTH_TOOLS } from './health.ts';
+import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -123,6 +123,8 @@ export interface Tool {
   humanOnly?: boolean;
   /** Exists only when the server runs in dev mode. */
   devOnly?: boolean;
+  /** Sends what a system measured: the only kind of tool a token that may only report can call. */
+  report?: boolean;
   run(l: Archipelago, actor: Actor, input: any): Promise<unknown>;
 }
 
@@ -816,43 +818,8 @@ export const TOOLS: Record<string, Tool> = {
     input: { id: z.string() },
     run: async (l, _actor, input) => readDocument(l, input.id),
   },
-  ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...HEALTH_TOOLS,
-  token_create: {
-    description:
-      'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once. ' +
-      'An agent\u2019s token can be limited to some repositories (repos): it then reads the map as before, and can change only what is theirs (what lives in them, and all that is part of that or about it). Give it an expiry (expires_days) unless there is a reason not to.',
-    humanOnly: true,
-    input: {
-      kind: z.enum(['human', 'agent']),
-      name: z.string().min(1).describe('Who or what will use it, e.g. "claude-code". Recorded against everything done with it.'),
-      entity: z.string().optional().describe('Id of the person this token is, or acts for. Defaults to you.'),
-      admin: z.boolean().optional(),
-      expires_days: z.number().int().positive().optional(),
-      repos: z.array(z.string()).optional().describe('Ids of the repositories an agent\u2019s token is limited to changing. Left out: no such limit.'),
-    },
-    run: async (l, actor, input) => {
-      const entity = input.entity ?? actor.person;
-      if (input.kind === 'human' || input.admin || entity !== actor.person) needAdmin(actor, 'make a token for anyone but an agent acting for yourself');
-      for (const id of input.repos ?? []) {
-        const repo = await l.entity(id);
-        if (!repo || !l.registry.isA(repo.type, 'software.repo')) throw new Error(`"${id}" is not a repository in this map, so a token cannot be limited to it.`);
-      }
-      if (input.repos?.length && input.kind !== 'agent') throw new Error('Only an agent\u2019s token can be limited to repositories.');
-      return createToken(l.db, l.workspace, { ...input, entity });
-    },
-  },
-  token_list: {
-    description: 'List tokens: an admin sees the whole workspace\u2019s, anyone else their own. Secrets are never shown.',
-    humanOnly: true,
-    input: {},
-    run: async (l, actor) => listTokens(l.db, actor.admin ? undefined : (actor.person ?? '')),
-  },
-  token_revoke: {
-    description: 'Revoke a token at once. An admin can revoke any; anyone else only their own.',
-    humanOnly: true,
-    input: { id: z.string() },
-    run: async (l, actor, input) => revokeToken(l.db, input.id, actor.admin ? undefined : (actor.person ?? '')),
-  },
+  ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
+  ...TOKEN_TOOLS,
   notify_workspace: {
     description: 'Send a notification to another workspace on this server. It arrives only if that workspace\u2019s admin has chosen to accept notifications from this one.',
     humanOnly: true,
@@ -1028,24 +995,24 @@ export const TOOLS: Record<string, Tool> = {
 export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(TOOLS), ...packTools(reg).filter(([t]) => !TOOLS[t])];
 
 /** Validate input and run a tool. */
-export async function callTool(l: Archipelago, actor: Actor, asked: string, input: unknown): Promise<unknown> {
+export async function callTool(l: Archipelago, actor: Actor, given: string, input: unknown): Promise<unknown> {
+  const asked = FORMER_NAMES[given] ?? given;
   const name = TOOLS[asked] || l.registry.tools.has(asked) ? asked : (packActionByShort(l.registry, asked) ?? asked);
   const pack = packTool(l.registry, name);
   const tool: Tool | undefined = TOOLS[name] ?? pack;
   if (!tool) throw new Error(`No tool "${name}". Tools: ${toolsFor(l.registry).map(([t]) => t).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
+  if (actor.may === 'report' && !tool.report) throw new Error(`This token may only report: it cannot call ${name}. Send what was measured with report.`);
   const parsed = z.strictObject(tool.input).safeParse(input ?? {});
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);
-  // An agent whose token is limited to some repositories is held to them here, whatever the tool.
-  const limited = actor.kind === 'agent' && Boolean(actor.repos?.length);
+  // An agent whose token is within some items is held to them here, whatever the tool; what it writes, where every change is checked.
+  const limited = actor.kind === 'agent' && Boolean(actor.within?.length);
   if (limited) await withinScope(l, actor, name, parsed.data as Record<string, unknown>);
-  // A pack's action is held to the token's work by what it would write, checked as a change is.
   const answer =
     pack && !TOOLS[name] && limited
       ? await pack.run(l, actor, parsed.data, async (done) => {
-          if (done.requests?.length) throw new Error(`This token is limited to some repositories: ${name} asks to act outside the map, which it cannot.`);
-          if (done.ops?.length) await withinScope(l, actor, 'change', { ops: done.ops });
+          if (done.requests?.length) throw new Error(`This token is limited to some of the map: ${name} asks to act outside the map, which it cannot.`);
         })
       : await tool.run(l, actor, parsed.data);
   // A step that could not be kept costs the page a step, never the agent its answer.

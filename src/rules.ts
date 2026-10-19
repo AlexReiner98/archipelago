@@ -143,3 +143,15 @@ export async function clashes(q: Q, reg: Registry, w: Written, target: Target | 
   }
   return out;
 }
+
+/** What the packs' rules make of each op of a change: whether it waits for a person, and what refuses it. */
+export async function judgeOps(q: Q, reg: Registry, human: boolean, given: { op: string }[]) {
+  const ops = given as (Written & { id?: string; keep?: string; drop?: string })[];
+  const on = (op: (typeof ops)[number]) => (op.op === 'merge' ? [op.keep!, op.drop!] : op.id ? [op.id] : []);
+  const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
+  return Promise.all(ops.map(async (op) => {
+    const targets = on(op).flatMap((id) => found.get(id) ?? []);
+    const judged = judge(reg, human, op, targets);
+    return { ...judged, refused: [...judged.refused, ...(await clashes(q, reg, op, targets[0]))] };
+  }));
+}

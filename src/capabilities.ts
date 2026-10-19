@@ -56,13 +56,16 @@ export interface Settles {
 /**
  * Its health is watched from outside: a monitor reports on the address in `field`, and the item's status follows,
  * to `down` when it fails and back to `up` when it answers. Only while its status is `up`, `down` or one of `also`:
- * a part still being built is left alone.
+ * a part still being built is left alone. A deploy reports a part live at a commit (up, the commit kept in
+ * `commit`), or stopped on purpose (`idle`, where monitors leave it alone too).
  */
 export interface Watch {
   field: string;
   up: string;
   down: string;
   also?: string[];
+  idle?: string;
+  commit?: string;
 }
 
 export interface Capabilities {
@@ -132,7 +135,8 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
   if (watch) {
     if (!watch.field) problems.push('watch needs the field its address is in');
     has('watch', watch.field, ['url', 'string']);
-    for (const s of [watch.up, watch.down, ...(watch.also ?? [])]) if (!statuses.includes(s)) problems.push(`watch names "${s}", which is no status of it`);
+    for (const s of [watch.up, watch.down, ...(watch.also ?? []), ...(watch.idle ? [watch.idle] : [])]) if (!statuses.includes(s)) problems.push(`watch names "${s}", which is no status of it`);
+    has('watch.commit', watch.commit, ['string']);
   }
   return problems;
 }

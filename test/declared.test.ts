@@ -58,7 +58,7 @@ test("a token limited to some work may call a pack's action on that work only", 
       { op: 'link', type: 'software.lives_in', from: 'in', to: 'r' },
     ],
   })) as { created: Record<string, string> };
-  const limited: Actor = { kind: 'agent', name: 'limited', repos: [made.created.r] };
+  const limited: Actor = { kind: 'agent', name: 'limited', within: [made.created.r] };
   assert.deepEqual(await callTool(l, limited, 'demo_visits', { site: 'Mill' }), []);
   // What it would write is checked as a change is, before anything is applied.
   await assert.rejects(callTool(l, limited, 'demo_plan_visit', { task: made.created.t, site: 'Mill' }), /"Visit Mill" is made without being tied/);

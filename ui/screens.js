@@ -11,6 +11,7 @@ import { proofPart } from './proof.js';
 import { lensView } from './lens.js';
 import { roadmap } from './roadmap.js';
 import { time } from './time.js';
+import { tokenPiece } from './token-piece.js';
 import { RAN, ago, chip, isA, label, link, pill, tokensText, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
@@ -177,6 +178,11 @@ const PIECES = {
   },
   // A page the kernel still draws itself, as its own part, until a pack draws it from pieces.
   page: (ctx, p) => PAGES[p.page] && { node: h('div', { class: 'part', 'data-part': p.page }), later: PAGES[p.page] },
+  // Tokens within the item: made here, listed and revoked here.
+  token: (ctx) => {
+    const node = h('div');
+    return { node, later: () => tokenPiece(node, ctx.e, fold) };
+  },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,
   document: () => null,
@@ -186,7 +192,7 @@ const PIECES = {
 const PAGES = { time };
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
-const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields'];
+const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields', 'token'];
 
 /** The column a screen of its own draws: its pieces, with no item. */
 export function drawScreen(screen, redraw) {

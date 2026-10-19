@@ -24,13 +24,14 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
       ],
     })
   ).result.created;
-  // Its owner makes it for one repository, with an end. Only a repository can be the limit, and only an agent limited.
-  assert.match((await call('/api/token_create', admin, { kind: 'agent', name: 'x', repos: [made.t] })).error, /not a repository/);
-  assert.match((await call('/api/token_create', admin, { kind: 'human', name: 'x', repos: [made.r] })).error, /Only an agent/);
-  const site = (await call('/api/token_create', admin, { kind: 'agent', name: 'site-machine', repos: [made.r], expires_days: 90 })).result.token;
+  // Its owner makes it within one repository, with an end. It is within an item of the map, and only an agent's is scoped.
+  assert.match((await call('/api/token_create', admin, { kind: 'agent', name: 'x', within: ['e_nothing1'] })).error, /no item in this map/);
+  assert.match((await call('/api/token_create', admin, { kind: 'human', name: 'x', within: [made.r] })).error, /Only an agent/);
+  assert.match((await call('/api/token_create', admin, { kind: 'human', name: 'x', may: 'report' })).error, /Only an agent/);
+  const site = (await call('/api/token_create', admin, { kind: 'agent', name: 'site-machine', within: [made.r], expires_days: 90 })).result.token;
   const free = (await call('/api/token_create', admin, { kind: 'agent', name: 'everywhere' })).result.token;
   const listed = (await call('/api/token_list', admin)).result.find((t: any) => t.name === 'site-machine');
-  assert.deepEqual([listed.repos, Math.round((Date.parse(listed.expires_at) - Date.now()) / 86_400_000)], [[made.r], 90]);
+  assert.deepEqual([listed.within, listed.within_titles, listed.may, Math.round((Date.parse(listed.expires_at) - Date.now()) / 86_400_000)], [[made.r], ['Site repo'], 'change', 90]);
 
   const change = (token: string, ops: unknown[]) => call('/agent/change', token, { reason: 'test', ops });
   // What is the repository's it can change; what is not, it cannot, though it can read it.

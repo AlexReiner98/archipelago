@@ -4,7 +4,8 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { checkWritten } from './automation-rules.ts';
-import { clashes, judge, type Target, type Written } from './rules.ts';
+import { judgeOps } from './rules.ts';
+import { mayWrite } from './within.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts';
 import { readEvents, type EventQuery } from './eventlog.ts';
@@ -20,9 +21,13 @@ export interface Actor {
   admin?: boolean;
   /** Id of the token in use, when there is one. */
   token?: string;
-  /** The repositories this identity's changes are limited to (their ids). Absent: no such limit. */
-  repos?: string[];
+  /** The items this identity writes within, with all that is part of them (their ids). Absent: everything. */
+  within?: string[];
+  /** What it may write: only reports (measurements), proposals that always wait, or changes. Absent: change. */
+  may?: May;
 }
+
+export type May = 'report' | 'propose' | 'change';
 
 export type Level = 'auto' | 'propose' | 'forbidden';
 export type OpKind = 'create' | 'update' | 'link' | 'unlink' | 'archive' | 'restore' | 'merge' | 'define_type';
@@ -252,19 +257,10 @@ export class Archipelago {
 
   // ---- writes ----------------------------------------------------------
 
-  /** What the packs' rules make of each op: whether it waits for a person, and what refuses it. */
-  private async judgeOps(actor: Actor, ops: Op[]) {
-    const on = (op: Op) => (op.op === 'merge' ? [op.keep, op.drop] : 'id' in op ? [op.id] : []);
-    const found = new Map((await this.db.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
-    return Promise.all(ops.map(async (op) => {
-      const targets = on(op).flatMap((id) => found.get(id) ?? []);
-      const judged = judge(this.registry, actor.kind === 'human', op as Written, targets);
-      return { ...judged, refused: [...judged.refused, ...(await clashes(this.db, this.registry, op as Written, targets[0]))] };
-    }));
-  }
-
-  async change(actor: Actor, input: ChangeInput) {
+  /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
+  async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
+    await mayWrite(this, actor, input.ops, measured);
     const { warnings } = await this.plan(input.ops);
     const me = actorId(actor);
     const claimed = input.authority;
@@ -276,15 +272,15 @@ export class Archipelago {
     // server's policy on everything the policy does not forbid outright.
     const chosen = actor.kind === 'human' ? undefined : await this.setting<string>(AGENT_CHANGES);
     // The packs' rules: what waits for a person, whatever else agents may do unreviewed, and what is refused.
-    const judged = await this.judgeOps(actor, input.ops);
+    const judged = await judgeOps(this.db, this.registry, actor.kind === 'human', input.ops);
     if (judged.some((j) => j.refused.length)) throw new Error(`Change rejected:\n${judged.flatMap((j) => j.refused).map((r) => `- ${r}`).join('\n')}`);
     const levels = input.ops.map((op, i): Level => {
-      if (actor.kind === 'human') return 'auto';
+      if (actor.kind === 'human' || measured) return 'auto';
       const level = this.policy[op.op];
       if (level === 'forbidden') return level;
       if (judged[i].hold) return 'propose';
-      // An agent may always ask for a look before its change takes effect.
-      if (input.hold) return 'propose';
+      // An agent may always ask for a look before its change takes effect, and one whose token may only propose always does.
+      if (input.hold || actor.may === 'propose') return 'propose';
       return chosen === 'apply' ? 'auto' : chosen === 'hold' ? 'propose' : level;
     });
     const forbidden = input.ops.filter((_, i) => levels[i] === 'forbidden').map((op) => op.op);

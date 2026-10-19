@@ -56,11 +56,11 @@ const count = (files: string[], pattern: RegExp) =>
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
   'src/views.ts': 509,
-  'src/tools.ts': 1054,
-  'src/pelago.ts': 1072,
+  'src/tools.ts': 1021,
+  'src/pelago.ts': 1068,
   'ui/style.css': 778,
   'src/server.ts': 557,
-  'src/sessions.ts': 503,
+  'src/sessions.ts': 501,
 };
 
 test(`no file is over ${MAX_LINES} lines`, () => {
@@ -72,11 +72,9 @@ test(`no file is over ${MAX_LINES} lines`, () => {
 const NAMES_PACKS: Record<string, number> = {
   'ui/time.js': 2,
   'ui/week.js': 1,
-  'ui/workspace.js': 1,
   'src/views.ts': 6,
   'src/brief.ts': 2,
   'src/github.ts': 3,
-  'src/tools.ts': 1,
   'src/github-app.ts': 1,
   'src/reader.ts': 1,
   'ui/doc.js': 1,

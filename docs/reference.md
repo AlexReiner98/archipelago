@@ -473,17 +473,26 @@ person can read it. Three things limit what a copied one is worth:
 
 - **It ends.** "Connect an agent" makes a token that expires in 90 days
   unless told otherwise; the token's row says when.
-- **It can be limited to some repositories.** Such a token reads the map as
-  its person does and can change only what is those repositories': what
-  lives in them and all that is part of that or about it (`src/scope.ts`).
-  What it makes has to be tied into that work in the same change. It cannot
-  archive, merge or re-link anything else, define a type, or speak for
-  another repository. What it may call is a list: beyond the tools that
-  only read, it reports results for that work's tests, takes a resource
-  that work needs or that no work is said to need, and notifies about that work. Everything else (a backup,
-  the owner's word on settled questions, a tool added later) is refused
-  until it is named in the list. The agent that reads pushes on the server is held to
-  the repository it is reading in the same way.
+- **It can be within an item.** Made with "Make a token for this" on an
+  item's page (a repository, an environment, a project), such a token reads
+  the map as its person does and writes only what is that item's: what lives
+  in it and all that is part of that or about it. What a change writes is
+  checked on the write path itself (`src/within.ts`, from
+  `Archipelago.change`), whichever tool sends it. What it makes has to be
+  tied into that work in the same change. It cannot archive, merge or re-link
+  anything else, define a type, or speak for another repository. What else
+  it may call is a list (`src/scope.ts`): beyond the tools that only read,
+  it reports results for that work's tests, takes a resource that work needs
+  or that no work is said to need, and notifies about that work. Everything
+  else (a backup, the owner's word on settled questions, a tool added later)
+  is refused until it is named in the list. The agent that reads pushes on
+  the server is held to the repository it is reading in the same way.
+- **It can be held to reporting or proposing.** A token that may only
+  report is for a running system (a monitor, a deploy): it can call the
+  `report` tool and nothing else, not even a read. A report names parts by
+  the address they are watched at, never by an id, and is applied at once
+  as a measurement. A token that may propose has every change it sends wait
+  for a person, whatever the workspace lets agents do.
 - **Its owner hears of a new place.** Each token keeps the networks it has
   been used from. Used from one it has not been, a warning goes to the
   owner; the first place a token is used is not news. This notices, it does
@@ -560,7 +569,8 @@ change that:
 - **First start prints two secrets, once:** your human token for the default
   workspace, and the operator secret.
 - **Tokens** are made with `token_create`, listed with `token_list` and
-  revoked with `token_revoke` (human only). Only a hash is stored. A launched
+  revoked with `token_revoke` (human only); an agent's can be within some
+  items (`within`) and may report, propose or change (`may`). Only a hash is stored. A launched
   session gets its own agent token, valid for a day and revoked when it ends.
 - **Several workspaces in one browser:** the UI remembers each workspace you
   sign in to and switches between them from the menu's bottom corner; the
