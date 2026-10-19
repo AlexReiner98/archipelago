@@ -89,6 +89,9 @@ services:
       PGBACKREST_LOG_LEVEL_CONSOLE: info
       PGBACKREST_COMPRESS_TYPE: zst
       PGBACKREST_START_FAST: "y"
+      # Files copied at once in a backup or restore: each request to the bucket takes about 0.4 s, and one at a time
+      # a full backup of 1344 files took 9 minutes.
+      PGBACKREST_PROCESS_MAX: 8
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_RETENTION_FULL: 7
       PGBACKREST_REPO2_TYPE: ${PGBACKREST_REPO2_S3_BUCKET:+s3}
