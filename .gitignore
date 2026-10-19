@@ -24,3 +24,8 @@ CLAUDE.local.md
 
 # The server's secrets, on the server only (deploy/.env.example names them).
 deploy/.env
+
+# What deploy.sh keeps on the server: the live colour, the hook's queue, its lock and the last test run.
+deploy/caddy/live/
+deploy/queue/
+deploy/.deploy.lock

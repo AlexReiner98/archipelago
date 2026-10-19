@@ -1,0 +1,14 @@
+# Runs deploy.sh while the hook's queue has a commit in it. deploy.sh empties the queue as it starts, so a commit
+# that passes during a deploy is one more run once it ends.
+#
+#   sudo cp deploy/systemd/archipelago-deploy.* /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now archipelago-deploy.path
+[Unit]
+Description=Deploy Archipelago when a tested commit is queued
+
+[Path]
+DirectoryNotEmpty=/home/ubuntu/archipelago/deploy/queue
+MakeDirectory=yes
+
+[Install]
+WantedBy=multi-user.target

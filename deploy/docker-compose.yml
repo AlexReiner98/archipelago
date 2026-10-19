@@ -4,10 +4,11 @@
 # published on the WireGuard address (10.66.0.1, reached from the owner's laptop) or not at all. Docker must start
 # after wg0 for those binds to work at boot (a systemd drop-in on the host: After=wg-quick@wg0.service).
 #
-# Secrets are in .env beside this file, on the server only (.env.example names them). Only blue starts while the
-# host has 4 GB; green is started for a deploy with --profile green.
+# Secrets are in .env beside this file, on the server only (.env.example names them). One colour runs at a time while
+# the host has 4 GB: deploy.sh starts the other (--profile green for green), switches Caddy to it and stops the first.
 #
-#   docker compose up -d --build
+#   deploy/deploy.sh           a push to live, by hand; the hook (hook/) and deploy/systemd/ run it when CI passes on main
+#   docker compose up -d       the rest, after a change to this file
 
 name: archipelago
 
@@ -47,9 +48,10 @@ services:
     environment:
       PELAGO_SITE: ${PELAGO_SITE:?set PELAGO_SITE in .env}
       PELAGO_TLS: ${PELAGO_TLS:-internal}
-      PELAGO_UPSTREAM: ${PELAGO_UPSTREAM:-app-blue:3100}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # A folder, not the file: a file mounted alone stays the one that was there when Caddy started, whatever a
+      # checkout puts in its place. caddy/live/ is the live colour, written by deploy.sh.
+      - ./caddy:/etc/caddy:ro
       - caddy-data:/data
       - caddy-config:/config
     healthcheck:
@@ -114,6 +116,22 @@ services:
       start_period: 60s
       retries: 3
     mem_limit: 1g
+
+  # Takes GitHub's word that the tests passed on main and leaves the commit in ./queue; the host's archipelago-deploy.path runs deploy.sh. It
+  # has no Docker socket and nothing of the app's. A change to hook/ is taken up when it is restarted.
+  deploy-hook:
+    image: node:24-slim
+    restart: unless-stopped
+    command: ["node", "/hook/hook.ts"]
+    environment:
+      DEPLOY_HOOK_SECRET: ${DEPLOY_HOOK_SECRET:?set DEPLOY_HOOK_SECRET in .env}
+      DEPLOY_BRANCH: ${DEPLOY_BRANCH:-main}
+      DEPLOY_WORKFLOW: ${DEPLOY_WORKFLOW:-Tests}
+    volumes:
+      - ./hook:/hook:ro
+      - ./queue:/queue
+    read_only: true
+    mem_limit: 64m
 
   uptime-kuma:
     image: louislam/uptime-kuma:1
