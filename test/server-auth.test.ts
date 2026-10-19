@@ -83,8 +83,8 @@ test('a token fixes identity and authority, whichever surface is used', async ()
 
 test('each workspace is its own database: tokens, data and local types do not cross', async () => {
   const { workspaces, call } = await serve('tokens');
-  const operator = workspaces.ensureOperator()!;
-  assert.equal(workspaces.ensureOperator(), undefined, 'the operator secret is made once');
+  const operator = (await workspaces.ensureOperator())!;
+  assert.equal((await workspaces.ensureOperator()), undefined, 'the operator secret is made once');
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex' })).token;
 
   assert.equal((await call('/operator/workspaces', mine, { id: 'acme', name: 'Acme' })).status, 401, 'a workspace token is not the operator');
@@ -261,7 +261,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
 
 test('a workspace receives notifications only from workspaces its admin accepts', async () => {
   const { workspaces, call } = await serve('tokens');
-  const operator = workspaces.ensureOperator()!;
+  const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
   const send = (token: string, workspace: string) => call('/api/notify_workspace', token, { workspace, title: 'The shadow study is ready', level: 'warning' });

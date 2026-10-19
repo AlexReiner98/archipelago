@@ -11,6 +11,11 @@
 // opened while that one is still there. Sealed on another server, or with a
 // key since lost, a value cannot be opened: it reads as not set, and is set
 // again by whoever owns it.
+//
+// Servers that share a Postgres server must seal with the same key, and keep
+// nothing on a disk of their own: there the key comes only from
+// PELAGO_SECRETS_KEY. A key file found beside the workspaces still opens what
+// was sealed with it, but none is made.
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -20,11 +25,16 @@ import { env } from './env.ts';
 const MARK = 'sealed:v1:';
 let dir: string | null = null;
 let made: Buffer | undefined;
+let mayMake = true;
 
-/** Where the key file is kept. Null (tests, a server with no disk of its own) keeps a key for this process only. */
-export function configureSecrets(folder: string | null): void {
+/**
+ * Where the key file is kept. Null (tests) keeps a key for this process only. `make` false (a server on Postgres)
+ * makes no key: without PELAGO_SECRETS_KEY nothing can be sealed.
+ */
+export function configureSecrets(folder: string | null, make = true): void {
   dir = folder;
   made = undefined;
+  mayMake = make;
 }
 
 function fromEnv(): Buffer | undefined {
@@ -41,6 +51,7 @@ function fromFile(create: boolean): Buffer | undefined {
   const file = join(dir, 'secrets.key');
   if (existsSync(file)) return (made = Buffer.from(readFileSync(file, 'utf8').trim(), 'base64'));
   if (!create) return undefined;
+  if (!mayMake) throw new Error('Set PELAGO_SECRETS_KEY to keep a secret: servers sharing a database seal with the one key, and none is kept on a disk.');
   mkdirSync(dir, { recursive: true });
   made = randomBytes(32);
   writeFileSync(file, made.toString('base64') + '\n', { mode: 0o600 });

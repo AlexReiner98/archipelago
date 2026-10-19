@@ -1,18 +1,20 @@
 // Tenancy: one database per customer. Each workspace has its own database,
 // its own locally defined types and its own automation runner, so one
 // customer's map cannot leak into another's by a missed filter: there is no
-// shared table to filter.
+// shared table to filter. Which workspaces there are is kept in the default
+// workspace's database (src/control.ts), so every server on it agrees.
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceId } from './auth.ts';
 import { Automations } from './automations.ts';
 import { restore, type Dump } from './backup.ts';
+import { addLocalType, addWorkspace, claimControlValue, controlValue, importControlFiles, importLocalPack, listWorkspaces, localTypes, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
 import { startSchedules, stopSchedules } from './hooks.ts';
-import { openDb } from './db.ts';
+import { openDb, type Database } from './db.ts';
 import { databaseFor, dropDatabaseFor } from './pg.ts';
 import { Archipelago, type Policy } from './pelago.ts';
-import { Registry } from './packs.ts';
+import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
 import { followPacks, packsOff } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
@@ -36,18 +38,13 @@ interface WorkspacesConfig {
    * database this names, another's that name and _<id> (src/pg.ts). Carries a password: from the environment only.
    */
   databaseUrl?: string;
-  /** Where other workspaces and the operator secret are kept. */
+  /** Where other workspaces' folders are kept, and the files the server kept before its database held them. */
   rootDir: string;
   packsDir: string;
   packs?: string[];
   policy?: Partial<Policy>;
   /** Start each workspace's automation runner and schedules when it opens: while this process leads (lead). */
   runAutomations?: boolean;
-}
-
-interface IndexFile {
-  operator?: string; // hash of the operator secret
-  workspaces: { id: string; name: string; created: string }[];
 }
 
 export class Workspaces {
@@ -57,52 +54,88 @@ export class Workspaces {
   /** Requests in hand on each workspace, and when each was last used. */
   private readonly held = new Map<string, number>();
   private readonly touched = new Map<string, number>();
-  private index: IndexFile;
+  /** The default workspace's database, which keeps the list of workspaces; opened on first need, never before. */
+  private base: Promise<Database> | undefined;
+  /** The workspaces besides the default one, as last read from it. */
+  private known = new Map<string, string>();
   private leading: boolean;
 
   constructor(config: WorkspacesConfig) {
     this.config = config;
     this.leading = Boolean(config.runAutomations);
-    const file = this.indexFile();
-    this.index = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { workspaces: [] };
-    // Other servers on the same Postgres may turn a pack off or on: each open workspace here follows within FOLLOW_MS.
+    // Other servers on the same Postgres may add a workspace, define a type or turn a pack off or on: this one
+    // follows within FOLLOW_MS.
     if (config.databaseUrl) setInterval(() => void this.follow(), FOLLOW_MS).unref();
+  }
+
+  /** The database that keeps which workspaces there are: the default workspace's. */
+  control(): Promise<Database> {
+    this.base ??= (async () => {
+      const { dataDir, databaseUrl, rootDir } = this.config;
+      const db = await openDb(dataDir === null ? undefined : databaseUrl || dataDir);
+      try {
+        if (dataDir !== null) {
+          const brought = await importControlFiles(db, rootDir);
+          if (brought.length) console.log(`taken into the database from ${rootDir}: ${brought.join(', ')}`);
+        }
+        await this.refresh(db);
+        return db;
+      } catch (err) {
+        await db.close();
+        throw err;
+      }
+    })().catch((err) => {
+      this.base = undefined;
+      throw err;
+    });
+    return this.base;
+  }
+
+  private async refresh(db: Database): Promise<void> {
+    this.known = new Map((await listWorkspaces(db)).map((w) => [w.id, w.name]));
   }
 
   /** Catch every open workspace up with what other servers changed in it that this process keeps in memory. */
   async follow(): Promise<void> {
+    if (this.base) await this.refresh(await this.base).catch((err) => console.error(`reading the workspaces failed: ${(err as Error).message}`));
     for (const [id, opening] of this.open) {
       const ws = await opening.catch(() => undefined);
-      if (ws) await followPacks(ws.pelago).catch((err) => console.error(`following packs in ${id} failed: ${(err as Error).message}`));
+      if (!ws) continue;
+      try {
+        if (ws.pelago.registry.followLocal(await localTypes<TypeDef>(ws.pelago.db))) await syncTypes(ws.pelago);
+        await followPacks(ws.pelago);
+      } catch (err) {
+        console.error(`following ${id} failed: ${(err as Error).message}`);
+      }
     }
   }
 
-  private indexFile(): string {
-    return join(this.config.rootDir, 'index.json');
+  async list(): Promise<{ id: string; name: string }[]> {
+    await this.refresh(await this.control());
+    return [{ id: DEFAULT_WORKSPACE, name: 'Default' }, ...[...this.known].map(([id, name]) => ({ id, name }))];
   }
 
-  private save(): void {
-    mkdirSync(this.config.rootDir, { recursive: true });
-    writeFileSync(this.indexFile(), JSON.stringify(this.index, null, 2) + '\n');
-  }
-
-  list(): { id: string; name: string }[] {
-    return [{ id: DEFAULT_WORKSPACE, name: 'Default' }, ...this.index.workspaces.map(({ id, name }) => ({ id, name }))];
-  }
-
-  has(id: string): boolean {
-    return id === DEFAULT_WORKSPACE || this.index.workspaces.some((w) => w.id === id);
+  /** Whether there is a workspace by this id: asked of the database when this server has not heard of it. */
+  async has(id: string): Promise<boolean> {
+    if (id === DEFAULT_WORKSPACE || this.known.has(id)) return true;
+    await this.refresh(await this.control());
+    return this.known.has(id);
   }
 
   /** Open a workspace, once. Unknown ids are refused rather than created. */
   get(id: string): Promise<Workspace> {
-    if (!this.has(id)) return Promise.reject(new Error(`No workspace "${id}"`));
     this.touched.set(id, Date.now());
     let opening = this.open.get(id);
     if (!opening) {
-      // A database being closed must be shut before it is opened again.
-      opening = (this.closing.get(id) ?? Promise.resolve()).then(() => this.load(id));
-      this.open.set(id, opening);
+      opening = (async () => {
+        if (!(await this.has(id))) throw new Error(`No workspace "${id}"`);
+        // A database being closed must be shut before it is opened again.
+        await this.closing.get(id);
+        return this.load(id);
+      })();
+      const mine = opening;
+      this.open.set(id, mine);
+      mine.catch(() => this.open.get(id) === mine && this.open.delete(id));
     }
     return opening;
   }
@@ -162,24 +195,29 @@ export class Workspaces {
   private async load(id: string, backup?: Dump): Promise<Workspace> {
     const { dataDir, databaseUrl, rootDir, packsDir, packs, policy } = this.config;
     const isDefault = id === DEFAULT_WORKSPACE;
-    const onServer = databaseUrl && (isDefault ? databaseUrl : await databaseFor(databaseUrl, id));
-    const dbDir = dataDir === null ? undefined : onServer || (isDefault ? dataDir : join(rootDir, id, 'db'));
-    // Types a workspace defines for itself stay with that workspace.
-    const localPack = isDefault ? undefined : join(rootDir, id, 'local-pack');
-    const db = await openDb(dbDir);
-    if (backup) {
-      await restore(db, backup, id).catch(async (err) => {
-        await db.close();
-        throw err;
-      });
+    let db: Database;
+    if (isDefault) db = await this.control();
+    else {
+      const onServer = databaseUrl && (await databaseFor(databaseUrl, id));
+      db = await openDb(dataDir === null ? undefined : onServer || join(rootDir, id, 'db'));
     }
-    const pelago = new Archipelago(db, new Registry(packsDir, packs, localPack), policy, id);
-    // The packs the owner turned off here stay off; what they made is dormant.
-    pelago.registry.turnOff(await packsOff(pelago));
-    await syncTypes(pelago);
-    const ws = { id, name: this.list().find((w) => w.id === id)!.name, pelago, automations: new Automations(pelago) };
-    if (this.leading) this.clocks(ws, true);
-    return ws;
+    try {
+      if (backup) await restore(db, backup, id);
+      // Types a workspace defines for itself are in its own database. Those kept in a folder before are taken in once.
+      if (dataDir !== null) await importLocalPack(db, isDefault ? join(packsDir, LOCAL_PACK, 'pack.json') : join(rootDir, id, 'local-pack', 'pack.json'));
+      const registry = new Registry(packsDir, packs, await localTypes<TypeDef>(db));
+      registry.keepLocal = (def) => addLocalType(db, def);
+      const pelago = new Archipelago(db, registry, policy, id);
+      // The packs the owner turned off here stay off; what they made is dormant.
+      pelago.registry.turnOff(await packsOff(pelago));
+      await syncTypes(pelago);
+      const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };
+      if (this.leading) this.clocks(ws, true);
+      return ws;
+    } catch (err) {
+      if (!isDefault) await db.close();
+      throw err;
+    }
   }
 
   /** Start or stop what runs on a clock in one workspace: its automations and its packs' schedules. */
@@ -197,7 +235,7 @@ export class Workspaces {
    */
   async lead(on: boolean): Promise<void> {
     this.leading = on;
-    if (on && this.config.databaseUrl) for (const { id } of this.list()) await this.get(id).catch((err) => console.error(`opening ${id} to lead failed: ${(err as Error).message}`));
+    if (on && this.config.databaseUrl) for (const { id } of await this.list()) await this.get(id).catch((err) => console.error(`opening ${id} to lead failed: ${(err as Error).message}`));
     for (const opening of this.open.values()) {
       const ws = await opening.catch(() => undefined);
       if (ws) this.clocks(ws, this.leading);
@@ -211,61 +249,63 @@ export class Workspaces {
    */
   async create(id: string, name: string, backup?: Dump): Promise<Workspace> {
     if (!validWorkspaceId(id)) throw new Error('A workspace id is 1 to 40 characters: lowercase letters, digits and hyphens, starting with a letter or digit.');
-    if (this.has(id)) throw new Error(`Workspace "${id}" already exists`);
+    if (await this.has(id)) throw new Error(`Workspace "${id}" already exists`);
     const folder = join(this.config.rootDir, id);
     // Nothing found there is ours to restore over, or to delete if it fails.
     if (backup && existsSync(folder)) throw new Error(`There is already a folder for "${id}" on this server. Choose another id.`);
-    this.index.workspaces.push({ id, name: name.trim() || backup?.workspace?.name || id, created: new Date().toISOString() });
-    this.save();
+    const control = await this.control();
+    const named = name.trim() || backup?.workspace?.name || id;
+    if (!(await addWorkspace(control, { id, name: named }))) throw new Error(`Workspace "${id}" already exists`);
+    this.known.set(id, named);
     if (!backup) return this.get(id);
     try {
-      if (backup.local_pack) {
-        // The types it defined for itself, where load() looks for them.
-        mkdirSync(join(folder, 'local-pack'), { recursive: true });
-        writeFileSync(join(folder, 'local-pack', 'pack.json'), JSON.stringify(backup.local_pack, null, 2) + '\n');
-      }
       this.touched.set(id, Date.now());
       const opening = this.load(id, backup);
       this.open.set(id, opening);
       return await opening;
     } catch (err) {
       this.open.delete(id);
-      this.index.workspaces = this.index.workspaces.filter((w) => w.id !== id);
-      this.save();
+      await removeWorkspace(control, id);
+      this.known.delete(id);
       rmSync(folder, { recursive: true, force: true });
       if (this.config.databaseUrl) await dropDatabaseFor(this.config.databaseUrl, id).catch(() => {});
       throw err;
     }
   }
 
-  /** Make the operator secret if there is none. Returns it only at that moment. */
-  ensureOperator(): string | undefined {
-    if (this.index.operator) return undefined;
+  /** Make the operator secret if there is none. Returns it only at that moment, on the one server that made it. */
+  async ensureOperator(): Promise<string | undefined> {
     const secret = newSecret('latop');
-    this.index.operator = hashSecret(secret);
-    this.save();
-    return secret;
+    return (await claimControlValue(await this.control(), OPERATOR, hashSecret(secret))) ? secret : undefined;
   }
 
-  isOperator(secret: string | undefined): boolean {
-    return Boolean(secret && this.index.operator && sameSecret(secret, this.index.operator));
+  async isOperator(secret: string | undefined): Promise<boolean> {
+    if (!secret) return false;
+    const hash = await controlValue<string>(await this.control(), OPERATOR);
+    return Boolean(hash && sameSecret(secret, hash));
   }
 
   /**
    * Replace a lost operator secret. Nobody can be asked for the old one, so
-   * the proof is being able to write on the server's own disk: the caller
-   * puts a value in a file beside the workspaces and then names that value.
-   * The file is good for one try. Returns the new secret, once.
+   * the proof is being able to write where the server keeps its state: the
+   * caller puts a value's hash in its database (`pelago operator-reset`), or
+   * the value in a file beside the workspaces, and then names that value.
+   * Either is good for one try. Returns the new secret, once.
    */
-  resetOperator(proof: string | undefined): string | undefined {
+  async resetOperator(proof: string | undefined): Promise<string | undefined> {
+    const db = await this.control();
+    const prepared = await takeControlValue<string>(db, OPERATOR_RESET);
     const file = join(this.config.rootDir, OPERATOR_RESET_FILE);
-    if (!existsSync(file)) return undefined;
-    const expected = readFileSync(file, 'utf8').trim();
-    rmSync(file, { force: true });
-    if (!proof || expected.length < 32 || !sameSecret(proof, hashSecret(expected))) return undefined;
+    let good: boolean;
+    if (prepared) good = Boolean(proof && sameSecret(proof, prepared));
+    else if (existsSync(file)) {
+      const expected = readFileSync(file, 'utf8').trim();
+      rmSync(file, { force: true });
+      good = Boolean(proof && expected.length >= 32 && sameSecret(proof, hashSecret(expected)));
+    } else return undefined;
+    if (!good) return undefined;
     const secret = newSecret('latop');
-    this.index.operator = hashSecret(secret);
-    this.save();
+    await setControlValue(db, OPERATOR, hashSecret(secret));
     return secret;
   }
 
@@ -276,8 +316,11 @@ export class Workspaces {
         this.clocks(ws, false);
         hostFor(ws.pelago.registry).stop();
       }
-      await ws?.pelago.db.close();
+      if (ws?.id !== DEFAULT_WORKSPACE) await ws?.pelago.db.close();
     }
     this.open.clear();
+    const base = this.base;
+    this.base = undefined;
+    await (await base?.catch(() => undefined))?.close();
   }
 }

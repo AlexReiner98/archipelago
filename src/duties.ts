@@ -16,8 +16,8 @@ export function serverDuties(leader: Leader, workspaces: Workspaces, githubApp: 
   const recheckAll = async () => {
     // The same hour, and so at every start: what the app is called on GitHub now.
     await githubApp.refresh().catch((err) => console.error(`The GitHub App could not be asked its name: ${(err as Error).message}`));
-    for (const { id } of workspaces.list()) {
-      const installation = githubApp.installationOf(id);
+    for (const { id } of await workspaces.list()) {
+      const installation = await githubApp.installationOf(id);
       if (!installation) continue;
       const release = workspaces.hold(id);
       try {
@@ -36,8 +36,8 @@ export function serverDuties(leader: Leader, workspaces: Workspaces, githubApp: 
   };
   // A push whose reading was cut off when the last server stopped is read by this one, soon after it is up.
   const readLeftUnread = async () => {
-    for (const { id } of workspaces.list()) {
-      const installation = githubApp.installationOf(id);
+    for (const { id } of await workspaces.list()) {
+      const installation = await githubApp.installationOf(id);
       if (!installation) continue;
       const release = workspaces.hold(id);
       try {

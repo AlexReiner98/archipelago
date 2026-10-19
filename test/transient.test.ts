@@ -24,7 +24,7 @@ test('a GitHub sign-up begun on one server is finished on another, once', async 
   const db = await openDb();
   const asked: string[] = [];
   const store = async (workspace: string) => (asked.push(workspace), db);
-  const options = { dir: null, origin: 'https://map.test', api: 'http://127.0.0.1:9', web: 'https://github.test', store };
+  const options = { origin: 'https://map.test', api: 'http://127.0.0.1:9', web: 'https://github.test', store };
   const one = new GithubApp(options);
   const url = await one.startCreate('acme');
   const state = new URL(url).searchParams.get('state')!;

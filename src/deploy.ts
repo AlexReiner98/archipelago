@@ -5,6 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from './config.ts';
+import { listWorkspaces } from './control.ts';
 import { openDb } from './db.ts';
 import { LATEST, versionOf } from './migrate.ts';
 import { databaseFor } from './pg.ts';
@@ -15,10 +16,16 @@ async function deploy() {
     console.error('PELAGO_DATABASE_URL is not set. A database in a folder is migrated by the server that opens it, as it starts.');
     process.exit(1);
   }
+  // The default database first: it lists the others. A server not yet started on it since the list moved there has
+  // it still in the file beside its data.
+  const main = await openDb(databaseUrl);
+  const listed = (await listWorkspaces(main)).map((w) => w.id);
+  console.log(`default: at step ${await versionOf(main)} of ${LATEST}`);
+  await main.close();
   const index = join(dataDir, '..', 'workspaces', 'index.json');
-  const ids: string[] = existsSync(index) ? JSON.parse(readFileSync(index, 'utf8')).workspaces.map((w: { id: string }) => w.id) : [];
-  for (const id of ['default', ...ids]) {
-    const db = await openDb(id === 'default' ? databaseUrl : await databaseFor(databaseUrl, id));
+  const filed: string[] = existsSync(index) ? JSON.parse(readFileSync(index, 'utf8')).workspaces.map((w: { id: string }) => w.id) : [];
+  for (const id of new Set([...listed, ...filed])) {
+    const db = await openDb(await databaseFor(databaseUrl, id));
     const at = await versionOf(db);
     await db.close();
     console.log(`${id}: at step ${at} of ${LATEST}`);

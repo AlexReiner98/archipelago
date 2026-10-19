@@ -13,7 +13,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { basename, join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { isServer, openDb, type Db } from './db.ts';
-import { LOCAL_PACK, type Registry } from './packs.ts';
+import { addLocalType, addWorkspace } from './control.ts';
+import type { Registry } from './packs.ts';
 import { databaseFor } from './pg.ts';
 import type { Workspaces } from './workspaces.ts';
 
@@ -62,6 +63,8 @@ export async function restore(db: Db, backup: Dump, as?: string): Promise<Record
       counts[table] = rows.length;
     }
     await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), 1))`);
+    // The types it defined for itself go in its database, where the server looks for them.
+    for (const def of (backup.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
     if (as !== undefined && as !== backup.workspace?.id) {
       for (const table of ['entity', 'relation', 'event', 'proposal', 'share', 'picture', 'act']) await tx.query(`update ${table} set workspace = $1`, [as]);
       await tx.query(`update token set revoked_at = now() where revoked_at is null`);
@@ -197,11 +200,8 @@ async function upload(file: string, workspace: string, target: UploadTarget): Pr
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
 }
 
-/** The types a workspace defined for itself, as its local pack file, if it has any. */
-export const localPackOf = (registry: Registry) => {
-  const file = registry.localDir ? join(registry.localDir, 'pack.json') : join(registry.dir, LOCAL_PACK, 'pack.json');
-  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined;
-};
+/** The types a workspace defined for itself, as a local pack file, if it has any. */
+export const localPackOf = (registry: Registry) => registry.localPack();
 
 /**
  * Back up every workspace into `dir/<workspace>/<time>.json.gz`, keeping the
@@ -216,7 +216,7 @@ export async function backupAll(
   target?: UploadTarget,
 ): Promise<{ workspace: string; file?: string; rows?: number; error?: string; copied?: boolean; copy_error?: string }[]> {
   const done = [];
-  for (const { id, name } of workspaces.list()) {
+  for (const { id, name } of await workspaces.list()) {
     // A workspace opened only to be backed up is closed again, or a backup would
     // put every customer's database in memory at once.
     const wasOpen = workspaces.isOpen(id);
@@ -290,6 +290,11 @@ export async function restoreTo(backup: Dump, target: string): Promise<{ where: 
   const where = !isServer(target) ? target : id === 'default' ? target : await databaseFor(target, id);
   const db = await openDb(where);
   try {
+    // Another workspace is listed in the default one's database, where every server on it looks.
+    if (isServer(target) && id !== 'default') {
+      const control = await openDb(target);
+      await addWorkspace(control, { id, name: backup.workspace?.name ?? id }).finally(() => control.close());
+    }
     return { where: isServer(where) ? `database ${new URL(where).pathname.slice(1)} on ${new URL(where).host}` : where, counts: await restore(db, backup) };
   } finally {
     await db.close();
@@ -309,6 +314,5 @@ if (import.meta.main) {
   });
   console.log(`Restored workspace "${backup.workspace.name}" (${backup.workspace.id}) as of ${backup.taken} into ${done.where}`);
   console.log(Object.entries(done.counts).map(([table, n]) => `${table}: ${n}`).join(', '));
-  if (backup.workspace.id !== 'default') console.log(`A server finds it once the workspace is listed in its workspaces/index.json.`);
-  if (backup.local_pack) console.log('This workspace defined types of its own. They are in the backup under "local_pack"; write them to its local pack file.');
+  if (backup.workspace.id !== 'default' && !isServer(target)) console.log(`A server finds it once it is listed: create the workspace from this backup through the operator instead (POST /operator/workspaces).`);
 }

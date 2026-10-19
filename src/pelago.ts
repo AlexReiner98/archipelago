@@ -697,7 +697,7 @@ export class Archipelago {
 
     for (const op of ops) {
       if (op.op !== 'define_type') continue;
-      this.registry.defineLocal(op.type);
+      await this.registry.defineLocal(op.type);
       await this.log(this.db, { actor, action: 'type.define', changeset, reason: input.reason, detail: { type: op.type, ...extra } });
     }
     await this.supersede(changeset);

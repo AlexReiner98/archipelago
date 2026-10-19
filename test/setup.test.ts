@@ -206,7 +206,7 @@ test('beyond this machine the server needs tokens, and answers only to the names
 
 test('the operator can issue a workspace a new owner token, and nobody else can', async () => {
   const { workspaces, call } = await serve('tokens');
-  const operator = workspaces.ensureOperator()!;
+  const operator = (await workspaces.ensureOperator())!;
   const made = await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' });
   assert.equal((await call('/operator/workspaces/acme/owner-token', made.result.owner_token)).status, 401, 'not the workspace\'s own owner');
   assert.equal((await call('/operator/workspaces/nope/owner-token', operator)).status, 404);
@@ -219,14 +219,14 @@ test('the operator can issue a workspace a new owner token, and nobody else can'
 
 test('the operator can create a workspace from a backup file: the map, its types and its owner arrive', async () => {
   const { workspaces, call } = await serve('tokens');
-  const operator = workspaces.ensureOperator()!;
+  const operator = (await workspaces.ensureOperator())!;
   const main = await workspaces.get('default');
   const old = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const me = (await call('/api/init', old, { name: 'Alex' })).result.me as string;
   await call('/api/change', old, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
   await call('/api/change', old, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }] });
 
-  const taken = await dump(main.pelago.db, { id: 'default', name: 'Default' }, JSON.parse(readFileSync(join(workspaces.config.packsDir, 'local', 'pack.json'), 'utf8')));
+  const taken = await dump(main.pelago.db, { id: 'default', name: 'Default' }, main.pelago.registry.localPack());
   const backup = gzipSync(JSON.stringify(taken)).toString('base64');
   assert.equal((await call('/operator/workspaces', old, { id: 'moved', backup })).status, 401, 'only the operator');
   assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: 'bm90IGEgYmFja3Vw' })).error, /not an Archipelago backup/);
@@ -253,10 +253,11 @@ test('the operator can create a workspace from a backup file: the map, its types
 
 test('a lost operator secret is replaced by whoever can write on the server\'s disk, and by nobody else', async () => {
   const { workspaces, call } = await serve('tokens');
-  const lost = workspaces.ensureOperator()!;
+  const lost = (await workspaces.ensureOperator())!;
   const file = join(workspaces.config.rootDir, OPERATOR_RESET_FILE);
   const proof = 'reset_' + 'a'.repeat(48);
   assert.equal((await call('/operator/reset', undefined, { proof })).status, 401, 'nothing was prepared');
+  mkdirSync(workspaces.config.rootDir, { recursive: true });
   writeFileSync(file, proof);
   assert.equal((await call('/operator/reset', undefined, { proof: 'reset_' + 'b'.repeat(48) })).status, 401, 'a wrong proof');
   assert.equal(existsSync(file), false, 'and the file is good for one try');
@@ -264,7 +265,6 @@ test('a lost operator secret is replaced by whoever can write on the server\'s d
   writeFileSync(file, 'short');
   assert.equal((await call('/operator/reset', undefined, { proof: 'short' })).status, 401, 'a guessable proof is not one');
 
-  mkdirSync(workspaces.config.rootDir, { recursive: true });
   writeFileSync(file, proof);
   const fresh = (await call('/operator/reset', undefined, { proof })).result.operator_secret as string;
   assert.equal((await call('/operator/workspaces', lost, undefined, 'GET')).status, 401, 'the old secret is finished');
@@ -274,13 +274,13 @@ test('a lost operator secret is replaced by whoever can write on the server\'s d
 
 test('a workspace admin merges a backup into their map; nobody else can, and listeners hear of the import, not of its history', async () => {
   const { workspaces, call } = await serve('tokens');
-  const operator = workspaces.ensureOperator()!;
+  const operator = (await workspaces.ensureOperator())!;
   // Where the file comes from: another map, with a type of its own and things its owner did.
   const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'work.task', title: 'Order the stone' }] });
   const laptop = await workspaces.get('laptop');
-  const taken = await dump(laptop.pelago.db, { id: 'laptop', name: 'Laptop' }, JSON.parse(readFileSync(join(workspaces.config.rootDir, 'laptop', 'local-pack', 'pack.json'), 'utf8')));
+  const taken = await dump(laptop.pelago.db, { id: 'laptop', name: 'Laptop' }, laptop.pelago.registry.localPack());
   const backup = gzipSync(JSON.stringify(taken)).toString('base64');
 
   const main = await workspaces.get('default');
@@ -309,7 +309,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
 
 test('an import can make the owner in the file and the owner here one person, and they keep their token and what is theirs', async () => {
   const { workspaces, call } = await serve('tokens');
-  const operator = workspaces.ensureOperator()!;
+  const operator = (await workspaces.ensureOperator())!;
   const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
   const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'From the laptop', owner: theirs }] });
