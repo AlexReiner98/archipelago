@@ -18,7 +18,8 @@
     "demo:approvals": "node scripts/demo-approvals.ts",
     "pelago": "node src/cli.ts",
     "test": "node --test --test-force-exit --test-global-setup=./test/global.ts --import ./test/each.ts \"test/*.test.ts\" \"packs/*/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "diagrams": "node src/diagrams.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
