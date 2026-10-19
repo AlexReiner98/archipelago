@@ -10,7 +10,7 @@ import { createToken } from './auth.ts';
 import { readDocument } from './documents.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
-import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts';
+import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts'; import { ASK_TOOLS } from './token-ask.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import type { GithubApp } from './github-app.ts';
@@ -819,7 +819,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => readDocument(l, input.id),
   },
   ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
-  ...TOKEN_TOOLS,
+  ...TOKEN_TOOLS, ...ASK_TOOLS,
   notify_workspace: {
     description: 'Send a notification to another workspace on this server. It arrives only if that workspace\u2019s admin has chosen to accept notifications from this one.',
     humanOnly: true,

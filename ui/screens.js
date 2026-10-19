@@ -12,6 +12,7 @@ import { lensView } from './lens.js';
 import { roadmap } from './roadmap.js';
 import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
+import { tokenAskPiece } from './token-ask.js';
 import { RAN, ago, chip, isA, label, link, pill, tokensText, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
@@ -182,6 +183,11 @@ const PIECES = {
   token: (ctx) => {
     const node = h('div');
     return { node, later: () => tokenPiece(node, ctx.e, fold) };
+  },
+  // Systems asking for a token: on an item's page those about it, on a screen of its own all of them.
+  token_ask: (ctx) => {
+    const node = h('div');
+    return { node, later: () => tokenAskPiece(node, ctx.e) };
   },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,

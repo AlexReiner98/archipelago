@@ -22,7 +22,7 @@ const MAY = [
 export async function tokenPiece(host, e, fold, made) {
   const me = await fetch('/whoami', { headers: authHeaders() }).then((r) => r.json()).catch(() => null);
   if (me?.auth !== 'tokens' || e.archived_at) return host.remove();
-  const tokens = (await api('token_list', { within: e.id }).catch(() => [])).filter((t) => !t.revoked_at && t.within?.length === 1);
+  const tokens = (await api('token_list', { within: e.id }).catch(() => [])).filter((t) => !t.revoked_at && t.within?.length);
   if (!host.isConnected) return;
   const again = (shown) => tokenPiece(host, e, fold, shown);
   const error = h('div', { class: 'error' });
@@ -42,7 +42,7 @@ export async function tokenPiece(host, e, fold, made) {
       'li',
       { class: 'row-top' },
       h('strong', { class: 'grow gist', title: t.name }, t.name),
-      scopePills({ may: t.may }),
+      scopePills({ may: t.may, ...(t.within.length > 1 && { within: t.within, within_titles: t.within_titles }) }),
       h('span', { class: 'muted small', title: t.expires_at ? `Expires ${when(t.expires_at)}` : 'Never expires' }, t.last_used ? ago(t.last_used) : 'never used'),
       h('button', { class: 'danger', onclick: () => revoke(t) }, 'Revoke'),
     );
