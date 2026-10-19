@@ -392,6 +392,15 @@ in the repository with what it used. The model is `claude-sonnet-5-5`
 (`PELAGO_READER_MODEL` changes it). Without a key, pushes are recorded and
 not read. A repository connected both ways hears each push once.
 
+Every model call goes through `src/model.ts`, with plain fetch. By default it
+asks Anthropic on the workspace's key. Set `PELAGO_MODEL_URL` to an
+OpenAI-compatible base (LiteLLM: `http://litellm:4000/v1`) and
+`PELAGO_MODEL_KEY` to its key, and every call goes there as a chat
+completion instead, for the model `PELAGO_READER_MODEL` names; every
+workspace's pushes are then read on that key, with or without one of its own.
+Prompt caching is Anthropic's alone, and a run's cost is still priced at
+Anthropic's rates.
+
 **Or the server hears the push through a webhook added by hand.** On the Workspace screen, **GitHub** makes a
 secret and shows the address to give GitHub (`/github/<workspace>`): in each
 repository, Settings, Webhooks, Add webhook, content type `application/json`,

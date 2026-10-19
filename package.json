@@ -21,7 +21,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.132.1",
     "@electric-sql/pglite": "^0.5.8",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "pg": "^8.23.1",

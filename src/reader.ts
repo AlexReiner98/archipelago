@@ -6,37 +6,21 @@
 // with nothing to set up in the repository: it has no checkout, and reads
 // through the app (which may only read).
 //
-// It runs on the workspace's own Anthropic key, set by its admin, and says
-// what each run used as a run in the repository, like any other agent.
+// It runs on the workspace's own Anthropic key, set by its admin, or on the
+// model server the server is given (src/model.ts), and says what each run used
+// as a run in the repository, like any other agent.
 
-import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { env } from './env.ts';
 import type { GithubApp } from './github-app.ts';
+import { asker, configured, keyTaken, ModelError, provider, type Ask, type Tool, type ToolResultBlock, type ToolUseBlock, type Turn } from './model.ts';
 import type { Actor, Entity, Archipelago } from './pelago.ts';
 import { recordRun } from './sessions.ts';
 import { callTool, TOOLS } from './tools.ts';
 
-type Message = Anthropic.Beta.BetaMessage;
-type Params = Anthropic.Beta.MessageCreateParamsNonStreaming;
-/** One request to the model. Replaced in tests by something that answers from a script. */
-export type Ask = (params: Params) => Promise<Message>;
-
-let asking: (key: string) => Ask = (key) => {
-  const client = new Anthropic({ apiKey: key });
-  return (params) => client.beta.messages.create(params);
-};
-/** Whether Anthropic takes a key, asked by listing one model: it costs nothing. Undefined when Anthropic could not be reached to ask. */
-let taken: (key: string) => Promise<boolean | undefined> = async (key) => {
-  try {
-    await new Anthropic({ apiKey: key, maxRetries: 1, timeout: 15_000 }).models.list({ limit: 1 });
-    return true;
-  } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) return false;
-    return undefined;
-  }
-};
-export function configureReader(make: ((key: string) => Ask) | undefined, check: (key: string) => Promise<boolean | undefined> = async () => true): void {
+let asking: (key: string | undefined) => Ask = (key) => asker(key);
+let taken: (key: string) => Promise<boolean | undefined> = (key) => keyTaken(key);
+export function configureReader(make: ((key: string | undefined) => Ask) | undefined, check: (key: string) => Promise<boolean | undefined> = async () => true): void {
   if (!make) return;
   asking = make;
   taken = check;
@@ -53,8 +37,10 @@ const MAX_TOKENS_USED = 600_000;
 /** The most of one tool's answer that is handed back: a whole file or diff can be far more than is needed. */
 const MAX_RESULT = 60_000;
 
+/** Whether a workspace's pushes can be read: on its own key, or on the model server's when the server has one. */
 export async function hasReaderKey(l: Archipelago): Promise<boolean> {
-  return Boolean(await l.secret(KEY));
+  const at = configured();
+  return Boolean((at.url && at.key) || (await l.secret(KEY)));
 }
 
 /**
@@ -67,7 +53,7 @@ export async function setReaderKey(l: Archipelago, key: string | undefined): Pro
   if (given) {
     if (/^sk-ant-oat/.test(given)) throw new Error('That is a Claude sign-in token (it starts sk-ant-oat), which signs a person in to Claude Code. The server needs an API key: make one at console.anthropic.com, under API keys.');
     const ok = await taken(given);
-    if (ok === false) throw new Error('Anthropic refused that key, so it was not saved. Check that it was copied whole and has not been revoked, or make a new one at console.anthropic.com, under API keys.');
+    if (ok === false) throw new Error(`${provider()} refused that key, so it was not saved. Check that it was copied whole and has not been revoked, or make a new one at console.anthropic.com, under API keys.`);
     await l.setSecret(KEY, given);
     return { checked: ok === true };
   }
@@ -99,10 +85,10 @@ export const sought = (query: unknown): string => String(query ?? '').replace(/\
 const PELAGO_TOOLS = ['view', 'search', 'get', 'events', 'schema', 'proposals', 'change', 'notify', 'rechecked'];
 
 /** What the reader can do: the map's own tools, and reading the one repository through the app. */
-function tools(app: GithubApp, repo: Repo, ref: string): { defs: Anthropic.Beta.BetaTool[]; run: (l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>) => Promise<unknown> } {
-  const defs: Anthropic.Beta.BetaTool[] = PELAGO_TOOLS.map((name) => {
+function tools(app: GithubApp, repo: Repo, ref: string): { defs: Tool[]; run: (l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>) => Promise<unknown> } {
+  const defs: Tool[] = PELAGO_TOOLS.map((name) => {
     const { $schema: _, ...schema } = z.toJSONSchema(z.object(TOOLS[name].input)) as Record<string, unknown>;
-    return { name, description: TOOLS[name].description, input_schema: schema as Anthropic.Beta.BetaTool['input_schema'] };
+    return { name, description: TOOLS[name].description, input_schema: schema };
   });
   const text = { type: 'string' } as const;
   const hub = (name: string, description: string, properties: Record<string, unknown>, required: string[] = []) => defs.push({ name, description, input_schema: { type: 'object', properties, required } });
@@ -225,7 +211,7 @@ Finish with two or three lines saying what you sent.`;
  */
 async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, system: string, task: string, title: string, link: string) {
   const key = await l.secret(KEY);
-  if (!key) return { ran: false as const, reason: 'This workspace has no Anthropic key, so nothing reads its pushes. Its admin sets one on the Workspace screen.' };
+  if (!(await hasReaderKey(l))) return { ran: false as const, reason: 'This workspace has no Anthropic key, so nothing reads its pushes. Its admin sets one on the Workspace screen.' };
   const me = await l.setting<string>('me');
   // It acts for the workspace's owner, as an agent's token does: it sees what they see, and what it makes is theirs.
   const mine = me ? l.as(me) : l;
@@ -234,7 +220,7 @@ async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, syst
   const actor: Actor = { kind: 'agent', name: 'reader', person: me, repos: [repo.entity.id] };
   const ask = asking(key);
   const kit = tools(app, repo, ref);
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: task }];
+  const messages: Turn[] = [{ role: 'user', content: task }];
   const used = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
   let turns = 0;
   let said = '';
@@ -263,7 +249,7 @@ async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, syst
       used.output += answer.usage.output_tokens;
       used.cache_read += answer.usage.cache_read_input_tokens ?? 0;
       used.cache_write += answer.usage.cache_creation_input_tokens ?? 0;
-      const text = answer.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n').trim();
+      const text = answer.content.flatMap((b) => (b.type === 'text' ? [String(b.text)] : [])).join('\n').trim();
       if (text) said = text;
       if (answer.stop_reason === 'refusal') {
         failed = `The model declined to go on${answer.stop_details?.explanation ? `: ${answer.stop_details.explanation}` : '.'}`;
@@ -273,12 +259,12 @@ async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, syst
         failed = 'Stopped: one answer ran past its length.';
         break;
       }
-      messages.push({ role: 'assistant', content: answer.content as Anthropic.Beta.BetaContentBlockParam[] });
+      messages.push({ role: 'assistant', content: answer.content });
       if (answer.stop_reason === 'pause_turn') continue;
-      const calls = answer.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use');
+      const calls = answer.content.filter((b): b is ToolUseBlock => b.type === 'tool_use');
       if (answer.stop_reason !== 'tool_use' || !calls.length) break;
       // Every call of a turn is answered in one message, an error as an error: none is dropped.
-      const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+      const results: ToolResultBlock[] = [];
       for (const call of calls) {
         try {
           const result = await kit.run(mine, actor, call.name, (call.input ?? {}) as Record<string, unknown>);
@@ -292,9 +278,10 @@ async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, syst
     }
   } catch (err) {
     // Said by kind, most particular first: what the owner can do about it differs.
-    if (err instanceof Anthropic.AuthenticationError) failed = 'Anthropic refused the workspace’s key. Set a new one on the Workspace screen.';
-    else if (err instanceof Anthropic.RateLimitError) failed = 'Anthropic’s rate limit was reached and the run gave up.';
-    else if (err instanceof Anthropic.APIError) failed = `Anthropic answered ${err.status ?? 'with an error'}: ${err.message.slice(0, 300)}`;
+    const who = provider();
+    if (err instanceof ModelError && err.kind === 'auth') failed = `${who} refused the key. ${configured().url ? 'The server’s model key needs looking at.' : 'Set a new one on the Workspace screen.'}`;
+    else if (err instanceof ModelError && err.kind === 'rate') failed = `${who}’s rate limit was reached and the run gave up.`;
+    else if (err instanceof ModelError) failed = `${who} answered ${err.status ?? 'with an error'}: ${err.message.slice(0, 300)}`;
     else failed = `The run broke: ${(err as Error).message.slice(0, 300)}`;
   }
   const tokens = used.input + used.output + used.cache_write;
