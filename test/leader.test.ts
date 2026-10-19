@@ -51,7 +51,7 @@ test('of two servers on one database, one leads, and the other takes over when i
   }
 });
 
-test('a leader whose connection is cut stops leading, and the follower takes over', { skip: !server && 'needs PELAGO_TEST_DATABASE_URL' }, async () => {
+test('a leader whose connection is cut stops leading, and one server leads again', { skip: !server && 'needs PELAGO_TEST_DATABASE_URL' }, async () => {
   const key = `pelago.leader.test.${process.pid}.${Date.now()}.cut`;
   const a = await pgLeader(server!, { everyMs: 100, key });
   const b = await pgLeader(server!, { everyMs: 100, key });
@@ -59,11 +59,13 @@ test('a leader whose connection is cut stops leading, and the follower takes ove
   await admin.connect();
   try {
     const stepped = nextChange(a);
-    const tookOver = nextChange(b);
     // The leader's connection is the one holding an advisory lock under its name.
     await admin.query(`select pg_terminate_backend(l.pid) from pg_locks l join pg_stat_activity s using (pid) where l.locktype = 'advisory' and l.granted and s.application_name = 'pelago-leader'`);
     assert.equal(await stepped, false, 'the old leader notices and stops');
-    assert.equal(await tookOver, true, 'the follower leads');
+    // Then both ask for the lock, and either may win it: the old leader, reconnected, as well as the follower.
+    const until = Date.now() + 10_000;
+    while (!a.leading && !b.leading && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+    assert.equal(Number(a.leading) + Number(b.leading), 1, 'exactly one server leads again');
   } finally {
     await admin.end();
     await a.stop();
