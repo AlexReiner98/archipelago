@@ -68,13 +68,39 @@ services:
     <<: *app
     profiles: ["green"]
 
+  # Every WAL segment goes to pgBackRest as Postgres closes it (at least once a minute), so the map can be put back to
+  # any minute: repo1 is a volume on this host, repo2 (when its bucket is set in .env) OVH Object Storage in
+  # Beauharnois, encrypted before it leaves. deploy/backup.sh takes the backups and tries a restore.
   postgres:
-    image: postgres:17-alpine
+    build: ./postgres
+    image: archipelago-postgres:17
     restart: unless-stopped
     environment:
       POSTGRES_USER: pelago
       POSTGRES_DB: pelago
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PGBACKREST_STANZA: pelago
+      # The command pgBackRest writes into a restore_command: the wrapper, which drops the empty settings below.
+      PGBACKREST_CMD: /usr/local/bin/pgbackrest
+      PGBACKREST_PG1_PATH: /var/lib/postgresql/data
+      PGBACKREST_PG1_SOCKET_PATH: /var/run/postgresql
+      PGBACKREST_PG1_USER: pelago
+      PGBACKREST_LOG_LEVEL_FILE: "off"
+      PGBACKREST_LOG_LEVEL_CONSOLE: info
+      PGBACKREST_COMPRESS_TYPE: zst
+      PGBACKREST_START_FAST: "y"
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_RETENTION_FULL: 7
+      PGBACKREST_REPO2_TYPE: ${PGBACKREST_REPO2_S3_BUCKET:+s3}
+      PGBACKREST_REPO2_PATH: ${PGBACKREST_REPO2_S3_BUCKET:+/archipelago-1}
+      PGBACKREST_REPO2_RETENTION_FULL: ${PGBACKREST_REPO2_S3_BUCKET:+30}
+      PGBACKREST_REPO2_S3_BUCKET: ${PGBACKREST_REPO2_S3_BUCKET:-}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${PGBACKREST_REPO2_S3_BUCKET:+${PGBACKREST_REPO2_S3_ENDPOINT:-s3.bhs.io.cloud.ovh.net}}
+      PGBACKREST_REPO2_S3_REGION: ${PGBACKREST_REPO2_S3_BUCKET:+${PGBACKREST_REPO2_S3_REGION:-bhs}}
+      PGBACKREST_REPO2_S3_KEY: ${PGBACKREST_REPO2_S3_KEY:-}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${PGBACKREST_REPO2_S3_KEY_SECRET:-}
+      PGBACKREST_REPO2_CIPHER_TYPE: ${PGBACKREST_REPO2_S3_BUCKET:+aes-256-cbc}
+      PGBACKREST_REPO2_CIPHER_PASS: ${PGBACKREST_REPO2_CIPHER_PASS:-}
     command: >
       postgres
       -c shared_buffers=256MB
@@ -82,11 +108,15 @@ services:
       -c work_mem=8MB
       -c maintenance_work_mem=64MB
       -c max_connections=100
+      -c archive_mode=on
+      -c archive_timeout=60
+      -c "archive_command=pgbackrest archive-push %p"
     ports:
       # For pulls from the laptop over WireGuard only.
       - "10.66.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - pgbackrest-repo:/var/lib/pgbackrest
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-pg_trgm.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pelago -d pelago"]
@@ -147,4 +177,5 @@ volumes:
   caddy-data:
   caddy-config:
   postgres-data:
+  pgbackrest-repo:
   kuma-data:
