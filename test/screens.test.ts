@@ -67,11 +67,11 @@ test("the owner's own screen and their version of a preset", () => {
   ]);
 });
 
-test("a pack's screen for Home is on it once its pack is used, until the owner takes it off, and can be put back", async () => {
+test("a pack's screen for Home is offered there, and is on it only once the owner puts it there", async () => {
   const l = await map();
   const onHome = async () => (await screens(l)).filter((s) => s.at === 'home').map((s) => s.id);
-  assert.deepEqual(await onHome(), ['home'], "a pack's screen waits for the first item of its pack");
-  assert.equal((await one(l, 'time.today'))!.idle, true);
+  assert.deepEqual(await onHome(), ['home'], "Home is the owner's move: the core pack's screen alone");
+  assert.equal((await one(l, 'time.today'))!.idle, true, 'a pack nothing is held of yet says so');
   await l.change(human, {
     reason: 'test',
     ops: [
@@ -80,13 +80,13 @@ test("a pack's screen for Home is on it once its pack is used, until the owner t
       { op: 'create', type: 'time.entry', title: 'T', status: 'logged', props: { date: '2026-10-17', hours: 1 } },
     ],
   });
-  assert.deepEqual(await onHome(), ['home', 'inquiry.undermined', 'software.releases', 'time.today'], "the core pack's first, then each pack's in the order they load");
+  assert.deepEqual(await onHome(), ['home'], "used, a pack's screen is still only offered");
+  assert.deepEqual([(await one(l, 'time.today'))!.homeable, (await one(l, 'time.today'))!.at, (await one(l, 'time.today'))!.idle], [true, undefined, undefined]);
 
-  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'screen', title: 'Today', status: 'current', props: { preset: 'time.today', home: false } }] })) as { created: Record<string, string> };
-  assert.deepEqual(await onHome(), ['home', 'inquiry.undermined', 'software.releases']);
-  assert.deepEqual([(await one(l, 'time.today'))!.homeable, (await one(l, 'time.today'))!.at], [true, undefined], 'taken off, it is still listed, to be put back');
-  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: made.created.s, props: { home: null } }] });
-  assert.ok((await onHome()).includes('time.today'));
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'screen', title: 'Today', status: 'current', props: { preset: 'time.today', home: true } }] })) as { created: Record<string, string> };
+  assert.deepEqual(await onHome(), ['home', 'time.today'], 'put on Home by the owner');
+  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: made.created.s, props: { home: false } }] });
+  assert.deepEqual(await onHome(), ['home'], 'and taken off again');
 });
 
 test("the owner's own screen is on Home only when they put it there", () => {

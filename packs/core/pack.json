@@ -140,6 +140,7 @@
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "place": { "type": "number", "description": "Its order among the views of the item it is about: the lowest is the one the page opens on." },
+        "pinned": { "type": "boolean", "description": "Kept in sight by the owner: shown on Home and first in the Atlas." },
         "from": { "type": "string", "description": "The id of the item this view starts from, when that is not the item it is about. Such a view is a shortcut: the page shows it as a way to that item." },
         "controls": { "type": "json", "description": "What the person looking may change on the page, as a list of: lit (what stays lit), far (how many steps down), closed (whether what is finished shows). None when not set." },
         "kinds": { "type": "json", "description": "Types to keep, as a list: a type (flavours included) or \"work\"; with a leading \"-\", to leave out." },
@@ -202,8 +203,9 @@
       "at": "home",
       "pieces": [
         { "piece": "token_ask" },
-        { "piece": "attention", "title": "Needs you", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] },
-        { "piece": "picture", "title": "Your work", "lens": { "far": 1 }, "style": { "shape": "list", "lit": "you" } }
+        { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "unsettled"], "limit": 5 },
+        { "piece": "picture", "title": "Your projects", "lens": { "altitude": "project", "fold": ["closed", "system"] }, "style": { "shape": "list" } },
+        { "piece": "atlas", "title": "Atlas", "limit": 6 }
       ]
     },
     { "id": "needs", "title": "Needs you", "on": ["work", "aim"], "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] }] },

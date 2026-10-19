@@ -30,20 +30,37 @@ const MARKS = {
 export function attentionRow(item, latest = false) {
   return h(
     'li',
-    { class: 'row-top' },
+    // One line at any width: the title gives way first, then what it sits in; the marks keep their size.
+    { class: 'row-top', style: 'flex-wrap: nowrap' },
     item.type && chip(item.type),
-    h('span', { class: 'grow gist', title: item.title }, link(item)),
-    item.top && h('a', { class: 'gist muted small', href: `#/e/${item.top.id}`, title: item.top.title }, item.top.title),
+    h('span', { class: 'grow gist', title: item.title, style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, link(item)),
+    item.top && h('a', { class: 'gist muted small', href: `#/e/${item.top.id}`, title: item.top.title, style: 'min-width: 0; max-width: 25%; flex-shrink: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, item.top.title),
     item.reasons.map((r) => {
       const [said, tone, tip] = MARKS[r.why]?.(r) ?? [r.why, '', ''];
-      return h('span', { class: `pill ${tone}`.trim(), title: tip }, said);
+      return h('span', { class: `pill ${tone}`.trim(), title: tip, style: 'flex: none' }, said);
     }),
     latest && item.changed && h('span', { class: 'muted small nowrap' }, ago(item.changed)),
   );
 }
 
-/** A card of attention rows. On an item's page it is left out when nothing there needs anyone; on Home it says so. */
-export async function attentionCard(host, params, title, onItem) {
+/** What is past the rows shown, as one line: how many, and in which projects, each a way to it. */
+function overflow(rest) {
+  const by = new Map();
+  for (const item of rest) {
+    const key = item.top?.id ?? '';
+    by.set(key, { top: item.top, n: (by.get(key)?.n ?? 0) + 1 });
+  }
+  const groups = [...by.values()].sort((a, b) => b.n - a.n);
+  return h(
+    'div',
+    { class: 'row-top muted small overflow', style: 'padding: 0 14px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' },
+    `and ${rest.length} more:`,
+    groups.map((g) => (g.top ? h('a', { href: `#/e/${g.top.id}`, title: `${g.n} in ${g.top.title}` }, `${g.top.title} ${g.n}`) : h('span', { title: 'In no project' }, `elsewhere ${g.n}`))),
+  );
+}
+
+/** A card of attention rows. On an item's page it is left out when nothing there needs anyone; on Home it says so. Given a limit, the rest are one line. */
+export async function attentionCard(host, params, title, onItem, limit) {
   const order = savedOrder();
   const answer = await api('view', { name: 'attention', params: { ...params, ...(order === 'latest' && { order }) } });
   if (!host.isConnected) return;
@@ -54,8 +71,9 @@ export async function attentionCard(host, params, title, onItem) {
     } catch {
       // Without storage the order holds until the page is drawn again.
     }
-    attentionCard(host, params, title, onItem);
+    attentionCard(host, params, title, onItem, limit);
   };
+  const shown = limit ? answer.items.slice(0, limit) : answer.items;
   const orders = [['pressing', 'Pressing', 'What matters most first'], ['latest', 'Latest', 'What changed most recently first']];
   host.replaceChildren(
     h(
@@ -68,7 +86,8 @@ export async function attentionCard(host, params, title, onItem) {
         answer.items.length > 0 && h('span', { class: 'n' }, answer.items.length),
         answer.items.length > 1 && h('span', { class: 'switch', style: 'margin-left: auto' }, orders.map(([key, label, tip]) => h('button', { class: order === key ? 'on' : '', title: tip, onclick: pick(key) }, label))),
       ),
-      answer.items.length ? h('ul', { class: 'rows' }, answer.items.map((item) => attentionRow(item, order === 'latest'))) : h('div', { class: 'empty' }, 'Nothing needs you.'),
+      answer.items.length ? h('ul', { class: 'rows' }, shown.map((item) => attentionRow(item, order === 'latest'))) : h('div', { class: 'empty' }, 'Nothing needs you.'),
+      shown.length < answer.items.length && overflow(answer.items.slice(shown.length)),
       answer.more && h('div', { class: 'muted small', style: 'padding: 0 14px 12px' }, answer.more),
     ),
   );

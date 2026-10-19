@@ -6,6 +6,7 @@
 import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
 import { attentionCard } from './attention.js';
+import { atlasStrip } from './atlas.js';
 import { gate } from './gate.js';
 import { proofPart } from './proof.js';
 import { lensView } from './lens.js';
@@ -159,16 +160,20 @@ const PIECES = {
   attention: (ctx, p) => {
     const node = h('div');
     const params = { ...(p.person && { person: p.person }), ...(p.reasons && { reasons: p.reasons }), ...(ctx.id && { within: ctx.id }) };
-    return { node, later: () => attentionCard(node, params, p.title ?? p.screen.title, Boolean(ctx.id)) };
+    return { node, later: () => attentionCard(node, params, p.title ?? p.screen.title, Boolean(ctx.id), p.limit) };
   },
   note: (ctx, p) => ({ node: h('section', { class: 'card wide note' }, renderBody(p.text)) }),
   // A picture: from the item the page is of, unless the lens says where. A style named by id is read by the server;
   // one written into the screen is its fields only, never code.
   picture: (ctx, p) => {
     const lens = typeof p.lens === 'string' ? { lens: p.lens } : { ...p.lens };
+    // A level of the hierarchy (docs/ui-strategy.md) is every type the packs put at it.
+    if (lens.altitude) (lens.kinds = (state.schema?.types ?? []).filter((t) => t.altitude === lens.altitude).map((t) => t.id)), delete lens.altitude;
     if (ctx.id && !lens.from) lens.from = ctx.id;
     if (typeof p.style === 'string') lens.style = p.style;
     const { code, ...style } = typeof p.style === 'object' && p.style ? p.style : {};
+    // A screen that names its shape is drawn in it, not by the code of a style the workspace keeps for every picture.
+    if (style.shape) style.code = '';
     const view = lensView({ lens, style, key: `screen:${p.screen.id}:${ctx.id ?? ''}`, quiet: true });
     return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: 14px' }, h('header', {}, h('h2', {}, p.title ?? p.screen.title)), view) };
   },
@@ -188,6 +193,11 @@ const PIECES = {
   token_ask: (ctx) => {
     const node = h('div');
     return { node, later: () => tokenAskPiece(node, ctx.e) };
+  },
+  // The pictures kept on the map, pinned first: a strip of tiles, each opening its picture.
+  atlas: (ctx, p) => {
+    const node = h('div');
+    return { node, later: () => atlasStrip(node, p.title ?? p.screen.title, p.limit) };
   },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,
