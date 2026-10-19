@@ -4,7 +4,7 @@
 # repo1 is the pgbackrest-repo volume on this host; repo2, when PGBACKREST_REPO2_S3_BUCKET is set in .env, is OVH
 # Object Storage, encrypted with PGBACKREST_REPO2_CIPHER_PASS before it leaves (lose that and repo2 is unreadable).
 #
-#   deploy/backup.sh init     once per repository: make the stanza and check that WAL reaches it
+#   deploy/backup.sh init     once, and again when repo2 is added: make the stanza and check that WAL reaches it
 #   deploy/backup.sh full     a full backup to each repository (archipelago-backup.timer runs it nightly, then try)
 #   deploy/backup.sh info     what each repository holds
 #   deploy/backup.sh try [n]  restore the newest backup of repo n (default each) into a spare Postgres, replay the
@@ -25,9 +25,6 @@ repos=(1)
 pgbr() { docker compose exec -T -u postgres postgres pgbackrest "$@"; }
 psql_live() { docker compose exec -T -u postgres postgres psql -U pelago -v ON_ERROR_STOP=1 -qtAX "$@"; }
 
-exec 9>"$here/.backup.lock"
-flock -n 9 || { say "another backup is running"; exit 0; }
-
 # Every user table of every database, with its rows: "database table rows", sorted. Postgres runs as a superuser
 # here, so row level security does not hide anything from the count.
 count_rows() {
@@ -38,70 +35,74 @@ count_rows() {
   done | sort
 }
 
-# The spare's container and volume, and the file of settings handed to it (it holds repo2's keys).
-spare_gone() {
-  docker rm -f "archipelago-restore-try-$1" >/dev/null 2>&1 || true
-  docker volume rm "archipelago-restore-try-$1" >/dev/null 2>&1 || true
-  rm -f "$here/.restore-try.env"
-}
+# One repository's restore tried, in a process of its own (backup.sh try-one n), so that any step that fails ends it.
+try_one() {
+  # Not local: the trap below runs after the function has returned.
+  name="archipelago-restore-try-$1" env_file=".restore-try.env"
+  local repo="$1" image repo_volume network=none
+  [[ $repo == 1 ]] || network=bridge
+  # The spare's container and volume go whatever happens, and the settings handed to it (they hold repo2's keys).
+  gone() { docker rm -f "$name" >/dev/null 2>&1 || true; docker volume rm "$name" >/dev/null 2>&1 || true; rm -f "$env_file"; }
+  trap gone EXIT
+  gone
 
-try_restore() {
-  local repo="$1" image volume name env_file="$here/.restore-try.env"
   image="$(docker compose images -q postgres | head -1)"
-  [[ -n $image ]] || { say "no postgres image: is the stack up?"; return 1; }
-  volume="archipelago-restore-try-$repo"; name="archipelago-restore-try-$repo"
-  spare_gone "$repo"
-  trap 'spare_gone "'"$repo"'"' EXIT
+  [[ -n $image ]] || { say "no postgres image: is the stack up?"; exit 1; }
+  # repo1's volume, read only: the one the postgres container has at /var/lib/pgbackrest.
+  repo_volume="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/pgbackrest"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -q postgres)")"
+  [[ -n $repo_volume ]] || { say "the postgres container has no volume at /var/lib/pgbackrest"; exit 1; }
 
   # What live holds now, then a WAL switch that pgBackRest confirms is archived: the spare must hold at least this.
   say "repo$repo: counting live, then closing the WAL segment"
   local before; before="$(count_rows psql_live)"
   pgbr check >/dev/null
 
-  (umask 077; docker compose exec -T postgres env | grep '^PGBACKREST_' > "$env_file" || true)
-  docker volume create "$volume" >/dev/null
-  docker run --rm -v "$volume:/restore" "$image" sh -c 'chown postgres:postgres /restore && chmod 700 /restore'
+  (umask 077; docker compose exec -T postgres env | grep '^PGBACKREST_[A-Z0-9_]*=.' > "$env_file")
+  docker volume create "$name" >/dev/null
+  docker run --rm -v "$name:/restore" "$image" sh -c 'chown postgres:postgres /restore && chmod 700 /restore'
 
   say "repo$repo: restoring the newest backup"
   local started=$SECONDS
-  docker run --rm --env-file "$env_file" -u postgres -v "$volume:/restore" \
-    -v archipelago_pgbackrest-repo:/var/lib/pgbackrest:ro \
+  docker run --rm --network "$network" --env-file "$env_file" -u postgres -v "$name:/restore" \
+    -v "$repo_volume:/var/lib/pgbackrest:ro" \
     "$image" pgbackrest --repo="$repo" --pg1-path=/restore --log-level-console=warn restore
 
   # The spare replays the archived WAL and opens. It archives nothing (archive_mode off on the command line beats
-  # what the restore wrote), listens on no address, and is on no network of the stack's.
-  docker run -d --name "$name" --env-file "$env_file" -u postgres -v "$volume:/restore" \
-    -v archipelago_pgbackrest-repo:/var/lib/pgbackrest:ro \
-    "$image" postgres -D /restore -c archive_mode=off -c listen_addresses= -c shared_buffers=64MB >/dev/null
+  # what the restore wrote), listens on no address, and joins none of the stack's networks.
+  docker run -d --name "$name" --network "$network" --env-file "$env_file" -e PGDATA=/restore -u postgres \
+    -v "$name:/restore" -v "$repo_volume:/var/lib/pgbackrest:ro" \
+    "$image" postgres -c archive_mode=off -c listen_addresses= -c shared_buffers=64MB >/dev/null
   local waited=0
-  until [[ "$(docker exec "$name" psql -U pelago -d postgres -qtAX -c 'select not pg_is_in_recovery()' 2>/dev/null)" == t ]]; do
-    if (( waited >= 300 )); then say "repo$repo: the spare did not open in 300 s"; docker logs --tail 30 "$name"; return 1; fi
+  until [[ "$(docker exec "$name" psql -U pelago -d postgres -qtAX -c 'select not pg_is_in_recovery()' 2>/dev/null || true)" == t ]]; do
+    if (( waited >= 300 )) || [[ "$(docker inspect -f '{{.State.Running}}' "$name")" != true ]]; then
+      say "repo$repo: the spare did not open"; docker logs --tail 30 "$name"; exit 1
+    fi
     sleep 2; waited=$((waited + 2))
   done
-  say "repo$repo: the spare is open after $((SECONDS - started)) s"
+  say "repo$repo: the spare is open, $((SECONDS - started)) s after the restore began"
 
   local after; after="$(count_rows docker exec "$name" psql -U pelago -v ON_ERROR_STOP=1 -qtAX)"
-  # Live may have moved on since it was counted; the spare may hold more, never less, and nothing may be missing.
+  # Live may have moved on since it was counted: the spare may hold more, never less, and no table may be missing.
   local short
   short="$(awk 'NR == FNR { got[$1 " " $2] = $3; next }
                 !(($1 " " $2) in got) { print "  " $1 " " $2 ": live " $3 ", restored none"; next }
-                got[$1 " " $2] < $3 { print "  " $1 " " $2 ": live " $3 ", restored " got[$1 " " $2] }'            <(printf '%s
-' "$after") <(printf '%s
-' "$before"))"
+                got[$1 " " $2] < $3 { print "  " $1 " " $2 ": live " $3 ", restored " got[$1 " " $2] }' \
+           <(printf '%s\n' "$after") <(printf '%s\n' "$before"))"
   if [[ -n $short ]]; then
-    say "repo$repo: the restore is short:"; printf '%s
-' "$short"; return 1
+    say "repo$repo: the restore is short:"; printf '%s\n' "$short"; exit 1
   fi
   say "repo$repo: restore good: $(wc -l <<<"$after") tables in $(cut -d' ' -f1 <<<"$after" | sort -u | wc -l) databases, none short"
-  spare_gone "$repo"
 }
+
+if [[ ${1:-} == try-one ]]; then try_one "$2"; exit; fi
+
+exec 9>"$here/.backup.lock"
+flock -n 9 || { say "another backup is running"; exit 0; }
 
 case "${1:-}" in
   init)
-    for r in "${repos[@]}"; do
-      say "repo$r: making the stanza"
-      pgbr --repo="$r" stanza-create
-    done
+    say "making the stanza (repositories ${repos[*]})"
+    pgbr stanza-create
     pgbr check
     say "WAL reaches every repository"
     ;;
@@ -117,7 +118,7 @@ case "${1:-}" in
     ;;
   try)
     failed=0
-    for r in ${2:-"${repos[@]}"}; do try_restore "$r" || failed=1; done
+    for r in ${2:-"${repos[@]}"}; do "$here/$(basename "$0")" try-one "$r" || failed=1; done
     exit "$failed"
     ;;
   *)

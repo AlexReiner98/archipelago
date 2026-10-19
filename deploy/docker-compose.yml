@@ -80,7 +80,11 @@ services:
       POSTGRES_DB: pelago
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       PGBACKREST_STANZA: pelago
+      # The command pgBackRest writes into a restore_command: the wrapper, which drops the empty settings below.
+      PGBACKREST_CMD: /usr/local/bin/pgbackrest
       PGBACKREST_PG1_PATH: /var/lib/postgresql/data
+      PGBACKREST_PG1_SOCKET_PATH: /var/run/postgresql
+      PGBACKREST_PG1_USER: pelago
       PGBACKREST_LOG_LEVEL_FILE: "off"
       PGBACKREST_LOG_LEVEL_CONSOLE: info
       PGBACKREST_COMPRESS_TYPE: zst
