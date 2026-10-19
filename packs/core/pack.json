@@ -196,8 +196,8 @@
       "title": "Home",
       "at": "home",
       "pieces": [
-        { "piece": "attention", "title": "Needs you", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] },
         { "piece": "token_ask" },
+        { "piece": "attention", "title": "Needs you", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] },
         { "piece": "picture", "title": "Your work", "lens": { "far": 1 }, "style": { "shape": "list", "lit": "you" } }
       ]
     },

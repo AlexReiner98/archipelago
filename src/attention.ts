@@ -38,6 +38,8 @@ export interface Input {
   days?: number;
   /** What nobody has changed in this many days is stale: 14 unless given. */
   stale_days?: number;
+  /** latest: what changed most recently first, in place of the strongest reason first. */
+  order?: 'latest';
   limit?: number;
 }
 
@@ -144,11 +146,12 @@ export async function attention(l: Archipelago, input: Input) {
   // What to confirm keeps the order the owner should see it in: what agents settled on their own judgment first.
   const asked = new Map((confirm?.questions ?? []).map((q, i) => [q.id, i]));
   const place = (id: string) => asked.get(id) ?? Infinity;
+  const newer = (a: { row: Row }, b: { row: Row }) => +new Date(b.row.updated_at) - +new Date(a.row.updated_at);
   const items = [...found.values()]
-    .sort((a, b) => rank(a.reasons) - rank(b.reasons) || place(a.row.id) - place(b.row.id) || String(a.row.due ?? '9').localeCompare(String(b.row.due ?? '9')) || +new Date(b.row.updated_at) - +new Date(a.row.updated_at))
+    .sort((a, b) => (input.order === 'latest' && newer(a, b)) || rank(a.reasons) - rank(b.reasons) || place(a.row.id) - place(b.row.id) || String(a.row.due ?? '9').localeCompare(String(b.row.due ?? '9')) || +new Date(b.row.updated_at) - +new Date(a.row.updated_at))
     .map(({ row, reasons }) => {
       const top = topOf(row.id);
-      return { id: row.id, type: row.type, kind: kindOf(row.type) ?? null, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, reasons, top: top ? { id: top, title: tops.get(top) ?? top } : null };
+      return { id: row.id, type: row.type, kind: kindOf(row.type) ?? null, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons, top: top ? { id: top, title: tops.get(top) ?? top } : null };
     });
   const counts = Object.fromEntries([...wanted].map((r) => [r, items.filter((i) => i.reasons.some((x) => x.why === r)).length]));
   const limit = input.limit ?? 100;

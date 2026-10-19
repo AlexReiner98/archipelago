@@ -2,7 +2,17 @@
 // at the top, muted. The same rows on Home, for you, and on an item's page, for what is that item's.
 
 import { api, h } from './base.js';
-import { chip, link } from './words.js';
+import { ago, chip, link } from './words.js';
+
+/** The order Needs you is read in, kept for this browser: the strongest reason first, or the latest change first. */
+const ORDER_KEY = 'pelago-needs-order';
+const savedOrder = () => {
+  try {
+    return localStorage.getItem(ORDER_KEY) === 'latest' ? 'latest' : 'pressing';
+  } catch {
+    return 'pressing';
+  }
+};
 
 /** Each reason as a mark: its words, how loud, and what its tooltip says. */
 const MARKS = {
@@ -17,7 +27,7 @@ const MARKS = {
   ready: () => ['ready', 'ok', 'Nothing is in its way'],
 };
 
-export function attentionRow(item) {
+export function attentionRow(item, latest = false) {
   return h(
     'li',
     { class: 'row-top' },
@@ -28,20 +38,37 @@ export function attentionRow(item) {
       const [said, tone, tip] = MARKS[r.why]?.(r) ?? [r.why, '', ''];
       return h('span', { class: `pill ${tone}`.trim(), title: tip }, said);
     }),
+    latest && item.changed && h('span', { class: 'muted small nowrap' }, ago(item.changed)),
   );
 }
 
 /** A card of attention rows. On an item's page it is left out when nothing there needs anyone; on Home it says so. */
 export async function attentionCard(host, params, title, onItem) {
-  const answer = await api('view', { name: 'attention', params });
+  const order = savedOrder();
+  const answer = await api('view', { name: 'attention', params: { ...params, ...(order === 'latest' && { order }) } });
   if (!host.isConnected) return;
   if (!answer.items.length && onItem) return host.remove();
+  const pick = (to) => () => {
+    try {
+      localStorage.setItem(ORDER_KEY, to);
+    } catch {
+      // Without storage the order holds until the page is drawn again.
+    }
+    attentionCard(host, params, title, onItem);
+  };
+  const orders = [['pressing', 'Pressing', 'What matters most first'], ['latest', 'Latest', 'What changed most recently first']];
   host.replaceChildren(
     h(
       'section',
       { class: 'card wide needs', style: 'margin-bottom: 14px' },
-      h('header', {}, h('h2', {}, title), answer.items.length > 0 && h('span', { class: 'n' }, answer.items.length)),
-      answer.items.length ? h('ul', { class: 'rows' }, answer.items.map(attentionRow)) : h('div', { class: 'empty' }, 'Nothing needs you.'),
+      h(
+        'header',
+        {},
+        h('h2', {}, title),
+        answer.items.length > 0 && h('span', { class: 'n' }, answer.items.length),
+        answer.items.length > 1 && h('span', { class: 'switch', style: 'margin-left: auto' }, orders.map(([key, label, tip]) => h('button', { class: order === key ? 'on' : '', title: tip, onclick: pick(key) }, label))),
+      ),
+      answer.items.length ? h('ul', { class: 'rows' }, answer.items.map((item) => attentionRow(item, order === 'latest'))) : h('div', { class: 'empty' }, 'Nothing needs you.'),
       answer.more && h('div', { class: 'muted small', style: 'padding: 0 14px 12px' }, answer.more),
     ),
   );

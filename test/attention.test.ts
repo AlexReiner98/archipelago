@@ -1,6 +1,6 @@
 // Attention: the one standing question the kernel answers. A small map with every reason in it, read for the owner,
 // for someone else, within a scope and by reason; the views it replaced answer only with where to look now; and Home
-// is the core pack's screen of two pieces.
+// is the core pack's screen of its pieces. It can be read latest first.
 
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync } from 'node:fs';
@@ -95,9 +95,29 @@ test('attention finds every reason, for the right person, within a scope, and th
   const listed = Object.keys((await callTool(l, human, 'view', {})) as Record<string, string>);
   assert.ok(listed.includes('attention') && !Object.keys(REPLACED).some((n) => listed.includes(n)));
 
-  // Home is the core pack's screen: what needs you, systems asking for a token, and a picture of your work as boxes.
+  // Home is the core pack's screen: systems asking for a token, what needs you, and a picture of your work as boxes.
   const { screens } = (await callTool(l, human, 'schema', {})) as { screens: { at?: string; pieces: { piece: string; title?: string; style?: { shape?: string } }[] }[] };
   const home = screens.find((s) => s.at === 'home')!;
-  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['attention', 'Needs you'], ['token_ask', undefined], ['picture', 'Your work']]);
+  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['token_ask', undefined], ['attention', 'Needs you'], ['picture', 'Your work']]);
   assert.equal(home.pieces[2].style?.shape, 'list');
+});
+
+test('attention can be read latest first, each item saying when it last changed', async () => {
+  const packs = mkdtempSync(join(tmpdir(), 'pelago-attention-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
+  const l = new Archipelago(await openDb(), new Registry(packs));
+  const me = ((await callTool(l, human, 'init', { name: 'Alex' })) as { me: string }).me;
+  const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+  const made = ((await l.change(human, { reason: 'test', ops: [
+    { op: 'create', ref: 'old', type: 'work.task', title: 'Old and due', owner: me, props: { due: soon } },
+    { op: 'create', ref: 'new', type: 'work.task', title: 'New and waiting', owner: me },
+    { op: 'link', type: 'waits_on', from: 'new', to: me },
+  ] })) as { created: Record<string, string> }).created;
+  await l.db.query(`update entity set updated_at = now() - interval '3 days' where id = $1`, [made.new]);
+  await l.db.query(`update entity set updated_at = now() - interval '1 hour' where id = $1`, [made.old]);
+  const read = async (params: Record<string, unknown>) => ((await callTool(l, human, 'view', { name: 'attention', params: { person: 'me', reasons: ['waits_on', 'due'], ...params } })) as { items: { title: string; changed: string }[] }).items;
+  assert.deepEqual((await read({})).map((i) => i.title), ['New and waiting', 'Old and due'], 'by default the strongest reason first');
+  const latest = await read({ order: 'latest' });
+  assert.deepEqual(latest.map((i) => i.title), ['Old and due', 'New and waiting']);
+  assert.ok(Date.parse(latest[0].changed) > Date.parse(latest[1].changed));
 });
