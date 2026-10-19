@@ -23,7 +23,7 @@ import { packActionByShort, packTool, packTools } from './packtools.ts';
 import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { undo } from './undo.ts';
-import { withScreens } from './screens.ts';
+import { withScreens } from './screens.ts'; import { schemaBrief, schemaOf } from './schema-brief.ts';
 import { getPicture, putPicture } from './pictures.ts';
 import { pictureOf, readLens, shownIn } from './lens.ts';
 import { askView, viewList } from './askview.ts';
@@ -308,9 +308,9 @@ type Refused = { who: string; input: Record<string, unknown> & { ops: unknown[] 
 
 export const TOOLS: Record<string, Tool> = {
   schema: {
-    description: 'Describe the map\'s model: enabled packs, every entity type with its statuses and fields, and every relation type. Read this before writing.',
-    input: {},
-    run: async (l) => withScreens(l, l.registry.describe()),
+    description: 'Describe the map\'s model: every entity type with its statuses and the fields you set, and every relation with its ends. Read this before writing. With type (a type, a relation or a pack): those whole, each field explained; full: true for everything, screens and verbs too.',
+    input: { type: z.string().optional().describe('A type, a relation or a pack, by its id as the brief lists it.'), full: z.boolean().optional() },
+    run: async (l, actor, input) => input.type ? schemaOf(l.registry.describe(), input.type) : actor.kind === 'human' || input.full ? withScreens(l, l.registry.describe()) : schemaBrief(l.registry),
   },
   search: {
     description: 'Find entities by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. Always search before creating, to avoid duplicates.',
