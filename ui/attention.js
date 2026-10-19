@@ -43,6 +43,35 @@ export function attentionRow(item, latest = false) {
   );
 }
 
+/** What is asked of you by each reason, strongest first: the verb, and what it is you do, when the map says. */
+const ASKS = [
+  ['to_confirm', (r) => ['Confirm', r.answer]],
+  // An open question is itself the ask: its title says what to decide.
+  ['unsettled', (r) => [r.by === 'evidence' ? 'Test' : 'Decide']],
+  ['waits_on', (r) => ['Do', r.for]],
+  ['due', (r) => [r.overdue ? 'Overdue' : 'Due']],
+  ['holding_up', () => ['Unblock']],
+];
+const sentence = (text) => text && text.charAt(0).toUpperCase() + text.slice(1);
+
+/** A row of what is yours to do, read as the thing to do: its verb, what is asked (or the item, when nothing more is said), then the item and where it sits, muted. */
+export function moveRow(item, latest = false) {
+  const [why, ask] = ASKS.find(([w]) => item.reasons.some((r) => r.why === w)) ?? [];
+  const [verb, said] = ask ? ask(item.reasons.find((r) => r.why === why)) : ['Look', undefined];
+  const cut = 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis';
+  // Beside it, muted: the item, when the ask is not its title; else what it waits on you for.
+  const aside = said ? item.title : sentence(item.reasons.find((r) => r.why === 'waits_on')?.for);
+  return h(
+    'li',
+    { class: 'row-top', style: 'flex-wrap: nowrap' },
+    h('span', { class: `pill ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => MARKS[r.why]?.(r)[2]).filter(Boolean).join('\n') }, verb),
+    h('a', { class: 'grow', href: `#/e/${item.id}`, title: said ? `${sentence(said)}\n${item.title}` : item.title, style: cut }, sentence(said) || item.title),
+    aside && h('span', { class: 'muted small', title: aside, style: `${cut}; max-width: 35%; flex-shrink: 2` }, aside),
+    item.top && h('a', { class: 'muted small', href: `#/e/${item.top.id}`, title: item.top.title, style: `${cut}; max-width: 20%; flex-shrink: 3` }, item.top.title),
+    latest && item.changed && h('span', { class: 'muted small nowrap' }, ago(item.changed)),
+  );
+}
+
 /** What is past the rows shown, as one line: how many, and in which projects, each a way to it. */
 function overflow(rest) {
   const by = new Map();
@@ -86,7 +115,7 @@ export async function attentionCard(host, params, title, onItem, limit) {
         answer.items.length > 0 && h('span', { class: 'n' }, answer.items.length),
         answer.items.length > 1 && h('span', { class: 'switch', style: 'margin-left: auto' }, orders.map(([key, label, tip]) => h('button', { class: order === key ? 'on' : '', title: tip, onclick: pick(key) }, label))),
       ),
-      answer.items.length ? h('ul', { class: 'rows' }, shown.map((item) => attentionRow(item, order === 'latest'))) : h('div', { class: 'empty' }, 'Nothing needs you.'),
+      answer.items.length ? h('ul', { class: 'rows' }, shown.map((item) => (params.person === 'me' ? moveRow : attentionRow)(item, order === 'latest'))) : h('div', { class: 'empty' }, 'Nothing needs you.'),
       shown.length < answer.items.length && overflow(answer.items.slice(shown.length)),
       answer.more && h('div', { class: 'muted small', style: 'padding: 0 14px 12px' }, answer.more),
     ),
