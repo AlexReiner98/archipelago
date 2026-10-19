@@ -1,6 +1,7 @@
 .git
 .github
-.claude
+.claude/*
+!.claude/skills
 node_modules
 data
 data-*
