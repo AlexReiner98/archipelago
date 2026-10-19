@@ -95,9 +95,9 @@ test('attention finds every reason, for the right person, within a scope, and th
   const listed = Object.keys((await callTool(l, human, 'view', {})) as Record<string, string>);
   assert.ok(listed.includes('attention') && !Object.keys(REPLACED).some((n) => listed.includes(n)));
 
-  // Home is the core pack's screen: what needs you, and a picture of your work as boxes.
+  // Home is the core pack's screen: what needs you, systems asking for a token, and a picture of your work as boxes.
   const { screens } = (await callTool(l, human, 'schema', {})) as { screens: { at?: string; pieces: { piece: string; title?: string; style?: { shape?: string } }[] }[] };
   const home = screens.find((s) => s.at === 'home')!;
-  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['attention', 'Needs you'], ['picture', 'Your work']]);
-  assert.equal(home.pieces[1].style?.shape, 'list');
+  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['attention', 'Needs you'], ['token_ask', undefined], ['picture', 'Your work']]);
+  assert.equal(home.pieces[2].style?.shape, 'list');
 });

@@ -493,6 +493,18 @@ person can read it. Three things limit what a copied one is worth:
   the address they are watched at, never by an id, and is applied at once
   as a measurement. A token that may propose has every change it sends wait
   for a person, whatever the workspace lets agents do.
+- **A system can ask for its own.** Nobody need copy a reporting token onto
+  a machine. The system posts its name and the watched addresses of the
+  parts it reports on to `POST /connect/request` (no token; counted like
+  the other open routes) and is given a short code and a poll. A person
+  approves or refuses the request on Home or the page of an item watched at
+  one of those addresses, after checking the code is the one the system
+  shows. Approved, the system's next poll (`POST /connect/poll/...`, the
+  poll's secret as a bearer) is handed a token once: an agent's, acting for
+  whoever approved it, within those items, that may only report. A request
+  waits ten minutes and is operational state, not an item
+  (`src/token-ask.ts`). `deploy/deploy.sh` asks this way when
+  `DEPLOY_MAP_TOKEN` is unset and writes the token into `deploy/.env`.
 - **Its owner hears of a new place.** Each token keeps the networks it has
   been used from. Used from one it has not been, a warning goes to the
   owner; the first place a token is used is not news. This notices, it does

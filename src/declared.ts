@@ -136,7 +136,7 @@ export interface ScreenDef {
  * The pieces the kernel draws, each with what it must be told. A tree, a gate, proof, usage and a document draw the
  * kernel's views of the item; a figure is the picture it keeps; rows and a form are the pack's own view and action.
  */
-export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [] } as const;
+export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [] } as const;
 
 /** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
 export const PAGES = ['time'];

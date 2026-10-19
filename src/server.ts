@@ -11,9 +11,8 @@
 //   /github/app/...    the server's GitHub App: created once, connected by
 //                      each workspace, and every push delivered to /hook
 //   GET  /whoami       which workspace and identity a request resolves to
-//   GET  /connect/setup.mjs  a script that connects the project it is run in
-//                      to this server: tools, hooks, the friction skill and
-//                      the working rules (no secret in it)
+//   /connect/...       the setup script that connects a project (no secret in
+//                      it), and a running system's request for its token
 //   /operator/workspaces  list and create workspaces (empty, or from a backup
 //                      file), and issue a workspace a new owner token
 //                      (operator secret)
@@ -36,7 +35,7 @@ import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './
 import { notify } from './notify.ts';
 import { backupAll, parseBackup } from './backup.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
-import { setupScript } from './connect.ts';
+import { serveConnect } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
 import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
@@ -195,15 +194,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const [wsId, key] = url.pathname.slice(13).split('/');
         return await serveBackupFile(key && (await workspaces.has(wsId)) ? (await workspaces.get(wsId)).pelago.db : undefined, key ?? '', res);
       }
-      // What a project needs to work with this server, as one script to run in its folder. It holds no secret,
-      // so it needs no token; it is given only under a name this server answers to, which it then writes down.
-      if (req.method === 'GET' && url.pathname === '/connect/setup.mjs') {
-        const host = req.headers.host ?? '';
-        if (!hosts.includes(host)) return send(res, 404, { error: 'Not found' });
-        if (tooOften(req, res, open)) return;
-        res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
-        return res.end(setupScript(`${named.includes(host) ? 'https' : 'http'}://${host}`, Boolean(tokens)));
-      }
+      // What a project needs to work with this server, and a running system's request for its token: no token needed.
+      if (url.pathname.startsWith('/connect/')) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, open), body: () => readJson(req) });
 
       // A product's public page: open to anyone, on any name this server has. It is read as the public role sees the
       // map, so there is nothing here to guard: what is not public is not there to be found.
