@@ -422,7 +422,7 @@ export const TOOLS: Record<string, Tool> = {
       if (unknown.length) throw new Error(`The file uses types this server does not have: ${unknown.join(', ')}. Install the pack that defines them first.`);
       const backed_up_first = input.apply ? Boolean(backUp && (await backUp())) : undefined;
       // The file's own types first, in the order they were defined: its entities need them.
-      if (input.apply) for (const def of defined) whole.registry.defineLocal(def);
+      if (input.apply) for (const def of defined) await whole.registry.defineLocal(def);
       // A map brought from elsewhere has its own person for its owner. If that is
       // who owns this workspace too, the two can be made one.
       const theirs = file.tables?.setting?.find((s) => s.key === 'me')?.value as string | undefined;
@@ -896,12 +896,12 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       const app = githubApp;
       const whole = await wholeMap(l);
-      const status = async () => ({ available: Boolean(app), app: app?.app ?? null, can_create: Boolean(app) && !app!.app && Boolean(actor.admin) && l.workspace === 'default', installation: app?.installationOf(l.workspace) ?? null, reader: { key: await hasReaderKey(whole), model: READER_MODEL } });
+      const status = async () => ({ available: Boolean(app), app: (await app?.app()) ?? null, can_create: Boolean(app) && !(await app!.app()) && Boolean(actor.admin) && l.workspace === 'default', installation: (await app?.installationOf(l.workspace)) ?? null, reader: { key: await hasReaderKey(whole), model: READER_MODEL } });
       if (!input.create && !input.connect && !input.disconnect && !input.key && !input.forget_key && !input.recheck) return status();
       if (!app) throw new Error('This server cannot have a GitHub App: it has nowhere to keep one.');
       needAdmin(actor, 'connect GitHub');
       if (input.recheck) {
-        const mine = app.installationOf(l.workspace);
+        const mine = await app.installationOf(l.workspace);
         if (!mine) throw new Error('This workspace has not connected GitHub, so there is nothing for the agent to read the repository through.');
         if (!(await hasReaderKey(whole))) throw new Error('This workspace has no Anthropic key for the agent to run on. Set one on the Workspace screen.');
         const repo = (await readable(whole, app, mine.id)).find((r) => r.entity.id === input.recheck);
@@ -922,9 +922,9 @@ export const TOOLS: Record<string, Tool> = {
         return { ...(await status()), url: await app.startCreate(l.workspace) };
       }
       if (input.connect) return { ...(await status()), url: await app.startConnect(l.workspace) };
-      const mine = app.installationOf(l.workspace);
+      const mine = await app.installationOf(l.workspace);
       if (mine) {
-        app.forget(mine.id);
+        await app.forget(mine.id);
         await l.log(l.db, { actor: actorId(actor), action: 'github.disconnect', reason: `Stopped hearing from GitHub (${mine.account})` });
       }
       return status();

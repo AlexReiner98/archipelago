@@ -3,7 +3,7 @@
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { newSecret, OPERATOR_RESET_FILE } from './auth.ts';
+import { hashSecret, newSecret, OPERATOR_RESET_FILE } from './auth.ts';
 import { loadConfig } from './config.ts';
 import { env } from './env.ts';
 
@@ -162,12 +162,20 @@ async function main(): Promise<void> {
     }
 
     case 'operator-reset': {
-      // Being able to write beside the server's data is the proof of who is
-      // asking: the server reads this file, once, and compares.
-      const dir = join(loadConfig().dataDir, '..', 'workspaces');
+      // Being able to write where the server keeps its state is the proof of
+      // who is asking: its database on a Postgres server, else beside its data.
+      // The server takes it, once, and compares.
+      const { dataDir, databaseUrl } = loadConfig();
+      const dir = join(dataDir, '..', 'workspaces');
       const proof = newSecret('reset');
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, OPERATOR_RESET_FILE), proof, { mode: 0o600 });
+      if (databaseUrl) {
+        const [{ openDb }, { OPERATOR_RESET, setControlValue }] = await Promise.all([import('./db.ts'), import('./control.ts')]);
+        const db = await openDb(databaseUrl);
+        await setControlValue(db, OPERATOR_RESET, hashSecret(proof)).finally(() => db.close());
+      } else {
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, OPERATOR_RESET_FILE), proof, { mode: 0o600 });
+      }
       try {
         const res = await fetch(`${base}/operator/reset`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proof }) });
         const body = (await res.json()) as { result?: { operator_secret: string; note: string }; error?: string };

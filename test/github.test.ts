@@ -158,7 +158,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   const hubAt = `http://127.0.0.1:${(hub.address() as AddressInfo).port}`;
 
   let theApp: GithubApp | undefined;
-  const { workspaces, call, base } = await serve('tokens', (origin) => (theApp ??= new GithubApp({ dir: null, origin, api: hubAt, web: 'https://github.test' })));
+  const { workspaces, call, base } = await serve('tokens', (origin) => (theApp ??= new GithubApp({ origin, api: hubAt, web: 'https://github.test' })));
   const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
@@ -273,10 +273,10 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
 
   // Renamed on GitHub by its owner, the app is asked its name, and a workspace is sent to where it now is.
   await theApp!.refresh();
-  assert.equal(theApp!.app?.slug, 'pelago-test', 'asked, and as it was');
+  assert.equal((await theApp!.app())?.slug, 'pelago-test', 'asked, and as it was');
   renamed = true;
   await theApp!.refresh();
-  assert.deepEqual(theApp!.app, { slug: 'pelago-renamed', name: 'Archipelago (renamed)' });
+  assert.deepEqual(await theApp!.app(), { slug: 'pelago-renamed', name: 'Archipelago (renamed)' });
   assert.match(await theApp!.startConnect('default'), /^https:\/\/github\.test\/apps\/pelago-renamed\/installations\/new\?state=/);
 
   // Its admin can ask for a re-check of a repository now; only of one the app was given, and no agent can.

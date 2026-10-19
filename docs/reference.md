@@ -370,7 +370,8 @@ server, and may only read (contents and metadata):
 1. The server's owner creates it once: Workspace, GitHub, **Create the GitHub
    App**, in the default workspace. Archipelago sends GitHub a manifest, GitHub
    asks for a name, and hands the server the app's id, key and signing secret
-   (kept in `github-app.json` beside the workspaces; or given by hand as
+   (kept, sealed, in the default workspace's database, where every server on
+   it reads them; or given by hand as
    `PELAGO_GITHUB_APP_ID`, `_KEY`, `_SECRET` and `_SLUG`).
 2. A workspace's admin presses **Connect GitHub** and chooses repositories on
    GitHub. Each one chosen is put in the map with its address, and the
@@ -459,7 +460,9 @@ What the server knows and must not give up is of two kinds.
   workspace's Anthropic key, the secret a GitHub webhook signs with, and the
   GitHub App's key and signing secret. The sealing key is
   `PELAGO_SECRETS_KEY` (32 bytes, base64) when that is set, and otherwise a
-  file the server makes beside the workspaces (`secrets.key`). It is never in
+  file the server makes beside the workspaces (`secrets.key`). A server on
+  Postgres makes no such file: every server sharing the database must seal
+  with one key, so there it comes only from `PELAGO_SECRETS_KEY`. It is never in
   a database or a backup, so a backup file, or the copy of it sent off the
   server, gives up none of these. A backup restored on another server reads
   them as not set, and they are set again there.

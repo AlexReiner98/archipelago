@@ -1,7 +1,7 @@
 // Packs: versioned bundles of types and relation types, stored as files. A type may extend another (a "flavour"); it
 // inherits the parent's fields and statuses, and anything that queries the parent also sees its flavours.
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
 import { checkDeclared, KERNEL_VERBS, screensOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
@@ -126,8 +126,10 @@ export const LOCAL_PACK = 'local';
 export class Registry {
   readonly dir: string;
   readonly only: string[] | undefined;
-  /** Where this workspace's own types are kept, when not beside the shared packs. */
-  readonly localDir: string | undefined;
+  /** The types this workspace defined for itself (define_type), in order: its database keeps them (src/control.ts). */
+  private local: TypeDef[];
+  /** Where a type defined here is kept once the registry has taken it: the workspace's database. None keeps it in memory. */
+  keepLocal: (def: TypeDef) => Promise<void> = async () => {};
   packs: PackFile[] = [];
   types = new Map<string, ResolvedType>();
   relations = new Map<string, ResolvedRelation>();
@@ -144,20 +146,19 @@ export class Registry {
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
-  constructor(dir: string, only?: string[], localDir?: string) {
+  constructor(dir: string, only?: string[], local: TypeDef[] = []) {
     this.dir = dir;
     this.only = only;
-    this.localDir = localDir;
+    this.local = [...local];
     this.reload();
   }
 
   reload(): void {
     const found = new Map<string, PackFile>();
-    // With its own local folder, a workspace must not pick up the types another workspace defined in the shared one.
+    // A workspace's own types are in its database, never in a folder another server started from here would read.
     const folders = readdirSync(this.dir)
-      .filter((name) => !(this.localDir && name === LOCAL_PACK))
+      .filter((name) => name !== LOCAL_PACK)
       .map((name) => [name, join(this.dir, name, 'pack.json')]);
-    if (this.localDir) folders.push([LOCAL_PACK, join(this.localDir, 'pack.json')]);
     for (const [name, file] of folders) {
       if (!existsSync(file)) continue;
       const pack = JSON.parse(readFileSync(file, 'utf8')) as PackFile;
@@ -165,6 +166,7 @@ export class Registry {
       found.set(pack.id, pack);
     }
     if (!found.has('core')) throw new Error(`No core pack in ${this.dir}`);
+    if (this.local.length) found.set(LOCAL_PACK, this.localPack()!);
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
@@ -287,8 +289,7 @@ export class Registry {
     const verbs = ordered.flatMap((pack) => pack.verbs ?? []);
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
-      const folder = pack.id === LOCAL_PACK && this.localDir ? this.localDir : join(this.dir, pack.id);
-      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), existsSync(join(folder, 'handler.js')));
+      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), pack.id !== LOCAL_PACK && existsSync(join(this.dir, pack.id, 'handler.js')));
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
       for (const def of pack.actions ?? []) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       for (const def of pack.views ?? []) tools.set(toolName(def.id), { pack: pack.id, call: 'view', def });
@@ -436,32 +437,31 @@ export class Registry {
     return problems;
   }
 
-  /** Add a type to the local pack file and reload. */
-  defineLocal(def: TypeDef): void {
-    const dir = this.localDir ?? join(this.dir, LOCAL_PACK);
-    const file = join(dir, 'pack.json');
-    const pack: PackFile = existsSync(file)
-      ? JSON.parse(readFileSync(file, 'utf8'))
-      : {
-          id: LOCAL_PACK,
-          version: '0.1.0',
-          title: 'Local',
-          description: 'Types defined in this workspace.',
-          requires: this.packs.map((p) => p.id).filter((id) => id !== LOCAL_PACK),
-          types: [],
-        };
-    pack.types = [...(pack.types ?? []), def];
-    mkdirSync(dir, { recursive: true });
-    const before = existsSync(file) ? readFileSync(file, 'utf8') : undefined;
-    writeFileSync(file, JSON.stringify(pack, null, 2) + '\n');
+  /** The types this workspace defined for itself, as a pack, if it has any. */
+  localPack(): PackFile | undefined {
+    return this.local.length ? { id: LOCAL_PACK, version: '0.1.0', title: 'Local', description: 'Types defined in this workspace.', types: this.local } : undefined;
+  }
+
+  /** Add a type of this workspace's own, reload, and keep it. */
+  async defineLocal(def: TypeDef): Promise<void> {
+    this.local = [...this.local, def];
     try {
       this.reload();
     } catch (err) {
-      if (before === undefined) writeFileSync(file, JSON.stringify({ ...pack, types: [] }, null, 2) + '\n');
-      else writeFileSync(file, before);
+      this.local = this.local.slice(0, -1);
       this.reload();
       throw err;
     }
+    await this.keepLocal(def);
+  }
+
+  /** Take up the types defined here by another server on the same database. Returns whether any were new. */
+  followLocal(defs: TypeDef[]): boolean {
+    const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));
+    if (!added.length) return false;
+    this.local = [...this.local, ...added];
+    this.reload();
+    return true;
   }
 
   describe() {

@@ -14,7 +14,7 @@ const hosts = new WeakMap<Registry, PackHost>();
 
 export function hostFor(reg: Registry): PackHost {
   let host = hosts.get(reg);
-  if (!host) hosts.set(reg, (host = new PackHost((pack) => (pack === 'local' && reg.localDir ? reg.localDir : join(reg.dir, pack)))));
+  if (!host) hosts.set(reg, (host = new PackHost((pack) => join(reg.dir, pack))));
   return host;
 }
 

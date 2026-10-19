@@ -15,8 +15,7 @@
 // What the app may do is read: the repositories' contents and metadata.
 
 import { createHmac, createSign, randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { controlValue, GITHUB_APP, setControlValue } from './control.ts';
 import type { Q } from './db.ts';
 import { repoByName } from './github.ts';
 import { env } from './env.ts';
@@ -44,8 +43,11 @@ interface Pending {
 }
 
 export interface GithubAppOptions {
-  /** Where the app's credentials are kept, beside the workspaces. Null keeps them in memory (tests). */
-  dir: string | null;
+  /**
+   * The database the app's credentials and its installations are kept in, the same for every server (src/control.ts).
+   * None keeps them in this process (tests).
+   */
+  control?: () => Promise<Q>;
   /** The address this server is reached at, which GitHub is told to call and to send people back to. */
   origin: string;
   /** GitHub's API and site. Elsewhere only in tests. */
@@ -63,42 +65,51 @@ const PENDING_MINUTES = 15;
 
 export class GithubApp {
   private readonly options: GithubAppOptions;
-  private kept: Kept;
+  private kept: Kept = { installations: {} };
+  /** The app's credentials as last read, sealed, so they are opened again only when they change. */
+  private sealed = '';
   private readonly pending = new Map<string, Pending & { expires: number }>();
   private readonly tokens = new Map<string, { token: string; expires: number }>();
 
   constructor(options: GithubAppOptions) {
     this.options = options;
-    const file = this.file();
-    this.kept = file && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { installations: {} };
-    // On disk the app's key and signing secret are sealed; here they are open. A file written before that is sealed now.
-    if (this.kept.app) {
-      const { pem, webhook_secret } = this.kept.app;
-      const open = { pem: unseal(pem), webhook_secret: unseal(webhook_secret) };
-      if (!open.pem || !open.webhook_secret) {
-        console.error('The GitHub App\u2019s key cannot be opened with the sealing key this server has (PELAGO_SECRETS_KEY or secrets.key). The app has to be created again.');
-        this.kept.app = undefined;
-      } else {
-        Object.assign(this.kept.app, open);
-        if (!isSealed(pem) || !isSealed(webhook_secret)) this.save();
+  }
+
+  /** What is kept, as it stands in the database now: another server may have created the app or connected a workspace. */
+  private async fresh(): Promise<Kept> {
+    const control = this.options.control && (await this.options.control());
+    if (control) {
+      const app = await controlValue<Credentials>(control, GITHUB_APP);
+      const { rows } = await control.query<{ id: string; workspace: string; account: string }>(`select id, workspace, account from github_installation`);
+      if (JSON.stringify(app ?? null) !== this.sealed) {
+        this.sealed = JSON.stringify(app ?? null);
+        this.kept.app = app && this.opened(app);
+        // One brought from the file kept before secrets were sealed is sealed now.
+        if (app && this.kept.app && (!isSealed(app.pem) || !isSealed(app.webhook_secret))) await this.saveApp();
       }
+      this.kept.installations = Object.fromEntries(rows.map((r) => [r.id, { workspace: r.workspace, account: r.account }]));
     }
     // An app registered by hand comes in through the environment instead.
     const [id, pem, secret, slug] = ['ID', 'KEY', 'SECRET', 'SLUG'].map((name) => env(`GITHUB_APP_${name}`));
     if (!this.kept.app && id && pem && secret && slug) this.kept.app = { id: Number(id), slug, name: slug, pem: pem.replaceAll('\\n', '\n'), webhook_secret: secret };
+    return this.kept;
   }
 
-  private file(): string | null {
-    return this.options.dir && join(this.options.dir, 'github-app.json');
+  /** The app's key and signing secret are sealed where they are kept; here they are open. */
+  private opened(app: Credentials): Credentials | undefined {
+    const [pem, webhook_secret] = [unseal(app.pem), unseal(app.webhook_secret)];
+    if (pem && webhook_secret) return { ...app, pem, webhook_secret };
+    console.error('The GitHub App\u2019s key cannot be opened with the sealing key this server has (PELAGO_SECRETS_KEY or secrets.key). The app has to be created again.');
+    return undefined;
   }
 
-  private save(): void {
-    const file = this.file();
-    if (!file) return;
-    mkdirSync(this.options.dir!, { recursive: true });
-    // It holds the app's key: for the server's own eyes.
-    const app = this.kept.app && { ...this.kept.app, pem: seal(this.kept.app.pem), webhook_secret: seal(this.kept.app.webhook_secret) };
-    writeFileSync(file, JSON.stringify({ ...this.kept, app }, null, 2) + '\n', { mode: 0o600 });
+  private async saveApp(): Promise<void> {
+    const control = this.options.control && (await this.options.control());
+    const app = this.kept.app;
+    if (!control || !app) return;
+    const sealed = { ...app, pem: seal(app.pem), webhook_secret: seal(app.webhook_secret) };
+    await setControlValue(control, GITHUB_APP, sealed);
+    this.sealed = JSON.stringify(sealed);
   }
 
   private get api(): string {
@@ -109,18 +120,19 @@ export class GithubApp {
     return (this.options.web ?? 'https://github.com').replace(/\/$/, '');
   }
 
-  get app(): { slug: string; name: string } | undefined {
-    return this.kept.app && { slug: this.kept.app.slug, name: this.kept.app.name };
+  async app(): Promise<{ slug: string; name: string } | undefined> {
+    const { app } = await this.fresh();
+    return app && { slug: app.slug, name: app.name };
   }
 
   /** The installation a workspace connected, if it has. */
-  installationOf(workspace: string): { id: string; account: string } | undefined {
-    const found = Object.entries(this.kept.installations).find(([, i]) => i.workspace === workspace);
+  async installationOf(workspace: string): Promise<{ id: string; account: string } | undefined> {
+    const found = Object.entries((await this.fresh()).installations).find(([, i]) => i.workspace === workspace);
     return found && { id: found[0], account: found[1].account };
   }
 
-  workspaceOf(installation: string | number | undefined): string | undefined {
-    return installation === undefined ? undefined : this.kept.installations[String(installation)]?.workspace;
+  async workspaceOf(installation: string | number | undefined): Promise<string | undefined> {
+    return installation === undefined ? undefined : (await this.fresh()).installations[String(installation)]?.workspace;
   }
 
   /**
@@ -160,7 +172,8 @@ export class GithubApp {
 
   /** Where to send the server's owner to create the app: a page of ours that hands GitHub the manifest. */
   async startCreate(workspace: string): Promise<string> {
-    if (this.kept.app) throw new Error(`This server already has its GitHub App (${this.kept.app.name}).`);
+    const { app } = await this.fresh();
+    if (app) throw new Error(`This server already has its GitHub App (${app.name}).`);
     return `${this.options.origin}/github/app/new?state=${await this.begin('create', workspace)}`;
   }
 
@@ -200,7 +213,7 @@ export class GithubApp {
     const made = (await res.json().catch(() => ({}))) as Partial<Credentials> & { message?: string };
     if (!res.ok || !made.id || !made.pem || !made.webhook_secret || !made.slug) throw new Error(`GitHub did not hand over the app (${res.status}${made.message ? `: ${made.message}` : ''}).`);
     this.kept.app = { id: made.id, slug: made.slug, name: made.name ?? made.slug, pem: made.pem, webhook_secret: made.webhook_secret };
-    this.save();
+    await this.saveApp();
   }
 
   /**
@@ -208,47 +221,60 @@ export class GithubApp {
    * name: GitHub is asked what the app is called now, and what is kept here is brought into line.
    */
   async refresh(): Promise<void> {
-    const app = this.kept.app;
+    const { app } = await this.fresh();
     if (!app) return;
     const now = (await this.asApp('/app')) as { slug?: string; name?: string };
     if (!now.slug || (now.slug === app.slug && (now.name ?? app.name) === app.name)) return;
     Object.assign(app, { slug: now.slug, name: now.name ?? now.slug });
-    this.save();
+    await this.saveApp();
   }
 
   // ---- 2. connecting a workspace ----------------------------------------
 
   /** Where to send a workspace's admin to choose repositories. */
   async startConnect(workspace: string): Promise<string> {
-    if (!this.kept.app) throw new Error('This server has no GitHub App yet. Its owner creates one from the Workspace screen of the default workspace.');
-    return `${this.web}/apps/${this.kept.app.slug}/installations/new?state=${await this.begin('connect', workspace)}`;
+    const { app } = await this.fresh();
+    if (!app) throw new Error('This server has no GitHub App yet. Its owner creates one from the Workspace screen of the default workspace.');
+    return `${this.web}/apps/${app.slug}/installations/new?state=${await this.begin('connect', workspace)}`;
   }
 
   /** They chose, and GitHub sent them back: the installation is this workspace's from now on. */
   async installed(installation: string | null, state: string | null): Promise<{ workspace: string; installation: string }> {
     const { workspace } = await this.finish('connect', state);
     if (!installation || !/^\d+$/.test(installation)) throw new Error('GitHub sent no installation back.');
-    const taken = this.kept.installations[installation];
-    if (taken && taken.workspace !== workspace) throw new Error('That installation is already connected to another workspace.');
+    const taken = (await this.fresh()).installations[installation];
+    const elsewhere = new Error('That installation is already connected to another workspace.');
+    if (taken && taken.workspace !== workspace) throw elsewhere;
     // Asked of GitHub, as the app: the id in the address is only what the browser said.
     const about = (await this.asApp(`/app/installations/${installation}`)) as { account?: { login?: string } };
-    this.kept.installations[installation] = { workspace, account: about.account?.login ?? '' };
-    this.save();
+    const account = about.account?.login ?? '';
+    const control = this.options.control && (await this.options.control());
+    if (control) {
+      // Another server may have tied it to another workspace meanwhile: the first to write it has it.
+      const { rows } = await control.query(
+        `insert into github_installation (id, workspace, account) values ($1, $2, $3)
+         on conflict (id) do update set account = excluded.account where github_installation.workspace = excluded.workspace returning id`,
+        [installation, workspace, account],
+      );
+      if (!rows.length) throw elsewhere;
+    }
+    this.kept.installations[installation] = { workspace, account };
     return { workspace, installation };
   }
 
   /** Forget an installation: removed on GitHub, or disconnected here. */
-  forget(installation: string | number): void {
+  async forget(installation: string | number): Promise<void> {
     delete this.kept.installations[String(installation)];
     this.tokens.delete(String(installation));
-    this.save();
+    const control = this.options.control && (await this.options.control());
+    if (control) await control.query(`delete from github_installation where id = $1`, [String(installation)]);
   }
 
   // ---- 3. what GitHub sends, and asking GitHub ---------------------------
 
   /** Whether a delivery was signed with the app's secret. */
-  signed(body: Buffer, header: string | string[] | undefined): boolean {
-    const secret = this.kept.app?.webhook_secret;
+  async signed(body: Buffer, header: string | string[] | undefined): Promise<boolean> {
+    const secret = (await this.fresh()).app?.webhook_secret;
     if (!secret || typeof header !== 'string') return false;
     const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`);
     const given = Buffer.from(header);
@@ -272,7 +298,8 @@ export class GithubApp {
     return answer;
   }
 
-  private asApp(path: string, method = 'GET'): Promise<unknown> {
+  private async asApp(path: string, method = 'GET'): Promise<unknown> {
+    await this.fresh();
     return this.ask(path, `Bearer ${this.jwt()}`, method);
   }
 
