@@ -118,7 +118,7 @@
     },
     {
       "id": "software.component",
-      "capabilities": { "watch": { "field": "url", "up": "up", "down": "down", "also": ["degraded"] } },
+      "capabilities": { "watch": { "field": "url", "up": "up", "down": "down", "also": ["degraded"], "idle": "planned", "commit": "commit" } },
       "extends": "place",
       "title": "Component",
       "description": "A part of a running system: a service, a store, a proxy, a model endpoint, a client. Part of the environment it runs in; it calls (software.calls) what it sends to, the link's says naming how (HTTPS, SQL) and its state saying whether it is wired, planned or broken. Its status is its health, kept true as it is wired up and watched. Drawn by the architecture shape.",
@@ -126,7 +126,8 @@
       "fields": {
         "role": { "type": "enum", "values": ["client", "edge", "app", "data", "storage", "model", "monitor", "network", "tool", "service"], "shown": true, "description": "What it does in the system. data and storage are drawn as a cylinder, client as a pill." },
         "host": { "type": "string", "shown": true, "description": "Where it runs, as its operator names it: a container, a machine, a region." },
-        "url": { "type": "url", "description": "The address its health is read from: what its monitor checks (http(s)://…, or tcp://host:port for a port). A monitor reporting on it moves the status between up and down." }
+        "url": { "type": "url", "description": "The address its health is read from: what its monitor checks (http(s)://…, or tcp://host:port for a port). A monitor reporting on it moves the status between up and down." },
+        "commit": { "type": "string", "system": true, "description": "The commit it runs, as its deploy last reported." }
       }
     },
     {

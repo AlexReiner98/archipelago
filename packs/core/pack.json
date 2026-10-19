@@ -201,7 +201,8 @@
       ]
     },
     { "id": "needs", "title": "Needs you", "on": ["work", "aim"], "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] }] },
-    { "id": "gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] }
+    { "id": "gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
+    { "id": "tokens", "title": "Tokens for this", "on": ["place", "aim"], "pieces": [{ "piece": "token" }] }
   ],
   "relations": [
     { "id": "depends_on", "root": true, "title": "depends on", "inverse": "blocks", "from": ["*"], "to": ["*"], "description": "The source cannot finish until the target is closed. Drives the blockers view." },

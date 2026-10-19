@@ -20,7 +20,8 @@ change it. A problem is anything that lets someone:
 - read what is private to another member of the same workspace;
 - act with a human's authority while holding an agent's token: approve a
   held change, launch a session, make or revoke tokens;
-- reach beyond its repositories with a token limited to some;
+- write beyond the items a token is within, or do more than report with a
+  token that may only report;
 - get a secret back out of the server: a token, a sealed key, the operator
   secret;
 - make the server unusable for others from outside, without a token.

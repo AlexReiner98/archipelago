@@ -1,4 +1,4 @@
-// Health reported from outside: Uptime Kuma's webhook body read as a reading, the rule a watched status follows, and
+// What a running system reports: Uptime Kuma's webhook body read as a reading, the rule a watched status follows, and
 // a report taking a part down and back up through the write path, with the monitor's words as the reason.
 
 import assert from 'node:assert/strict';
@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { checkCapabilities } from '../src/capabilities.ts';
 import { openDb } from '../src/db.ts';
-import { nextStatus, readKuma, sameAddress } from '../src/health.ts';
+import { nextStatus, readKuma, sameAddress } from '../src/report.ts';
 import { Registry } from '../src/packs.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
@@ -67,24 +67,24 @@ test('a monitor’s report takes a component down and back up, logged with what 
   const status = async (ref: string) => (await l.entity(made[ref]))!.status;
 
   // By address, from an agent token, under a policy that holds agents' changes: applied all the same.
-  const down = (await callTool(l, kuma, 'health_report', beat(0, { name: 'litellm', type: 'http', url: 'http://litellm:4000/health/liveliness' }, 'connect ECONNREFUSED 172.18.0.4:4000'))) as { changed: { to: string }[] };
+  const down = (await callTool(l, kuma, 'report', beat(0, { name: 'litellm', type: 'http', url: 'http://litellm:4000/health/liveliness' }, 'connect ECONNREFUSED 172.18.0.4:4000'))) as { changed: { to: string }[] };
   assert.deepEqual(down.changed.map((c) => c.to), ['down']);
   assert.equal(await status('llm'), 'down');
   const { rows } = await l.db.query<{ reason: string; actor: string }>(`select reason, actor from event where target_id = $1 and action = 'entity.update' order by seq desc limit 1`, [made.llm]);
   assert.match(rows[0].reason, /Uptime Kuma: litellm does not answer \(connect ECONNREFUSED/);
   assert.equal(rows[0].actor, 'agent:Uptime Kuma');
 
-  await callTool(l, kuma, 'health_report', beat(1, { name: 'litellm', type: 'http', url: 'http://litellm:4000/health/liveliness/' }, '200 - OK'));
+  await callTool(l, kuma, 'report', beat(1, { name: 'litellm', type: 'http', url: 'http://litellm:4000/health/liveliness/' }, '200 - OK'));
   assert.equal(await status('llm'), 'up');
 
   // By title, when no item has the monitor's address.
-  await callTool(l, kuma, 'health_report', beat(0, { name: 'Postgres 17', type: 'port', hostname: 'postgres', port: 5432 }, 'timeout'));
+  await callTool(l, kuma, 'report', beat(0, { name: 'Postgres 17', type: 'port', hostname: 'postgres', port: 5432 }, 'timeout'));
   assert.equal(await status('pg'), 'down');
 
   // A part not yet running is left alone; a test notification changes nothing.
-  await callTool(l, kuma, 'health_report', beat(0, { name: 'App, green', type: 'http', url: 'http://app-green:3100/health' }, 'getaddrinfo ENOTFOUND'));
+  await callTool(l, kuma, 'report', beat(0, { name: 'App, green', type: 'http', url: 'http://app-green:3100/health' }, 'getaddrinfo ENOTFOUND'));
   assert.equal(await status('green'), 'planned');
-  assert.deepEqual(await callTool(l, kuma, 'health_report', { heartbeat: null, monitor: null, msg: 'Uptime Kuma Testing...' }), { heard: true, note: 'No heartbeat: nothing to report.' });
+  assert.deepEqual(await callTool(l, kuma, 'report', { heartbeat: null, monitor: null, msg: 'Uptime Kuma Testing...' }), { heard: true, note: 'Nothing measured: nothing to report.' });
   const { rows: proposals } = await l.db.query(`select id from proposal`);
   assert.equal(proposals.length, 0, 'nothing waits for review');
 });

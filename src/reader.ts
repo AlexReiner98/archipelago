@@ -217,7 +217,7 @@ async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, syst
   const mine = me ? l.as(me) : l;
   // And it is held to the one repository it is reading: what it reads there is someone else's text, and a file
   // that tried to steer it could reach nothing but that repository's own work.
-  const actor: Actor = { kind: 'agent', name: 'reader', person: me, repos: [repo.entity.id] };
+  const actor: Actor = { kind: 'agent', name: 'reader', person: me, within: [repo.entity.id] };
   const ask = asking(key);
   const kit = tools(app, repo, ref);
   const messages: Turn[] = [{ role: 'user', content: task }];

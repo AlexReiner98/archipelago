@@ -57,25 +57,23 @@ health_commit() {
     | grep -o '"commit":"[0-9a-f]*"' | cut -d'"' -f4 || true
 }
 
-# Tell the map which colour is live: the new one up, the old one planned (stopped, so a monitor leaves it alone).
-# Only after a switch, and only when deploy/.env names the map, a token and both items; a map that does not answer
-# is logged and the deploy still counts. The token is sent in a header and never written to the log.
+# Tell the map which colour is live: a report of what was measured, the new colour live at the commit and the old
+# one stopped (it rests where a monitor leaves it alone). Each colour is named by the address its health is read
+# from, as the map's components are watched, so only a token is needed: one that may only report, made on the
+# environment's page. Only after a switch; a map that does not answer is logged and the deploy still counts. The
+# token is sent in a header and never written to the log.
 # A setting from the environment, else from .env (which this script does not source as a whole).
 from_env() { if [[ -n ${!1:-} ]]; then printf '%s' "${!1}"; else grep -s "^$1=" .env | head -1 | cut -d= -f2- || true; fi; }
 
 tell_map() {
-  local url token blue green
+  local url token
   url="$(from_env DEPLOY_MAP_URL)"; url="${url:-https://app.archipelago.tools}"
-  token="$(from_env DEPLOY_MAP_TOKEN)" blue="$(from_env DEPLOY_MAP_BLUE)" green="$(from_env DEPLOY_MAP_GREEN)"
-  if [[ -z $token || -z $blue || -z $green ]]; then say "map not told (DEPLOY_MAP_TOKEN, _BLUE, _GREEN unset)"; return; fi
-  if [[ ! $blue =~ ^e_[a-z0-9]+$ || ! $green =~ ^e_[a-z0-9]+$ ]]; then say "map not told: DEPLOY_MAP_BLUE/_GREEN are not item ids"; return; fi
-  local up down
-  if [[ $1 == blue ]]; then up="$blue"; down="$green"; else up="$green"; down="$blue"; fi
-  local body
-  body="$(printf '{"actor":"deploy:archipelago-1","reason":"Deployed %s: %s is live, %s stopped","authority":{"of":"agent","basis":"deploy.sh switched Caddy to app-%s and its /health named %s"},"ops":[{"op":"update","id":"%s","status":"up"},{"op":"update","id":"%s","status":"planned"}]}'     "${2:0:7}" "$1" "$3" "$1" "${2:0:7}" "$up" "$down")"
-  local answer
-  if answer="$(curl -fsS -m 20 -X POST "$url/agent/change" -H "authorization: Bearer $token" -H 'content-type: application/json' --data-binary "$body" 2>&1)"; then
-    say "map told: $1 up, $3 planned ($(grep -o '"status":"[a-z_]*"' <<<"$answer" | head -1 || true))"
+  token="$(from_env DEPLOY_MAP_TOKEN)"
+  if [[ -z $token ]]; then say "map not told (DEPLOY_MAP_TOKEN unset)"; return; fi
+  local body answer
+  body="$(printf '{"actor":"deploy:archipelago-1","live":{"at":"http://app-%s:3100/health","commit":"%s"},"idle":["http://app-%s:3100/health"],"said":"deploy.sh switched Caddy to app-%s"}' "$1" "$2" "$3" "$1")"
+  if answer="$(curl -sS --fail-with-body -m 20 -X POST "$url/agent/report" -H "authorization: Bearer $token" -H 'content-type: application/json' --data-binary "$body" 2>&1)"; then
+    say "map told: $1 live, $3 stopped ($(grep -o '"to":"[a-z_]*"' <<<"$answer" | tr '\n' ' ' || true))"
   else
     say "map not told: ${answer:0:200}"
   fi

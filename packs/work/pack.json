@@ -130,6 +130,7 @@
   ],
   "screens": [
     { "id": "work.figure", "title": "Figure", "on": ["work.note", "work.file"], "pieces": [{ "piece": "figure" }] },
-    { "id": "work.reading", "title": "Reading", "on": ["work.document"], "pieces": [{ "piece": "document" }] }
+    { "id": "work.reading", "title": "Reading", "on": ["work.document"], "pieces": [{ "piece": "document" }] },
+    { "id": "work.tokens", "title": "Tokens for this", "on": ["work.project"], "pieces": [{ "piece": "token" }] }
   ]
 }

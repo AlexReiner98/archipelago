@@ -399,7 +399,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const { ws, pelago, actor } = await resolve(req, res, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; remote?: string; reason?: string; tokens?: number; setup?: string };
         const host = req.headers.host ?? '';
-        const answer = await answerHook(url.pathname.slice('/hooks/'.length), { whole: ws.pelago.db, pelago, repos: actor().repos ?? [], body, running, origin: `${named.includes(host) ? 'https' : 'http'}://${host}` });
+        const answer = await answerHook(url.pathname.slice('/hooks/'.length), { whole: ws.pelago.db, pelago, within: actor().within ?? [], may: actor().may, body, running, origin: `${named.includes(host) ? 'https' : 'http'}://${host}` });
         if (answer) return send(res, 200, answer);
       }
 

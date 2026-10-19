@@ -1,10 +1,12 @@
 // Identity. A token says who is calling and which workspace they belong to;
-// what they may do follows from whether the token is a human's or an agent's.
-// Tokens live in their workspace's own database, stored only as a hash.
+// what they may do follows from whether the token is a human's or an agent's,
+// and for an agent's from its scope: within which items it writes, and whether
+// it may report, propose or change. Tokens live in their workspace's own
+// database, stored only as a hash.
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { newId, type Q } from './db.ts';
-import type { Actor } from './pelago.ts';
+import type { Actor, May } from './pelago.ts';
 
 export interface Identity {
   /** Carries the token's person, admin flag and id along with kind and name. */
@@ -24,8 +26,10 @@ export interface TokenInfo {
   last_used: Date | null;
   expires_at: Date | null;
   revoked_at: Date | null;
-  /** The repositories it is limited to changing; null when it is not limited. */
-  repos: string[] | null;
+  /** The items it writes within (and what is part of them); null for everything. */
+  within: string[] | null;
+  /** What it may do: send reports, propose changes, or change as any agent does. */
+  may: May;
   /** The addresses it has been used from, each cut to its network. */
   seen: string[] | null;
 }
@@ -58,15 +62,18 @@ export function bearer(header: string | undefined): string | undefined {
 }
 
 /** Make a token. The secret is returned once and cannot be recovered. */
-export async function createToken(db: Q, workspace: string, input: { kind: 'human' | 'agent'; name: string; entity?: string; expires_days?: number; admin?: boolean; repos?: string[] }) {
+export async function createToken(db: Q, workspace: string, input: { kind: 'human' | 'agent'; name: string; entity?: string; expires_days?: number; admin?: boolean; within?: string[]; may?: May }) {
   if (!validWorkspaceId(workspace)) throw new Error(`Invalid workspace id "${workspace}"`);
   if (!input.name.trim()) throw new Error('A token needs a name: who or what will use it.');
   const token = `pel_${workspace}_${randomBytes(20).toString('hex')}`;
   const id = newId('k');
+  const agent = input.kind === 'agent';
+  const within = agent && input.within?.length ? JSON.stringify(input.within) : null;
+  // repos is written beside within for the commit before this one, which reads only repos, while both run.
   await db.query(
-    `insert into token (id, hash, hint, kind, name, entity_id, admin, expires_at, repos)
-     values ($1, $2, $3, $4, $5, $6, $7, case when $8::int is null then null else now() + ($8::int || ' days')::interval end, $9::jsonb)`,
-    [id, hash(token), `…${token.slice(-6)}`, input.kind, input.name.trim(), input.entity ?? null, Boolean(input.admin) && input.kind === 'human', input.expires_days ?? null, input.kind === 'agent' && input.repos?.length ? JSON.stringify(input.repos) : null],
+    `insert into token (id, hash, hint, kind, name, entity_id, admin, expires_at, within, repos, may)
+     values ($1, $2, $3, $4, $5, $6, $7, case when $8::int is null then null else now() + ($8::int || ' days')::interval end, $9::jsonb, $9::jsonb, $10)`,
+    [id, hash(token), `…${token.slice(-6)}`, input.kind, input.name.trim(), input.entity ?? null, Boolean(input.admin) && !agent, input.expires_days ?? null, within, agent ? (input.may ?? 'change') : 'change'],
   );
   return { id, token, kind: input.kind, name: input.name.trim(), note: 'Keep this token now: it is not stored and cannot be shown again.' };
 }
@@ -78,8 +85,8 @@ export async function createToken(db: Q, workspace: string, input: { kind: 'huma
  * The first place a token is used is not news.
  */
 export async function verifyToken(db: Q, token: string, from?: string): Promise<Identity | undefined> {
-  const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; repos: string[] | null; seen: string[] | null }>(
-    `select id, hash, kind, name, entity_id, admin, repos, seen from token where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
+  const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; within: string[] | null; may: May; seen: string[] | null }>(
+    `select id, hash, kind, name, entity_id, admin, within, coalesce(may, 'change') as may, seen from token where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
     [hash(token)],
   );
   const row = rows[0];
@@ -90,7 +97,7 @@ export async function verifyToken(db: Q, token: string, from?: string): Promise<
   // The last twenty places are kept: enough to know a machine by, and a list that cannot grow without end.
   await db.query(`update token set last_used = now(), seen = $2::jsonb where id = $1`, [row.id, JSON.stringify(fresh ? [...seen, place].slice(-20) : seen)]);
   return {
-    actor: { kind: row.kind, name: row.name, person: row.entity_id ?? undefined, admin: row.admin, token: row.id, ...(row.repos?.length && { repos: row.repos }) },
+    actor: { kind: row.kind, name: row.name, person: row.entity_id ?? undefined, admin: row.admin, token: row.id, ...(row.within?.length && { within: row.within }), ...(row.may !== 'change' && { may: row.may }) },
     ...(fresh && seen.length > 0 && { newPlace: place }),
   };
 }
@@ -98,7 +105,7 @@ export async function verifyToken(db: Q, token: string, from?: string): Promise<
 /** Every token, or only those belonging to one person. */
 export async function listTokens(db: Q, person?: string): Promise<TokenInfo[]> {
   const { rows } = await db.query<TokenInfo>(
-    `select id, kind, name, entity_id, hint, admin, created_at, last_used, expires_at, revoked_at, repos, seen from token where $1::text is null or entity_id = $1 order by created_at`,
+    `select id, kind, name, entity_id, hint, admin, created_at, last_used, expires_at, revoked_at, within, coalesce(may, 'change') as may, seen from token where $1::text is null or entity_id = $1 order by created_at`,
     [person ?? null],
   );
   return rows;

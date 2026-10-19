@@ -6,7 +6,7 @@
 
 import { livesIn, livesInFor, placeFor, scopeOf } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
-import { askView, canAsk } from './askview.ts';
+import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { blockGraph, heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
 import { STALE_DAYS } from './attention.ts';
@@ -27,17 +27,15 @@ export async function resolveRun(l: Archipelago, key: string, openOnly = false):
 }
 
 /**
- * Whether a hook may speak for the session it names, when the token it came with is limited to some repositories:
- * a session that is starting has to be in one of them, and any other has to be one that was registered there.
+ * Whether a hook may speak for the session it names, when the token it came with is within some items: a session
+ * that is starting has to be in a place that is theirs, and any other has to be one that was registered there.
  */
-export async function hookWithin(l: Archipelago, repos: string[], input: { session_id?: string; cwd?: string; remote?: string }, starting: boolean): Promise<boolean> {
-  if (starting) {
-    const repo = await placeFor(l, { cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined });
-    return Boolean(repo && repos.includes(repo.id));
-  }
+export async function hookWithin(l: Archipelago, within: string[], input: { session_id?: string; cwd?: string; remote?: string }, starting: boolean): Promise<boolean> {
+  const [scope, place] = [await scopeWithin(l, within), starting ? await placeFor(l, { cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined }) : undefined];
+  if (starting) return Boolean(place && scope.has(place.id));
   const run = input.session_id ? await resolveRun(l, input.session_id, true) : undefined;
   if (!run) return true; // nothing to speak for: the hook does nothing either way
-  const { rows } = await l.db.query(`select 1 from relation where type = any($3::text[]) and from_id = $1 and to_id = any($2::text[]) and valid_to is null`, [run.id, repos, livesIn(l)]);
+  const { rows } = await l.db.query(`select 1 from relation where type = any($3::text[]) and from_id = $1 and to_id = any($2::text[]) and valid_to is null`, [run.id, [...scope], livesIn(l)]);
   return rows.length > 0;
 }
 

@@ -385,3 +385,15 @@ create or replace trigger relation_order before insert or update or delete on re
 create or replace trigger proposal_order before insert or update or delete on proposal for each statement execute function pelago_event_order();
 create or replace function pelago_hold_lock(resource text) returns void language sql as $fn$ select pg_advisory_xact_lock(hashtext('pelago.holds'), hashtext(resource)) $fn$;
 `;
+
+/**
+ * What an agent's token may write: within these items and what is part of them (null is everything), and how
+ * (report, propose or change). A repository limit is the case of within, so the tokens limited to repositories are
+ * within them; repos is still written beside within, for the commit before this one while both run. may is left
+ * empty by a backup made before it, and empty is change.
+ */
+export const TOKEN_SCOPE = `
+alter table token add column if not exists within jsonb;
+alter table token add column if not exists may text default 'change';
+update token set within = repos where repos is not null and within is null;
+`;
