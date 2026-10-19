@@ -21,3 +21,6 @@ backups/
 .claude/pelago-setup.json
 *.pelago-backup
 CLAUDE.local.md
+
+# The server's secrets, on the server only (deploy/.env.example names them).
+deploy/.env

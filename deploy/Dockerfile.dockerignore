@@ -1,0 +1,16 @@
+.git
+.github
+.claude
+node_modules
+data
+data-*
+runs
+workspaces
+backups
+demo
+demo-approvals
+.proof
+deploy/.env
+*.pelago-backup
+CLAUDE.local.md
+.mcp.json

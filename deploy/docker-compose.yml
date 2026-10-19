@@ -1,0 +1,132 @@
+# Archipelago on its own server (archipelago-1): Caddy in front, the app in two colours, Postgres, LiteLLM, Uptime Kuma.
+#
+# Caddy is the only service on the public address. Docker's published ports go around ufw, so everything else is
+# published on the WireGuard address (10.66.0.1, reached from the owner's laptop) or not at all. Docker must start
+# after wg0 for those binds to work at boot (a systemd drop-in on the host: After=wg-quick@wg0.service).
+#
+# Secrets are in .env beside this file, on the server only (.env.example names them). Only blue starts while the
+# host has 4 GB; green is started for a deploy with --profile green.
+#
+#   docker compose up -d --build
+
+name: archipelago
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+    args:
+      PELAGO_COMMIT: ${PELAGO_COMMIT:-}
+  image: archipelago-app:${PELAGO_COMMIT:-latest}
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+  environment:
+    PELAGO_COMMIT: ${PELAGO_COMMIT:-}
+    PELAGO_DATABASE_URL: postgres://pelago:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/pelago
+    PELAGO_PUBLIC_HOST: ${PELAGO_PUBLIC_HOST:?set PELAGO_PUBLIC_HOST in .env}
+    PELAGO_SECRETS_KEY: ${PELAGO_SECRETS_KEY:-}
+    PELAGO_MODEL_URL: ${PELAGO_MODEL_URL:-http://litellm:4000/v1}
+    PELAGO_MODEL_KEY: ${LITELLM_MASTER_KEY:-}
+    PELAGO_READER_MODEL: ${PELAGO_READER_MODEL:-reader}
+    PELAGO_BACKUP_UPLOAD_URL: ${PELAGO_BACKUP_UPLOAD_URL:-}
+    PELAGO_BACKUP_UPLOAD_KEY: ${PELAGO_BACKUP_UPLOAD_KEY:-}
+  volumes:
+    - app-data:/var/archipelago
+  mem_limit: 1g
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PELAGO_SITE: ${PELAGO_SITE:?set PELAGO_SITE in .env}
+      PELAGO_TLS: ${PELAGO_TLS:-internal}
+      PELAGO_UPSTREAM: ${PELAGO_UPSTREAM:-app-blue:3100}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    mem_limit: 128m
+
+  app-blue:
+    <<: *app
+
+  app-green:
+    <<: *app
+    profiles: ["green"]
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pelago
+      POSTGRES_DB: pelago
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=8MB
+      -c maintenance_work_mem=64MB
+      -c max_connections=100
+    ports:
+      # For pulls from the laptop over WireGuard only.
+      - "10.66.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-pg_trgm.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pelago -d pelago"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 768m
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      SCW_SECRET_KEY: ${SCW_SECRET_KEY:-}
+      SCW_API_BASE: ${SCW_API_BASE:-https://api.scaleway.ai/v1}
+      LITELLM_LOG: WARNING
+    volumes:
+      - ./litellm.yaml:/app/config.yaml:ro
+    ports:
+      # For trying models from the laptop over WireGuard only.
+      - "10.66.0.1:4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')\""]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    mem_limit: 1g
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    ports:
+      - "10.66.0.1:3001:3001"
+    volumes:
+      - kuma-data:/app/data
+    mem_limit: 256m
+
+volumes:
+  app-data:
+  caddy-data:
+  caddy-config:
+  postgres-data:
+  kuma-data:
