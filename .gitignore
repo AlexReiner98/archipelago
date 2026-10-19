@@ -29,3 +29,7 @@ deploy/.env
 deploy/caddy/live/
 deploy/queue/
 deploy/.deploy.lock
+
+# What backup.sh keeps on the server: its lock, and the settings it hands a spare while a restore is tried.
+deploy/.backup.lock
+deploy/.restore-try.env
