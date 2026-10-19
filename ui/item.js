@@ -35,6 +35,7 @@ export async function entity(id, here) {
   }
   const e = data.entity;
   const type = types.get(e.type);
+  const altitude = type?.altitude;
   const change = async (ops, reason) => {
     try {
       await api('change', { ops, reason });
@@ -147,15 +148,17 @@ export async function entity(id, here) {
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row-top' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.length > 0 && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.length})` }, 'shared by link')),
+      h('div', { class: 'row-top' }, chip(e.type), altitude && h('span', { class: 'pill', title: `How high this sits: workspace, project, stream, step` }, altitude), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.length > 0 && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.length})` }, 'shared by link')),
+      // Where it sits, from Home down, each step a way back up, so a person always knows how high they are; a stream or a
+      // step in nothing says so, as work to file (docs/ui-strategy.md).
+      h(
+        'nav',
+        { class: 'trail', title: 'Where this sits' },
+        h('a', { class: 'trail-step', href: '#/' }, 'Home'),
+        (data.trail ?? []).map((t) => [h('span', { class: 'trail-sep' }, '›'), h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title)]),
+        !data.trail?.length && (altitude === 'stream' || altitude === 'step') && [h('span', { class: 'trail-sep' }, '›'), h('span', { class: 'muted', title: 'Part of no project yet' }, 'not filed')],
+      ),
       h('h1', { style: 'margin-top: 6px' }, e.title),
-      // Where it sits, outermost first, each step a way back up; the views kept about a step open with this item marked in them.
-      data.trail?.length > 0 &&
-        h(
-          'nav',
-          { class: 'trail', title: 'Where this sits' },
-          data.trail.map((t, i) => [i > 0 && h('span', { class: 'trail-sep' }, '›'), h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title)]),
-        ),
       // The pictures it is drawn in, each a way straight back to it with this item marked, and the documents that show it.
       data.shown_in?.length > 0 &&
         h(

@@ -28,6 +28,7 @@
     },
     {
       "id": "software.feature",
+      "altitude": "stream",
       "public": true,
       "capabilities": { "where": { "link": "lives_in" } },
       "extends": "work",
@@ -49,6 +50,7 @@
     },
     {
       "id": "software.release",
+      "altitude": "stream",
       "public": true,
       "extends": "event",
       "title": "Release",
@@ -118,6 +120,7 @@
     },
     {
       "id": "software.component",
+      "altitude": "stream",
       "capabilities": { "watch": { "field": "url", "up": "up", "down": "down", "also": ["degraded"], "idle": "planned", "commit": "commit" } },
       "extends": "place",
       "title": "Component",

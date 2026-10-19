@@ -47,7 +47,8 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[],
     const k = byPreset.get(p.id);
     if (k && !k.is_open) continue;
     const idle = p.at === 'home' && p.pack !== 'core' && used !== undefined && !used.has(p.pack);
-    const home = typeof k?.props.home === 'boolean' ? k.props.home : p.at === 'home' && !idle;
+    // Home is the owner's move (docs/ui-strategy.md): only the core pack's screen is on it until the owner adds another.
+    const home = typeof k?.props.home === 'boolean' ? k.props.home : p.at === 'home' && p.pack === 'core';
     out.push({
       id: p.id,
       pack: p.pack,

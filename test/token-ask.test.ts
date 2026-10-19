@@ -52,6 +52,9 @@ test('approved, the token is handed to the poll once, within the item, and may o
   const [request] = (await call('/api/token_requests', owner, {})).result as any[];
   const approved = await call('/api/token_request_answer', owner, { id: request.id, approve: true });
   assert.deepEqual([approved.result.within.map((e: any) => e.id), approved.result.may], [[app], 'report']);
+  // Answered, it stays on the card as a line until it runs out, naming the item its token is within.
+  const answered = async () => ((await call('/api/token_requests', owner, { answered: true })).result as any[]).map((a) => [a.state, a.answered_by, a.items[0]?.id]);
+  assert.deepEqual(await answered(), [['approved', 'alex', app]]);
   assert.match((await call('/api/token_request_answer', owner, { id: request.id, approve: false })).error, /no longer waiting/);
 
   // Without the poll's secret there is nothing to collect.
@@ -66,7 +69,13 @@ test('approved, the token is handed to the poll once, within the item, and may o
 
   const [token] = ((await call('/api/token_list', owner, { within: app })).result as any[]).filter((t) => t.name === 'deploy');
   assert.deepEqual([token.kind, token.within, token.may], ['agent', [app], 'report']);
-  assert.equal(((await call('/api/token_requests', owner, {})).result as any[]).length, 0, 'answered, it leaves the card');
+  assert.equal(((await call('/api/token_requests', owner, {})).result as any[]).length, 0, 'answered, it no longer waits');
+  assert.deepEqual(await answered(), [['handed', 'alex', app]], 'and says the system has collected it');
+
+  // Found by its name, in any case, and leading to the item it is within.
+  const found = (await call('/api/token_list', owner, { q: 'DEP' })).result as any[];
+  assert.deepEqual(found.map((t) => [t.name, t.within, t.within_titles]), [['deploy', [app], ['App']]]);
+  assert.equal(((await call('/api/token_list', owner, { q: 'nothing like it' })).result as any[]).length, 0);
 
   // The token reports, and does nothing else.
   const reported = await call('/agent/report', handed.token, { live: { at: 'https://app.example.com/health', commit: 'abc1234' } });
@@ -80,6 +89,8 @@ test('refused, the poll is told so and no token is made; unanswered, the request
   const id = ((await call('/api/token_requests', owner, {})).result as any[])[0].id;
   assert.equal((await call('/api/token_request_answer', owner, { id, approve: false })).result.refused, id);
   assert.equal((await poll(refused)).state, 'refused');
+  const kept = ((await call('/api/token_requests', owner, { answered: true })).result as any[]).find((a) => a.id === id);
+  assert.deepEqual([kept.state, kept.answered_by], ['refused', 'alex']);
   assert.equal(((await call('/api/token_list', owner, {})).result as any[]).filter((t) => t.name === 'stranger').length, 0);
 
   // A request about no item can be seen and refused, but not approved.

@@ -9,6 +9,7 @@ import { spent } from './spent.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
 import { findPlace, scopeOf } from './places.ts';
 import { brief } from './brief.ts';
+import { atlas } from './atlas.ts';
 
 /**
  * How a kernel view asks a question a pack answers (the gate asks proof of the software pack). Handed in by
@@ -444,15 +445,10 @@ export const VIEWS: Record<string, View> = {
       'What deserves attention, and why: each item with its reasons, the strongest first. Reasons: waits_on (someone must answer or act), to_confirm (an agent settled it and the owner has not confirmed), holding_up (others are blocked by it), due (its bound is near or past), unsettled (a question not yet settled, and how it settles), blocked (and what has to move first), stale (nobody has changed or confirmed it for stale_days), under_way (a session is on it), ready (work nothing blocks). Each item says what it sits in at the top (top). Params: person ("me", or an id: only what is theirs; everyone when left out), within (an item or place: only what is its), reasons (some of the above), days (due within, 7), stale_days (14), order (latest: what changed most recently first), limit (100). With to_confirm, the answer has to_confirm.upto for the confirmed tool.',
     run: (l, input) => attention(l, input as Input),
   },
-
-
-
   changed_since: {
     description: 'What changed since a moment in time: how many events of each kind, and the newest of them. Long notes are cut to their start, and a change set says its reason once. Params: since (ISO date-time, required), limit (events listed, default 50), full (true for everything whole).',
     run: changedSince,
   },
-
-
   graph: {
     description:
       'Nodes and edges for drawing the map. Params: relations (blocking, structure or all), focus (an entity id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system.',
@@ -484,14 +480,10 @@ export const VIEWS: Record<string, View> = {
     description: 'What agents spent over the last days, read from their runs: dollars where a run says what it cost, tokens where it does not, by where they ran. The money pack\u2019s costs view adds what is paid regularly. Params: days (default 30).',
     run: spent,
   },
-
-
   notifications: {
     description: 'Unread notifications for the human, newest first.',
     run: notifications,
   },
-
-
   sessions: {
     description: 'Agent sessions and automation runs: what each open one is working on and holding, whether it has gone quiet, and the last ten that ended.',
     run: sessions,
@@ -499,6 +491,10 @@ export const VIEWS: Record<string, View> = {
   brief: {
     description: 'Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required).',
     run: brief,
+  },
+  atlas: {
+    description: 'Every picture kept on the map (a lens, named by the style that draws it), with what it is a picture of: pinned first, then the newest. Params: limit (100).',
+    run: (l, input) => atlas(l, input as { limit?: number }),
   },
 
 

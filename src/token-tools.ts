@@ -38,9 +38,10 @@ export const TOKEN_TOOLS: Record<string, Tool> = {
   token_list: {
     description: 'List tokens: an admin sees the whole workspace’s, anyone else their own. Secrets are never shown. Each says what it is within, by name, and what it may do.',
     humanOnly: true,
-    input: { within: z.string().optional().describe('Only the tokens within this item.') },
+    input: { within: z.string().optional().describe('Only the tokens within this item.'), q: z.string().optional().describe('Only the tokens whose name holds this, in any case.') },
     run: async (l, actor, input) => {
-      const tokens = (await listTokens(l.db, actor.admin ? undefined : (actor.person ?? ''))).filter((t) => !input.within || t.within?.includes(input.within));
+      const q = input.q?.trim().toLowerCase();
+      const tokens = (await listTokens(l.db, actor.admin ? undefined : (actor.person ?? ''))).filter((t) => (!input.within || t.within?.includes(input.within)) && (!q || t.name.toLowerCase().includes(q)));
       return Promise.all(tokens.map(async (t) => ({ ...t, within_titles: t.within && (await Promise.all(t.within.map(async (id) => (await l.entity(id))?.title ?? id))) })));
     },
   },
