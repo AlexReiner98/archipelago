@@ -111,6 +111,10 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
 
 ## UI rules
 
+What each screen is for (one level of the hierarchy per screen, a bounded
+Home, an atlas of named pictures) is in `docs/ui-strategy.md`; read it before
+adding or changing a screen.
+
 The UI is for a person glancing at it, and most of what it shows was written
 by agents, who write paragraphs. Every screen keeps to these (the owner's
 goal, 8 Oct 2026: minimal, no walls of text, text never stacking vertically,
