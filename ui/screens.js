@@ -7,6 +7,7 @@ import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
 import { attentionCard } from './attention.js';
 import { atlasStrip } from './atlas.js';
+import { heldPiece } from './held.js';
 import { gate } from './gate.js';
 import { proofPart } from './proof.js';
 import { lensView } from './lens.js';
@@ -193,6 +194,11 @@ const PIECES = {
   token_ask: (ctx) => {
     const node = h('div');
     return { node, later: () => tokenAskPiece(node, ctx.e) };
+  },
+  // The changes that wait for the owner's word: a table on Home, left out when none wait.
+  held: (ctx, p) => {
+    const node = h('div');
+    return { node, later: () => heldPiece(node, p.title ?? p.screen.title) };
   },
   // The pictures kept on the map, pinned first: a strip of tiles, each opening its picture.
   atlas: (ctx, p) => {

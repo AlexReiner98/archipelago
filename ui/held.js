@@ -1,76 +1,74 @@
-// Changes: what is held for the owner and what has happened, newest first.
+// Held for you: the changes that wait for the owner's word before they apply, on Home above everything else, since
+// an agent waits on each one. A row says who asked and why, with Apply and Decline in reach; Look opens the whole
+// change, where each part can be left out or corrected before it is applied (docs/ui-strategy.md).
 
-import { api, ask, h, part, tell } from './base.js';
-import { ago, changeRow, chip, eventLine, gist, link, loadSchema, refreshReviewCount, relations, statusesOf, who } from './words.js';
+import { api, ask, h, tell } from './base.js';
+import { ago, chip, gist, link, loadSchema, relations, statusesOf, typeTitle, who } from './words.js';
 
-// ---- Review --------------------------------------------------------------
+/** What a held change does, in a few words: the one thing it does, when it does one; else why it was asked for. */
+function said(p, names) {
+  if (p.ops.length !== 1) return gist(p.reason);
+  const [o] = p.ops;
+  const name = (id) => names.get(id)?.title ?? 'an item';
+  if (o.op === 'create') return `New ${typeTitle(o.type).toLowerCase()}: ${o.title}`;
+  if (o.op === 'update') return o.visibility === 'public' ? `Make "${name(o.id)}" public` : o.status ? `Set "${name(o.id)}" to ${o.status}` : `Change "${name(o.id)}"`;
+  if (o.op === 'archive') return `Archive "${name(o.id)}"`;
+  if (o.op === 'link') return `Link "${name(o.from)}" ${relations.get(o.type)?.title ?? o.type} "${name(o.to)}"`;
+  if (o.op === 'define_type') return `New type: ${o.type.title}`;
+  return gist(p.reason);
+}
 
-// What has changed, as one list, newest first: what is held for the owner
-// above it, and in it what agents did since the owner last looked, marked.
-// Looking is recorded; it permits nothing.
-export const reviewState = { origin: '' };
-export const ORIGINS = [['', 'Everything'], ['github', 'Pushes'], ['external', 'Tool calls']];
-
-export async function review() {
-  const main = part('review');
-  const from = h('select', { title: 'Where the changes came from', onchange: (e) => ((reviewState.origin = e.target.value), review()) }, ORIGINS.map(([key, text]) => h('option', { value: key, selected: reviewState.origin === key }, text)));
-  const seen = h('button', { hidden: true, title: 'Record that you have looked at what agents changed' }, 'Mark all seen');
-  main.replaceChildren(h('div', { class: 'page-head' }, h('h1', {}, 'Changes'), from, h('span', { class: 'grow' }), seen));
-  const [pending, known, notes] = await Promise.all([api('proposals'), api('search', { limit: 200, include_archived: true }), api('view', { name: 'notifications' })]);
+/** The table on Home: one row per held change, the oldest first. Left out when nothing is held. */
+export async function heldPiece(host, title) {
+  const [pending, known] = await Promise.all([api('proposals').catch(() => []), api('search', { limit: 200, include_archived: true }).catch(() => [])]);
+  if (!host.isConnected) return;
+  if (!pending.length) return host.remove();
   const names = new Map(known.map((e) => [e.id, e]));
-  // What agents and the system have told the owner is not a list of its own:
-  // the change it is about is marked in the list of changes, and opening that
-  // change is reading it.
-  const read = async (ns, row, gone = false) => {
-    if (!ns.length) return;
-    try {
-      await api('change', { ops: ns.map((n) => ({ op: 'update', id: n.id, status: 'read' })), reason: 'Read in the UI' });
-      ns.length = 0;
-      gone ? row?.remove() : row?.classList.remove('attn');
-      refreshReviewCount();
-    } catch (err) {
-      tell('That change was not made', err.message);
-    }
+  const again = () => heldPiece(host, title);
+  const row = (p) => {
+    const whole = h('div', { hidden: true });
+    const decide = async (yes) => {
+      const note = yes ? undefined : await ask({ title: 'Decline this change?', message: p.reason, input: { placeholder: 'Why not? (optional, kept in the log for whoever made it)' }, action: 'Decline', danger: true });
+      if (!yes && note === null) return;
+      try {
+        await api('decide', { proposal: p.id, approve: yes, note: note || undefined });
+        if (yes && p.ops.some((o) => o.op === 'define_type')) await loadSchema();
+      } catch (err) {
+        return tell('That was not done', err.message);
+      }
+      again();
+    };
+    const look = () => {
+      whole.hidden = !whole.hidden;
+      if (!whole.hidden && !whole.childElementCount) whole.append(proposalCard(p, names, again));
+    };
+    const n = p.ops.length;
+    return [
+      h(
+        'li',
+        { class: 'row-top', style: 'flex-wrap: nowrap' },
+        h('span', { class: 'pill warn', style: 'flex: none' }, 'Approve'),
+        h('span', { class: 'grow', title: p.reason, style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, said(p, names)),
+        h('span', { class: 'muted small', style: 'flex: none' }, who(p.actor)),
+        h('span', { class: 'muted small nowrap', style: 'flex: none' }, `${n} change${n === 1 ? '' : 's'}`),
+        h('button', { style: 'flex: none', title: 'See each part of it, and leave out or correct any before applying', onclick: look }, 'Look'),
+        h('button', { class: 'primary', style: 'flex: none', onclick: () => decide(true) }, 'Apply'),
+        h('button', { class: 'danger', style: 'flex: none', onclick: () => decide(false) }, 'Decline'),
+      ),
+      whole,
+    ];
   };
-  if (pending.length) main.append(h('h2', {}, `Held for you (${pending.length})`));
-  for (const p of pending) main.append(proposalCard(p, names));
-  const list = h('div');
-  main.append(h('section', { class: 'card' }, list));
-  drawTimeline(list, reviewState.origin, notes, read, seen).catch((err) => list.replaceChildren(h('div', { class: 'error' }, err.message)));
-}
-
-/**
- * Which change each unread notification is about: the latest change an agent
- * made to the thing it names, up to when it was sent. One that is about no
- * change in sight (a session gone quiet, a plain message) is `loose`, and
- * is a line of its own.
- */
-export function attentionOf(notes, events) {
-  const sets = new Map();
-  const loose = [];
-  for (const n of notes) {
-    const sent = new Date(n.created_at).getTime() + 2000;
-    const ev = n.about_id && events.find((e) => e.changeset && e.target_id === n.about_id && e.actor.startsWith('agent:') && !(e.target_type ?? 'sys.').startsWith('sys.') && new Date(e.ts).getTime() <= sent);
-    if (ev) sets.set(ev.changeset, [...(sets.get(ev.changeset) ?? []), n]);
-    else loose.push(n);
-  }
-  return { sets, loose };
-}
-
-/** A notification that is about no change in the list, as a line among them. */
-export const noticeLine = (n, read) => {
-  const line = h(
-    'div',
-    { class: 'change line attn' },
-    who(n.from),
-    h('span', { class: 'gist', title: n.body ?? '' }, n.about_id ? h('a', { href: `#/e/${n.about_id}`, onclick: () => read([n]) }, n.title) : n.title),
-    ago(n.created_at),
-    h('button', { class: 'quiet-button', title: 'Mark this read', onclick: () => read([n], line, true) }, 'Read'),
+  host.replaceChildren(
+    h(
+      'section',
+      { class: 'card wide needs held', style: 'margin-bottom: 14px' },
+      h('header', {}, h('h2', { title: 'Changes that wait for your word before they apply' }, title), h('span', { class: 'n' }, pending.length)),
+      h('ul', { class: 'rows' }, pending.map(row)),
+    ),
   );
-  return line;
-};
+}
 
-export function proposalCard(p, names) {
+function proposalCard(p, names, done) {
   const ops = structuredClone(p.ops);
   const included = ops.map(() => true);
   const edited = new Set();
@@ -228,7 +226,7 @@ export function proposalCard(p, names) {
         ops: yes && edited.size ? ops : undefined,
       });
       el.replaceChildren(h('div', { class: 'empty' }, yes ? `Applied: ${gist(p.reason)}` : `Declined: ${gist(p.reason)}`));
-      refreshReviewCount();
+      done();
       if (yes && ops.some((o) => o.op === 'define_type')) await loadSchema();
     } catch (err) {
       status.textContent = '';
@@ -239,50 +237,4 @@ export function proposalCard(p, names) {
   approve.addEventListener('click', () => decide(true));
   draw();
   return el;
-}
-
-/** The whole record, or one strand of it, as lines into `list`. */
-export async function drawTimeline(list, origin, notes = [], read, seen) {
-  const again = () => drawTimeline(list, origin, notes, read, seen);
-  const events = await api('events', { limit: 500, origin: origin || undefined });
-  const undoneSets = new Set(events.filter((e) => e.action === 'changeset.undo').map((e) => e.detail?.undoes));
-  const undo = async (g) => {
-    if (!(await ask({ title: 'Undo this change set?', message: 'The opposite is applied as a new change; nothing is erased from the log.', action: 'Undo' }))) return;
-    try {
-      const r = await api('undo', { changeset: g.changeset });
-      if (r.skipped.length) await tell('Undone, except:', `- ${r.skipped.join('\n- ')}`);
-      again();
-    } catch (err) {
-      tell('That was not undone', err.message);
-    }
-  };
-  // Fold each changeset into one line: one decision, many effects.
-  const groups = [];
-  for (const ev of events) {
-    const last = groups.at(-1);
-    if (ev.changeset && last?.changeset === ev.changeset) last.events.push(ev);
-    else groups.push({ changeset: ev.changeset, events: [ev] });
-  }
-  const needs = attentionOf(notes, events);
-  // What an agent did by itself since the owner last looked is marked: not what a human applied, nor a session keeping its own record.
-  const seenUpto = events.find((e) => e.action === 'changes.seen')?.detail?.upto ?? 0;
-  const fresh = (g) => g.events.some((e) => e.seq > seenUpto) && g.events.every((e) => e.actor.startsWith('agent:') && !e.detail?.approved_by) && !g.events.every((e) => (e.target_type ?? 'sys.').startsWith('sys.')) && !undoneSets.has(g.changeset);
-  const unseen = origin ? [] : groups.filter((g) => g.changeset && fresh(g));
-  const marked = new Set(unseen.map((g) => g.changeset));
-  list.replaceChildren(
-    ...needs.loose.map((n) => noticeLine(n, read)),
-    ...groups.flatMap((g) => (g.changeset ? changeRow(g, { undone: undoneSets.has(g.changeset), onUndo: undo, attention: needs.sets.get(g.changeset), onRead: read, fresh: marked.has(g.changeset) }) : g.events.map(eventLine))),
-  );
-  if (seen) {
-    seen.hidden = !unseen.length && !notes.length;
-    seen.textContent = unseen.length ? `Mark ${unseen.length} seen` : 'Mark all seen';
-    seen.onclick = () => api('seen', { upto: events[0].seq }).then(() => read?.([...notes])).then(review, (err) => tell('That was not recorded', err.message));
-  }
-  if (!events.length) list.replaceChildren(h('div', { class: 'empty' }, 'Nothing here.'));
-}
-
-/** The old address of the record: it lives on Changes now. */
-export function activity() {
-  reviewState.origin = '';
-  location.hash = '#/review';
 }

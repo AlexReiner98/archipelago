@@ -1,9 +1,8 @@
 import { api, h, main, route, state } from './base.js';
-import { refreshReviewCount } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
-// The server's pulse moves whenever the map or the review queue does. The page
+// The server's pulse moves whenever the map or what is held for the owner does. The page
 // is drawn again when it moves, unless that would throw away something half
 // done (typed text, ticked boxes, an open question, a graph being explored);
 // then a notice offers the refresh instead.
@@ -148,7 +147,6 @@ export async function checkPulse() {
   if (!moved) return;
   if (state.selfDrawn) return void (state.selfDrawn = false);
   if (state.dirty || document.querySelector('dialog[open]') || /^#\/new/.test(location.hash)) {
-    refreshReviewCount();
     stale.hidden = false;
     return;
   }

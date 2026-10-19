@@ -188,20 +188,6 @@ export function card(title, { wide } = {}) {
 
 export const WHY = { depends_on: 'depends on', waits_on: 'waits on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
 
-// The count beside Changes: what that page holds for the owner, the changes
-// held for them and what there is to read. A count sits only beside the page
-// that shows what it counts.
-export async function refreshReviewCount() {
-  const badge = document.getElementById('held-count');
-  try {
-    const [pending, notes] = await Promise.all([api('proposals'), api('view', { name: 'notifications' })]);
-    badge.textContent = pending.length + notes.length;
-    badge.hidden = pending.length + notes.length === 0;
-  } catch {
-    badge.hidden = true;
-  }
-}
-
 /** A small menu for what is done rarely: the page keeps one or two actions in sight. */
 export function menu(label, items) {
   const box = h('details', { class: 'menu' }, h('summary', {}, label), h('div', { class: 'menu-items' }, items.filter(Boolean).map(([text, onclick, cls]) => h('button', { class: cls ?? '', onclick: (ev) => ((box.open = false), onclick(ev)) }, text))));

@@ -203,6 +203,7 @@
       "at": "home",
       "pieces": [
         { "piece": "token_ask" },
+        { "piece": "held", "title": "Held for you" },
         { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "unsettled"], "limit": 5 },
         { "piece": "picture", "title": "Your projects", "lens": { "altitude": "project", "fold": ["closed", "system"] }, "style": { "shape": "list" } },
         { "piece": "atlas", "title": "Atlas", "limit": 6 }
