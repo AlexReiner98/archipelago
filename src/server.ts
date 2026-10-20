@@ -195,7 +195,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         return await serveBackupFile(key && (await workspaces.has(wsId)) ? (await workspaces.get(wsId)).pelago.db : undefined, key ?? '', res);
       }
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
-      if (url.pathname.startsWith('/connect/')) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, open), body: () => readJson(req) });
+      if (/^\/(connect|x)\//.test(url.pathname)) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, open), body: () => readJson(req), raw: () => readBody(req) });
 
       // A product's public page: open to anyone, on any name this server has. It is read as the public role sees the
       // map, so there is nothing here to guard: what is not public is not there to be found.

@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
 import { redeem, requestSignIn, workspaceOfCode } from './members.ts';
+import { serveServerPack } from './server-routes.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
 import type { Workspaces } from './workspaces.ts';
@@ -52,10 +53,12 @@ export interface ConnectRoutes {
   tokens: boolean;
   /** The workspace a request that names none is for. */
   fallback: string;
-  workspaces: Pick<Workspaces, 'has' | 'get' | 'hold' | 'list'>;
+  workspaces: Pick<Workspaces, 'has' | 'get' | 'hold' | 'list' | 'create'>;
   /** True, and the request answered, when its address has asked too often. */
   tooOften: () => boolean;
   body: () => Promise<unknown>;
+  /** The body as it came, for what is signed over its bytes. Read it or body, not both. */
+  raw: () => Promise<Buffer>;
 }
 
 /** One sign-in mail a minute to an address, whoever asks: the form cannot be used to flood someone's inbox. */
@@ -71,13 +74,15 @@ function askedLately(email: string): boolean {
 const reply = (res: ServerResponse, status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body));
 
 /**
- * Everything under /connect/, none of it behind a token: the setup script, a system's request for a token (POST
+ * Everything under /connect/ and /x/, none of it behind a token: the setup script, a system's request for a token (POST
  * /connect/request) and its poll (POST /connect/poll/<workspace>/<id>, the poll's secret as Authorization: Bearer).
  * Each is counted as the other open routes are, and given only under a name this server answers to.
  */
 export async function serveConnect(req: IncomingMessage, res: ServerResponse, path: string, at: ConnectRoutes) {
   const host = req.headers.host ?? '';
   if (!at.hosts.includes(host)) return reply(res, 404, { error: 'Not found' });
+  // What a server pack offers anyone: its pages, entries and webhooks (src/server-routes.ts).
+  if (path.startsWith('/x/')) return serveServerPack(req, res, path, at);
   const origin = `${at.named.includes(host) ? 'https' : 'http'}://${host}`;
   if (req.method === 'GET' && path === '/connect/setup.mjs') {
     if (at.tooOften()) return;

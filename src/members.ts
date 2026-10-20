@@ -38,11 +38,29 @@ export async function memberOf(db: Q, email: string): Promise<Member | undefined
   return rows[0];
 }
 
+/**
+ * Add someone to a workspace by their address, with no mail: a server pack's act (src/server-acts.ts). The first member
+ * of a workspace is its owner, the person its views are for.
+ */
+export async function admitMember(whole: Archipelago, email: string, admin: boolean): Promise<string> {
+  const first = !(await whole.db.query(`select 1 from member where removed_at is null limit 1`)).rows.length;
+  const { rows } = await whole.db.query<{ id: string }>(`select id from entity where type = 'person' and archived_at is null and lower(props->>'email') = $1 order by created_at limit 1`, [email]);
+  const person = first
+    ? (await whole.init({ kind: 'human', name: email }, { name: email, email })).me
+    : (rows[0]?.id ?? (await whole.apply('system', { ops: [{ op: 'create', ref: 'p', type: 'person', title: email, visibility: 'shared', props: { email } }], reason: 'Added to the workspace' })).created.p);
+  await whole.db.query(
+    `insert into member (email, person_id, admin, added_by) values ($1, $2, $3, 'server pack')
+     on conflict (email) do update set person_id = excluded.person_id, admin = excluded.admin, removed_at = null`,
+    [email, person, admin || first],
+  );
+  return person;
+}
+
 const KEY = 'signin:';
 const hash = (code: string) => createHash('sha256').update(code).digest('hex');
 
 /** A one-time link that signs this member in. The code names its workspace, so the server knows where to trade it. */
-async function linkFor(db: Q, workspace: string, email: string, ms: number, origin = site.origin): Promise<string> {
+export async function linkFor(db: Q, workspace: string, email: string, ms: number, origin = site.origin): Promise<string> {
   const code = `inv_${workspace}_${randomBytes(20).toString('hex')}`;
   await keep(db, KEY + hash(code), { email }, ms);
   return `${origin}/#/join/${code}`;

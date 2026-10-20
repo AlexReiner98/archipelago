@@ -353,3 +353,23 @@ export function backupCard(done) {
     importRow(done),
   );
 }
+
+/** The server's packs, for an admin of the default workspace: each with what it may ask the server to do. Nothing when there are none. */
+export function serverPacksCard() {
+  const card = h('section', { class: 'card wide', hidden: true });
+  api('server_packs').then(({ packs, refused }) => {
+    if (!packs.length && !refused.length) return;
+    const offers = (p) => [...p.pages.map((x) => `page ${x}`), ...p.entries.map((x) => `entry ${x}`), ...p.webhooks.map((x) => `webhook ${x}`)].join('\n');
+    const row = (p) =>
+      h(
+        'li',
+        { class: 'row-top tie-row' },
+        h('span', { class: 'grow', title: `${p.title} ${p.version}, at /x/${p.id}\n${offers(p)}` }, h('strong', {}, p.title), ' ', h('span', { class: 'muted small' }, `/x/${p.id}`)),
+        h('span', { class: 'pill', title: `What it may ask the server for:\n${p.acts.join('\n') || 'nothing'}` }, `${p.acts.length} act${p.acts.length === 1 ? '' : 's'}`),
+      );
+    const left = (r) => h('li', { class: 'row-top tie-row' }, h('span', { class: 'grow muted', title: `${r.folder}\n${r.why.join('\n')}` }, r.folder.split(/[\\/]/).pop()), h('span', { class: 'pill bad', title: r.why.join('\n') }, 'left out'));
+    card.replaceChildren(h('header', {}, h('h2', { class: 'hinted', title: 'What this server does that no one workspace can, by packs kept on the machine it runs on' }, 'Server packs')), h('ul', { class: 'rows' }, packs.map(row), refused.map(left)));
+    card.hidden = false;
+  }, () => null);
+  return card;
+}
