@@ -700,7 +700,10 @@ change that:
   a TXT record at `<selector>._domainkey.<domain>`), a DMARC record, and the
   server's reverse DNS set to its name. The host must let it out on port 25.
   `PELAGO_SMTP_URL` hands mail to a relay instead (`smtp://user:pass@host:587`
-  or `smtps://…:465`); a password is never sent without TLS.
+  or `smtps://…:465`); a password is never sent without TLS. The hosted server
+  is an OVH Public Cloud instance, which may not send on mail ports, so its
+  mail goes through a relay of our own over WireGuard: `deploy/relay/README.md`
+  is the whole setup, step by step.
 - **Notifications between workspaces.** A human can send another workspace a
   notification with `notify_workspace`. It arrives only if that workspace's
   admin has added the sender to the workspaces it accepts, and accepting is
