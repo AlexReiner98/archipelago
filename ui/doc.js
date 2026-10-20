@@ -187,7 +187,7 @@ function draw(d) {
             'section',
             { id: p.section.id },
             h('h2', {}, p.section.title),
-            p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id })),
+            p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
             blocks(p.section.body, titles, 3),
           )
         : h('div', { class: 'text' }, blocks(p.text, titles, 2)),
@@ -197,7 +197,7 @@ function draw(d) {
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.type === INVOICE);
   // Read with the reader's sign-in, a figure is fetched the same way.
-  if (own) for (const img of main.querySelectorAll('img[data-figure]')) api('picture', { result: img.dataset.figure }).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
+  if (own) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }
 
 (own

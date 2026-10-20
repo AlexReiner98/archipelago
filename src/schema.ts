@@ -410,3 +410,39 @@ create table if not exists member (
 );
 alter table member enable row level security;
 `;
+
+/** Step 7 (src/migrate.ts): a share may be made out to another workspace on the server instead of to a secret (src/workspace-share.ts). */
+export const WORKSPACE_SHARE = `
+alter table share add column if not exists to_workspace text;
+alter table share add column if not exists to_item text;
+alter table share alter column hash drop not null;
+
+-- What a share made out to a workspace shows to that workspace, and nothing else: as pelago_shared_document, but
+-- found by the share and the reading workspace, which the server says, not by a secret the reader holds.
+create or replace function pelago_workspace_document(share_id text, reader text) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  with d as (
+    select e.* from share s join entity e on e.id = s.entity_id
+    where s.id = share_id and s.to_workspace = reader and s.revoked_at is null and e.archived_at is null
+  ),
+  named as (
+    select distinct m[1] as id from d, regexp_matches(d.body, '^[ \\t]*(e_[a-z0-9]{8})[ \\t]*$', 'gn') as m
+  ),
+  items as (
+    select i.id, i.type, i.title, i.status, i.body, i.updated_at, exists (select 1 from picture p where p.entity_id = i.id) as picture
+    from entity i join named n on n.id = i.id, d
+    where i.archived_at is null and i.workspace = d.workspace and (i.private_to is null or i.private_to = d.private_to)
+  )
+  select jsonb_build_object(
+    'id', d.id, 'type', d.type, 'title', d.title, 'body', d.body, 'status', d.status, 'props', d.props, 'updated_at', d.updated_at,
+    'items', coalesce((select jsonb_agg(to_jsonb(items)) from items), '[]'::jsonb))
+  from d
+$fn$;
+create or replace function pelago_workspace_picture(share_id text, reader text, target text)
+returns table (content_type text, bytes bytea)
+language sql stable security definer set search_path = public as $fn$
+  select p.content_type, p.bytes from picture p
+  where p.entity_id = target
+    and exists (select 1 from jsonb_array_elements(pelago_workspace_document(share_id, reader) -> 'items') i where i ->> 'id' = target)
+$fn$;
+grant execute on function pelago_workspace_document(text, text), pelago_workspace_picture(text, text, text) to pelago_public;`;
