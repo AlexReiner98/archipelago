@@ -684,10 +684,10 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .proofs .ptile:hover .cap { text-decoration: underline; }
 @media (max-width: 640px) { .proofs .ptiles { padding-left: 14px; } }
 
-/* Costs and the changelog: one line a row. */
-.rows.costs > li.row-top, .proofs .rows > li.row-top { flex-wrap: nowrap; }
-.rows.costs > li.row-top > .grow, .proofs .rows > li.row-top > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rows.costs > li.row-top > :not(.grow), .proofs .rows > li.row-top > :not(.grow) { flex: none; }
+/* The changelog: one line a row. */
+.proofs .rows > li.row-top { flex-wrap: nowrap; }
+.proofs .rows > li.row-top > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proofs .rows > li.row-top > :not(.grow) { flex: none; }
 
 /* A session's story: what it found, over a picture of that; how it got there, folded. */
 .story .finding { margin: 4px 14px 12px; max-width: 70ch; font-size: 15px; line-height: 1.5; }

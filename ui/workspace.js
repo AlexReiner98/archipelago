@@ -3,7 +3,7 @@
 import { api, ask, authHeaders, h, part, tell } from './base.js';
 import { screensCard } from './nav.js';
 import { packsCard } from './packs.js';
-import { RAN, ago, card, chip, hint, link, tokensText, when } from './words.js';
+import { ago, when } from './words.js';
 import { scopePills } from './token-piece.js';
 import { backupCard, connectBox, githubCard, importCard, operatorCard, ownerCard, secretBox } from './workspace-cards.js';
 
@@ -15,12 +15,7 @@ export async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, costsCard(), ownerCard(owner, workspace), backupCard(), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace)),
-      h('section', { class: 'card' },
-        h('div', { class: 'empty' },
-          h('strong', {}, 'Single user'), h('span', { class: 'muted', title: 'One workspace, no sign-in; everything done here is done as its owner. To share it, set "auth": "tokens" in pelago.config.json and restart: the first start prints your token.' }, ' \u00b7 no sign-in on this server'),
-        ),
-      ),
+      h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace)),
     );
   }
   const [info, tokens, people] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 })]);
@@ -68,7 +63,6 @@ export async function workspace() {
     h(
       'div',
       { class: 'grid' },
-      costsCard(),
       (me.actor.admin || !info.owner) && ownerCard(info.owner, workspace),
       me.actor.admin && backupCard(),
       me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
@@ -150,7 +144,7 @@ export async function workspace() {
                 [['private', 'Private to their author unless shared'], ['shared', 'Shared with everyone unless made private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label)),
               ),
             ),
-            h('dt', {}, 'What agents change'),
+            h('dt', { class: 'hinted', title: 'Either way every change is in the log with who made it and why, and can be undone. Held, the answer to a decision or a hypothesis waits for you too. Taking effect, an agent can settle one: it has to say what was chosen and why, and you are notified on Home.' }, 'What agents change'),
             h(
               'dd',
               {},
@@ -159,9 +153,8 @@ export async function workspace() {
                 { onchange: (e) => api('workspace_set', { agent_changes: e.target.value }).then(workspace, fail) },
                 [['hold', 'Is held until I have looked'], ['apply', 'Takes effect as they make it']].map(([v, label]) => h('option', { value: v, selected: v === info.agent_changes }, label)),
               ),
-              hint('Either way every change is in the log with who made it and why, and can be undone. Held, the answer to a decision or a hypothesis waits for you too. Taking effect, an agent can settle one: it has to say what was chosen and why, and you are notified on Home.'),
             ),
-            h('dt', {}, 'Accept notifications from'),
+            h('dt', { class: 'hinted', title: `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".` }, 'Accept notifications from'),
             h(
               'dd',
               {},
@@ -171,7 +164,6 @@ export async function workspace() {
                 accepts,
                 h('button', { onclick: () => api('workspace_set', { accepts_from: accepts.value.split(',').map((s) => s.trim()).filter(Boolean) }).then(workspace, fail) }, 'Save'),
               ),
-              hint(`Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".`),
             ),
           ),
         ),
@@ -180,56 +172,4 @@ export async function workspace() {
       operatorCard(info.id),
     ),
   );
-}
-
-// ---- Costs ---------------------------------------------------------------
-
-/** What the work costs over thirty days: each regular payment and its share, and what agents spent by where they ran. */
-export function costsCard() {
-  const c = card('Costs', { wide: true });
-  const money = (n) => `$${n.toFixed(2)}`;
-  c.fill(
-    api('view', { name: 'costs', params: { days: 30 } }),
-    (d) => {
-      const paid = d.recurring.items.map((i) =>
-        h(
-          'li',
-          { class: 'row-top' },
-          chip(i.type),
-          h('span', { class: 'grow', title: i.title }, link(i)),
-          i.vendor && h('span', { class: 'muted small' }, i.vendor),
-          i.amount === null ? h('span', { class: 'pill warn', title: 'Nobody has said what is paid' }, 'not priced') : h('span', { class: 'muted small', title: `${i.amount} ${i.currency} every ${i.every}` }, i.currency === 'USD' ? `${money(i.per_month)}/mo` : `${i.per_month} ${i.currency}/mo`),
-          i.share !== null && i.currency === 'USD' && h('strong', {}, money(i.share)),
-        ),
-      );
-      const spent = d.agents.by.map((s) =>
-        h(
-          'li',
-          { class: 'row-top' },
-          h('span', { class: 'chip' }, 'Agents'),
-          h('span', { class: 'grow' }, RAN[s.surface] ?? s.surface),
-          h('span', { class: 'muted small' }, `${s.runs} run${s.runs === 1 ? '' : 's'} \u00b7 ${tokensText(s.tokens)}`),
-          s.unpriced_tokens > 0 && s.cost_usd === 0 ? h('span', { class: 'pill closed', title: 'These runs count tokens and do not say what they cost' }, 'tokens only') : h('strong', {}, money(s.cost_usd)),
-        ),
-      );
-      const node = h(
-        'div',
-        {},
-        h(
-          'div',
-          { class: 'toolbar fold-bar usage-sums' },
-          h('span', { class: 'fact', title: 'What a month costs at this rate: the regular payments, and what agents spent scaled to a month' }, h('span', { class: 'muted' }, 'a month '), h('strong', {}, money(d.per_month))),
-          h('span', { class: 'fact', title: 'Paid to run agents through the API, where a run says what it cost' }, h('span', { class: 'muted' }, 'agents '), h('strong', {}, money(d.agents.cost_usd))),
-          h('span', { class: 'fact', title: 'Hosting, subscriptions and the like: their share of these days' }, h('span', { class: 'muted' }, 'regular '), h('strong', {}, money(d.recurring.cost_usd))),
-          d.agents.unpriced_tokens > 0 && h('span', { class: 'fact', title: 'Used by runs that count tokens and do not say what they cost, such as a session on a subscription: not in the dollars' }, h('span', { class: 'muted' }, 'not priced '), tokensText(d.agents.unpriced_tokens)),
-          h('span', { class: 'grow' }),
-          d.adds && h('a', { class: 'button', href: `#/new/${d.adds}`, title: 'Hosting, a subscription, a licence, a domain' }, 'Add a cost'),
-        ),
-        (paid.length > 0 || spent.length > 0) && h('ul', { class: 'rows costs' }, paid, spent),
-      );
-      return [`${money(d.total_usd)} in ${d.days} days`, node];
-    },
-    '',
-  );
-  return c.el;
 }
