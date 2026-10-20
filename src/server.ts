@@ -48,7 +48,7 @@ import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
-import { publicPage, publicPicture } from './public.ts';
+import { publicPage, publicPicture } from './public.ts'; import { pageStyle } from './styles.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
@@ -214,7 +214,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (what === 'data') {
           const page = await publicPage(pelago, product, url.searchParams.get('build') ?? undefined);
           if (!page) return none();
-          return res.writeHead(200, { ...guard, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify(page));
+          return res.writeHead(200, { ...guard, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...page, theme: (await pageStyle(pelago, {})).style.theme }));
         }
         const picture = extra ? await publicPicture(pelago, extra) : null;
         if (!picture) return none();
@@ -240,7 +240,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         }
         const doc = (await workspaces.has(wsId)) ? await sharedDocument((await workspaces.get(wsId)).pelago, secret) : null;
         if (!doc) return res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'This link does not open anything: it may have been revoked.' }));
-        return res.writeHead(200, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify(doc));
+        return res.writeHead(200, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ ...doc, theme: (await pageStyle((await workspaces.get(wsId)).pelago, {})).style.theme }));
       }
 
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the

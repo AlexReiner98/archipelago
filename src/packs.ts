@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
-import { checkDeclared, KERNEL_VERBS, screensOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
+import { checkDeclared, KERNEL_VERBS, screensOf, stylesOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type StyleDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
@@ -85,8 +85,8 @@ export interface PackFile {
   /** What agents and people can do and read through it, run by its handler. */
   actions?: ActionDef[];
   views?: ViewDef[];
-  /** What it shows on the page of every item of a kind or type: one column of pieces the kernel draws. */
-  screens?: ScreenDef[];
+  /** What it shows on the page of every item of a kind or type: one column of pieces the kernel draws; and how it looks. */
+  screens?: ScreenDef[]; styles?: StyleDef[];
   /** What comes from and goes to the world outside: hosts it may reach, webhooks it receives, what it runs by itself. */
   hosts?: HostDef[];
   webhooks?: WebhookDef[];
@@ -494,7 +494,7 @@ export class Registry {
       trees: [...this.trees.values()],
       verbs: this.verbs.map((v) => ({ ...v, kernel_tools: Object.keys(KERNEL_VERBS).filter((t) => KERNEL_VERBS[t] === v.id) })),
       pack_tools: [...this.tools].map(([tool, { pack, call, def }]) => ({ tool, pack, [call]: def.id, ...('verb' in def ? { verb: def.verb, title: def.title, on: def.on, item: def.item, input: def.input } : { shape: def.shape }) })),
-      screens: screensOf(this.packs),
+      screens: screensOf(this.packs), styles: stylesOf(this.packs),
     };
   }
 }

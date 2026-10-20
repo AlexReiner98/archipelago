@@ -2,6 +2,7 @@
 
 import { api, ask, authHeaders, h, part, tell } from './base.js';
 import { screensCard } from './nav.js';
+import { stylesCard } from './styles-card.js';
 import { packsCard } from './packs.js';
 import { ago, when } from './words.js';
 import { scopePills } from './token-piece.js';
@@ -16,7 +17,7 @@ export async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace)),
+      h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace), stylesCard(workspace)),
     );
   }
   const [info, tokens, people, members] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 }), me.actor.admin ? api('member_list') : []]);
@@ -25,8 +26,8 @@ export async function workspace() {
   const fail = (err) => notice.replaceChildren(h('div', { class: 'error', style: 'padding: 10px 14px' }, err.message));
   const live = tokens.filter((t) => !t.revoked_at);
   // A word at the top of the page once it is drawn again, brought into view from wherever the button was.
-  const show = (el) => {
-    main.children[1].replaceChildren(el);
+  const say = (cls, text) => {
+    main.children[1].replaceChildren(h('div', { class: cls, style: 'padding: 10px 14px' }, text));
     main.children[1].scrollIntoView({ block: 'center' });
   };
 
@@ -70,6 +71,7 @@ export async function workspace() {
       me.actor.admin && backupCard(workspace),
       me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
       me.actor.admin && screensCard(workspace),
+      me.actor.admin && stylesCard(workspace),
       h(
         'section',
         { class: 'card wide' },
@@ -104,7 +106,7 @@ export async function workspace() {
           ),
         ),
       ),
-      me.actor.admin && membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, show }),
+      me.actor.admin && membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, say }),
       me.actor.admin &&
         h(
           'section',

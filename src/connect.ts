@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
 import { redeem, requestSignIn, workspaceOfCode } from './members.ts';
+import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
 import type { Workspaces } from './workspaces.ts';
 
@@ -82,6 +83,12 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     if (at.tooOften()) return;
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(setupScript(origin, at.tokens));
+  }
+  // The page's colours before anyone is signed in, so the sign-in page is drawn like every other: the theme only.
+  if (req.method === 'GET' && path === '/connect/theme') {
+    if (at.tooOften()) return;
+    const { style } = await pageStyle((await at.workspaces.get(at.fallback)).pelago, {});
+    return reply(res, 200, { theme: style.theme ?? null });
   }
   // Signing in by email: a link asked for at an address, and a link opened, its code traded once for a token.
   if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join')) {

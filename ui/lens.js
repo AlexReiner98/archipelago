@@ -66,10 +66,9 @@ export function storyPart(data) {
 // A lens says what is in a picture and the server answers it with data of one
 // shape (the `lens` view). A style says how that data looks, and is only ever
 // read here: which shape, and what stays lit. The kernel draws five shapes:
-// list, the default; flow, a process map; grid, rows by lanes; time, along a
+// list (the core pack's house style); flow, a process map; grid, rows by lanes; time, along a
 // time axis; and architecture, a system's parts, where they run and their wires. Any other look is a style with code of its own, written for the
 // project by its people or agents.
-export const LENS_STYLE = { shape: 'list', lit: 'all' };
 /** The views every item may have beside its own, by the id the server gives each, with what each shows. */
 const BUILT_IN = { holding: 'Everything it waits on, step by step, and nothing else', when: 'When what is in it happens, by day, each person a lane' };
 /** A date some days on. */
@@ -190,7 +189,7 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
     if (empty) return body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this view.'));
     // Nearest wins, field by field: built in, what the map keeps for this view, what this person chose, what the address asks.
     for (const name of Object.keys(chosen)) delete chosen[name];
-    Object.assign(chosen, LENS_STYLE, answer.style, keptStyle(key), style, { noLit: !answer.controls.includes('lit') });
+    Object.assign(chosen, answer.style, keptStyle(key), style, { noLit: !answer.controls.includes('lit') });
     dress(body, chosen);
     // A style with code of its own is the drawing; without, one of those that come built in.
     // A lens on a time axis is drawn along it unless a shape is asked for here; a shape kept from before (nest, boxes) is drawn as the list.

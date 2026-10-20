@@ -1,6 +1,8 @@
 // The page itself: how it is drawn (h), how it asks (ask, tell), how it calls the server (api) and who it is signed in as.
 // What more than one module writes is kept on `state`; `route` is the router, set by app.js.
 
+import { applyTheme } from './theme.js';
+
 export const state = { schema: undefined, pulse: undefined, dirty: false, selfDrawn: false };
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
@@ -142,8 +144,10 @@ export async function api(tool, input = {}) {
 }
 
 export function signIn(message) {
-  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 1; min-width: 240px', autocomplete: 'email' });
-  const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: 240px', autocomplete: 'off' });
+  // Signed out, the style is not read with the rest: its colours are asked for on their own.
+  fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
+  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', class: 'grow', autocomplete: 'email' });
+  const input = h('input', { type: 'text', placeholder: 'pel_…', class: 'grow', autocomplete: 'off' });
   const error = h('div', { class: 'error', style: 'padding: 0 14px 14px' }, message ?? '');
   const byEmail = h('div', { class: 'toolbar', style: 'padding: 14px' });
   const sendLink = async () => {
@@ -176,8 +180,8 @@ export function signIn(message) {
       { class: 'card', style: 'max-width: 620px' },
       others.length > 0 && h('div', { class: 'toolbar', style: 'padding: 14px 14px 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
       byEmail,
+      h('details', { class: 'fold-bar' }, h('summary', { class: 'muted small', title: 'For an agent, or a workspace’s first sign-in' }, 'With a token'), h('div', { class: 'toolbar fold-bar' }, input, h('button', { onclick: submit }, 'Sign in'))),
       error,
-      h('details', { style: 'padding: 0 14px 14px' }, h('summary', { class: 'muted small', title: 'For an agent, or a workspace’s first sign-in' }, 'With a token'), h('div', { class: 'toolbar', style: 'padding-top: 10px' }, input, h('button', { onclick: submit }, 'Sign in'))),
     ),
   );
   email.focus();

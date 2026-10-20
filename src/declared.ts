@@ -121,6 +121,18 @@ export interface PieceDef {
   limit?: number;
 }
 
+/**
+ * How things look, as a pack ships it: a style preset, under every style the map keeps. On nothing, it is the
+ * workspace's; on kinds or types, it is how the pictures and pages of such items look. How anything looks is a style
+ * (docs: "Where does style live?"): the kernel draws what styles say, and keeps no values of its own.
+ */
+export interface StyleDef {
+  id: string;
+  title: string;
+  on?: string[];
+  props: Record<string, unknown>;
+}
+
 /** What a pack shows on the page of every item of the kinds or types it is on: one column of pieces. */
 export interface ScreenDef {
   id: string;
@@ -145,6 +157,8 @@ export const PAGES = ['time'];
 
 /** Every screen the packs declare, in the order the packs load. */
 export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.screens ?? []).map((s) => ({ ...s, pack: pack.id })));
+/** Every style preset the packs ship, in the order the packs load. */
+export const stylesOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.styles ?? []).map((s) => ({ ...s, pack: pack.id })));
 
 /**
  * The kernel's own tools that are one of the six verbs in all but name. change, the generic op, stays beneath them
@@ -209,6 +223,15 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
       if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a picture's style has no code: code runs only from a style kept on the map`);
     }
+  }
+  // A preset says only what a style can say, and carries no code: code runs only from a style kept on the map, where a person approves it.
+  const styleFields = types.get('style')?.fields ?? {};
+  for (const style of pack.styles ?? []) {
+    const at = `style "${style.id}"`;
+    if (!own(style.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
+    if (!style.title || !style.props || typeof style.props !== 'object') problems.push(`${at} needs a title and its props`);
+    for (const t of style.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);
+    for (const key of Object.keys(style.props ?? {})) if (!styleFields[key] || styleFields[key].system || ['code', 'on'].includes(key)) problems.push(`${at}: "${key}" is not a field a preset sets`);
   }
   for (const host of pack.hosts ?? []) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);
   for (const hook of pack.webhooks ?? []) if (!handler || !hook.secret) problems.push(`webhook "${hook.id}" needs the handler and the name of its secret`);

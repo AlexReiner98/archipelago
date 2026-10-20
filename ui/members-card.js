@@ -5,12 +5,11 @@
 import { api, ask, h } from './base.js';
 import { ago, menu } from './words.js';
 
-/** members: from member_list. others: the live human tokens of nobody listed. then: draw the page again; show: put a word at its top. */
-export function membersCard({ me, members, others, tokenRow, then, fail, show }) {
-  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 2; min-width: 200px', autocomplete: 'off' });
-  const name = h('input', { type: 'text', placeholder: 'Name (optional)', style: 'flex: 1; min-width: 140px' });
+/** members: from member_list. others: the live human tokens of nobody listed. then: draw the page again; say: put a word at its top. */
+export function membersCard({ me, members, others, tokenRow, then, fail, say }) {
+  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', class: 'grow', autocomplete: 'off' });
+  const name = h('input', { type: 'text', placeholder: 'Name (optional)', class: 'grow' });
   const admin = h('input', { type: 'checkbox' });
-  const say = (cls, text) => show(h('div', { class: cls, style: 'padding: 10px 14px' }, text));
   const add = async () => {
     try {
       const made = await api('member_add', { email: email.value.trim(), name: name.value.trim() || undefined, admin: admin.checked });
@@ -45,6 +44,6 @@ export function membersCard({ me, members, others, tokenRow, then, fail, show })
     { class: 'card wide' },
     h('header', {}, h('h2', { class: 'hinted', title: 'People who sign in to this workspace, each by their email address.' }, 'Members')),
     h('ul', { class: 'rows' }, members.map(row), others.map(tokenRow)),
-    h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, email, name, h('label', {}, admin, ' Admin'), h('button', { class: 'primary', title: 'They are sent an invitation by email', onclick: add }, 'Add member')),
+    h('div', { class: 'toolbar fold-bar' }, email, name, h('label', {}, admin, ' Admin'), h('button', { class: 'primary', title: 'They are sent an invitation by email', onclick: add }, 'Add member')),
   );
 }

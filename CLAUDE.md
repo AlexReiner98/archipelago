@@ -180,6 +180,13 @@ else a pack"). These rules keep it composable while that happens, and
 - **The UI loads as modules,** with no build step: each part of the page its
   own module under `ui/`, served by name from `src/ui-files.ts`.
 - **Four dependencies,** as above.
+- **How anything looks is a style on the map, never kernel code,** the
+  defaults included (the owner, 20 Oct 2026). A pack ships its defaults as
+  style presets (`styles` in its pack file, resolved in `src/styles.ts`);
+  the owner changes one by keeping their own version on the map. The UI
+  keeps the mechanism (layouts, renderers, CSS rules reading variables) and
+  no values: a colour, a length or a number constant in `ui/` is counted,
+  and the count only goes down.
 
 Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may
 only shrink and goes once the rule is met: when your change brings a number

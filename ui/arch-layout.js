@@ -6,9 +6,6 @@
 // their column by barycentre sweeps, and the wires routed at right angles, each on a track of its own. Pure: an
 // answer in, geometry out; `measure(text, px)` gives a title's width at a size.
 
-const LAYER_GAP = 48, NODE_GAP = 18, COL_GAP = 36, MARGIN = 24, MAX_TEXT = 150, TRACK = 8, SLOT = 10, LEAD_OUT = 12, LEAD_IN = 20;
-/** Room inside a place's box: its name above its parts, and a margin around them. */
-export const HEAD = 26, PAD = 12;
 
 /** How a part is, read from its status word alone: no type is named. */
 const HEALTH = {
@@ -38,7 +35,17 @@ export function wireState(link, a, b) {
 const shapeOf = (i) => (['data', 'storage', 'database', 'queue'].includes(i.role) ? 'store' : ['client', 'person', 'user'].includes(i.role) || i.kind === 'actor' ? 'pill' : i.kind === 'question' ? 'diamond' : 'box');
 
 /** The parts (each with its place x, y and size w, h), the places that hold them, the wires and the whole size. */
-export function layout({ items, links, rootId, measure }) {
+/**
+ * Every length it lays out by is the style's (`sizes`, arch_*): the house style in packs/core/pack.json names each.
+ * HEAD and PAD are the room inside a place's box: its name above its parts, and a margin around them.
+ */
+export function layout({ items, links, rootId, measure, sizes }) {
+  const need = (name) => {
+    if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every one the architecture lays out by`);
+    return sizes[name];
+  };
+  const [LAYER_GAP, NODE_GAP, COL_GAP, MARGIN, MAX_TEXT, TRACK, SLOT, LEAD_OUT, LEAD_IN, HEAD, PAD] = ['layer_gap', 'node_gap', 'col_gap', 'margin', 'max_text', 'track', 'slot', 'lead_out', 'lead_in', 'head', 'pad'].map((n) => need(`arch_${n}`));
+  const [TEXT, PLACE_TEXT, PLACE_NAME_PAD, DIAMOND_PAD, DIAMOND_H, STORE_PAD, STORE_H, BOX_PAD, BOX_H] = ['text', 'place_text', 'place_name_pad', 'diamond_pad', 'diamond_height', 'store_pad', 'store_height', 'box_pad', 'box_height'].map((n) => need(`arch_${n}`));
   const byId = new Map(items.map((i) => [i.id, i]));
   const holds = new Map();
   for (const i of items) if (i.inside && byId.has(i.inside)) holds.set(i.inside, [...(holds.get(i.inside) ?? []), i.id]);
@@ -96,10 +103,10 @@ export function layout({ items, links, rootId, measure }) {
 
   // ---- Sizes.
   for (const n of nodes.values()) {
-    const text = Math.min(measure(n.item.title, 13), MAX_TEXT);
-    if (n.shape === 'diamond') [n.w, n.h] = [text + 90, 56];
-    else if (n.shape === 'store') [n.w, n.h] = [text + 44, 44];
-    else [n.w, n.h] = [text + 44, 34];
+    const text = Math.min(measure(n.item.title, TEXT), MAX_TEXT);
+    if (n.shape === 'diamond') [n.w, n.h] = [text + DIAMOND_PAD, DIAMOND_H];
+    else if (n.shape === 'store') [n.w, n.h] = [text + STORE_PAD, STORE_H];
+    else [n.w, n.h] = [text + BOX_PAD, BOX_H];
   }
 
   // ---- Layers, from the bottom up: what calls nothing (a store, a model, a service outside) on the last row, and
@@ -183,7 +190,7 @@ export function layout({ items, links, rootId, measure }) {
   const colLeft = new Map(), colRight = new Map();
   let at = MARGIN + PAD;
   for (const c of order) {
-    const w = Math.max(...layers.map((_, k) => widthOf(cell(k, c))), c === null ? 0 : measure(byId.get(c).title, 12) + 20);
+    const w = Math.max(...layers.map((_, k) => widthOf(cell(k, c))), c === null ? 0 : measure(byId.get(c).title, PLACE_TEXT) + PLACE_NAME_PAD);
     colLeft.set(c, at);
     colRight.set(c, at + w);
     at += w + COL_GAP + 2 * PAD;

@@ -7,11 +7,10 @@
 
 import { h } from './base.js';
 import { layout } from './arch-layout.js';
-import { lensTree, litCount, litSwitch } from './lens-base.js';
+import { lensTree, litCount, litSwitch, numberOf, sizeOf } from './lens-base.js';
 import { panZoom } from './pan-zoom.js';
 
 const NS = 'http://www.w3.org/2000/svg';
-const FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 const svg = (tag, attrs = {}, ...kids) => {
   const el = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== false) el.setAttribute(k, String(v));
@@ -27,31 +26,34 @@ const WIRES = [['wired', 'Wired'], ['planned', 'Not yet wired'], ['broken', 'Bro
 const PILL = { ok: 'ok', warn: 'warn', down: 'bad', building: '', standby: 'closed', planned: 'closed', unknown: 'closed', gone: 'closed' };
 const said = (list, key) => list.find(([k]) => k === key)?.[1] ?? key;
 
-/** A part's outline, centred on x, y. */
-function outline(shape, x, y, w, hgt) {
+/** A part's outline, centred on x, y, its corners as round as rx and a store's lid as deep as lid. */
+function outline(shape, x, y, w, hgt, rx, lid) {
   const l = x - w / 2, r = x + w / 2, t = y - hgt / 2, b = y + hgt / 2;
   if (shape === 'diamond') return svg('path', { d: `M${x} ${t}L${r} ${y}L${x} ${b}L${l} ${y}Z`, class: 'ar-shape' });
   if (shape === 'pill') return svg('rect', { x: l, y: t, width: w, height: hgt, rx: hgt / 2, class: 'ar-shape' });
   // A store: a cylinder, its lid drawn over its body.
   if (shape === 'store') {
-    const ry = 6;
+    const ry = lid;
     return svg('g', {}, svg('path', { d: `M${l} ${t + ry}A${w / 2} ${ry} 0 0 1 ${r} ${t + ry}V${b - ry}A${w / 2} ${ry} 0 0 1 ${l} ${b - ry}Z`, class: 'ar-shape' }), svg('path', { d: `M${l} ${t + ry}A${w / 2} ${ry} 0 0 0 ${r} ${t + ry}`, class: 'ar-lid' }));
   }
-  return svg('rect', { x: l, y: t, width: w, height: hgt, rx: Math.min(6, hgt / 5), class: 'ar-shape' });
+  return svg('rect', { x: l, y: t, width: w, height: hgt, rx: Math.min(rx, hgt / 5), class: 'ar-shape' });
 }
 
 /** The system: its parts, the places they run and the wires between them, with how each is. */
 export function drawArch(host, answer, style, keep) {
   const { me, byId } = lensTree(answer);
+  // Every length is the style's (sizes, arch_*), named by the house style; so is the typeface.
+  const z = (name) => sizeOf(style, `arch_${name}`);
+  const [TEXT, PLACE_TEXT, SAYS_TEXT, CORNER, LID] = ['text', 'place_text', 'says_text', 'corner', 'lid'].map(z);
   const ctx = document.createElement('canvas').getContext('2d');
-  const measure = (text, px) => ((ctx.font = `400 ${px}px ${FONT}`), ctx.measureText(text).width);
+  const measure = (text, px) => ((ctx.font = `400 ${px}px ${style.font}`), ctx.measureText(text).width);
   const fit = (text, width, px) => {
     if (measure(text, px) <= width) return text;
     let t = text;
     while (t.length > 1 && measure(`${t}…`, px) > width) t = t.slice(0, -1);
     return `${t}…`;
   };
-  const g = layout({ items: answer.items, links: answer.links, rootId: answer.lens.from, measure });
+  const g = layout({ items: answer.items, links: answer.links, rootId: answer.lens.from, measure, sizes: style.sizes });
   const parts = g.all.filter((n) => !n.dummy);
   if (!parts.length) return host.replaceChildren(h('div', { class: 'empty' }, 'Nothing here is part of a system.'));
 
@@ -64,11 +66,11 @@ export function drawArch(host, answer, style, keep) {
   };
 
   // The places first, under everything: a box each. Its name and its own dot go over the wires, on its top edge.
-  const boxLayer = g.boxes.map((b) => svg('rect', { x: b.x, y: b.y, width: b.w, height: b.h, rx: 10, class: `ar-place-box ${b.health}` }));
+  const boxLayer = g.boxes.map((b) => svg('rect', { x: b.x, y: b.y, width: b.w, height: b.h, rx: z('place_corner'), class: `ar-place-box ${b.health}` }));
   const nameLayer = g.boxes.map((b) => {
-    const text = fit(b.item.title, b.w - 34, 12);
+    const text = fit(b.item.title, b.w - z('place_name_room'), PLACE_TEXT);
     const el = titled(
-      svg('a', { href: `#/e/${b.id}`, class: `ar-place ${b.health}` }, svg('rect', { x: b.x + 4, y: b.y + 4, width: measure(text, 12) + 30, height: 18, rx: 6, class: 'ar-place-name' }), svg('circle', { cx: b.x + 14, cy: b.y + 13, r: 4, class: `ar-dot ${b.health}` }), svg('text', { x: b.x + 24, y: b.y + 13.5 }, text)),
+      svg('a', { href: `#/e/${b.id}`, class: `ar-place ${b.health}` }, svg('rect', { x: b.x + z('place_name_inset'), y: b.y + z('place_name_inset'), width: measure(text, PLACE_TEXT) + z('place_name_room') - z('place_name_inset'), height: z('place_name_height'), rx: CORNER, class: 'ar-place-name' }), svg('circle', { cx: b.x + z('place_dot_x'), cy: b.y + z('place_name_inset') + z('place_name_height') / 2, r: z('dot_small'), class: `ar-dot ${b.health}` }), svg('text', { x: b.x + z('place_text_x'), y: b.y + z('place_name_inset') + z('place_name_height') / 2 }, text)),
       [b.item.title, `${said(HEALTHS, b.health)} (${b.item.status})`].join('\n'),
     );
     els.set(b.id, el);
@@ -87,7 +89,7 @@ export function drawArch(host, answer, style, keep) {
     hit.addEventListener('mouseenter', () => [path, head].forEach((el) => el.classList.add('lit')));
     hit.addEventListener('mouseleave', () => light(null));
     wires.set(c, [path, head]);
-    if (c.says) labels.push({ c, text: fit(c.says, 120, 10.5) });
+    if (c.says) labels.push({ c, text: fit(c.says, z('says_most'), SAYS_TEXT) });
     return [path, head, hit];
   });
   // What a wire carries is written on it where there is room: on its drop into what it calls when nothing else
@@ -95,31 +97,31 @@ export function drawArch(host, answer, style, keep) {
   const once = (list, v) => list.filter((p) => p === v).length === 1;
   const heads = g.chains.map((c) => c.points.at(-1)[0]), feet = g.chains.map((c) => c.points[0][0]);
   // A place's name is never written over.
-  const placed = g.boxes.map((b) => [b.x + Math.min(b.w, measure(b.item.title, 12) + 34) / 2, b.y + 13, Math.min(b.w, measure(b.item.title, 12) + 34)]);
+  const placed = g.boxes.map((b) => [b.x + Math.min(b.w, measure(b.item.title, PLACE_TEXT) + z('place_name_room')) / 2, b.y + z('place_name_inset') + z('place_name_height') / 2, Math.min(b.w, measure(b.item.title, PLACE_TEXT) + z('place_name_room'))]);
   const labelLayer = labels.flatMap(({ c, text }) => {
-    const w = measure(text, 10.5) + 12, p = c.points;
+    const w = measure(text, SAYS_TEXT) + 2 * z('says_pad'), p = c.points;
     const spots = [once(heads, p.at(-1)[0]) && [p.at(-1)[0], (p.at(-2)[1] + p.at(-1)[1]) / 2], once(feet, p[0][0]) && [p[0][0], (p[0][1] + p[1][1]) / 2], Math.abs(p[2][0] - p[1][0]) > w + 16 && [(p[1][0] + p[2][0]) / 2, p[1][1]]].filter(Boolean);
     const spot = spots.find(([lx, ly]) => !placed.some(([px, py, pw]) => Math.abs(px - lx) < (pw + w) / 2 + 4 && Math.abs(py - ly) < 16));
     if (!spot) return [];
     placed.push([...spot, w]);
     const [lx, ly] = spot;
-    return [svg('g', { class: `ar-says ${c.state}` }, svg('rect', { x: lx - w / 2, y: ly - 8, width: w, height: 16, rx: 8 }), svg('text', { x: lx, y: ly + 0.5 }, text))];
+    return [svg('g', { class: `ar-says ${c.state}` }, svg('rect', { x: lx - w / 2, y: ly - z('says_height') / 2, width: w, height: z('says_height'), rx: z('says_height') / 2 }), svg('text', { x: lx, y: ly }, text))];
   });
   const breakLayer = g.breaks.map(([bx, by]) => svg('g', { class: 'ar-break' }, svg('rect', { x: bx - 3, y: by - 8, width: 6, height: 16 }), svg('path', { d: `M${bx - 6} ${by}H${bx + 6}` })));
   // Last, the parts over all of it.
   const partLayer = parts.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
-    const left = n.shape === 'diamond' ? X - n.w / 2 + 45 : X - n.w / 2 + 28;
-    const room = n.shape === 'diamond' ? n.w - 90 : n.w - 40;
+    const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + z('text_x');
+    const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - z('text_x') - z('text_after');
     const cls = ['ar-part', n.health, yours(i) && 'you', i.id === style.here && 'here'].filter(Boolean).join(' ');
     const el = titled(
       svg(
         'a',
         { href: `#/e/${i.id}`, class: cls },
-        outline(n.shape, X, Y, n.w, n.h),
-        svg('circle', { cx: left - 12, cy: Y + (n.shape === 'store' ? 3 : 0), r: 4.5, class: `ar-dot ${n.health}` }),
-        svg('text', { x: left, y: Y + (n.shape === 'store' ? 3 : 0) + 0.5 }, fit(i.title, room, 13)),
-        n.notes && svg('g', { class: `ar-badge${n.notes.some(yours) ? ' you' : ''}` }, svg('circle', { cx: X + n.w / 2 - 4, cy: Y - n.h / 2, r: 8 }), svg('text', { x: X + n.w / 2 - 4, y: Y - n.h / 2 + 0.5 }, String(n.notes.length))),
+        outline(n.shape, X, Y, n.w, n.h, CORNER, LID),
+        svg('circle', { cx: left - z('dot_gap'), cy: Y + (n.shape === 'store' ? LID / 2 : 0), r: z('dot'), class: `ar-dot ${n.health}` }),
+        svg('text', { x: left, y: Y + (n.shape === 'store' ? LID / 2 : 0) }, fit(i.title, room, TEXT)),
+        n.notes && svg('g', { class: `ar-badge${n.notes.some(yours) ? ' you' : ''}` }, svg('circle', { cx: X + n.w / 2 - z('badge_in'), cy: Y - n.h / 2, r: z('badge') }), svg('text', { x: X + n.w / 2 - z('badge_in'), y: Y - n.h / 2 }, String(n.notes.length))),
       ),
       words(n),
     );
@@ -136,7 +138,7 @@ export function drawArch(host, answer, style, keep) {
   const legend = h(
     'div',
     { class: 'lf-legend ar-legend' },
-    [['box', 'Part'], ['store', 'Store'], ['pill', 'Client'], ['diamond', 'Question']].filter(([shape]) => parts.some((n) => n.shape === shape)).map(([shape, label]) => mark(svg('g', { class: 'ar-part' }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 13)), label)),
+    [['box', 'Part'], ['store', 'Store'], ['pill', 'Client'], ['diamond', 'Question']].filter(([shape]) => parts.some((n) => n.shape === shape)).map(([shape, label]) => mark(svg('g', { class: 'ar-part' }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 13, CORNER, 3)), label)),
     g.boxes.length > 0 && mark(svg('rect', { x: 1, y: 1, width: 20, height: 12, rx: 3, class: 'ar-place-box' }), 'Where it runs'),
     HEALTHS.filter(([k]) => healths.has(k)).map(([k, label]) => mark(svg('circle', { cx: 11, cy: 7, r: 4, class: `ar-dot ${k}` }), label)),
     WIRES.filter(([k]) => states.has(k)).map(([k, label]) => mark(svg('path', { d: 'M1 7H21', class: `ar-wire ${k}` }), label)),
@@ -161,15 +163,15 @@ export function drawArch(host, answer, style, keep) {
   const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, legend);
   host.replaceChildren(stage);
   const start = g.nodes.has(style.here) ? style.here : undefined;
-  legend.hidden = stage.clientWidth > 0 && stage.clientWidth < 720;
-  const moves = panZoom(stage, picture, { width: g.width, height: g.height, start: start ? [g.x.get(start), g.y.get(start)] : undefined, aside: legend.hidden ? 0 : legend.offsetWidth + 20 });
+  legend.hidden = stage.clientWidth > 0 && stage.clientWidth < sizeOf(style, 'flow_legend_from');
+  const moves = panZoom(stage, picture, { width: g.width, height: g.height, start: start ? [g.x.get(start), g.y.get(start)] : undefined, aside: legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room') });
   const key = h('button', { class: legend.hidden ? '' : 'on', title: 'What the marks mean', onclick: (ev) => ((legend.hidden = !legend.hidden), ev.currentTarget.classList.toggle('on', !legend.hidden)) }, 'Key');
   const zoom = h(
     'span',
     { class: 'switch' },
-    h('button', { title: 'Zoom out', onclick: () => moves.zoomBy(1 / 1.25) }, '−'),
+    h('button', { title: 'Zoom out', onclick: () => moves.zoomBy(1 / numberOf(style, 'zoom_step')) }, '−'),
     h('button', { title: 'All of it in sight', onclick: () => moves.fit() }, 'Fit'),
-    h('button', { title: 'Zoom in', onclick: () => moves.zoomBy(1.25) }, '+'),
+    h('button', { title: 'Zoom in', onclick: () => moves.zoomBy(numberOf(style, 'zoom_step')) }, '+'),
   );
   host.prepend(h('div', { class: 'toolbar fold-bar' }, tally, h('span', { class: 'grow' }), lit, key, zoom));
   host.redraw = redraw;
