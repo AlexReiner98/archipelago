@@ -11,7 +11,7 @@ backups/
 .proof/
 
 # What the setup command writes into a project to connect it to a Archipelago server (/connect/setup.mjs), and the
-# maintainer's notes on their own installation. Each is true of one machine's setup, not of the code.
+# notes on this machine's own installation (CLAUDE.local.md). Each is true of one machine's setup, not of the code.
 .mcp.json
 .claude/settings.json
 .claude/settings.local.json
@@ -21,16 +21,3 @@ backups/
 .claude/pelago-setup.json
 *.pelago-backup
 CLAUDE.local.md
-
-# The server's secrets, on the server only (deploy/.env.example names them).
-deploy/.env
-
-# What deploy.sh keeps on the server: the live colour, the hook's queue, its lock and the last test run.
-deploy/caddy/live/
-deploy/queue/
-deploy/.deploy.lock
-
-# What backup.sh keeps on the server: its lock, and the settings it hands a spare while a restore is tried.
-deploy/.backup.lock
-deploy/.restore-try.env
-deploy/.staging.lock

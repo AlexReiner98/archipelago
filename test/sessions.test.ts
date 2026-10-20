@@ -9,10 +9,10 @@ test('a session registers, takes the lane its task needs, and gives it back when
   const l = await fresh();
   const made = await laneSetup(l);
 
-  const one = await sessionStart(l, agent, { task: made.live, cwd: 'c:/code/aperture/src', session_id: 's1' });
+  const one = await sessionStart(l, agent, { task: made.live, cwd: 'c:/code/apex/src', session_id: 's1' });
   assert.equal(one.status, 'running');
   assert.deepEqual(one.claimed, ['Live lane']);
-  assert.equal(one.repo?.title, 'Aperture repo', 'found by a subfolder, whatever the slashes or case');
+  assert.equal(one.repo?.title, 'Apex repo', 'found by a subfolder, whatever the slashes or case');
   assert.equal((await l.proposals()).length, 0, 'operational state needs no approval');
   assert.equal((await sessionStart(l, agent, { session_id: 's1' })).resumed, true, 'announcing twice is safe');
 
@@ -126,10 +126,10 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
   await l.claim(agent, { resource: made.lane, holder: holder.run, reason: 'busy' });
 
   const brief = (await VIEWS.brief.run(l, { task: made.live })) as any;
-  assert.equal(brief.repo.path, 'C:\\code\\Aperture');
+  assert.equal(brief.repo.path, 'C:\\code\\Apex');
   assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
   assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['work.governed_by', 'One live lane.']]);
-  for (const part of ['# Capture probe', 'Part of: Aperture', 'held by Other session', 'Only one session drives Rhino.']) {
+  for (const part of ['# Capture probe', 'Part of: Apex', 'held by Other session', 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
   const gated = (await VIEWS.brief.run(l, { task: made.gated })) as any;
@@ -139,14 +139,14 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
 test('the session-start hook registers the session and hands it the repo\'s work and the lane state', async () => {
   const l = await fresh();
   const made = await laneSetup(l);
-  const text = await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Aperture' });
+  const text = await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Apex' });
   assert.match(text, /registered in Archipelago/);
-  const repoId = /Repository: Aperture repo \((e_\w+)\)/.exec(text)?.[1];
+  const repoId = /Repository: Apex repo \((e_\w+)\)/.exec(text)?.[1];
   assert.ok(repoId, 'the repository comes with its id');
-  assert.match(await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Aperture' }), new RegExp(`Repository: Aperture repo \\(${repoId}\\)`), 'a session that is resumed is told its repository again');
+  assert.match(await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Apex' }), new RegExp(`Repository: Apex repo \\(${repoId}\\)`), 'a session that is resumed is told its repository again');
   // What the session was told is enough to ask for the repository's work; asked for none, the view says which there are.
-  for (const repo of [repoId, 'aperture repo']) assert.equal(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo } })) as any).repo.id, repoId);
-  await assert.rejects(async () => callTool(l, human, 'view', { name: 'repo_work', params: {} }), new RegExp(`repo_work needs "repo".*Repositories here: Aperture repo \\(${repoId}\\)`));
+  for (const repo of [repoId, 'apex repo']) assert.equal(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo } })) as any).repo.id, repoId);
+  await assert.rejects(async () => callTool(l, human, 'view', { name: 'repo_work', params: {} }), new RegExp(`repo_work needs "repo".*Repositories here: Apex repo \\(${repoId}\\)`));
   assert.match(text, new RegExp(`Write unit tests \\(${made.offline}\\)`));
   assert.match(text, /Tune the solver .* waiting on: Which target\?/);
   assert.match(text, /"Live lane" .* is free/);
@@ -156,24 +156,24 @@ test('the session-start hook registers the session and hands it the repo\'s work
   assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), /does not know a repository[\s\S]*HELD by Lane holder: do not use it/);
 
   // On another machine the folder is somewhere else: the repository is known by the address it was cloned from, however that is written.
-  await make(l, [{ op: 'update', id: repoId!, props: { remote: 'https://github.com/Acme/Aperture' } }]);
-  const far = await hookSessionStart(l, { session_id: 'far', cwd: '/home/someone/work/aperture', remote: 'git@github.com:acme/aperture.git' });
-  assert.match(far, new RegExp(`Repository: Aperture repo \\(${repoId}\\)`));
+  await make(l, [{ op: 'update', id: repoId!, props: { remote: 'https://github.com/Acme/Apex' } }]);
+  const far = await hookSessionStart(l, { session_id: 'far', cwd: '/home/someone/work/apex', remote: 'git@github.com:acme/apex.git' });
+  assert.match(far, new RegExp(`Repository: Apex repo \\(${repoId}\\)`));
   assert.match(far, new RegExp(`Write unit tests \\(${made.offline}\\)`));
-  assert.equal(((await VIEWS.sessions.run(l, {})) as any).open.find((r: any) => r.cwd === '/home/someone/work/aperture').repo.id, repoId);
+  assert.equal(((await VIEWS.sessions.run(l, {})) as any).open.find((r: any) => r.cwd === '/home/someone/work/apex').repo.id, repoId);
   assert.match(await hookSessionStart(l, { session_id: 'stranger', cwd: '/tmp/x', remote: 'https://github.com/acme/other' }), /does not know a repository for this folder \(a checkout of https:\/\/github\.com\/acme\/other\)/);
   for (const id of ['far', 'stranger']) await hookSessionEnd(l, { session_id: id });
 
   await hookSessionEnd(l, { session_id: 'abc', reason: 'logout' });
   const open = ((await VIEWS.sessions.run(l, {})) as any).open.map((r: any) => r.title);
-  assert.ok(!open.includes('Session in Aperture repo'));
+  assert.ok(!open.includes('Session in Apex repo'));
   await hookSessionEnd(l, { session_id: 'never-seen' });
 });
 
 test('a session that finishes says where the repository\'s open work stands', async () => {
   const l = await fresh();
   const made = await laneSetup(l);
-  const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture', session_id: 'r1' });
+  const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'r1' });
 
   // It did one task and closed it; the other two it has not said a word about.
   await make(l, [{ op: 'update', id: made.offline, status: 'done' }]);
@@ -202,7 +202,7 @@ test('a session that finishes says where the repository\'s open work stands', as
   const old = await attend(l, { reasons: ['stale'], within: made.repo });
   assert.deepEqual(old.items.map((i: any) => [i.title, i.reasons[0].days]).sort(), [['Capture probe', 20], ['Tune the solver', 40]]);
   assert.equal((await attend(l, { reasons: ['stale'], stale_days: 30 })).items.length, 1, 'only those older than asked for');
-  const told = await hookSessionStart(l, { session_id: 'r0', cwd: 'C:\\code\\Aperture' });
+  const told = await hookSessionStart(l, { session_id: 'r0', cwd: 'C:\\code\\Apex' });
   assert.match(told, /Capture probe \(e_\w+\), not confirmed for 20 days/);
   assert.doesNotMatch(told, /Write unit tests.*not confirmed/);
   // Saying it is still true takes it off the list.
@@ -220,7 +220,7 @@ test('a session that finishes says where the repository\'s open work stands', as
   // Once done, the project waits out its interval again, even with old items left.
   await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 7 } }]);
   const done = (await callTool(l, agent, 'rechecked', { repo: made.repo, summary: 'One left for the owner' })) as any;
-  assert.deepEqual(done.rechecked.map((p: any) => p.title), ['Aperture']);
+  assert.deepEqual(done.rechecked.map((p: any) => p.title), ['Apex']);
   due = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any;
   assert.deepEqual([due.due, typeof due.projects[0].rechecked_at], [false, 'string']);
   await l.db.query(`update entity set props = props || '{"rechecked_at":"2020-01-01T00:00:00Z"}' where id = $1`, [made.proj]);
@@ -241,21 +241,21 @@ test('a session that finishes says where the repository\'s open work stands', as
     { op: 'create', ref: 'leak', type: 'work.issue', title: 'The probe leaks handles' },
     { op: 'link', type: 'part_of', from: 'leak', to: made.proj },
   ]);
-  assert.match(await hookSessionStart(l, { session_id: 'r5', cwd: 'C:\\code\\Aperture' }), new RegExp(`- Issue: The probe leaks handles \\(${leak}\\)`));
+  assert.match(await hookSessionStart(l, { session_id: 'r5', cwd: 'C:\\code\\Apex' }), new RegExp(`- Issue: The probe leaks handles \\(${leak}\\)`));
   assert.ok(((await callTool(l, agent, 'session_end', { run: 'r5' })) as any).unreconciled.some((i: any) => i.id === leak));
   await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r5', outcome: 'cancelled' });
   await make(l, [{ op: 'archive', id: leak }]);
 
   // A session closed over its head (the hook, a crash) is recorded as not having said.
-  await hookSessionStart(l, { session_id: 'r2', cwd: 'C:\\code\\Aperture' });
+  await hookSessionStart(l, { session_id: 'r2', cwd: 'C:\\code\\Apex' });
   await hookSessionEnd(l, { session_id: 'r2', reason: 'exit' });
   const { rows } = await l.db.query<{ body: string }>(`select body from entity where props->>'session_id' = 'r2'`);
   assert.match(rows[0].body, /Session ended \(exit\)\nNot reconciled, open and left unsaid: .*Capture probe/);
 
   // The human ending one from the UI is not asked, and neither is a session that failed.
-  const third = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture' });
+  const third = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex' });
   assert.equal(((await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: third.run, outcome: 'cancelled' })) as any).status, 'cancelled');
-  const fourth = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture' });
+  const fourth = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex' });
   assert.equal(((await callTool(l, agent, 'session_end', { run: fourth.run, outcome: 'failed' })) as any).status, 'failed');
 });
 
@@ -284,7 +284,7 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   assert.deepEqual(work.blocked.find((b: any) => b.id === made.offline).waiting_on, ['Owner']);
 
   // A session ending there is not asked about it: nothing it did could have settled it.
-  const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture', session_id: 'w1' });
+  const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'w1' });
   const asked = (await callTool(l, agent, 'session_end', { run })) as any;
   assert.deepEqual(asked.unreconciled.map((i: any) => i.title).sort(), ['Capture probe', 'Tune the solver']);
   // What it never looked at it says it cannot tell: that ends it, and the item is left as it was, not marked as checked.
@@ -297,7 +297,7 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
 
   // The next session is not asked about what has a change waiting for the owner (the vouching above is one, held),
   // and answers for all it never looked at in one word.
-  const next = await sessionStart(l, agent, { cwd: 'C:\\code\\Aperture', session_id: 'w2' });
+  const next = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'w2' });
   const again = (await callTool(l, agent, 'session_end', { run: next.run })) as any;
   assert.deepEqual(again.unreconciled.map((i: any) => i.title), ['Tune the solver']);
   assert.equal(((await callTool(l, agent, 'session_end', { run: next.run, cannot_tell_rest: true })) as any).status, 'finished');

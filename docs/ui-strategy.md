@@ -13,15 +13,13 @@ Where the two disagree, change the rule and say so in the commit.
 
 ## The problem, as seen on 19 Oct 2026
 
-- Archipelago alone holds 131 items; 102 of them want attention, 65 merely
+- One project alone holds 131 items; 102 of them want attention, 65 merely
   "ready". Home lists them all, ranked, with no way to tell a project from a
   one-line fix.
-- The picture the owner likes best, the stack drawn as architecture (style
-  "The stack as architecture" on lens "The stack as wired"), cannot be found:
-  it is private, sits as the first view of the "Sovereign AI stack"
-  component three levels down (Archipelago, then "A sovereign stack and a
-  loop in seconds", then the component), and no page lists pictures. Search
-  finds it only if you already know its name.
+- The picture the owner likes best, a system drawn as architecture, cannot be
+  found: it is private, sits as the first view of a component three levels
+  down (a project, then a feature, then the component), and no page lists
+  pictures. Search finds it only if you already know its name.
 - Agents close a task by recording what they found, and what they found is
   new issues. Nothing tells the screen that these are lower than the work
   they came from.
@@ -34,9 +32,9 @@ type; it reads the altitude from the registry):
 | Altitude | What sits there | Examples |
 | --- | --- | --- |
 | 0 Workspace | areas, goals, the people | the workspace itself, a goal it serves |
-| 1 Project | projects | Aperture, Archipelago, Aaline |
-| 2 Stream | features, components, releases, documents | "A minimal kernel", "Sovereign AI stack" |
-| 3 Step | tasks, issues, decisions, hypotheses, notes | "Does PGlite stay as a second driver?" |
+| 1 Project | projects | a product, a client engagement |
+| 2 Stream | features, components, releases, documents | "Sign-in by email", "The web server" |
+| 3 Step | tasks, issues, decisions, hypotheses, notes | "Which database do we keep?" |
 
 The rules:
 
@@ -68,7 +66,7 @@ Home answers one question: what can only I do next? It holds:
 1. **Your move,** at most five rows (the owner may set the number): things
    that `waits_on` you, decisions an agent settled for you to confirm, and
    open decisions owned by you. Ranked by what each holds up. Below them, one
-   line: "and 23 more, in Aperture (14), Archipelago (9)", each a link to that
+   line: "and 23 more, in Website (14), Mobile app (9)", each a link to that
    project's page, filtered to you.
 2. **Your projects,** one row each (altitude 1), with the same pills. Not
    their tasks.

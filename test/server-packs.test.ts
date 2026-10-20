@@ -43,21 +43,21 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   assert.equal((await fetch(`${base}/x/demo/public/signup.js`)).headers.get('content-type'), 'text/javascript');
   for (const path of ['/x/demo/public/signup.html', '/x/demo/handler.js', '/x/demo/public/..%2Fhandler.js', '/x/nobody/signup', '/x/demo/signup/more']) assert.equal((await fetch(base + path)).status, 404, path);
 
-  assert.deepEqual(await post('/x/demo/start', { request: 'r1', email: 'Mani@Aaline.example', name: 'Aaline' }), { status: 200, result: { kept: 'r1' } });
+  assert.deepEqual(await post('/x/demo/start', { request: 'r1', email: 'Rosa@Acme.example', name: 'Acme' }), { status: 200, result: { kept: 'r1' } });
   assert.deepEqual((await post('/x/demo/poll', { request: 'r1' })).result, { state: 'waiting' });
 
   // Only what is signed with the secret the server holds reaches the handler.
   assert.equal((await hook({ request: 'r1' }, 'another secret')).status, 401);
-  assert.equal(await workspaces.has('aaline'), false);
-  assert.deepEqual(await hook({ request: 'r1' }), { status: 200, result: { workspace: 'aaline' } });
+  assert.equal(await workspaces.has('acme'), false);
+  assert.deepEqual(await hook({ request: 'r1' }), { status: 200, result: { workspace: 'acme' } });
 
   const ready = (await post('/x/demo/poll', { request: 'r1' })).result;
   assert.equal(ready.state, 'ready');
-  const code = /#\/join\/(inv_aaline_[a-f0-9]{40})$/.exec(ready.link)?.[1];
+  const code = /#\/join\/(inv_acme_[a-f0-9]{40})$/.exec(ready.link)?.[1];
   assert.ok(code, ready.link);
   const { token } = await post('/connect/join', { code });
   const me = await call('/whoami', token, undefined, 'GET');
-  assert.deepEqual([me.workspace.id, me.actor.name, me.actor.admin], ['aaline', 'mani@aaline.example', true]);
+  assert.deepEqual([me.workspace.id, me.actor.name, me.actor.admin], ['acme', 'rosa@acme.example', true]);
   assert.equal((await post('/connect/join', { code })).status, 410, 'a link works once');
 
   // What it did not declare, a workspace it did not make, and the map: refused.

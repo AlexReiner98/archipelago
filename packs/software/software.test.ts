@@ -40,14 +40,14 @@ function ctxOver(items: Item[], opts: { scope?: Record<string, string[]>; lives?
 }
 
 const ITEMS: Item[] = [
-  { id: 'repo', type: 'software.repo', title: 'Aperture repo', props: { remote: 'https://github.com/AlexReiner98/Aperture.git' } },
-  { id: 'proj', type: 'work.project', title: 'Aperture', props: { recheck_days: 7 } },
+  { id: 'repo', type: 'software.repo', title: 'Apex repo', props: { remote: 'https://github.com/acme/apex.git' } },
+  { id: 'proj', type: 'work.project', title: 'Apex', props: { recheck_days: 7 } },
   { id: 'a', type: 'work.task', title: 'Write the probe', props: { due: '2026-10-20' }, updated_at: '2026-09-01T00:00:00Z' },
   { id: 'b', type: 'work.task', title: 'Tune the solver', updated_at: '2026-10-15T00:00:00Z' },
   { id: 'c', type: 'work.issue', title: 'Thin walls diverge', updated_at: '2026-10-10T00:00:00Z' },
   { id: 'gone', type: 'work.task', title: 'Old chore', status: 'done', is_open: false, updated_at: '2026-10-14T00:00:00Z' },
   { id: 'who', type: 'person', title: 'Alex' },
-  { id: 'note', type: 'software.handoff', title: 'Aperture handoff', body: 'Next\nRun the probe.', updated_at: '2026-10-12T00:00:00Z' },
+  { id: 'note', type: 'software.handoff', title: 'Apex handoff', body: 'Next\nRun the probe.', updated_at: '2026-10-12T00:00:00Z' },
   { id: 'run', type: 'sys.run', title: 'Read the push', status: 'finished', is_open: false, body: '[2026-10-13T10:00:00Z] finished: all good', updated_at: '2026-10-13T10:00:00Z', created_at: '2026-10-13T09:00:00Z', props: { tokens_used: 1200, surface: 'github-actions', cost_usd: 0.25 } },
 ];
 const OPTS = {
@@ -58,11 +58,11 @@ const OPTS = {
 };
 
 test('a repository is found by its id, its GitHub name in any form, or its title, and says which there are when not', async () => {
-  assert.equal(repoName('git@github.com:AlexReiner98/Aperture.git'), 'alexreiner98/aperture');
-  assert.equal(repoName('https://github.com/AlexReiner98/Aperture/tree/main'), 'alexreiner98/aperture');
+  assert.equal(repoName('git@github.com:acme/apex.git'), 'acme/apex');
+  assert.equal(repoName('https://github.com/acme/apex/tree/main'), 'acme/apex');
   const ctx = ctxOver(ITEMS, OPTS);
-  for (const repo of ['repo', 'AlexReiner98/aperture', 'aperture repo']) assert.equal((await handler['software.repo_work']({ repo }, ctx)).answer.repo.id, 'repo');
-  await assert.rejects(handler['software.repo_work']({}, ctx), /repo_work needs "repo".*Repositories here: Aperture repo \(repo\)/);
+  for (const repo of ['repo', 'acme/apex', 'apex repo']) assert.equal((await handler['software.repo_work']({ repo }, ctx)).answer.repo.id, 'repo');
+  await assert.rejects(handler['software.repo_work']({}, ctx), /repo_work needs "repo".*Repositories here: Apex repo \(repo\)/);
 });
 
 test('a repository’s work is split by what blocks it, due first, and its last push is a push to a branch', async () => {

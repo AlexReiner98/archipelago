@@ -52,14 +52,14 @@ test('a document shared with another workspace is read there once accepted, and 
   assert.ok((await api(theirs, 'view', { name: 'notifications' })).some((n: any) => n.title === '"Proposal for Acme" was shared with this workspace'));
   await assert.rejects(api(theirs, 'document', { id: offer.id }), /accept it to read it here/);
   // Everyone there sees it, until someone there makes it private.
-  const mani = (await api(theirs, 'token_create', { kind: 'human', name: 'mani' })).token;
-  assert.deepEqual((await api(mani, 'search', { type: 'sys.shared_document' })).map((s: any) => s.id), [offer.id]);
+  const rosa = (await api(theirs, 'token_create', { kind: 'human', name: 'rosa' })).token;
+  assert.deepEqual((await api(rosa, 'search', { type: 'sys.shared_document' })).map((s: any) => s.id), [offer.id]);
 
   await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: offer.id, status: 'accepted' }] });
   const read = await api(theirs, 'document', { id: offer.id });
   assert.equal(read.title, 'Proposal for Acme');
   assert.equal(read.from, 'default');
-  assert.equal((await api(mani, 'document', { id: offer.id })).title, 'Proposal for Acme');
+  assert.equal((await api(rosa, 'document', { id: offer.id })).title, 'Proposal for Acme');
   const section = read.parts.find((p: any) => p.section).section;
   assert.deepEqual([section.id, section.title, section.body, section.via, section.picture], [made.s, 'Costs', 'Twenty an hour.', offer.id, true]);
   assert.ok(!JSON.stringify(read).includes(made.x), 'an item the document does not bring in is not named');

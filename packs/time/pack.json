@@ -75,7 +75,7 @@
         "currency": { "type": "string", "description": "Currency billed in, e.g. CAD." },
         "terms_days": { "type": "number", "description": "Days until an invoice is due." },
         "hst": { "type": "boolean", "description": "Whether 13% HST is charged to this client." },
-        "billed_by": { "type": "string", "description": "Id of the company or person who bills this client, e.g. Aperture Design Tools Inc." },
+        "billed_by": { "type": "string", "description": "Id of the company or person who bills this client, e.g. your own company." },
         "address": { "type": "string", "description": "Postal address, for invoices." },
         "email": { "type": "string", "description": "Where invoices go." },
         "hst_number": { "type": "string", "description": "Its own HST number, when it bills." },

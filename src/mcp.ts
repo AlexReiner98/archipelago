@@ -16,7 +16,7 @@ import type { Actor, Archipelago } from './pelago.ts';
 import { callTool, devMode, toolsFor, type Tool } from './tools.ts';
 
 const actorField = {
-  actor: z.string().optional().describe('Who you are, e.g. "claude-code:aperture". Recorded against everything you do.'),
+  actor: z.string().optional().describe('Who you are, e.g. "claude-code:my-project". Recorded against everything you do.'),
 };
 
 /**

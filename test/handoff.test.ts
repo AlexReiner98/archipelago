@@ -21,10 +21,10 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   assert.match(bare.how, new RegExp(`^Nobody has written a handoff note for this repository\\. To write the first, create a software\\.handoff and link it software\\.lives_in to ${made.repo}`));
   assert.deepEqual(bare.open.ready.map((i: any) => i.title).sort(), ['Capture probe', 'Write unit tests']);
   assert.deepEqual(bare.open.blocked.map((i: any) => [i.title, i.waiting_on]), [['Tune the solver', ['Which target?']]]);
-  assert.match(await hookSessionStart(l, { session_id: 'h0', cwd: 'C:\\code\\Aperture' }), /Where things stand: view "handoff" with repo e_\w+\. Nobody has written a handoff note here/);
+  assert.match(await hookSessionStart(l, { session_id: 'h0', cwd: 'C:\\code\\Apex' }), /Where things stand: view "handoff" with repo e_\w+\. Nobody has written a handoff note here/);
 
   const { note } = await make(l, [
-    { op: 'create', ref: 'note', type: 'software.handoff', title: 'Aperture handoff', body: 'Not seen\nThe probe has not been run on a real model.' },
+    { op: 'create', ref: 'note', type: 'software.handoff', title: 'Apex handoff', body: 'Not seen\nThe probe has not been run on a real model.' },
     { op: 'link', type: 'part_of', from: 'note', to: made.proj },
   ]);
   // Everything from here on happened after the note was written.
@@ -38,7 +38,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   ]);
   await hookSessionEnd(l, { session_id: 'h0', reason: 'exit' });
 
-  const stand = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: 'aperture repo' } })) as any;
+  const stand = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: 'apex repo' } })) as any;
   assert.deepEqual([stand.note.id, stand.note.body], [note, 'Not seen\nThe probe has not been run on a real model.']);
   assert.match(stand.how, /^Everything but the note/);
   assert.equal(stand.note.characters, stand.note.body.length);
@@ -59,7 +59,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   assert.deepEqual(stand.since_then.sessions.map((s: any) => [s.status, /^finished: Session ended \(exit\)/.test(s.said) || /Not reconciled/.test(s.said)]), [['finished', true]]);
   assert.ok(!stand.open.ready.some((i: any) => i.title === 'Write unit tests'), 'what is open is as the map has it now, whatever the note says');
   // The next session is told how far the note is behind.
-  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: 'C:\\code\\Aperture' }), /Its note, "Aperture handoff" \(e_\w+\), was written \d{4}-\d\d-\d\d; since then: 1 push, 1 item settled, 1 item opened, 1 session ended\./);
+  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: 'C:\\code\\Apex' }), /Its note, "Apex handoff" \(e_\w+\), was written \d{4}-\d\d-\d\d; since then: 1 push, 1 item settled, 1 item opened, 1 session ended\./);
   // Counted from another moment when asked.
   assert.equal(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() } })) as any).since_then.settled.length, 0);
 
