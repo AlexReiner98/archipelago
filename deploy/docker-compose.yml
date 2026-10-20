@@ -45,6 +45,8 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+      # Staging, for the laptop over WireGuard only.
+      - "10.66.0.1:3200:3200"
     environment:
       PELAGO_SITE: ${PELAGO_SITE:?set PELAGO_SITE in .env}
       PELAGO_TLS: ${PELAGO_TLS:-internal}
@@ -67,6 +69,22 @@ services:
   app-green:
     <<: *app
     profiles: ["green"]
+
+  # A branch on a fresh copy of live (pelago_staging), for the laptop only: Caddy answers https://10.66.0.1:3200 and
+  # passes to it. deploy/staging.sh builds the image and starts it. It has no sealing key and no model, backup or
+  # GitHub settings, so it acts on nothing outside.
+  staging:
+    image: archipelago-staging:latest
+    profiles: ["staging"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PELAGO_COMMIT: ${STAGING_COMMIT:-}
+      PELAGO_DATABASE_URL: postgres://pelago:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/pelago_staging
+      PELAGO_PUBLIC_HOST: 10.66.0.1:3200
+    mem_limit: 512m
 
   # Every WAL segment goes to pgBackRest as Postgres closes it (at least once a minute), so the map can be put back to
   # any minute: repo1 is a volume on this host, repo2 (when its bucket is set in .env) OVH Object Storage in
