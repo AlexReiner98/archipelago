@@ -1,7 +1,7 @@
 // The pelago web UI. No framework and no build step: it calls the same tools as the CLI through /api/<tool>.
 // Each page part is its own module; this one routes between them.
 
-import { SignInNeeded, h, hooks, main, part, showIdentity, signIn, state, store } from './base.js';
+import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
 import { newEntity } from './forms.js';
 import { home } from './home.js';
 import { entity } from './item.js';
@@ -30,6 +30,7 @@ async function route(pulse = false) {
   const [, name = 'home', arg] = where.split('/');
   // Addresses that have been folded into another screen still lead somewhere.
   // Changes is gone: what is held for the owner is on Home; what changed is each item's history.
+  if (name === 'join' && arg) return join(arg);
   if (name === 'activity' || name === 'review') return void (location.hash = '#/home');
   // The app opens on Home: each project's questions and its next release.
   if (name === 'projects' || name === 'today') return void (location.hash = '#/home');

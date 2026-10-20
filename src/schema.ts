@@ -397,3 +397,16 @@ alter table token add column if not exists within jsonb;
 alter table token add column if not exists may text default 'change';
 update token set within = repos where repos is not null and within is null;
 `;
+
+/** Members, each by an email address (src/members.ts): step 6. Only the whole database reads it. */
+export const MEMBER = `
+create table if not exists member (
+  email      text primary key,
+  person_id  text not null,
+  admin      boolean not null default false,
+  added_at   timestamptz not null default now(),
+  added_by   text,
+  removed_at timestamptz
+);
+alter table member enable row level security;
+`;

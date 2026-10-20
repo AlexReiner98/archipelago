@@ -1,6 +1,8 @@
 // The page itself: how it is drawn (h), how it asks (ask, tell), how it calls the server (api) and who it is signed in as.
 // What more than one module writes is kept on `state`; `route` is the router, set by app.js.
 
+import { applyTheme } from './theme.js';
+
 export const state = { schema: undefined, pulse: undefined, dirty: false, selfDrawn: false };
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
@@ -142,8 +144,19 @@ export async function api(tool, input = {}) {
 }
 
 export function signIn(message) {
+  // Signed out, the style is not read with the rest: its colours are asked for on their own.
+  fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
+  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'email' });
   const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'off' });
   const error = h('div', { class: 'error', style: 'padding: 0 var(--space-8) var(--space-8)' }, message ?? '');
+  const byEmail = h('div', { class: 'toolbar', style: 'padding: var(--space-8)' });
+  const sendLink = async () => {
+    const res = await fetch('/connect/sign-in', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.value.trim() }) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return (error.textContent = body.error ?? 'That did not work.');
+    error.textContent = '';
+    byEmail.replaceChildren(h('span', { class: 'muted' }, `If ${body.sent_to} is a member here, a sign-in link is on its way to it.`));
+  };
   const submit = async () => {
     store.token = input.value.trim();
     const res = await fetch('/whoami', { headers: authHeaders() });
@@ -154,21 +167,34 @@ export function signIn(message) {
     state.schema = undefined;
     route();
   };
+  email.addEventListener('keydown', (e) => e.key === 'Enter' && sendLink());
   input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  byEmail.replaceChildren(email, h('button', { class: 'primary', onclick: sendLink }, 'Email me a link'));
   const others = Object.entries(known.all());
   document.querySelector('#nav .brand').replaceChildren('Archipelago');
   document.title = 'Archipelago';
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Sign in'), h('p', { class: 'muted' }, 'This server asks for a token. It decides which workspace you see and what you may do.')),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Sign in')),
     h(
       'section',
       { class: 'card', style: 'max-width: var(--card-most)' },
       others.length > 0 && h('div', { class: 'toolbar', style: 'padding: var(--space-8) var(--space-8) 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
-      h('div', { class: 'toolbar', style: 'padding: var(--space-8)' }, input, h('button', { class: 'primary', onclick: submit }, 'Sign in')),
+      byEmail,
+      h('details', { class: 'fold-bar' }, h('summary', { class: 'muted small', title: 'For an agent, or a workspace’s first sign-in' }, 'With a token'), h('div', { class: 'toolbar fold-bar' }, input, h('button', { onclick: submit }, 'Sign in'))),
       error,
     ),
   );
-  input.focus();
+  email.focus();
+}
+
+/** Open a sign-in link: its code is traded once for this person's token, which the browser keeps. */
+export async function join(code) {
+  // The code leaves the address at once: it is not left in the history for the next person at this machine.
+  history.replaceState(null, '', '#/');
+  const res = await fetch('/connect/join', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return signIn(body.error ?? 'That sign-in link did not work.');
+  enter(body.token);
 }
 
 export async function showIdentity() {
