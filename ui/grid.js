@@ -1,10 +1,10 @@
 // A lens answer drawn as a grid.
 
 import { h } from './base.js';
-import { lensTree, litCount } from './lens-base.js';
+import { lensTree, litCount, sizeOf } from './lens-base.js';
 import { relations, types } from './words.js';
 
-/** The colours a grid gives the values of the field it colours by, in the order the field declares them, when the style names none. */
+/** The Time page's colours for projects, until pages are styled too (phase 2 of "Where does style live?"); a grid and a calendar take the style's hues. */
 export const GRID_HUES = ['#2e7d4f', '#2f5fb3', '#a86a12', '#6f43b0', '#59636e', '#0f7c86', '#b23a48', '#7a6a1c'];
 /** A stored value as a person reads it: "set_up" is "Set up". */
 export const inWords = (value) => (value == null ? 'Unfiled' : String(value).charAt(0).toUpperCase() + String(value).slice(1).replaceAll('_', ' '));
@@ -59,7 +59,8 @@ export function drawGrid(host, answer, style, keep, kept) {
     const named = palette[value];
     if (typeof named === 'string' && /^#[0-9a-f]{3,8}$/i.test(named)) return named;
     const at = declared.indexOf(value);
-    return GRID_HUES[(at < 0 ? declared.length + [...String(value)].length : at) % GRID_HUES.length];
+    const hues = style.hues;
+    return hues[(at < 0 ? declared.length + [...String(value)].length : at) % hues.length];
   };
   const detail = typeof style.detail === 'string' ? style.detail : null;
   const markField = typeof style.mark === 'string' ? style.mark : null;
@@ -88,7 +89,8 @@ export function drawGrid(host, answer, style, keep, kept) {
     return el;
   };
 
-  const grid = h('div', { class: 'lg-grid', style: `grid-template-columns: minmax(120px, 0.7fr) repeat(${lanes.length}, minmax(170px, 1fr)); min-width: ${120 + lanes.length * 176}px` });
+  const [head, lane, gap] = [sizeOf(style, 'grid_row_head'), sizeOf(style, 'grid_lane'), sizeOf(style, 'grid_gap')];
+  const grid = h('div', { class: 'lg-grid', style: `grid-template-columns: minmax(${head}px, 0.7fr) repeat(${lanes.length}, minmax(${lane}px, 1fr)); min-width: ${head + lanes.length * (lane + gap)}px` });
   grid.append(h('div', { class: 'lg-corner' }), ...lanes.map((lane) => h('div', { class: 'lg-lane' }, name(lane))));
   for (const row of rows) {
     grid.append(

@@ -9,21 +9,41 @@ export const LIT = [
   ['blocked', 'Blocked', 'Only what is blocked stays lit'],
 ];
 
-/** A style's colours and sizes, by the name the stylesheet knows each by, with the range a size may take. */
-export const STYLE_COLORS = ['sea', 'land', 'inner', 'line', 'text', 'muted', 'blocked', 'you', 'session', 'done'];
-export const STYLE_SIZES = { text: [9, 22], radius: [0, 40], gap: [0, 40], column: [140, 640] };
-/** A style's colours and sizes are handed to the stylesheet. Only a plain hex colour or a number in range is: a style is written by anyone who can change the map. */
+/** A style's colours, by the name the stylesheet knows each by. */
+export const STYLE_COLORS = ['sea', 'land', 'inner', 'line', 'text', 'muted', 'blocked', 'you', 'session', 'done', 'warn'];
+/** The sizes a style names at its top, and the stylesheet's name for each. */
+const TOP_SIZES = ['text', 'radius', 'gap', 'column'];
+/** A length as a style may give it: a number of pixels, or a number with one of these units. */
+const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?)*$/;
+const NAME = /^[a-z][a-z0-9_]*$/;
+const asLength = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? `${v}px` : typeof v === 'string' && LENGTH.test(v) ? v : null);
+/**
+ * A style's colours, sizes and numbers, handed to the stylesheet as --ln-<name>. Only a plain hex colour, a length
+ * or a number is: a style is written by anyone who can change the map. What the style does not say is not set: the
+ * values are the presets' (each pack's styles), never the kernel's.
+ */
 export function dress(host, style) {
-  for (const name of STYLE_COLORS) {
-    const colour = style.colors?.[name];
-    if (typeof colour === 'string' && /^#[0-9a-f]{3,8}$/i.test(colour)) host.style.setProperty(`--ln-${name}`, colour);
-    else host.style.removeProperty(`--ln-${name}`);
-  }
-  for (const [name, [least, most]] of Object.entries(STYLE_SIZES)) {
-    if (Number.isFinite(style[name])) host.style.setProperty(`--ln-${name}-size`, `${Math.max(least, Math.min(most, style[name]))}px`);
-    else host.style.removeProperty(`--ln-${name}-size`);
-  }
+  const set = new Map();
+  for (const name of STYLE_COLORS) if (typeof style.colors?.[name] === 'string' && /^#[0-9a-f]{3,8}$/i.test(style.colors[name])) set.set(`--ln-${name}`, style.colors[name]);
+  for (const name of TOP_SIZES) if (asLength(style[name])) set.set(`--ln-${name}-size`, asLength(style[name]));
+  for (const [name, value] of Object.entries(style.sizes ?? {})) if (NAME.test(name) && asLength(value)) set.set(`--ln-${name.replaceAll('_', '-')}`, asLength(value));
+  for (const [name, value] of Object.entries(style.numbers ?? {})) if (NAME.test(name) && Number.isFinite(value)) set.set(`--ln-${name.replaceAll('_', '-')}`, String(value));
+  if (typeof style.font === 'string' && !/[;{}]/.test(style.font)) set.set('--ln-font', style.font);
+  for (const name of [...host.style].filter((n) => n.startsWith('--ln-') && !set.has(n))) host.style.removeProperty(name);
+  for (const [name, value] of set) host.style.setProperty(name, value);
 }
+/** A size a drawing's code lays out by, in pixels: the style's, named by the house style. */
+export const sizeOf = (style, name) => {
+  const v = style.sizes?.[name];
+  if (typeof v !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+  return v;
+};
+/** A number a drawing's code is drawn by: the style's, named by the house style. */
+export const numberOf = (style, name) => {
+  const v = style.numbers?.[name];
+  if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+  return v;
+};
 
 /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it: the same numbers at every depth. */
 export function lensTree(answer) {

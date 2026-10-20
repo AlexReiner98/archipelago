@@ -61,7 +61,9 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk): Pro
   }
   layers.sort((a, b) => a.weight - b.weight);
   const style: Record<string, unknown> = {};
-  for (const layer of layers) Object.assign(style, fields(layer.props));
+  // A field that names things (sizes, numbers, colours, a palette) is merged name by name: a nearer style that sets one size keeps the rest.
+  const named = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+  for (const layer of layers) for (const [key, value] of Object.entries(fields(layer.props))) style[key] = named(value) && named(style[key]) ? { ...style[key], ...value } : value;
   return { style, used: layers.map(({ id, title, preset }) => ({ id, title, ...(preset && { preset }) })) };
 }
 

@@ -8,14 +8,22 @@
 const FLOW = new Set(['depends_on']);
 /** Past this many steps the layer search and the sifting are skipped: they grow with the square of the steps. */
 export const LARGE = 60;
-/** A step that this many plain steps lead into has them as checklists. */
-export const FOLD_AT = 4;
-/** A checklist: its head, and a row for each thing in it. */
-export const LIST_HEAD = 28, LIST_ROW = 20;
-const LAYER_GAP = 84, NODE_GAP = 16, MARGIN = 24, MAX_TEXT = 140, TRACK = 8, SLOT = 9, LEAD_OUT = 12, LEAD_IN = 22;
 
-/** The steps (each with its place x, y and size w, h), the wires (each with its points), the breaks and the whole size. */
-export function layout({ items, links, rootId, measure }) {
+/**
+ * The steps (each with its place x, y and size w, h), the wires (each with its points), the breaks and the whole size.
+ * Every length and count it lays out by is the style's (`sizes` and `numbers`, flow_*): the house style in
+ * packs/core/pack.json names each, and a nearer style may change any.
+ */
+export function layout({ items, links, rootId, measure, sizes, numbers }) {
+  const need = (set, name) => {
+    if (typeof set?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every one the flow lays out by`);
+    return set[name];
+  };
+  const [LAYER_GAP, NODE_GAP, MARGIN, MAX_TEXT, TRACK, SLOT, LEAD_OUT, LEAD_IN] = ['flow_layer_gap', 'flow_node_gap', 'flow_margin', 'flow_max_text', 'flow_track', 'flow_slot', 'flow_lead_out', 'flow_lead_in'].map((n) => need(sizes, n));
+  const [LIST_HEAD, LIST_ROW, LIST_PAD, LIST_TEXT_MORE] = ['flow_list_head', 'flow_list_row', 'flow_list_pad', 'flow_list_text_more'].map((n) => need(sizes, n));
+  const [TEXT, STUB_TEXT, ROW_TEXT] = ['flow_text', 'flow_stub_text', 'flow_row_text'].map((n) => need(sizes, n));
+  const [DIAMOND_PAD, DIAMOND_H, END_PAD, END_H, BOX_PAD, BOX_H, SHEET_H] = ['flow_diamond_pad', 'flow_diamond_height', 'flow_end_pad', 'flow_end_height', 'flow_box_pad', 'flow_box_height', 'flow_sheet_height'].map((n) => need(sizes, n));
+  const FOLD_AT = need(numbers, 'flow_fold_at');
   // ---- Steps: everything in the picture; the item it is of too, when it is a step of the process (a release that
   // waits on the work before it), not only what holds it (a project).
   const shapeOf = (i) => (i.kind === 'question' ? 'diamond' : i.kind === 'occurrence' ? 'pill' : i.kind === 'record' ? 'sheet' : 'box');
@@ -96,11 +104,11 @@ export function layout({ items, links, rootId, measure }) {
 
   // ---- Sizes.
   for (const n of nodes.values()) {
-    const text = Math.min(measure(n.item.title, n.stub ? 12 : 13), MAX_TEXT);
-    if (n.shape === 'diamond') [n.w, n.h] = [text + 96, 60];
-    else if (n.shape === 'end') [n.w, n.h] = [text + 30, 30];
-    else if (n.shape === 'list') [n.w, n.h] = [Math.max(...n.list.map((i) => Math.min(measure(i.title, 12), MAX_TEXT + 40))) + 40, LIST_HEAD + n.list.length * LIST_ROW + 6];
-    else [n.w, n.h] = [text + 42, n.shape === 'sheet' ? 40 : 34];
+    const text = Math.min(measure(n.item.title, n.stub ? STUB_TEXT : TEXT), MAX_TEXT);
+    if (n.shape === 'diamond') [n.w, n.h] = [text + DIAMOND_PAD, DIAMOND_H];
+    else if (n.shape === 'end') [n.w, n.h] = [text + END_PAD, END_H];
+    else if (n.shape === 'list') [n.w, n.h] = [Math.max(...n.list.map((i) => Math.min(measure(i.title, ROW_TEXT), MAX_TEXT + LIST_TEXT_MORE))) + LIST_TEXT_MORE, LIST_HEAD + n.list.length * LIST_ROW + LIST_PAD];
+    else [n.w, n.h] = [text + BOX_PAD, n.shape === 'sheet' ? SHEET_H : BOX_H];
   }
 
   // ---- Layers: each step one below the lowest it follows, to start with.

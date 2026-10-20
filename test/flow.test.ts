@@ -3,6 +3,8 @@
 // and wires cross only where they must.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the UI, with no types of its own.
 import { layout, LARGE } from '../ui/flow-layout.js';
@@ -12,7 +14,9 @@ const item = (id: string, kind = 'work', extra: Record<string, unknown> = {}) =>
 /** b depends on a: a leads to b. */
 const dep = (b: string, a: string, says?: string) => ({ kind: 'depends_on', from: b, to: a, ...(says && { says }) });
 const measure = (text: string, px: number) => text.length * px * 0.55;
-const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, rootId: 'r', measure });
+// Laid out by the house style's lengths, as the page lays it out (packs/core/pack.json).
+const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, rootId: 'r', measure, sizes: house.sizes, numbers: house.numbers });
 
 function checks(g: any) {
   const steps = g.all.filter((n: any) => !n.dummy);

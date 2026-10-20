@@ -231,11 +231,10 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: 4px; }
 .rm-node .track { fill: var(--closed-soft); }
 .rm-node .fill { fill: var(--ok); }
 .rm-node .flag { fill: var(--g-blocked); }
-/* A lens, drawn in a style. What a style may change is a variable here: its colours and sizes come from the page (dress in app.js). */
+/* A lens, drawn in a style. Its sizes are the style's, set by dress (ui/lens-base.js) from the house style; its colours follow the page's until they are presets too. */
 .lens-view {
   --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
-  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok);
-  --ln-text-size: 13px; --ln-radius-size: 8px; --ln-gap-size: 8px; --ln-column-size: 270px;
+  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn);
 }
 .lens-card { overflow: hidden; }
 .lens-bar { padding: 10px 14px 0; flex-wrap: wrap; min-width: 0; }

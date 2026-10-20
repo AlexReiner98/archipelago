@@ -3,6 +3,8 @@
 // every wire turns only at right angles, and health and wire states are read from statuses and links alone.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the UI, with no types of its own.
 import { health, layout, wireState } from '../ui/arch-layout.js';
@@ -12,7 +14,9 @@ const item = (id: string, inside = 'r', status = 'up', extra: Record<string, unk
 /** a calls b. */
 const call = (a: string, b: string, extra: Record<string, unknown> = {}) => ({ kind: 'depends_on', from: a, to: b, ...extra });
 const measure = (text: string, px: number) => text.length * px * 0.55;
-const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure });
+// Laid out by the house style's lengths, as the page lays it out (packs/core/pack.json).
+const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure, sizes: house.sizes });
 
 function checks(g: any) {
   const parts = g.all.filter((n: any) => !n.dummy);
