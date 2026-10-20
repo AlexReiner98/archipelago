@@ -38,7 +38,8 @@ export function drawTable(t, cell) {
   );
 }
 
-export function renderBody(text) {
+/** `whole`: for a document, the one place meant to be read through: every section open, its title a heading. */
+export function renderBody(text, { whole = false } = {}) {
   const heading = (line) => /^[A-Z0-9][A-Z0-9 ,'()\/&-]{2,60}:?$/.test(line.trim()) && /[A-Z]{3}/.test(line);
   const item = (line) => /^\s*(-|\*|\d+\.|[A-Z]\.)\s+/.exec(line);
   const sections = [{ title: null, lines: [] }];
@@ -101,11 +102,15 @@ export function renderBody(text) {
     const rest = long ? [first, ...more] : more;
     return [start, rest.length > 0 && h('details', { class: 'section' }, h('summary', {}, 'More'), rest)];
   };
+  const part = (sec) =>
+    whole
+      ? [sec.title && h('h4', { class: 'part-title' }, sentence(sec.title)), blocks(sec.lines)]
+      : sec.title
+        ? h('details', { class: 'section' }, h('summary', { title: sec.title }, sentence(sec.title)), blocks(sec.lines))
+        : opening(sec.lines);
   return h(
     'div',
-    { class: 'body-text' },
-    sections
-      .filter((sec) => sec.title || sec.lines.some((l) => l.trim()))
-      .map((sec) => (sec.title ? h('details', { class: 'section' }, h('summary', { title: sec.title }, sentence(sec.title)), blocks(sec.lines)) : opening(sec.lines))),
+    { class: whole ? 'body-text whole' : 'body-text' },
+    sections.filter((sec) => sec.title || sec.lines.some((l) => l.trim())).map(part),
   );
 }

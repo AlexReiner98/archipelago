@@ -9,6 +9,7 @@ import type { Archipelago } from './pelago.ts';
 import { placeAll, readAxis, zoneOf, type TimeAxis } from './timeaxis.ts';
 import { blockGraph } from './blocking.ts';
 import { hubs, keptOf, type Kept } from './lens-kept.ts';
+import { styleFor } from './styles.ts';
 import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
 
 // Kept where they were first imported from.
@@ -225,11 +226,9 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   // What the story is about, in the order it came to them; and for each, the beats that are about it.
   const about = told ? [...new Set(told.beats.flatMap((b) => b.about))] : [];
   const beatsOf = (id: string) => (told ? told.beats.filter((b) => b.about.includes(id)).map((b) => b.n) : []);
-  // A style is passed on as it is kept: only the page that draws reads it. The workspace's, then the item's, then this view's, then one named.
-  const weight = (one: Kept) => (one.id === input.style ? 3 : view && one.about.includes(view.id) ? 2 : hub !== undefined && one.about.includes(hub) ? 1 : one.about.length ? -1 : 0);
-  const drawn = styles.filter((one) => weight(one) >= 0).sort((a, b) => weight(a) - weight(b));
-  const style: Record<string, unknown> = {};
-  for (const one of drawn) for (const [key, value] of Object.entries(one.props)) if (value != null) style[key] = value;
+  // A style is passed on as it is kept: only the page that draws reads it. The packs' presets, then the workspace's, the item's kind's, the item's, this view's, one named.
+  const hubType = hub === undefined ? undefined : all.get(hub)?.type;
+  const { style, used: drawn } = await styleFor(l, styles, { ...(hubType && { hub: { id: hub!, type: hubType } }), ...(view && { view: view.id }), named: input.style });
   // What holds an item is drawn as a flow, whatever the item's own pictures are drawn as.
   if (holding) (delete style.code, (style.shape = 'flow'));
   // And when things happen, as a calendar of days, each person a lane.
@@ -438,7 +437,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     lens: asked,
     style,
     // Which lenses and styles kept on the map went into those two, the one that weighs most last.
-    kept: { lens: read.map(({ id, title }) => ({ id, title })), style: drawn.map(({ id, title }) => ({ id, title })) },
+    kept: { lens: read.map(({ id, title }) => ({ id, title })), style: drawn },
     // The lens in words: the rule a person reads on the page and an agent reads here.
     said: holding ? `What "${all.get(hub!)?.title}" waits on, step by step` : when ? `When what is in "${all.get(hub!)?.title}" happens, by day and by person` : sayLens(l, asked, told ? told.title : asked.from ? all.get(asked.from)?.title : undefined),
     // The lenses that can be chosen for this picture, in order, and which this is. One that starts somewhere else is a shortcut to there.

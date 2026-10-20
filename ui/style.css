@@ -82,14 +82,15 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .fold-bar { padding: 10px 14px 0; }
 .fold-bar.usage-sums { padding-bottom: 10px; border-bottom: 1px solid var(--line); gap: 18px; }
 .fold-bar .switch button { padding: 3px 10px; font-size: 12.5px; }
-/* A document: its own text, and each item it brings in as a section, one line until it is opened. */
-.note.doc details.doc-section { border-top: 1px solid var(--line); }
-.note.doc details.doc-section > summary { display: flex; align-items: center; gap: 8px; padding: 9px 0; cursor: pointer; list-style: none; white-space: nowrap; }
-.note.doc details.doc-section > summary > .grow { overflow: hidden; text-overflow: ellipsis; }
-.note.doc details.doc-section > summary::-webkit-details-marker { display: none; }
-.note.doc details.doc-section > summary::before { content: "\25B8"; color: var(--muted); }
-.note.doc details.doc-section[open] > summary::before { content: "\25BE"; }
-.note.doc details.doc-section[open] { padding-bottom: 8px; }
+/* A document, read through as one piece: each item it brings in is its title as a heading and its note whole, and a
+   picture sits where it falls with its note as the caption. The one page meant to be read through. */
+.note.doc { padding: 6px 0 10px; }
+.note.doc .body-text { padding-top: 6px; padding-bottom: 0; }
+.note.doc h3.doc-head { margin: 22px 14px 2px; font-size: 17px; line-height: 1.3; max-width: 72ch; }
+.note.doc h3.doc-head a { color: var(--text); text-decoration: none; }
+.note.doc h3.doc-head a:hover { color: var(--accent); text-decoration: underline; }
+.body-text.whole h4.part-title { margin: 14px 0 4px; font-size: 14px; }
+.body-text.whole h4.part-title:first-child { margin-top: 0; }
 /* Where an item sits: one line under its title, each step a link up, with the views kept about it as small chips. */
 .page-head .trail { display: flex; align-items: center; gap: 6px; flex-basis: 100%; width: 100%; margin-top: 4px; font-size: 13px; white-space: nowrap; overflow: hidden; color: var(--muted); }
 .page-head .trail-step { color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -104,10 +105,9 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .page-head a.deliverable { text-decoration: none; }
 .page-head a.deliverable:hover { border-color: var(--accent); }
 .note > img.figure { display: block; margin: 14px 14px 4px; max-width: calc(100% - 28px); border: 1px solid var(--line); border-radius: 6px; background: #fff; }
-.note.doc section.doc-lens { border-top: 1px solid var(--line); padding: 8px 0 10px; }
-.note.doc .doc-lens-head { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; white-space: nowrap; overflow: hidden; }
-.note.doc .doc-lens-head a { overflow: hidden; text-overflow: ellipsis; }
-.note.doc .doc-lens .lens-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+.note.doc figure.doc-lens { margin: 0; }
+.note.doc .doc-lens .lens-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 8px 14px 0; }
+.note.doc .doc-lens figcaption .body-text { color: var(--muted); font-size: 13px; }
 .body-text table.text-table { border-collapse: collapse; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
 .body-text table.text-table th { padding: 4px 10px 4px 0; color: var(--muted); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--line); }
 .body-text table.text-table td { padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line); }

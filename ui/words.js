@@ -149,8 +149,9 @@ export const named = (id) => titles.get(id) ?? id;
 export const idsAsLinks = (text) => {
   const out = [];
   let from = 0;
-  for (const m of text.matchAll(/\be_[a-z0-9]{8}\b/g)) {
-    out.push(text.slice(from, m.index), h('a', { href: `#/e/${m[0]}`, title: 'Open it' }, titles.get(m[0]) ?? 'this item'));
+  // An item's id is a way to it; a source written [its name](its address) is its name, opening the address.
+  for (const m of text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|\be_[a-z0-9]{8}\b/g)) {
+    out.push(text.slice(from, m.index), m[1] ? h('a', { href: m[2], target: '_blank', rel: 'noopener noreferrer', title: m[2] }, m[1]) : h('a', { href: `#/e/${m[0]}`, title: 'Open it' }, titles.get(m[0]) ?? 'this item'));
     from = m.index + m[0].length;
   }
   return [...out, text.slice(from)];

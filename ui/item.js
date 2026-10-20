@@ -224,7 +224,8 @@ export async function entity(id, here) {
     ties.editor,
     acting,
     // Where it sits and what it holds, as a picture: the lens and the style kept for it, or the ones every item opens on. It takes no room when there is nothing to draw.
-    ...(story ? [storyPart(story)].flat() : [h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true }))]),
+    // A document is that picture itself: what it holds is in its text, in the order it is read.
+    ...(story ? [storyPart(story)].flat() : doc ? [] : [h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true }))]),
     // What it holds up and what holds it, said outright: a picture places them, these say which way the tie runs.
     (holding.length + heldBy.length > 0 || '') &&
       h('div', { class: 'grid', style: 'margin-bottom: 14px' }, holding.length > 0 && fold(id, 'holding', 'Waiting on this', holding.length, true, tieRows(holding)), heldBy.length > 0 && fold(id, 'held', 'This waits on', heldBy.length, true, tieRows(heldBy))),

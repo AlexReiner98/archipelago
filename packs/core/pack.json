@@ -158,7 +158,7 @@
       "id": "style",
       "tier": "system",
       "title": "Style",
-      "description": "How a picture of the map is drawn. About a project or item, it is how that thing's picture looks; about nothing, the workspace's. A field left empty comes from the level above. Read only by the page that draws.",
+      "description": "How a picture of the map is drawn, and how a page looks. About a project or item, it is how that thing's picture looks; on kinds or types (on), how every such item's pictures and pages look; about nothing, the workspace's. A field left empty comes from the level below: the workspace's, then a kind's, then the item's, then the view's. The defaults are styles too: a pack ships them as presets, and one kept on the map with the preset's id (preset) is the owner's version of it, its fields over the preset's; retired, the preset is not used. Read only by the page that draws.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "shape": { "type": "enum", "values": ["list", "flow", "grid", "time", "architecture"], "description": "One of the drawings that come built in, used when the style has no code of its own. architecture: a system read from the top down, each part a box (a store a cylinder, a client a pill) inside a box for the place it is part of (a host, a cloud), wires at right angles from a part to what it depends on or calls, each labelled with what the link says; a dot for each part's health (read from its status: up, degraded, down, being wired, planned), and each wire wired, not yet wired (dashed) or broken (red), by the link's own state or else by its two ends. list: a table, one line a row, its marks in columns; a thing that holds others a group that folds. grid: rows by what the start holds, columns by the lens's lanes, each thing a card; no lines are drawn. time: along a time axis (the lens's time), as a calendar of days with hours down (layout: calendar) or as bars across days (layout: bars, a Gantt chart), each lane a row; the one a lens on a time axis is drawn in unless said. flow: a process map read from the top down, each item a step (work a box, a question a diamond, an occurrence a pill, a record a sheet), wires at right angles from what is depended on to what depends on it, an open question's choices as dashed scenarios. Any other look is code of its own. list unless said." },
@@ -178,7 +178,9 @@
         "labels": { "type": "json", "description": "grid: what a lane or a value is called, e.g. {\"set_up\": \"Set up\"}. Not named, it is the value in words." },
         "detail": { "type": "string", "description": "grid: the shown field written on each card's second line, e.g. amount." },
         "mark": { "type": "string", "description": "grid: the shown date field marked on a card, with the field <name>_note before it when there is one, e.g. deadline." },
-        "code": { "type": "string", "description": "The drawing itself, as a JavaScript module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the lens view answered; style is this style's other fields; theme is the page's colours (sea, land, inner, line, text, muted, blocked, you, session, done) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl }) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer. With code, shape is not used." }
+        "code": { "type": "string", "description": "The drawing itself, as a JavaScript module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the lens view answered; style is this style's other fields; theme is the page's colours (sea, land, inner, line, text, muted, blocked, you, session, done) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl }) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer. With code, shape is not used." },
+        "on": { "type": "json", "description": "The kinds or types whose pictures and pages it is for, as a list. Left empty, it is about what it is linked to by about, or the whole workspace." },
+        "preset": { "type": "string", "description": "The id of the pack's style this is the owner's version of.", "system": true }
       }
     },
     {
@@ -195,6 +197,9 @@
         "preset": { "type": "string", "description": "The id of the pack's screen this is the owner's version of.", "system": true }
       }
     }
+  ],
+  "styles": [
+    { "id": "core.house", "title": "House style", "props": { "shape": "list", "lit": "all" } }
   ],
   "screens": [
     {

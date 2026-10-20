@@ -2,6 +2,7 @@
 
 import { api, ask, authHeaders, h, part, tell } from './base.js';
 import { screensCard } from './nav.js';
+import { stylesCard } from './styles-card.js';
 import { packsCard } from './packs.js';
 import { ago, when } from './words.js';
 import { scopePills } from './token-piece.js';
@@ -15,7 +16,7 @@ export async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace)),
+      h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace), stylesCard(workspace)),
     );
   }
   const [info, tokens, people] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 })]);
@@ -67,6 +68,7 @@ export async function workspace() {
       me.actor.admin && backupCard(workspace),
       me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
       me.actor.admin && screensCard(workspace),
+      me.actor.admin && stylesCard(workspace),
       h(
         'section',
         { class: 'card wide' },
