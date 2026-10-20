@@ -8,7 +8,7 @@ import { entity } from './item.js';
 import { graph } from './atlas.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
-import { map, mapState, searchBar } from './search.js';
+import { map, searchBar, searchHref } from './search.js';
 import { loadSchema } from './words.js';
 import { workspace } from './workspace.js';
 
@@ -36,7 +36,7 @@ async function route(pulse = false) {
   // Automations are found like any other kind of item.
   // The graph around an item is its relations, drawn further out, on its own page.
   if (name === 'graph' && arg) return void (location.hash = `#/graph?from=${arg}`);
-  if (name === 'automations') return void ((mapState.type = 'sys.automation'), (location.hash = '#/map'));
+  if (name === 'automations') return void (location.hash = searchHref({ type: 'sys.automation' }));
   // A project's roadmap and its questions are on the project's own page.
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/map');
   try {
@@ -54,7 +54,7 @@ async function route(pulse = false) {
   for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (page === 'screen' ? `s/${decodeURIComponent(arg ?? '')}` : page));
   const draw = {
     home,
-    map: name === 'map' || page !== 'map' ? map : searchBar,
+    map: name === 'map' || page !== 'map' ? () => map(query) : searchBar,
     // The graph around an item is drawn on that item's page, under it.
     item: name === 'e' && arg ? () => entity(arg, new URLSearchParams(query).get('here') ?? undefined) : name === 'new' && (() => newEntity(arg)),
     graph: name === 'graph' && (() => graph(query)),

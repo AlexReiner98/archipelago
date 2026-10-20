@@ -10,6 +10,7 @@ import { hubs, HUB_AT, lens } from './lens.ts';
 import { findPlace, scopeOf } from './places.ts';
 import { brief } from './brief.ts';
 import { atlas } from './atlas.ts';
+import { kinds } from './search.ts';
 
 /**
  * How a kernel view asks a question a pack answers (the gate asks proof of the software pack). Handed in by
@@ -493,13 +494,12 @@ export const VIEWS: Record<string, View> = {
     run: brief,
   },
   atlas: {
-    description: 'Every picture kept on the map (a lens, named by the style that draws it), with what it is a picture of: pinned first, then the newest. Params: limit (100).',
-    run: (l, input) => atlas(l, input as { limit?: number }),
+    description: 'Every picture kept on the map (a lens, named by the style that draws it), with what it is a picture of: pinned first, then the newest. Params: q (words in its name or in the title of what it is of), limit (100).',
+    run: (l, input) => atlas(l, input as { q?: string; limit?: number }),
   },
-
-
-
-
-
+  kinds: {
+    description: 'How many items there are of each type, the most first. Params: open (true unfinished, false finished), system (false leaves out sources and notifications).',
+    run: (l, input) => kinds(l, input as { open?: boolean; system?: boolean }),
+  },
 
 };

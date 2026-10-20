@@ -357,8 +357,8 @@ table.list td.act { width: 1%; white-space: nowrap; text-align: right; }
 .add-relation .rows > li { align-items: center; }
 .nowrap { white-space: nowrap; }
 /* Activity is many small tables; fixed columns keep them aligned. */
-table.events { table-layout: fixed; }
-table.events td { overflow: hidden; text-overflow: ellipsis; }
+table.events, table.found { table-layout: fixed; }
+table.events td, table.found td { overflow: hidden; text-overflow: ellipsis; }
 table.events td:nth-child(1) { width: 84px; }
 table.events td:nth-child(2) { width: 110px; }
 table.events td:nth-child(3) { width: 96px; }
@@ -406,7 +406,7 @@ button.quiet-button { padding: 2px 9px; font-size: 12px; }
   #nav { align-items: center; position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
   #nav .brand { padding: 4px 10px; }
   #main { padding: 16px; }
-  .ops td.kind { width: auto; }
+  .ops td.kind { width: auto; } table.found .when { display: none; }
 }
 
 /* Forms */
