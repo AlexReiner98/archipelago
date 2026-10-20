@@ -28,3 +28,13 @@
 		}
 	}
 }
+
+# Staging (deploy/staging.sh), for the laptop over WireGuard: compose publishes this port on 10.66.0.1 only. With
+# staging stopped it answers 502.
+https://10.66.0.1:3200 {
+	tls internal
+	encode zstd gzip
+	reverse_proxy staging:3100 {
+		flush_interval -1
+	}
+}
