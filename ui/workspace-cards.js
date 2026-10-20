@@ -354,7 +354,6 @@ export function backupCard() {
     'section',
     { class: 'card' },
     h('header', {}, h('h2', { class: 'hinted', title: 'The whole map as one file: to keep, or to restore into another server' }, 'Backups')),
-    h('div', { class: 'toolbar' }, h('button', { class: 'primary', onclick: download }, 'Download backup'), note),
-    h('div', { class: 'toolbar' }, h('label', { title: 'Lets an agent call backup_download. A backup holds private items too.' }, allow, ' Agents may download')),
+    h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, h('button', { class: 'primary', onclick: download }, 'Download backup'), h('label', { title: 'Lets an agent call backup_download. A backup holds private items too.' }, allow, ' Agents may download'), note),
   );
 }

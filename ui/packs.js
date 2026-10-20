@@ -23,7 +23,7 @@ export function packsCard({ h, api, ask, tell, then }) {
         'div',
         { class: 'row-top', style: 'flex-wrap: nowrap; align-items: center' },
         h('span', { class: 'grow', title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}`, style: 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap' }, h('strong', {}, p.title), ' ', h('span', { class: 'muted small' }, p.version)),
-        h('span', { class: `pill${p.state === 'active' ? ' ok' : p.state === 'waiting' ? ' warn' : ' closed'}`, title: p.why ?? '' }, p.state),
+        p.state !== 'active' && h('span', { class: `pill${p.state === 'waiting' ? ' warn' : ' closed'}`, title: p.why ?? '' }, p.state),
         !KERNEL.includes(p.id) && h('button', { title: p.why ?? '', style: 'white-space: nowrap', onclick: () => turn(p, p.state === 'off') }, p.state === 'off' ? 'Turn on' : 'Turn off'),
       ),
     );
