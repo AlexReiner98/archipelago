@@ -657,9 +657,15 @@ change that:
   is that you can write on the server's disk, so it needs the same
   `PELAGO_DATA` and port settings as the server.
 
-- **Several people in one workspace.** An admin adds people with
-  `member_add`, which creates their person entity and their token. From then
-  on:
+- **Several people in one workspace.** An admin adds people by their email
+  address with `member_add` (the Members card on the Workspace screen). They
+  are sent an invitation; from then on they sign in on the sign-in page by
+  asking for a link at that address. The link works once, for 30 minutes, and
+  keeps that browser signed in for 30 days. An address that is a member of
+  several workspaces gets one mail with a link to each. Whether a member is an
+  admin is kept on the member (`member_set`), and removing one ends their
+  sign-ins at once. The page says the same whether or not an address is a
+  member anywhere. From then on:
   - New things are **private to their author** unless created or edited as
     shared. An admin can flip that default with `workspace_set`.
   - Private means hidden from other members everywhere: search, by id,
@@ -683,6 +689,18 @@ change that:
     holds the live lane, others are refused it and told it is held by
     "someone's private session".
 
+- **The mail it sends** goes out from the server itself, straight to the
+  recipient's mail servers, so it passes through no mail service elsewhere.
+  `PELAGO_MAIL_FROM` names the sender (`Archipelago <signin@archipelago.tools>`);
+  without it nothing is sent and each message is written to the server's log.
+  For it to arrive, and not as spam, the sending domain needs: an SPF record
+  naming the server's address (`v=spf1 ip4:<address> -all`), a DKIM key
+  (`openssl genrsa -out dkim.pem 2048`; the private key in `PELAGO_DKIM_KEY`,
+  as PEM or a file path, with `PELAGO_DKIM_SELECTOR`, and the public half as
+  a TXT record at `<selector>._domainkey.<domain>`), a DMARC record, and the
+  server's reverse DNS set to its name. The host must let it out on port 25.
+  `PELAGO_SMTP_URL` hands mail to a relay instead (`smtp://user:pass@host:587`
+  or `smtps://…:465`); a password is never sent without TLS.
 - **Notifications between workspaces.** A human can send another workspace a
   notification with `notify_workspace`. It arrives only if that workspace's
   admin has added the sender to the workspaces it accepts, and accepting is

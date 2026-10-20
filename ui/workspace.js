@@ -6,6 +6,7 @@ import { stylesCard } from './styles-card.js';
 import { packsCard } from './packs.js';
 import { ago, when } from './words.js';
 import { scopePills } from './token-piece.js';
+import { membersCard } from './members-card.js';
 import { backupCard, connectBox, githubCard, operatorCard, ownerCard, secretBox } from './workspace-cards.js';
 
 export async function workspace() {
@@ -19,11 +20,16 @@ export async function workspace() {
       h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace), stylesCard(workspace)),
     );
   }
-  const [info, tokens, people] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 })]);
+  const [info, tokens, people, members] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 }), me.actor.admin ? api('member_list') : []]);
   const personName = (id) => people.find((p) => p.id === id)?.title;
   const notice = h('div');
   const fail = (err) => notice.replaceChildren(h('div', { class: 'error', style: 'padding: var(--space-6) var(--space-8)' }, err.message));
   const live = tokens.filter((t) => !t.revoked_at);
+  // A word at the top of the page once it is drawn again, brought into view from wherever the button was.
+  const say = (cls, text) => {
+    main.children[1].replaceChildren(h('div', { class: cls, style: 'padding: var(--space-6) var(--space-8)' }, text));
+    main.children[1].scrollIntoView({ block: 'center' });
+  };
 
   const tokenRow = (t) =>
     h(
@@ -53,9 +59,6 @@ export async function workspace() {
   // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
   const agentLife = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
   const agentToken = (fallback) => ({ kind: 'agent', name: agentName.value.trim() || fallback, ...(Number(agentLife.value) > 0 && { expires_days: Number(agentLife.value) }) });
-  const memberName = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: var(--input-least)' });
-  const memberEmail = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: var(--input-least)' });
-  const memberAdmin = h('input', { type: 'checkbox' });
   const accepts = h('input', { type: 'text', value: info.accepts_from.join(', '), placeholder: 'workspace ids, separated by commas', style: 'flex: 1; min-width: var(--input-wide)' });
 
   main.replaceChildren(
@@ -103,31 +106,7 @@ export async function workspace() {
           ),
         ),
       ),
-      me.actor.admin &&
-        h(
-          'section',
-          { class: 'card wide' },
-          h('header', {}, h('h2', { class: 'hinted', title: 'People who can sign in to this workspace.' }, 'Members')),
-          h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'human').map(tokenRow)),
-          h(
-            'div',
-            { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' },
-            memberName,
-            memberEmail,
-            h('label', {}, memberAdmin, ' Admin'),
-            h(
-              'button',
-              {
-                class: 'primary',
-                onclick: () =>
-                  api('member_add', { name: memberName.value.trim(), email: memberEmail.value.trim() || undefined, admin: memberAdmin.checked })
-                    .then((made) => workspace().then(() => main.children[1].replaceChildren(secretBox(`Sign-in token for ${memberName.value.trim()}. Send it to them privately.`, made.token))))
-                    .catch(fail),
-              },
-              'Add member',
-            ),
-          ),
-        ),
+      me.actor.admin && membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, say }),
       me.actor.admin &&
         h(
           'section',

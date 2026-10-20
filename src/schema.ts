@@ -398,7 +398,20 @@ alter table token add column if not exists may text default 'change';
 update token set within = repos where repos is not null and within is null;
 `;
 
-/** Step 6 (src/migrate.ts): a share may be made out to another workspace on the server instead of to a secret (src/workspace-share.ts). */
+/** Members, each by an email address (src/members.ts): step 6. Only the whole database reads it. */
+export const MEMBER = `
+create table if not exists member (
+  email      text primary key,
+  person_id  text not null,
+  admin      boolean not null default false,
+  added_at   timestamptz not null default now(),
+  added_by   text,
+  removed_at timestamptz
+);
+alter table member enable row level security;
+`;
+
+/** Step 7 (src/migrate.ts): a share may be made out to another workspace on the server instead of to a secret (src/workspace-share.ts). */
 export const WORKSPACE_SHARE = `
 alter table share add column if not exists to_workspace text;
 alter table share add column if not exists to_item text;

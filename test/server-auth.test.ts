@@ -115,7 +115,7 @@ test('each workspace is its own database: tokens, data and local types do not cr
 });
 
 test('inside a workspace, private things are hidden from other members by the database', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call, member } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const api = async (token: string, tool: string, body: unknown = {}) => {
@@ -127,8 +127,8 @@ test('inside a workspace, private things are hidden from other members by the da
 
   // The first admin becomes a person; then adds a colleague.
   const me = (await api(alex, 'init', { name: 'Alex' })).me;
-  const added = await api(alex, 'member_add', { name: 'Sam' });
-  const sam = added.token as string;
+  const sam = await member(alex, { email: 'sam@example.com', name: 'Sam' });
+  const samPerson = (await call('/whoami', sam, undefined, 'GET')).actor.person;
   assert.deepEqual(await titles(sam, 'person'), ['Alex', 'Sam'], 'people are shared so colleagues can refer to each other');
 
   // New things are private to their author unless they say otherwise.
@@ -139,7 +139,7 @@ test('inside a workspace, private things are hidden from other members by the da
     { op: 'link', type: 'part_of', from: 's', to: 'p' },
     { op: 'link', type: 'part_of', from: 'x', to: 'p' },
   ] });
-  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Sam private', owner: added.person }] });
+  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Sam private', owner: samPerson }] });
   assert.deepEqual(await titles(alex), ['Alex private', 'Shared task']);
   assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
 
@@ -188,10 +188,10 @@ test('inside a workspace, private things are hidden from other members by the da
   assert.equal((await api(alex, 'view', { name: 'notifications' })).length, 0);
 
   // Only an admin manages people, other people's tokens and settings.
-  for (const [tool, body] of [['member_add', { name: 'Eve' }], ['token_create', { kind: 'human', name: 'eve' }], ['token_create', { kind: 'agent', name: 'x', entity: me }], ['workspace_set', { default_visibility: 'shared' }]] as const) {
+  for (const [tool, body] of [['member_add', { email: 'eve@example.com' }], ['token_create', { kind: 'human', name: 'eve' }], ['token_create', { kind: 'agent', name: 'x', entity: me }], ['workspace_set', { default_visibility: 'shared' }]] as const) {
     assert.match((await call(`/api/${tool}`, sam, body)).error, /Only a workspace admin/, tool);
   }
-  assert.deepEqual((await api(sam, 'token_list')).map((t: any) => t.name).sort(), ['Sam', 'sam-claude']);
+  assert.deepEqual((await api(sam, 'token_list')).map((t: any) => t.name).sort(), ['sam-claude', 'sam@example.com'], 'a member’s sign-in is named by their address');
   assert.ok((await api(alex, 'token_list')).length >= 3);
   const alexTokenId = (await api(alex, 'token_list')).find((t: any) => t.name === 'alex').id;
   assert.match((await call('/api/token_revoke', sam, { id: alexTokenId })).error, /No active token/);
@@ -203,7 +203,7 @@ test('inside a workspace, private things are hidden from other members by the da
 });
 
 test('nothing can depend on a private item from outside it, and a held resource is held for everyone', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call, member } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const api = async (token: string, tool: string, body: unknown = {}) => {
@@ -213,7 +213,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
   };
   const refused = async (token: string, ops: unknown[]) => (await call('/api/change', token, { reason: 'x', ops })).error as string;
   await api(alex, 'init', { name: 'Alex' });
-  const sam = (await api(alex, 'member_add', { name: 'Sam' })).token as string;
+  const sam = await member(alex, { email: 'sam@example.com', name: 'Sam' });
 
   const made = (await api(alex, 'change', { reason: 'x', ops: [
     { op: 'create', ref: 'pub', type: 'work.task', title: 'Public task', visibility: 'shared' },
@@ -314,4 +314,5 @@ test('dev mode turns review off and offers agents a restart; without it neither 
   process.env.PELAGO_DEV = '0';
   assert.equal(loadConfig().dev, false);
 });
+
 

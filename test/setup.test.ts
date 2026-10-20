@@ -273,7 +273,7 @@ test('a lost operator secret is replaced by whoever can write on the server\'s d
 });
 
 test('a workspace admin merges a backup into their map; nobody else can, and listeners hear of the import, not of its history', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call, member: join } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   // Where the file comes from: another map, with a type of its own and things its owner did.
   const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
@@ -285,7 +285,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
 
   const main = await workspaces.get('default');
   const admin = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const member = (await call('/api/member_add', admin, { name: 'Sam' })).result.token as string;
+  const member = await join(admin, { email: 'sam@example.com', name: 'Sam' });
   const robot = (await createToken(main.pelago.db, 'default', { kind: 'agent', name: 'robot' })).token;
   await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'Already here', visibility: 'shared' }] });
   assert.match((await call('/api/import_backup', member, { backup })).error, /Only a workspace admin/);

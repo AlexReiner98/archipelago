@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { bodyAfter } from './ops.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
-import { createToken } from './auth.ts';
+import { MEMBER_TOOLS } from './members.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
 import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts'; import { ASK_TOOLS } from './token-ask.ts';
@@ -792,26 +792,8 @@ export const TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => launch(l, actor, input),
   },
-  member_add: {
-    description: 'Add a person to this workspace: creates their (shared) person entity and a human token for them. Admins only.',
-    humanOnly: true,
-    input: {
-      name: z.string().min(1),
-      email: z.string().optional(),
-      admin: z.boolean().optional().describe('May manage members, tokens and workspace settings.'),
-    },
-    run: async (l, actor, input) => {
-      needAdmin(actor, 'add members');
-      const { created } = await l.apply(actorId(actor), {
-        ops: [{ op: 'create', ref: 'p', type: 'person', title: input.name, visibility: 'shared', props: input.email ? { email: input.email } : {} }],
-        reason: 'Added to the workspace',
-      });
-      const token = await createToken(l.db, l.workspace, { kind: 'human', name: input.name, entity: created.p, admin: input.admin });
-      return { person: created.p, token: token.token, note: token.note };
-    },
-  },
   ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
-  ...TOKEN_TOOLS, ...ASK_TOOLS,
+  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS,
   notify_workspace: {
     description: 'Send a notification to another workspace on this server. It arrives only if that workspace\u2019s admin has chosen to accept notifications from this one.',
     humanOnly: true,
