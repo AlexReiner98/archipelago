@@ -69,8 +69,7 @@ Its change shows up on **Changes** for you to apply.
 
 ## Host your own
 
-One Node server with a persistent disk; [render.yaml](render.yaml) is a ready
-example for Render. Set `PELAGO_HOST=0.0.0.0`, `PELAGO_AUTH=tokens` and
+One Node server with a persistent disk. Set `PELAGO_HOST=0.0.0.0`, `PELAGO_AUTH=tokens` and
 `PELAGO_PUBLIC_HOST`; see [Hosting](docs/reference.md#hosting).
 
 ## More
