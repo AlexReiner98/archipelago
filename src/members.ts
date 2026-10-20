@@ -38,6 +38,20 @@ export async function memberOf(db: Q, email: string): Promise<Member | undefined
   return rows[0];
 }
 
+/** A new workspace's first member: its owner, an admin, and the person its views are for. */
+export async function admitOwner(l: Archipelago, email: string): Promise<string> {
+  const { me } = await l.init({ kind: 'human', name: email }, { name: email, email });
+  await l.db.query(`insert into member (email, person_id, admin, added_by) values ($1, $2, true, 'signup') on conflict (email) do nothing`, [email, me]);
+  return me;
+}
+
+/** A month's sign-in for a member, or nothing if the address is not one. */
+export async function memberToken(db: Q, workspace: string, email: string): Promise<string | undefined> {
+  const member = await memberOf(db, email);
+  if (!member) return undefined;
+  return (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
+}
+
 const KEY = 'signin:';
 const hash = (code: string) => createHash('sha256').update(code).digest('hex');
 
@@ -54,9 +68,7 @@ export const workspaceOfCode = (code: string) => /^inv_([a-z0-9][a-z0-9-]{0,39})
 /** Trade a code for a month's token, once, if the address it was sent to is still a member. */
 export async function redeem(db: Q, workspace: string, code: string): Promise<string | undefined> {
   const taken = await take<{ email: string }>(db, KEY + hash(code));
-  const member = taken && (await memberOf(db, taken.value.email));
-  if (!member) return undefined;
-  return (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
+  return taken && memberToken(db, workspace, taken.value.email);
 }
 
 /**
