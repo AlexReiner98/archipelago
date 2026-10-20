@@ -16,8 +16,9 @@ function thumbnail(p) {
   const view = lensView({ lens: { lens: p.lens, ...(p.of && { from: p.of.id }) }, key: `atlas:${p.lens}`, bare: true });
   return h(
     'div',
-    { class: 'atlas-thumb', 'aria-hidden': 'true', style: 'height: 96px; overflow: hidden; border-radius: 6px; background: var(--bg); pointer-events: none' },
-    h('div', { style: `width: ${SHRINK * 100}%; height: ${SHRINK * 96}px; transform: scale(${1 / SHRINK}); transform-origin: 0 0` }, view),
+    { class: 'atlas-thumb', 'aria-hidden': 'true', style: 'position: relative; height: 96px; overflow: hidden; border-radius: 6px; background: var(--bg); pointer-events: none' },
+    // Placed out of the flow, so the drawing's own width never widens the tile, the strip or the page.
+    h('div', { style: `position: absolute; top: 0; left: 0; width: ${SHRINK * 100}%; height: ${SHRINK * 96}px; transform: scale(${1 / SHRINK}); transform-origin: 0 0` }, view),
   );
 }
 
@@ -38,20 +39,27 @@ export const tile = (p) => {
   );
 };
 
-/** The strip on Home: the pinned pictures, then the newest, up to the limit. Left out when nothing is kept. */
+/** Whether the strip on Home is open to every picture: kept while the page is, so a redraw does not fold it again. */
+let open = false;
+
+/** The strip on Home: the pinned pictures, then the newest, up to the limit; open, every one. Left out when nothing is kept. */
 export async function atlasStrip(host, title, limit = 6) {
-  const answer = await api('view', { name: 'atlas', params: { limit } }).catch(() => null);
+  const answer = await api('view', { name: 'atlas' }).catch(() => null);
   if (!host.isConnected) return;
   if (!answer?.pictures.length) return host.remove();
-  const all = answer.pictures.length + answer.more;
-  host.replaceChildren(
-    h(
-      'section',
-      { class: 'card wide atlas', style: 'margin-bottom: 14px' },
-      h('header', {}, h('h2', {}, title), answer.more > 0 && h('span', { class: 'muted small', style: 'margin-left: auto', title: 'Pictures kept on the map: the pinned first, then the newest' }, `${answer.pictures.length} of ${all} pictures`)),
-      h('div', { class: 'atlas-tiles', style: 'display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; padding: 0 14px 14px' }, answer.pictures.map(tile)),
-    ),
-  );
+  const all = answer.pictures;
+  const tiles = h('div', { class: 'atlas-tiles', style: 'display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 8px; padding: 0 14px 14px' });
+  // A tile is drawn only once it is shown: each is a picture of its own.
+  const show = () => {
+    const n = open ? all.length : Math.min(limit, all.length);
+    tiles.replaceChildren(...[...tiles.children].slice(0, n), ...all.slice(tiles.children.length, n).map(tile));
+    if (fold) fold.textContent = open ? 'Fewer' : `All ${all.length}`;
+  };
+  const fold =
+    all.length > limit &&
+    h('button', { class: 'quiet-button', style: 'margin-left: auto; white-space: nowrap', title: 'Every picture kept on the map, or only the pinned and the newest', onclick: () => ((open = !open), show()) });
+  host.replaceChildren(h('section', { class: 'card wide atlas', style: 'margin-bottom: 14px; min-width: 0' }, h('header', {}, h('h2', {}, title), fold), tiles));
+  show();
 }
 
 /** What a picture is called and where it sits: the style kept about its lens names it, else the lens, else the view it opened on. */
