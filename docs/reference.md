@@ -320,8 +320,8 @@ is refused with the new one in the message.
 
 You host Archipelago yourself: one server running everything, with the
 embedded database on a persistent disk. Any host that runs Node 24 and keeps
-a disk will do; [render.yaml](../render.yaml) is a ready example for Render.
-The server does not speak TLS: that ends at the platform or proxy in front of
+a disk will do: install with `npm ci --omit=dev`, start with `npm start`, and
+keep `PELAGO_DATA` on the disk. The server does not speak TLS: that ends at the platform or proxy in front of
 it.
 
 - `PELAGO_HOST=0.0.0.0` makes the server listen beyond this machine. It
@@ -503,8 +503,8 @@ person can read it. Three things limit what a copied one is worth:
   poll's secret as a bearer) is handed a token once: an agent's, acting for
   whoever approved it, within those items, that may only report. A request
   waits ten minutes and is operational state, not an item
-  (`src/token-ask.ts`). `deploy/deploy.sh` asks this way when
-  `DEPLOY_MAP_TOKEN` is unset and writes the token into `deploy/.env`.
+  (`src/token-ask.ts`). A deploy script can ask this way for a token to
+  report which of its servers is live.
 - **Its owner hears of a new place.** Each token keeps the networks it has
   been used from. Used from one it has not been, a warning goes to the
   owner; the first place a token is used is not news. This notices, it does
@@ -700,10 +700,9 @@ change that:
   a TXT record at `<selector>._domainkey.<domain>`), a DMARC record, and the
   server's reverse DNS set to its name. The host must let it out on port 25.
   `PELAGO_SMTP_URL` hands mail to a relay instead (`smtp://user:pass@host:587`
-  or `smtps://…:465`); a password is never sent without TLS. The hosted server
-  is an OVH Public Cloud instance, which may not send on mail ports, so its
-  mail goes through a relay of our own over WireGuard: `deploy/relay/README.md`
-  is the whole setup, step by step.
+  or `smtps://…:465`); a password is never sent without TLS. A host that may not
+  send on mail ports can hand mail to a relay it reaches over a private
+  network.
 - **Notifications between workspaces.** A human can send another workspace a
   notification with `notify_workspace`. It arrives only if that workspace's
   admin has added the sender to the workspaces it accepts, and accepting is

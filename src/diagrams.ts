@@ -1,19 +1,18 @@
 // `npm run diagrams`: the architecture and type diagrams, made from the code as draw.io files under docs/diagrams/
-// (or the folder given). Reads src/, ui/ and packs/ and writes three files, each of pages: modules.drawio,
-// types.drawio and stack.drawio. The drawing is done by the pure modules beside this; here is only the reading
+// (or the folder given). Reads src/, ui/ and packs/ and writes two files, each of pages: modules.drawio and
+// types.drawio. The drawing is done by the pure modules beside this; here is only the reading
 // and the writing.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { moduleDiagram, type SourceFile } from './diagram-modules.ts';
-import { stackDiagram } from './diagram-stack.ts';
 import { typeDiagram, type PackFile } from './diagram-types.ts';
 import { mxfile, type Page } from './diagram-xml.ts';
 
 /** Every diagram file, by name, from the sources and pack files given. */
 export function diagrams(files: SourceFile[], packs: PackFile[], link?: (path: string) => string | undefined): Record<string, string> {
-  const sets: Record<string, Page[]> = { 'modules.drawio': moduleDiagram(files, link), 'types.drawio': typeDiagram(packs), 'stack.drawio': stackDiagram() };
+  const sets: Record<string, Page[]> = { 'modules.drawio': moduleDiagram(files, link), 'types.drawio': typeDiagram(packs) };
   return Object.fromEntries(Object.entries(sets).map(([name, pages]) => [name, mxfile(pages)]));
 }
 
