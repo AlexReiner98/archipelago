@@ -95,11 +95,22 @@ function draw(d) {
   main.replaceChildren(...page.childNodes);
 }
 
+/** The page's colours: the workspace's theme (its style), light or dark as the reader's system is. Only plain hex colours. */
+const dark = matchMedia('(prefers-color-scheme: dark)');
+let theme;
+const paint = () => {
+  for (const [name, colour] of Object.entries(theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (/^[a-z][a-z0-9_]*$/.test(name) && /^#[0-9a-f]{3,8}$/i.test(String(colour))) document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, colour);
+};
+dark.addEventListener('change', paint);
+
 async function load(build) {
   try {
     const res = await fetch(`${here}/data${build ? `?build=${encodeURIComponent(build)}` : ''}`);
     if (!res.ok) return main.replaceChildren(h('p', { class: 'muted' }, 'There is nothing public at this address.'));
-    draw(await res.json());
+    const page = await res.json();
+    theme = page.theme;
+    paint();
+    draw(page);
   } catch {
     main.replaceChildren(h('p', { class: 'muted' }, 'This page could not be loaded. Try again in a moment.'));
   }

@@ -4,8 +4,6 @@ import { h } from './base.js';
 import { lensTree, litCount, sizeOf } from './lens-base.js';
 import { relations, types } from './words.js';
 
-/** The Time page's colours for projects, until pages are styled too (phase 2 of "Where does style live?"); a grid and a calendar take the style's hues. */
-export const GRID_HUES = ['#2e7d4f', '#2f5fb3', '#a86a12', '#6f43b0', '#59636e', '#0f7c86', '#b23a48', '#7a6a1c'];
 /** A stored value as a person reads it: "set_up" is "Set up". */
 export const inWords = (value) => (value == null ? 'Unfiled' : String(value).charAt(0).toUpperCase() + String(value).slice(1).replaceAll('_', ' '));
 
