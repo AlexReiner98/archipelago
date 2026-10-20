@@ -15,6 +15,9 @@ export function configureOutbox(next: Lookup): void {
   lookup = next;
 }
 
+/** Another workspace's whole map on this server, or undefined if there is no such workspace. */
+export const otherMap = async (workspace: string): Promise<Archipelago | undefined> => (workspace ? lookup?.(workspace) : undefined);
+
 /** The whole of a map, not one person's view of it, for the few things an admin does to all of it. */
 export async function wholeMap(l: Archipelago): Promise<Archipelago> {
   if (l.viewer === undefined) return l;

@@ -87,7 +87,7 @@ export async function entity(id, here) {
     again();
   };
   // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
-  const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story' && !(run && RUN_OWN.includes(k)));
+  const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story' && !(run && RUN_OWN.includes(k)) && !(/^[a-z]_[a-z0-9]{8}$/.test(String(v)) && !ID.test(String(v)))); // an id that names no item is to copy, not to read
   const runFacts = run && [
     e.props.surface && h('span', { class: 'fact', title: e.props.cwd ?? '' }, e.props.surface === 'claude-code' ? 'Claude Code' : (RAN[e.props.surface] ?? e.props.surface)),
     e.props.last_seen && h('span', { class: 'fact' }, h('span', { class: 'muted' }, 'heard from '), ago(e.props.last_seen)),
@@ -150,7 +150,7 @@ export async function entity(id, here) {
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row-top' }, chip(e.type), altitude && h('span', { class: 'pill', title: `How high this sits: workspace, project, stream, step` }, altitude), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.length > 0 && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.length})` }, 'shared by link')),
+      h('div', { class: 'row-top' }, chip(e.type), altitude && h('span', { class: 'pill', title: `How high this sits: workspace, project, stream, step` }, altitude), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.some((s) => !s.to_workspace) && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.filter((s) => !s.to_workspace).length})` }, 'shared by link'), links.filter((s) => s.to_workspace).map((s) => h('span', { class: 'pill', title: `Readable in the workspace "${s.to_workspace}" once accepted there` }, `shared with ${s.to_workspace}`)), doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`)),
       // Where it sits, from Home down, each step a way back up, so a person always knows how high they are; a stream or a
       // step in nothing says so, as work to file (docs/ui-strategy.md).
       h(
@@ -218,7 +218,7 @@ export async function entity(id, here) {
           ],
         publishable && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
         e.visibility === 'public' && type?.public && type.kind === 'work' && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
-        ...(doc ? documentMenu(e, links, page, again) : []),
+        ...(doc ? documentMenu(e, links, page, again, doc) : []),
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),

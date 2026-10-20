@@ -19,6 +19,8 @@ export interface Section {
   updated_at: string | Date;
   /** Whether a figure is kept for it, shown above its text. */
   picture?: boolean;
+  /** Read through a share with this workspace: the item here that the share is, for its figure. */
+  via?: string;
 }
 
 /** A document as its reader meets it: the text between sections, and each section in its place. */
@@ -52,8 +54,11 @@ export function assemble(body: string, items: Map<string, Section>): Part[] {
   return parts;
 }
 
+/** The item a workspace holds a document another workspace shares with it as (src/workspace-share.ts). A kernel type. */
+export const SHARED = 'sys.shared_document';
+
 /** Of an item's fields, those its type's pack marks as shown: what a page may lay out (an invoice's number, dates, total). */
-const shownOf = (l: Archipelago, type: string, props: Record<string, unknown>) => {
+export const shownOf = (l: Archipelago, type: string, props: Record<string, unknown>) => {
   const defs = l.registry.type(type)?.fields ?? {};
   return Object.fromEntries(Object.entries(props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
 };
@@ -85,7 +90,7 @@ export const sharePath = (workspace: string, secret: string) => `/s/${workspace}
 /** A link to a document for someone with no login. The secret is in the path it returns, shown once. */
 export async function createShare(l: Archipelago, actor: Actor, id: string) {
   const doc = await l.entity(id);
-  if (!doc || !l.registry.drawnWith('document').includes(doc.type)) throw new Error(`"${id}" is not a document: only a document can be given as a link.`);
+  if (!doc || doc.type === SHARED || !l.registry.drawnWith('document').includes(doc.type)) throw new Error(`"${id}" is not a document of this workspace: only one can be given as a link.`);
   if (doc.archived_at) throw new Error(`"${doc.title}" is archived.`);
   const secret = randomBytes(24).toString('hex');
   const share = newId('s');
@@ -99,8 +104,8 @@ export async function createShare(l: Archipelago, actor: Actor, id: string) {
 
 /** The links made to a document, standing first. */
 export async function listShares(l: Archipelago, id: string) {
-  const { rows } = await l.db.query<{ id: string; hint: string; made_by: string; created_at: Date; revoked_at: Date | null }>(
-    `select id, hint, made_by, created_at, revoked_at from share where entity_id = $1 order by revoked_at is not null, created_at desc`,
+  const { rows } = await l.db.query<{ id: string; hint: string; made_by: string; created_at: Date; revoked_at: Date | null; to_workspace: string | null }>(
+    `select id, hint, made_by, created_at, revoked_at, to_workspace from share where entity_id = $1 order by revoked_at is not null, created_at desc`,
     [id],
   );
   return rows;
@@ -109,10 +114,11 @@ export async function listShares(l: Archipelago, id: string) {
 /** Stop a link from working. */
 export async function revokeShare(l: Archipelago, actor: Actor, share: string) {
   return l.db.transaction(async (tx: Q) => {
-    const { rows } = await tx.query<{ entity_id: string }>(`update share set revoked_at = now() where id = $1 and revoked_at is null returning entity_id`, [share]);
+    const { rows } = await tx.query<{ entity_id: string; to_workspace: string | null; to_item: string | null }>(`update share set revoked_at = now() where id = $1 and revoked_at is null returning entity_id, to_workspace, to_item`, [share]);
     if (!rows.length) throw new Error(`No standing link "${share}"`);
-    await l.log(tx, { actor: `${actor.kind}:${actor.name}`, action: 'share.revoke', target: rows[0].entity_id, reason: 'A link to read it was revoked', detail: { share } });
-    return { revoked: share, document: rows[0].entity_id };
+    const [r] = rows;
+    await l.log(tx, { actor: `${actor.kind}:${actor.name}`, action: 'share.revoke', target: r.entity_id, reason: r.to_workspace ? `It is no longer shared with the workspace "${r.to_workspace}"` : 'A link to read it was revoked', detail: { share } });
+    return { revoked: share, document: r.entity_id, to_workspace: r.to_workspace, to_item: r.to_item };
   });
 }
 
@@ -129,16 +135,34 @@ export async function sharedPicture(l: Archipelago, secret: string, id: string):
 /** What a link shows, read as anyone with no login: the document and the items it brings in, or nothing. */
 export async function sharedDocument(l: Archipelago, secret: string) {
   if (!/^[a-f0-9]{48}$/.test(secret)) return null;
-  const { rows } = await l.forAnyone().db.query<{ doc: { id: string; type: string; title: string; body: string; status: string; props: Record<string, unknown>; updated_at: string; items: Section[] } | null }>(
+  const { rows } = await l.forAnyone().db.query<{ doc: Given | null }>(
     `select pelago_shared_document($1) as doc`,
     [hash(secret)],
   );
   const doc = rows[0]?.doc;
-  if (!doc) return null;
-  // An item the link does not show is not named either: where a text points at one, the reader is told less, not more.
+  return doc ? forReader(l, doc) : null;
+}
+
+/** A document read from outside the map, as the database gave it: the document and the items it brings in. */
+export interface Given {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  status: string;
+  props: Record<string, unknown>;
+  updated_at: string;
+  items: Section[];
+}
+
+/**
+ * What a reader from outside the map is given of a document: an item it does not bring in is not named either, so
+ * where a text points at one the reader is told less, not more. `via` marks each section as read through that share.
+ */
+export function forReader(l: Archipelago, doc: Given, via?: string) {
   const shown = new Set(doc.items.map((item) => item.id));
   const scrub = (text: string) => text.replace(/[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g, (found, id) => (shown.has(id) ? found : ''));
-  const items = new Map(doc.items.map((item) => [item.id, { ...item, body: scrub(item.body) }]));
+  const items = new Map(doc.items.map((item) => [item.id, { ...item, body: scrub(item.body), ...(via && { via }) }]));
   const parts = assemble(doc.body, items).flatMap((part): Part[] => ('missing' in part ? [] : 'text' in part ? [{ text: scrub(part.text) }] : [part]));
   return { type: doc.type, title: doc.title, status: doc.status, fields: shownOf(l, doc.type, doc.props), updated_at: doc.updated_at, parts };
 }
