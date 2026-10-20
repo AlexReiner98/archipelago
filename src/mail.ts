@@ -104,7 +104,7 @@ export async function sendMail(mail: Mail): Promise<void> {
   let last: Error | undefined;
   for (const route of routes) {
     try {
-      return await deliver(route, { from: addressOf(from), to: mail.to, data });
+      return await deliver(route, { from: addressOf(from), to: mail.to, data }, { helo: env('PUBLIC_HOST')?.split(',')[0]?.trim().replace(/:\d+$/, '') });
     } catch (err) {
       last = err as Error;
     }

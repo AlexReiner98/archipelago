@@ -117,9 +117,11 @@ const open = (route: Route): Promise<Socket | TLSSocket> =>
 export const dotStuff = (data: string) => data.replace(/(^|\r\n)\./g, '$1..');
 
 /** Hand one message to one server. Throws, saying what the server said, when it is not taken. */
-export async function deliver(route: Route, envelope: Envelope, options: { rejectUnauthorized?: boolean } = {}): Promise<void> {
+export async function deliver(route: Route, envelope: Envelope, options: { rejectUnauthorized?: boolean; helo?: string } = {}): Promise<void> {
   const talk = new Conversation(await open(route));
-  const me = hostname();
+  // The name this server greets with: its public one, which its address's reverse DNS gives back. In a container
+  // the machine's own name is a random id, which receiving servers hold against the mail.
+  const me = options.helo || hostname();
   try {
     await talk.expect(undefined, '220');
     let hello = await talk.expect(`EHLO ${me}`, '250');
