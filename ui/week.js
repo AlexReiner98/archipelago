@@ -1,5 +1,4 @@
 import { api, h, state } from './base.js';
-import { GRID_HUES } from './grid.js';
 import { chip } from './words.js';
 
 // ---- Time ------------------------------------------------------------------
@@ -238,7 +237,8 @@ export const calHidden = (wk) =>
   });
 
 export function weekCalendar(wk, today, act, full) {
-  const hueOf = new Map(wk.projects.map((p, i) => [p.id, GRID_HUES[i % GRID_HUES.length]]));
+  const hues = state.style.hues; // the workspace's style says how projects are told apart
+  const hueOf = new Map(wk.projects.map((p, i) => [p.id, hues[i % hues.length]]));
   const titleOf = new Map(wk.projects.map((p) => [p.id, p.title]));
   // The waking day on weekdays, unless the whole of it is asked for; a block that runs past the edge is cut there.
   const [top, bottom] = full ? [0, 24] : CAL_HOURS;

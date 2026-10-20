@@ -36,6 +36,9 @@ export default function draw({ canvas, answer, theme, size, tree, on, open, tip,
     links: answer.links,
     rootId: root.id,
     measure: (text, px) => (font(px), ctx.measureText(text).width),
+    // The lengths it lays out by are the style's: the house style names them, and this style may change any.
+    sizes: answer.style.sizes,
+    numbers: answer.style.numbers,
   });
 
   // ---- Drawing.

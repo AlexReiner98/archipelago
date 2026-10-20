@@ -9,7 +9,7 @@ import { spent } from './spent.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
 import { findPlace, scopeOf } from './places.ts';
 import { brief } from './brief.ts';
-import { atlas } from './atlas.ts';
+import { atlas } from './atlas.ts'; import { pageStyle } from './styles.ts';
 
 /**
  * How a kernel view asks a question a pack answers (the gate asks proof of the software pack). Handed in by
@@ -496,10 +496,8 @@ export const VIEWS: Record<string, View> = {
     description: 'Every picture kept on the map (a lens, named by the style that draws it), with what it is a picture of: pinned first, then the newest. Params: limit (100).',
     run: (l, input) => atlas(l, input as { limit?: number }),
   },
-
-
-
-
-
-
+  style: {
+    description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page and the pages that are not pictures are drawn by. Params: of (an entity id).',
+    run: (l, input) => pageStyle(l, input),
+  },
 };

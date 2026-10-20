@@ -4,7 +4,7 @@
 import { api, ask, h, tell } from './base.js';
 import { renderBody } from './body.js';
 import { lensView } from './lens.js';
-import { chip, isA, pill, unfolded } from './words.js';
+import { isA } from './words.js';
 import { secretBox } from './workspace-cards.js';
 
 /** The item as a reader meets it, and the links to it that still work. */
@@ -21,30 +21,29 @@ export const figureOf = (s, cls = 'doc-figure') => {
   return img;
 };
 
-/** The text, each part where it falls. `here` is an item to mark in the pictures it brings in. */
-export function documentNote(doc, id, here) {
+/**
+ * The text, each part where it falls, read through as one piece: a section brought in is its title as a heading
+ * (the way to its own page) and its note as the page's style reads it; a lens is its picture, its note the caption.
+ * `here` is an item to mark in the pictures it brings in; `style` is the page's, which says how its notes read.
+ */
+export function documentNote(doc, id, here, style) {
+  const head = (s) => h('h3', { class: 'doc-head' }, h('a', { href: `#/e/${s.id}`, title: `Open "${s.title}"` }, s.title));
   const lensPart = (s) =>
     h(
-      'section',
+      'figure',
       { class: 'doc-lens' },
-      h('div', { class: 'doc-lens-head' }, chip(s.type), h('a', { class: 'grow', href: `#/e/${s.id}`, title: s.title }, s.title)),
+      head(s),
       h('div', { class: 'lens-card' }, lensView({ lens: { lens: s.id }, key: `doc:${id}:${s.id}`, bare: true, style: here ? { here } : {} })),
-      s.body && renderBody(s.body),
+      s.body && h('figcaption', {}, renderBody(s.body, { style })),
     );
   const part = (p) =>
     p.section && isA(p.section.type, 'lens')
       ? lensPart(p.section)
       : p.section
-        ? h(
-            'details',
-            { class: 'doc-section', open: unfolded.get(`${id}:${p.section.id}`) ?? Boolean(p.section.picture), ontoggle: (ev) => unfolded.set(`${id}:${p.section.id}`, ev.target.open) },
-            h('summary', {}, chip(p.section.type), h('span', { class: 'grow', title: p.section.title }, h('a', { href: `#/e/${p.section.id}` }, p.section.title)), pill(p.section.type, p.section.status)),
-            p.section.picture && figureOf(p.section),
-            p.section.body ? renderBody(p.section.body) : h('div', { class: 'empty' }, 'No notes.'),
-          )
+        ? h('section', { class: 'doc-part' }, head(p.section), p.section.picture && figureOf(p.section), p.section.body && renderBody(p.section.body, { style }))
         : p.missing
           ? h('div', { class: 'error' }, `${p.missing}: not found, archived or not yours to see`)
-          : renderBody(p.text.replace(/^#{1,3}\s+/gm, '')); // a heading for the reader is a section title here
+          : renderBody(p.text.replace(/^#{1,3}\s+/gm, ''), { style }); // a heading for the reader is a section title here
   return h('section', { class: 'card wide note doc' }, doc.parts.length ? doc.parts.map(part) : h('div', { class: 'empty' }, 'Nothing written yet.'));
 }
 
