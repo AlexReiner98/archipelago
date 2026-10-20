@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { bearer } from './auth.ts';
+import { redeemInvite, workspaceOfInvite } from './invite.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
 import type { Workspaces } from './workspaces.ts';
 
@@ -70,6 +71,18 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     if (at.tooOften()) return;
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(setupScript(origin, at.tokens));
+  }
+  // A sign-in link opened in a browser: its code traded, once, for the person's token.
+  if (req.method === 'POST' && path === '/connect/join') {
+    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in with tokens.' });
+    if (at.tooOften()) return;
+    const code = String(((await at.body()) as { code?: unknown } | undefined)?.code ?? '');
+    const workspace = workspaceOfInvite(code);
+    const gone = () => reply(res, 410, { error: 'This sign-in link has been used or has run out. Ask for a new one.' });
+    if (!workspace || !(await at.workspaces.has(workspace))) return gone();
+    res.once('close', at.workspaces.hold(workspace));
+    const token = await redeemInvite((await at.workspaces.get(workspace)).pelago.db, workspace, code);
+    return token ? reply(res, 200, { token }) : gone();
   }
   const poll = /^\/connect\/poll\/([a-z0-9-]+)\/(a_[0-9a-f]{12})$/.exec(path);
   if (req.method !== 'POST' || !(path === '/connect/request' || poll)) return reply(res, 404, { error: 'Not found' });

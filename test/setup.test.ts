@@ -285,7 +285,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
 
   const main = await workspaces.get('default');
   const admin = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const member = (await call('/api/member_add', admin, { name: 'Sam' })).result.token as string;
+  const member = (await call('/connect/join', undefined, { code: (await call('/api/member_add', admin, { name: 'Sam' })).result.code })).token as string;
   const robot = (await createToken(main.pelago.db, 'default', { kind: 'agent', name: 'robot' })).token;
   await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'Already here', visibility: 'shared' }] });
   assert.match((await call('/api/import_backup', member, { backup })).error, /Only a workspace admin/);

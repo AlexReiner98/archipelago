@@ -171,6 +171,16 @@ export function signIn(message) {
   input.focus();
 }
 
+/** Open a sign-in link: its code is traded once for this person's token, which the browser keeps. */
+export async function join(code) {
+  // The code leaves the address at once: it is not left in the history for the next person at this machine.
+  history.replaceState(null, '', '#/');
+  const res = await fetch('/connect/join', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return signIn(body.error ?? 'That sign-in link did not work.');
+  enter(body.token);
+}
+
 export async function showIdentity() {
   const slot = document.getElementById('whoami');
   try {

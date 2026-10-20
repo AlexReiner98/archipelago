@@ -128,7 +128,7 @@ test('inside a workspace, private things are hidden from other members by the da
   // The first admin becomes a person; then adds a colleague.
   const me = (await api(alex, 'init', { name: 'Alex' })).me;
   const added = await api(alex, 'member_add', { name: 'Sam' });
-  const sam = added.token as string;
+  const sam = (await call('/connect/join', undefined, { code: added.code })).token as string;
   assert.deepEqual(await titles(sam, 'person'), ['Alex', 'Sam'], 'people are shared so colleagues can refer to each other');
 
   // New things are private to their author unless they say otherwise.
@@ -213,7 +213,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
   };
   const refused = async (token: string, ops: unknown[]) => (await call('/api/change', token, { reason: 'x', ops })).error as string;
   await api(alex, 'init', { name: 'Alex' });
-  const sam = (await api(alex, 'member_add', { name: 'Sam' })).token as string;
+  const sam = (await call('/connect/join', undefined, { code: (await api(alex, 'member_add', { name: 'Sam' })).code })).token as string;
 
   const made = (await api(alex, 'change', { reason: 'x', ops: [
     { op: 'create', ref: 'pub', type: 'work.task', title: 'Public task', visibility: 'shared' },
@@ -315,3 +315,30 @@ test('dev mode turns review off and offers agents a restart; without it neither 
   assert.equal(loadConfig().dev, false);
 });
 
+
+test('a member signs in by a link that works once, and an admin can make them another', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const db = (await workspaces.get('default')).pelago.db;
+  const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const added = (await call('/api/member_add', alex, { name: 'Mani', admin: true })).result;
+  assert.match(added.code, /^inv_default_[0-9a-f]{40}$/);
+  assert.equal(added.token, undefined, 'no token travels in the link');
+
+  const joined = await call('/connect/join', undefined, { code: added.code });
+  assert.equal(joined.status, 200);
+  const mani = joined.token as string;
+  const who = await call('/whoami', mani, undefined, 'GET');
+  assert.deepEqual([who.actor.kind, who.actor.name, who.actor.admin, who.actor.person], ['human', 'Mani', true, added.person]);
+  assert.equal((await call('/connect/join', undefined, { code: added.code })).status, 410, 'a link works once');
+  assert.equal((await call('/connect/join', undefined, { code: 'inv_default_' + '0'.repeat(40) })).status, 410);
+  assert.equal((await call('/connect/join', undefined, { code: 'nonsense' })).status, 410);
+
+  // A second device: a new link for the same member, as the same person, with the same standing.
+  const token = ((await call('/api/token_list', alex)).result as any[]).find((t) => t.name === 'Mani' && t.kind === 'human');
+  const sam = (await call('/connect/join', undefined, { code: (await call('/api/member_add', alex, { name: 'Sam' })).result.code })).token as string;
+  assert.match((await call('/api/sign_in_link', sam, { token: token.id })).error, /Only a workspace admin/);
+  const again = (await call('/api/sign_in_link', alex, { token: token.id })).result;
+  const second = (await call('/connect/join', undefined, { code: again.code })).token as string;
+  assert.deepEqual((await call('/whoami', second, undefined, 'GET')).actor.person, added.person);
+  assert.equal((await call('/whoami', mani, undefined, 'GET')).actor.name, 'Mani', 'the first device stays signed in');
+});

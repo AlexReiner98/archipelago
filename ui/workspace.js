@@ -24,6 +24,14 @@ export async function workspace() {
   const fail = (err) => notice.replaceChildren(h('div', { class: 'error', style: 'padding: 10px 14px' }, err.message));
   const live = tokens.filter((t) => !t.revoked_at);
 
+  const linkBox = (made) => secretBox(`Sign-in link for ${made.name}: it works once, until ${when(made.expires_at)}. Send it to them privately.`, `${location.origin}/#/join/${made.code}`);
+  // The link is shown at the top of the page, which is out of sight from the Members card: it is brought into view.
+  const showLink = async (made) => {
+    await workspace();
+    main.children[1].replaceChildren(linkBox(made));
+    main.children[1].scrollIntoView({ block: 'center' });
+  };
+
   const tokenRow = (t) =>
     h(
       'li',
@@ -34,6 +42,7 @@ export async function workspace() {
         h('span', { class: 'chip' }, t.kind),
         h('span', { class: 'grow' }, h('strong', {}, t.name), t.admin && [' ', h('span', { class: 'pill' }, 'admin')], t.id === me.actor.token && [' ', h('span', { class: 'pill ok' }, 'this session')], scopePills(t)),
         t.kind === 'agent' && h('span', { class: 'muted small', title: [t.last_used ? `Last used ${when(t.last_used)}` : 'Never used', t.seen?.length ? `from ${t.seen.length} place${t.seen.length === 1 ? '' : 's'}: ${t.seen.join(', ')}` : ''].filter(Boolean).join(', ') }, t.expires_at ? `expires ${when(t.expires_at)}` : 'never expires'),
+        t.kind === 'human' && me.actor.admin && h('button', { title: 'A link that signs them in once more, on a new device', onclick: () => api('sign_in_link', { token: t.id }).then(showLink, fail) }, 'Sign-in link'),
         h(
           'button',
           {
@@ -119,7 +128,7 @@ export async function workspace() {
                 class: 'primary',
                 onclick: () =>
                   api('member_add', { name: memberName.value.trim(), email: memberEmail.value.trim() || undefined, admin: memberAdmin.checked })
-                    .then((made) => workspace().then(() => main.children[1].replaceChildren(secretBox(`Sign-in token for ${memberName.value.trim()}. Send it to them privately.`, made.token))))
+                    .then((made) => showLink({ ...made, name: memberName.value.trim() }))
                     .catch(fail),
               },
               'Add member',
