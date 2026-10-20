@@ -5,6 +5,7 @@ import { screensCard } from './nav.js';
 import { packsCard } from './packs.js';
 import { ago, when } from './words.js';
 import { scopePills } from './token-piece.js';
+import { membersCard } from './members-card.js';
 import { backupCard, connectBox, githubCard, operatorCard, ownerCard, secretBox } from './workspace-cards.js';
 
 export async function workspace() {
@@ -18,17 +19,14 @@ export async function workspace() {
       h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace)),
     );
   }
-  const [info, tokens, people] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 })]);
+  const [info, tokens, people, members] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 }), me.actor.admin ? api('member_list') : []]);
   const personName = (id) => people.find((p) => p.id === id)?.title;
   const notice = h('div');
   const fail = (err) => notice.replaceChildren(h('div', { class: 'error', style: 'padding: 10px 14px' }, err.message));
   const live = tokens.filter((t) => !t.revoked_at);
-
-  const linkBox = (made) => secretBox(`Sign-in link for ${made.name}: it works once, until ${when(made.expires_at)}. Send it to them privately.`, `${location.origin}/#/join/${made.code}`);
-  // The link is shown at the top of the page, which is out of sight from the Members card: it is brought into view.
-  const showLink = async (made) => {
-    await workspace();
-    main.children[1].replaceChildren(linkBox(made));
+  // A word at the top of the page once it is drawn again, brought into view from wherever the button was.
+  const show = (el) => {
+    main.children[1].replaceChildren(el);
     main.children[1].scrollIntoView({ block: 'center' });
   };
 
@@ -42,7 +40,6 @@ export async function workspace() {
         h('span', { class: 'chip' }, t.kind),
         h('span', { class: 'grow' }, h('strong', {}, t.name), t.admin && [' ', h('span', { class: 'pill' }, 'admin')], t.id === me.actor.token && [' ', h('span', { class: 'pill ok' }, 'this session')], scopePills(t)),
         t.kind === 'agent' && h('span', { class: 'muted small', title: [t.last_used ? `Last used ${when(t.last_used)}` : 'Never used', t.seen?.length ? `from ${t.seen.length} place${t.seen.length === 1 ? '' : 's'}: ${t.seen.join(', ')}` : ''].filter(Boolean).join(', ') }, t.expires_at ? `expires ${when(t.expires_at)}` : 'never expires'),
-        t.kind === 'human' && me.actor.admin && h('button', { title: 'A link that signs them in once more, on a new device', onclick: () => api('sign_in_link', { token: t.id }).then(showLink, fail) }, 'Sign-in link'),
         h(
           'button',
           {
@@ -61,9 +58,6 @@ export async function workspace() {
   // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
   const agentLife = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
   const agentToken = (fallback) => ({ kind: 'agent', name: agentName.value.trim() || fallback, ...(Number(agentLife.value) > 0 && { expires_days: Number(agentLife.value) }) });
-  const memberName = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: 160px' });
-  const memberEmail = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: 160px' });
-  const memberAdmin = h('input', { type: 'checkbox' });
   const accepts = h('input', { type: 'text', value: info.accepts_from.join(', '), placeholder: 'workspace ids, separated by commas', style: 'flex: 1; min-width: 220px' });
 
   main.replaceChildren(
@@ -110,31 +104,7 @@ export async function workspace() {
           ),
         ),
       ),
-      me.actor.admin &&
-        h(
-          'section',
-          { class: 'card wide' },
-          h('header', {}, h('h2', { class: 'hinted', title: 'People who can sign in to this workspace.' }, 'Members')),
-          h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'human').map(tokenRow)),
-          h(
-            'div',
-            { class: 'toolbar', style: 'padding: 12px 14px' },
-            memberName,
-            memberEmail,
-            h('label', {}, memberAdmin, ' Admin'),
-            h(
-              'button',
-              {
-                class: 'primary',
-                onclick: () =>
-                  api('member_add', { name: memberName.value.trim(), email: memberEmail.value.trim() || undefined, admin: memberAdmin.checked })
-                    .then((made) => showLink({ ...made, name: memberName.value.trim() }))
-                    .catch(fail),
-              },
-              'Add member',
-            ),
-          ),
-        ),
+      me.actor.admin && membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, show }),
       me.actor.admin &&
         h(
           'section',

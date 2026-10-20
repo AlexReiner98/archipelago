@@ -10,7 +10,8 @@ import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { bearer } from './auth.ts';
-import { redeemInvite, workspaceOfInvite } from './invite.ts';
+import { normalEmail } from './mail.ts';
+import { redeem, requestSignIn, workspaceOfCode } from './members.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
 import type { Workspaces } from './workspaces.ts';
 
@@ -50,10 +51,20 @@ export interface ConnectRoutes {
   tokens: boolean;
   /** The workspace a request that names none is for. */
   fallback: string;
-  workspaces: Pick<Workspaces, 'has' | 'get' | 'hold'>;
+  workspaces: Pick<Workspaces, 'has' | 'get' | 'hold' | 'list'>;
   /** True, and the request answered, when its address has asked too often. */
   tooOften: () => boolean;
   body: () => Promise<unknown>;
+}
+
+/** One sign-in mail a minute to an address, whoever asks: the form cannot be used to flood someone's inbox. */
+const lately = new Map<string, number>();
+function askedLately(email: string): boolean {
+  const now = Date.now();
+  for (const [e, at] of lately) if (now - at > 60_000) lately.delete(e);
+  if (lately.has(email)) return true;
+  lately.set(email, now);
+  return false;
 }
 
 const reply = (res: ServerResponse, status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body));
@@ -72,16 +83,27 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(setupScript(origin, at.tokens));
   }
-  // A sign-in link opened in a browser: its code traded, once, for the person's token.
-  if (req.method === 'POST' && path === '/connect/join') {
-    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in with tokens.' });
+  // Signing in by email: a link asked for at an address, and a link opened, its code traded once for a token.
+  if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join')) {
+    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
     if (at.tooOften()) return;
-    const code = String(((await at.body()) as { code?: unknown } | undefined)?.code ?? '');
-    const workspace = workspaceOfInvite(code);
+    const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown };
+    if (path === '/connect/sign-in') {
+      const email = normalEmail(body.email);
+      if (!email) return reply(res, 400, { error: 'That is not an email address.' });
+      // Answered at once and the same either way: whether the address is a member anywhere is not told.
+      if (!askedLately(email)) {
+        const all = (await at.workspaces.list()).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
+        void requestSignIn(all, email, origin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
+      }
+      return reply(res, 200, { sent_to: email });
+    }
+    const code = String(body.code ?? '');
+    const workspace = workspaceOfCode(code);
     const gone = () => reply(res, 410, { error: 'This sign-in link has been used or has run out. Ask for a new one.' });
     if (!workspace || !(await at.workspaces.has(workspace))) return gone();
     res.once('close', at.workspaces.hold(workspace));
-    const token = await redeemInvite((await at.workspaces.get(workspace)).pelago.db, workspace, code);
+    const token = await redeem((await at.workspaces.get(workspace)).pelago.db, workspace, code);
     return token ? reply(res, 200, { token }) : gone();
   }
   const poll = /^\/connect\/poll\/([a-z0-9-]+)\/(a_[0-9a-f]{12})$/.exec(path);

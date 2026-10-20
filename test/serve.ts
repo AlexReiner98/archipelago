@@ -6,8 +6,15 @@ import { join } from 'node:path';
 import { after } from 'node:test';
 import type { GithubApp } from '../src/github-app.ts';
 import type { Limit } from '../src/limit.ts';
+import { setMailer, type Mail } from '../src/mail.ts';
 import { createHttpServer } from '../src/server.ts';
 import { Workspaces } from '../src/workspaces.ts';
+
+// The mail the servers would send is kept here instead.
+export const mailbox: Mail[] = [];
+setMailer(async (mail) => void mailbox.push(mail));
+/** The code in the newest link sent to an address. */
+export const codeSentTo = (email: string) => /#\/join\/(inv_[a-z0-9-]+_[0-9a-f]{40})/.exec(mailbox.findLast((m) => m.to === email)?.text ?? '')?.[1];
 
 // What this machine keeps for its own sessions stays out of the tests: a setup run here would take it for a
 // machine connected before, and keep it again under the new names.
@@ -51,5 +58,11 @@ export async function serve(auth: 'off' | 'tokens', github?: (origin: string) =>
     }
     return { status: res.status, ...json };
   };
-  return { workspaces, call, base };
+  /** Add a member as an admin does, and sign them in by the link they were sent: their token. */
+  const member = async (admin: string, body: { email: string; name?: string; admin?: boolean }) => {
+    const added = await call('/api/member_add', admin, body);
+    if (added.status !== 200) throw new Error(added.error);
+    return (await call('/connect/join', undefined, { code: codeSentTo(body.email) })).token as string;
+  };
+  return { workspaces, call, base, member };
 }

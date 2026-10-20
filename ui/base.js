@@ -142,8 +142,17 @@ export async function api(tool, input = {}) {
 }
 
 export function signIn(message) {
-  const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: 260px', autocomplete: 'off' });
+  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 1; min-width: 240px', autocomplete: 'email' });
+  const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: 240px', autocomplete: 'off' });
   const error = h('div', { class: 'error', style: 'padding: 0 14px 14px' }, message ?? '');
+  const byEmail = h('div', { class: 'toolbar', style: 'padding: 14px' });
+  const sendLink = async () => {
+    const res = await fetch('/connect/sign-in', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.value.trim() }) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return (error.textContent = body.error ?? 'That did not work.');
+    error.textContent = '';
+    byEmail.replaceChildren(h('span', { class: 'muted' }, `If ${body.sent_to} is a member here, a sign-in link is on its way to it.`));
+  };
   const submit = async () => {
     store.token = input.value.trim();
     const res = await fetch('/whoami', { headers: authHeaders() });
@@ -154,21 +163,24 @@ export function signIn(message) {
     state.schema = undefined;
     route();
   };
+  email.addEventListener('keydown', (e) => e.key === 'Enter' && sendLink());
   input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  byEmail.replaceChildren(email, h('button', { class: 'primary', onclick: sendLink }, 'Email me a link'));
   const others = Object.entries(known.all());
   document.querySelector('#nav .brand').replaceChildren('Archipelago');
   document.title = 'Archipelago';
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Sign in'), h('p', { class: 'muted' }, 'This server asks for a token. It decides which workspace you see and what you may do.')),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Sign in')),
     h(
       'section',
       { class: 'card', style: 'max-width: 620px' },
       others.length > 0 && h('div', { class: 'toolbar', style: 'padding: 14px 14px 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
-      h('div', { class: 'toolbar', style: 'padding: 14px' }, input, h('button', { class: 'primary', onclick: submit }, 'Sign in')),
+      byEmail,
       error,
+      h('details', { style: 'padding: 0 14px 14px' }, h('summary', { class: 'muted small', title: 'For an agent, or a workspace’s first sign-in' }, 'With a token'), h('div', { class: 'toolbar', style: 'padding-top: 10px' }, input, h('button', { onclick: submit }, 'Sign in'))),
     ),
   );
-  input.focus();
+  email.focus();
 }
 
 /** Open a sign-in link: its code is traded once for this person's token, which the browser keeps. */

@@ -19,7 +19,7 @@ import { databaseFor } from './pg.ts';
 import type { Workspaces } from './workspaces.ts';
 
 /** Every table, parents before the rows that point at them. */
-const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act'] as const;
+const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member'] as const;
 
 export interface Dump {
   format: 1;
