@@ -31,10 +31,10 @@ export async function make(l: Archipelago, ops: Op[]) {
 /** A project in a repo, with one task that needs the live lane and one that does not. */
 export async function laneSetup(l: Archipelago) {
   return make(l, [
-    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Aperture repo', props: { path: 'C:\\code\\Aperture' } },
-    { op: 'create', ref: 'proj', type: 'work.project', title: 'Aperture' },
+    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
+    { op: 'create', ref: 'proj', type: 'work.project', title: 'Apex' },
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
-    { op: 'create', ref: 'rule', type: 'work.decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives Rhino.' } },
+    { op: 'create', ref: 'rule', type: 'work.decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives the CAD app.' } },
     { op: 'create', ref: 'live', type: 'work.task', title: 'Capture probe' },
     { op: 'create', ref: 'offline', type: 'work.task', title: 'Write unit tests' },
     { op: 'create', ref: 'q', type: 'work.decision', title: 'Which target?' },

@@ -2,7 +2,7 @@
 // (src/smtp.ts), signed with DKIM so the recipient's server can tell it really comes from our domain.
 //
 // Settings, from the environment:
-//   PELAGO_MAIL_FROM      who it is from, e.g. "Archipelago <signin@archipelago.tools>". Without it nothing is sent:
+//   PELAGO_MAIL_FROM      who it is from, e.g. "Archipelago <signin@example.com>". Without it nothing is sent:
 //                         each message is written to the server's log instead, which is what a laptop wants.
 //   PELAGO_SMTP_URL       a relay to hand mail to (smtp://user:pass@host:587); without it, mail goes straight to the
 //                         recipient's servers.

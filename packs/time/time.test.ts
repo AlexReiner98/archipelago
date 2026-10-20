@@ -67,7 +67,7 @@ function ctxOver(items: Item[], links: Link[], lens: unknown = { items: [] }, no
 }
 
 const MAP: Item[] = [
-  { id: 'me', type: 'company', title: 'Aperture Design Tools Inc.', props: { address: '1 King St' } },
+  { id: 'me', type: 'company', title: 'Apex Design Tools Inc.', props: { address: '1 King St' } },
   { id: 'nw', type: 'company', title: 'Northwind', props: { rate: 80, hst: true, terms_days: 30, billed_by: 'me' } },
   { id: 'p', type: 'work.project', title: 'Northwind research' },
   { id: 't', type: 'work.task', title: 'Funding research' },
@@ -93,7 +93,7 @@ test('time is logged as a block or as hours, on the day it began where the work 
   ]);
   assert.equal(block.answer.client, 'Northwind', 'the company the work sits in involves');
   const hours = await handler['time.log']({ work: 'me', hours: 2, what: 'Books', planned: true, billable: false }, ctx);
-  assert.deepEqual([hours.ops[0].status, hours.ops[0].props, hours.answer.client], ['planned', { date: '2026-10-16', hours: 2, billable: false }, 'Aperture Design Tools Inc.'], 'today in Toronto; a company is its own client');
+  assert.deepEqual([hours.ops[0].status, hours.ops[0].props, hours.answer.client], ['planned', { date: '2026-10-16', hours: 2, billable: false }, 'Apex Design Tools Inc.'], 'today in Toronto; a company is its own client');
   await assert.rejects(handler['time.log']({ work: 't', hours: 30, what: 'Too long' }, ctx), /at most 24/);
   await assert.rejects(handler['time.log']({ work: 'nowhere', hours: 1, what: 'x' }, ctx), /No work "nowhere"/);
 });

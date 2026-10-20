@@ -175,7 +175,7 @@ test('a connection\'s tool-call log is imported once into the activity log', asy
   const log = join(mkdtempSync(join(tmpdir(), 'pelago-audit-')), 'audit.jsonl');
   const line = (ts: string, tool: string) => JSON.stringify({ ts, tool, params: { n: 1 }, durationMs: 12, ok: true, error: null });
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), 'not json', line('2026-10-01T10:00:05.000Z', 'run_command')].join('\n'));
-  const made = await make(l, [{ op: 'create', ref: 'c', type: 'sys.connection', title: 'Aperture', props: { audit_log: log } }]);
+  const made = await make(l, [{ op: 'create', ref: 'c', type: 'sys.connection', title: 'Apex', props: { audit_log: log } }]);
 
   assert.deepEqual(await l.importAudit(agent, { connection: made.c }), { imported: 2, skipped: 1, path: log });
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), line('2026-10-01T10:00:09.000Z', 'form_snapshot')].join('\n'));
@@ -183,7 +183,7 @@ test('a connection\'s tool-call log is imported once into the activity log', asy
 
   const external = (await l.events({ origin: 'external' })) as any[];
   assert.deepEqual(external.map((e) => e.action), ['form_snapshot', 'run_command', 'nodegraph_add_node']);
-  assert.equal(external[0].actor, 'external:Aperture');
+  assert.equal(external[0].actor, 'external:Apex');
   assert.equal(new Date(external[0].ts).toISOString(), '2026-10-01T10:00:09.000Z');
 });
 

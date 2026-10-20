@@ -7,8 +7,8 @@ is how to work on it.
 ## Where things stand
 
 The state of this build is kept in an Archipelago map, not in this file. Which map
-that is belongs to whoever is working: the maintainer's sessions keep theirs
-on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
+that is belongs to whoever is working; `CLAUDE.local.md` (not tracked) says
+where, and how that server is run.
 
 - **If your pelago tools are connected to a map that tracks this
   repository,** start with `view`, name `handoff`, and the repository. One
@@ -39,9 +39,9 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
   restart it and wait for `GET /health`: with the `restart` tool if your
   pelago tools are the local server's, otherwise
   `curl -X POST http://127.0.0.1:3100/agent/restart -H "content-type: application/json" -d "{}"`. `/health` says which commit the
-  server was started from and when (`commit`, `started`): after a push, the
-  new code is live on the hosted server when its `commit` is the one you
-  pushed (`git rev-parse HEAD`), not merely when it answers. If it does not come back, the
+  server was started from and when (`commit`, `started`): any server runs
+  new code when its `commit` is the one you mean (`git rev-parse HEAD`), not
+  merely when it answers. If it does not come back, the
   reason is in `runs/dev-server.log`; fix the code and it starts again on the
   next file change. Without dev mode (no `restart` tool), ask the owner.
 - **Test where the owner can watch.** Try things on the local server (port
@@ -54,13 +54,9 @@ on a hosted server, and `CLAUDE.local.md` (not tracked) says where.
 - **Name what a change makes by its ref.** A title or note in the same change
   as a new item names it as `{ref}`, which becomes the item's id when the
   change is applied. Do not write an id you have not been given.
-- **A push restarts the hosted server under every open session.** For a
-  minute or more their tool calls fail, each failure a whole error page in
-  their context. Gather what is ready into one push; do not push each small
-  commit as it is made.
-- **After a deploy your tool list is old.** The client keeps the tools as
-  they were when it connected; the prompt hook says when the server has
-  restarted under the session. A tool or input the server has and your list
+- **After the server restarts on new code, your tool list is old.** The
+  client keeps the tools as they were when it connected; the prompt hook says
+  when the server has restarted under the session. A tool or input the server has and your list
   lacks can be called as plain JSON (`POST /agent/<tool>` with the agent
   token from the environment, never printed), or the owner can reconnect.
 - **Say who is waited on with a relation, not a sentence.** Work that cannot

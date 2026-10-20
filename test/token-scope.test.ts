@@ -18,7 +18,7 @@ async function setUp() {
     await call('/api/change', admin, {
       reason: 'x',
       ops: [
-        { op: 'create', ref: 'env', type: 'software.environment', title: 'archipelago-1' },
+        { op: 'create', ref: 'env', type: 'software.environment', title: 'server-1' },
         { op: 'create', ref: 'blue', type: 'software.component', title: 'App, blue', status: 'up', props: { url: 'http://app-blue:3100/health' } },
         { op: 'create', ref: 'green', type: 'software.component', title: 'App, green', status: 'planned', props: { url: 'http://app-green:3100/health' } },
         { op: 'create', ref: 'llm', type: 'software.component', title: 'LiteLLM', status: 'up', props: { url: 'http://litellm:4000/health' } },
@@ -49,7 +49,7 @@ test('a token that may only report sends readings about what it is within, appli
   assert.equal((await call('/agent/report', kuma, beat(1, { name: 'LiteLLM', type: 'http', url: 'http://litellm:4000/health/' }, 'OK'))).result.changed[0].to, 'up');
   assert.deepEqual((await call('/api/proposals', admin)).result, []);
   // A part outside what it is within is not its to report on.
-  assert.match((await call('/agent/report', kuma, beat(0, { name: 'Laptop proxy', type: 'http', url: 'http://laptop:8080' }))).error, /limited to the work of archipelago-1\. "Laptop proxy" is not part of it/);
+  assert.match((await call('/agent/report', kuma, beat(0, { name: 'Laptop proxy', type: 'http', url: 'http://laptop:8080' }))).error, /limited to the work of server-1\. "Laptop proxy" is not part of it/);
   assert.equal(await status('other'), 'up');
 });
 
@@ -80,7 +80,7 @@ test('a token is within any item, and writes only what is part of it', async () 
   const { call, made, token } = await setUp();
   const env = await token({ name: 'env', within: [made.env] });
   assert.equal((await call('/agent/change', env, { reason: 'x', ops: [{ op: 'update', id: made.blue, props: { host: 'app-blue' } }] })).result.status, 'proposed');
-  assert.match((await call('/agent/change', env, { reason: 'x', ops: [{ op: 'update', id: made.task, status: 'doing' }] })).error, /limited to the work of archipelago-1\. "Paint the fence" is not part of it/);
+  assert.match((await call('/agent/change', env, { reason: 'x', ops: [{ op: 'update', id: made.task, status: 'doing' }] })).error, /limited to the work of server-1\. "Paint the fence" is not part of it/);
   assert.equal((await call('/agent/get', env, { id: made.task })).result.entity.title, 'Paint the fence', 'it reads what its person reads');
 });
 

@@ -33,7 +33,7 @@ const acted = async (...a: Parameters<typeof callTool>): Promise<unknown> => ((r
 test('time is logged against work, summed by day and client, and billed on a numbered invoice that can be voided', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'ap', type: 'company', title: 'Aperture Design Tools Inc.', props: { address: '1 King St, Toronto', hst_number: '123456789RT0001' } },
+    { op: 'create', ref: 'ap', type: 'company', title: 'Apex Design Tools Inc.', props: { address: '1 King St, Toronto', hst_number: '123456789RT0001' } },
     { op: 'create', ref: 'aa', type: 'company', title: 'Northwind', props: { rate: 80, hst: true, terms_days: 30, billed_by: 'PLACEHOLDER' } },
     { op: 'create', ref: 'p', type: 'work.project', title: 'Northwind research project' },
     { op: 'create', ref: 't', type: 'work.task', title: 'Funding research' },
@@ -59,7 +59,7 @@ test('time is logged against work, summed by day and client, and billed on a num
   assert.deepEqual([inv.number.replace(/\d{4}/, 'YYYY'), inv.entries, inv.subtotal, inv.tax, inv.total], ['INV-YYYY-001', 2, 360, 46.8, 406.8]);
   const doc = (await callTool(l, human, 'document', { id: inv.created.inv })) as { parts: { text?: string }[] };
   const text = doc.parts.map((p) => p.text).join('\n');
-  assert.match(text, /\| \*\*Aperture Design Tools Inc\.\*\* \| \*\*Northwind\*\* \|\n\| 1 King St, Toronto \|  \|\n\| HST 123456789RT0001 \|  \|/);
+  assert.match(text, /\| \*\*Apex Design Tools Inc\.\*\* \| \*\*Northwind\*\* \|\n\| 1 King St, Toronto \|  \|\n\| HST 123456789RT0001 \|  \|/);
   assert.match(text, /\| Oct 14 \| Funding research \| 3 \| \$80\.00 \| \$240\.00 \|/);
   const read = (await callTool(l, human, 'document', { id: inv.created.inv })) as { type: string; fields: Record<string, unknown> };
   assert.equal(read.type, 'time.invoice');
@@ -82,7 +82,7 @@ test('time is logged against work, summed by day and client, and billed on a num
 test('a block of time has hours from its start and end, and a week holds the owner’s blocks beside the agents’ lanes', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'ap', type: 'work.project', title: 'Aperture' },
+    { op: 'create', ref: 'ap', type: 'work.project', title: 'Apex' },
     { op: 'create', ref: 't', type: 'work.task', title: 'Sun study loop' },
     { op: 'create', ref: 'ar', type: 'work.project', title: 'Archipelago' },
     { op: 'create', ref: 'repo', type: 'software.repo', title: 'Archipelago repo', props: { path: 'c:/code/arch' } },
@@ -111,7 +111,7 @@ test('a block of time has hours from its start and end, and a week holds the own
   type B = { id: string; what: string; from_hour: number | null; to_hour: number | null; hours: number; project: string | null; session?: string };
   const wk = (await callTool(l, human, 'time_week', { from: '2026-10-15' })) as { from: string; to: string; projects: { id: string; title: string }[]; days: { date: string; hours: number; owner: B[]; agents: B[][] }[] };
   assert.deepEqual([wk.from, wk.to, wk.days.length], ['2026-10-12', '2026-10-18', 7], 'any day names its week, Monday to Sunday');
-  assert.deepEqual(wk.projects.map((p) => p.title).sort(), ['Aperture', 'Archipelago']);
+  assert.deepEqual(wk.projects.map((p) => p.title).sort(), ['Apex', 'Archipelago']);
   const wed = wk.days[2];
   assert.deepEqual(wed.owner.map((b) => [b.what, b.from_hour, b.to_hour, b.project]), [['Reviewed the loop', 13, 15.5, made.ap]]);
   assert.equal(wed.agents.length, 2, 'one lane for each agent at work at once');
@@ -220,7 +220,7 @@ test('a routine is drawn on the days it falls on; one for work waits to be confi
   const now = today();
   const back = (n: number) => new Date(Date.parse(`${now}T12:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Aperture' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Apex' },
     { op: 'create', ref: 'dinner', type: 'time.routine', title: 'Dinner', status: 'active', props: { ...dinner, starts: back(10) } },
     { op: 'create', ref: 'deep', type: 'time.routine', title: 'Deep work', status: 'active', props: { from_time: '09:00', to_time: '11:00', starts: back(2) } },
     { op: 'link', type: 'part_of', from: 'deep', to: 'p' },

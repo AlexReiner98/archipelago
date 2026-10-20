@@ -9,7 +9,7 @@
       "id": "software.application",
       "extends": "place",
       "title": "Application",
-      "description": "A software application the work uses or targets, such as Rhino or Revit.",
+      "description": "A software application the work uses or targets, such as a CAD program or a browser.",
       "statuses": { "open": ["in_use"], "closed": ["retired"] },
       "fields": { "version": { "type": "string" } }
     },
@@ -79,7 +79,7 @@
       "fields": {
         "compares": { "type": "string", "description": "What is compared with what, in one line a user can read: the position of the sun against the NOAA calculator in six cities." },
         "tolerance": { "type": "string", "description": "How close it must be to pass, e.g. within 0.01 degrees." },
-        "environment": { "type": "string", "description": "Where it runs and draws its picture: outside any host, in Rhino, in Revit." }
+        "environment": { "type": "string", "description": "Where it runs and draws its picture: outside any host, or inside the program it extends." }
       }
     },
     {

@@ -44,7 +44,7 @@ test('a dependency cycle does not hang the views', async () => {
 test('an exclusive resource has one holder, and blocks other work that needs it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Live Rhino lane' },
+    { op: 'create', ref: 'lane', type: 'resource', title: 'Live CAD lane' },
     { op: 'create', ref: 'run1', type: 'sys.run', title: 'Session one' },
     { op: 'create', ref: 'run2', type: 'sys.run', title: 'Session two' },
     { op: 'create', ref: 'live1', type: 'work.task', title: 'Capture parity probe' },
@@ -62,7 +62,7 @@ test('an exclusive resource has one holder, and blocks other work that needs it'
 
   const during = await attend(l, { reasons: ['ready', 'blocked'] });
   assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'ready').map((t: any) => t.title).sort(), ['Capture parity probe', 'Write unit tests']);
-  assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'blocked').map((t: any) => [t.title, t.reasons[0].by]), [['Debug conduit', ['Live Rhino lane']]]);
+  assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'blocked').map((t: any) => [t.title, t.reasons[0].by]), [['Debug conduit', ['Live CAD lane']]]);
   assert.equal((await heldResources(l))[0].held_by_title, 'Session one');
 
   assert.deepEqual(await l.release(agent, { resource: made.lane, holder: made.run1, reason: 'Done' }), { released: 1 });

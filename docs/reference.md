@@ -151,8 +151,8 @@ both: created entities are archived, edits put back, links removed or
 restored, archived entities restored. An edit that has been changed again
 since is left alone and reported. A merge cannot be undone automatically.
 
-`claim` and `release` (taking an exclusive resource, such as the one live Rhino
-session) take effect at once for agents too.
+`claim` and `release` (taking an exclusive resource, such as the one live session
+of a desktop program) take effect at once for agents too.
 
 ## Sessions and the live lane
 
@@ -691,7 +691,7 @@ change that:
 
 - **The mail it sends** goes out from the server itself, straight to the
   recipient's mail servers, so it passes through no mail service elsewhere.
-  `PELAGO_MAIL_FROM` names the sender (`Archipelago <signin@archipelago.tools>`);
+  `PELAGO_MAIL_FROM` names the sender (`Archipelago <signin@example.com>`);
   without it nothing is sent and each message is written to the server's log.
   For it to arrive, and not as spam, the sending domain needs: an SPF record
   naming the server's address (`v=spf1 ip4:<address> -all`), a DKIM key
