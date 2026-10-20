@@ -8,7 +8,8 @@ export const types = new Map();
 export const relations = new Map();
 
 export async function loadSchema() {
-  state.schema = await api('schema');
+  // The schema, and the workspace's style: what a page that is not a picture is drawn by, until it asks for its own.
+  [state.schema, state.style] = await Promise.all([api('schema'), api('view', { name: 'style', params: {} }).then((r) => r.style)]);
   types.clear();
   relations.clear();
   for (const t of state.schema.types) types.set(t.id, t);

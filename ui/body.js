@@ -1,6 +1,6 @@
 // A note as a page: its first paragraph and the titles of its sections, each one click away.
 
-import { h } from './base.js';
+import { h, state } from './base.js';
 import { idsAsLinks } from './words.js';
 
 /**
@@ -38,14 +38,23 @@ export function drawTable(t, cell) {
   );
 }
 
-/** `whole`: for a document, the one place meant to be read through: every section open, its title a heading. */
-export function renderBody(text, { whole = false } = {}) {
+/**
+ * How a note reads is its page's style (page.notes: folded, or whole as a document is read through) and how much of
+ * it opens is the style's numbers (note_*): the house style says, a kind's or an item's may say otherwise. Without a
+ * page's own, the workspace's.
+ */
+export function renderBody(text, { style = state.style } = {}) {
+  const whole = style.page?.notes === 'whole';
+  const n = (name) => {
+    if (typeof style.numbers?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every number a note is read by`);
+    return style.numbers[name];
+  };
   const heading = (line) => /^[A-Z0-9][A-Z0-9 ,'()\/&-]{2,60}:?$/.test(line.trim()) && /[A-Z]{3}/.test(line);
   const item = (line) => /^\s*(-|\*|\d+\.|[A-Z]\.)\s+/.exec(line);
   const sections = [{ title: null, lines: [] }];
   const lines = text.split('\n');
   // A short line that opens a paragraph and does not end as a sentence is that paragraph's title.
-  const titles = (line, i) => !lines[i - 1]?.trim() && Boolean(lines[i + 1]?.trim()) && line.trim().length <= 90 && !/[.;,|]$/.test(line.trim()) && !item(line);
+  const titles = (line, i) => !lines[i - 1]?.trim() && Boolean(lines[i + 1]?.trim()) && line.trim().length <= n('note_title_most') && !/[.;,|]$/.test(line.trim()) && !item(line);
   for (const [i, line] of lines.entries()) {
     if (heading(line) || (line.trim() && titles(line, i))) sections.push({ title: line.trim().replace(/:$/, ''), lines: [] });
     else sections.at(-1).lines.push(line);
@@ -97,8 +106,9 @@ export function renderBody(text, { whole = false } = {}) {
     if (first.tagName === 'TABLE') return [first, more.length > 0 && h('details', { class: 'section' }, h('summary', {}, 'More'), more)];
     // A first paragraph that is itself long is shown as its first sentences, and whole with the rest.
     const text = first.textContent;
-    const long = text.length > 320 || first.tagName !== 'P';
-    const start = long ? h('p', {}, `${(/^.{80,300}?[.:](?=\s)/s.exec(text)?.[0] ?? text.slice(0, 240)).trim()} …`) : first;
+    const long = text.length > n('note_opening_most') || first.tagName !== 'P';
+    const sentence = new RegExp(`^.{${n('note_sentence_least')},${n('note_sentence_most')}}?[.:](?=\\s)`, 's');
+    const start = long ? h('p', {}, `${(sentence.exec(text)?.[0] ?? text.slice(0, n('note_opening_cut'))).trim()} …`) : first;
     const rest = long ? [first, ...more] : more;
     return [start, rest.length > 0 && h('details', { class: 'section' }, h('summary', {}, 'More'), rest)];
   };

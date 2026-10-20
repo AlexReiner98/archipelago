@@ -23,10 +23,10 @@ export const figureOf = (s, cls = 'doc-figure') => {
 
 /**
  * The text, each part where it falls, read through as one piece: a section brought in is its title as a heading
- * (the way to its own page) and its note whole; a lens is its picture with the note under it as a caption.
- * `here` is an item to mark in the pictures it brings in.
+ * (the way to its own page) and its note as the page's style reads it; a lens is its picture, its note the caption.
+ * `here` is an item to mark in the pictures it brings in; `style` is the page's, which says how its notes read.
  */
-export function documentNote(doc, id, here) {
+export function documentNote(doc, id, here, style) {
   const head = (s) => h('h3', { class: 'doc-head' }, h('a', { href: `#/e/${s.id}`, title: `Open "${s.title}"` }, s.title));
   const lensPart = (s) =>
     h(
@@ -34,16 +34,16 @@ export function documentNote(doc, id, here) {
       { class: 'doc-lens' },
       head(s),
       h('div', { class: 'lens-card' }, lensView({ lens: { lens: s.id }, key: `doc:${id}:${s.id}`, bare: true, style: here ? { here } : {} })),
-      s.body && h('figcaption', {}, renderBody(s.body, { whole: true })),
+      s.body && h('figcaption', {}, renderBody(s.body, { style })),
     );
   const part = (p) =>
     p.section && isA(p.section.type, 'lens')
       ? lensPart(p.section)
       : p.section
-        ? h('section', { class: 'doc-part' }, head(p.section), p.section.picture && figureOf(p.section), p.section.body && renderBody(p.section.body, { whole: true }))
+        ? h('section', { class: 'doc-part' }, head(p.section), p.section.picture && figureOf(p.section), p.section.body && renderBody(p.section.body, { style }))
         : p.missing
           ? h('div', { class: 'error' }, `${p.missing}: not found, archived or not yours to see`)
-          : renderBody(p.text.replace(/^#{1,3}\s+/gm, ''), { whole: true }); // a heading for the reader is a section title here
+          : renderBody(p.text.replace(/^#{1,3}\s+/gm, ''), { style }); // a heading for the reader is a section title here
   return h('section', { class: 'card wide note doc' }, doc.parts.length ? doc.parts.map(part) : h('div', { class: 'empty' }, 'Nothing written yet.'));
 }
 

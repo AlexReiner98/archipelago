@@ -9,7 +9,7 @@
 // the preset's place; retired, the preset is not used. Read each time, so a change shows on the next look.
 
 import { stylesOf, type StyleDef } from './declared.ts';
-import type { Kept } from './lens-kept.ts';
+import { keptOf, type Kept } from './lens-kept.ts';
 import type { Archipelago } from './pelago.ts';
 
 export interface Preset extends StyleDef {
@@ -43,6 +43,13 @@ const listed = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
 export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk): Promise<{ style: Record<string, unknown>; used: { id: string; title: string; preset?: string }[] }> {
   const presets: Preset[] = stylesOf(l.registry.packs);
   const versions = await versionsOf(l);
+  // A field that names things (sizes, numbers, colours, a page) is merged name by name: a nearer style that sets one keeps the rest.
+  const named = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+  const over = (base: Record<string, unknown>, top: Record<string, unknown>) => {
+    const out = { ...base };
+    for (const [key, value] of Object.entries(top)) out[key] = named(value) && named(out[key]) ? { ...out[key], ...value } : value;
+    return out;
+  };
   const onIt = (on: string[]) => ask.hub !== undefined && on.some((t) => l.registry.isA(ask.hub!.type, t));
   const layers: { weight: number; id: string; title: string; preset?: string; props: Record<string, unknown> }[] = [];
   for (const p of presets) {
@@ -51,7 +58,7 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk): Pro
     const on = mine && listed(mine.props.on).length ? listed(mine.props.on) : (p.on ?? []);
     const weight = !on.length ? 0 : onIt(on) ? 2 : -1;
     if (weight < 0) continue;
-    layers.push({ weight, id: mine?.id ?? p.id, title: mine?.title || p.title, preset: p.id, props: { ...p.props, ...(mine ? fields(mine.props) : {}) } });
+    layers.push({ weight, id: mine?.id ?? p.id, title: mine?.title || p.title, preset: p.id, props: mine ? over(p.props, fields(mine.props)) : p.props });
   }
   for (const one of kept) {
     if (one.props.preset != null) continue;
@@ -60,10 +67,8 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk): Pro
     if (weight >= 0) layers.push({ weight, id: one.id, title: one.title, props: one.props });
   }
   layers.sort((a, b) => a.weight - b.weight);
-  const style: Record<string, unknown> = {};
-  // A field that names things (sizes, numbers, colours, a palette) is merged name by name: a nearer style that sets one size keeps the rest.
-  const named = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
-  for (const layer of layers) for (const [key, value] of Object.entries(fields(layer.props))) style[key] = named(value) && named(style[key]) ? { ...style[key], ...value } : value;
+  let style: Record<string, unknown> = {};
+  for (const layer of layers) style = over(style, fields(layer.props));
   return { style, used: layers.map(({ id, title, preset }) => ({ id, title, ...(preset && { preset }) })) };
 }
 
@@ -77,4 +82,12 @@ export async function withStyles<T extends { styles: Preset[] }>(l: Archipelago,
       return { ...p, ...(mine && { item: mine.id, ...(!mine.is_open && { retired: true }) }) };
     }),
   };
+}
+
+/** The style a page is drawn in: of one item (its kind's, then its own), or the workspace's. What the item page and the pages that are not pictures read. */
+export async function pageStyle(l: Archipelago, input: { of?: unknown }) {
+  const of = typeof input.of === 'string' ? input.of : undefined;
+  const item = of === undefined ? undefined : (await l.db.query<{ id: string; type: string }>('select id, type from entity where id = $1', [of])).rows[0];
+  if (of !== undefined && !item) throw new Error(`No entity "${of}"`);
+  return styleFor(l, await keptOf(l, 'style', undefined), item ? { hub: item } : {});
 }

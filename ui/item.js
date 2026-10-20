@@ -53,6 +53,8 @@ export async function entity(id, here) {
   const story = run && e.props.story?.length ? await api('view', { name: 'story', params: { run: id } }).catch(() => null) : null;
   // An item a screen reads whole is met as its reader meets it: its text with the items it brings in, in their places.
   const { doc, links } = readWhole(e.type) ? await readDocument(id) : { doc: null, links: [] };
+  // How its page looks is its style: the house style's, its kind's (a document reads through), its own.
+  const looks = (await api('view', { name: 'style', params: { of: id } })).style;
 
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
   // What names it, less what the trail already leads to; and what it makes for a reader, named under its title.
@@ -91,11 +93,11 @@ export async function entity(id, here) {
     e.props.last_seen && h('span', { class: 'fact' }, h('span', { class: 'muted' }, 'heard from '), ago(e.props.last_seen)),
     e.props.tokens_used > 0 && h('span', { class: 'fact', title: `${e.props.tokens_used} tokens, input and output, not counting cached re-reads` }, h('span', { class: 'muted' }, 'used '), tokensText(e.props.tokens_used)),
   ];
-  const short = fields.filter(([, v]) => String(v).length <= 32);
+  const short = fields.filter(([, v]) => String(v).length <= looks.numbers.fact_most);
   // A field that holds an item's id says that item's name, as a way to it.
   await Promise.all(short.filter(([, v]) => ID.test(String(v)) && !titles.has(String(v))).map(([, v]) => api('get', { id: String(v) }).then((r) => titles.set(r.entity.id, r.entity.title), () => null)));
   const value = (v) => (ID.test(String(v)) ? idsAsLinks(String(v)) : String(v));
-  const long = fields.filter(([, v]) => String(v).length > 32);
+  const long = fields.filter(([, v]) => String(v).length > looks.numbers.fact_most);
   const edit = () => {
     const form = entityForm(e.type, e, {
       submitLabel: 'Save',
@@ -134,13 +136,13 @@ export async function entity(id, here) {
   };
 
   const note = doc
-    ? documentNote(doc, id, here)
+    ? documentNote(doc, id, here, looks)
     : h(
         'section',
         { class: 'card wide note' },
         keepsFigure(e.type) && figureOf(e, 'figure'),
-        long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > 140 ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
-        e.body ? renderBody(e.body) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
+        long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > looks.numbers.field_fold_at ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
+        e.body ? renderBody(e.body, { style: looks }) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
       );
   const screens = drawScreens({ e, data, id, redraw: again });
 
@@ -224,16 +226,16 @@ export async function entity(id, here) {
     ties.editor,
     acting,
     // Where it sits and what it holds, as a picture: the lens and the style kept for it, or the ones every item opens on. It takes no room when there is nothing to draw.
-    // A document is that picture itself: what it holds is in its text, in the order it is read.
-    ...(story ? [storyPart(story)].flat() : doc ? [] : [h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true }))]),
+    // Whether its page draws that picture is its style's (a document's preset says no: what it holds is in its text).
+    ...(story ? [storyPart(story)].flat() : !looks.page.picture ? [] : [h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true }))]),
     // What it holds up and what holds it, said outright: a picture places them, these say which way the tie runs.
     (holding.length + heldBy.length > 0 || '') &&
-      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, holding.length > 0 && fold(id, 'holding', 'Waiting on this', holding.length, true, tieRows(holding)), heldBy.length > 0 && fold(id, 'held', 'This waits on', heldBy.length, true, tieRows(heldBy))),
+      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, holding.length > 0 && fold(id, 'holding', 'Waiting on this', holding.length, looks.page.ties === 'open', tieRows(holding)), heldBy.length > 0 && fold(id, 'held', 'This waits on', heldBy.length, looks.page.ties === 'open', tieRows(heldBy))),
     // What it is comes before what its screens draw of it: said under a chart, it reads as a caption to it.
     // A session that tells its story keeps its log of notes behind a fold: the story is what it says.
     h('div', { class: 'grid', style: 'margin-bottom: 14px' }, story ? fold(id, 'log', 'Log', 0, false, note) : note),
     screens.column,
-    h('div', { class: 'grid' }, fold(id, 'history', 'History', lines.length, false, lines)),
+    h('div', { class: 'grid' }, fold(id, 'history', 'History', lines.length, looks.page.history === 'open', lines)),
   );
   screens.after();
 }
