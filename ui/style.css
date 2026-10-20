@@ -402,7 +402,7 @@ details.folded[open] > summary::before { content: "\25BE  "; }
 button.quiet-button { padding: 2px 9px; font-size: 12px; }
 
 @media (max-width: 720px) {
-  body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
   #nav { align-items: center; position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
   #nav .brand { padding: 4px 10px; }
   #main { padding: 16px; }
@@ -557,7 +557,7 @@ details.menu > .menu-items > button:hover { background: var(--accent-soft); }
 .part + .part:not([hidden]) { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
 /* One thing at a time under the search box, and a section under a page has a section's heading. */
 .part[data-part="map"] ~ .part:not([hidden]) { margin-top: 16px; padding-top: 0; border-top: 0; }
-.screens { display: grid; gap: 14px; margin-bottom: 14px; } .screens:empty, .screens > :empty { display: none; }
+.screens { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 14px; } .screens:empty, .screens > :empty { display: none; }
 .part[data-part="item"]:not([hidden]) ~ .part[data-part="graph"] .page-head h1 { font-size: 16px; }
 .part[data-part="automations"] .page-head h1 { font-size: 16px; }
 .projects-top { margin-bottom: 14px; }
