@@ -87,6 +87,10 @@ test('health is read from the status word, and a wire from its own state or else
   assert.equal(wireState({}, up, down), 'broken');
   assert.equal(wireState({ state: 'planned' }, up, up), 'planned', 'two parts up need not be wired to each other yet');
   assert.equal(wireState({ state: 'nonsense' }, up, up), 'wired');
+  const idle = item('s', 'r', 'standby');
+  assert.equal(health(idle), 'standby');
+  assert.equal(wireState({}, up, idle), 'standby', 'a wire to a part stopped on purpose is quiet, not owed');
+  assert.equal(wireState({}, planned, idle), 'planned');
 });
 
 test('a larger system lays out with nothing overlapping', () => {

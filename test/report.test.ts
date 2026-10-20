@@ -40,6 +40,7 @@ test('a watched status goes down from up or degraded, back up from down, and is 
   assert.equal(nextStatus(watch, 'up', true), undefined);
   assert.equal(nextStatus(watch, 'wiring', false), undefined);
   assert.equal(nextStatus(watch, 'planned', true), undefined);
+  assert.equal(nextStatus(watch, 'standby', false), undefined, 'a part stopped on purpose is left alone');
   assert.equal(nextStatus(watch, 'down', undefined), undefined);
 });
 

@@ -17,6 +17,7 @@ const HEALTH = {
   down: ['down', 'unavailable', 'failed', 'broken', 'open_incident'],
   building: ['wiring', 'building', 'doing', 'in_progress', 'testing'],
   planned: ['planned', 'todo', 'draft', 'upcoming', 'raw', 'untested'],
+  standby: ['standby', 'idle', 'paused'],
 };
 export function health(item) {
   if (!item.open) return 'gone';
@@ -29,6 +30,8 @@ export function wireState(link, a, b) {
   const ends = [health(a), health(b)];
   if (ends.includes('down')) return 'broken';
   if (ends.some((h) => h === 'planned' || h === 'building' || h === 'gone')) return 'planned';
+  // A wire to a part stopped on purpose is there, and carries nothing until it runs again.
+  if (ends.includes('standby')) return 'standby';
   return 'wired';
 }
 /** A part's outline, by its role where its type sends one, else by its kind. */

@@ -127,5 +127,5 @@ test('a deploy names both colours, and its token is within both', async () => {
   await call('/api/token_request_answer', owner, { id: request.id, approve: true });
   const handed = await poll(asked);
   const reported = await call('/agent/report', handed.token, { live: { at: 'http://app-green:3100/health', commit: 'abc1234' }, idle: ['http://app-blue:3100/health'] });
-  assert.deepEqual(reported.result.changed.map((c: any) => [c.title, c.to]).sort(), [['App, blue', 'planned'], ['App, green', 'up']]);
+  assert.deepEqual(reported.result.changed.map((c: any) => [c.title, c.to]).sort(), [['App, blue', 'standby'], ['App, green', 'up']]);
 });

@@ -57,8 +57,8 @@ test('a deploy says which part is live at which commit by its address, and the o
   const { call, made, token, status } = await setUp();
   const deploy = await token({ name: 'deploy', within: [made.env], may: 'report' });
   const live = (await call('/agent/report', deploy, { live: { at: 'http://app-green:3100/health', commit: 'abcdef1234567' }, idle: ['http://app-blue:3100/health'], said: 'deploy.sh switched Caddy' })).result;
-  assert.deepEqual(live.changed.map((c: any) => [c.title, c.to, c.commit]), [['App, green', 'up', 'abcdef1234567'], ['App, blue', 'planned', undefined]]);
-  assert.deepEqual([await status('green'), await status('blue')], ['up', 'planned']);
+  assert.deepEqual(live.changed.map((c: any) => [c.title, c.to, c.commit]), [['App, green', 'up', 'abcdef1234567'], ['App, blue', 'standby', undefined]]);
+  assert.deepEqual([await status('green'), await status('blue')], ['up', 'standby']);
   const reason = (await call('/agent/events', deploy, { target: made.green, limit: 1 })).error;
   assert.match(reason, /may only report/, 'it reads nothing back');
   // Kuma leaves the stopped colour alone; the same deploy said again changes nothing.
