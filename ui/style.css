@@ -1,48 +1,15 @@
-:root {
-  --bg: #f6f5f2;
-  --panel: #ffffff;
-  --line: #e3e0d9;
-  --text: #1f1e1b;
-  --muted: #6d6a62;
-  --accent: #2f5fd0;
-  --accent-soft: #e6edfb;
-  --ok: #2c7a4b;
-  --ok-soft: #e3f3e9;
-  --warn: #a35a00;
-  --warn-soft: #fbefd9;
-  --bad: #b3312b;
-  --bad-soft: #fbe6e4;
-  --closed: #8a877f;
-  --closed-soft: #eceae5;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161614;
-    --panel: #1f1f1c;
-    --line: #34332e;
-    --text: #ecebe6;
-    --muted: #a09d94;
-    --accent: #8fb0ff;
-    --accent-soft: #232c45;
-    --ok: #7fd3a0;
-    --ok-soft: #1c3226;
-    --warn: #f0b765;
-    --warn-soft: #3a2c14;
-    --bad: #f08a84;
-    --bad-soft: #3d1f1d;
-    --closed: #8f8c84;
-    --closed-soft: #2a2925;
-  }
-}
 
+/* Light or dark as the reader's system is; the colours of each are the style's theme. */
+:root { color-scheme: light dark; }
 * { box-sizing: border-box; }
 body {
   margin: 0;
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
+  /* The theme's colours are the style's (theme, set by ui/theme.js); until it is read, the browser's own. */
+  background: var(--bg, Canvas);
+  color: var(--text, CanvasText);
   font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 a { color: var(--accent); text-decoration: none; }
@@ -104,7 +71,7 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .page-head .delivers .deliverable .gist { overflow: hidden; text-overflow: ellipsis; }
 .page-head a.deliverable { text-decoration: none; }
 .page-head a.deliverable:hover { border-color: var(--accent); }
-.note > img.figure { display: block; margin: 14px 14px 4px; max-width: calc(100% - 28px); border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.note > img.figure { display: block; margin: 14px 14px 4px; max-width: calc(100% - 28px); border: 1px solid var(--line); border-radius: 6px; background: var(--figure); }
 .note.doc figure.doc-lens { margin: 0; }
 .note.doc .doc-lens .lens-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 8px 14px 0; }
 .note.doc .doc-lens figcaption .body-text { color: var(--muted); font-size: 13px; }
@@ -141,7 +108,7 @@ details.fold > summary .n { color: var(--muted); font-size: 12px; }
 .tq-entry .tq-work-text { flex: 0 1 auto; max-width: 26%; margin-left: auto; }
 .tq-edit { width: 100%; }
 .tq-money .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.note.doc img.doc-figure { display: block; max-width: 100%; margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.note.doc img.doc-figure { display: block; max-width: 100%; margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--figure); }
 #around svg.graph { height: 520px; }
 .card .empty, .card .error { padding: 14px; color: var(--muted); }
 .card .error { color: var(--bad); }
@@ -418,20 +385,8 @@ textarea { resize: vertical; }
 .form .actions { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
 .row-sub.error { color: var(--bad); }
 
-/* Graph. Group colours (one per kind) are the dataviz reference palette, slots 1-7, aim added, validated
-   for colour-blind separation on these surfaces in each theme. */
-:root {
-  --g-actor: #2a78d6; --g-aim: #9a6a2f; --g-work: #eb6834; --g-record: #1baf7a; --g-question: #eda100;
-  --g-occurrence: #e87ba4; --g-place: #008300; --g-system: #4a3aa7; --g-blocked: #d03b3b;
-  --edge: #b9b5aa; --edge-strong: #5f5c55;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --g-actor: #3987e5; --g-aim: #b8864b; --g-work: #d95926; --g-record: #199e70; --g-question: #c98500;
-    --g-occurrence: #d55181; --g-place: #008300; --g-system: #9085e9; --g-blocked: #d03b3b;
-    --edge: #55534c; --edge-strong: #b5b2a8;
-  }
-}
+/* Graph. Group colours (one per kind, --g-*) are the house style's theme: the dataviz reference palette, slots 1-7,
+   aim added, validated for colour-blind separation on these surfaces in each theme. */
 .graph-card { position: relative; }
 svg.graph { display: block; width: 100%; height: calc(100vh - 215px); min-height: 380px; touch-action: none; cursor: grab; user-select: none; }
 svg.graph .edge { stroke: var(--edge); stroke-width: 1.25; }
@@ -751,7 +706,7 @@ details.menu.ok > summary { padding: 2px 9px; font-size: 12px; border-color: var
 .cal-owner { flex: 1 1 0; }
 /* Agents take at most half the day, however many there are. */
 .cal-agent { flex: 0 1 8px; max-width: calc(50% / max(var(--cal-agents), 1)); min-width: 3px; }
-.cal-block { position: absolute; left: 0; right: 0; display: block; overflow: hidden; border-radius: 3px; background: var(--cal-hue); color: #fff; text-decoration: none; }
+.cal-block { position: absolute; left: 0; right: 0; display: block; overflow: hidden; border-radius: 3px; background: var(--cal-hue); color: var(--on-mark); text-decoration: none; }
 .cal-run { opacity: 0.75; border-radius: 2px; }
 .cal-block:hover { outline: 2px solid var(--text); outline-offset: -1px; opacity: 1; z-index: 2; }
 .cal-what { display: block; padding: 2px 4px; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
