@@ -1,8 +1,8 @@
 // A lens answer drawn as a system: every part a box (a store a cylinder, a client a pill), each place that holds
 // parts (a host, a cloud, a machine) a box around them, and wires at right angles from a part down to what it calls,
 // broken where one passes under another, as in the flow. It is for seeing how the system is as it is wired up and
-// run: each part's dot says its health (up, degraded, down, being wired, planned), each wire whether it is wired,
-// only planned, or broken, and the bar over the picture counts both. The layout is ui/arch-layout.js; this draws
+// run: each part's dot says its health (up, degraded, down, being wired, on standby, planned), each wire whether it
+// is wired, only planned, broken or to a part on standby, and the bar over the picture counts both. The layout is ui/arch-layout.js; this draws
 // it as SVG, so every name is in the page and every part a link. Its colours are the lens's, in ui/arch.css.
 
 import { h } from './base.js';
@@ -21,10 +21,10 @@ const svg = (tag, attrs = {}, ...kids) => {
 const titled = (el, text) => (el.prepend(svg('title', {}, text)), el);
 
 /** What each health and wire state is called, in the order the bar and the key give them. */
-const HEALTHS = [['ok', 'Up'], ['warn', 'Degraded'], ['down', 'Down'], ['building', 'Being wired'], ['planned', 'Planned'], ['unknown', 'Not known'], ['gone', 'Retired']];
-const WIRES = [['wired', 'Wired'], ['planned', 'Not yet wired'], ['broken', 'Broken']];
+const HEALTHS = [['ok', 'Up'], ['warn', 'Degraded'], ['down', 'Down'], ['building', 'Being wired'], ['standby', 'On standby'], ['planned', 'Planned'], ['unknown', 'Not known'], ['gone', 'Retired']];
+const WIRES = [['wired', 'Wired'], ['planned', 'Not yet wired'], ['broken', 'Broken'], ['standby', 'On standby']];
 /** The pill each health is counted in. */
-const PILL = { ok: 'ok', warn: 'warn', down: 'bad', building: '', planned: 'closed', unknown: 'closed', gone: 'closed' };
+const PILL = { ok: 'ok', warn: 'warn', down: 'bad', building: '', standby: 'closed', planned: 'closed', unknown: 'closed', gone: 'closed' };
 const said = (list, key) => list.find(([k]) => k === key)?.[1] ?? key;
 
 /** A part's outline, centred on x, y. */
@@ -145,11 +145,13 @@ export function drawArch(host, answer, style, keep) {
 
   // The bar: how many parts are in each health, and how many wires are wired, as marks to be read at a glance.
   const count = (k) => parts.filter((n) => n.health === k).length;
+  // A wire to a part on standby is neither owed nor wired: it is left out of the count.
+  const running = g.chains.filter((c) => c.state !== 'standby');
   const tally = h(
     'span',
     { class: 'ar-tally' },
     HEALTHS.filter(([k]) => count(k)).map(([k, label]) => h('span', { class: `pill ${PILL[k]}`, title: `${label}: ${parts.filter((n) => n.health === k).map((n) => n.item.title).join(', ')}` }, `${count(k)} ${label.toLowerCase()}`)),
-    g.chains.length > 0 && h('span', { class: `pill ${g.chains.some((c) => c.state === 'broken') ? 'bad' : g.chains.every((c) => c.state === 'wired') ? 'ok' : 'closed'}`, title: WIRES.map(([k, label]) => `${label}: ${g.chains.filter((c) => c.state === k).length}`).join('\n') }, `${g.chains.filter((c) => c.state === 'wired').length} of ${g.chains.length} wired`),
+    running.length > 0 && h('span', { class: `pill ${running.some((c) => c.state === 'broken') ? 'bad' : running.every((c) => c.state === 'wired') ? 'ok' : 'closed'}`, title: WIRES.map(([k, label]) => `${label}: ${g.chains.filter((c) => c.state === k).length}`).join('\n') }, `${running.filter((c) => c.state === 'wired').length} of ${running.length} wired`),
   );
 
   const redraw = () => {

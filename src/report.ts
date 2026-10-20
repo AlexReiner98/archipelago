@@ -115,7 +115,7 @@ export const REPORT_TOOLS: Record<string, Tool> = {
   report: {
     description:
       'A running system reports what it measured, and the parts of the map that stand for it follow, at once: the token may be one that can only report. ' +
-      'Uptime Kuma’s webhook notification posts its body here as it is (POST /agent/report, the token in an Authorization: Bearer header): the item whose watched address (a component’s url) is the monitor’s address, else whose title is its name, goes down when the check fails and up when it answers again; one still being built (planned, wiring) is left alone. ' +
+      'Uptime Kuma’s webhook notification posts its body here as it is (POST /agent/report, the token in an Authorization: Bearer header): the item whose watched address (a component’s url) is the monitor’s address, else whose title is its name, goes down when the check fails and up when it answers again; one still being built (planned, wiring) or stopped on purpose (standby) is left alone. ' +
       'A deploy sends live (the address of the part now live, and its commit) and idle (the addresses of the parts it stopped). Parts are found by their address, never by an id; the change set’s reason is what was reported.',
     report: true,
     input: REPORT_INPUT,
