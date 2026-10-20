@@ -19,7 +19,7 @@ export interface Picture {
   pinned: boolean;
 }
 
-export async function atlas(l: Archipelago, input: { limit?: number } = {}): Promise<{ pictures: Picture[]; more: number }> {
+export async function atlas(l: Archipelago, input: { q?: string; limit?: number } = {}): Promise<{ pictures: Picture[]; more: number }> {
   const [lenses, styles] = await Promise.all([keptOf(l, 'lens', undefined), keptOf(l, 'style', undefined)]);
   const ofIds = [...new Set(lenses.flatMap((x) => x.about))];
   const { rows } = ofIds.length ? await l.db.query<{ id: string; title: string; type: string }>(`select id, title, type from entity where id = any($1::text[]) and archived_at is null`, [ofIds]) : { rows: [] };
@@ -34,9 +34,16 @@ export async function atlas(l: Archipelago, input: { limit?: number } = {}): Pro
       const shape = style?.props.shape;
       return { lens: x.id, title: style?.title || x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), pinned: x.props.pinned === true };
     })
+    .filter(matches(input.q))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned));
   const limit = input.limit ?? 100;
   return { pictures: pictures.slice(0, limit), more: Math.max(0, pictures.length - limit) };
+}
+
+/** Asked for by words: a picture is found by its own name and by the title of what it is of, each word in either. */
+function matches(q: string | undefined): (p: Picture) => boolean {
+  const words = (q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+  return (p) => words.every((w) => `${p.title} ${p.of?.title ?? ''}`.toLowerCase().includes(w));
 }
 
 /** The nearest project an item is or is part of, going up "is part of": a project is a type the packs put at that altitude. */
