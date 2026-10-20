@@ -1,29 +1,13 @@
 :root {
-  --ink: #1d1f23;
-  --muted: #6b7079;
-  --line: #e3e5e8;
-  --link: #2457c5;
-  --page: #ffffff;
-  --bad: #b3261e;
   color-scheme: light dark;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e6e7ea;
-    --muted: #9aa0a9;
-    --line: #33363c;
-    --link: #8cb0ff;
-    --page: #16181b;
-    --bad: #ff8a80;
-  }
 }
 * {
   box-sizing: border-box;
 }
 body {
   margin: 0;
-  background: var(--page);
-  color: var(--ink);
+  background: var(--reader-page, Canvas);
+  color: var(--reader-ink, CanvasText);
   font: 17px/1.6 Georgia, 'Iowan Old Style', 'Times New Roman', serif;
 }
 main {
@@ -49,7 +33,7 @@ h2 {
   font-size: 1.35rem;
   margin: 2.2em 0 0.4em;
   padding-top: 0.6em;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--reader-line);
 }
 h3 {
   font-size: 1.08rem;
@@ -68,21 +52,21 @@ li {
   margin: 0.2em 0;
 }
 a {
-  color: var(--link);
+  color: var(--reader-link);
   overflow-wrap: anywhere;
 }
 .muted {
-  color: var(--muted);
+  color: var(--reader-muted);
   font-size: 0.9rem;
 }
 .error {
-  color: var(--bad);
+  color: var(--reader-bad);
 }
 header {
   margin-bottom: 1.6em;
 }
 nav.contents {
-  border: 1px solid var(--line);
+  border: 1px solid var(--reader-line);
   border-radius: 8px;
   padding: 10px 16px;
   margin: 0 0 1.6em;
@@ -95,25 +79,24 @@ nav.contents ol {
 footer {
   margin-top: 3em;
   padding-top: 1em;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--reader-line);
 }
 button.print {
   font: inherit;
   padding: 6px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--reader-line);
   border-radius: 6px;
   background: transparent;
-  color: var(--ink);
+  color: var(--reader-ink);
   cursor: pointer;
 }
 @media print {
-  :root {
-    --ink: #000;
-    --muted: #555;
-    --link: #000;
-    --page: #fff;
-  }
+  /* On paper, the theme's print colours: set on the body, so they win over the page's own. */
   body {
+    --reader-ink: var(--reader-print-ink);
+    --reader-muted: var(--reader-print-muted);
+    --reader-link: var(--reader-print-ink);
+    --reader-page: var(--reader-print-page);
     font-size: 11pt;
   }
   main {
@@ -135,7 +118,7 @@ button.print {
 section + div.text {
   margin-top: 2.2em;
   padding-top: 0.8em;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--reader-line);
 }
 /* A section's figure: as wide as the text, on its own light card so a drawing made on white reads in the dark too. */
 figure {
@@ -145,9 +128,9 @@ figure img {
   display: block;
   width: 100%;
   height: auto;
-  border: 1px solid var(--line);
+  border: 1px solid var(--reader-line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--reader-figure);
 }
 /* An invoice: its number, dates and what is due as a heading block; the rest reads as the bill, in a plain face. */
 body.invoice main {
@@ -162,7 +145,7 @@ body.invoice main {
   gap: 24px;
   padding-bottom: 18px;
   margin-bottom: 1.4em;
-  border-bottom: 2px solid var(--ink);
+  border-bottom: 2px solid var(--reader-ink);
 }
 .invoice-head h1 {
   font-size: 2.2rem;
@@ -176,7 +159,7 @@ body.invoice main {
   text-align: right;
 }
 .invoice-facts dt {
-  color: var(--muted);
+  color: var(--reader-muted);
 }
 .invoice-facts dd {
   margin: 0;
@@ -191,17 +174,17 @@ body.invoice main {
   left: 46%;
   top: 8px;
   padding: 4px 14px;
-  border: 3px solid #2e7d4f;
+  border: 3px solid var(--reader-paid);
   border-radius: 6px;
-  color: #2e7d4f;
+  color: var(--reader-paid);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   transform: rotate(-8deg);
 }
 .stamp.void {
-  border-color: #b3261e;
-  color: #b3261e;
+  border-color: var(--reader-void);
+  color: var(--reader-void);
 }
 body.invoice ul {
   padding-left: 1.1em;
@@ -222,13 +205,13 @@ table.text-table th {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--reader-muted);
   padding: 6px 8px;
-  border-bottom: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--reader-ink);
 }
 table.text-table td {
   padding: 7px 8px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--reader-line);
   vertical-align: top;
 }
 table.text-table tr:last-child td {
@@ -241,7 +224,7 @@ body.invoice h3 + table.text-table:not(:has(thead)) {
   margin-left: auto;
 }
 body.invoice table.text-table:not(:has(thead)) tr:last-child td {
-  border-top: 1.5px solid var(--ink);
+  border-top: 1.5px solid var(--reader-ink);
   font-size: 1.1em;
 }
 body.invoice table.text-table:first-of-type td {
@@ -250,7 +233,7 @@ body.invoice table.text-table:first-of-type td {
 }
 @media print {
   table.text-table th {
-    color: #000;
+    color: var(--reader-print-ink);
   }
   table.text-table tr {
     break-inside: avoid;
