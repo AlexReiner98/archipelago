@@ -73,7 +73,8 @@ export const base64 = (blob) =>
 
 // Bring a map kept somewhere else into this one, as often as wanted: the
 // server says what the file would add and change, and does it only on a yes.
-export function importCard(done) {
+// A row of the Backups card.
+function importRow(done) {
   const file = h('input', { type: 'file', accept: '.gz' });
   const result = h('div');
   const say = (cls, text) => result.replaceChildren(h('div', { class: cls, style: 'padding: 0 14px 12px' }, text));
@@ -125,13 +126,7 @@ export function importCard(done) {
       say('error', err.message);
     }
   };
-  return h(
-    'section',
-    { class: 'card wide' },
-    h('header', {}, h('h2', { class: 'hinted', title: 'Merge a map kept elsewhere into this one.' }, 'Import a backup')),
-    h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, file, h('button', { class: 'primary', onclick: start }, 'Import\u2026')),
-    result,
-  );
+  return [h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, file, h('button', { onclick: start, title: 'Merge a map kept elsewhere into this one' }, 'Import\u2026')), result];
 }
 
 // GitHub tells this workspace when a repository is pushed to. The secret it
@@ -329,8 +324,8 @@ export function ownerCard(owner, redraw) {
   );
 }
 
-/** The whole map as a file, for the owner to keep, and whether agents may have one too. */
-export function backupCard() {
+/** The whole map as a file, for the owner to keep, whether agents may have one too, and a file brought in. */
+export function backupCard(done) {
   const note = h('span', { class: 'muted small grow' });
   const allow = h('input', { type: 'checkbox', disabled: true });
   api('workspace_info').then((info) => ((allow.checked = info.agent_backups), (allow.disabled = false)), () => null);
@@ -352,8 +347,9 @@ export function backupCard() {
   };
   return h(
     'section',
-    { class: 'card' },
-    h('header', {}, h('h2', { class: 'hinted', title: 'The whole map as one file: to keep, or to restore into another server' }, 'Backups')),
+    { class: 'card wide' },
+    h('header', {}, h('h2', { class: 'hinted', title: 'The whole map as one file: to keep, to restore into another server, or to merge in from elsewhere' }, 'Backups')),
     h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, h('button', { class: 'primary', onclick: download }, 'Download backup'), h('label', { title: 'Lets an agent call backup_download. A backup holds private items too.' }, allow, ' Agents may download'), note),
+    importRow(done),
   );
 }

@@ -5,7 +5,7 @@ import { screensCard } from './nav.js';
 import { packsCard } from './packs.js';
 import { ago, when } from './words.js';
 import { scopePills } from './token-piece.js';
-import { backupCard, connectBox, githubCard, importCard, operatorCard, ownerCard, secretBox } from './workspace-cards.js';
+import { backupCard, connectBox, githubCard, operatorCard, ownerCard, secretBox } from './workspace-cards.js';
 
 export async function workspace() {
   const main = part('workspace');
@@ -15,7 +15,7 @@ export async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace)),
+      h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), screensCard(workspace)),
     );
   }
   const [info, tokens, people] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 })]);
@@ -64,7 +64,7 @@ export async function workspace() {
       'div',
       { class: 'grid' },
       (me.actor.admin || !info.owner) && ownerCard(info.owner, workspace),
-      me.actor.admin && backupCard(),
+      me.actor.admin && backupCard(workspace),
       me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
       me.actor.admin && screensCard(workspace),
       h(
@@ -168,7 +168,6 @@ export async function workspace() {
           ),
         ),
       me.actor.admin && githubCard(),
-      me.actor.admin && importCard(),
       operatorCard(info.id),
     ),
   );
