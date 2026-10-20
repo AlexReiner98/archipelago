@@ -18,13 +18,19 @@ Done once, on 20 Oct 2026. Each step says how to check it, so a step can be redo
 | Record | Name | Value |
 |---|---|---|
 | A | `mail` | the relay's IPv4 |
+| MX, priority 10 | *(root)* | `mail.archipelago.tools.` |
 | TXT (SPF; one record only) | *(root)* | `v=spf1 ip4:<hub IPv4> ip4:<relay IPv4> -all` |
 | TXT (DKIM) | `mail._domainkey` | `v=DKIM1; k=rsa; p=<public key, step 2>` |
-| TXT (DMARC; one record only) | `_dmarc` | `v=DMARC1; p=quarantine; adkim=s; aspf=s` |
+| TXT (DMARC; one record only) | `_dmarc` | `v=DMARC1; p=quarantine; adkim=s; aspf=s; rua=mailto:dmarc@archipelago.tools` |
 
-Reverse DNS (Bare Metal Cloud → Network → IP, the address's ⋯ → Modify the reverse DNS): the relay's IPv4 →
-`mail.archipelago.tools`, the hub's → `app.archipelago.tools`. Two DMARC or two SPF records cancel each other: delete
+The MX lets the domain be written back to (a sender domain that cannot be is a spammer's mark); the relay keeps that
+mail, and the DMARC reports `rua` asks Gmail and Outlook for, in `/var/mail/ubuntu`. Make SPF a plain **TXT** record:
+OVH's SPF form will not save an edit to one it did not make. Two DMARC or two SPF records cancel each other: delete
 any default one OVH made.
+
+Reverse DNS: the relay's IPv4 → `mail.archipelago.tools` (Bare Metal Cloud → Virtual private servers → the VPS → its
+IP's ⋯, or Network → IP), and the hub's → `app.archipelago.tools`. Add the A record first: OVH checks the name points
+back.
 
 Check: `nslookup -type=TXT archipelago.tools ns10.ovh.ca` (and the same for `_dmarc.` and `mail._domainkey.`), and
 `nslookup <relay IPv4>`.
@@ -88,3 +94,18 @@ one, recreate the live colour's container (`deploy.sh` says which is live).
 Add yourself as a member of a workspace (Workspace → Members) and open the invitation. In Gmail, ⋮ → Show original
 should say **SPF: PASS, DKIM: PASS, DMARC: PASS**. If the invitation says it was not sent, the reason is in its
 message; on the relay, `sudo journalctl -u postfix -n 50` shows each delivery and why one failed.
+
+## 6. Out of spam
+
+A new domain on a new address goes to spam at first even when every check passes: reputation is earned by sending
+mail people want, a little at a time. What helps, in order:
+
+- Mark the first ones **Not spam**, and add `signin@archipelago.tools` to your contacts. Gmail learns from both.
+- Register the domain in **Google Postmaster Tools** (postmaster.google.com; it gives a TXT record to add to the
+  zone). It shows the domain's and the address's reputation as Gmail sees them, once there is enough mail.
+- Read the DMARC reports in `/var/mail/ubuntu` on the relay: who received mail from us and whether it passed.
+- Keep the volume low and the mail expected (invitations and sign-in links people asked for). Once mail lands in the
+  inbox for a few weeks, raise DMARC to `p=reject`.
+
+The app's side already does what it can: quoted-printable text (not base64, which filters hold against plain text),
+`Auto-Submitted`, a reply address on invitations, and wording that says who sent it and why.

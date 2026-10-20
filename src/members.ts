@@ -67,13 +67,19 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
   const links: string[] = [];
   for (const ws of workspaces) {
     const db = await ws.db();
-    if (await memberOf(db, email)) links.push(`${ws.name}\n${await linkFor(db, ws.id, email, LINK_MINUTES * 60_000, origin)}`);
+    if (await memberOf(db, email)) links.push(`${ws.name}:\n${await linkFor(db, ws.id, email, LINK_MINUTES * 60_000, origin)}`);
   }
   if (!links.length) return;
   await sendMail({
     to: email,
-    subject: 'Sign in to Archipelago',
-    text: `Open this link to sign in. It works once, for the next ${LINK_MINUTES} minutes, and keeps this browser signed in for ${SIGNED_IN_DAYS} days.\n\n${links.join('\n\n')}\n\nIf you did not ask to sign in, you can ignore this mail.\n`,
+    subject: 'Your Archipelago sign-in link',
+    text: [
+      'Hello,',
+      `Here is the link you asked for to sign in to Archipelago. It works once, for the next ${LINK_MINUTES} minutes, and keeps this browser signed in for ${SIGNED_IN_DAYS} days.`,
+      links.join('\n\n'),
+      'If you did not ask to sign in, you can ignore this email: nobody can sign in without the link.',
+      '- Archipelago',
+    ].join('\n\n'),
   });
 }
 
@@ -106,12 +112,25 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
         [email, person, Boolean(input.admin), actor.name],
       );
       const name = await site.nameOf(l.workspace);
-      const by = (actor.person && (await l.entity(actor.person))?.title) || actor.name;
+      const inviter = actor.person ? await l.entity(actor.person) : undefined;
+      const by = inviter?.title || actor.name;
+      // A reply reaches whoever sent the invitation, at the address they sign in with, else the one on their page.
+      const { rows: theirs } = actor.person ? await whole.db.query<{ email: string }>(`select email from member where person_id = $1 and removed_at is null limit 1`, [actor.person]) : { rows: [] };
+      const replyTo = theirs[0]?.email ?? normalEmail(inviter?.props?.email);
       try {
         await sendMail({
           to: email,
-          subject: `You are invited to ${name} on Archipelago`,
-          text: `${by} has added you to ${name} on Archipelago.\n\nOpen this link to sign in. It works once, for ${INVITE_DAYS} days. After that, sign in at ${site.origin} with this email address.\n\n${await linkFor(whole.db, l.workspace, email, INVITE_DAYS * 86_400_000)}\n`,
+          ...(replyTo && { replyTo }),
+          subject: `${by} invited you to ${name} on Archipelago`,
+          text: [
+            'Hello,',
+            `${by} has invited you to ${name} on Archipelago, where its people and their AI agents keep track of their work together.`,
+            `To accept, open this link. It signs you in on this device and works once, for ${INVITE_DAYS} days:`,
+            await linkFor(whole.db, l.workspace, email, INVITE_DAYS * 86_400_000),
+            `Afterwards, sign in at ${site.origin} with this email address, and you will be sent a link each time you need one.`,
+            `You are getting this because ${by} added ${email} to ${name}. If you were not expecting it, you can ignore this email: nothing happens unless the link is opened.${replyTo ? ` Reply to it to reach ${by}.` : ''}`,
+            '- Archipelago',
+          ].join('\n\n'),
         });
         return { email, person, invited: true };
       } catch (err) {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, createVerify, generateKeyPairSync } from 'node:crypto';
 import { createServer, type AddressInfo } from 'node:net';
 import { test } from 'node:test';
-import { compose, dkimSign, normalEmail, relaxedBody } from '../src/mail.ts';
+import { compose, dkimSign, normalEmail, quotedPrintable, relaxedBody } from '../src/mail.ts';
 import { deliver, dotStuff, relay } from '../src/smtp.ts';
 
 test('an address is kept trimmed and in lower case, and what is not one is refused', () => {
@@ -81,4 +81,22 @@ test('a message is handed over in order, with a line that begins with a dot kept
     fake.close();
   }
   assert.equal(dotStuff('.a\r\n.b'), '..a\r\n..b');
+});
+
+/** Quoted-printable read back, as a mail program does. */
+const unQP = (s: string) => Buffer.from(s.replace(/=\r\n/g, '').replace(/=([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))), 'latin1').toString('utf8');
+
+test('the body is quoted-printable: plain text stays readable, nothing else is lost, no line is over 76', () => {
+  const text = `Hello Renée,\n\nOpen this link: https://app.archipelago.tools/#/join/inv_aaline_${'a'.repeat(40)} and a = sign, trailing space \nend\t`;
+  const qp = quotedPrintable(text);
+  assert.ok(qp.split('\r\n').every((l) => l.length <= 76), qp);
+  assert.match(qp, /^Hello Ren=C3=A9e,\r\n\r\nOpen this link: https:\/\/app\.archipelago\.tools/);
+  assert.equal(unQP(qp), text.replace(/\n/g, '\r\n'));
+  for (const long of ['x'.repeat(300), 'é'.repeat(100), `${'y'.repeat(73)}éé`]) assert.equal(unQP(quotedPrintable(long)), long, long.slice(0, 10));
+  const { headers, body } = compose('Archipelago <signin@archipelago.tools>', { to: 'a@b.ca', subject: 's', text: 'Hi\n', replyTo: 'alex@b.ca' });
+  assert.deepEqual(
+    headers.filter(([n]) => ['Content-Transfer-Encoding', 'Auto-Submitted', 'Reply-To'].includes(n)),
+    [['Reply-To', 'alex@b.ca'], ['Content-Transfer-Encoding', 'quoted-printable'], ['Auto-Submitted', 'auto-generated']],
+  );
+  assert.equal(body, 'Hi\r\n');
 });

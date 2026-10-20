@@ -11,8 +11,9 @@ test('an admin adds a member by email; the invitation signs them in once, for a 
   const added = await call('/api/member_add', alex, { email: '  Mani@Aaline.example ', name: 'Mani', admin: true });
   assert.deepEqual([added.result.email, added.result.invited], ['mani@aaline.example', true], 'the address is kept as one, in lower case');
   const invitation = mailbox.findLast((m) => m.to === 'mani@aaline.example')!;
-  assert.match(invitation.subject, /invited to Default/);
-  assert.match(invitation.text, /alex has added you/);
+  assert.match(invitation.subject, /^alex invited you to Default on Archipelago$/);
+  assert.match(invitation.text, /alex has invited you to Default on Archipelago/);
+  assert.equal(invitation.replyTo, undefined, 'a reply goes to the inviter only when they have an address');
   assert.match((await call('/api/member_add', alex, { email: 'mani@aaline.example' })).error, /a member already/);
   assert.match((await call('/api/member_add', alex, { email: 'not an address' })).error, /not an email address/);
 
@@ -50,7 +51,7 @@ test('anyone may ask for a sign-in link at an address, and is told nothing of wh
   const sent = mailbox.slice(before);
   assert.deepEqual(sent.map((m) => m.to), ['alex@example.com'], 'only a member is sent mail');
   assert.equal((sent[0].text.match(/#\/join\//g) ?? []).length, 2, 'one mail, with a link for each workspace');
-  assert.match(sent[0].text, /Default\n.*\n\nAaline\n/s);
+  assert.match(sent[0].text, /Default:\n.*\n\nAaline:\n/s);
 
   // Asking again within the minute sends nothing more.
   await call('/connect/sign-in', undefined, { email: 'alex@example.com' });

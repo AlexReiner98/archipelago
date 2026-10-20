@@ -6,9 +6,11 @@
 # The hub is the app's server. Its public key comes from deploy/relay/hub.sh key, run there. The endpoint defaults to
 # 148.113.137.251:51820 and the relay's address on the private network to 10.66.0.3.
 #
-# What it makes: a WireGuard peer of the hub that talks to the hub alone, and Postfix taking mail on port 25 only from
-# the hub, over that tunnel, and delivering it to the recipients' own servers. It takes no mail from the internet and
-# delivers none locally. The app signs every message with DKIM before it gets here, and the relay leaves it as it is.
+# What it makes: a WireGuard peer of the hub that talks to the hub alone, and Postfix relaying mail from the hub, over
+# that tunnel, to the recipients' own servers. From the internet it takes only mail for archipelago.tools's own few
+# addresses (postmaster, abuse, dmarc for DMARC reports, signin for bounces), kept in ubuntu's mailbox, /var/mail/ubuntu:
+# a domain that cannot be written back to looks like a spammer's. It relays nothing for anyone else. The app signs
+# every message with DKIM before it gets here, and the relay leaves it as it is.
 #
 # It prints the relay's public key last: give it to deploy/relay/hub.sh add on the hub. Running it again is harmless.
 set -euo pipefail
@@ -59,17 +61,30 @@ umask 022
 systemctl enable -q wg-quick@wg0
 systemctl restart wg-quick@wg0
 
-say "Postfix: relay for the hub, deliver to the world, keep nothing"
+say "Postfix: relay for the hub; from anyone else, mail for archipelago.tools's own addresses only"
+cat >/etc/aliases <<'EOF'
+# archipelago.tools's own addresses (deploy/relay/setup.sh), all kept in ubuntu's mailbox, /var/mail/ubuntu.
+# Any other address at the domain is refused while the sender is still connected.
+postmaster: ubuntu
+abuse: ubuntu
+dmarc: ubuntu
+signin: ubuntu
+root: ubuntu
+EOF
+newaliases
 postconf -e \
   "myhostname = $name" \
   "myorigin = archipelago.tools" \
-  "mydestination =" \
-  "local_transport = error:this server delivers nothing locally" \
+  "mydestination = archipelago.tools, \$myhostname, localhost" \
+  "local_transport = local:\$myhostname" \
+  "alias_maps = hash:/etc/aliases" \
+  "local_recipient_maps = \$alias_maps" \
   "inet_interfaces = all" \
   "inet_protocols = ipv4" \
   "mynetworks = 127.0.0.0/8, $hub/32" \
-  "smtpd_relay_restrictions = permit_mynetworks, reject" \
-  "smtpd_recipient_restrictions = permit_mynetworks, reject" \
+  "smtpd_helo_required = yes" \
+  "smtpd_relay_restrictions = permit_mynetworks, reject_unauth_destination" \
+  "smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination" \
   "smtpd_banner = \$myhostname ESMTP" \
   "disable_vrfy_command = yes" \
   "message_size_limit = 2097152" \
@@ -84,18 +99,35 @@ systemctl daemon-reload
 systemctl enable -q postfix
 systemctl restart postfix
 
-say "firewall: SSH, and mail from the hub over the tunnel, nothing else"
+say "firewall: SSH, and mail (Postfix decides whose), nothing else"
 ufw --force default deny incoming >/dev/null
 ufw --force default allow outgoing >/dev/null
 ufw allow 22/tcp comment 'ssh (until: setup.sh lock-ssh)' >/dev/null
 ufw allow in on wg0 to any port 22 proto tcp comment 'ssh over wireguard' >/dev/null
 ufw allow in on wg0 from "$hub" to any port 25 proto tcp comment 'mail from the hub' >/dev/null
+ufw allow 25/tcp comment 'mail for archipelago.tools' >/dev/null
 ufw --force enable >/dev/null
 ufw status | sed -n '1,20p'
 
 say "checks"
 timeout 8 bash -c '</dev/tcp/gmail-smtp-in.l.google.com/25' && echo "port 25 out: open" || echo "port 25 out: BLOCKED (this host cannot be the relay)"
 ping -c1 -W3 "$hub" >/dev/null && echo "tunnel to the hub: up" || echo "tunnel to the hub: not yet (add this relay on the hub: deploy/relay/hub.sh add)"
+# Not an open relay: asked from the public address (an outsider, to Postfix), mail for another domain is refused, and
+# mail for postmaster@archipelago.tools is taken.
+public=$(ip -4 route get 1.1.1.1 | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}')
+python3 - "$public" <<'EOF'
+import smtplib, sys
+s = smtplib.SMTP(sys.argv[1], 25, timeout=10)
+s.ehlo('check.example.org')
+s.mail('check@example.org')
+other, _ = s.rcpt('someone@example.com')
+s.rset()
+s.mail('check@example.org')
+ours, _ = s.rcpt('postmaster@archipelago.tools')
+s.quit()
+print('open relay: no' if other >= 500 else 'open relay: YES, fix this before anything else')
+print('postmaster@archipelago.tools taken: yes' if ours < 300 else f'postmaster@archipelago.tools taken: no ({ours})')
+EOF
 
 say "relay public key (for deploy/relay/hub.sh add on the hub)"
 wg pubkey </etc/wireguard/relay.key

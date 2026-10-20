@@ -18,6 +18,8 @@ export interface Mail {
   to: string;
   subject: string;
   text: string;
+  /** Where a reply goes, when not to the sender (an invitation: to whoever sent it). */
+  replyTo?: string;
 }
 
 type Mailer = (mail: Mail) => Promise<void>;
@@ -43,21 +45,52 @@ export const mailConfigured = () => Boolean(env('MAIL_FROM'));
 /** A header's value in words a mail program reads whatever the letters: plain when it is plain ASCII. */
 const word = (s: string) => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${Buffer.from(s).toString('base64')}?=`);
 
-/** The message itself: headers and a base64 body, lines ended with CRLF. */
+const hex = (byte: number) => `=${byte.toString(16).toUpperCase().padStart(2, '0')}`;
+
+/**
+ * Text as quoted-printable (RFC 2045): plain ASCII stays as it is, anything else and "=" become =XX, and no line is
+ * longer than 76. Plain text sent as base64 is a long-standing sign of spam to filters; this is how ordinary mail goes.
+ */
+export function quotedPrintable(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .map((line) => {
+      let encoded = '';
+      for (const byte of Buffer.from(line)) encoded += byte === 61 || byte > 126 || (byte < 32 && byte !== 9) ? hex(byte) : String.fromCharCode(byte);
+      // A space or tab at the end of a line would be lost on the way.
+      encoded = encoded.replace(/[ \t]$/, (c) => hex(c.charCodeAt(0)));
+      const out: string[] = [];
+      while (encoded.length > 76) {
+        // Cut before the 76th, with room for the "=" that says the line goes on, and never inside an =XX.
+        let cut = 75;
+        if (encoded[cut - 1] === '=') cut -= 1;
+        else if (encoded[cut - 2] === '=') cut -= 2;
+        out.push(`${encoded.slice(0, cut)}=`);
+        encoded = encoded.slice(cut);
+      }
+      return [...out, encoded].join('\r\n');
+    })
+    .join('\r\n');
+}
+
+/** The message itself: headers and a quoted-printable body, lines ended with CRLF. */
 export function compose(from: string, mail: Mail, now = new Date()): { headers: [string, string][]; body: string } {
   const domain = addressOf(from).split('@')[1];
   const name = /^(.*?)\s*</.exec(from)?.[1]?.replace(/^"|"$/g, '');
-  const body = (Buffer.from(mail.text.replace(/\r?\n/g, '\r\n')).toString('base64').match(/.{1,76}/g) ?? []).join('\r\n') + '\r\n';
+  const body = `${quotedPrintable(mail.text.replace(/\n+$/, ''))}\r\n`;
   return {
     headers: [
       ['From', name ? `${word(name)} <${addressOf(from)}>` : addressOf(from)],
       ['To', mail.to],
+      ...(mail.replyTo ? [['Reply-To', mail.replyTo] as [string, string]] : []),
       ['Subject', word(mail.subject)],
       ['Date', now.toUTCString().replace('GMT', '+0000')],
       ['Message-ID', `<${randomBytes(12).toString('hex')}@${domain}>`],
       ['MIME-Version', '1.0'],
       ['Content-Type', 'text/plain; charset=utf-8'],
-      ['Content-Transfer-Encoding', 'base64'],
+      ['Content-Transfer-Encoding', 'quoted-printable'],
+      // Sent by a program, because of something a person did: no auto-replies to it, and no vacation notices.
+      ['Auto-Submitted', 'auto-generated'],
     ],
     body,
   };
@@ -74,7 +107,7 @@ export function relaxedBody(body: string): string {
 /** The DKIM-Signature header for a message, signed with the key for `domain` under `selector`. */
 export function dkimSign(headers: [string, string][], body: string, domain: string, selector: string, key: string, now = new Date()): [string, string] {
   const bh = createHash('sha256').update(relaxedBody(body)).digest('base64');
-  const signed = headers.filter(([n]) => ['from', 'to', 'subject', 'date', 'message-id', 'mime-version', 'content-type'].includes(n.toLowerCase()));
+  const signed = headers.filter(([n]) => ['from', 'to', 'reply-to', 'subject', 'date', 'message-id', 'mime-version', 'content-type', 'content-transfer-encoding'].includes(n.toLowerCase()));
   const value = `v=1; a=rsa-sha256; c=relaxed/relaxed; d=${domain}; s=${selector}; t=${Math.floor(now.getTime() / 1000)}; h=${signed.map(([n]) => n.toLowerCase()).join(':')}; bh=${bh}; b=`;
   const input = [...signed.map(([n, v]) => relaxedHeader(n, v)), relaxedHeader('DKIM-Signature', value)].join('\r\n');
   return ['DKIM-Signature', value + createSign('RSA-SHA256').update(input).sign(key, 'base64')];
