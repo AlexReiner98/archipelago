@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { bodyAfter } from './ops.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
-import { MEMBER_TOOLS } from './members.ts';
+import { MEMBER_TOOLS } from './members.ts'; import { SERVER_PACK_TOOLS } from './server-pack-tools.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
 import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts'; import { ASK_TOOLS } from './token-ask.ts';
@@ -793,7 +793,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => launch(l, actor, input),
   },
   ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
-  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS,
+  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS,
   notify_workspace: {
     description: 'Send a notification to another workspace on this server. It arrives only if that workspace\u2019s admin has chosen to accept notifications from this one.',
     humanOnly: true,

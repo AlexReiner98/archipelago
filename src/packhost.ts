@@ -43,7 +43,10 @@ interface Proc {
   stderr: string;
 }
 
-class Sandbox {
+/** What a call may ask the kernel while it runs: a workspace pack reads the map; a server pack asks for acts and its store. */
+export type Answerer = (query: Record<string, unknown>) => Promise<unknown>;
+
+export class Sandbox {
   private proc?: Proc;
   private queue: Promise<unknown> = Promise.resolve();
   private seq = 0;
@@ -89,7 +92,8 @@ class Sandbox {
   }
 
   /** Make one call; calls to one pack are taken one at a time. */
-  call(l: Archipelago, message: Record<string, unknown>, ms: number): Promise<Done> {
+  call(l: Archipelago | Answerer, message: Record<string, unknown>, ms: number): Promise<Done> {
+    const answer: Answerer = typeof l === 'function' ? l : (query) => answerRead(l, query as Read);
     const run = async (): Promise<Done> => {
       const { child, waiting } = (this.proc ??= this.start());
       const id = ++this.seq;
@@ -109,7 +113,7 @@ class Sandbox {
           if (line.done !== undefined) return finish(() => resolve(line.done as Done));
           if (typeof line.read === 'number') {
             const { id: _, read, ...query } = line;
-            answerRead(l, query as Read).then(
+            answer(query).then(
               (result) => child.stdin!.write(JSON.stringify({ id, read, result }) + '\n'),
               (err) => child.stdin!.write(JSON.stringify({ id, read, error: (err as Error).message }) + '\n'),
             );

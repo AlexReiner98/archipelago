@@ -132,3 +132,37 @@ export async function importLocalPack(db: Q, file: string): Promise<number> {
   await setControlValue(db, LOCAL_IMPORTED, true);
   return types.length;
 }
+
+// ---- what a server pack keeps (src/server-host.ts) ----------------------
+
+/** Step 8 of the schema: keys and values a server pack keeps, each pack its own, some until a time. */
+export const PACK_STORE = `
+create table if not exists pack_store (
+  pack  text not null,
+  key   text not null,
+  value jsonb not null,
+  until timestamptz,
+  primary key (pack, key)
+);
+alter table pack_store enable row level security;`;
+
+export async function storeGet<T>(db: Q, pack: string, key: string): Promise<T | undefined> {
+  const { rows } = await db.query<{ value: T }>(`select value from pack_store where pack = $1 and key = $2 and (until is null or until >= now())`, [pack, key]);
+  return rows[0]?.value;
+}
+
+/** Keep a value, for `ms` or for good, in place of what was there; what has run out is cleared as it goes. */
+export async function storePut(db: Q, pack: string, key: string, value: unknown, ms?: number): Promise<void> {
+  await db.query(`delete from pack_store where until < now()`);
+  await db.query(
+    `insert into pack_store (pack, key, value, until) values ($1, $2, $3::jsonb, case when $4::float8 is null then null else now() + make_interval(secs => $4::float8) end)
+     on conflict (pack, key) do update set value = excluded.value, until = excluded.until`,
+    [pack, key, JSON.stringify(value ?? null), ms === undefined ? null : ms / 1000],
+  );
+}
+
+/** A value given once: taken away as it is read, by whichever call asks first. */
+export async function storeTake<T>(db: Q, pack: string, key: string): Promise<T | undefined> {
+  const { rows } = await db.query<{ value: T; live: boolean }>(`delete from pack_store where pack = $1 and key = $2 returning value, (until is null or until >= now()) as live`, [pack, key]);
+  return rows[0]?.live ? rows[0].value : undefined;
+}

@@ -10,7 +10,7 @@
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
 import { MEMBER, ORDERED, SCHEMA, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
-import { CONTROL } from './control.ts';
+import { CONTROL, PACK_STORE } from './control.ts';
 import { TRANSIENT } from './transient.ts';
 
 interface Migration {
@@ -32,6 +32,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 5, name: 'a token is within some items, and may report, propose or change', sql: TOKEN_SCOPE },
   { version: 6, name: 'members sign in by their email address', sql: MEMBER },
   { version: 7, name: 'a document shared with another workspace', sql: WORKSPACE_SHARE },
+  { version: 8, name: 'what a server pack keeps', sql: PACK_STORE },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

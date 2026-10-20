@@ -17,6 +17,14 @@ const handler = (await import(pathToFileURL(process.argv[2]).href)).default as R
 const reads = new Map<number, (result: unknown, error?: string) => void>();
 let next = 0;
 
+/** Ask the kernel something during a call and wait for its answer: a read, or a server pack's act or store. */
+const ask = (id: number, query: Record<string, unknown>) =>
+  new Promise((resolve, reject) => {
+    const n = ++next;
+    reads.set(n, (result, error) => (error ? reject(new Error(error)) : resolve(result)));
+    send({ id, read: n, ...query });
+  });
+
 async function run(call: Line) {
   const entry = handler?.[call.name as string];
   if (typeof entry !== 'function') return send({ id: call.id, error: `The handler has no "${call.name}".` });
@@ -26,12 +34,14 @@ async function run(call: Line) {
     zone: call.zone,
     settings: call.settings ?? {},
     present: call.present ?? [],
-    read: (query: Record<string, unknown>) =>
-      new Promise((resolve, reject) => {
-        const n = ++next;
-        reads.set(n, (result, error) => (error ? reject(new Error(error)) : resolve(result)));
-        send({ id: call.id, read: n, ...query });
-      }),
+    read: (query: Record<string, unknown>) => ask(call.id, query),
+    // A server pack's: what it asks the kernel to do (only the acts it declared), and the keys it keeps.
+    act: (name: string, input: unknown) => ask(call.id, { act: name, input }),
+    store: {
+      get: (key: string) => ask(call.id, { store: 'get', key }),
+      put: (key: string, value: unknown, ms?: number) => ask(call.id, { store: 'put', key, value, ms }),
+      take: (key: string) => ask(call.id, { store: 'take', key }),
+    },
   };
   try {
     const done = (await entry(call.input, ctx)) ?? {};
