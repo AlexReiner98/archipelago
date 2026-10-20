@@ -5,20 +5,20 @@
 
 import { h } from './base.js';
 import { BLOCKING, isOf } from './graph.js';
-import { lensTree, litCount, litSwitch } from './lens-base.js';
+import { lensTree, litCount, litSwitch, sizeOf } from './lens-base.js';
 import { isClosed, relations, titles, typeTitle } from './words.js';
 
 /** The columns a row may have, in the order they are drawn; a style's `show` picks among them. */
 const COLUMNS = ['type', 'status', 'waits', 'sessions'];
-const SHOWN = ['status', 'waits', 'sessions'];
 
 /** The list: a table of one-line rows, grouped by what holds what. Reads only what a lens answers with. */
 export function drawList(host, answer, style, keep, kept) {
   const { me, byId, root } = lensTree(answer);
   // `show` names columns; the older words for marks (you, blocked, count) mean the waits column.
-  const asked = Array.isArray(style.show) ? style.show.map((s) => (['you', 'blocked'].includes(s) ? 'waits' : s)) : SHOWN;
+  // Which columns and how far it opens are the style's: the house style says, and a nearer one may say otherwise.
+  const asked = (Array.isArray(style.show) ? style.show : []).map((s) => (['you', 'blocked'].includes(s) ? 'waits' : s));
   const columns = COLUMNS.filter((c) => asked.includes(c));
-  const levels = Number.isFinite(style.open) ? style.open : 1;
+  const levels = Number(style.open);
   const { opened } = kept;
   // Around one item, what it sits in is open down to it, and how far things open is counted from it.
   const here = byId.get(answer.lens.from);
@@ -118,5 +118,7 @@ export function drawList(host, answer, style, keep, kept) {
   const lit = litSwitch(me, style, keep, draw);
   host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), body].filter(Boolean));
   host.redraw = draw;
+  // Narrow, the type and waits columns step aside, at the width the style says.
+  new ResizeObserver(([seen]) => body.classList.toggle('ll-narrow', seen.contentRect.width < sizeOf(style, 'list_narrow_at'))).observe(body);
   draw();
 }

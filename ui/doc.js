@@ -159,7 +159,17 @@ function invoiceHead(d) {
   );
 }
 
+/** The page's colours: the workspace's theme (its style), light or dark as the reader's system is. Only plain hex colours. */
+const dark = matchMedia('(prefers-color-scheme: dark)');
+let theme;
+const paint = () => {
+  for (const [name, colour] of Object.entries(theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (/^[a-z][a-z0-9_]*$/.test(name) && /^#[0-9a-f]{3,8}$/i.test(String(colour))) document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, colour);
+};
+dark.addEventListener('change', paint);
+
 function draw(d) {
+  theme = d.theme;
+  paint();
   document.title = d.type === INVOICE && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
   const sections = d.parts.filter((p) => p.section);
@@ -187,7 +197,7 @@ function draw(d) {
 }
 
 (own
-  ? api('document', { id: own })
+  ? Promise.all([api('document', { id: own }), api('view', { name: 'style', params: {} })]).then(([d, s]) => ({ ...d, theme: s.style.theme }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');
