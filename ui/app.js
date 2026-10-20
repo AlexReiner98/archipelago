@@ -7,10 +7,9 @@ import { home } from './home.js';
 import { entity } from './item.js';
 import { graph } from './atlas.js';
 import { stale } from './live.js';
-import { activity, review } from './review.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { map, mapState, searchBar } from './search.js';
-import { loadSchema, refreshReviewCount } from './words.js';
+import { loadSchema } from './words.js';
 import { workspace } from './workspace.js';
 
 // ---- routing -------------------------------------------------------------
@@ -20,7 +19,7 @@ import { workspace } from './workspace.js';
 // page of the thing it is about or in the search, and its old address leads
 // there. Search is one thing at a time under its search box: the search, an
 // item, or a graph.
-const PAGES = { home: ['home'], review: ['review'], map: ['map', 'item', 'graph'], screen: ['screen'], workspace: ['workspace'] };
+const PAGES = { home: ['home'], map: ['map', 'item', 'graph'], screen: ['screen'], workspace: ['workspace'] };
 const UNDER = { e: 'map', new: 'map', graph: 'map', s: 'screen' };
 /** The part an address names, where that is not the address's own name. */
 const PART = { e: 'item', new: 'item', s: 'screen' };
@@ -30,7 +29,8 @@ async function route(pulse = false) {
   const [where, query = ''] = location.hash.split('?');
   const [, name = 'home', arg] = where.split('/');
   // Addresses that have been folded into another screen still lead somewhere.
-  if (name === 'activity') return activity();
+  // Changes is gone: what is held for the owner is on Home; what changed is each item's history.
+  if (name === 'activity' || name === 'review') return void (location.hash = '#/home');
   // The app opens on Home: each project's questions and its next release.
   if (name === 'projects' || name === 'today') return void (location.hash = '#/home');
   // Automations are found like any other kind of item.
@@ -54,7 +54,6 @@ async function route(pulse = false) {
   for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (page === 'screen' ? `s/${decodeURIComponent(arg ?? '')}` : page));
   const draw = {
     home,
-    review,
     map: name === 'map' || page !== 'map' ? map : searchBar,
     // The graph around an item is drawn on that item's page, under it.
     item: name === 'e' && arg ? () => entity(arg, new URLSearchParams(query).get('here') ?? undefined) : name === 'new' && (() => newEntity(arg)),
@@ -87,7 +86,6 @@ async function route(pulse = false) {
   // The parts above the one asked for have their final height only now, and a list in them a moment later.
   const settle = () => location.hash.split('/')[1] === name && part(named).scrollIntoView();
   if (!pulse && named !== wanted[0] && page !== 'map' && part(named) !== main) (settle(), setTimeout(settle, 700));
-  refreshReviewCount();
   showIdentity();
 }
 

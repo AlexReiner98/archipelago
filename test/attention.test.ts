@@ -98,9 +98,9 @@ test('attention finds every reason, for the right person, within a scope, and th
   // Home is the core pack's screen (docs/ui-strategy.md): systems asking for a token, your move capped at five, your projects as a list, the atlas.
   const { screens } = (await callTool(l, human, 'schema', {})) as { screens: { at?: string; pieces: { piece: string; title?: string; style?: { shape?: string } }[] }[] };
   const home = screens.find((s) => s.at === 'home')!;
-  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['token_ask', undefined], ['attention', 'Your move'], ['picture', 'Your projects'], ['atlas', 'Atlas']]);
-  assert.equal((home.pieces[1] as { limit?: number }).limit, 5);
-  assert.equal(home.pieces[2].style?.shape, 'list');
+  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['token_ask', undefined], ['held', 'Held for you'], ['attention', 'Your move'], ['picture', 'Your projects'], ['atlas', 'Atlas']]);
+  assert.equal((home.pieces[2] as { limit?: number }).limit, 5);
+  assert.equal(home.pieces[3].style?.shape, 'list');
 });
 
 test('attention can be read latest first, each item saying when it last changed', async () => {

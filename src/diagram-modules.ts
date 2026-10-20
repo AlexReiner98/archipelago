@@ -35,7 +35,7 @@ const AREAS: Record<'server' | 'browser', Array<[string, RegExp]>> = {
     ['Server and surfaces', /./],
   ],
   browser: [
-    ['Item page', /^(item.*|body|review|proof|forms)\.js$/],
+    ['Item page', /^(item.*|body|held|proof|forms)\.js$/],
     ['Pictures', /^(lens.*|graph.*|flow.*|grid|list|timeline|roadmap|pan-zoom|draw|style-code)\.(js|html)$/],
     ['Home and workspace', /^(home|attention|workspace.*|packs|screens|nav|search)\.js$/],
     ['Time', /^(time|week)\.js$/],

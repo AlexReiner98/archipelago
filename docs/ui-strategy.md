@@ -61,6 +61,10 @@ a decision is a step wherever it is filed.
 
 Home answers one question: what can only I do next? It holds:
 
+0. **Held for you,** a table above everything, shown only when an agent's
+   change waits for the owner's word: what it does, who asked, Look, Apply,
+   Decline. There is no Changes page (removed 19 Oct 2026): what changed is
+   each item's history, and notifications are for agents, not the screen.
 1. **Your move,** at most five rows (the owner may set the number): things
    that `waits_on` you, decisions an agent settled for you to confirm, and
    open decisions owned by you. Ranked by what each holds up. Below them, one
