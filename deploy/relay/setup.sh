@@ -37,6 +37,10 @@ say "name"
 hostnamectl set-hostname "$name"
 echo "$name" >/etc/mailname
 
+say "SSH: keys only (OVH delivers a VPS with a password login)"
+printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin no\n' >/etc/ssh/sshd_config.d/10-keys-only.conf
+sshd -t && systemctl reload ssh
+
 say "WireGuard: a peer of the hub, and of nothing else"
 umask 077
 [[ -f /etc/wireguard/relay.key ]] || wg genkey >/etc/wireguard/relay.key

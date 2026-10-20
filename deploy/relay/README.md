@@ -40,13 +40,25 @@ The second line is the DKIM record's value. The private key never leaves the hub
 
 ## 3. The relay
 
-Order an OVH **VPS** (not Public Cloud), the smallest, in Beauharnois, Ubuntu 24.04, with the `archipelago-vps` SSH
-key. Then, from a machine with that key:
+Order an OVH **VPS** (not Public Cloud), the smallest, in Beauharnois, Ubuntu 24.04. It arrives in a few minutes to
+an hour, with a password for `ubuntu` in OVH's email and no SSH key, and the password must be changed at the first
+login, which needs a terminal of its own (a piped command is refused with "no TTY"). So, by hand, in a terminal:
 
 ```bash
-scp deploy/relay/setup.sh ubuntu@<relay IPv4>:
-ssh ubuntu@10.66.0.1 'sudo bash ~/archipelago/deploy/relay/hub.sh key'
-ssh ubuntu@<relay IPv4> 'sudo bash setup.sh <hub key from the line above>'
+ssh ubuntu@<relay IPv4>
+```
+
+(OVH's password, then a new one twice: nothing shows as you type; it then closes the connection), and then
+
+```bash
+cat ~/.ssh/archipelago_vps.pub | ssh ubuntu@<relay IPv4> "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+```
+
+From then on the key does it all, from this repository's folder (`setup.sh` also turns password logins off):
+
+```bash
+ssh -i ~/.ssh/archipelago_vps ubuntu@10.66.0.1 'sudo cat /etc/wireguard/server.key | wg pubkey'
+ssh -i ~/.ssh/archipelago_vps ubuntu@<relay IPv4> 'sudo bash -s -- <hub key from the line above>' < deploy/relay/setup.sh
 ```
 
 `setup.sh` installs Postfix and WireGuard, closes the firewall to all but SSH and mail from the hub, and ends with
@@ -55,7 +67,8 @@ two checks and the relay's public key. **If it says port 25 out is BLOCKED, stop
 On the hub, take the relay on as a peer, then check both ends:
 
 ```bash
-ssh ubuntu@10.66.0.1 'sudo bash ~/archipelago/deploy/relay/hub.sh add <relay key> && bash ~/archipelago/deploy/relay/hub.sh check'
+ssh -i ~/.ssh/archipelago_vps ubuntu@10.66.0.1 'sudo bash -s -- add <relay key>' < deploy/relay/hub.sh
+ssh -i ~/.ssh/archipelago_vps ubuntu@10.66.0.1 'bash -s -- check' < deploy/relay/hub.sh
 ```
 
 `check` should say the tunnel is up and the relay answers on port 25 from the host and from the app's container.
