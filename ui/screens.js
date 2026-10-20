@@ -51,10 +51,10 @@ export function actionForm(tool, id, done) {
         ? h('select', { name: key }, [['', '(not set)'], ['true', 'yes'], ['false', 'no']].map(([v, text]) => h('option', { value: v }, text)))
         : h('input', { type: numeric(def) ? 'number' : 'text', name: key });
   const fields = Object.entries(props).filter(([key]) => key !== tool.item);
-  const error = h('div', { class: 'error', style: 'padding: 0 14px 14px' });
+  const error = h('div', { class: 'error', style: 'padding: 0 var(--space-8) var(--space-8)' });
   const form = h(
     'section',
-    { class: 'card wide form', style: 'margin-bottom: 14px' },
+    { class: 'card wide form', style: 'margin-bottom: var(--space-8)' },
     h('header', {}, h('h2', { title: `From the ${tool.pack} pack` }, tool.title ?? tool.tool)),
     fields.length > 0 && h('dl', { class: 'fields' }, fields.map(([key, def]) => [h('dt', { title: def.description ?? '', class: def.description ? 'hinted' : '' }, `${label(key)}${required.has(key) ? ' *' : ''}`), h('dd', {}, control(key, def))])),
     error,
@@ -176,7 +176,7 @@ const PIECES = {
     // A screen that names its shape is drawn in it, not by the code of a style the workspace keeps for every picture.
     if (style.shape) style.code = '';
     const view = lensView({ lens, style, key: `screen:${p.screen.id}:${ctx.id ?? ''}`, quiet: true });
-    return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: 14px' }, h('header', {}, h('h2', {}, p.title ?? p.screen.title)), view) };
+    return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, p.title ?? p.screen.title)), view) };
   },
   // Some of the item's fields, together under the screen's name.
   fields: (ctx, p) => {
@@ -222,7 +222,7 @@ const unknownPiece = (p) => {
     node.replaceChildren(
       h(
         'section',
-        { class: 'card wide', style: 'margin-bottom: 14px' },
+        { class: 'card wide', style: 'margin-bottom: var(--space-8)' },
         h(
           'div',
           { class: 'toolbar fold-bar' },

@@ -81,7 +81,7 @@ export async function roadmap(rootId) {
 
   const flat = (bs) => bs.flatMap((b) => [b, ...flat(b.branches)]);
   const features = flat(data.branches);
-  const title = h('input', { type: 'text', placeholder: 'A new feature', style: 'flex: 1; min-width: 200px' });
+  const title = h('input', { type: 'text', placeholder: 'A new feature', style: 'flex: 1; min-width: var(--input-wide)' });
   const add = () =>
     title.value.trim() &&
     change(
@@ -134,7 +134,7 @@ export async function roadmap(rootId) {
           h('span', { class: 'switch' }, [['Graph', true], ['List', false]].map(([label, graph]) => h('button', { class: asGraph === graph ? 'on' : '', onclick: () => ((roadmapState.graph = graph), roadmap(rootId)) }, label))),
         ),
         !data.branches.length ? h('div', { class: 'empty' }, 'No features yet.') : asGraph ? graphView({ focus: rootId, defaults: { kind: 'structure', steps: 1 }, extras: { info, edges: through, workOnly: true } }) : h('ul', { class: 'tree top' }, data.branches.map(branch)),
-        h('div', { class: 'toolbar', style: 'padding: 12px 14px; border-top: 1px solid var(--line)' }, title, h('button', { class: 'primary', onclick: add }, 'Add feature')),
+        h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8); border-top: var(--border-1) solid var(--line)' }, title, h('button', { class: 'primary', onclick: add }, 'Add feature')),
       ),
       data.unplaced.length > 0 &&
         !asGraph &&

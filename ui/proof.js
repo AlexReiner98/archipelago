@@ -76,7 +76,7 @@ export async function proofPart(rootId, withLog = false) {
   main.replaceChildren(
     h(
       'div',
-      { class: 'grid proofs', style: 'margin-bottom: 14px' },
+      { class: 'grid proofs', style: 'margin-bottom: var(--space-8)' },
       counts.questions > 0 &&
       h(
         'section',

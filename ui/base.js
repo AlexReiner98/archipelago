@@ -142,8 +142,8 @@ export async function api(tool, input = {}) {
 }
 
 export function signIn(message) {
-  const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: 260px', autocomplete: 'off' });
-  const error = h('div', { class: 'error', style: 'padding: 0 14px 14px' }, message ?? '');
+  const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'off' });
+  const error = h('div', { class: 'error', style: 'padding: 0 var(--space-8) var(--space-8)' }, message ?? '');
   const submit = async () => {
     store.token = input.value.trim();
     const res = await fetch('/whoami', { headers: authHeaders() });
@@ -162,9 +162,9 @@ export function signIn(message) {
     h('div', { class: 'page-head' }, h('h1', {}, 'Sign in'), h('p', { class: 'muted' }, 'This server asks for a token. It decides which workspace you see and what you may do.')),
     h(
       'section',
-      { class: 'card', style: 'max-width: 620px' },
-      others.length > 0 && h('div', { class: 'toolbar', style: 'padding: 14px 14px 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
-      h('div', { class: 'toolbar', style: 'padding: 14px' }, input, h('button', { class: 'primary', onclick: submit }, 'Sign in')),
+      { class: 'card', style: 'max-width: var(--card-most)' },
+      others.length > 0 && h('div', { class: 'toolbar', style: 'padding: var(--space-8) var(--space-8) 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
+      h('div', { class: 'toolbar', style: 'padding: var(--space-8)' }, input, h('button', { class: 'primary', onclick: submit }, 'Sign in')),
       error,
     ),
   );

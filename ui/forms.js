@@ -8,7 +8,7 @@ export function entityForm(typeId, initial, { submitLabel, onSubmit, onCancel })
   const type = types.get(typeId);
   const state = { title: initial.title ?? '', status: initial.status ?? type.statuses.open[0], body: initial.body ?? '', visibility: initial.visibility ?? '', props: { ...(initial.props ?? {}) } };
   const bad = new Set();
-  const error = h('div', { class: 'error', style: 'white-space: pre-wrap; padding: 0 14px 14px' });
+  const error = h('div', { class: 'error', style: 'white-space: pre-wrap; padding: 0 var(--space-8) var(--space-8)' });
 
   const control = (key, def) => {
     const value = state.props[key];
@@ -110,7 +110,7 @@ export function newEntity(typeId) {
       h('div', { class: 'page-head' }, h('h1', {}, 'New')),
       h(
         'div',
-        { class: 'toolbar', style: 'margin-bottom: 12px' },
+        { class: 'toolbar', style: 'margin-bottom: var(--space-7)' },
         h('label', { class: 'muted' }, 'Type '),
         h(
           'select',

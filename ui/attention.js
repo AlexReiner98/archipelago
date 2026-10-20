@@ -82,7 +82,7 @@ function overflow(rest) {
   const groups = [...by.values()].sort((a, b) => b.n - a.n);
   return h(
     'div',
-    { class: 'row-top muted small overflow', style: 'padding: 0 14px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' },
+    { class: 'row-top muted small overflow', style: 'padding: 0 var(--space-8) var(--space-7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis' },
     `and ${rest.length} more:`,
     groups.map((g) => (g.top ? h('a', { href: `#/e/${g.top.id}`, title: `${g.n} in ${g.top.title}` }, `${g.top.title} ${g.n}`) : h('span', { title: 'In no project' }, `elsewhere ${g.n}`))),
   );
@@ -107,7 +107,7 @@ export async function attentionCard(host, params, title, onItem, limit) {
   host.replaceChildren(
     h(
       'section',
-      { class: 'card wide needs', style: 'margin-bottom: 14px' },
+      { class: 'card wide needs', style: 'margin-bottom: var(--space-8)' },
       h(
         'header',
         {},
@@ -117,7 +117,7 @@ export async function attentionCard(host, params, title, onItem, limit) {
       ),
       answer.items.length ? h('ul', { class: 'rows' }, shown.map((item) => (params.person === 'me' ? moveRow : attentionRow)(item, order === 'latest'))) : h('div', { class: 'empty' }, 'Nothing needs you.'),
       shown.length < answer.items.length && overflow(answer.items.slice(shown.length)),
-      answer.more && h('div', { class: 'muted small', style: 'padding: 0 14px 12px' }, answer.more),
+      answer.more && h('div', { class: 'muted small', style: 'padding: 0 var(--space-8) var(--space-7)' }, answer.more),
     ),
   );
 }

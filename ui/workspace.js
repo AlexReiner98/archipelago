@@ -22,7 +22,7 @@ export async function workspace() {
   const [info, tokens, people] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 })]);
   const personName = (id) => people.find((p) => p.id === id)?.title;
   const notice = h('div');
-  const fail = (err) => notice.replaceChildren(h('div', { class: 'error', style: 'padding: 10px 14px' }, err.message));
+  const fail = (err) => notice.replaceChildren(h('div', { class: 'error', style: 'padding: var(--space-6) var(--space-8)' }, err.message));
   const live = tokens.filter((t) => !t.revoked_at);
 
   const tokenRow = (t) =>
@@ -49,14 +49,14 @@ export async function workspace() {
       h('div', { class: 'row-sub' }, t.entity_id && `${personName(t.entity_id) ?? t.entity_id} · `, `${t.hint} · `, t.last_used ? ['used ', ago(t.last_used)] : 'never used', t.expires_at && ` · expires ${when(t.expires_at)}`),
     );
 
-  const agentName = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1; min-width: 180px' });
+  const agentName = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1; min-width: var(--input-least)' });
   // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
   const agentLife = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
   const agentToken = (fallback) => ({ kind: 'agent', name: agentName.value.trim() || fallback, ...(Number(agentLife.value) > 0 && { expires_days: Number(agentLife.value) }) });
-  const memberName = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: 160px' });
-  const memberEmail = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: 160px' });
+  const memberName = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: var(--input-least)' });
+  const memberEmail = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: var(--input-least)' });
   const memberAdmin = h('input', { type: 'checkbox' });
-  const accepts = h('input', { type: 'text', value: info.accepts_from.join(', '), placeholder: 'workspace ids, separated by commas', style: 'flex: 1; min-width: 220px' });
+  const accepts = h('input', { type: 'text', value: info.accepts_from.join(', '), placeholder: 'workspace ids, separated by commas', style: 'flex: 1; min-width: var(--input-wide)' });
 
   main.replaceChildren(
     head,
@@ -76,7 +76,7 @@ export async function workspace() {
         h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'agent').map(tokenRow)),
         h(
           'div',
-          { class: 'toolbar', style: 'padding: 12px 14px' },
+          { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' },
           agentName,
           agentLife,
           h(
@@ -111,7 +111,7 @@ export async function workspace() {
           h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'human').map(tokenRow)),
           h(
             'div',
-            { class: 'toolbar', style: 'padding: 12px 14px' },
+            { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' },
             memberName,
             memberEmail,
             h('label', {}, memberAdmin, ' Admin'),

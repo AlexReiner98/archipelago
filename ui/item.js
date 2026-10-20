@@ -160,7 +160,7 @@ export async function entity(id, here) {
         (data.trail ?? []).map((t) => [h('span', { class: 'trail-sep' }, '›'), h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title)]),
         !data.trail?.length && (altitude === 'stream' || altitude === 'step') && [h('span', { class: 'trail-sep' }, '›'), h('span', { class: 'muted', title: 'Part of no project yet' }, 'not filed')],
       ),
-      h('h1', { style: 'margin-top: 6px' }, e.title),
+      h('h1', { style: 'margin-top: var(--space-4)' }, e.title),
       // The pictures it is drawn in, each a way straight back to it with this item marked, and the documents that show it.
       data.shown_in?.length > 0 &&
         h(
@@ -227,13 +227,13 @@ export async function entity(id, here) {
     acting,
     // Where it sits and what it holds, as a picture: the lens and the style kept for it, or the ones every item opens on. It takes no room when there is nothing to draw.
     // Whether its page draws that picture is its style's (a document's preset says no: what it holds is in its text).
-    ...(story ? [storyPart(story)].flat() : !looks.page.picture ? [] : [h('section', { class: 'card lens-card', style: 'margin-bottom: 14px' }, lensView({ lens: { from: id }, quiet: true }))]),
+    ...(story ? [storyPart(story)].flat() : !looks.page.picture ? [] : [h('section', { class: 'card lens-card', style: 'margin-bottom: var(--space-8)' }, lensView({ lens: { from: id }, quiet: true }))]),
     // What it holds up and what holds it, said outright: a picture places them, these say which way the tie runs.
     (holding.length + heldBy.length > 0 || '') &&
-      h('div', { class: 'grid', style: 'margin-bottom: 14px' }, holding.length > 0 && fold(id, 'holding', 'Waiting on this', holding.length, looks.page.ties === 'open', tieRows(holding)), heldBy.length > 0 && fold(id, 'held', 'This waits on', heldBy.length, looks.page.ties === 'open', tieRows(heldBy))),
+      h('div', { class: 'grid', style: 'margin-bottom: var(--space-8)' }, holding.length > 0 && fold(id, 'holding', 'Waiting on this', holding.length, looks.page.ties === 'open', tieRows(holding)), heldBy.length > 0 && fold(id, 'held', 'This waits on', heldBy.length, looks.page.ties === 'open', tieRows(heldBy))),
     // What it is comes before what its screens draw of it: said under a chart, it reads as a caption to it.
     // A session that tells its story keeps its log of notes behind a fold: the story is what it says.
-    h('div', { class: 'grid', style: 'margin-bottom: 14px' }, story ? fold(id, 'log', 'Log', 0, false, note) : note),
+    h('div', { class: 'grid', style: 'margin-bottom: var(--space-8)' }, story ? fold(id, 'log', 'Log', 0, false, note) : note),
     screens.column,
     h('div', { class: 'grid' }, fold(id, 'history', 'History', lines.length, looks.page.history === 'open', lines)),
   );

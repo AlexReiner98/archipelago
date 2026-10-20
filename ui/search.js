@@ -18,7 +18,7 @@ export function searchBar() {
     location.hash = '#/map';
   };
   // Typing here is not an edit that a redraw would lose.
-  part('map').replaceChildren(h('div', { class: 'toolbar' }, h('input', { type: 'search', placeholder: 'Search titles and text', style: 'flex: 1; min-width: 200px', onkeydown: go, oninput: (e) => e.stopPropagation() })));
+  part('map').replaceChildren(h('div', { class: 'toolbar' }, h('input', { type: 'search', placeholder: 'Search titles and text', style: 'flex: 1; min-width: var(--input-wide)', onkeydown: go, oninput: (e) => e.stopPropagation() })));
 }
 
 /** A token found by name: it leads to the item it is within, whose Tokens for this lists it, or to the Workspace screen. */
@@ -98,8 +98,8 @@ export function map() {
     h('div', { class: 'page-head' }, h('h1', {}, 'Search')),
     h(
       'div',
-      { class: 'toolbar', style: 'margin-bottom: 12px' },
-      h('input', { type: 'search', placeholder: 'Search titles and text', value: mapState.q, oninput: set('q'), autofocus: true, style: 'flex: 1; min-width: 200px' }),
+      { class: 'toolbar', style: 'margin-bottom: var(--space-7)' },
+      h('input', { type: 'search', placeholder: 'Search titles and text', value: mapState.q, oninput: set('q'), autofocus: true, style: 'flex: 1; min-width: var(--input-wide)' }),
       h('select', { onchange: set('type') }, h('option', { value: '' }, 'All types'), state.schema.types.filter((t) => !t.dormant).map((t) => h('option', { value: t.id, selected: t.id === mapState.type }, typeChoice(t)))),
       h('button', { onclick: () => (location.hash = `#/new/${mapState.type || workType()}`) }, 'New'),
       h('button', { title: 'The whole map as a picture', onclick: () => (location.hash = '#/graph') }, 'Map'),
