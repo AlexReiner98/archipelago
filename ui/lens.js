@@ -47,14 +47,14 @@ export function storyPart(data) {
   return [
     h(
       'section',
-      { class: 'card story', style: 'margin-bottom: 14px' },
+      { class: 'card story', style: 'margin-bottom: var(--space-8)' },
       h('header', { class: 'toolbar fold-bar' }, h('h2', { title: 'What this session has found, as it last said it' }, 'Found'), h('span', { class: 'grow' }), ago(found.at)),
       said,
       h('div', { class: 'story-picture' }, picture),
     ),
     h(
       'details',
-      { class: 'card wide fold story-beats', style: 'margin-bottom: 14px' },
+      { class: 'card wide fold story-beats', style: 'margin-bottom: var(--space-8)' },
       h('summary', { title: 'Each thing the session concluded, in order' }, h('h2', {}, 'How it got there'), h('span', { class: 'n' }, data.beats.filter((b) => !b.replaced_by).length)),
       h('ol', { class: 'beats' }, rows),
     ),

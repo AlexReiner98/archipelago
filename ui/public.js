@@ -95,11 +95,15 @@ function draw(d) {
   main.replaceChildren(...page.childNodes);
 }
 
-/** The page's colours: the workspace's theme (its style), light or dark as the reader's system is. Only plain hex colours. */
+/** The page's colours and lengths: the workspace's style, light or dark as the reader's system is. Only plain hex colours and lengths. */
 const dark = matchMedia('(prefers-color-scheme: dark)');
-let theme;
+const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?)*$/;
+const asLength = (v) => (typeof v === 'number' && v >= 0 ? `${v}px` : typeof v === 'string' && LENGTH.test(v) ? v : null);
+let look = {};
 const paint = () => {
-  for (const [name, colour] of Object.entries(theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (/^[a-z][a-z0-9_]*$/.test(name) && /^#[0-9a-f]{3,8}$/i.test(String(colour))) document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, colour);
+  const set = (name, value) => /^[a-z][a-z0-9_]*$/.test(name) && document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, value);
+  for (const [name, colour] of Object.entries(look.theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (/^#[0-9a-f]{3,8}$/i.test(String(colour))) set(name, colour);
+  for (const [name, value] of Object.entries(look.lengths ?? {})) if (asLength(value)) set(name, asLength(value));
 };
 dark.addEventListener('change', paint);
 
@@ -108,7 +112,7 @@ async function load(build) {
     const res = await fetch(`${here}/data${build ? `?build=${encodeURIComponent(build)}` : ''}`);
     if (!res.ok) return main.replaceChildren(h('p', { class: 'muted' }, 'There is nothing public at this address.'));
     const page = await res.json();
-    theme = page.theme;
+    look = page;
     paint();
     draw(page);
   } catch {

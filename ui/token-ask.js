@@ -35,7 +35,7 @@ export async function tokenAskPiece(host, e) {
     h(
       'li',
       { class: 'row-top tie-row' },
-      h('strong', { class: 'gist muted', title: a.name, style: 'flex: 0 1 auto; min-width: 3ch; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap' }, a.name),
+      h('strong', { class: 'gist muted', title: a.name, style: 'flex: 0 1 auto; min-width: var(--code-least); max-width: var(--code-most); overflow: hidden; text-overflow: ellipsis; white-space: nowrap' }, a.name),
       h('span', { class: `pill ${a.state === 'refused' ? 'bad' : 'ok'}`, title: `${a.answered_by ? `By ${a.answered_by}, ` : ''}${a.state === 'handed' ? 'and the system has collected its token' : a.state === 'approved' ? 'not yet collected by the system' : 'the system is told no'}` }, a.state === 'refused' ? 'refused' : a.state === 'handed' ? 'collected' : 'approved'),
       h('span', { class: 'grow gist', title: names(a) }, a.state === 'refused' ? h('span', { class: 'muted' }, names(a)) : items(a, a.state === 'handed' ? 'Its token is under Tokens for this' : 'Its token is made when the system collects it')),
       h('span', { class: 'muted small', title: `Gone from here ${when(a.expires_at)}` }, a.code),
@@ -44,7 +44,7 @@ export async function tokenAskPiece(host, e) {
     h(
       'li',
       { class: 'row-top tie-row' },
-      h('strong', { class: 'gist', title: a.name, style: 'flex: 0 1 auto; min-width: 3ch; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap' }, a.name),
+      h('strong', { class: 'gist', title: a.name, style: 'flex: 0 1 auto; min-width: var(--code-least); max-width: var(--code-most); overflow: hidden; text-overflow: ellipsis; white-space: nowrap' }, a.name),
       h('span', { class: 'pill warn', title: `The code the system showed: approve only if it is the same.\nAsked ${when(a.asked_at)}, runs out ${when(a.expires_at)}` }, a.code),
       h('span', { class: 'grow gist', title: names(a) }, a.items.map((i, n) => [n > 0 && ', ', i ? link(i) : h('span', { class: 'muted', title: 'No item you can see is watched here' }, a.addresses[n])])),
       h('button', { class: 'primary', disabled: !known(a), title: known(a) ? `A token that may only report, within ${names(a)}` : 'No item you can see is watched at one of its addresses', onclick: () => answer(a, true) }, 'Approve'),
@@ -52,7 +52,7 @@ export async function tokenAskPiece(host, e) {
     );
   host.replaceChildren(
     ...(asks.length
-      ? [h('section', { class: `card wide${waiting.length ? ' needs' : ''}`, style: 'margin-bottom: 14px' }, h('header', {}, h('h2', {}, 'Asking for a token'), waiting.length > 0 && h('span', { class: 'n' }, waiting.length)), h('ul', { class: 'rows' }, asks.map((a) => (a.state === 'pending' ? row(a) : answered(a)))), error)]
+      ? [h('section', { class: `card wide${waiting.length ? ' needs' : ''}`, style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, 'Asking for a token'), waiting.length > 0 && h('span', { class: 'n' }, waiting.length)), h('ul', { class: 'rows' }, asks.map((a) => (a.state === 'pending' ? row(a) : answered(a)))), error)]
       : []),
   );
 }

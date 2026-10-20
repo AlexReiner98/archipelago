@@ -125,7 +125,7 @@ export async function gate(eventId) {
   main.replaceChildren(
     h(
       'div',
-      { class: 'grid gated', style: 'margin-bottom: 14px' },
+      { class: 'grid gated', style: 'margin-bottom: var(--space-8)' },
       unsorted.length > 0 &&
         h(
           'section',

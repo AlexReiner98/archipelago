@@ -146,10 +146,10 @@ export async function api(tool, input = {}) {
 export function signIn(message) {
   // Signed out, the style is not read with the rest: its colours are asked for on their own.
   fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
-  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', class: 'grow', autocomplete: 'email' });
-  const input = h('input', { type: 'text', placeholder: 'pel_…', class: 'grow', autocomplete: 'off' });
-  const error = h('div', { class: 'error', style: 'padding: 0 14px 14px' }, message ?? '');
-  const byEmail = h('div', { class: 'toolbar', style: 'padding: 14px' });
+  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'email' });
+  const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'off' });
+  const error = h('div', { class: 'error', style: 'padding: 0 var(--space-8) var(--space-8)' }, message ?? '');
+  const byEmail = h('div', { class: 'toolbar', style: 'padding: var(--space-8)' });
   const sendLink = async () => {
     const res = await fetch('/connect/sign-in', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.value.trim() }) });
     const body = await res.json().catch(() => ({}));
@@ -177,8 +177,8 @@ export function signIn(message) {
     h('div', { class: 'page-head' }, h('h1', {}, 'Sign in')),
     h(
       'section',
-      { class: 'card', style: 'max-width: 620px' },
-      others.length > 0 && h('div', { class: 'toolbar', style: 'padding: 14px 14px 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
+      { class: 'card', style: 'max-width: var(--card-most)' },
+      others.length > 0 && h('div', { class: 'toolbar', style: 'padding: var(--space-8) var(--space-8) 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
       byEmail,
       h('details', { class: 'fold-bar' }, h('summary', { class: 'muted small', title: 'For an agent, or a workspace’s first sign-in' }, 'With a token'), h('div', { class: 'toolbar fold-bar' }, input, h('button', { onclick: submit }, 'Sign in'))),
       error,

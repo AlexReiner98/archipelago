@@ -7,6 +7,8 @@ export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
   '/': 'index.html',
   '/app.js': 'app.js',
+  // The house style's lengths as a stylesheet, so the page is laid out before the workspace's style is read (src/styles.ts).
+  '/layout.css': 'layout.css',
   '/style.css': 'style.css',
   '/flow.css': 'flow.css',
   '/arch.css': 'arch.css',

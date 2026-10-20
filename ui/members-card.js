@@ -7,8 +7,8 @@ import { ago, menu } from './words.js';
 
 /** members: from member_list. others: the live human tokens of nobody listed. then: draw the page again; say: put a word at its top. */
 export function membersCard({ me, members, others, tokenRow, then, fail, say }) {
-  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', class: 'grow', autocomplete: 'off' });
-  const name = h('input', { type: 'text', placeholder: 'Name (optional)', class: 'grow' });
+  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 2; min-width: var(--input-least)', autocomplete: 'off' });
+  const name = h('input', { type: 'text', placeholder: 'Name (optional)', style: 'flex: 1; min-width: var(--input-least)' });
   const admin = h('input', { type: 'checkbox' });
   const add = async () => {
     try {
@@ -44,6 +44,6 @@ export function membersCard({ me, members, others, tokenRow, then, fail, say }) 
     { class: 'card wide' },
     h('header', {}, h('h2', { class: 'hinted', title: 'People who sign in to this workspace, each by their email address.' }, 'Members')),
     h('ul', { class: 'rows' }, members.map(row), others.map(tokenRow)),
-    h('div', { class: 'toolbar fold-bar' }, email, name, h('label', {}, admin, ' Admin'), h('button', { class: 'primary', title: 'They are sent an invitation by email', onclick: add }, 'Add member')),
+    h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, email, name, h('label', {}, admin, ' Admin'), h('button', { class: 'primary', title: 'They are sent an invitation by email', onclick: add }, 'Add member')),
   );
 }

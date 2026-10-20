@@ -247,7 +247,7 @@ export function weekCalendar(wk, today, act, full) {
   const seen = (b) => b.to_hour > top && b.from_hour < bottom;
   const place = (from, to) => {
     const [a, z] = [Math.max(from, top), Math.min(to, bottom)];
-    return `top: ${((a - top) / span) * 100}%; height: max(2px, ${((z - a) / span) * 100}%)`;
+    return `top: ${((a - top) / span) * 100}%; height: max(var(--space-2), ${((z - a) / span) * 100}%)`;
   };
   const colour = (b) => `--cal-hue: ${hueOf.get(b.project) ?? 'var(--closed)'}`;
   const tip = (b) =>
@@ -375,7 +375,7 @@ export function weekCalendar(wk, today, act, full) {
       { class: 'cal-scroll' },
       h(
         'div',
-        { class: 'cal-grid', style: `grid-template-columns: 44px repeat(${days.length}, minmax(64px, 1fr))` },
+        { class: 'cal-grid', style: `grid-template-columns: var(--cal-gutter) repeat(${days.length}, minmax(var(--cal-day-least), 1fr))` },
         h('div', { class: 'cal-axis' }, h('div', { class: 'cal-head' }), h('div', { class: 'cal-loose' }), h('div', { class: 'cal-body' }, [...hours, bottom].filter((n) => n === top || n === bottom || span <= 16 || n % 2 === 0).map((n) => h('span', { class: `cal-hour${n === top ? ' cal-first' : n === bottom ? ' cal-last' : ''}`, style: `top: ${((n - top) / span) * 100}%` }, clockText(n))))),
         days.map((d) => {
           const loose = d.owner.filter((b) => b.from_hour == null);

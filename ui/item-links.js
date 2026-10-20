@@ -42,7 +42,7 @@ export function relationEditor(e, data, change, redraw) {
     .flatMap((r) => [fits(r.from, e.type) && { rel: r.id, out: true, label: r.title, others: r.to }, fits(r.to, e.type) && r.inverse !== r.title && { rel: r.id, out: false, label: r.inverse, others: r.from }])
     .filter(Boolean);
   const adder = h('div', { class: 'add-relation', hidden: true });
-  const editor = h('section', { class: 'card', hidden: true, style: 'margin-bottom: 14px' }, h('table', { class: 'list' }, h('tbody', {}, rows(data.outgoing, 'out'), rows(data.incoming, 'in'))), adder);
+  const editor = h('section', { class: 'card', hidden: true, style: 'margin-bottom: var(--space-8)' }, h('table', { class: 'list' }, h('tbody', {}, rows(data.outgoing, 'out'), rows(data.incoming, 'in'))), adder);
   const open = () => {
     state.dirty = true; // a live update must not close this
     editor.hidden = false;

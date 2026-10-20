@@ -199,33 +199,17 @@ test('every UI module parses', () => {
 // keeps the mechanism (layouts, renderers, CSS rules that read variables) and no values: no colours, no lengths, no
 // numeric constants. Counted here as hex colours, CSS lengths and UPPER_CASE number constants, as of 20 Oct 2026.
 const LOOKS_IN_KERNEL: Record<string, number> = {
-  'ui/atlas.js': 13,
-  'ui/attention.js': 5,
-  'ui/base.js': 6,
-  'ui/doc.css': 75,
+  'ui/atlas.js': 1,
   'ui/draw.html': 6,
   'ui/flow-layout.js': 1,
-  'ui/forms.js': 3,
-  'ui/gate.js': 1,
   'ui/grid.css': 1,
-  'ui/held.js': 1,
-  'ui/item-links.js': 1,
-  'ui/item.js': 4,
-  'ui/lens.js': 2,
   'ui/list.css': 2,
   'ui/pan-zoom.js': 1,
-  'ui/proof.js': 1,
-  'ui/public.css': 51,
-  'ui/roadmap.js': 4,
-  'ui/screens.js': 5,
-  'ui/search.js': 3,
-  'ui/style.css': 728,
+  'ui/public.css': 1,
+  'ui/style.css': 17,
   'ui/timeline.js': 1,
-  'ui/token-ask.js': 6,
-  'ui/token-piece.js': 1,
-  'ui/week.js': 4,
-  'ui/workspace-cards.js': 39,
-  'ui/workspace.js': 8,
+  'ui/token-ask.js': 1,
+  'ui/week.js': 1,
 };
 const LOOKS = /#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|rem|em|ch|vh|vw)\b|^(?:export )?const [A-Z][A-Z0-9_]* = -?[\d.]/gm;
 

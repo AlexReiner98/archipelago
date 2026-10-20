@@ -159,16 +159,20 @@ function invoiceHead(d) {
   );
 }
 
-/** The page's colours: the workspace's theme (its style), light or dark as the reader's system is. Only plain hex colours. */
+/** The page's colours and lengths: the workspace's style, light or dark as the reader's system is. Only plain hex colours and lengths. */
 const dark = matchMedia('(prefers-color-scheme: dark)');
-let theme;
+const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?)*$/;
+const asLength = (v) => (typeof v === 'number' && v >= 0 ? `${v}px` : typeof v === 'string' && LENGTH.test(v) ? v : null);
+let look = {};
 const paint = () => {
-  for (const [name, colour] of Object.entries(theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (/^[a-z][a-z0-9_]*$/.test(name) && /^#[0-9a-f]{3,8}$/i.test(String(colour))) document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, colour);
+  const set = (name, value) => /^[a-z][a-z0-9_]*$/.test(name) && document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, value);
+  for (const [name, colour] of Object.entries(look.theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (/^#[0-9a-f]{3,8}$/i.test(String(colour))) set(name, colour);
+  for (const [name, value] of Object.entries(look.lengths ?? {})) if (asLength(value)) set(name, asLength(value));
 };
 dark.addEventListener('change', paint);
 
 function draw(d) {
-  theme = d.theme;
+  look = d;
   paint();
   document.title = d.type === INVOICE && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
@@ -197,7 +201,7 @@ function draw(d) {
 }
 
 (own
-  ? Promise.all([api('document', { id: own }), api('view', { name: 'style', params: {} })]).then(([d, s]) => ({ ...d, theme: s.style.theme }))
+  ? Promise.all([api('document', { id: own }), api('view', { name: 'style', params: {} })]).then(([d, s]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');
