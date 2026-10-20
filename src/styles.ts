@@ -91,3 +91,26 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown }) {
   if (of !== undefined && !item) throw new Error(`No entity "${of}"`);
   return styleFor(l, await keptOf(l, 'style', undefined), item ? { hub: item } : {});
 }
+
+/** What the page itself is drawn in: the colours (theme) and lengths of the workspace's style. Sent with a page read by no login. */
+export async function pageLook(l: Archipelago) {
+  const { theme, lengths } = (await pageStyle(l, {})).style;
+  return { theme, lengths };
+}
+
+/** A length as a style may give it: a number of pixels, or numbers with one of these units. */
+const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?)*$/;
+
+/**
+ * The page's lengths as the presets on nothing give them, as a stylesheet: what the page is laid out by until the
+ * workspace's own style is read (ui/theme.js paints that over it). Only a plain name and a length go in.
+ */
+export function lengthsSheet(packs: Parameters<typeof stylesOf>[0]): string {
+  const lengths: Record<string, unknown> = {};
+  for (const preset of stylesOf(packs)) if (!preset.on?.length && preset.props.lengths && typeof preset.props.lengths === 'object') Object.assign(lengths, preset.props.lengths);
+  const lines = Object.entries(lengths).flatMap(([name, value]) => {
+    const length = typeof value === 'number' && value >= 0 ? `${value}px` : typeof value === 'string' && LENGTH.test(value) ? value : null;
+    return /^[a-z][a-z0-9_]*$/.test(name) && length ? [`  --${name.replaceAll('_', '-')}: ${length};`] : [];
+  });
+  return `:root {\n${lines.join('\n')}\n}\n`;
+}

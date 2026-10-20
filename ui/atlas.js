@@ -16,7 +16,7 @@ function thumbnail(p) {
   const view = lensView({ lens: { lens: p.lens, ...(p.of && { from: p.of.id }) }, key: `atlas:${p.lens}`, bare: true });
   return h(
     'div',
-    { class: 'atlas-thumb', 'aria-hidden': 'true', style: 'position: relative; height: 96px; overflow: hidden; border-radius: 6px; background: var(--bg); pointer-events: none' },
+    { class: 'atlas-thumb', 'aria-hidden': 'true', style: 'position: relative; height: var(--thumb); overflow: hidden; border-radius: var(--radius-2); background: var(--bg); pointer-events: none' },
     // Placed out of the flow, so the drawing's own width never widens the tile, the strip or the page.
     h('div', { style: `position: absolute; top: 0; left: 0; width: ${SHRINK * 100}%; height: ${SHRINK * 96}px; transform: scale(${1 / SHRINK}); transform-origin: 0 0` }, view),
   );
@@ -31,7 +31,7 @@ export const tile = (p) => {
       class: 'atlas-tile',
       title: `${p.title}\n${where}`,
       onclick: () => (location.hash = pictureHref(p)),
-      style: 'display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer',
+      style: 'display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-5); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); cursor: pointer',
     },
     thumbnail(p),
     h('span', { class: 'row-top', style: 'min-width: 0; flex-wrap: nowrap' }, h('a', { class: 'gist grow', href: pictureHref(p), style: 'min-width: 0; color: var(--text); text-decoration: none' }, p.title), p.pinned && h('span', { class: 'pill', title: 'Pinned', style: 'flex: none' }, 'pinned')),
@@ -48,7 +48,7 @@ export async function atlasStrip(host, title, limit = 6) {
   if (!host.isConnected) return;
   if (!answer?.pictures.length) return host.remove();
   const all = answer.pictures;
-  const tiles = h('div', { class: 'atlas-tiles', style: 'display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 8px; padding: 0 14px 14px' });
+  const tiles = h('div', { class: 'atlas-tiles', style: 'display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--input-wide), 100%), 1fr)); gap: var(--space-5); padding: 0 var(--space-8) var(--space-8)' });
   // A tile is drawn only once it is shown: each is a picture of its own.
   const show = () => {
     const n = open ? all.length : Math.min(limit, all.length);
@@ -58,7 +58,7 @@ export async function atlasStrip(host, title, limit = 6) {
   const fold =
     all.length > limit &&
     h('button', { class: 'quiet-button', style: 'margin-left: auto; white-space: nowrap', title: 'Every picture kept on the map, or only the pinned and the newest', onclick: () => ((open = !open), show()) });
-  host.replaceChildren(h('section', { class: 'card wide atlas', style: 'margin-bottom: 14px; min-width: 0' }, h('header', {}, h('h2', {}, title), fold), tiles));
+  host.replaceChildren(h('section', { class: 'card wide atlas', style: 'margin-bottom: var(--space-8); min-width: 0' }, h('header', {}, h('h2', {}, title), fold), tiles));
   show();
 }
 
@@ -77,7 +77,7 @@ async function pictureHead(lens, view) {
     { class: 'page-head' },
     // Where it sits, from Home down to what it is a picture of, each a way there.
     h('nav', { class: 'trail', title: 'Where this picture sits' }, h('a', { class: 'trail-step', href: '#/' }, 'Home'), steps.map((t) => [h('span', { class: 'trail-sep' }, '›'), h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title)])),
-    h('h1', { style: 'margin-top: 6px' }, title),
+    h('h1', { style: 'margin-top: var(--space-4)' }, title),
   );
 }
 

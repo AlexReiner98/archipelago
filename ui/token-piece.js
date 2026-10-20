@@ -34,7 +34,7 @@ export async function tokenPiece(host, e, fold, made) {
   if (!host.isConnected) return;
   const again = (shown) => tokenPiece(host, e, fold, shown);
   const error = h('div', { class: 'error' });
-  const name = h('input', { type: 'text', placeholder: 'Name (Uptime Kuma)', style: 'flex: 1; min-width: 160px' });
+  const name = h('input', { type: 'text', placeholder: 'Name (Uptime Kuma)', style: 'flex: 1; min-width: var(--input-least)' });
   const may = h('select', { title: MAY[0][2], onchange: () => (may.title = MAY.find(([v]) => v === may.value)[2]) }, MAY.map(([v, label]) => h('option', { value: v }, label)));
   const make = async () => {
     try {

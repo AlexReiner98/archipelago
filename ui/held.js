@@ -61,7 +61,7 @@ export async function heldPiece(host, title) {
   host.replaceChildren(
     h(
       'section',
-      { class: 'card wide needs held', style: 'margin-bottom: 14px' },
+      { class: 'card wide needs held', style: 'margin-bottom: var(--space-8)' },
       h('header', {}, h('h2', { title: 'Changes that wait for your word before they apply' }, title), h('span', { class: 'n' }, pending.length)),
       h('ul', { class: 'rows' }, pending.map(row)),
     ),

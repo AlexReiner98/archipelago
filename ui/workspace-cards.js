@@ -43,7 +43,7 @@ export function connectBox(made) {
       h('div', { class: 'muted small' }, `1. On that machine, in ${os === 'windows' ? 'PowerShell' : 'a terminal'}, in the project's folder. Then quit Claude Code completely and open it in that folder.`),
       h('code', { style: 'white-space: pre-wrap; word-break: break-all' }, first[os].replace(made.token, `${made.token.slice(0, 12)}…`)),
       h('div', { class: 'toolbar' }, copy(first[os], 'Copy command'), h('span', { class: 'muted small' }, 'Shown once: it holds the token. Revoke it below to disconnect.')),
-      h('div', { class: 'muted small', style: 'margin-top: 10px' }, '2. For each other project on that machine, in its folder. It holds no secret.'),
+      h('div', { class: 'muted small', style: 'margin-top: var(--space-6)' }, '2. For each other project on that machine, in its folder. It holds no secret.'),
       h('code', { style: 'white-space: pre-wrap; word-break: break-all' }, fetchIt),
       h(
         'div',
@@ -77,7 +77,7 @@ export const base64 = (blob) =>
 function importRow(done) {
   const file = h('input', { type: 'file', accept: '.gz' });
   const result = h('div');
-  const say = (cls, text) => result.replaceChildren(h('div', { class: cls, style: 'padding: 0 14px 12px' }, text));
+  const say = (cls, text) => result.replaceChildren(h('div', { class: cls, style: 'padding: 0 var(--space-8) var(--space-7)' }, text));
   const list = (titles, n) => (titles.length ? `: ${titles.slice(0, 5).join(', ')}${n > 5 ? ', \u2026' : ''}` : '');
   const start = async () => {
     try {
@@ -126,7 +126,7 @@ function importRow(done) {
       say('error', err.message);
     }
   };
-  return [h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, file, h('button', { onclick: start, title: 'Merge a map kept elsewhere into this one' }, 'Import\u2026')), result];
+  return [h('div', { class: 'toolbar', style: 'padding: 0 var(--space-8) var(--space-7)' }, file, h('button', { onclick: start, title: 'Merge a map kept elsewhere into this one' }, 'Import\u2026')), result];
 }
 
 // GitHub tells this workspace when a repository is pushed to. The secret it
@@ -155,7 +155,7 @@ export function githubCard() {
       app.installation &&
       h(
         'div',
-        { class: 'toolbar', style: 'padding: 10px 14px 0' },
+        { class: 'toolbar', style: 'padding: var(--space-6) var(--space-8) 0' },
         h('span', { class: `pill ${app.reader?.key ? 'ok' : 'warn'}`, title: app.reader?.key ? 'An agent on this server reads each push against the open work' : 'Pushes are recorded, but nothing reads them until there is a key' }, app.reader?.key ? 'pushes are read' : 'pushes are not read'),
         h('span', { class: 'grow muted small' }, app.reader?.key ? app.reader.model : ''),
         h('button', { class: app.reader?.key ? '' : 'primary', onclick: setKey }, app.reader?.key ? 'New key' : 'Set Anthropic key'),
@@ -164,10 +164,10 @@ export function githubCard() {
     const appBar =
       app.available &&
       (app.installation
-        ? h('div', { class: 'toolbar', style: 'padding: 12px 14px 0' }, h('span', { class: 'pill ok' }, 'connected'), h('span', { class: 'grow' }, app.installation.account || app.app.name), h('button', { title: 'Choose on GitHub which repositories this map hears from', onclick: go('connect') }, 'Choose repositories'), menu('More', [!s.connected && ['Use a webhook as well', () => fresh()], ['Disconnect', unhook, 'danger']]))
+        ? h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8) 0' }, h('span', { class: 'pill ok' }, 'connected'), h('span', { class: 'grow' }, app.installation.account || app.app.name), h('button', { title: 'Choose on GitHub which repositories this map hears from', onclick: go('connect') }, 'Choose repositories'), menu('More', [!s.connected && ['Use a webhook as well', () => fresh()], ['Disconnect', unhook, 'danger']]))
         : app.app
-          ? h('div', { class: 'toolbar', style: 'padding: 12px 14px 0' }, h('span', { class: 'grow muted' }, app.app.name), h('button', { class: 'primary', title: 'Choose repositories on GitHub; each is put in the map and its pushes are heard', onclick: go('connect') }, 'Connect GitHub'), !s.connected && menu('More', [['Use a webhook instead', () => fresh()]]))
-          : app.can_create && h('div', { class: 'toolbar', style: 'padding: 12px 14px 0' }, h('span', { class: 'grow' }), h('button', { class: 'primary', title: 'Once for this server: GitHub asks for a name, and the server then has its app', onclick: go('create') }, 'Create the GitHub App'), !s.connected && menu('More', [['Use a webhook instead', () => fresh()]])));
+          ? h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8) 0' }, h('span', { class: 'grow muted' }, app.app.name), h('button', { class: 'primary', title: 'Choose repositories on GitHub; each is put in the map and its pushes are heard', onclick: go('connect') }, 'Connect GitHub'), !s.connected && menu('More', [['Use a webhook instead', () => fresh()]]))
+          : app.can_create && h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8) 0' }, h('span', { class: 'grow' }), h('button', { class: 'primary', title: 'Once for this server: GitHub asks for a name, and the server then has its app', onclick: go('create') }, 'Create the GitHub App'), !s.connected && menu('More', [['Use a webhook instead', () => fresh()]])));
     const url = location.origin + s.webhook_path;
     const fresh = async () => {
       if (s.connected && !(await ask({ title: 'Make a new secret?', message: 'The one GitHub has now stops working until you replace it in each repository\'s webhook.', action: 'New secret', danger: true }))) return;
@@ -179,7 +179,7 @@ export function githubCard() {
       made?.secret
         ? h(
             'div',
-            { style: 'padding: 12px 14px 0' },
+            { style: 'padding: var(--space-7) var(--space-8) 0' },
             h(
               'div',
               { class: 'secret' },
@@ -187,7 +187,7 @@ export function githubCard() {
               h('code', {}, made.secret),
               h('div', { class: 'toolbar' }, h('button', { onclick: (e) => navigator.clipboard.writeText(made.secret).then(() => (e.target.textContent = 'Copied')) }, 'Copy'), h('span', { class: 'muted small' }, 'Shown once. If it is lost, make a new one.')),
             ),
-            h('div', { class: 'muted small', style: 'margin-top: 8px' }, 'In each repository on GitHub: Settings, Webhooks, Add webhook. Payload URL: ', h('code', {}, url), '. Content type: application/json. Secret: the one above. Events: just the push event.'),
+            h('div', { class: 'muted small', style: 'margin-top: var(--space-5)' }, 'In each repository on GitHub: Settings, Webhooks, Add webhook. Payload URL: ', h('code', {}, url), '. Content type: application/json. Secret: the one above. Events: just the push event.'),
           )
         : '',
       h(
@@ -202,8 +202,8 @@ export function githubCard() {
           ),
         ),
       ),
-      (s.connected || !appBar) && h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, s.connected && h('code', { class: 'grow' }, url), h('button', { title: 'A webhook added by hand in each repository, signed with a secret made here', class: s.connected ? '' : 'primary', onclick: fresh }, s.connected ? 'New secret' : 'Connect GitHub')),
-      appBar && !s.connected && h('div', { style: 'height: 12px' }),
+      (s.connected || !appBar) && h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, s.connected && h('code', { class: 'grow' }, url), h('button', { title: 'A webhook added by hand in each repository, signed with a secret made here', class: s.connected ? '' : 'primary', onclick: fresh }, s.connected ? 'New secret' : 'Connect GitHub')),
+      appBar && !s.connected && h('div', { style: 'height: var(--space-7)' }),
     );
   };
   const fail = (err) => body.replaceChildren(h('div', { class: 'error' }, err.message));
@@ -230,7 +230,7 @@ export function operatorCard(current) {
   };
   const draw = async (made) => {
     if (!operatorSecret) {
-      const secret = h('input', { type: 'password', placeholder: 'Operator secret', autocomplete: 'off', style: 'flex: 1; min-width: 220px' });
+      const secret = h('input', { type: 'password', placeholder: 'Operator secret', autocomplete: 'off', style: 'flex: 1; min-width: var(--input-wide)' });
       const error = h('div');
       const open = async () => {
         operatorSecret = secret.value.trim();
@@ -243,13 +243,13 @@ export function operatorCard(current) {
       };
       return body.replaceChildren(
         h('div', { class: 'empty' }, 'Needs the operator secret. ', hint('It was printed the first time the server started with tokens on. If it is lost, run "node src/cli.ts operator-reset" on the server.')),
-        h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, secret, h('button', { onclick: open }, 'Show workspaces')),
+        h('div', { class: 'toolbar', style: 'padding: 0 var(--space-8) var(--space-7)' }, secret, h('button', { onclick: open }, 'Show workspaces')),
         error,
       );
     }
     const list = await call('GET');
-    const id = h('input', { type: 'text', placeholder: 'id, e.g. acme', style: 'flex: 1; min-width: 140px' });
-    const name = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: 160px' });
+    const id = h('input', { type: 'text', placeholder: 'id, e.g. acme', style: 'flex: 1; min-width: var(--input-least)' });
+    const name = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 1; min-width: var(--input-least)' });
     const error = h('div');
     // With a backup file chosen, the new workspace starts as the map in that file.
     const file = h('input', { type: 'file', accept: '.gz', title: 'Optional: a backup file (.json.gz) to start the workspace from' });
@@ -263,9 +263,9 @@ export function operatorCard(current) {
     };
     body.replaceChildren(
       made?.restored
-        ? h('div', { class: 'muted small', style: 'padding: 12px 14px 0' }, `Restored ${made.restored.entities} entities and ${made.restored.events} events from the backup of "${made.restored.from.name}" taken ${new Date(made.restored.taken).toLocaleString()}. Tokens from where it came from do not work here.`)
+        ? h('div', { class: 'muted small', style: 'padding: var(--space-7) var(--space-8) 0' }, `Restored ${made.restored.entities} entities and ${made.restored.events} events from the backup of "${made.restored.from.name}" taken ${new Date(made.restored.taken).toLocaleString()}. Tokens from where it came from do not work here.`)
         : '',
-      made ? h('div', { style: 'padding: 12px 14px 0' }, secretBox(`Owner token for "${made.workspace.name}". Send it to its owner privately.`, made.owner_token)) : '',
+      made ? h('div', { style: 'padding: var(--space-7) var(--space-8) 0' }, secretBox(`Owner token for "${made.workspace.name}". Send it to its owner privately.`, made.owner_token)) : '',
       h(
         'ul',
         { class: 'rows' },
@@ -291,8 +291,8 @@ export function operatorCard(current) {
           ),
         ),
       ),
-      h('div', { class: 'toolbar', style: 'padding: 12px 14px 0' }, id, name, h('button', { class: 'primary', onclick: create }, 'Create workspace'), h('button', { onclick: () => ((operatorSecret = ''), draw()) }, 'Forget secret')),
-      h('label', { class: 'toolbar muted small', style: 'padding: 8px 14px 12px' }, 'From a backup file (optional):', file),
+      h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8) 0' }, id, name, h('button', { class: 'primary', onclick: create }, 'Create workspace'), h('button', { onclick: () => ((operatorSecret = ''), draw()) }, 'Forget secret')),
+      h('label', { class: 'toolbar muted small', style: 'padding: var(--space-5) var(--space-8) var(--space-7)' }, 'From a backup file (optional):', file),
       error,
     );
   };
@@ -306,8 +306,8 @@ export function operatorCard(current) {
 // Whose workspace this is. "Needs you now" and the other standing questions
 // are asked about the owner, so a new workspace is not much use until one is set.
 export function ownerCard(owner, redraw) {
-  const name = h('input', { type: 'text', placeholder: 'Your name', style: 'flex: 1; min-width: 180px' });
-  const email = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: 180px' });
+  const name = h('input', { type: 'text', placeholder: 'Your name', style: 'flex: 1; min-width: var(--input-least)' });
+  const email = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: var(--input-least)' });
   const error = h('div');
   const set = () =>
     name.value.trim() &&
@@ -320,7 +320,7 @@ export function ownerCard(owner, redraw) {
     h('header', {}, h('h2', {}, 'Owner')),
     owner
       ? h('ul', { class: 'rows' }, h('li', { class: 'row-top' }, chip('person'), h('span', { class: 'grow' }, link(owner))))
-      : [h('div', { class: 'empty' }, 'No owner yet. ', hint('Enter your name to become it; a person is created for you in the map.')), h('div', { class: 'toolbar', style: 'padding: 0 14px 12px' }, name, email, h('button', { class: 'primary', onclick: set }, 'Set owner')), error],
+      : [h('div', { class: 'empty' }, 'No owner yet. ', hint('Enter your name to become it; a person is created for you in the map.')), h('div', { class: 'toolbar', style: 'padding: 0 var(--space-8) var(--space-7)' }, name, email, h('button', { class: 'primary', onclick: set }, 'Set owner')), error],
   );
 }
 
@@ -349,7 +349,7 @@ export function backupCard(done) {
     'section',
     { class: 'card wide' },
     h('header', {}, h('h2', { class: 'hinted', title: 'The whole map as one file: to keep, to restore into another server, or to merge in from elsewhere' }, 'Backups')),
-    h('div', { class: 'toolbar', style: 'padding: 12px 14px' }, h('button', { class: 'primary', onclick: download }, 'Download backup'), h('label', { title: 'Lets an agent call backup_download. A backup holds private items too.' }, allow, ' Agents may download'), note),
+    h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, h('button', { class: 'primary', onclick: download }, 'Download backup'), h('label', { title: 'Lets an agent call backup_download. A backup holds private items too.' }, allow, ' Agents may download'), note),
     importRow(done),
   );
 }
