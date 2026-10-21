@@ -3,8 +3,11 @@
 .doc-lens .lens-view {
   --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
   --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn);
-  border: var(--border-1) solid var(--reader-line); border-radius: var(--radius-3); overflow: hidden; font-family: var(--ln-font);
+  font-family: var(--ln-font);
 }
+/* Drawn right on the page: no border, no panel behind it, and a time picture no wider than the page. */
+.doc-lens .lens-view .lg-stage { background: none; padding: 0; }
+.doc-lens svg.timeline { max-width: 100%; height: auto; }
 .doc-lens .toolbar { display: flex; gap: var(--space-5); align-items: center; padding: var(--space-6) var(--space-8); background: var(--panel); border-bottom: var(--border-1) solid var(--reader-line); }
 .doc-lens .grow { flex: 1; min-width: 0; }
 .doc-lens .switch { display: inline-flex; }
@@ -17,3 +20,10 @@
 .doc-lens .group-actor .dot { fill: var(--g-actor); } .doc-lens .group-aim .dot { fill: var(--g-aim); } .doc-lens .group-work .dot { fill: var(--g-work); }
 .doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }
 .doc-lens .group-place .dot { fill: var(--g-place); } .doc-lens .group-system .dot { fill: var(--g-system); }
+/* The page's first picture (ui/doc.js) is wider than its text: up to the style's reader_wide, and never past the
+   window less the page's sides, centred on the text column, so a whole system opens in sight. */
+.doc-lens.wide {
+  --doc-wide: min(var(--reader-wide), calc(var(--reader-window) - 2 * var(--reader-side)));
+  width: var(--doc-wide);
+  margin-left: calc((100% - var(--doc-wide)) / 2);
+}

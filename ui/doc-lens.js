@@ -17,7 +17,8 @@ const ITEM = /^#\/e\/(e_[a-z0-9]{8})$/;
 /** Draw one frozen answer into host. `typeTitles` names each type the picture holds. */
 export function drawFrozen(host, answer, typeTitles = {}) {
   for (const [id, title] of Object.entries(typeTitles)) if (!types.has(id)) types.set(id, { id, title });
-  const style = { ...answer.style, noLit: true };
+  // Read here, a picture holds still and asks nothing: no lighting to switch, no zoom, its key always open.
+  const style = { ...answer.style, noLit: true, still: true };
   const body = h('div', { class: 'lens-view' });
   const said = h('p', { class: 'lens-said muted', hidden: true });
   // What a clicked part says is over the picture, where the eye already is.

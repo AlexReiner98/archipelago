@@ -40,3 +40,8 @@
 .lf-row:hover .lf-row-hit, .lf-row:focus .lf-row-hit { fill: var(--ln-sea); }
 .lf-row.closed text { fill: var(--ln-muted); }
 .lf-row.dim { opacity: var(--ln-dim); }
+/* A still picture (a published page's): no frame to move it in, drawn at the width it is given and as tall as that
+   makes it, on the page itself; its key a row above it, in the flow, never over a step or a wire. */
+.lf-stage.still { height: auto; overflow: visible; background: none; cursor: auto; touch-action: auto; user-select: auto; }
+.lf-stage.still > svg { width: auto; max-width: 100%; height: auto; margin: 0 auto; }
+.lf-legend.still { position: static; flex-direction: row; flex-wrap: wrap; column-gap: var(--ln-legend-pad-x); padding: 0 0 var(--ln-legend-pad-y); background: none; border: none; }

@@ -159,6 +159,17 @@ export function drawArch(host, answer, style, keep) {
   const redraw = () => {
     for (const [id, el] of els) byId.has(id) && el.classList.toggle('dim', !litCount(byId.get(id), style));
   };
+  // Read on a published page, a picture holds still: all of it in sight at the width it is given, its key open
+  // above it, where it covers no part and no wire.
+  if (style.still) {
+    legend.classList.add('still');
+    // Its own size is the most it is drawn at: a small picture is not blown up to fill the page.
+    picture.setAttribute('width', g.width);
+    picture.setAttribute('height', g.height);
+    host.replaceChildren(legend, h('div', { class: 'lf-stage still' }, picture));
+    host.redraw = redraw;
+    return redraw();
+  }
   const lit = litSwitch(me, style, keep, redraw);
   const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, legend);
   host.replaceChildren(stage);
