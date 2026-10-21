@@ -149,6 +149,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
     if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return say(201, { id: 7, slug: 'pelago-test', name: 'Archipelago (test)', pem, webhook_secret: 'whsec' });
     if (req.url === '/app/installations/42') return isApp() ? say(200, { account: { login: 'acme' } }) : say(401, { message: 'Bad credentials' });
     if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
+    if (req.url?.startsWith('/repos/Acme/Tools/commits/')) return say(200, { sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools. The whetstone still needs oiling.' }, files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1, patch: '+  oil()' }] });
     if (req.url?.startsWith('/repos/Acme/Tools/compare/')) return bearer === 'ghs_forty-two' ? say(200, { commits: [{ sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools\n\nThe whetstone still needs oiling.', author: { name: 'sam' } } }], files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1 }] }) : say(401, { message: 'Bad credentials' });
     if (req.url === '/repos/Acme/Tools') return say(200, { default_branch: 'main' });
     if (req.url?.startsWith('/installation/repositories')) return bearer === 'ghs_forty-two' ? say(200, { repositories: [{ full_name: 'Acme/Site' }, { full_name: 'Acme/Tools' }] }) : say(401, { message: 'Bad credentials' });
@@ -211,10 +212,11 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   // Something that is not this repository's: the reader is held to the repository it reads, whatever it is told there.
   const outside = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Pay the invoice' }] })).result.created['#1'];
   const asks: any[] = [];
+  // The push is read with five narrow tools, what changed and the open work handed over first (src/reader-push.ts).
   const script = [
-    { stop_reason: 'tool_use', content: [{ type: 'text', text: 'Reading the push.' }, { type: 'tool_use', id: 'tu_1', name: 'commits', input: { base: 'a'.repeat(40), head: 'b'.repeat(40) } }, { type: 'tool_use', id: 'tu_2', name: 'view', input: { name: 'repo_work', params: { repo: 'acme/tools' } } }, { type: 'tool_use', id: 'tu_3', name: 'no_such_tool', input: {} }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }, { op: 'update', id: outside, title: 'Steered by a file in the repository' }] } }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }] } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'text', text: 'Reading the push.' }, { type: 'tool_use', id: 'tu_1', name: 'diff', input: { sha: 'b'.repeat(40) } }, { type: 'tool_use', id: 'tu_2', name: 'find', input: { words: 'whetstone' } }, { type: 'tool_use', id: 'tu_3', name: 'no_such_tool', input: {} }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'update', input: { id: outside, title: 'Steered by a file in the repository', why: 'The file said to' } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'create', input: { type: 'work.task', title: 'Oil the whetstone', why: 'The commit says the whetstone still needs oiling' } }] },
     { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Made one task: Oil the whetstone.' }] },
   ];
   configureModels({ ask: (key) => async (params) => {
@@ -239,7 +241,10 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.match((await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value, /^sealed:v1:/);
   // Connected as an account on the Workspace page, it replaces that key, sealed the same way; the page sees its last four characters.
   const connectedModel = (await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) })).result;
-  assert.deepEqual(connectedModel.account, { provider: 'anthropic', name: 'Anthropic', model: 'claude-sonnet-5-5', url: null, key: '…xxxx' });
+  assert.deepEqual(connectedModel.account, { provider: 'anthropic', name: 'Anthropic', model: 'claude-sonnet-5-5', url: null, price: { input: 2, output: 10 }, key: '…xxxx' }, 'Anthropic priced as it lists its model');
+  // Its price can be set on its own, keeping the key: what each run is said to cost.
+  assert.match((await call('/api/model_account', admin, { price_in: 1 })).error, /Give both prices/);
+  assert.deepEqual((await call('/api/model_account', admin, { price_in: 3, price_out: 15 })).result.account.price, { input: 3, output: 15 });
   assert.match((await db.query<{ value: string }>(`select value from setting where key = 'model_account'`)).rows[0].value, /^sealed:v1:/);
   assert.equal((await db.query(`select 1 from setting where key = 'anthropic_key'`)).rows.length, 0);
   assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
@@ -255,14 +260,15 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.match(asks[2].messages.at(-1).content[0].content, /limited to the work of Tools repo\. "Pay the invoice" is not part of it/);
   assert.equal(asks[2].messages.at(-1).content[0].is_error, true);
   assert.equal((await call('/api/get', admin, { id: outside })).result.entity.title, 'Pay the invoice');
-  // It asked with the workspace's key, on the model chosen, with the map's tools and the repository's beside them.
+  // It asked with the workspace's key, on the model chosen, with the push's narrow tools, starting from what the push changed.
   assert.deepEqual([asks[0].key, asks[0].model, asks[0].fallbacks], ['sk-ant-' + 'x'.repeat(30), 'claude-sonnet-5-5', 'default']);
-  assert.ok(['view', 'change', 'commits', 'diff', 'file'].every((name) => asks[0].tools.some((t: any) => t.name === name)));
-  assert.match(asks[0].messages[0].content, /branch "main" of Acme\/Tools[\s\S]*aaaaaaa.*\.\.b{40}/);
+  assert.deepEqual(asks[0].tools.map((t: any) => t.name), ['update', 'create', 'look', 'find', 'diff', 'file']);
+  assert.ok(JSON.stringify(asks[0].tools).length < 3000, 'small enough to send every turn');
+  assert.match(asks[0].messages[0].content, /Branch "main"[\s\S]*a{40}\.\.b{40}[\s\S]*whetstone still needs oiling[\s\S]*tools\/sharpen\.ts[\s\S]*Open items of this repository/);
   // What it asked for was done, all of a turn answered together, and a tool that is not there said so without ending the run.
   const answers = asks[1].messages.at(-1).content;
   assert.deepEqual(answers.map((a: any) => [a.tool_use_id, Boolean(a.is_error)]), [['tu_1', false], ['tu_2', false], ['tu_3', true]]);
-  assert.match(answers[0].content, /whetstone still needs oiling[\s\S]*tools\/sharpen\.ts/);
+  assert.match(answers[0].content, /whetstone still needs oiling|tools\/sharpen\.ts/);
   // What it sent is an agent's change like any other: here, where agents' changes are held, it waits for the owner.
   const held = (await call('/api/proposals', admin)).result;
   assert.deepEqual(held.map((p: any) => [p.actor, p.ops[0].title]), [['agent:reader', 'Oil the whetstone']]);

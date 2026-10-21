@@ -76,11 +76,11 @@ test('an account is sealed where it is kept, never given back whole, and removed
     assert.ok(!kept.includes('sk-proj'));
     assert.deepEqual(JSON.parse((await l.secret('model_account'))!), { provider: 'openai', key: 'sk-proj-secret-a1b2', model: 'gpt-x' });
     const status = await modelStatus(l);
-    assert.deepEqual(status.account, { provider: 'openai', name: 'OpenAI', model: 'gpt-x', url: null, key: '…a1b2' });
+    assert.deepEqual(status.account, { provider: 'openai', name: 'OpenAI', model: 'gpt-x', url: null, price: null, key: '…a1b2' });
     assert.equal((await modelStatus(l, false)).account!.key, undefined, 'a member who is not an admin is not shown even the end of it');
     // A compatible server is kept with its address, without the trailing slash.
     await connectModel(l, { provider: 'compatible', key: '', url: 'https://llm.example/v1/', model: 'mistral-small' });
-    assert.deepEqual((await modelStatus(l)).account, { provider: 'compatible', name: 'The model server', model: 'mistral-small', url: 'https://llm.example/v1', key: null });
+    assert.deepEqual((await modelStatus(l)).account, { provider: 'compatible', name: 'The model server', model: 'mistral-small', url: 'https://llm.example/v1', price: null, key: null });
     await forgetModel(l);
     assert.equal(await l.setting('model_account'), undefined);
     assert.deepEqual(await modelStatus(l), { account: null, server_model: null, default_model: 'claude-sonnet-5-5', runs_on: null, note: NO_MODEL });
