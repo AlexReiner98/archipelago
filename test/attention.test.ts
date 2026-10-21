@@ -99,8 +99,8 @@ test('attention finds every reason, for the right person, within a scope, and th
   const { screens } = (await callTool(l, human, 'schema', {})) as { screens: { at?: string; pieces: { piece: string; title?: string; style?: { shape?: string } }[] }[] };
   const home = screens.find((s) => s.at === 'home')!;
   assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['start', 'Start here'], ['token_ask', undefined], ['held', 'Held for you'], ['attention', 'Your move'], ['picture', 'Your projects'], ['atlas', 'Atlas']]);
-  assert.equal((home.pieces[2] as { limit?: number }).limit, 5);
-  assert.equal(home.pieces[3].style?.shape, 'list');
+  assert.equal((home.pieces[3] as { limit?: number }).limit, 5);
+  assert.equal(home.pieces[4].style?.shape, 'list');
 });
 
 test('attention can be read latest first, each item saying when it last changed', async () => {
