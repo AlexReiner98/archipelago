@@ -173,6 +173,7 @@ export const KERNEL_VERBS: Record<string, string> = {
   tell: 'report',
   run_report: 'report',
   notify: 'ask',
+  publish_ask: 'ask',
   claim: 'assign',
   launch: 'assign',
   release: 'revise',

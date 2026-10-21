@@ -55,6 +55,8 @@ export async function entity(id, here) {
   const { doc, links } = readWhole(e.type) ? await readDocument(id) : { doc: null, links: [] };
   // A document is read in public as it was last published: whether it is, and whether its draft says something else now.
   const shown = doc && !doc.from && type?.public ? await api('published', { id }).catch(() => null) : null;
+  // What it holds that can be published: a site's project publishes all of it with one click.
+  const plan = !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? await api('publish_plan', { within: id }).catch(() => null) : null;
   // How its page looks is its style: the house style's, its kind's (a document reads through), its own.
   const looks = (await api('view', { name: 'style', params: { of: id } })).style;
 
@@ -152,7 +154,7 @@ export async function entity(id, here) {
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row-top' }, chip(e.type), altitude && h('span', { class: 'pill', title: `How high this sits: workspace, project, stream, step` }, altitude), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), shown?.published ? h('span', { class: `pill ${shown.changed ? 'warn' : 'ok'}`, title: shown.changed ? 'Its draft says something other than what anyone reads: publish it again to show them' : 'Anyone reads it as it is now, at its own address' }, shown.changed ? 'draft changed' : 'published') : e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.some((s) => !s.to_workspace) && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.filter((s) => !s.to_workspace).length})` }, 'shared by link'), links.filter((s) => s.to_workspace).map((s) => h('span', { class: 'pill', title: `Readable in the workspace "${s.to_workspace}" once accepted there` }, `shared with ${s.to_workspace}`)), doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`)),
+      h('div', { class: 'row-top' }, chip(e.type), altitude && h('span', { class: 'pill', title: `How high this sits: workspace, project, stream, step` }, altitude), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), shown?.published ? h('span', { class: `pill ${shown.changed ? 'warn' : 'ok'}`, title: shown.changed ? 'Its draft says something other than what anyone reads: publish it again to show them' : 'Anyone reads it as it is now, at its own address' }, shown.changed ? 'draft changed' : 'published') : e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.some((s) => !s.to_workspace) && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.filter((s) => !s.to_workspace).length})` }, 'shared by link'), links.filter((s) => s.to_workspace).map((s) => h('span', { class: 'pill', title: `Readable in the workspace "${s.to_workspace}" once accepted there` }, `shared with ${s.to_workspace}`)), doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`), plan?.to_publish > 0 && h('span', { class: 'pill warn', title: `Not published as they are now: ${plan.documents.filter((d) => d.changed).map((d) => d.title).join(', ')}` }, `${plan.to_publish} to publish`)),
       // Where it sits, from Home down, each step a way back up, so a person always knows how high they are; a stream or a
       // step in nothing says so, as work to file (docs/ui-strategy.md).
       h(
@@ -211,6 +213,12 @@ export async function entity(id, here) {
         workish && ['Copy session brief', copyBrief],
         workish && ['Launch a session: investigate only', () => launch('plan')],
         workish && ['Launch a session: may edit files', () => launch('acceptEdits')],
+        plan?.documents.length > 0 && [
+          plan.to_publish ? `Publish all (${plan.to_publish} to publish)` : 'Publish all again',
+          async () =>
+            (await ask({ title: `Publish everything in "${e.title}"?`, message: `Its ${plan.documents.length} documents, as they are now, for anyone to read at their own addresses, each linking to the others. What you change afterwards stays a draft until you publish again.`, action: 'Publish all', danger: plan.documents.some((d) => !d.published) })) &&
+            api('publish_all', { within: id }).then((r) => (r.refused && tell('Some were not published', r.refused.map((x) => `${x.title}: ${x.error}`).join(' ')), again()), (err) => tell('Nothing was published', err.message)),
+        ],
         shown && [
           shown.published ? 'Publish again' : 'Publish',
           async () =>

@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { createShare, listShares } from './documents.ts';
-import { publish, publishedState, unpublish } from './published.ts';
+import { publish, publishAll, publishAsk, publishedState, publishPlan, unpublish } from './published.ts';
 import type { Tool } from './tools.ts';
 import { endShare, readAny, sharedFigure, shareWithWorkspace } from './workspace-share.ts';
 
@@ -50,6 +50,22 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: { id: z.string().describe('The document.') },
     run: async (l, actor, input) => unpublish(l, actor, input.id),
+  },
+  publish_all: {
+    description: 'Publish every open document an item holds (part_of, at any depth), then publish them again so each links to the others at their addresses. One whose path is taken is named, and the rest go ahead.',
+    humanOnly: true,
+    input: { within: z.string().describe('The item that holds the documents, such as a site’s project.') },
+    run: async (l, actor, input) => publishAll(l, actor, input.within),
+  },
+  publish_plan: {
+    description: 'Which documents an item holds and whether each is published as it stands: those not yet published or changed since are counted in to_publish.',
+    input: { within: z.string().describe('The item that holds the documents.') },
+    run: async (l, _actor, input) => publishPlan(l, input.within),
+  },
+  publish_ask: {
+    description: 'Ask the person to publish an item’s documents: they are notified about the item, with what changed, and publish all of it with one click on its page. Publishing is theirs; this never publishes.',
+    input: { within: z.string().describe('The item that holds the documents.'), reason: z.string().optional().describe('Why now, in a sentence.') },
+    run: async (l, actor, input) => publishAsk(l, actor, input.within, input.reason),
   },
   published: {
     description: 'Whether a document is published, when and by whom, and whether its draft now says something other than what is published (changed): then only a human publishing it again changes what anyone reads.',

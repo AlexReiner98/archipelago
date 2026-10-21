@@ -6,6 +6,7 @@
 // picture's data with nothing private in it and nothing that names a person or a session.
 
 import { lens } from './lens.ts';
+import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { publicDocument, readable } from './public-document.ts';
 
@@ -158,4 +159,58 @@ export async function publishedAt(l: Archipelago, path: string) {
 export async function sitePages(l: Archipelago): Promise<{ id: string; title: string; path: string | null; menu: number | null; published_at: string }[]> {
   const { rows } = await l.forAnyone().db.query<{ pages: never[] }>(`select pelago_site_pages($1::text[]) as pages`, [readable(l)]);
   return rows[0]?.pages ?? [];
+}
+
+/** The open documents an item holds, at any depth, of the types that can be public: what Publish all publishes. */
+async function heldDocuments(l: Archipelago, within: string) {
+  const { rows } = await l.db.query<{ id: string; title: string }>(
+    `with recursive down(id, depth) as (
+       select $1::text, 0
+       union select r.from_id, d.depth + 1 from relation r join down d on r.to_id = d.id
+       where r.type = 'part_of' and r.valid_to is null and d.depth < 8
+     )
+     select e.id, e.title from entity e where e.id in (select id from down where depth > 0)
+       and e.type = any($2::text[]) and e.is_open and e.archived_at is null order by e.title`,
+    [within, readable(l)],
+  );
+  return rows;
+}
+
+/** What publishing everything in an item would do: each document it holds, whether it is published, and whether its draft now says something else. */
+export async function publishPlan(l: Archipelago, within: string) {
+  const item = ID.test(within) ? await l.entity(within) : null;
+  if (!item) throw new Error(`No item "${within}".`);
+  const documents = [];
+  for (const doc of await heldDocuments(l, within)) {
+    const state = await publishedState(l, doc.id);
+    documents.push({ id: doc.id, title: doc.title, published: state.published, changed: state.published ? state.changed : true });
+  }
+  return { within: { id: item.id, title: item.title }, documents, to_publish: documents.filter((d) => d.changed).length };
+}
+
+/**
+ * Publish every document an item holds, then publish them again, so each links to the others at the addresses they
+ * now have. One that cannot be published (its path is taken) is said, and the rest go ahead.
+ */
+export async function publishAll(l: Archipelago, actor: Actor, within: string) {
+  const { documents } = await publishPlan(l, within);
+  if (!documents.length) throw new Error('It holds no document that can be published.');
+  const refused = new Map<string, string>();
+  for (const pass of [1, 2])
+    for (const doc of documents.filter((d) => !refused.has(d.id)))
+      await publish(l, actor, doc.id).catch((err: Error) => pass === 1 && refused.set(doc.id, err.message));
+  return {
+    published: documents.filter((d) => !refused.has(d.id)).map((d) => ({ id: d.id, title: d.title })),
+    ...(refused.size && { refused: documents.filter((d) => refused.has(d.id)).map((d) => ({ id: d.id, title: d.title, error: refused.get(d.id) })) }),
+  };
+}
+
+/** An agent asks for an item's documents to be published: a notification about it for the person, who publishes with one click. */
+export async function publishAsk(l: Archipelago, actor: Actor, within: string, reason?: string) {
+  const plan = await publishPlan(l, within);
+  if (!plan.to_publish) return { asked: false, note: `Everything in "${plan.within.title}" is published as it stands.` };
+  const n = plan.to_publish;
+  const title = `${n} document${n === 1 ? '' : 's'} in "${plan.within.title}" to publish`.slice(0, 200);
+  await notify(l, actor, { title, body: [reason, plan.documents.filter((d) => d.changed).map((d) => `- ${d.title}`).join('\n')].filter(Boolean).join('\n\n'), about: within });
+  return { asked: true, to_publish: n, note: 'The person is notified; publishing is theirs, with one click on the item’s page.' };
 }
