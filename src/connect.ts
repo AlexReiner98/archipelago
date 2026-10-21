@@ -11,7 +11,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
-import { redeem, requestSignIn, workspaceOfCode } from './members.ts';
+import { LINK_MINUTES, redeem, redeemTyped, requestSignIn, workspaceOfCode } from './members.ts';
 import { serveServerPack } from './server-routes.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
@@ -96,19 +96,25 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     return reply(res, 200, { theme: style.theme ?? null, lengths: style.lengths ?? null });
   }
   // Signing in by email: a link asked for at an address, and a link opened, its code traded once for a token.
-  if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join')) {
+  if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code')) {
     if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
     if (at.tooOften()) return;
     const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown };
+    const all = async () => (await at.workspaces.list()).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
     if (path === '/connect/sign-in') {
       const email = normalEmail(body.email);
       if (!email) return reply(res, 400, { error: 'That is not an email address.' });
       // Answered at once and the same either way: whether the address is a member anywhere is not told.
-      if (!askedLately(email)) {
-        const all = (await at.workspaces.list()).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
-        void requestSignIn(all, email, origin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
-      }
+      if (!askedLately(email)) void requestSignIn(await all(), email, origin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
       return reply(res, 200, { sent_to: email });
+    }
+    // A code from the mail, typed with the address it was sent to.
+    if (path === '/connect/code') {
+      const email = normalEmail(body.email);
+      if (!email) return reply(res, 400, { error: 'That is not an email address.' });
+      const traded = await redeemTyped(await all(), (await at.workspaces.get(at.fallback)).pelago.db, email, String(body.code ?? ''));
+      if (traded === 'tries') return reply(res, 429, { error: `Too many wrong codes for this address. Wait ${LINK_MINUTES} minutes, then ask for a new email.` });
+      return traded === 'gone' ? reply(res, 410, { error: 'That code was not accepted: it may be mistyped, used or run out.' }) : reply(res, 200, traded);
     }
     const code = String(body.code ?? '');
     const workspace = workspaceOfCode(code);

@@ -156,7 +156,17 @@ export function signIn(message) {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return (error.textContent = body.error ?? 'That did not work.');
     error.textContent = '';
-    byEmail.replaceChildren(h('span', { class: 'muted' }, `If ${body.sent_to} is a member here, a sign-in link is on its way to it.`));
+    // The mail's link opens in the browser mail opens in; its code can be typed here, in whichever browser asked.
+    const code = h('input', { type: 'text', placeholder: 'Code from the email', style: 'flex: 1', autocomplete: 'one-time-code', autocapitalize: 'characters' });
+    const typed = async () => {
+      const res = await fetch('/connect/code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: body.sent_to, code: code.value }) });
+      const given = await res.json().catch(() => ({}));
+      if (!res.ok) return (error.textContent = given.error ?? 'That code was not accepted.');
+      enter(given.token);
+    };
+    code.addEventListener('keydown', (e) => e.key === 'Enter' && typed());
+    byEmail.replaceChildren(h('span', { class: 'muted grow', title: `If ${body.sent_to} is a member here, a sign-in link and a code are on their way to it` }, `Check ${body.sent_to}`), code, h('button', { class: 'primary', onclick: typed }, 'Sign in'));
+    code.focus();
   };
   const submit = async () => {
     store.token = input.value.trim();
