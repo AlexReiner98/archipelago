@@ -67,7 +67,9 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   assert.match((await post('/x/demo/limit', { workspace: 'acme', members: 0 })).error, /a whole number/);
   const bob = (await call('/api/change', token, { reason: 'test', ops: [{ op: 'create', ref: 'b', type: 'person', title: 'Bob' }] })).result.created.b;
   assert.match((await call('/api/token_create', token, { name: 'bob', kind: 'human', entity: bob })).error, /signs in as a member/, 'no seat by a token');
-  await post('/x/demo/limit', { workspace: 'acme', members: 2 });
+  assert.match((await post('/x/demo/limit', { workspace: 'acme', members: 1, manage: 'javascript:alert(1)' })).error, /https address/);
+  await post('/x/demo/limit', { workspace: 'acme', members: 2, plan: 'Duo', manage: 'https://seller.example/billing' });
+  assert.deepEqual((await call('/api/workspace_info', token)).result.member_limit, { members: 2, plan: 'Duo', manage: 'https://seller.example/billing' });
   assert.equal((await call('/api/member_add', token, { email: 'sam@acme.example' })).result.email, 'sam@acme.example');
   assert.match((await call('/api/member_add', token, { email: 'kim@acme.example' })).error, /room for 2 members\.$/);
   await post('/x/demo/limit', { workspace: 'acme', members: null });

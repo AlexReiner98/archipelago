@@ -32,6 +32,9 @@ export interface Member {
 export interface MemberLimit {
   members: number;
   note?: string;
+  /** What the workspace is on, as the pack that set the limit names it ("Solo"), and where its admin manages that. */
+  plan?: string;
+  manage?: string;
 }
 
 let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id, limitOf: async (_id: string): Promise<MemberLimit | undefined> => undefined };
