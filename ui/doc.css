@@ -76,6 +76,37 @@ nav.contents ol {
   margin: 0;
   padding-left: var(--rhythm-6);
 }
+/* A site's header: its name and its main pages on one line; what does not fit scrolls sideways, never wraps. */
+nav.site-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-9);
+  margin: calc(-1 * var(--rhythm-5)) 0 var(--rhythm-9);
+  padding-bottom: var(--space-6);
+  border-bottom: var(--border-1) solid var(--reader-line);
+  font-size: var(--reader-small);
+  white-space: nowrap;
+}
+nav.site-head a {
+  text-decoration: none;
+  color: var(--reader-muted);
+}
+nav.site-head a:hover,
+nav.site-head a[aria-current] {
+  color: var(--reader-ink);
+}
+nav.site-head .site-name {
+  flex: none;
+  font-weight: 600;
+  color: var(--reader-ink);
+}
+.site-pages {
+  display: flex;
+  gap: var(--space-8);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
 footer {
   margin-top: var(--rhythm-10);
   padding-top: var(--rhythm-5);

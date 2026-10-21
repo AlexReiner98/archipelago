@@ -40,7 +40,10 @@ const day = (ts) => new Date(ts).toLocaleDateString(undefined, { dateStyle: 'lon
 
 /** Other published documents a published one names, by id, with their titles: each is read at its own page beside this one. */
 let away = new Map();
-const pageOf = (id) => (own ? `/read/${id}` : here.replace(/[^/]+$/, id));
+// On a site's own domain a published page is read at its address word, the front page at /.
+let paths = {};
+let onSite = false;
+const pageOf = (id) => (own ? `/read/${id}` : onSite && paths[id] ? (paths[id] === 'home' ? '/' : `/${paths[id]}`) : here.replace(/[^/]+$/, id));
 
 /** A line's words, with addresses on the web as links, **strong** as strong, and a section's or another published document's id as a way to it. */
 function inline(text, titles) {
@@ -140,6 +143,17 @@ function blocks(text, titles, depth) {
   return out;
 }
 
+/** The site's header: its name, a way home, and its main pages, the one open marked. */
+function siteHead(site) {
+  const at = (href) => href && (href === location.pathname || (href !== '/' && location.pathname.startsWith(`${href}/`)));
+  return h(
+    'nav',
+    { class: 'site-head' },
+    h('a', { class: 'site-name', href: site.home ?? undefined }, site.name),
+    h('span', { class: 'site-pages' }, site.pages.map((page) => h('a', { href: page.href, 'aria-current': at(page.href) ? 'page' : undefined }, page.title))),
+  );
+}
+
 const INVOICE = 'time.invoice';
 const money = (n, currency = 'CAD') => new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(Number(n) || 0);
 const longDay = (ts) => new Date(`${ts}T12:00:00Z`).toLocaleDateString('en-CA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -183,6 +197,8 @@ function draw(d) {
   document.title = d.type === INVOICE && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
   away = new Map(Object.entries(d.links ?? {}));
+  paths = d.paths ?? {};
+  onSite = Boolean(d.site?.host);
   const sections = d.parts.filter((p) => p.section);
   const part = (p) =>
     p.section
@@ -201,12 +217,13 @@ function draw(d) {
   const opening = 'text' in (d.parts[0] ?? {}) ? 1 : 0;
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
+    d.site && siteHead(d.site),
     d.type === INVOICE ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
     d.parts.slice(0, opening).map(part),
     sections.length > 2 && h('nav', { class: 'contents' }, h('ol', {}, sections.map((p) => h('li', {}, h('a', { href: `#${p.section.id}` }, p.section.title))))),
     d.parts.slice(opening).map(part),
     // A published page is read on the web: only a link's or an invoice's has a way to print it.
-    !published && h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
+    !published && !d.site && h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.type === INVOICE);

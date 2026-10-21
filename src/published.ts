@@ -46,8 +46,8 @@ export function freezeLens(answer: Answer, bodies: Map<string, string>) {
  */
 async function freeze(l: Archipelago, id: string) {
   // The other documents published here, which it may name by id and a reader then opens at their own pages.
-  const { rows: others } = await l.db.query<{ id: string; title: string }>(
-    `select e.id, e.title from published p join entity e on e.id = p.entity_id
+  const { rows: others } = await l.db.query<{ id: string; title: string; path: string | null }>(
+    `select e.id, e.title, p.path from published p join entity e on e.id = p.entity_id
      where p.entity_id <> $1 and e.visibility = 'public' and e.archived_at is null and e.private_to is null`,
     [id],
   );
@@ -67,8 +67,19 @@ async function freeze(l: Archipelago, id: string) {
     lenses[section.id] = freezeLens(kept, shown);
     for (const i of kept.items) types[i.type] = l.registry.type(i.type)?.title ?? i.type;
   }
-  return { ...reader, sections: sections.map((s) => s.id), lenses, types };
+  // Its own address word and place in the header, and the address word of each document it links to.
+  const props = (await l.entity(id))?.props ?? {};
+  const paths = Object.fromEntries(others.filter((o) => o.path && reader.links?.[o.id]).map((o) => [o.id, o.path]));
+  return { ...reader, sections: sections.map((s) => s.id), lenses, types, path: pathOf(props.path), menu: typeof props.menu === 'number' ? props.menu : null, ...(Object.keys(paths).length && { paths }) };
 }
+
+/** An address word: lowercase letters and digits, words joined by single dashes. */
+export const PATH = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const pathOf = (value: unknown) => {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string' || !PATH.test(value) || value.length > 60) throw new Error(`"${value}" cannot be an address: use lowercase letters, digits and single dashes, such as how-it-works.`);
+  return value;
+};
 
 /** Whether two answers say the same, whatever order their keys are kept in (the database keeps its own). */
 const canon = (v: unknown): unknown =>
@@ -80,18 +91,23 @@ export async function publish(l: Archipelago, actor: Actor, id: string) {
   const doc = ID.test(id) ? await l.entity(id) : null;
   if (!doc || !readable(l).includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
   if (doc.archived_at) throw new Error(`"${doc.title}" is archived.`);
+  pathOf(doc.props.path);
   if (doc.visibility !== 'public') await l.apply(actorId(actor), { ops: [{ op: 'update', id, visibility: 'public' }], reason: 'Published, for anyone to read' });
   const given = await freeze(l, id);
+  if (given.path) {
+    const { rows } = await l.db.query<{ title: string }>(`select given ->> 'title' as title from published where path = $1 and entity_id <> $2`, [given.path, id]);
+    if (rows[0]) throw new Error(`"${rows[0].title}" is already published at /${given.path}: give this one another path.`);
+  }
   const by = actor.person ?? actorId(actor);
   await l.db.transaction(async (tx) => {
     await tx.query(
-      `insert into published (entity_id, workspace, given, published_by) values ($1, $2, $3::jsonb, $4)
-       on conflict (entity_id) do update set given = excluded.given, published_by = excluded.published_by, published_at = now()`,
-      [id, l.workspace, JSON.stringify(given), by],
+      `insert into published (entity_id, workspace, given, published_by, path, menu) values ($1, $2, $3::jsonb, $4, $5, $6)
+       on conflict (entity_id) do update set given = excluded.given, published_by = excluded.published_by, path = excluded.path, menu = excluded.menu, published_at = now()`,
+      [id, l.workspace, JSON.stringify(given), by, given.path, given.menu],
     );
     await l.log(tx, { actor: actorId(actor), action: 'document.publish', target: id, reason: 'Published as it stands', detail: { sections: given.sections.length, lenses: Object.keys(given.lenses).length } });
   });
-  return { published: id, sections: given.sections.length, lenses: Object.keys(given.lenses).length };
+  return { published: id, sections: given.sections.length, lenses: Object.keys(given.lenses).length, ...(given.path && { path: given.path }) };
 }
 
 /** Take a document down: it is shared again, and its address answers nothing. */
@@ -129,4 +145,17 @@ export async function publishedPicture(l: Archipelago, id: string, section: stri
     [id, readable(l), section],
   );
   return rows[0] ? { content_type: rows[0].content_type, bytes: Buffer.from(rows[0].data, 'base64') } : null;
+}
+
+/** The published document at an address word, as anyone reads it, or null. */
+export async function publishedAt(l: Archipelago, path: string) {
+  if (!PATH.test(path)) return null;
+  const { rows } = await l.forAnyone().db.query<{ doc: Record<string, unknown> | null }>(`select pelago_published_at($1, $2::text[]) as doc`, [path, readable(l)]);
+  return rows[0]?.doc ?? null;
+}
+
+/** A site's published pages, for its header and its sitemap: id, title as published, path and place. */
+export async function sitePages(l: Archipelago): Promise<{ id: string; title: string; path: string | null; menu: number | null; published_at: string }[]> {
+  const { rows } = await l.forAnyone().db.query<{ pages: never[] }>(`select pelago_site_pages($1::text[]) as pages`, [readable(l)]);
+  return rows[0]?.pages ?? [];
 }

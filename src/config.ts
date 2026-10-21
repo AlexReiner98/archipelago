@@ -32,6 +32,12 @@ export interface Config {
    */
   publicHosts: string[];
   /**
+   * Domains that each serve one workspace's public site (PELAGO_SITES,
+   * "archipelago.tools=archipelago", comma separated): there a published
+   * document is read at its address word, and the one called home at /.
+   */
+  sites: Record<string, string>;
+  /**
    * The proxies in front of the server whose word is taken for where a
    * request came from, beyond private networks (PELAGO_TRUSTED_PROXIES):
    * networks as CIDR, comma separated, or "cloudflare". See src/address.ts.
@@ -120,6 +126,7 @@ export function loadConfig(): Config {
     // A hosted server has neither its customers' repositories nor their Claude CLI.
     launch: local,
     publicHosts: named.map((name) => name.trim().toLowerCase()).filter(Boolean),
+    sites: Object.fromEntries((env('SITES') ?? '').split(',').map((pair) => pair.split('=').map((part) => part.trim().toLowerCase())).filter(([host, ws]) => host && ws)),
     trustedProxies: env('TRUSTED_PROXIES') ?? fromFile.trustedProxies,
     // Hosting platforms say which port to use through PORT.
     port: Number(env('PORT') ?? process.env.PORT ?? fromFile.port ?? 3100),
