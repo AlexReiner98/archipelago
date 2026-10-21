@@ -923,13 +923,9 @@ export class Archipelago {
     if (actor.kind !== 'human') throw new Error('Only a human can set the workspace owner.');
     const found = await this.db.query<{ id: string }>(`select id from entity where type = 'person' and lower(title) = lower($1) and archived_at is null`, [input.name]);
     let id = found.rows[0]?.id;
-    if (!id) {
-      const result = await this.apply(actorId(actor), {
-        ops: [{ op: 'create', ref: 'me', type: 'person', title: input.name, props: input.email ? { email: input.email } : {} }],
-        reason: 'Workspace owner',
-      });
-      id = result.created.me;
-    }
+    if (!id) id = (await this.apply(actorId(actor), { ops: [{ op: 'create', ref: 'me', type: 'person', title: input.name, props: input.email ? { email: input.email } : {} }], reason: 'Workspace owner' })).created.me;
+    // Its first owner begins a workspace: what its agents change takes effect as they make it, until the owner says otherwise (owner, 21 Oct 2026).
+    if ((await this.setting('me')) === undefined) await this.db.query(`insert into setting (key, value) values ($1, '"apply"'::jsonb) on conflict (key) do nothing`, [AGENT_CHANGES]);
     await this.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(id)]);
     return { me: id };
   }

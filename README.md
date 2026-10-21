@@ -10,7 +10,8 @@ Each agent session usually starts from nothing, and what it learned stays in
 a chat. Archipelago is the place the work lives instead: a map of projects,
 tasks, decisions, people and what waits on what. You look at it in a web page;
 agents read and change it through the same tools, over MCP. What an agent
-changes waits for your yes, or is applied, logged and one click to undo.
+changes is applied, logged and one click to undo, or waits for your yes if
+you choose that.
 
 ![Archipelago in its own demo map: you, Claude Code and GitHub working on one project, and the release it is waiting for](docs/demo-map.png)
 
@@ -65,7 +66,8 @@ and ask it something like:
 > Put this repository in Archipelago as a project, with the three things I am
 > working on as tasks, and tell me what you would do first.
 
-Its change shows up on **Changes** for you to apply.
+Its change is on the map at once, and on **Changes** with Undo; under
+**Workspace → Settings** you can have agents' changes wait for you instead.
 
 ## Host your own
 
