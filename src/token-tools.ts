@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { createToken, listTokens, revokeToken } from './auth.ts';
+import { humanTokenAllowed } from './members.ts';
 import type { Actor } from './pelago.ts';
 import type { Tool } from './tools.ts';
 
@@ -32,6 +33,7 @@ export const TOKEN_TOOLS: Record<string, Tool> = {
       if (input.kind === 'human' || input.admin || entity !== actor.person) needAdmin(actor, 'make a token for anyone but an agent acting for yourself');
       if ((input.within?.length || (input.may && input.may !== 'change')) && input.kind !== 'agent') throw new Error('Only an agent’s token can be scoped.');
       for (const id of input.within ?? []) if (!(await l.entity(id))) throw new Error(`"${id}" is no item in this map, so a token cannot be within it.`);
+      if (input.kind === 'human') await humanTokenAllowed(l, entity);
       return createToken(l.db, l.workspace, { ...input, entity });
     },
   },

@@ -58,25 +58,25 @@ import { UI_FILES } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
-const BODY_MAX = 32_000_000;
+const BODY_MAX = 32_000_000; /** What a route open to anyone takes: a form's worth, or a webhook's delivery. */ const OPEN_BODY_MAX = 64_000, HOOK_BODY_MAX = 1_000_000;
 
 /** A request's body, refused once it is larger than any honest one: some routes read it before they know who sent it. */
-async function readBody(req: IncomingMessage): Promise<Buffer> {
-  const tooLarge = () => new Refused(413, `A request may carry ${BODY_MAX / 1_000_000} MB at most.`);
-  if (Number(req.headers['content-length'] ?? 0) > BODY_MAX) throw tooLarge();
+async function readBody(req: IncomingMessage, most = BODY_MAX): Promise<Buffer> {
+  const tooLarge = () => new Refused(413, `A request here may carry ${most >= 1_000_000 ? `${most / 1_000_000} MB` : `${most / 1000} kB`} at most.`);
+  if (Number(req.headers['content-length'] ?? 0) > most) throw tooLarge();
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
-    if (size > BODY_MAX) throw tooLarge();
+    if (size > most) throw tooLarge();
     chunks.push(chunk as Buffer);
   }
   return Buffer.concat(chunks);
 }
 
-async function readJson(req: IncomingMessage): Promise<unknown> {
-  const text = (await readBody(req)).toString('utf8');
-  return text ? JSON.parse(text) : undefined;
+async function readJson(req: IncomingMessage, most = BODY_MAX): Promise<unknown> {
+  const text = (await readBody(req, most)).toString('utf8');
+  try { return text ? JSON.parse(text) : undefined; } catch { throw new Refused(400, 'The body is not JSON.'); }
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
@@ -195,7 +195,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         return await serveBackupFile(key && (await workspaces.has(wsId)) ? (await workspaces.get(wsId)).pelago.db : undefined, key ?? '', res);
       }
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
-      if (/^\/(connect|x)\//.test(url.pathname)) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, open), body: () => readJson(req), raw: () => readBody(req) });
+      if (/^\/(connect|x)\//.test(url.pathname)) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(url.pathname) ? deliveries : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX) });
 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;

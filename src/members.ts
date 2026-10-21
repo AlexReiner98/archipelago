@@ -54,12 +54,13 @@ export async function setMemberLimit(control: Q, workspace: string, limit: Membe
 }
 
 /** Refuse one more member past the limit, saying how to make room. Those already in stay when a limit is lowered. */
-async function roomForOneMore(db: Q, workspace: string): Promise<void> {
+async function roomForOneMore(db: Q, workspace: string, added = 0): Promise<void> {
   const limit = await site.limitOf(workspace);
   if (!limit) return;
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
-  if (rows[0].n < limit.members) return;
+  if (rows[0].n - added < limit.members) return;
   const name = await site.nameOf(workspace);
+  if (added) rows[0].n -= added;
   throw new Error(`${name} has room for ${limit.members} member${limit.members === 1 ? '' : 's'}${rows[0].n > limit.members ? ` and has ${rows[0].n}` : ''}.${limit.note ? ` ${limit.note}` : ''}`);
 }
 
@@ -84,6 +85,13 @@ export async function admitMember(whole: Archipelago, email: string, admin: bool
     [email, person, admin || first],
   );
   return person;
+}
+
+/** On a workspace with a member limit a person signs in as a member: a human token for anyone else would be a seat unpaid for. */
+export async function humanTokenAllowed(l: Archipelago, person: string | undefined): Promise<void> {
+  if (!(await site.limitOf(l.workspace))) return;
+  const { rows } = await (await wholeMap(l)).db.query(`select 1 from member where person_id = $1 and removed_at is null`, [person ?? '']);
+  if (!rows.length) throw new Error('On this workspace a person signs in as a member: add them under Members first.');
 }
 
 const KEY = 'signin:';
@@ -160,6 +168,11 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
          on conflict (email) do update set person_id = excluded.person_id, admin = excluded.admin, added_by = excluded.added_by, added_at = now(), removed_at = null`,
         [email, person, Boolean(input.admin), actor.name],
       );
+      // Two added at once may both have found room: counted again, the one past the limit is taken out.
+      await roomForOneMore(whole.db, l.workspace, 1).catch(async (err) => {
+        await whole.db.query(`update member set removed_at = now() where email = $1`, [email]);
+        throw err;
+      });
       const name = await site.nameOf(l.workspace);
       const inviter = actor.person ? await l.entity(actor.person) : undefined;
       const by = inviter?.title || actor.name;
