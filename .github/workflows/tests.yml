@@ -1,5 +1,7 @@
-# The gate: the type check and the tests on Linux, on every push and on every
-# change someone else proposes, once on PGlite and once on a Postgres server.
+# The gate: the type check and the tests on Linux, on every pull request and on
+# every push to main, once on PGlite and once on a Postgres server. A branch is
+# tested by its pull request, so the result shows on the pull request's page
+# and each commit runs once; a branch with no pull request is not tested.
 # Windows runs nightly (nightly.yml). Needs nothing set in the repository's
 # settings.
 
@@ -7,7 +9,7 @@ name: Tests
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
 # A newer push to the same branch makes the run for the older one pointless.
@@ -20,9 +22,6 @@ permissions:
 
 jobs:
   pglite:
-    # A branch of this repository is already tested by its push: only a
-    # change from a fork needs the pull request's own run.
-    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -42,7 +41,6 @@ jobs:
   postgres:
     # The engine that runs live. Each test gets a database copied from a
     # template the run builds once (scratchPg in src/pg.ts).
-    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:

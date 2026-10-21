@@ -1,7 +1,7 @@
 # Windows, where the owner develops: the type check and the tests on PGlite,
 # each night, on demand, and on a change proposed from a fork (which no
-# nightly run of this repository would see). Linux gates every push
-# (tests.yml).
+# nightly run of this repository would see). Linux gates every pull request
+# and every push to main (tests.yml).
 
 name: Windows
 
