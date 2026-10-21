@@ -314,7 +314,7 @@ create policy member_token on token for all to pelago_member
 
 drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member
-  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish'));
+  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups'));
 drop policy if exists member_setting on setting;
 create policy member_setting on setting for all to pelago_member
   using (current_setting('pelago.admin', true) = '1' or key like 'audit_cursor:%')
@@ -446,3 +446,10 @@ language sql stable security definer set search_path = public as $fn$
     and exists (select 1 from jsonb_array_elements(pelago_workspace_document(share_id, reader) -> 'items') i where i ->> 'id' = target)
 $fn$;
 grant execute on function pelago_workspace_document(text, text), pelago_workspace_picture(text, text, text) to pelago_public;`;
+
+/** Step 12 (src/migrate.ts): a member, and so an agent's token, reads whether the owner lets agents publish (src/published.ts). */
+export const AGENT_PUBLISH_READ = `
+drop policy if exists member_setting_read on setting;
+create policy member_setting_read on setting for select to pelago_member
+  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish'));
+`;
