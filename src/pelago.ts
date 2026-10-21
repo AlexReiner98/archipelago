@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { checkWritten } from './automation-rules.ts';
 import { judgeOps } from './rules.ts';
-import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts';
+import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts';
 import { readEvents, type EventQuery } from './eventlog.ts';
@@ -264,10 +264,7 @@ export class Archipelago {
     const { warnings } = await this.plan(input.ops);
     const me = actorId(actor);
     const claimed = input.authority;
-    if (actor.kind !== 'human' && claimed?.of === 'human' && !claimed.basis?.trim())
-      throw new Error('Change rejected:\n- authority: to act on a human\u2019s word, say what they said and where (authority.basis).');
-    const authority: Authority =
-      actor.kind === 'human' ? { of: 'human', who: me } : claimed?.of === 'human' ? { of: 'human', basis: claimed.basis, stated_by: me } : { of: 'agent', who: me, ...(claimed?.basis && { basis: claimed.basis }) };
+    const authority = authorityOf(actor.kind === 'human', me, claimed);
     // The workspace's own choice, when it has made one, stands in for the
     // server's policy on everything the policy does not forbid outright.
     const chosen = actor.kind === 'human' ? undefined : await this.setting<string>(AGENT_CHANGES);

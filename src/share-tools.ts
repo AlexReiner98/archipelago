@@ -7,6 +7,14 @@ import { publish, publishAll, publishAsk, publishedState, publishPlan, unpublish
 import type { Tool } from './tools.ts';
 import { endShare, readAny, sharedFigure, shareWithWorkspace } from './workspace-share.ts';
 
+const authority = z
+  .object({
+    of: z.enum(['human', 'agent']).describe('"human" when a person told you to publish it; "agent" when it is your own judgment.'),
+    basis: z.string().optional().describe('For "human": what they said and where (required). For "agent": what it rests on.'),
+  })
+  .optional()
+  .describe('On whose authority an agent publishes, kept on the event it logs. Left out, it is recorded as your own judgment.');
+
 export const SHARE_TOOLS: Record<string, Tool> = {
   document: {
     description:
@@ -40,10 +48,9 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => endShare(l, actor, input.id),
   },
   publish: {
-    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as pictures a reader can explore.',
-    humanOnly: true,
-    input: { id: z.string().describe('The document.') },
-    run: async (l, actor, input) => publish(l, actor, input.id),
+    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as pictures a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with publish_ask.',
+    input: { id: z.string().describe('The document.'), authority },
+    run: async (l, actor, input) => publish(l, actor, input.id, input.authority),
   },
   unpublish: {
     description: 'Take a published document down: its address answers nothing, and it is shared with the workspace again.',
@@ -52,10 +59,9 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => unpublish(l, actor, input.id),
   },
   publish_all: {
-    description: 'Publish every open document an item holds (part_of, at any depth), then publish them again so each links to the others at their addresses. One whose path is taken is named, and the rest go ahead.',
-    humanOnly: true,
-    input: { within: z.string().describe('The item that holds the documents, such as a site’s project.') },
-    run: async (l, actor, input) => publishAll(l, actor, input.within),
+    description: 'Publish every open document an item holds (part_of, at any depth), then publish them again so each links to the others at their addresses. One whose path is taken is named, and the rest go ahead. An agent may only where the owner allows it, as with publish.',
+    input: { within: z.string().describe('The item that holds the documents, such as a site’s project.'), authority },
+    run: async (l, actor, input) => publishAll(l, actor, input.within, input.authority),
   },
   publish_plan: {
     description: 'Which documents an item holds and whether each is published as it stands: those not yet published or changed since are counted in to_publish.',

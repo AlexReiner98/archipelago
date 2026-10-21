@@ -314,7 +314,7 @@ create policy member_token on token for all to pelago_member
 
 drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member
-  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups'));
+  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish'));
 drop policy if exists member_setting on setting;
 create policy member_setting on setting for all to pelago_member
   using (current_setting('pelago.admin', true) = '1' or key like 'audit_cursor:%')

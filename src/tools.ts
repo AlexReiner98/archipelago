@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { bodyAfter } from './ops.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
-import { MEMBER_TOOLS, limitOf } from './members.ts'; import { endedOf } from './ended.ts'; import { SERVER_PACK_TOOLS } from './server-pack-tools.ts';
+import { MEMBER_TOOLS } from './members.ts'; import { WORKSPACE_TOOLS } from './workspace-tools.ts'; import { SERVER_PACK_TOOLS } from './server-pack-tools.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
 import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts'; import { ASK_TOOLS } from './token-ask.ts';
@@ -18,7 +18,7 @@ import { connection, NO_MODEL } from './model-account.ts';
 import { MODEL_TOOLS } from './model-tools.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
-import { acceptedSenders, notifyWorkspace, wholeMap } from './outbox.ts';
+import { notifyWorkspace, wholeMap } from './outbox.ts';
 import type { Registry, TypeDef } from './packs.ts';
 import { packActionByShort, packTool, packTools } from './packtools.ts';
 import { withinScope } from './scope.ts';
@@ -795,7 +795,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => launch(l, actor, input),
   },
   ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS, ...MODEL_TOOLS,
-  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS,
+  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS,
   notify_workspace: {
     description: 'Send a notification to another workspace on this server. It arrives only if that workspace\u2019s admin has chosen to accept notifications from this one.',
     humanOnly: true,
@@ -867,33 +867,6 @@ export const TOOLS: Record<string, Tool> = {
         await l.log(l.db, { actor: actorId(actor), action: 'github.disconnect', reason: `Stopped hearing from GitHub (${mine.account})` });
       }
       return status();
-    },
-  },
-  workspace_info: {
-    description: 'This workspace\u2019s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, and which workspaces it accepts notifications from.',
-    humanOnly: true,
-    input: {},
-    run: async (l) => {
-      const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on to_jsonb(e.id) = s.value where s.key = 'me'`);
-      return { id: l.workspace, owner: rows[0] ?? null, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups: (await l.setting<boolean>('agent_backups')) === true, member_limit: (await limitOf(l.workspace)) ?? null, ended: (await endedOf(l.workspace)) ?? null };
-    },
-  },
-  workspace_set: {
-    description: 'Change workspace settings. default_visibility: whether new things are private to their author (the default) or shared unless they say otherwise. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human. With "apply" an agent can also settle a decision or a hypothesis: it must say what was chosen and why, and the human is notified. accepts_from: which other workspaces may send this one notifications. Admins only.',
-    humanOnly: true,
-    input: {
-      default_visibility: z.enum(['private', 'shared']).optional(),
-      agent_changes: z.enum(['apply', 'hold']).optional(),
-      accepts_from: z.array(z.string()).optional().describe('Ids of the workspaces allowed to send this one notifications. Replaces the list.'),
-      agent_backups: z.boolean().optional().describe('Whether agents may download the whole workspace as a backup file (backup_download), private items included.'),
-    },
-    run: async (l, actor, input) => {
-      needAdmin(actor, 'change workspace settings');
-      for (const [key, value] of Object.entries(input)) {
-        await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
-        await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${key} set to ${JSON.stringify(value)}` });
-      }
-      return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups: (await l.setting<boolean>('agent_backups')) === true };
     },
   },
   seen: {
