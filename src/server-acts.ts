@@ -5,7 +5,7 @@
 
 import { setControlValue, controlValue } from './control.ts';
 import { normalEmail, sendMail } from './mail.ts';
-import { admitMember, linkFor, memberOf } from './members.ts';
+import { admitMember, linkFor, memberOf, setMemberLimit } from './members.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
 import { validWorkspaceId } from './auth.ts';
 import type { Workspaces } from './workspaces.ts';
@@ -62,6 +62,15 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       const person = await admitMember(ws.pelago, email, Boolean(input.admin));
       await log(`Added ${email} to "${ws.name}"`, { workspace: ws.id, email, admin: Boolean(input.admin) });
       return { person };
+    }
+    case 'workspace.limit': {
+      const ws = await itsOwn(at, pack.id, input.workspace);
+      const members = input.members === null ? null : Number(input.members);
+      if (members !== null && !(Number.isInteger(members) && members >= 1 && members <= 10_000)) throw new Error('members: a whole number from 1, or null to lift the limit.');
+      const note = input.note == null || input.note === '' ? undefined : text(input.note, 300, 'The note');
+      await setMemberLimit(owner.db, ws.id, members === null ? null : { members, ...(note && { note }) });
+      await log(members === null ? `Lifted the member limit of "${ws.name}"` : `Set "${ws.name}" to at most ${members} member${members === 1 ? '' : 's'}`, { workspace: ws.id, members });
+      return { workspace: ws.id, members };
     }
     case 'signin.link': {
       const ws = await itsOwn(at, pack.id, input.workspace);

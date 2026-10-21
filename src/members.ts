@@ -8,6 +8,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { createToken } from './auth.ts';
+import { controlValue, setControlValue, takeControlValue } from './control.ts';
 import type { Q } from './db.ts';
 import { normalEmail, sendMail } from './mail.ts';
 import { wholeMap } from './outbox.ts';
@@ -27,10 +28,37 @@ export interface Member {
   added_at: string;
 }
 
-let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id };
-/** Where the links in the mail lead, and a workspace's name to put in it: the server says, when it starts. */
-export function configureMembers(given: typeof site) {
-  site = given;
+/** The most members a workspace may have, and what to say to the admin who would add one more (how to make room). */
+export interface MemberLimit {
+  members: number;
+  note?: string;
+}
+
+let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id, limitOf: async (_id: string): Promise<MemberLimit | undefined> => undefined };
+/** Where the links in the mail lead, a workspace's name to put in it, and its member limit: the server says, when it starts. */
+export function configureMembers(given: Omit<typeof site, 'limitOf'> & Partial<Pick<typeof site, 'limitOf'>>) {
+  site = { ...site, ...given };
+}
+
+/**
+ * A workspace's member limit is the server's, not its map's: a server pack sets it on a workspace it made (a plan with
+ * room for so many), in the control values of the default workspace's database, where no workspace admin can reach.
+ */
+const limitKey = (workspace: string) => `member_limit:${workspace}`;
+export const memberLimit = (control: Q, workspace: string) => controlValue<MemberLimit>(control, limitKey(workspace));
+export async function setMemberLimit(control: Q, workspace: string, limit: MemberLimit | null): Promise<void> {
+  if (limit) await setControlValue(control, limitKey(workspace), limit);
+  else await takeControlValue(control, limitKey(workspace));
+}
+
+/** Refuse one more member past the limit, saying how to make room. Those already in stay when a limit is lowered. */
+async function roomForOneMore(db: Q, workspace: string): Promise<void> {
+  const limit = await site.limitOf(workspace);
+  if (!limit) return;
+  const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
+  if (rows[0].n < limit.members) return;
+  const name = await site.nameOf(workspace);
+  throw new Error(`${name} has room for ${limit.members} member${limit.members === 1 ? '' : 's'}${rows[0].n > limit.members ? ` and has ${rows[0].n}` : ''}.${limit.note ? ` ${limit.note}` : ''}`);
 }
 
 export async function memberOf(db: Q, email: string): Promise<Member | undefined> {
@@ -120,6 +148,7 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
       if (!email) throw new Error(`"${input.email}" is not an email address.`);
       const whole = await wholeMap(l);
       if (await memberOf(whole.db, email)) throw new Error(`${email} is a member already.`);
+      await roomForOneMore(whole.db, l.workspace);
       const { rows } = await whole.db.query<{ id: string }>(`select id from entity where type = 'person' and archived_at is null and lower(props->>'email') = $1 order by created_at limit 1`, [email]);
       const person =
         rows[0]?.id ??

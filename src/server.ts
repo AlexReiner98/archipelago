@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { notify } from './notify.ts';
-import { backupAll, parseBackup } from './backup.ts'; import { configureMembers } from './members.ts';
+import { backupAll, parseBackup } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { serveConnect } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
@@ -111,7 +111,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
   const github = options.github; configureGithubApp(github);
-  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id });
+  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, limitOf: async (id) => memberLimit((await workspaces.get('default')).pelago.db, id) });
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };

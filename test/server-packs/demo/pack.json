@@ -4,8 +4,8 @@
   "title": "Demo",
   "description": "A server pack for the tests: sells a workspace on a signed webhook.",
   "tier": "server",
-  "acts": ["workspace.create", "workspace.admit", "signin.link"],
-  "entries": [{ "id": "start" }, { "id": "poll" }, { "id": "sneak" }, { "id": "peek" }, { "id": "elsewhere" }],
+  "acts": ["workspace.create", "workspace.admit", "workspace.limit", "signin.link"],
+  "entries": [{ "id": "start" }, { "id": "poll" }, { "id": "sneak" }, { "id": "peek" }, { "id": "elsewhere" }, { "id": "limit" }],
   "pages": [{ "id": "signup", "file": "signup.html" }],
   "webhooks": [{ "id": "paid", "secret": "hook", "header": "x-signature", "format": "hex" }]
 }
