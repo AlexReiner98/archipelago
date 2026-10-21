@@ -45,7 +45,13 @@ export function freezeLens(answer: Answer, bodies: Map<string, string>) {
  * with nothing private in it.
  */
 async function freeze(l: Archipelago, id: string) {
-  const reader = await publicDocument(l, id);
+  // The other documents published here, which it may name by id and a reader then opens at their own pages.
+  const { rows: others } = await l.db.query<{ id: string; title: string }>(
+    `select e.id, e.title from published p join entity e on e.id = p.entity_id
+     where p.entity_id <> $1 and e.visibility = 'public' and e.archived_at is null and e.private_to is null`,
+    [id],
+  );
+  const reader = await publicDocument(l, id, new Map(others.map((o) => [o.id, o.title])));
   if (!reader) throw new Error(`"${id}" is not a public document.`);
   const sections = reader.parts.flatMap((part) => ('section' in part ? [part.section] : []));
   const lenses: Record<string, ReturnType<typeof freezeLens>> = {};

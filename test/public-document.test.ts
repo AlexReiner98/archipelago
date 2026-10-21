@@ -138,6 +138,26 @@ test('a published document reads as it was published until it is published again
   assert.equal((await call('/api/get', undefined, { id: d })).result.entity.visibility, 'shared');
 });
 
+test('a published document links to the other published documents it names, and to nothing else', async () => {
+  const { call, base } = await serve('off');
+  const { a, b, c } = (
+    await call('/api/change', undefined, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'a', type: 'work.document', title: 'First steps', visibility: 'shared', body: 'Start here.' },
+        { op: 'create', ref: 'c', type: 'work.document', title: 'Not out yet', visibility: 'shared', body: 'A draft.' },
+        { op: 'create', ref: 'b', type: 'work.document', title: 'Going further', visibility: 'shared', body: 'After {a}, read on. Later: {c}.' },
+      ],
+    })
+  ).result.created;
+  await call('/api/publish', undefined, { id: a });
+  await call('/api/publish', undefined, { id: b });
+  const read = (await (await fetch(`${base}/p/default/${b}/data`)).json()) as { links?: Record<string, string>; parts: { text?: string }[] };
+  assert.deepEqual(read.links, { [a]: 'First steps' });
+  assert.match(read.parts[0].text!, new RegExp(`After ${a}, read on\\. Later:\\.$`), 'a document not published is not named');
+  assert.ok(!JSON.stringify(read).includes(c));
+});
+
 test('a part is told by its first sentence, with no ids', () => {
   assert.equal(gist('Does one thing (e_abcdefgh). Then another.\n\nMore.'), 'Does one thing.');
   assert.equal(gist(''), '');
