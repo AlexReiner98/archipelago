@@ -6,7 +6,8 @@ import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { dump } from '../src/backup.ts';
 import { GithubApp } from '../src/github-app.ts';
-import { configureReader, readUnread } from '../src/reader.ts';
+import { configureModels } from '../src/model-account.ts';
+import { readUnread } from '../src/reader.ts';
 import { serve, closers } from './serve.ts';
 
 test('GitHub tells the map of a push: it is recorded against its repository, and what a commit says it finished is proposed closed', async () => {
@@ -166,7 +167,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   const page = (path: string) => fetch(base + path, { redirect: 'manual' });
 
   // 1. The server has no app until its owner creates one. An agent cannot.
-  assert.deepEqual((await call('/api/github_app', admin)).result, { available: true, app: null, can_create: true, installation: null, reader: { key: false, model: 'claude-sonnet-5-5' } });
+  assert.deepEqual((await call('/api/github_app', admin)).result, { available: true, app: null, can_create: true, installation: null, reader: { model: null, from: null } });
   assert.match((await call('/agent/github_app', robot, { create: true })).error, /humans only/);
   assert.match((await call('/api/github_app', admin, { connect: true })).error, /no GitHub App yet/);
   const create = (await call('/api/github_app', admin, { create: true })).result.url as string;
@@ -202,11 +203,11 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   const heard = (await deliver('push', push(42))).result;
   assert.deepEqual([heard.recorded, heard.repo.title, heard.commits], [true, 'Tools repo', 1]);
   assert.equal((await deliver('push', push(99))).result.recorded, false, 'an installation no workspace connected is not anyone\'s');
-  // 4. With a key, the agent on this server reads the push: it looks at the commits through the app, asks the map,
+  // 4. With a model account, the agent on this server reads the push: it looks at the commits through the app, asks the map,
   // and sends what the commits show. Here the model is a script, so what is tried is everything around it.
-  assert.deepEqual((await call('/api/github_app', admin)).result.reader, { key: false, model: 'claude-sonnet-5-5' });
-  assert.equal(heard.reading, false, 'without a key a push is recorded and not read');
-  assert.match((await call('/agent/github_app', robot, { key: 'sk-ant-' + 'x'.repeat(30) })).error, /humans only/);
+  assert.deepEqual((await call('/api/github_app', admin)).result.reader, { model: null, from: null });
+  assert.equal(heard.reading, false, 'without a model account a push is recorded and not read');
+  assert.match((await call('/agent/model_account', robot, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) })).error, /humans only/);
   // Something that is not this repository's: the reader is held to the repository it reads, whatever it is told there.
   const outside = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Pay the invoice' }] })).result.created['#1'];
   const asks: any[] = [];
@@ -216,15 +217,17 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
     { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'change', input: { reason: 'The commit says the whetstone still needs oiling', authority: { of: 'agent', basis: 'Message of commit bbbbbbb' }, ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Oil the whetstone' }, { op: 'link', type: 'software.lives_in', from: 't', to: heard.repo.id }] } }] },
     { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Made one task: Oil the whetstone.' }] },
   ];
-  configureReader((key) => async (params) => {
+  configureModels({ ask: (key) => async (params) => {
     asks.push({ key, ...params, messages: structuredClone(params.messages) }); // as they stood when asked: the run goes on adding to them
     return { id: `msg_${asks.length}`, type: 'message', role: 'assistant', model: params.model, usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 5000, cache_creation_input_tokens: 0 }, ...script[asks.length - 1] } as any;
-  }, async (key) => !key.includes('revoked'));
+  }, fetch: (async (_url: string, init?: RequestInit) => new Response('{}', { status: String((init?.headers as Record<string, string>)['x-api-key']).includes('revoked') ? 401 : 200 })) as typeof fetch });
   // A key is tried when it is given: one Anthropic will not take is not saved, and a sign-in token is told from an API key.
-  assert.match((await call('/api/github_app', admin, { key: 'sk-ant-api03-revoked-' + 'x'.repeat(20) })).error, /Anthropic refused that key, so it was not saved/);
-  assert.match((await call('/api/github_app', admin, { key: 'sk-ant-oat01-' + 'x'.repeat(30) })).error, /sign-in token[\s\S]*needs an API key/);
-  assert.equal((await call('/api/github_app', admin)).result.reader.key, false);
-  assert.equal((await call('/api/github_app', admin, { key: 'sk-ant-' + 'x'.repeat(30) })).result.reader.key, true);
+  assert.match((await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-api03-revoked-' + 'x'.repeat(20) })).error, /Anthropic refused that key, so it was not saved/);
+  assert.match((await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-oat01-' + 'x'.repeat(30) })).error, /sign-in token[\s\S]*needs an API key/);
+  assert.equal((await call('/api/github_app', admin)).result.reader.from, null);
+  // The Anthropic key set before there were model accounts is read as one.
+  await (await workspaces.get('default')).pelago.setSecret('anthropic_key', 'sk-ant-' + 'x'.repeat(30));
+  assert.deepEqual((await call('/api/github_app', admin)).result.reader, { model: 'claude-sonnet-5-5', from: 'workspace' });
   // The key is sealed where it is stored, so neither the database nor a backup of it holds it; nor does the log of its being set.
   const kept = (await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value;
   assert.match(kept, /^sealed:v1:/);
@@ -232,8 +235,14 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   // One stored before secrets were sealed leaves in a backup sealed all the same, and is sealed where it lies once it is read.
   await db.query(`update setting set value = $1::jsonb where key = 'anthropic_key'`, [JSON.stringify('sk-ant-' + 'x'.repeat(30))]);
   assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
-  assert.equal((await call('/api/github_app', admin)).result.reader.key, true);
+  assert.equal((await call('/api/github_app', admin)).result.reader.from, 'workspace');
   assert.match((await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value, /^sealed:v1:/);
+  // Connected as an account on the Workspace page, it replaces that key, sealed the same way; the page sees its last four characters.
+  const connectedModel = (await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) })).result;
+  assert.deepEqual(connectedModel.account, { provider: 'anthropic', name: 'Anthropic', model: 'claude-sonnet-5-5', url: null, key: '…xxxx' });
+  assert.match((await db.query<{ value: string }>(`select value from setting where key = 'model_account'`)).rows[0].value, /^sealed:v1:/);
+  assert.equal((await db.query(`select 1 from setting where key = 'anthropic_key'`)).rows.length, 0);
+  assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
   const read = (await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result;
   assert.deepEqual([read.recorded, read.reading], [true, true]);
   let runs: any[] = [];
@@ -284,9 +293,11 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   assert.match((await call('/api/github_app', admin, { recheck: 'e_notarepo' })).error, /not a repository the GitHub App was given/);
   assert.equal((await call('/api/github_app', admin, { recheck: heard.repo.id })).result.started, true);
 
-  // The key is never given back, and removing it stops the reading.
+  // The key is never given back, and removing the account stops the reading.
   assert.ok(!JSON.stringify((await call('/api/github_app', admin)).result).includes('sk-ant-'));
-  assert.equal((await call('/api/github_app', admin, { forget_key: true })).result.reader.key, false);
+  assert.ok(!JSON.stringify((await call('/api/model_account', admin)).result).includes('sk-ant-'));
+  assert.equal((await call('/api/model_account', admin, { remove: true })).result.account, null);
+  assert.equal((await call('/api/github_app', admin)).result.reader.from, null);
 
   assert.deepEqual((await deliver('installation_repositories', { action: 'added', installation: { id: 42, account: { login: 'acme' } }, repositories_added: [{ full_name: 'Acme/Docs' }] })).result, { added: ['Acme/Docs'], known: [] });
   // Chosen again on GitHub later, they come back with no word: the installation is known, and the map is brought up to date.

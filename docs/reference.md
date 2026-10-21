@@ -381,8 +381,8 @@ server, and may only read (contents and metadata):
    in the repository itself.
 
 **An agent on the server reads each push that arrives through the app.**
-Once the workspace's admin has given it an Anthropic key (the GitHub card,
-**Set Anthropic key**; kept on the server, never shown again), every push of
+Once the workspace's admin has connected a model account (the Model card on
+the Workspace page; kept sealed on the server, never shown again), every push of
 commits to a branch is read against the repository's open items by an agent
 that runs on the Archipelago server (`src/reader.ts`), and every hour it asks
 whether a re-check of old items is due. It has no checkout: it reads commits,
@@ -393,14 +393,19 @@ in the repository with what it used. The model is `claude-sonnet-5-5`
 (`PELAGO_READER_MODEL` changes it). Without a key, pushes are recorded and
 not read. A repository connected both ways hears each push once.
 
-Every model call goes through `src/model.ts`, with plain fetch. By default it
-asks Anthropic on the workspace's key. Set `PELAGO_MODEL_URL` to an
-OpenAI-compatible base (LiteLLM: `http://litellm:4000/v1`) and
-`PELAGO_MODEL_KEY` to its key, and every call goes there as a chat
-completion instead, for the model `PELAGO_READER_MODEL` names; every
-workspace's pushes are then read on that key, with or without one of its own.
-Prompt caching is Anthropic's alone, and a run's cost is still priced at
-Anthropic's rates.
+Every model call goes through `src/model.ts`, with plain fetch, on the
+workspace's own model account: Anthropic (an API key), OpenAI (an API key and
+a model) or any OpenAI-compatible server (its address up to its version, a key
+if it needs one, and a model). An account is tried when it is connected (its
+model is looked up, or a compatible server is asked for one token) and is not
+kept if it does not answer. A workspace with no account runs on the server's
+model, if it has one: set `PELAGO_MODEL_URL` to an OpenAI-compatible base
+(LiteLLM: `http://litellm:4000/v1`) and `PELAGO_MODEL_KEY` to its key.
+`PELAGO_MODEL_SHARED=off` keeps that model from workspaces (a hosted server, so
+none runs on the operator's bill), and `PELAGO_MODEL_PRIVATE_URLS=off` refuses
+a compatible server on the server's own network (loopback, private and
+link-local addresses). Prompt caching is Anthropic's alone, and a run's cost
+is still priced at Anthropic's rates.
 
 **Or the server hears the push through a webhook added by hand.** On the Workspace screen, **GitHub** makes a
 secret and shows the address to give GitHub (`/github/<workspace>`): in each
@@ -457,7 +462,7 @@ What the server knows and must not give up is of two kinds.
   operator secret. Each is shown once, when it is made, and cannot be read
   back out of the server or a backup.
 - **What it has to use is sealed** (AES-256-GCM, `src/secrets.ts`): a
-  workspace's Anthropic key, the secret a GitHub webhook signs with, and the
+  workspace's model account, the secret a GitHub webhook signs with, and the
   GitHub App's key and signing secret. The sealing key is
   `PELAGO_SECRETS_KEY` (32 bytes, base64) when that is set, and otherwise a
   file the server makes beside the workspaces (`secrets.key`). A server on

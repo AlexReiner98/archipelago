@@ -20,7 +20,7 @@ export async function startPiece(host, title) {
   const [gh, tokens, members, info] = await Promise.all([api('github_app').catch(() => null), api('token_list').catch(() => []), api('member_list').catch(() => []), api('workspace_info').catch(() => ({}))]);
   const room = info.member_limit?.members;
   const steps = [
-    { id: 'model', title: 'Connect your AI account', done: Boolean(gh?.reader?.key), href: '#/workspace', tip: 'Anthropic, OpenAI or any OpenAI-compatible address: the reader and other tools run on it. On the Workspace page.' },
+    { id: 'model', title: 'Connect your AI account', done: gh?.reader?.from === 'workspace', href: '#/workspace', tip: 'Anthropic, OpenAI or any OpenAI-compatible address: the reader and other tools run on it. The Model card, on the Workspace page.' },
     gh?.available && { id: 'github', title: 'Connect GitHub', done: Boolean(gh.installation), href: '#/workspace', tip: 'Install the GitHub App on the repositories this map should hear from. On the Workspace page.' },
     { id: 'agent', title: 'Connect Claude Code', done: tokens.some((t) => t.kind === 'agent' && !t.revoked_at && t.last_used), href: '#/workspace', tip: 'Run the setup command in a project folder: it gives that machine a token and sets the project up. On the Workspace page.' },
     room !== 1 && { id: 'team', title: 'Invite your team', done: members.length > 1, href: '#/workspace', tip: 'Add people by their email address; each is sent an invitation. On the Workspace page.' },
