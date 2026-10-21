@@ -1,6 +1,7 @@
 // The Workspace screen's Model card: the account this workspace's model calls run on (src/model-account.ts). An
 // admin connects one in a line: which kind, its key, the model, and for any other server its address. It is tried
-// before it is kept, and only the key's last four characters ever come back.
+// before it is kept, and only the key's last four characters ever come back. Its price (US$ a million tokens, in and out)
+// is what each run here is said to cost: set on the row, from the provider's price list.
 
 import { api, ask, h } from './base.js';
 import { menu } from './words.js';
@@ -51,6 +52,18 @@ export function modelCard() {
     return [h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, kind, url, key, model, save, again && h('button', { onclick: () => draw(s) }, 'Cancel')), said];
   };
 
+  // The price, in one line in place of the row's last part: in and out, US$ a million tokens.
+  const pricing = (s, a) => {
+    const cell = (v, what) => h('input', { type: 'number', min: '0', step: 'any', value: v ?? '', placeholder: what, title: `US$ for a million tokens the model ${what === 'in' ? 'reads' : 'writes'}`, style: FIELD });
+    const pin = cell(a.price?.input, 'in');
+    const pout = cell(a.price?.output, 'out');
+    const save = h('button', { class: 'primary' }, 'Save');
+    const said = h('div');
+    save.onclick = () =>
+      api('model_account', { price_in: Number(pin.value), price_out: Number(pout.value) }).then(draw, (err) => said.replaceChildren(h('div', { class: 'error', style: `padding: 0 var(--space-8) var(--space-7); ${ONE_LINE}`, title: err.message }, err.message)));
+    return [h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)', title: 'From the provider’s price list. Each run here is said to cost what it read and wrote at these prices.' }, h('span', { class: 'muted small' }, 'US$ / M tokens'), pin, pout, save, h('button', { onclick: () => draw(s) }, 'Cancel')), said];
+  };
+
   const draw = (s) => {
     const a = s.account;
     const disconnect = async () => {
@@ -67,8 +80,9 @@ export function modelCard() {
         a ? 'connected' : s.server_model ? 'server' : 'none',
       ),
       h('span', { class: 'grow', style: ONE_LINE, title: a?.url ?? what }, what),
+      a && h('span', { class: `pill${a.price ? '' : ' warn'}`, title: a.price ? `US$${a.price.input} a million tokens in, US$${a.price.output} out: what each run is said to cost` : 'No price set: what runs cost here is not known. Set it under More.' }, a.price ? `$${a.price.input}/$${a.price.output}` : 'no price'),
       a?.key && h('code', { class: 'muted small', title: 'The end of the key, all that is shown of it' }, a.key),
-      a ? menu('More', [['Replace', () => body.replaceChildren(h('ul', { class: 'rows' }, row), ...form(s, true))], ['Disconnect', disconnect, 'danger']]) : '',
+      a ? menu('More', [['Price', () => body.replaceChildren(h('ul', { class: 'rows' }, row), ...pricing(s, a))], ['Replace', () => body.replaceChildren(h('ul', { class: 'rows' }, row), ...form(s, true))], ['Disconnect', disconnect, 'danger']]) : '',
     );
     body.replaceChildren(h('ul', { class: 'rows' }, row), ...(a ? [] : form(s, false)));
   };

@@ -26,7 +26,17 @@ export interface ModelAccount {
   url?: string;
   /** Left out for Anthropic: the server's reader model. */
   model?: string;
+  /** What the model costs, in US$ a million tokens, as its admin read it on the provider's price list. */
+  price?: Price;
 }
+
+export interface Price {
+  input: number;
+  output: number;
+}
+
+/** Anthropic's reader model, priced as Anthropic lists it, when its account says no price of its own. */
+const ANTHROPIC_PRICE: Price = { input: 2, output: 10 };
 
 /** The model the reader asks, on Anthropic or the server's model, unless an account names its own. */
 export const READER_MODEL = env('READER_MODEL') || 'claude-sonnet-5-5';
@@ -45,6 +55,8 @@ export interface Connection {
   name: string;
   model: string;
   ask: Ask;
+  /** What a run costs is worked out from this; without it, a run's cost is not known and not said. */
+  price?: Price;
 }
 
 type Fetch = typeof fetch;
@@ -76,7 +88,7 @@ async function stored(l: Archipelago): Promise<ModelAccount | undefined> {
 /** What this workspace's model calls run on: its own account, or the server's model where it is offered. Undefined: nothing. */
 export async function connection(l: Archipelago): Promise<Connection | undefined> {
   const a = await stored(l);
-  if (a) return { from: 'workspace', name: NAMES[a.provider], model: a.model || READER_MODEL, ask: make(a.key || undefined, endpointOf(a)) };
+  if (a) return { from: 'workspace', name: NAMES[a.provider], model: a.model || READER_MODEL, ask: make(a.key || undefined, endpointOf(a)), price: a.price ?? (a.provider === 'anthropic' ? ANTHROPIC_PRICE : undefined) };
   const at = shared();
   if (at) return { from: 'server', name: 'The server’s model', model: READER_MODEL, ask: make(undefined, at) };
   return undefined;
@@ -89,7 +101,7 @@ export async function modelStatus(l: Archipelago, admin = true) {
   const a = await stored(l);
   const server = shared();
   return {
-    account: a ? { provider: a.provider, name: NAMES[a.provider], model: a.model || READER_MODEL, url: a.url ?? null, ...(admin && { key: a.key ? `…${a.key.slice(-4)}` : null }) } : null,
+    account: a ? { provider: a.provider, name: NAMES[a.provider], model: a.model || READER_MODEL, url: a.url ?? null, price: a.price ?? (a.provider === 'anthropic' ? ANTHROPIC_PRICE : null), ...(admin && { key: a.key ? `…${a.key.slice(-4)}` : null }) } : null,
     server_model: server ? READER_MODEL : null,
     default_model: READER_MODEL,
     runs_on: a ? ('workspace' as const) : server ? ('server' as const) : null,
@@ -160,7 +172,7 @@ export async function tryAccount(a: ModelAccount, f: Fetch = fetching): Promise<
 }
 
 /** Keep the account a workspace's admin gave, once it has answered. What it replaces (an Anthropic key set before) goes. */
-export async function connectModel(l: Archipelago, input: { provider: Provider; key?: string; url?: string; model?: string }): Promise<ModelAccount> {
+export async function connectModel(l: Archipelago, input: { provider: Provider; key?: string; url?: string; model?: string; price?: Price }): Promise<ModelAccount> {
   const key = (input.key ?? '').trim();
   const model = (input.model ?? '').trim() || undefined;
   if (!PROVIDERS.includes(input.provider)) throw new Error(`The account is one of: ${PROVIDERS.join(', ')}.`);
@@ -168,9 +180,28 @@ export async function connectModel(l: Archipelago, input: { provider: Provider; 
   if (/^sk-ant-oat/.test(key)) throw new Error('That is a Claude sign-in token (it starts sk-ant-oat), which signs a person in to Claude Code. The server needs an API key: make one at console.anthropic.com, under API keys.');
   if (!model && input.provider !== 'anthropic') throw new Error(`Name the model to use, as ${input.provider === 'openai' ? 'OpenAI' : 'the server'} names it.`);
   if (model && model.length > 200) throw new Error('That is not a model’s name.');
-  const account: ModelAccount = { provider: input.provider, key, ...(input.provider === 'compatible' && { url: await baseUrl(input.url) }), ...(model && { model }) };
+  const account: ModelAccount = { provider: input.provider, key, ...(input.provider === 'compatible' && { url: await baseUrl(input.url) }), ...(model && { model }), ...(input.price && { price: input.price }) };
   const refused = await tryAccount(account);
   if (refused) throw new Error(refused);
+  await l.setSecret(ACCOUNT, JSON.stringify(account));
+  await l.setSecret(LEGACY, undefined);
+  return account;
+}
+
+/** A price a person typed: two amounts of US$ a million tokens, from nothing to a thousand. */
+export function priceOf(input: { price_in?: number; price_out?: number }): Price | undefined {
+  if (input.price_in === undefined && input.price_out === undefined) return undefined;
+  const fine = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1000;
+  if (!fine(input.price_in) || !fine(input.price_out)) throw new Error('Give both prices, in US$ a million tokens: what the model charges for what it reads (in) and for what it writes (out).');
+  return { input: input.price_in!, output: input.price_out! };
+}
+
+/** Change what the connected model is said to cost, keeping its key. */
+export async function priceModel(l: Archipelago, price: Price | undefined): Promise<ModelAccount> {
+  const a = await stored(l);
+  if (!a) throw new Error('Connect a model account first.');
+  const { price: _, ...rest } = a;
+  const account: ModelAccount = { ...rest, ...(price && { price }) };
   await l.setSecret(ACCOUNT, JSON.stringify(account));
   await l.setSecret(LEGACY, undefined);
   return account;
