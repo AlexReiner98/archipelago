@@ -45,6 +45,8 @@ export function configureMembers(given: Omit<typeof site, 'limitOf'> & Partial<P
  * room for so many), in the control values of the default workspace's database, where no workspace admin can reach.
  */
 const limitKey = (workspace: string) => `member_limit:${workspace}`;
+/** A workspace's member limit, as the server says it. */
+export const limitOf = (workspace: string) => site.limitOf(workspace);
 export const memberLimit = (control: Q, workspace: string) => controlValue<MemberLimit>(control, limitKey(workspace));
 export async function setMemberLimit(control: Q, workspace: string, limit: MemberLimit | null): Promise<void> {
   if (limit) await setControlValue(control, limitKey(workspace), limit);

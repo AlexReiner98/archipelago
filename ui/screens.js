@@ -8,6 +8,7 @@ import { renderBody } from './body.js';
 import { attentionCard } from './attention.js';
 import { atlasStrip } from './atlas.js';
 import { heldPiece } from './held.js';
+import { startPiece } from './start.js';
 import { gate } from './gate.js';
 import { proofPart } from './proof.js';
 import { lensView } from './lens.js';
@@ -196,6 +197,11 @@ const PIECES = {
     return { node, later: () => tokenAskPiece(node, ctx.e) };
   },
   // The changes that wait for the owner's word: a table on Home, left out when none wait.
+  // A new workspace's first steps, for its admin: left out once they are done or hidden.
+  start: (ctx, p) => {
+    const node = h('div');
+    return { node, later: () => startPiece(node, p.title ?? p.screen.title) };
+  },
   held: (ctx, p) => {
     const node = h('div');
     return { node, later: () => heldPiece(node, p.title ?? p.screen.title) };

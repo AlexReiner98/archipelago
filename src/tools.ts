@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { bodyAfter } from './ops.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
-import { MEMBER_TOOLS } from './members.ts'; import { SERVER_PACK_TOOLS } from './server-pack-tools.ts';
+import { MEMBER_TOOLS, limitOf } from './members.ts'; import { SERVER_PACK_TOOLS } from './server-pack-tools.ts';
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
 import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts'; import { ASK_TOOLS } from './token-ask.ts';
@@ -877,7 +877,7 @@ export const TOOLS: Record<string, Tool> = {
     input: {},
     run: async (l) => {
       const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on to_jsonb(e.id) = s.value where s.key = 'me'`);
-      return { id: l.workspace, owner: rows[0] ?? null, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups: (await l.setting<boolean>('agent_backups')) === true };
+      return { id: l.workspace, owner: rows[0] ?? null, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups: (await l.setting<boolean>('agent_backups')) === true, member_limit: (await limitOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {

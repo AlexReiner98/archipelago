@@ -8,6 +8,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
+import { notify } from './notify.ts';
 import { serverPacksOf } from './server-host.ts';
 import { serverSecret } from './server-packs.ts';
 import type { ActPlaces } from './server-acts.ts';
@@ -24,6 +25,21 @@ export interface ServerRoutes {
   tooOften: () => boolean;
   body: () => Promise<unknown>;
   raw: () => Promise<Buffer>;
+}
+
+/** How often the owner is told that one pack's webhook refused a delivery or failed on one: once an hour at most. */
+const TOLD_EVERY_MS = 3_600_000;
+const told = new Map<string, number>();
+/** Tell the owner of the server, on the default map, that a webhook refused a delivery or failed on it. */
+async function tellOwner(workspaces: ActPlaces, pack: string, hook: string, what: 'refused' | 'failed', detail: string): Promise<void> {
+  const key = `${pack}/${hook}/${what}`;
+  if (Date.now() - (told.get(key) ?? 0) < TOLD_EVERY_MS) return;
+  told.set(key, Date.now());
+  const owner = (await workspaces.get('default')).pelago;
+  const title = what === 'refused' ? `The ${pack} pack's webhook "${hook}" refused a delivery` : `The ${pack} pack's webhook "${hook}" failed`;
+  await notify(owner, { kind: 'agent', name: `pack:${pack}` }, { title, body: `${detail}
+
+Said once an hour at most; the server's log has each one.`, level: what === 'failed' ? 'urgent' : 'warning' }).catch((err) => console.error(`telling the owner: ${(err as Error).message}`));
 }
 
 /** Whether a body was signed with the secret: sha256=<hex> (prefixed, as GitHub sends) or the bare hex. */
@@ -60,7 +76,12 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
     const raw = await at.raw();
     const secret = serverSecret(file.id, hook.secret);
     const signature = req.headers[(hook.header ?? 'x-signature-256').toLowerCase()];
-    if (!secret || !signedBy(secret, raw, typeof signature === 'string' ? signature : undefined, hook.format)) return json(401, { error: 'The signature does not match.' });
+    if (!secret || !signedBy(secret, raw, typeof signature === 'string' ? signature : undefined, hook.format)) {
+      // Most such are strangers; one from the sender itself means its secret and ours differ, and sales stop.
+      console.error(`server pack ${file.id} webhook ${hook.id}: ${secret ? 'a delivery with a signature that does not match' : 'a delivery, and no secret is set'}`);
+      await tellOwner(at.workspaces, file.id, hook.id, 'refused', secret ? 'Its signature did not match the secret this server holds. If the sender is the real one, the two secrets differ.' : `No secret is set for it on this server, so every delivery is refused.`);
+      return json(401, { error: 'The signature does not match.' });
+    }
     let body: unknown;
     try {
       body = JSON.parse(raw.toString('utf8'));
@@ -72,6 +93,7 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
     } catch (err) {
       // A sender tries again on an error: a failure here is said as one, so it is.
       console.error(`server pack ${file.id} webhook ${hook.id}: ${(err as Error).message}`);
+      await tellOwner(at.workspaces, file.id, hook.id, 'failed', `It failed on a signed delivery: ${(err as Error).message}. The sender will try again.`);
       return json(500, { error: (err as Error).message });
     }
   }

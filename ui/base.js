@@ -129,7 +129,8 @@ export function enter(token) {
   store.token = token;
   state.schema = undefined;
   state.pulse = undefined;
-  if (location.hash && location.hash !== '#/map') location.hash = '#/map';
+  // A sign-in opens on Home, as the app does: a new workspace's first steps are there.
+  if (location.hash && location.hash !== '#/home') location.hash = '#/home';
   else route();
 }
 

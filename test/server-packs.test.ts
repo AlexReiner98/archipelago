@@ -88,6 +88,9 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
     ['server.workspace.limit', 'pack:demo'],
     ['server.workspace.limit', 'pack:demo'],
   ]);
+  // The refused delivery is told to the owner, once.
+  const notes = (await call('/api/search', owner, { type: 'sys.notification' })).result as any[];
+  assert.deepEqual(notes.map((n) => n.title), [`The demo pack's webhook "paid" refused a delivery`]);
   const listed = (await call('/api/server_packs', owner)).result;
   assert.deepEqual(listed.packs.map((p: any) => [p.id, p.acts]), [['demo', ['workspace.create', 'workspace.admit', 'workspace.limit', 'signin.link']]]);
   assert.equal(listed.refused.length, 1);
