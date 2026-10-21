@@ -44,10 +44,10 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
   }
   if (!pelago) return none();
   if (what === 'data') {
-    if (doc) return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...doc, ...(await pageLook(pelago)), site }));
+    if (doc) return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...doc, ...(await pageLook(pelago)), site }));
     const page = await publicPage(pelago, id, match.build);
     if (!page) return none();
-    return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
+    return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
   }
   // A section of a public document shows its figure; anything public in its own right, its own.
   const picture = extra ? ((doc && (await publishedPicture(pelago, id, extra))) ?? (await publicPicture(pelago, extra))) : null;

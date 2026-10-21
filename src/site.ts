@@ -66,7 +66,7 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
     return picture ? send(200, picture.content_type, picture.bytes, { 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));
   }
   const site = { ...(await siteNav(at.workspaces, at.workspace, (page) => (page.path ? siteHref(page.path) : null))), host: at.host };
-  if (what === 'data') return send(200, 'application/json', JSON.stringify({ ...doc, ...(await pageLook(pelago)), site }), { 'cache-control': 'public, max-age=30' });
+  if (what === 'data') return send(200, 'application/json', JSON.stringify({ ...doc, ...(await pageLook(pelago)), site }), { 'cache-control': 'no-cache' });
   const page = publicHead(await readFile(join(UI_DIR, 'doc.html'), 'utf8'), doc, origin + siteHref(doc.path), site.name);
   return send(200, 'text/html; charset=utf-8', page, { 'cache-control': 'no-store', 'content-security-policy': POLICY });
 }
