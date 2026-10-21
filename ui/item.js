@@ -9,7 +9,7 @@ import { documentMenu, documentNote, figureOf, readDocument } from './item-doc.j
 import { relationEditor } from './item-links.js';
 import { lensView, storyPart } from './lens.js';
 import { actionForm, actionsFor, drawScreens, fold, keepsFigure, readWhole } from './screens.js';
-import { RAN, ageChip, ago, changeRow, chip, eventLine, gist, idsAsLinks, isA, isClosed, link, menu, pill, relations, statusesOf, titles, tokensText, typeTitle, types, when } from './words.js';
+import { RAN, ageChip, ago, changeRow, chip, eventLine, gist, idsAsLinks, idsIn, isA, isClosed, link, menu, pill, relations, statusesOf, titles, tokensText, typeTitle, types, when } from './words.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
 const rootOf = (type) => relations.get(type)?.root ?? type;
@@ -100,6 +100,10 @@ export async function entity(id, here) {
   const short = fields.filter(([, v]) => String(v).length <= looks.numbers.fact_most);
   // A field that holds an item's id says that item's name, as a way to it.
   await Promise.all(short.filter(([, v]) => ID.test(String(v)) && !titles.has(String(v))).map(([, v]) => api('get', { id: String(v) }).then((r) => titles.set(r.entity.id, r.entity.title), () => null)));
+  // So does an item its note names by id ("Read next"): its neighbours' names are already here; the rest are asked for.
+  for (const r of [...data.outgoing, ...data.incoming, ...(data.mentioned_in ?? [])]) titles.set(r.id, r.title);
+  const noted = idsIn([e.body ?? '', ...(doc?.parts ?? []).map((p) => p.section?.body ?? '')].join('\n')).filter((n) => !titles.has(n));
+  await Promise.all(noted.map((n) => api('get', { id: n }).then((r) => titles.set(r.entity.id, r.entity.title), () => null)));
   const value = (v) => (ID.test(String(v)) ? idsAsLinks(String(v)) : String(v));
   const long = fields.filter(([, v]) => String(v).length > looks.numbers.fact_most);
   const edit = () => {
