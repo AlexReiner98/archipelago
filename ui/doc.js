@@ -7,6 +7,7 @@ const here = location.pathname.replace(/\/+$/, '');
 // Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in; from a link (/s/...), with the link;
 // made public (/p/<workspace>/<id>), as anyone.
 const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
+const published = here.startsWith('/p/');
 const token = () => {
   try {
     return localStorage.getItem('pelago-token') ?? '';
@@ -204,7 +205,8 @@ function draw(d) {
     d.parts.slice(0, opening).map(part),
     sections.length > 2 && h('nav', { class: 'contents' }, h('ol', {}, sections.map((p) => h('li', {}, h('a', { href: `#${p.section.id}` }, p.section.title))))),
     d.parts.slice(opening).map(part),
-    h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
+    // A published page is read on the web: only a link's or an invoice's has a way to print it.
+    !published && h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.type === INVOICE);
