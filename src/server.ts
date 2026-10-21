@@ -48,7 +48,7 @@ import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
-import { servePublic } from './public-route.ts'; import { lengthsSheet, pageLook } from './styles.ts';
+import { servePublic } from './public-route.ts'; import { serveSite } from './site.ts'; import { lengthsSheet, pageLook } from './styles.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
@@ -99,14 +99,12 @@ class Refused extends Error {
     this.status = status;
   }
 }
-
 export { lenient } from './mcp.ts';
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
-  const named = options.publicHosts ?? [];
-  const hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named];
+  const [named, sites] = [options.publicHosts ?? [], options.sites ?? {}], hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named];
   const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`)];
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
@@ -130,7 +128,6 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     if (wait) res.writeHead(429, { 'content-type': 'application/json', 'retry-after': String(wait) }).end(JSON.stringify({ error: `Asked too often. Try again in ${wait} seconds.` }));
     return wait > 0;
   };
-
 
   /** The workspace a request is for and who is making it. */
   async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent'): Promise<{ ws: Workspace; pelago: Archipelago; actor: (label?: string) => Actor }> {
@@ -190,6 +187,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, leading: options.leading?.() ?? true });
+      // A domain that serves a workspace's public site: its pages by address word (src/site.ts); the rest as on any name.
+      const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
+      if (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces })))) return;
       if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) {
         const [wsId, key] = url.pathname.slice(13).split('/');
         return await serveBackupFile(key && (await workspaces.has(wsId)) ? (await workspaces.get(wsId)).pelago.db : undefined, key ?? '', res);
@@ -199,7 +199,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
-      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named }));
+      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named, sites }));
 
       // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
       // the page is never cached, never framed and never says where it was read from. What it shows is read through one
@@ -467,7 +467,7 @@ If that process is not a pelago server, delete ${lock}.`);
   // The GitHub App is told this server's address: the name it is reached by from outside, when it has one.
   const origin = config.publicHosts[0] ? `https://${config.publicHosts[0]}` : `http://127.0.0.1:${config.port}`;
   const githubApp = new GithubApp({ control: () => workspaces.control(), origin, store: async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago.db : undefined) });
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, github: githubApp, proxies: config.trustedProxies, leading: () => leader?.leading ?? false });
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, github: githubApp, proxies: config.trustedProxies, leading: () => leader?.leading ?? false });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {

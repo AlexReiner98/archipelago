@@ -121,7 +121,11 @@
       "deliverable": true,
       "description": "Writing for a reader, made of the map: its note is the text, and a line holding only an item's id brings that item in at that place, as a section with its title and note. Read whole with the document tool; the owner can give someone a link to it, or make it public, to be read by anyone at /p/<workspace>/<id>.",
       "statuses": { "open": ["draft", "ready"], "closed": ["superseded", "withdrawn"] },
-      "fields": { "for": { "type": "string", "description": "Who it is written for, e.g. \"Sam at Northwind\"." } }
+      "fields": {
+        "for": { "type": "string", "description": "Who it is written for, e.g. \"Sam at Northwind\"." },
+        "path": { "type": "string", "description": "Its address word once published, such as how-it-works: lowercase letters, digits and dashes. On a site's own domain it is read at /<path>, and the one whose path is home is the front page. Kept with each revision: a new one takes effect when it is published again." },
+        "menu": { "type": "number", "description": "Its place in the site's header, lowest first. Left out, it is not in the header." }
+      }
     }
   ],
   "relations": [

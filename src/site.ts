@@ -1,0 +1,72 @@
+// A workspace's public site at a domain of its own. The server's configuration ties a domain to a workspace
+// (PELAGO_SITES: archipelago.tools=archipelago); there each published document is read at its address word, the one
+// whose path is home at /, with a sitemap for search engines. Read as /p/ reads them (src/public-route.ts): through
+// narrow functions that give what was published, nothing of the map as it is now. The app keeps its own address.
+
+import { readFile } from 'node:fs/promises';
+import type { ServerResponse } from 'node:http';
+import { join } from 'node:path';
+import type { Part } from './documents.ts';
+import { GUARD, POLICY, publicHead } from './public-document.ts';
+import { publishedAt, publishedPicture, sitePages } from './published.ts';
+import { pageLook } from './styles.ts';
+import type { Workspaces } from './workspaces.ts';
+
+const UI_DIR = join(import.meta.dirname, '..', 'ui');
+/** The address word of a site's front page, read at /. */
+export const HOME = 'home';
+
+/** Domains and the workspace each serves, from "archipelago.tools=archipelago,docs.example.com=acme". */
+export function readSites(text: string | undefined): Record<string, string> {
+  const pairs = (text ?? '').split(',').map((pair) => pair.split('=').map((part) => part.trim().toLowerCase()));
+  return Object.fromEntries(pairs.filter(([host, ws]) => host && ws));
+}
+
+/** Where a page of a site is read: its front page at /, every other at /<path>. */
+export const siteHref = (path: string) => (path === HOME ? '/' : `/${path}`);
+
+/** The site's name and the pages its header shows, in their menu's order, each as an address on this site. */
+export async function siteNav(workspaces: Workspaces, workspace: string, href: (page: { id: string; path: string | null }) => string | null) {
+  const pages = await sitePages((await workspaces.get(workspace)).pelago);
+  const home = pages.find((page) => page.path === HOME);
+  return {
+    name: (await workspaces.list()).find((ws) => ws.id === workspace)?.name ?? workspace,
+    home: home ? href(home) : null,
+    pages: pages.filter((page) => page.menu != null && page.path !== HOME).map((page) => ({ title: page.title, href: href(page) })).filter((page) => page.href),
+  };
+}
+
+const xml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/**
+ * Answer a GET on a site's domain, or say it is not the site's (false), so the server answers it as on any other
+ * name: the page's own scripts and styles are served by name, as everywhere.
+ */
+export async function serveSite(res: ServerResponse, pathname: string, at: { host: string; workspace: string; workspaces: Workspaces }): Promise<boolean> {
+  const parts = pathname.split('/').filter(Boolean);
+  const origin = `https://${at.host}`;
+  const send = (status: number, type: string, body: string | Buffer, more: Record<string, string> = {}) => (res.writeHead(status, { ...GUARD, 'content-type': type, ...more }).end(body), true);
+  if (!(await at.workspaces.has(at.workspace))) return false;
+  const pelago = (await at.workspaces.get(at.workspace)).pelago;
+  if (pathname === '/robots.txt') return send(200, 'text/plain; charset=utf-8', `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`);
+  if (pathname === '/sitemap.xml') {
+    const urls = (await sitePages(pelago)).filter((page) => page.path).map((page) => `  <url><loc>${xml(origin + siteHref(page.path!))}</loc><lastmod>${new Date(page.published_at).toISOString().slice(0, 10)}</lastmod></url>`);
+    return send(200, 'application/xml; charset=utf-8', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`, { 'cache-control': 'public, max-age=300' });
+  }
+  // The front page's data and figures are read at /data and /picture/<id>, as any page's are below its own address.
+  const [path, what, extra] = parts.length === 0 || parts[0] === 'data' || parts[0] === 'picture' ? [HOME, ...parts] : parts;
+  if (parts.length > 3 || (what && what !== 'data' && what !== 'picture') || (what === 'picture' && !extra) || (what === 'data' && extra)) return false;
+  // The front page has one address.
+  if (parts[0] === HOME && !what) return send(301, 'text/plain; charset=utf-8', 'Moved', { location: '/' });
+  const doc = (await publishedAt(pelago, path)) as ({ id: string; title: string; parts: Part[]; path: string } & Record<string, unknown>) | null;
+  // An address no published page has is not the site's: the server answers it as it would anywhere.
+  if (!doc) return parts.length === 0 ? send(404, 'text/plain; charset=utf-8', 'This site has no front page yet.') : false;
+  if (what === 'picture') {
+    const picture = await publishedPicture(pelago, doc.id, extra);
+    return picture ? send(200, picture.content_type, picture.bytes, { 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));
+  }
+  const site = { ...(await siteNav(at.workspaces, at.workspace, (page) => (page.path ? siteHref(page.path) : null))), host: at.host };
+  if (what === 'data') return send(200, 'application/json', JSON.stringify({ ...doc, ...(await pageLook(pelago)), site }), { 'cache-control': 'public, max-age=30' });
+  const page = publicHead(await readFile(join(UI_DIR, 'doc.html'), 'utf8'), doc, origin + siteHref(doc.path), site.name);
+  return send(200, 'text/html; charset=utf-8', page, { 'cache-control': 'no-store', 'content-security-policy': POLICY });
+}

@@ -26,7 +26,7 @@ after(async () => {
 });
 
 /** A server on its own port with in-memory databases and its own copy of the packs. */
-export async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp, limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }) {
+export async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp, limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }, sites?: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), 'pelago-platform-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
@@ -35,7 +35,7 @@ export async function serve(auth: 'off' | 'tokens', github?: (origin: string) =>
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));
   const port = (probe.address() as AddressInfo).port;
   await new Promise((r) => probe.close(r));
-  const server = createHttpServer(workspaces, port, { auth, github: github?.(`http://127.0.0.1:${port}`), limits });
+  const server = createHttpServer(workspaces, port, { auth, github: github?.(`http://127.0.0.1:${port}`), limits, sites });
   await new Promise<void>((r) => server.listen(port, '127.0.0.1', r));
   closers.push(async () => {
     server.close();

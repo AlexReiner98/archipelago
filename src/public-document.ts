@@ -60,14 +60,26 @@ export function describe(parts: Part[], most = 160): string {
   return '';
 }
 
+/** What every public page and its data are sent with: never sniffed, never telling where a reader came from. */
+export const GUARD = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
+/** A public page loads its own scripts and styles and talks only to this server, and is never framed. */
+export const POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /**
  * The shared document page (ui/doc.html) as a public document's: its own title, a description from its first
  * paragraph and the address to keep, and no request to be left out of a search engine's index.
  */
-export function publicHead(html: string, doc: { title: string; parts: Part[] }, canonical: string): string {
+export function publicHead(html: string, doc: { title: string; parts: Part[] }, canonical: string, site?: string): string {
   const description = describe(doc.parts);
-  const head = [description && `<meta name="description" content="${escape(description)}" />`, `<link rel="canonical" href="${escape(canonical)}" />`].filter(Boolean).join('\n    ');
+  // What a link to it shows where it is posted: its title, its first words and its address (Open Graph, and a card).
+  const share: [string, string | undefined][] = [['og:type', 'article'], ['og:title', doc.title], ['og:description', description], ['og:url', canonical], ['og:site_name', site]];
+  const head = [
+    description && `<meta name="description" content="${escape(description)}" />`,
+    `<link rel="canonical" href="${escape(canonical)}" />`,
+    ...share.filter(([, value]) => value).map(([name, value]) => `<meta property="${name}" content="${escape(value!)}" />`),
+    '<meta name="twitter:card" content="summary" />',
+  ].filter(Boolean).join('\n    ');
   return html.replace(/<meta name="robots" content="noindex" \/>/, head).replace(/<title>[^<]*<\/title>/, `<title>${escape(doc.title)}</title>`);
 }

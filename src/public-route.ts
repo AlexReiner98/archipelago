@@ -7,31 +7,34 @@ import { readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import type { Part } from './documents.ts';
-import { publicHead } from './public-document.ts';
+import { GUARD, POLICY, publicHead } from './public-document.ts';
 import { publishedDocument, publishedPicture } from './published.ts';
 import { publicPage, publicPicture } from './public.ts';
+import { siteHref, siteNav } from './site.ts';
 import { pageLook } from './styles.ts';
 import type { Workspaces } from './workspaces.ts';
 
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
-const GUARD = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
-const POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 /** Where a public item's page is read: stable for as long as it is public, whatever it is renamed. */
 export const publicPath = (workspace: string, id: string) => `/p/${workspace}/${id}`;
 
 /** Answer a GET under /p/: its page, its data, or one of its pictures. */
-export async function servePublic(res: ServerResponse, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }, at: { workspaces: Workspaces; named: string[] }) {
+export async function servePublic(res: ServerResponse, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }, at: { workspaces: Workspaces; named: string[]; sites?: Record<string, string> }) {
   const { workspace, id, what, extra } = match;
   const none = () => res.writeHead(404, { ...GUARD, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
   const pelago = (await at.workspaces.has(workspace)) ? (await at.workspaces.get(workspace)).pelago : null;
   // A document is read as it was last published, never as the map has it now.
-  const doc = pelago && ((await publishedDocument(pelago, id)) as { title: string; parts: Part[] } | null);
+  const doc = pelago && ((await publishedDocument(pelago, id)) as { title: string; parts: Part[]; path?: string | null } | null);
+  // A workspace with a domain of its own: its pages' addresses there are the ones to keep.
+  const domain = Object.entries(at.sites ?? {}).find(([, ws]) => ws === workspace)?.[0];
+  const site = doc && pelago ? await siteNav(at.workspaces, workspace, (page) => publicPath(workspace, page.id)) : null;
   if (!what) {
     // A public document's page carries its title, what it opens on and its address in the page itself, for a search engine.
     if (doc) {
       const path = publicPath(workspace, id);
-      const page = publicHead(await readFile(join(UI_DIR, 'doc.html'), 'utf8'), doc, at.named[0] ? `https://${at.named[0]}${path}` : path);
+      const canonical = domain && doc.path ? `https://${domain}${siteHref(doc.path)}` : at.named[0] ? `https://${at.named[0]}${path}` : path;
+      const page = publicHead(await readFile(join(UI_DIR, 'doc.html'), 'utf8'), doc, canonical, site?.name);
       return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': POLICY }).end(page);
     }
     // A product's page reads its data once open. What is not public, or not there, has no page at all.
@@ -41,7 +44,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
   }
   if (!pelago) return none();
   if (what === 'data') {
-    if (doc) return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...doc, ...(await pageLook(pelago)) }));
+    if (doc) return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...doc, ...(await pageLook(pelago)), site }));
     const page = await publicPage(pelago, id, match.build);
     if (!page) return none();
     return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));

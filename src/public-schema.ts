@@ -79,3 +79,28 @@ language sql stable security definer set search_path = public as $fn$
 $fn$;
 grant execute on function pelago_published(text, text[]), pelago_published_picture(text, text[], text) to pelago_public;
 `;
+
+/** Step 11 (src/migrate.ts): a published document's address word and its place in the site's header. */
+export const PUBLISHED_PATH = `
+-- Kept with the revision, as everything public is: a new path or place takes effect when it is published again.
+alter table published add column if not exists path text;
+alter table published add column if not exists menu double precision;
+create unique index if not exists published_path on published (path) where path is not null;
+
+-- The published document at an address word, as anyone reads it: the same four facts as pelago_published hold.
+create or replace function pelago_published_at(at_path text, readable text[]) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select p.given || jsonb_build_object('id', p.entity_id, 'path', p.path, 'published_at', p.published_at)
+  from published p join entity e on e.id = p.entity_id
+  where p.path = at_path and e.visibility = 'public' and e.archived_at is null and e.private_to is null and e.type = any(readable)
+$fn$;
+-- The site's published pages, for its header and its sitemap: each one's id, title as published, path and place.
+create or replace function pelago_site_pages(readable text[]) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select coalesce(jsonb_agg(jsonb_build_object('id', p.entity_id, 'title', p.given ->> 'title', 'path', p.path, 'menu', p.menu, 'published_at', p.published_at)
+    order by p.menu nulls last, p.given ->> 'title'), '[]'::jsonb)
+  from published p join entity e on e.id = p.entity_id
+  where e.visibility = 'public' and e.archived_at is null and e.private_to is null and e.type = any(readable)
+$fn$;
+grant execute on function pelago_published_at(text, text[]), pelago_site_pages(text[]) to pelago_public;
+`;
