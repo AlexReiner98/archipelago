@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { openDb } from '../src/db.ts';
+import { migrate } from '../src/migrate.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
@@ -19,9 +20,10 @@ after(() => registries.forEach((r) => hostFor(r).stop()));
 async function withDocument() {
   const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
   registries.push(reg);
-  const l = new Archipelago(await openDb(), reg);
+  const db = await openDb();
+  const l = new Archipelago(db, reg);
   const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'work.document', title: 'Landing', visibility: 'shared', body: 'What it is, in a line.' }] });
-  return { l, doc: (made as { created: Record<string, string> }).created.d };
+  return { l, db, doc: (made as { created: Record<string, string> }).created.d };
 }
 
 test('an agent may not publish until the owner allows it', async () => {
@@ -61,4 +63,16 @@ test('only a human admin turns agent publishing on, and the database refuses any
   assert.equal(await scoped.setting('agent_publish'), undefined);
   await callTool(l, owner, 'workspace_set', { agent_publish: true });
   assert.equal(await scoped.setting('agent_publish'), true, 'a member reads it, as an agent token does');
+});
+
+test('a database made before step 12 lets an agent read the allowance once it takes that step', async () => {
+  const { l, db } = await withDocument();
+  // As a database at step 11 is: the read rule of step 1, without the allowance in it.
+  await db.exec(`drop policy member_setting_read on setting;
+    create policy member_setting_read on setting for select to pelago_member using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups'));
+    delete from schema_version where version = 12`);
+  await callTool(l, owner, 'workspace_set', { agent_publish: true });
+  assert.equal(await l.as('e_agentx').setting('agent_publish'), undefined, 'hidden from a member before the step');
+  await migrate(db, false);
+  assert.equal(await l.as('e_agentx').setting('agent_publish'), true);
 });
