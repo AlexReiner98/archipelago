@@ -114,11 +114,12 @@
     {
       "id": "work.document",
       "altitude": "stream",
+      "public": true,
       "moved_from": ["document"],
       "extends": "record",
       "title": "Document",
       "deliverable": true,
-      "description": "Writing for a reader, made of the map: its note is the text, and a line holding only an item's id brings that item in at that place, as a section with its title and note. Read whole with the document tool; the owner can give someone a link to it.",
+      "description": "Writing for a reader, made of the map: its note is the text, and a line holding only an item's id brings that item in at that place, as a section with its title and note. Read whole with the document tool; the owner can give someone a link to it, or make it public, to be read by anyone at /p/<workspace>/<id>.",
       "statuses": { "open": ["draft", "ready"], "closed": ["superseded", "withdrawn"] },
       "fields": { "for": { "type": "string", "description": "Who it is written for, e.g. \"Sam at Northwind\"." } }
     }
