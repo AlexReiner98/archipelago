@@ -81,7 +81,7 @@ export async function workspace() {
       'div',
       { class: 'grid' },
       (me.actor.admin || !info.owner) && ownerCard(info.owner, workspace),
-      me.actor.admin && backupCard(workspace),
+      me.actor.admin && at('backup', backupCard(workspace)),
       me.actor.admin && me.workspace.id === 'default' && serverPacksCard(),
       me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
       me.actor.admin && screensCard(workspace),
@@ -123,7 +123,7 @@ export async function workspace() {
         ),
         ),
       ),
-      me.actor.admin && planCard(info.member_limit, members.length),
+      me.actor.admin && planCard(info.member_limit, members.length, info.ended),
       // A workspace for one person (its limit is one, and it has no more) has no members to manage.
       me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, say })),
       me.actor.admin &&

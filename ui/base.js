@@ -207,7 +207,10 @@ export async function showIdentity() {
     if (me.auth !== 'tokens') return slot.replaceChildren();
     known.remember(me.workspace);
     // Which workspace this is, where it cannot be missed: under the name at the top, and on the tab.
-    document.querySelector('#nav .brand').replaceChildren('Archipelago', h('div', { class: 'workspace-name' }, me.workspace.name));
+    // A workspace that has ended says so under its name on every page: until when, and where its backup is.
+    const ended = me.actor.kind === 'human' ? await api('workspace_info').then((info) => info.ended, () => null) : null;
+    const until = ended && h('a', { class: 'small error', href: '#/workspace?at=backup', title: `Ended ${ended.since.slice(0, 10)}: read-only, and deleted from the server on ${ended.delete_at.slice(0, 10)}. Download its backup before then.${ended.note ? ` ${ended.note}` : ''}` }, `Deleted on ${new Date(ended.delete_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`);
+    document.querySelector('#nav .brand').replaceChildren('Archipelago', h('div', { class: 'workspace-name' }, me.workspace.name), until || '');
     document.title = `${me.workspace.name} · Archipelago`;
     const others = Object.entries(known.all()).filter(([id]) => id !== me.workspace.id);
     slot.replaceChildren(

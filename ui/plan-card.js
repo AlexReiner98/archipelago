@@ -4,10 +4,11 @@
 
 import { h } from './base.js';
 
-/** limit: workspace_info's member_limit; members: how many there are now. */
-export function planCard(limit, members) {
-  if (!limit) return null;
-  const room = `up to ${limit.members} member${limit.members === 1 ? '' : 's'}`;
+/** limit: workspace_info's member_limit; members: how many there are now; ended: workspace_info's ended. */
+export function planCard(limit, members, ended) {
+  if (!limit && !ended) return null;
+  const room = limit ? `up to ${limit.members} member${limit.members === 1 ? '' : 's'}` : '';
+  const manage = ended?.manage ?? limit?.manage;
   return h(
     'section',
     { class: 'card wide' },
@@ -15,9 +16,12 @@ export function planCard(limit, members) {
     h(
       'div',
       { class: 'row-top', style: 'padding: var(--space-6) var(--space-8)' },
-      h('span', { class: 'pill ok' }, limit.plan ?? 'plan'),
-      h('span', { class: 'grow gist muted', title: `${members} of ${limit.members} in use` }, room),
-      limit.manage && h('a', { href: limit.manage, target: '_blank', rel: 'noopener noreferrer', title: 'Change the plan, the seats or the card, or cancel, with the seller' }, 'Manage subscription'),
+      ended ? h('span', { class: 'pill bad', title: `Ended ${ended.since.slice(0, 10)}` }, 'ended') : h('span', { class: 'pill ok' }, limit.plan ?? 'plan'),
+      ended
+        ? h('span', { class: 'grow gist', title: `Read-only until it is deleted from the server on ${ended.delete_at.slice(0, 10)}.${ended.note ? ` ${ended.note}` : ''}` }, `read-only · deleted ${ended.delete_at.slice(0, 10)}`)
+        : h('span', { class: 'grow gist muted', title: `${members} of ${limit.members} in use` }, room),
+      ended && h('a', { href: '#/workspace?at=backup', title: 'Everything in it, as a file another server can import' }, 'Download backup'),
+      manage && h('a', { href: manage, target: '_blank', rel: 'noopener noreferrer', title: 'Change the plan, the seats or the card, or cancel, with the seller' }, ended ? 'Subscribe again' : 'Manage subscription'),
     ),
   );
 }

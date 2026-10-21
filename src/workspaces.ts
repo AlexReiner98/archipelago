@@ -13,6 +13,7 @@ import { addLocalType, addWorkspace, claimControlValue, controlValue, importCont
 import { startSchedules, stopSchedules } from './hooks.ts';
 import { openDb, type Database } from './db.ts';
 import { databaseFor, dropDatabaseFor } from './pg.ts';
+import { dueForDeletion, setEnded } from './ended.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
 import { followPacks, packsOff } from './packstate.ts';
@@ -22,6 +23,8 @@ import { syncTypes } from './typetable.ts';
 export const DEFAULT_WORKSPACE = 'default';
 /** How soon a pack switched on another server is followed here. */
 const FOLLOW_MS = 5_000;
+/** How often the server that leads looks for ended workspaces whose day to be deleted has come. */
+const DELETE_DUE_MS = 3_600_000;
 
 export interface Workspace {
   id: string;
@@ -45,6 +48,8 @@ interface WorkspacesConfig {
   policy?: Partial<Policy>;
   /** Start each workspace's automation runner and schedules when it opens: while this process leads (lead). */
   runAutomations?: boolean;
+  /** Where the scheduled backups are written, one folder a workspace: a deleted workspace's go with it. */
+  backupsDir?: string;
 }
 
 export class Workspaces {
@@ -59,6 +64,7 @@ export class Workspaces {
   /** The workspaces besides the default one, as last read from it. */
   private known = new Map<string, string>();
   private leading: boolean;
+  private deleting: ReturnType<typeof setTimeout> | undefined;
 
   constructor(config: WorkspacesConfig) {
     this.config = config;
@@ -235,6 +241,13 @@ export class Workspaces {
    */
   async lead(on: boolean): Promise<void> {
     this.leading = on;
+    // The first look a minute after taking the lead, then hourly; unref'd, so this clock alone keeps nothing running.
+    clearTimeout(this.deleting);
+    const look = () => {
+      this.deleting = setTimeout(look, DELETE_DUE_MS).unref();
+      void this.deleteDue().catch((err) => console.error(`deleting ended workspaces failed: ${(err as Error).message}`));
+    };
+    this.deleting = on ? setTimeout(look, 60_000).unref() : undefined;
     if (on && this.config.databaseUrl) for (const { id } of await this.list()) await this.get(id).catch((err) => console.error(`opening ${id} to lead failed: ${(err as Error).message}`));
     for (const opening of this.open.values()) {
       const ws = await opening.catch(() => undefined);
@@ -309,7 +322,45 @@ export class Workspaces {
     return secret;
   }
 
+  /**
+   * Delete a workspace from this server, whole and for good: its database, its folder, its scheduled backups, and what
+   * the server kept about it. Only what has ended and whose day has come is deleted by itself (deleteDue).
+   */
+  async delete(id: string): Promise<void> {
+    if (id === DEFAULT_WORKSPACE) throw new Error('The default workspace is never deleted.');
+    const opening = this.open.get(id);
+    this.open.delete(id);
+    const ws = await opening?.catch(() => undefined);
+    if (ws) {
+      this.clocks(ws, false);
+      hostFor(ws.pelago.registry).stop();
+      await ws.pelago.db.close().catch(() => {});
+    }
+    await this.closing.get(id)?.catch(() => {});
+    const control = await this.control();
+    await removeWorkspace(control, id);
+    for (const key of [`member_limit:${id}`, `server_pack_made:${id}`]) await takeControlValue(control, key);
+    await control.query(`delete from github_installation where workspace = $1`, [id]);
+    await setEnded(control, id, null);
+    this.known.delete(id);
+    rmSync(join(this.config.rootDir, id), { recursive: true, force: true });
+    if (this.config.backupsDir) rmSync(join(this.config.backupsDir, id), { recursive: true, force: true });
+    if (this.config.databaseUrl) await dropDatabaseFor(this.config.databaseUrl, id);
+  }
+
+  /** Delete every ended workspace whose day has come. Returns those deleted. */
+  async deleteDue(now = new Date()): Promise<string[]> {
+    const due = await dueForDeletion(await this.control(), now);
+    for (const id of due) {
+      await this.delete(id);
+      console.log(`deleted the ended workspace ${id}`);
+    }
+    return due;
+  }
+
   async closeAll(): Promise<void> {
+    clearTimeout(this.deleting);
+    this.deleting = undefined;
     for (const opening of this.open.values()) {
       const ws = await opening.catch(() => undefined);
       if (ws) {

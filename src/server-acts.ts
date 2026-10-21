@@ -6,6 +6,7 @@
 import { setControlValue, controlValue } from './control.ts';
 import { normalEmail, sendMail } from './mail.ts';
 import { admitMember, linkFor, memberOf, setMemberLimit } from './members.ts';
+import { setEnded } from './ended.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
 import { validWorkspaceId } from './auth.ts';
 import type { Workspaces } from './workspaces.ts';
@@ -74,6 +75,25 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       await setMemberLimit(owner.db, ws.id, members === null ? null : { members, ...(note && { note }), ...(plan && { plan }), ...(manage && { manage }) });
       await log(members === null ? `Lifted the member limit of "${ws.name}"` : `Set "${ws.name}" to at most ${members} member${members === 1 ? '' : 's'}`, { workspace: ws.id, members });
       return { workspace: ws.id, members };
+    }
+    case 'workspace.end': {
+      // Ended, the workspace is read-only and deleted after `days`; ended: false makes it writable again.
+      const ws = await itsOwn(at, pack.id, input.workspace);
+      if (input.ended === false) {
+        await setEnded(owner.db, ws.id, null);
+        await log(`"${ws.name}" is writable again`, { workspace: ws.id });
+        return { workspace: ws.id, ended: false };
+      }
+      const days = Number(input.days ?? 30);
+      if (!(Number.isInteger(days) && days >= 1 && days <= 365)) throw new Error('days: a whole number from 1 to 365.');
+      const note = input.note == null || input.note === '' ? undefined : text(input.note, 300, 'The note');
+      const manage = input.manage == null || input.manage === '' ? undefined : text(input.manage, 500, 'The manage link');
+      if (manage && !/^https:\/\/[^\s"<>]+$/.test(manage)) throw new Error('The manage link is an https address.');
+      const since = new Date();
+      const ended = { since: since.toISOString(), delete_at: new Date(since.getTime() + days * 86_400_000).toISOString(), ...(note && { note }), ...(manage && { manage }) };
+      await setEnded(owner.db, ws.id, ended);
+      await log(`"${ws.name}" ended: read-only, deleted on ${ended.delete_at.slice(0, 10)}`, { workspace: ws.id, delete_at: ended.delete_at });
+      return { workspace: ws.id, ended: true, delete_at: ended.delete_at };
     }
     case 'signin.link': {
       const ws = await itsOwn(at, pack.id, input.workspace);
