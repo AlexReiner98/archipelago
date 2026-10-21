@@ -227,8 +227,10 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const about = told ? [...new Set(told.beats.flatMap((b) => b.about))] : [];
   const beatsOf = (id: string) => (told ? told.beats.filter((b) => b.about.includes(id)).map((b) => b.n) : []);
   // A style is passed on as it is kept: only the page that draws reads it. The packs' presets, then the workspace's, the item's kind's, the item's, this view's, one named.
-  const hubType = hub === undefined ? undefined : all.get(hub)?.type;
-  const { style, used: drawn } = await styleFor(l, styles, { ...(hubType && { hub: { id: hub!, type: hubType } }), ...(view && { view: view.id }), named: input.style });
+  // Asked for by its id alone (in a document), a view is drawn as the item it starts from is.
+  const styled = hub ?? start;
+  const hubType = styled === undefined ? undefined : all.get(styled)?.type;
+  const { style, used: drawn } = await styleFor(l, styles, { ...(hubType && { hub: { id: styled!, type: hubType } }), ...(view && { view: view.id }), named: input.style });
   // What holds an item is drawn as a flow, whatever the item's own pictures are drawn as.
   if (holding) (delete style.code, (style.shape = 'flow'));
   // And when things happen, as a calendar of days, each person a lane.
@@ -266,7 +268,13 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const leads = new Map<string, string[]>();
   for (const r of relations) if (r.type === asked.by && r.from_id !== r.to_id && standing.has(r.from_id) && standing.has(r.to_id)) leads.set(r.from_id, [...(leads.get(r.from_id) ?? []), r.to_id]);
   const parent = new Map<string, string>();
-  const holder = (id: string) => leads.get(id)?.find((p) => leads.has(p)) ?? leads.get(id)?.[0];
+  // Of the things it is part of, the one inside another of them is the nearer; failing that, one inside something.
+  const above = (from: string, seek: string, seen = new Set<string>()): boolean =>
+    (leads.get(from) ?? []).some((up) => up === seek || (!seen.has(up) && seen.size < 64 && (seen.add(up), above(up, seek, seen))));
+  const holder = (id: string) => {
+    const ups = leads.get(id);
+    return ups?.find((p) => ups.some((q) => q !== p && above(p, q))) ?? ups?.find((p) => leads.has(p)) ?? ups?.[0];
+  };
   for (const id of eligible.keys()) {
     // Up past what is not of the kinds kept, to the nearest thing that is.
     let up = holder(id);

@@ -16,14 +16,14 @@ import type { Archipelago } from './pelago.ts';
 const ID = /^e_[a-z0-9]{8}$/;
 
 /** The types a document is read whole as and can be public: a flavour that cannot be (an invoice) is left out. */
-const readable = (l: Archipelago) => l.registry.drawnWith('document').filter((t) => t !== SHARED && l.registry.type(t)?.public);
+export const readable = (l: Archipelago) => l.registry.drawnWith('document').filter((t) => t !== SHARED && l.registry.type(t)?.public);
 
 /** A public document as anyone reads it, or null when there is no such public document. */
-export async function publicDocument(l: Archipelago, id: string) {
+export async function publicDocument(l: Archipelago, id: string, elsewhere?: Map<string, string>) {
   if (!ID.test(id)) return null;
   const { rows } = await l.forAnyone().db.query<{ doc: Given | null }>(`select pelago_public_document($1, $2::text[]) as doc`, [id, readable(l)]);
   const doc = rows[0]?.doc;
-  return doc ? forReader(l, doc) : null;
+  return doc ? forReader(l, doc, undefined, elsewhere) : null;
 }
 
 /** The figure of one section a public document shows, or null. */

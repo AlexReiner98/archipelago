@@ -159,10 +159,12 @@ export interface Given {
  * What a reader from outside the map is given of a document: an item it does not bring in is not named either, so
  * where a text points at one the reader is told less, not more. `via` marks each section as read through that share.
  */
-export function forReader(l: Archipelago, doc: Given, via?: string) {
-  const shown = new Set(doc.items.map((item) => item.id));
+export function forReader(l: Archipelago, doc: Given, via?: string, elsewhere: Map<string, string> = new Map()) {
+  // Named as well as shown: other documents a reader can open where they are (a published one's pages), by title.
+  const shown = new Set([...doc.items.map((item) => item.id), ...elsewhere.keys()]);
   const scrub = (text: string) => text.replace(/[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g, (found, id) => (shown.has(id) ? found : ''));
   const items = new Map(doc.items.map((item) => [item.id, { ...item, body: scrub(item.body), ...(via && { via }) }]));
   const parts = assemble(doc.body, items).flatMap((part): Part[] => ('missing' in part ? [] : 'text' in part ? [{ text: scrub(part.text) }] : [part]));
-  return { type: doc.type, title: doc.title, status: doc.status, fields: shownOf(l, doc.type, doc.props), updated_at: doc.updated_at, parts };
+  const named = [...elsewhere].filter(([id]) => parts.some((part) => ('text' in part ? part.text : 'section' in part ? part.section.body : '').includes(id)));
+  return { type: doc.type, title: doc.title, status: doc.status, fields: shownOf(l, doc.type, doc.props), updated_at: doc.updated_at, parts, ...(named.length && { links: Object.fromEntries(named) }) };
 }

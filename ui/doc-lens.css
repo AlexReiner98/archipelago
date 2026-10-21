@@ -1,0 +1,19 @@
+/* A picture in a published document (ui/doc-lens.js): the lens's colours read from the page's, as in the app
+   (ui/style.css, .lens-view), and the few controls its shapes put over it. Every value is the style's. */
+.doc-lens .lens-view {
+  --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
+  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn);
+  border: var(--border-1) solid var(--reader-line); border-radius: var(--radius-3); overflow: hidden; font-family: var(--ln-font);
+}
+.doc-lens .toolbar { display: flex; gap: var(--space-5); align-items: center; padding: var(--space-6) var(--space-8); background: var(--panel); border-bottom: var(--border-1) solid var(--reader-line); }
+.doc-lens .grow { flex: 1; min-width: 0; }
+.doc-lens .switch { display: inline-flex; }
+.doc-lens button { font: inherit; font-size: var(--text-3); padding: var(--space-3) var(--space-6); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--edge); border-radius: var(--radius-2); cursor: pointer; }
+.doc-lens button.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.doc-lens .pill { font-size: var(--text-1); padding: var(--space-1) var(--space-5); border-radius: var(--radius-4); white-space: nowrap; background: var(--accent-soft); color: var(--accent); }
+.doc-lens .lens-said { margin: 0 0 var(--space-5); font-size: var(--reader-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-lens .lens-said[hidden] { display: none; }
+/* A picture in time colours each thing by its kind, as the app's pages do (ui/style.css). */
+.doc-lens .group-actor .dot { fill: var(--g-actor); } .doc-lens .group-aim .dot { fill: var(--g-aim); } .doc-lens .group-work .dot { fill: var(--g-work); }
+.doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }
+.doc-lens .group-place .dot { fill: var(--g-place); } .doc-lens .group-system .dot { fill: var(--g-system); }

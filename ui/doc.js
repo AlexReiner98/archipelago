@@ -7,6 +7,7 @@ const here = location.pathname.replace(/\/+$/, '');
 // Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in; from a link (/s/...), with the link;
 // made public (/p/<workspace>/<id>), as anyone.
 const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
+const published = here.startsWith('/p/');
 const token = () => {
   try {
     return localStorage.getItem('pelago-token') ?? '';
@@ -37,7 +38,11 @@ function h(tag, attrs, ...kids) {
 
 const day = (ts) => new Date(ts).toLocaleDateString(undefined, { dateStyle: 'long' });
 
-/** A line's words, with addresses on the web as links, **strong** as strong, and a section's id as a way to it. */
+/** Other published documents a published one names, by id, with their titles: each is read at its own page beside this one. */
+let away = new Map();
+const pageOf = (id) => (own ? `/read/${id}` : here.replace(/[^/]+$/, id));
+
+/** A line's words, with addresses on the web as links, **strong** as strong, and a section's or another published document's id as a way to it. */
 function inline(text, titles) {
   const out = [];
   const pattern = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s)]+[^\s).,;:])|\*\*([^*]+)\*\*|\b(e_[a-z0-9]{8})\b/g;
@@ -47,7 +52,7 @@ function inline(text, titles) {
     if (m[1]) out.push(h('a', { href: m[2], rel: 'noopener noreferrer', target: '_blank' }, m[1]));
     else if (m[3]) out.push(h('a', { href: m[3], rel: 'noopener noreferrer', target: '_blank' }, m[3].replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')));
     else if (m[4]) out.push(h('strong', {}, m[4]));
-    else out.push(titles.has(m[5]) ? h('a', { href: `#${m[5]}` }, titles.get(m[5])) : '');
+    else out.push(titles.has(m[5]) ? h('a', { href: `#${m[5]}` }, titles.get(m[5])) : away.has(m[5]) ? h('a', { href: pageOf(m[5]) }, away.get(m[5])) : '');
     at = m.index + m[0].length;
   }
   out.push(text.slice(at));
@@ -177,26 +182,37 @@ function draw(d) {
   paint();
   document.title = d.type === INVOICE && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
+  away = new Map(Object.entries(d.links ?? {}));
   const sections = d.parts.filter((p) => p.section);
+  const part = (p) =>
+    p.section
+      ? h(
+          'section',
+          { id: p.section.id },
+          h('h2', {}, p.section.title),
+          // A lens published with the document is its picture, drawn from what was frozen; otherwise a section shows its figure.
+          d.lenses?.[p.section.id]
+            ? h('div', { class: 'doc-lens', 'data-lens': p.section.id })
+            : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
+          blocks(p.section.body, titles, 3),
+        )
+      : h('div', { class: 'text' }, blocks(p.text, titles, 2));
+  // What it opens on is read before its contents: the point first, then the way through it.
+  const opening = 'text' in (d.parts[0] ?? {}) ? 1 : 0;
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
-    d.type === INVOICE ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, `Updated ${day(d.updated_at)}`)),
+    d.type === INVOICE ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
+    d.parts.slice(0, opening).map(part),
     sections.length > 2 && h('nav', { class: 'contents' }, h('ol', {}, sections.map((p) => h('li', {}, h('a', { href: `#${p.section.id}` }, p.section.title))))),
-    d.parts.map((p) =>
-      p.section
-        ? h(
-            'section',
-            { id: p.section.id },
-            h('h2', {}, p.section.title),
-            p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
-            blocks(p.section.body, titles, 3),
-          )
-        : h('div', { class: 'text' }, blocks(p.text, titles, 2)),
-    ),
-    h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
+    d.parts.slice(opening).map(part),
+    // A published page is read on the web: only a link's or an invoice's has a way to print it.
+    !published && h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.type === INVOICE);
+  // Its pictures are drawn by the app's own shapes, loaded only when there is one to draw.
+  const pictures = [...main.querySelectorAll('[data-lens]')];
+  if (pictures.length) import('/doc-lens.js').then((m) => pictures.forEach((el) => m.drawFrozen(el, d.lenses[el.dataset.lens], d.types)));
   // Read with the reader's sign-in, a figure is fetched the same way.
   if (own) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }

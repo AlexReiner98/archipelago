@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { describe, publicDocument } from '../src/public-document.ts';
+import { gist } from '../src/published.ts';
 import { serve } from './serve.ts';
 
 // A one-pixel PNG.
@@ -35,8 +36,13 @@ test('a document a human makes public is read by anyone at its own address, with
   assert.equal(asked.result.status, 'proposed');
   assert.equal((await fetch(`${base}/p/default/${d}/data`)).status, 404);
 
-  // A human's applies, and the page is there, for anyone and for a search engine.
+  // A human's applies, but nothing is read until it is published: what anyone reads is a published revision.
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, visibility: 'public' }] });
+  assert.equal((await fetch(`${base}/p/default/${d}/data`)).status, 404);
+  // Only a human publishes.
+  assert.notEqual((await call('/agent/publish', undefined, { id: d })).status, 200);
+  assert.equal((await call('/api/publish', undefined, { id: d })).status, 200);
+  // Published, the page is there, for anyone and for a search engine.
   const page = await fetch(`${base}/p/default/${d}`);
   assert.equal(page.status, 200);
   assert.equal(page.headers.get('x-robots-tag'), null);
@@ -80,6 +86,82 @@ test('a document a human makes public is read by anyone at its own address, with
   assert.equal((await fetch(`${base}/p/default/${d}`)).status, 404);
   assert.equal((await fetch(`${base}/p/default/${d}/data`)).status, 404);
   assert.equal((await fetch(`${base}/p/default/${d}/picture/${s}`)).status, 404);
+});
+
+test('a published document reads as it was published until it is published again, its pictures frozen', async () => {
+  const { call, base } = await serve('off');
+  const made = (
+    await call('/api/change', undefined, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'd', type: 'work.document', title: 'How it works', visibility: 'shared', body: 'Opening words.\n\n{s}\n\n{l}' },
+        { op: 'create', ref: 's', type: 'work.note', title: 'A section', visibility: 'shared', body: 'As first written.' },
+        { op: 'create', ref: 'f', type: 'software.feature', title: 'The system', visibility: 'shared', body: 'The whole of it.' },
+        { op: 'create', ref: 'a', type: 'work.task', title: 'A part', visibility: 'shared', body: 'Does the first thing. Then more ({b}).' },
+        { op: 'create', ref: 'b', type: 'work.task', title: 'Another part', visibility: 'shared', body: 'Does the second.' },
+        { op: 'create', ref: 'x', type: 'work.task', title: 'A private part', visibility: 'private', body: 'Never shown.' },
+        { op: 'create', ref: 'l', type: 'lens', title: 'The system, drawn', visibility: 'shared', status: 'current', props: { far: 2 } },
+        { op: 'link', type: 'about', from: 'l', to: 'f' },
+        { op: 'link', type: 'part_of', from: 'a', to: 'f' },
+        { op: 'link', type: 'part_of', from: 'b', to: 'f' },
+        { op: 'link', type: 'part_of', from: 'x', to: 'f' },
+        { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
+        { op: 'link', type: 'part_of', from: 's', to: 'd' },
+        { op: 'link', type: 'part_of', from: 'l', to: 'd' },
+      ],
+    })
+  ).result.created;
+  const { d, s, l, a, x } = made;
+  assert.equal((await call('/api/published', undefined, { id: d })).result.published, false);
+  assert.equal((await call('/api/publish', undefined, { id: d })).status, 200);
+  const read = async () => (await (await fetch(`${base}/p/default/${d}/data`)).json()) as { published_at: string; parts: { section?: { id: string; body: string } }[]; lenses: Record<string, { items: { id: string; title: string; gist: string; state: { waits_on: unknown[]; sessions: number } }[]; viewer: unknown }> };
+  const first = await read();
+  assert.ok(first.published_at);
+  const picture = first.lenses[l];
+  assert.ok(picture, 'a lens it holds is frozen with it');
+  assert.deepEqual(picture.items.map((i) => i.title).sort(), ['A part', 'Another part', 'The system']);
+  assert.equal(picture.items.find((i) => i.id === a)!.gist, 'Does the first thing.');
+  assert.equal(picture.viewer, null);
+  assert.ok(!JSON.stringify(first).includes(x) && !JSON.stringify(first).includes('Never shown'), 'nothing private is frozen');
+
+  // The draft is changed: nothing public changes, and the owner is told the draft says something else.
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: s, body: 'Rewritten.' }] });
+  assert.equal((await read()).parts.find((p) => p.section?.id === s)!.section!.body, 'As first written.');
+  assert.equal((await call('/api/published', undefined, { id: d })).result.changed, true);
+  await call('/api/publish', undefined, { id: d });
+  assert.equal((await read()).parts.find((p) => p.section?.id === s)!.section!.body, 'Rewritten.');
+  assert.equal((await call('/api/published', undefined, { id: d })).result.changed, false);
+
+  // Unpublished, its address answers nothing and it is shared again.
+  await call('/api/unpublish', undefined, { id: d });
+  assert.equal((await fetch(`${base}/p/default/${d}/data`)).status, 404);
+  assert.equal((await call('/api/get', undefined, { id: d })).result.entity.visibility, 'shared');
+});
+
+test('a published document links to the other published documents it names, and to nothing else', async () => {
+  const { call, base } = await serve('off');
+  const { a, b, c } = (
+    await call('/api/change', undefined, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'a', type: 'work.document', title: 'First steps', visibility: 'shared', body: 'Start here.' },
+        { op: 'create', ref: 'c', type: 'work.document', title: 'Not out yet', visibility: 'shared', body: 'A draft.' },
+        { op: 'create', ref: 'b', type: 'work.document', title: 'Going further', visibility: 'shared', body: 'After {a}, read on. Later: {c}.' },
+      ],
+    })
+  ).result.created;
+  await call('/api/publish', undefined, { id: a });
+  await call('/api/publish', undefined, { id: b });
+  const read = (await (await fetch(`${base}/p/default/${b}/data`)).json()) as { links?: Record<string, string>; parts: { text?: string }[] };
+  assert.deepEqual(read.links, { [a]: 'First steps' });
+  assert.match(read.parts[0].text!, new RegExp(`After ${a}, read on\\. Later:\\.$`), 'a document not published is not named');
+  assert.ok(!JSON.stringify(read).includes(c));
+});
+
+test('a part is told by its first sentence, with no ids', () => {
+  assert.equal(gist('Does one thing (e_abcdefgh). Then another.\n\nMore.'), 'Does one thing.');
+  assert.equal(gist(''), '');
+  assert.ok(gist('word '.repeat(80)).endsWith('…'));
 });
 
 test('a document is described by the first paragraph it opens on, cut short', () => {
