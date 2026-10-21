@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { checkWritten } from './automation-rules.ts';
 import { judgeOps } from './rules.ts';
-import { mayWrite } from './within.ts';
+import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts';
 import { readEvents, type EventQuery } from './eventlog.ts';
@@ -260,7 +260,7 @@ export class Archipelago {
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
-    await mayWrite(this, actor, input.ops, measured);
+    await stillWritable(this.workspace); await mayWrite(this, actor, input.ops, measured);
     const { warnings } = await this.plan(input.ops);
     const me = actorId(actor);
     const claimed = input.authority;
@@ -544,7 +544,7 @@ export class Archipelago {
    * proposals, and the system's own bookkeeping (sessions).
    */
   async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority } = {}) {
-    const ops = dropExcepted(input.ops, opts.except ?? []);
+    const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(this.workspace);
     if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
     // Validate again: the map may have changed since this was proposed.
     const { warnings } = await this.plan(ops);

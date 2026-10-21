@@ -13,7 +13,7 @@ import { delimiter, join, resolve } from 'node:path';
 import { env } from './env.ts';
 
 /** The acts a server pack may ask the kernel for, each only if it declares it. */
-export const SERVER_ACTS = ['workspace.create', 'workspace.admit', 'workspace.limit', 'signin.link', 'mail.send'] as const;
+export const SERVER_ACTS = ['workspace.create', 'workspace.admit', 'workspace.limit', 'workspace.end', 'signin.link', 'mail.send'] as const;
 export type ServerAct = (typeof SERVER_ACTS)[number];
 
 const ID = /^[a-z][a-z0-9_]{0,39}$/;

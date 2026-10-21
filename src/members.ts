@@ -9,6 +9,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { createToken } from './auth.ts';
 import { controlValue, setControlValue, takeControlValue } from './control.ts';
+import { stillWritable } from './ended.ts';
 import type { Q } from './db.ts';
 import { normalEmail, sendMail } from './mail.ts';
 import { wholeMap } from './outbox.ts';
@@ -161,6 +162,7 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
       if (!email) throw new Error(`"${input.email}" is not an email address.`);
       const whole = await wholeMap(l);
       if (await memberOf(whole.db, email)) throw new Error(`${email} is a member already.`);
+      await stillWritable(l.workspace);
       await roomForOneMore(whole.db, l.workspace);
       const { rows } = await whole.db.query<{ id: string }>(`select id from entity where type = 'person' and archived_at is null and lower(props->>'email') = $1 order by created_at limit 1`, [email]);
       const person =
