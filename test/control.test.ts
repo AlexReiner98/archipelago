@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import pg from 'pg';
+import { readEnded, setEnded } from '../src/ended.ts';
 import { hashSecret } from '../src/auth.ts';
 import { controlValue, GITHUB_APP } from '../src/control.ts';
 import { GithubApp } from '../src/github-app.ts';
@@ -112,6 +113,37 @@ test('two servers on one database agree on the workspaces and on the types defin
   } finally {
     await a.closeAll();
     await b.closeAll();
+    for (const db of [name, `${name}_acme`]) await admin.query(`drop database if exists ${db} with (force)`);
+    await admin.end();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('an ended workspace whose day has come is deleted from Postgres, its database dropped, while another server has it open', { skip: !server && 'needs PELAGO_TEST_DATABASE_URL' }, async () => {
+  const { root, config } = setUp();
+  const name = `pelago_d_${randomBytes(5).toString('hex')}`;
+  const admin = new pg.Client({ connectionString: server });
+  await admin.connect();
+  await admin.query(`create database ${name}`);
+  const databaseUrl = Object.assign(new URL(server!), { pathname: `/${name}` }).toString();
+  const a = new Workspaces({ ...config, databaseUrl });
+  const b = new Workspaces({ ...config, databaseUrl });
+  const exists = async (db: string) => (await admin.query(`select 1 from pg_database where datname = $1`, [db])).rows.length > 0;
+  try {
+    await a.create('acme', 'Acme');
+    await (await b.get('acme')).pelago.db.query('select 1');
+    assert.equal(await exists(`${name}_acme`), true);
+    const control = (await a.get('default')).pelago.db;
+    await setEnded(control, 'acme', { since: new Date().toISOString(), delete_at: new Date(Date.now() + 86_400_000).toISOString() });
+    assert.deepEqual(await a.deleteDue(), [], 'not before its day');
+    assert.deepEqual(await a.deleteDue(new Date(Date.now() + 2 * 86_400_000)), ['acme']);
+    assert.equal(await exists(`${name}_acme`), false, 'its database is dropped');
+    assert.equal(await a.has('acme'), false);
+    assert.deepEqual((await b.list()).map((w) => w.id), ['default'], 'gone for the other server too');
+    assert.equal(await readEnded(control, 'acme'), undefined);
+  } finally {
+    await a.closeAll();
+    await b.closeAll().catch(() => {});
     for (const db of [name, `${name}_acme`]) await admin.query(`drop database if exists ${db} with (force)`);
     await admin.end();
     rmSync(root, { recursive: true, force: true });
