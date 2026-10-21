@@ -1,11 +1,12 @@
 // Members: the people who sign in to a workspace, each by an email address. An admin adds someone by their address;
 // they are sent an invitation, and from then on sign in by asking for a link at that address (POST /connect/sign-in).
-// The link works once, for half an hour; opened, the page trades its code (POST /connect/join) for a token that keeps
+// The link (or the code beside it, typed: POST /connect/code) works once, for half an hour; opened, the page trades
+// its code (POST /connect/join) for a token that keeps
 // that browser signed in for a month. Whether a member is an admin is kept here, on the member, so every sign-in gets
 // it; removing a member ends their sign-ins at once. The table is read only through the whole database: no member's
 // role is granted it.
 
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { createToken } from './auth.ts';
 import { controlValue, setControlValue, takeControlValue } from './control.ts';
@@ -15,7 +16,7 @@ import { normalEmail, sendMail } from './mail.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
-import { keep, take } from './transient.ts';
+import { keep, kept, take } from './transient.ts';
 
 /** How long a sign-in lasts in a browser, how long a sign-in link works, and how long an invitation does. */
 export const SIGNED_IN_DAYS = 30;
@@ -112,22 +113,59 @@ export async function linkFor(db: Q, workspace: string, email: string, ms: numbe
 export const workspaceOfCode = (code: string) => /^inv_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}$/.exec(code)?.[1];
 
 /** Trade a code for a month's token, once, if the address it was sent to is still a member. */
-export async function redeem(db: Q, workspace: string, code: string): Promise<string | undefined> {
-  const taken = await take<{ email: string }>(db, KEY + hash(code));
+export const redeem = (db: Q, workspace: string, code: string) => redeemWith(db, workspace, KEY + hash(code));
+
+// A code to type, beside each link: for a browser the mail's links do not open in, such as an agent's own. It is short
+// enough to type, so it works only with the address it was sent to, and an address is allowed a few wrong ones.
+const CODE = 'signin-code:';
+const TRIES = 'signin-tries:';
+/** The characters of a typed code: none that reads as another (0 and O, 1, I and L). */
+const LETTERS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+export const CODE_TRIES = 5;
+const typed = (code: string) => code.toUpperCase().replace(/[^0-9A-Z]/g, '');
+
+/** A one-time code that signs this member in when typed with their address, shown as two groups of four. */
+export async function codeFor(db: Q, email: string, ms: number): Promise<string> {
+  const code = Array.from({ length: 8 }, () => LETTERS[randomInt(LETTERS.length)]).join('');
+  await keep(db, CODE + hash(`${email}:${code}`), { email }, ms);
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
+/**
+ * Trade a typed code for a month's token in the workspace it was sent for, once. Wrong ones are counted per address in
+ * the server's own database (control), and past CODE_TRIES nothing is traded for that address until the count runs out.
+ */
+export async function redeemTyped(workspaces: { id: string; db: () => Promise<Q> }[], control: Q, email: string, code: string): Promise<{ token: string } | 'gone' | 'tries'> {
+  const tries = (await kept<number>(control, TRIES + email)) ?? 0;
+  if (tries >= CODE_TRIES) return 'tries';
+  for (const ws of workspaces) {
+    const db = await ws.db();
+    if (!(await memberOf(db, email))) continue;
+    const token = await redeemWith(db, ws.id, CODE + hash(`${email}:${typed(code)}`));
+    if (token) return { token };
+  }
+  await keep(control, TRIES + email, tries + 1, LINK_MINUTES * 60_000);
+  return 'gone';
+}
+
+async function redeemWith(db: Q, workspace: string, key: string): Promise<string | undefined> {
+  const taken = await take<{ email: string }>(db, key);
   const member = taken && (await memberOf(db, taken.value.email));
   if (!member) return undefined;
   return (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
 }
 
 /**
- * Someone asks to sign in at an address: one mail, with a link for each workspace it is a member of. Nothing is
- * said back either way, so the page cannot be used to learn who is a member where.
+ * Someone asks to sign in at an address: one mail, with a link and a code for each workspace it is a member of.
+ * Nothing is said back either way, so the page cannot be used to learn who is a member where.
  */
 export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string, origin: string): Promise<void> {
   const links: string[] = [];
   for (const ws of workspaces) {
     const db = await ws.db();
-    if (await memberOf(db, email)) links.push(`${ws.name}:\n${await linkFor(db, ws.id, email, LINK_MINUTES * 60_000, origin)}`);
+    if (!(await memberOf(db, email))) continue;
+    const ms = LINK_MINUTES * 60_000;
+    links.push(`${ws.name}:\n${await linkFor(db, ws.id, email, ms, origin)}\nOr type this code on the sign-in page: ${await codeFor(db, email, ms)}`);
   }
   if (!links.length) return;
   await sendMail({
@@ -135,9 +173,9 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
     subject: 'Your Archipelago sign-in link',
     text: [
       'Hello,',
-      `Here is the link you asked for to sign in to Archipelago. It works once, for the next ${LINK_MINUTES} minutes, and keeps this browser signed in for ${SIGNED_IN_DAYS} days.`,
+      `Here is the link you asked for to sign in to Archipelago. Open it, or type its code on the page where you asked. Either works once, for the next ${LINK_MINUTES} minutes, and keeps that browser signed in for ${SIGNED_IN_DAYS} days.`,
       links.join('\n\n'),
-      'If you did not ask to sign in, you can ignore this email: nobody can sign in without the link.',
+      'If you did not ask to sign in, you can ignore this email: nobody can sign in without the link or its code.',
       '- Archipelago',
     ].join('\n\n'),
   });

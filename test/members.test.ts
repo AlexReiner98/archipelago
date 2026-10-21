@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
+import { CODE_TRIES } from '../src/members.ts';
 import { codeSentTo, mailbox, serve } from './serve.ts';
 
 test('an admin adds a member by email; the invitation signs them in once, for a month, as an admin or not', async () => {
@@ -61,6 +62,26 @@ test('anyone may ask for a sign-in link at an address, and is told nothing of wh
   const codes = [...sent[0].text.matchAll(/#\/join\/(\S+)/g)].map((m) => m[1]);
   const into = await Promise.all(codes.map(async (code) => (await call('/whoami', (await call('/connect/join', undefined, { code })).token, undefined, 'GET')).workspace.id));
   assert.deepEqual(into, ['default', 'acme']);
+});
+
+test('a code from the sign-in mail, typed with its address, signs in once; a few wrong ones and the address waits', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const main = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  await call('/api/member_add', main, { email: 'kim@example.com', name: 'Kim' });
+  const before = mailbox.length;
+  await call('/connect/sign-in', undefined, { email: 'kim@example.com' });
+  await new Promise((r) => setTimeout(r, 200));
+  const code = /type this code on the sign-in page: ([0-9A-Z]{4}-[0-9A-Z]{4})/.exec(mailbox.slice(before)[0].text)![1];
+
+  assert.equal((await call('/connect/code', undefined, { email: 'someone@example.com', code })).status, 410, 'only with the address it was sent to');
+  const signed = await call('/connect/code', undefined, { email: 'Kim@Example.com', code: ` ${code.toLowerCase().replace('-', ' ')} ` });
+  assert.equal(signed.status, 200, 'typed loosely: any case, spaces for the dash');
+  const who = await call('/whoami', signed.token, undefined, 'GET');
+  assert.deepEqual([who.workspace.id, who.actor.name], ['default', 'kim@example.com']);
+  assert.equal((await call('/connect/code', undefined, { email: 'kim@example.com', code })).status, 410, 'a code works once');
+
+  for (let i = 1; i < CODE_TRIES; i++) assert.equal((await call('/connect/code', undefined, { email: 'kim@example.com', code: 'AAAA-AAAA' })).status, 410);
+  assert.equal((await call('/connect/code', undefined, { email: 'kim@example.com', code: 'AAAA-AAAA' })).status, 429, 'past the tries, the address waits');
 });
 
 test('an admin changes a member’s standing or removes them, and their sign-ins follow at once', async () => {
