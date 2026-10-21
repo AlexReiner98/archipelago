@@ -159,6 +159,8 @@ export const idsAsLinks = (text) => {
   }
   return [...out, text.slice(from)];
 };
+/** The item ids a text names, each once: what idsAsLinks will need a name for. */
+export const idsIn = (text) => [...new Set(text.match(/\be_[a-z0-9]{8}\b/g) ?? [])];
 export const link = (e) => (e ? (titles.set(e.id, e.title), h('a', { href: `#/e/${e.id}` }, e.title)) : h('span', { class: 'muted' }, '(missing)'));
 
 /** The usual one-line rendering of an entity. */
