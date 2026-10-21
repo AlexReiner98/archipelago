@@ -108,7 +108,8 @@ export async function workspace() {
           ),
         ),
       ),
-      me.actor.admin && membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, say }),
+      // A workspace for one person (its limit is one, and it has no more) has no members to manage.
+      me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, say }),
       me.actor.admin &&
         h(
           'section',
