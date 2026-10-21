@@ -168,7 +168,8 @@ export function githubCard() {
       if (s.connected && !(await ask({ title: 'Make a new secret?', message: 'The one GitHub has now stops working until you replace it in each repository\'s webhook.', action: 'New secret', danger: true }))) return;
       draw(await api('github', { new_secret: true })).catch(fail);
     };
-    body.replaceChildren(
+    // Through a div, so that a part left out (false) is skipped, not printed.
+    body.replaceChildren(h('div', {},
       appBar || '',
       reading || '',
       made?.secret
@@ -199,7 +200,7 @@ export function githubCard() {
       ),
       (s.connected || !appBar) && h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, s.connected && h('code', { class: 'grow' }, url), h('button', { title: 'A webhook added by hand in each repository, signed with a secret made here', class: s.connected ? '' : 'primary', onclick: fresh }, s.connected ? 'New secret' : 'Connect GitHub')),
       appBar && !s.connected && h('div', { style: 'height: var(--space-7)' }),
-    );
+    ));
   };
   const fail = (err) => body.replaceChildren(h('div', { class: 'error' }, err.message));
   draw().catch(fail);
