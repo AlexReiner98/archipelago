@@ -133,6 +133,11 @@ export function leanTools(callTool: Call, app: GithubApp, repo: Repo, push: Push
         const op: Record<string, unknown> = { op: 'update', id: String(input.id ?? '') };
         for (const k of ['status', 'title', 'append'] as const) if (typeof input[k] === 'string' && input[k]) op[k] = input[k];
         if (Object.keys(op).length === 2) throw new Error('Say what to change: status, title or append.');
+        // What it already is, it is not set to again: an update that changes nothing is no reading of the push.
+        const now = ((await callTool(l, actor, 'get', { id: op.id })) as { entity: { status: string; title: string } }).entity;
+        if (op.status === now.status) delete op.status;
+        if (op.title === now.title) delete op.title;
+        if (Object.keys(op).length === 2) throw new Error(`Nothing to change: ${op.id} is already "${now.title}" [${now.status}]. Leave it.`);
         return change(l, actor, input.why, [op]);
       }
       case 'create': {
