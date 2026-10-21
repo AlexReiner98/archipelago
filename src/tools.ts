@@ -32,7 +32,7 @@ import { keep, kept as keptFor, take } from './transient.ts';
 import { type Focus, listening, point as setFocus, presence, tellStamp, took } from './presence.ts';
 
 const props = z.record(z.string(), z.unknown());
-const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page; only a project, feature, release, proof question, test or test result can be, and only a human makes it so (from an agent it waits as a proposal).');
+const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page, or a document at its own address (/p/<workspace>/<id>) with the sections it holds; only a project, feature, release, proof question, test, test result or document can be, and only a human makes it so (from an agent it waits as a proposal).');
 const confidence = z.number().min(0).max(1);
 const field = z.object({
   type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'url', 'enum', 'json']),

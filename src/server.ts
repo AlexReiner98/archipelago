@@ -48,7 +48,7 @@ import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
-import { publicPage, publicPicture } from './public.ts'; import { lengthsSheet, pageLook } from './styles.ts';
+import { servePublic } from './public-route.ts'; import { lengthsSheet, pageLook } from './styles.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
@@ -197,29 +197,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       if (/^\/(connect|x)\//.test(url.pathname)) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, open), body: () => readJson(req), raw: () => readBody(req) });
 
-      // A product's public page: open to anyone, on any name this server has. It is read as the public role sees the
-      // map, so there is nothing here to guard: what is not public is not there to be found.
+      // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
-      if (pub) {
-        if (tooOften(req, res, open)) return;
-        const [, wsId, product, what, extra] = pub;
-        const guard = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
-        if (!what) {
-          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
-          return res.end(await readFile(join(UI_DIR, 'public.html')));
-        }
-        const none = () => res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
-        if (!(await workspaces.has(wsId))) return none();
-        const { pelago } = await workspaces.get(wsId);
-        if (what === 'data') {
-          const page = await publicPage(pelago, product, url.searchParams.get('build') ?? undefined);
-          if (!page) return none();
-          return res.writeHead(200, { ...guard, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
-        }
-        const picture = extra ? await publicPicture(pelago, extra) : null;
-        if (!picture) return none();
-        return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
-      }
+      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named }));
 
       // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
       // the page is never cached, never framed and never says where it was read from. What it shows is read through one

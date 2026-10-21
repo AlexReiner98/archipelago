@@ -85,7 +85,7 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   assert.deepEqual(plan.on, ['work']);
   assert.ok(plan.input, 'the form is drawn from its input');
   // What can be made public is said by the types themselves, and a flavour inherits it.
-  assert.deepEqual(schema.types.filter((t) => t.public).map((t) => t.id).sort(), ['software.feature', 'software.proof', 'software.release', 'software.test', 'software.test_result', 'work.project']);
+  assert.deepEqual(schema.types.filter((t) => t.public).map((t) => t.id).sort(), ['software.feature', 'software.proof', 'software.release', 'software.test', 'software.test_result', 'work.document', 'work.project']);
 
   const dir = packs();
   const bad = (screens: unknown[]) => {

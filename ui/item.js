@@ -213,11 +213,11 @@ export async function entity(id, here) {
           e.visibility !== 'public' && [
             'Make public',
             async () =>
-              (await ask({ title: `Make "${e.title}" public?`, message: 'Anyone will be able to see its name and state, with no login. A proof question brings its tests and their results. Notes and history stay private.', action: 'Make public', danger: true })) &&
+              (await ask({ title: `Make "${e.title}" public?`, message: doc ? 'Anyone will be able to read it at its own address, with no login, and search engines to list it: its text and the sections it holds that are shared with the workspace. History stays private.' : 'Anyone will be able to see its name and state, with no login. A proof question brings its tests and their results. Notes and history stay private.', action: 'Make public', danger: true })) &&
               change([{ op: 'update', id, visibility: 'public' }], 'Made public in the UI'),
           ],
         publishable && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
-        e.visibility === 'public' && type?.public && type.kind === 'work' && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
+        e.visibility === 'public' && type?.public && (type.kind === 'work' || doc) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
         ...(doc ? documentMenu(e, links, page, again, doc) : []),
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
