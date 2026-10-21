@@ -7,8 +7,20 @@ import { packsCard } from './packs.js';
 import { ago, when } from './words.js';
 import { scopePills } from './token-piece.js';
 import { membersCard } from './members-card.js';
+import { planCard } from './plan-card.js';
 import { modelCard } from './model-card.js';
-import { backupCard, connectBox, githubCard, operatorCard, ownerCard, secretBox, serverPacksCard } from './workspace-cards.js';
+import { backupCard, connectBox, githubCard, ownerCard, secretBox, serverPacksCard } from './workspace-cards.js';
+
+/** A card a step of Start here (ui/start.js) leads to, as #/workspace?at=<step>. */
+const at = (step, card) => (card && (card.dataset.at = step), card);
+
+/** Bring the card asked for into view, once the cards that load their own content have their height. */
+function seek() {
+  const step = new URLSearchParams(location.hash.split('?')[1] ?? '').get('at');
+  if (!step) return;
+  history.replaceState(null, '', '#/workspace');
+  setTimeout(() => document.querySelector(`[data-at="${CSS.escape(step)}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 400);
+}
 
 export async function workspace() {
   const main = part('workspace');
@@ -74,7 +86,9 @@ export async function workspace() {
       me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
       me.actor.admin && screensCard(workspace),
       me.actor.admin && stylesCard(workspace),
-      h(
+      at(
+        'agent',
+        h(
         'section',
         { class: 'card wide' },
         h('header', {}, h('h2', { class: 'hinted', title: 'An agent with one of these acts for you: it sees what you see and proposes to you.' }, 'Agent tokens')),
@@ -107,8 +121,11 @@ export async function workspace() {
             'Token only',
           ),
         ),
+        ),
       ),
-      me.actor.admin && membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, say }),
+      me.actor.admin && planCard(info.member_limit, members.length),
+      // A workspace for one person (its limit is one, and it has no more) has no members to manage.
+      me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, say })),
       me.actor.admin &&
         h(
           'section',
@@ -150,9 +167,9 @@ export async function workspace() {
             ),
           ),
         ),
-      me.actor.admin && modelCard(),
-      me.actor.admin && githubCard(),
-      operatorCard(info.id),
+      me.actor.admin && at('model', modelCard()),
+      me.actor.admin && at('github', githubCard()),
     ),
   );
+  seek();
 }

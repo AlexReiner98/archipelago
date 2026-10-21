@@ -68,7 +68,10 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       const members = input.members === null ? null : Number(input.members);
       if (members !== null && !(Number.isInteger(members) && members >= 1 && members <= 10_000)) throw new Error('members: a whole number from 1, or null to lift the limit.');
       const note = input.note == null || input.note === '' ? undefined : text(input.note, 300, 'The note');
-      await setMemberLimit(owner.db, ws.id, members === null ? null : { members, ...(note && { note }) });
+      const plan = input.plan == null || input.plan === '' ? undefined : text(input.plan, 40, 'The plan');
+      const manage = input.manage == null || input.manage === '' ? undefined : text(input.manage, 500, 'The manage link');
+      if (manage && !/^https:\/\/[^\s"<>]+$/.test(manage)) throw new Error('The manage link is an https address.');
+      await setMemberLimit(owner.db, ws.id, members === null ? null : { members, ...(note && { note }), ...(plan && { plan }), ...(manage && { manage }) });
       await log(members === null ? `Lifted the member limit of "${ws.name}"` : `Set "${ws.name}" to at most ${members} member${members === 1 ? '' : 's'}`, { workspace: ws.id, members });
       return { workspace: ws.id, members };
     }
