@@ -43,3 +43,39 @@ language sql stable security definer set search_path = public as $fn$
 $fn$;
 grant execute on function pelago_public_document(text, text[]), pelago_public_document_picture(text, text[], text) to pelago_public;
 `;
+
+/** Step 10 (src/migrate.ts): what a public document said when it was last published, read in place of the map. */
+export const PUBLISHED = `
+-- A document as it was published: what a reader is given of it (its text, its sections, its pictures' data), frozen
+-- by the person who published it. The draft is edited on the map; nothing public changes until it is published again.
+create table if not exists published (
+  entity_id    text primary key references entity(id),
+  workspace    text not null default 'default',
+  given        jsonb not null,
+  published_by text not null,
+  published_at timestamptz not null default now()
+);
+grant select, insert, update, delete on published to pelago_member;
+alter table published enable row level security;
+drop policy if exists member_published on published;
+create policy member_published on published for all to pelago_member
+  using (entity_id in (select id from entity))
+  with check (entity_id in (select id from entity));
+
+-- A published document as anyone reads it: its revision, while the document is public, not archived, private to
+-- nobody and of a type read whole. Nothing of the map as it is now but those four facts.
+create or replace function pelago_published(target text, readable text[]) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select p.given || jsonb_build_object('published_at', p.published_at)
+  from published p join entity e on e.id = p.entity_id
+  where p.entity_id = target and e.visibility = 'public' and e.archived_at is null and e.private_to is null and e.type = any(readable)
+$fn$;
+-- The figure of one section a published document holds, and of nothing else.
+create or replace function pelago_published_picture(target text, readable text[], section text)
+returns table (content_type text, bytes bytea)
+language sql stable security definer set search_path = public as $fn$
+  select p.content_type, p.bytes from picture p
+  where p.entity_id = section and pelago_published(target, readable) -> 'sections' ? section
+$fn$;
+grant execute on function pelago_published(text, text[]), pelago_published_picture(text, text[], text) to pelago_public;
+`;

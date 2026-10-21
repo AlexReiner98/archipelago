@@ -56,6 +56,22 @@ test('a lens asked for by its id alone starts from what it is kept about, and ca
   assert.equal(((await callTool(l, human, 'picture_put', { result: made.v, data: png, content_type: 'image/png' })) as { size: number }).size, 8);
 });
 
+test('a thing part of both a feature and the feature’s project is inside the feature', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'top', type: 'work.project', title: 'Everything' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Business' },
+    { op: 'create', ref: 'f', type: 'software.feature', title: 'A feature' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'A step' },
+    { op: 'link', type: 'part_of', from: 'p', to: 'top' },
+    { op: 'link', type: 'part_of', from: 'f', to: 'p' },
+    { op: 'link', type: 'part_of', from: 't', to: 'p' },
+    { op: 'link', type: 'part_of', from: 't', to: 'f' },
+  ]);
+  const answer = (await callTool(l, human, 'view', { name: 'lens', params: { from: made.f } })) as { items: { id: string; inside?: string }[] };
+  assert.equal(answer.items.find((i) => i.id === made.t)?.inside, made.f);
+});
+
 test('an item says where it sits: what it is part of, outermost first, with the views kept about each', async () => {
   const l = await fresh();
   const made = await make(l, [

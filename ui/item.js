@@ -53,6 +53,8 @@ export async function entity(id, here) {
   const story = run && e.props.story?.length ? await api('view', { name: 'story', params: { run: id } }).catch(() => null) : null;
   // An item a screen reads whole is met as its reader meets it: its text with the items it brings in, in their places.
   const { doc, links } = readWhole(e.type) ? await readDocument(id) : { doc: null, links: [] };
+  // A document is read in public as it was last published: whether it is, and whether its draft says something else now.
+  const shown = doc && !doc.from && type?.public ? await api('published', { id }).catch(() => null) : null;
   // How its page looks is its style: the house style's, its kind's (a document reads through), its own.
   const looks = (await api('view', { name: 'style', params: { of: id } })).style;
 
@@ -150,7 +152,7 @@ export async function entity(id, here) {
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row-top' }, chip(e.type), altitude && h('span', { class: 'pill', title: `How high this sits: workspace, project, stream, step` }, altitude), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.some((s) => !s.to_workspace) && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.filter((s) => !s.to_workspace).length})` }, 'shared by link'), links.filter((s) => s.to_workspace).map((s) => h('span', { class: 'pill', title: `Readable in the workspace "${s.to_workspace}" once accepted there` }, `shared with ${s.to_workspace}`)), doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`)),
+      h('div', { class: 'row-top' }, chip(e.type), altitude && h('span', { class: 'pill', title: `How high this sits: workspace, project, stream, step` }, altitude), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), shown?.published ? h('span', { class: `pill ${shown.changed ? 'warn' : 'ok'}`, title: shown.changed ? 'Its draft says something other than what anyone reads: publish it again to show them' : 'Anyone reads it as it is now, at its own address' }, shown.changed ? 'draft changed' : 'published') : e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.some((s) => !s.to_workspace) && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.filter((s) => !s.to_workspace).length})` }, 'shared by link'), links.filter((s) => s.to_workspace).map((s) => h('span', { class: 'pill', title: `Readable in the workspace "${s.to_workspace}" once accepted there` }, `shared with ${s.to_workspace}`)), doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`)),
       // Where it sits, from Home down, each step a way back up, so a person always knows how high they are; a stream or a
       // step in nothing says so, as work to file (docs/ui-strategy.md).
       h(
@@ -209,15 +211,23 @@ export async function entity(id, here) {
         workish && ['Copy session brief', copyBrief],
         workish && ['Launch a session: investigate only', () => launch('plan')],
         workish && ['Launch a session: may edit files', () => launch('acceptEdits')],
+        shown && [
+          shown.published ? 'Publish again' : 'Publish',
+          async () =>
+            (await ask({ title: `Publish "${e.title}"?`, message: 'Anyone will be able to read it at its own address, with no login, and search engines to list it: its text, the sections it holds that are shared with the workspace and its pictures, as they are now. What you change afterwards stays a draft until you publish again.', action: 'Publish', danger: !shown.published })) &&
+            api('publish', { id }).then(again, (err) => tell('It was not published', err.message)),
+        ],
+        shown?.published && ['Unpublish', async () => (await ask({ title: `Unpublish "${e.title}"?`, message: 'Its address will answer nothing; it stays shared with the workspace.', action: 'Unpublish', danger: true })) && api('unpublish', { id }).then(again, (err) => tell('It was not unpublished', err.message))],
         publishable &&
+          !shown &&
           e.visibility !== 'public' && [
             'Make public',
             async () =>
               (await ask({ title: `Make "${e.title}" public?`, message: doc ? 'Anyone will be able to read it at its own address, with no login, and search engines to list it: its text and the sections it holds that are shared with the workspace. History stays private.' : 'Anyone will be able to see its name and state, with no login. A proof question brings its tests and their results. Notes and history stay private.', action: 'Make public', danger: true })) &&
               change([{ op: 'update', id, visibility: 'public' }], 'Made public in the UI'),
           ],
-        publishable && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
-        e.visibility === 'public' && type?.public && (type.kind === 'work' || doc) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
+        publishable && !shown && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
+        e.visibility === 'public' && type?.public && (type.kind === 'work' || shown?.published) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
         ...(doc ? documentMenu(e, links, page, again, doc) : []),
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],

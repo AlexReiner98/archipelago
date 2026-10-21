@@ -180,7 +180,7 @@ function draw(d) {
   const sections = d.parts.filter((p) => p.section);
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
-    d.type === INVOICE ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, `Updated ${day(d.updated_at)}`)),
+    d.type === INVOICE ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
     sections.length > 2 && h('nav', { class: 'contents' }, h('ol', {}, sections.map((p) => h('li', {}, h('a', { href: `#${p.section.id}` }, p.section.title))))),
     d.parts.map((p) =>
       p.section
@@ -188,7 +188,10 @@ function draw(d) {
             'section',
             { id: p.section.id },
             h('h2', {}, p.section.title),
-            p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
+            // A lens published with the document is its picture, drawn from what was frozen; otherwise a section shows its figure.
+            d.lenses?.[p.section.id]
+              ? h('div', { class: 'doc-lens', 'data-lens': p.section.id })
+              : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
             blocks(p.section.body, titles, 3),
           )
         : h('div', { class: 'text' }, blocks(p.text, titles, 2)),
@@ -197,6 +200,9 @@ function draw(d) {
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.type === INVOICE);
+  // Its pictures are drawn by the app's own shapes, loaded only when there is one to draw.
+  const pictures = [...main.querySelectorAll('[data-lens]')];
+  if (pictures.length) import('/doc-lens.js').then((m) => pictures.forEach((el) => m.drawFrozen(el, d.lenses[el.dataset.lens], d.types)));
   // Read with the reader's sign-in, a figure is fetched the same way.
   if (own) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }

@@ -3,6 +3,7 @@
 
 import { z } from 'zod';
 import { createShare, listShares } from './documents.ts';
+import { publish, publishedState, unpublish } from './published.ts';
 import type { Tool } from './tools.ts';
 import { endShare, readAny, sharedFigure, shareWithWorkspace } from './workspace-share.ts';
 
@@ -37,6 +38,23 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: { id: z.string().describe('The link or share, from share_list.') },
     run: async (l, actor, input) => endShare(l, actor, input.id),
+  },
+  publish: {
+    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as pictures a reader can explore.',
+    humanOnly: true,
+    input: { id: z.string().describe('The document.') },
+    run: async (l, actor, input) => publish(l, actor, input.id),
+  },
+  unpublish: {
+    description: 'Take a published document down: its address answers nothing, and it is shared with the workspace again.',
+    humanOnly: true,
+    input: { id: z.string().describe('The document.') },
+    run: async (l, actor, input) => unpublish(l, actor, input.id),
+  },
+  published: {
+    description: 'Whether a document is published, when and by whom, and whether its draft now says something other than what is published (changed): then only a human publishing it again changes what anyone reads.',
+    input: { id: z.string().describe('The document.') },
+    run: async (l, _actor, input) => publishedState(l, input.id),
   },
   share_figure: {
     description: 'The figure of one section of a document another workspace shares with this one, as base64 with its content type, or null.',

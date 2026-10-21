@@ -1,12 +1,14 @@
-// What anyone may open at /p/<workspace>/<id>, with no login, on any name this server has: a public document, drawn
-// as a link draws one (ui/doc.html) and left for search engines to index, or a product's public page (ui/public.html).
+// What anyone may open at /p/<workspace>/<id>, with no login, on any name this server has: a public document as it
+// was last published (src/published.ts), drawn as a link draws one (ui/doc.html) and left for search engines to index, or a product's public page (ui/public.html).
 // Everything is read as the public role sees the map, so there is nothing here to guard: what is not public is not
 // there to be found.
 
 import { readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
 import { join } from 'node:path';
-import { publicDocument, publicDocumentPicture, publicHead } from './public-document.ts';
+import type { Part } from './documents.ts';
+import { publicHead } from './public-document.ts';
+import { publishedDocument, publishedPicture } from './published.ts';
 import { publicPage, publicPicture } from './public.ts';
 import { pageLook } from './styles.ts';
 import type { Workspaces } from './workspaces.ts';
@@ -23,7 +25,8 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
   const { workspace, id, what, extra } = match;
   const none = () => res.writeHead(404, { ...GUARD, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
   const pelago = (await at.workspaces.has(workspace)) ? (await at.workspaces.get(workspace)).pelago : null;
-  const doc = pelago && (await publicDocument(pelago, id));
+  // A document is read as it was last published, never as the map has it now.
+  const doc = pelago && ((await publishedDocument(pelago, id)) as { title: string; parts: Part[] } | null);
   if (!what) {
     // A public document's page carries its title, what it opens on and its address in the page itself, for a search engine.
     if (doc) {
@@ -44,7 +47,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
     return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
   }
   // A section of a public document shows its figure; anything public in its own right, its own.
-  const picture = extra ? ((doc && (await publicDocumentPicture(pelago, id, extra))) ?? (await publicPicture(pelago, extra))) : null;
+  const picture = extra ? ((doc && (await publishedPicture(pelago, id, extra))) ?? (await publicPicture(pelago, extra))) : null;
   if (!picture) return none();
   return res.writeHead(200, { ...GUARD, 'content-type': picture.content_type, 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
 }
