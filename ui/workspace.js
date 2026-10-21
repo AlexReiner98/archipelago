@@ -7,6 +7,7 @@ import { packsCard } from './packs.js';
 import { ago, when } from './words.js';
 import { scopePills } from './token-piece.js';
 import { membersCard } from './members-card.js';
+import { modelCard } from './model-card.js';
 import { backupCard, connectBox, githubCard, operatorCard, ownerCard, secretBox, serverPacksCard } from './workspace-cards.js';
 
 export async function workspace() {
@@ -17,7 +18,7 @@ export async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid' }, ownerCard(owner, workspace), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), serverPacksCard(), screensCard(workspace), stylesCard(workspace)),
+      h('div', { class: 'grid' }, ownerCard(owner, workspace), modelCard(), backupCard(workspace), packsCard({ h, api, ask, tell, then: workspace }), serverPacksCard(), screensCard(workspace), stylesCard(workspace)),
     );
   }
   const [info, tokens, people, members] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 }), me.actor.admin ? api('member_list') : []]);
@@ -149,6 +150,7 @@ export async function workspace() {
             ),
           ),
         ),
+      me.actor.admin && modelCard(),
       me.actor.admin && githubCard(),
       operatorCard(info.id),
     ),

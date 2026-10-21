@@ -1,0 +1,45 @@
+// The database's half of a public document (src/public-document.ts): what anyone with no login is given of one,
+// through a function that sees everything and gives as little as it can. Kept apart, with no imports, so the schema's
+// steps (src/migrate.ts) can be read without the code that reads them.
+
+/** Step 9 (src/migrate.ts): a public document, read by anyone with no login. */
+export const PUBLIC_DOCUMENT = `
+-- A public document as anyone reads it: the document, when it is public, not archived, private to nobody and of a type
+-- read whole (the server names those, as its packs' screens say: a project's note is never given here), and of the
+-- items its note brings in by a line holding only their id, those it holds (part_of it), with their notes, and those
+-- public in their own right, with only what is public of them: a title and a state. Nothing private, to anyone or
+-- marked so in a workspace of one: a section is shown once it is shared with the workspace.
+create or replace function pelago_public_document(target text, readable text[]) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  with d as (
+    select e.* from entity e
+    where e.id = target and e.visibility = 'public' and e.archived_at is null and e.private_to is null and e.type = any(readable)
+  ),
+  named as (
+    select distinct m[1] as id from d, regexp_matches(d.body, '^[ \\t]*(e_[a-z0-9]{8})[ \\t]*$', 'gn') as m
+  ),
+  brought as (
+    select i.*, exists (select 1 from relation r where r.type = 'part_of' and r.valid_to is null and r.from_id = i.id and r.to_id = d.id) as held
+    from entity i join named n on n.id = i.id, d
+    where i.archived_at is null and i.workspace = d.workspace and i.private_to is null and i.visibility <> 'private'
+  ),
+  items as (
+    select b.id, b.type, b.title, b.status, case when b.held then b.body else '' end as body, b.updated_at,
+           exists (select 1 from picture p where p.entity_id = b.id) as picture
+    from brought b where b.held or pelago_is_public(b.id)
+  )
+  select jsonb_build_object(
+    'id', d.id, 'type', d.type, 'title', d.title, 'body', d.body, 'status', d.status, 'props', d.props, 'updated_at', d.updated_at,
+    'items', coalesce((select jsonb_agg(to_jsonb(items)) from items), '[]'::jsonb))
+  from d
+$fn$;
+-- The figure of one item a public document shows, and of nothing else.
+create or replace function pelago_public_document_picture(target text, readable text[], section text)
+returns table (content_type text, bytes bytea)
+language sql stable security definer set search_path = public as $fn$
+  select p.content_type, p.bytes from picture p
+  where p.entity_id = section
+    and exists (select 1 from jsonb_array_elements(pelago_public_document(target, readable) -> 'items') i where i ->> 'id' = section)
+$fn$;
+grant execute on function pelago_public_document(text, text[]), pelago_public_document_picture(text, text[], text) to pelago_public;
+`;

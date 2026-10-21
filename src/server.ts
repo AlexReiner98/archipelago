@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { notify } from './notify.ts';
-import { backupAll, parseBackup } from './backup.ts'; import { configureMembers } from './members.ts';
+import { backupAll, parseBackup } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { serveConnect } from './connect.ts';
 import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
@@ -43,12 +43,12 @@ import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
-import { hasReaderKey, readPush } from './reader.ts';
+import { hasModel } from './model-account.ts'; import { readPush } from './reader.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
-import { publicPage, publicPicture } from './public.ts'; import { lengthsSheet, pageLook } from './styles.ts';
+import { servePublic } from './public-route.ts'; import { lengthsSheet, pageLook } from './styles.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
@@ -58,25 +58,25 @@ import { UI_FILES } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
-const BODY_MAX = 32_000_000;
+const BODY_MAX = 32_000_000; /** What a route open to anyone takes: a form's worth, or a webhook's delivery. */ const OPEN_BODY_MAX = 64_000, HOOK_BODY_MAX = 1_000_000;
 
 /** A request's body, refused once it is larger than any honest one: some routes read it before they know who sent it. */
-async function readBody(req: IncomingMessage): Promise<Buffer> {
-  const tooLarge = () => new Refused(413, `A request may carry ${BODY_MAX / 1_000_000} MB at most.`);
-  if (Number(req.headers['content-length'] ?? 0) > BODY_MAX) throw tooLarge();
+async function readBody(req: IncomingMessage, most = BODY_MAX): Promise<Buffer> {
+  const tooLarge = () => new Refused(413, `A request here may carry ${most >= 1_000_000 ? `${most / 1_000_000} MB` : `${most / 1000} kB`} at most.`);
+  if (Number(req.headers['content-length'] ?? 0) > most) throw tooLarge();
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
-    if (size > BODY_MAX) throw tooLarge();
+    if (size > most) throw tooLarge();
     chunks.push(chunk as Buffer);
   }
   return Buffer.concat(chunks);
 }
 
-async function readJson(req: IncomingMessage): Promise<unknown> {
-  const text = (await readBody(req)).toString('utf8');
-  return text ? JSON.parse(text) : undefined;
+async function readJson(req: IncomingMessage, most = BODY_MAX): Promise<unknown> {
+  const text = (await readBody(req, most)).toString('utf8');
+  try { return text ? JSON.parse(text) : undefined; } catch { throw new Refused(400, 'The body is not JSON.'); }
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
@@ -111,7 +111,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
   const github = options.github; configureGithubApp(github);
-  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id });
+  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, limitOf: async (id) => memberLimit((await workspaces.get('default')).pelago.db, id) });
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };
@@ -195,31 +195,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         return await serveBackupFile(key && (await workspaces.has(wsId)) ? (await workspaces.get(wsId)).pelago.db : undefined, key ?? '', res);
       }
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
-      if (/^\/(connect|x)\//.test(url.pathname)) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, open), body: () => readJson(req), raw: () => readBody(req) });
+      if (/^\/(connect|x)\//.test(url.pathname)) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(url.pathname) ? deliveries : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX) });
 
-      // A product's public page: open to anyone, on any name this server has. It is read as the public role sees the
-      // map, so there is nothing here to guard: what is not public is not there to be found.
+      // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
-      if (pub) {
-        if (tooOften(req, res, open)) return;
-        const [, wsId, product, what, extra] = pub;
-        const guard = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
-        if (!what) {
-          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
-          return res.end(await readFile(join(UI_DIR, 'public.html')));
-        }
-        const none = () => res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
-        if (!(await workspaces.has(wsId))) return none();
-        const { pelago } = await workspaces.get(wsId);
-        if (what === 'data') {
-          const page = await publicPage(pelago, product, url.searchParams.get('build') ?? undefined);
-          if (!page) return none();
-          return res.writeHead(200, { ...guard, 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
-        }
-        const picture = extra ? await publicPicture(pelago, extra) : null;
-        if (!picture) return none();
-        return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
-      }
+      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named }));
 
       // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
       // the page is never cached, never framed and never says where it was read from. What it shows is read through one
@@ -354,7 +334,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const taken = await receivePush(pelago, payload, typeof deliveryId === 'string' ? deliveryId : undefined);
         // A push of commits to a branch is then read against the map, by the agent on this server. GitHub is not
         // kept waiting for that: it is answered now, and the run says what it did when it is over.
-        const reading = Boolean(taken.recorded && taken.repo && taken.branch && !taken.deleted && taken.commits && payload.after && payload.repository?.full_name) && (await hasReaderKey(pelago));
+        const reading = Boolean(taken.recorded && taken.repo && taken.branch && !taken.deleted && taken.commits && payload.after && payload.repository?.full_name) && (await hasModel(pelago));
         if (reading) {
           const release = workspaces.hold(workspace);
           void readPush(pelago, github, { installation: String(installation), name: payload.repository!.full_name!, entity: taken.repo! }, { branch: taken.branch!, default_branch: payload.repository!.default_branch ?? taken.branch!, before: payload.before ?? '0', after: payload.after! })

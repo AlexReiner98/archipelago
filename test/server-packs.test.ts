@@ -60,6 +60,19 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   assert.deepEqual([me.workspace.id, me.actor.name, me.actor.admin], ['acme', 'rosa@acme.example', true]);
   assert.equal((await post('/connect/join', { code })).status, 410, 'a link works once');
 
+  // A plan's member limit, set by the pack on its own workspace: one more past it is refused, saying how to make room.
+  assert.deepEqual((await post('/x/demo/limit', { workspace: 'acme', members: 1, note: 'Move to the larger plan for more.' })).result, { workspace: 'acme', members: 1 });
+  assert.match((await call('/api/member_add', token, { email: 'sam@acme.example' })).error, /Acme has room for 1 member\. Move to the larger plan for more\./);
+  assert.match((await post('/x/demo/limit', { workspace: 'default', members: 1 })).error, /not a workspace this pack made/);
+  assert.match((await post('/x/demo/limit', { workspace: 'acme', members: 0 })).error, /a whole number/);
+  const bob = (await call('/api/change', token, { reason: 'test', ops: [{ op: 'create', ref: 'b', type: 'person', title: 'Bob' }] })).result.created.b;
+  assert.match((await call('/api/token_create', token, { name: 'bob', kind: 'human', entity: bob })).error, /signs in as a member/, 'no seat by a token');
+  await post('/x/demo/limit', { workspace: 'acme', members: 2 });
+  assert.equal((await call('/api/member_add', token, { email: 'sam@acme.example' })).result.email, 'sam@acme.example');
+  assert.match((await call('/api/member_add', token, { email: 'kim@acme.example' })).error, /room for 2 members\.$/);
+  await post('/x/demo/limit', { workspace: 'acme', members: null });
+  assert.equal((await call('/api/member_add', token, { email: 'kim@acme.example' })).result.email, 'kim@acme.example', 'lifted');
+
   // What it did not declare, a workspace it did not make, and the map: refused.
   assert.match((await post('/x/demo/sneak', {})).error, /did not declare the act "mail.send"/);
   assert.match((await post('/x/demo/elsewhere', {})).error, /"default" is not a workspace this pack made/);
@@ -73,9 +86,15 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
     ['server.workspace.create', 'pack:demo'],
     ['server.workspace.admit', 'pack:demo'],
     ['server.signin.link', 'pack:demo'],
+    ['server.workspace.limit', 'pack:demo'],
+    ['server.workspace.limit', 'pack:demo'],
+    ['server.workspace.limit', 'pack:demo'],
   ]);
+  // The refused delivery is told to the owner, once.
+  const notes = (await call('/api/search', owner, { type: 'sys.notification' })).result as any[];
+  assert.deepEqual(notes.map((n) => n.title), [`The demo pack's webhook "paid" refused a delivery`]);
   const listed = (await call('/api/server_packs', owner)).result;
-  assert.deepEqual(listed.packs.map((p: any) => [p.id, p.acts]), [['demo', ['workspace.create', 'workspace.admit', 'signin.link']]]);
+  assert.deepEqual(listed.packs.map((p: any) => [p.id, p.acts]), [['demo', ['workspace.create', 'workspace.admit', 'workspace.limit', 'signin.link']]]);
   assert.equal(listed.refused.length, 1);
   assert.match((await call('/api/server_packs', me.actor && token)).error, /default workspace/);
 });

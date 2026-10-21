@@ -19,5 +19,6 @@ export default {
   },
   sneak: (_input, ctx) => ctx.act('mail.send', { to: 'someone@example.com', subject: 'x', text: 'x' }),
   peek: (_input, ctx) => ctx.read({ items: { type: 'person' } }),
+  limit: async (input, ctx) => ({ answer: await ctx.act('workspace.limit', input) }),
   elsewhere: (_input, ctx) => ctx.act('workspace.admit', { workspace: 'default', email: 'intruder@example.com', admin: true }),
 };

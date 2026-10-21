@@ -128,7 +128,7 @@ details.fold > summary .n { color: var(--muted); font-size: var(--text-2); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 
-button, select, input[type="text"], input[type="search"] {
+button, select, input[type="text"], input[type="password"], input[type="search"] {
   font: inherit; color: var(--text);
   background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); padding: var(--space-4) var(--space-6);
 }

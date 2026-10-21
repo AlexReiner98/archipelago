@@ -214,6 +214,7 @@
       "title": "Home",
       "at": "home",
       "pieces": [
+        { "piece": "start", "title": "Start here" },
         { "piece": "token_ask" },
         { "piece": "held", "title": "Held for you" },
         { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "unsettled"], "limit": 5 },

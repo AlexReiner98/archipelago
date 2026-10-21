@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
 import { MEMBER, ORDERED, SCHEMA, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { CONTROL, PACK_STORE } from './control.ts';
+import { PUBLIC_DOCUMENT } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 
 interface Migration {
@@ -33,6 +34,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 6, name: 'members sign in by their email address', sql: MEMBER },
   { version: 7, name: 'a document shared with another workspace', sql: WORKSPACE_SHARE },
   { version: 8, name: 'what a server pack keeps', sql: PACK_STORE },
+  { version: 9, name: 'a public document, read by anyone', sql: PUBLIC_DOCUMENT },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

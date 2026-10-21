@@ -1,10 +1,11 @@
-// A document given as a link, read by someone with no login: its text and the sections it brings in, in order.
+// A document given as a link or made public, read by someone with no login: its text and the sections it brings in, in order.
 // Nothing drawn that the server did not say, and every text set as text, never as markup. Made to be read whole and
 // printed: the one place in Archipelago where a page is meant to be read through.
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
-// Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in; from a link (/s/...), with the link.
+// Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in; from a link (/s/...), with the link;
+// made public (/p/<workspace>/<id>), as anyone.
 const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
 const token = () => {
   try {

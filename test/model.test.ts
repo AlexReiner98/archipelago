@@ -2,7 +2,7 @@
 // OpenAI-compatible server (LiteLLM) alike.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { asker, configured, keyTaken, ModelError, type Params } from '../src/model.ts';
+import { asker, configured, ModelError, shared, type Params } from '../src/model.ts';
 
 /** A fetch that answers from a script and keeps what it was asked. */
 function fake(...answers: (Response | Error)[]) {
@@ -100,19 +100,15 @@ test('what passes is tried again, and what does not is said by kind', async () =
   assert.deepEqual([wrong.kind, wrong.message], ['api', 'no such model']);
 });
 
-test('a key is tried by listing the models, where the calls go', async () => {
-  const a = fake(json({ data: [] }), json({}, 401), new TypeError('offline'));
-  assert.equal(await keyTaken('k', {}, a.f), true);
-  assert.equal(await keyTaken('k', {}, a.f), false);
-  assert.equal(await keyTaken('k', {}, a.f), undefined);
-  assert.equal(a.asked[0].url, 'https://api.anthropic.com/v1/models?limit=1');
-  const b = fake(json({}, 403));
-  assert.equal(await keyTaken('k', { url: 'http://m/v1' }, b.f), false);
-  assert.deepEqual([b.asked[0].url, b.asked[0].headers.authorization], ['http://m/v1/models', 'Bearer k']);
+test('OpenAI itself is asked with max_completion_tokens, which its newer models require; other servers with max_tokens', async () => {
+  const { f, asked } = fake(json({ choices: [{ message: { content: 'x' } }] }));
+  await asker(undefined, { url: 'https://api.openai.com/v1', key: 'sk-proj', openai: true }, f)(params);
+  assert.deepEqual([asked[0].url, asked[0].headers.authorization, asked[0].body.max_completion_tokens, asked[0].body.max_tokens], ['https://api.openai.com/v1/chat/completions', 'Bearer sk-proj', 1000, undefined]);
+  assert.equal(asked[0].body.tools[0].function.name, 'get', 'with the tools as functions');
 });
 
 test('the model server is configuration: a URL and a key from the environment', () => {
-  const before = { url: process.env.PELAGO_MODEL_URL, key: process.env.PELAGO_MODEL_KEY };
+  const before = { url: process.env.PELAGO_MODEL_URL, key: process.env.PELAGO_MODEL_KEY, shared: process.env.PELAGO_MODEL_SHARED };
   try {
     delete process.env.PELAGO_MODEL_URL;
     delete process.env.PELAGO_MODEL_KEY;
@@ -120,7 +116,11 @@ test('the model server is configuration: a URL and a key from the environment', 
     process.env.PELAGO_MODEL_URL = 'http://litellm:4000/v1/';
     process.env.PELAGO_MODEL_KEY = 'sk-litellm';
     assert.deepEqual(configured(), { url: 'http://litellm:4000/v1', key: 'sk-litellm' });
+    // Offered to workspaces without an account of their own, unless the server turns that off.
+    assert.deepEqual(shared(), { url: 'http://litellm:4000/v1', key: 'sk-litellm' });
+    process.env.PELAGO_MODEL_SHARED = 'off';
+    assert.equal(shared(), undefined);
   } finally {
-    for (const [k, v] of [['PELAGO_MODEL_URL', before.url], ['PELAGO_MODEL_KEY', before.key]] as const) v === undefined ? delete process.env[k] : (process.env[k] = v);
+    for (const [k, v] of [['PELAGO_MODEL_URL', before.url], ['PELAGO_MODEL_KEY', before.key], ['PELAGO_MODEL_SHARED', before.shared]] as const) v === undefined ? delete process.env[k] : (process.env[k] = v);
   }
 });
