@@ -2,13 +2,12 @@
 // plain fetch. A conversation is said in one shape (Anthropic's messages,
 // which the reader was written against) and sent one of two ways:
 //
-// - to Anthropic's own API, by default, on the workspace's key;
-// - to any OpenAI-compatible URL (PELAGO_MODEL_URL: LiteLLM in front of
-//   open-weight models, say), turned into a chat completion and its answer
-//   turned back. PELAGO_MODEL_KEY is the key for that URL.
+// - to Anthropic's own API, on an Anthropic key;
+// - to OpenAI, or any OpenAI-compatible URL (LiteLLM in front of open-weight
+//   models, say), turned into a chat completion and its answer turned back.
 //
-// Which model is a name (PELAGO_READER_MODEL), so moving from one to the other
-// is configuration alone.
+// Which account a call runs on is the workspace's own (src/model-account.ts);
+// the server's model (PELAGO_MODEL_URL and PELAGO_MODEL_KEY) is the fallback.
 
 import { env } from './env.ts';
 
@@ -47,10 +46,22 @@ export interface Endpoint {
   url?: string;
   /** The key for that url; when there is none, the workspace's key is sent to it. */
   key?: string;
+  /** OpenAI's own API: there a length is max_completion_tokens, which its newer models require. */
+  openai?: boolean;
 }
 export const configured = (): Endpoint => ({ url: env('MODEL_URL')?.replace(/\/+$/, '') || undefined, key: env('MODEL_KEY') || undefined });
 
-const ANTHROPIC = 'https://api.anthropic.com';
+/**
+ * The server's model, offered to a workspace that has no account of its own, unless PELAGO_MODEL_SHARED is off: a
+ * hosted server turns it off, so that no workspace runs on the operator's bill.
+ */
+export const shared = (): Endpoint | undefined => {
+  const at = configured();
+  return at.url && !/^(off|false|0|no)$/i.test(env('MODEL_SHARED')?.trim() ?? '') ? at : undefined;
+};
+
+export const ANTHROPIC = 'https://api.anthropic.com';
+export const OPENAI = 'https://api.openai.com/v1';
 
 /** A model's refusal, by what the owner can do about it. */
 export class ModelError extends Error {
@@ -94,16 +105,16 @@ async function send(f: Fetch, url: string, init: RequestInit, timeout: number): 
   }
 }
 
-const anthropicHeaders = (key: string, betas?: string[]): Record<string, string> => ({
+export const anthropicHeaders = (key: string, betas?: string[]): Record<string, string> => ({
   'content-type': 'application/json',
   'x-api-key': key,
   'anthropic-version': '2023-06-01',
   ...(betas?.length && { 'anthropic-beta': betas.join(',') }),
 });
-const bearer = (key: string | undefined): Record<string, string> => ({ 'content-type': 'application/json', ...(key && { authorization: `Bearer ${key}` }) });
+export const bearer = (key: string | undefined): Record<string, string> => ({ 'content-type': 'application/json', ...(key && { authorization: `Bearer ${key}` }) });
 
 /** A conversation as a chat completion request. What only Anthropic understands (caching, effort, fallbacks) is left out. */
-export function toChat(params: Params): Record<string, unknown> {
+export function toChat(params: Params, openai = false): Record<string, unknown> {
   const messages: Record<string, unknown>[] = [];
   if (params.system) messages.push({ role: 'system', content: params.system });
   for (const turn of params.messages) {
@@ -120,7 +131,7 @@ export function toChat(params: Params): Record<string, unknown> {
   }
   return {
     model: params.model,
-    max_tokens: params.max_tokens,
+    [openai ? 'max_completion_tokens' : 'max_tokens']: params.max_tokens,
     messages,
     ...(params.tools?.length && { tools: params.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description ?? '', parameters: t.input_schema } })) }),
   };
@@ -160,23 +171,8 @@ export function asker(key: string | undefined, at: Endpoint = configured(), f: F
   if (at.url) {
     const url = at.url;
     const token = at.key ?? key;
-    return async (params) => fromChat((await send(f, `${url}/chat/completions`, { method: 'POST', headers: bearer(token), body: JSON.stringify(toChat(params)) }, timeout)) as Chat);
+    return async (params) => fromChat((await send(f, `${url}/chat/completions`, { method: 'POST', headers: bearer(token), body: JSON.stringify(toChat(params, at.openai)) }, timeout)) as Chat);
   }
   if (!key) throw new ModelError(401, 'there is no key to ask Anthropic with');
   return async ({ betas, ...body }) => (await send(f, `${ANTHROPIC}/v1/messages`, { method: 'POST', headers: anthropicHeaders(key, betas), body: JSON.stringify(body) }, timeout)) as Answer;
 }
-
-/** Whether a key is taken, asked by listing the models: it costs nothing. Undefined when the endpoint could not be reached to ask. */
-export async function keyTaken(key: string, at: Endpoint = configured(), f: Fetch = fetch): Promise<boolean | undefined> {
-  const [url, headers] = at.url ? [`${at.url}/models`, bearer(key)] : [`${ANTHROPIC}/v1/models?limit=1`, anthropicHeaders(key)];
-  try {
-    const res = await f(url, { headers, signal: AbortSignal.timeout(15_000) });
-    if (res.status === 401 || res.status === 403) return false;
-    return res.ok ? true : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Who answers, in a word or two, for what the owner is told. */
-export const provider = (at: Endpoint = configured()): string => (at.url ? 'The model server' : 'Anthropic');

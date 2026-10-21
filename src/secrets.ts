@@ -1,5 +1,5 @@
 // Secrets this server has to be able to use, and so cannot keep only as a
-// hash: a workspace's Anthropic key, the secret GitHub signs with, the GitHub
+// hash: a workspace's model account, the secret GitHub signs with, the GitHub
 // App's own key. They are sealed before they are stored (AES-256-GCM), with a
 // key that is never in a database or a backup, so a backup file, a copy of it
 // off the server, or a database read on its own gives up none of them.
@@ -59,7 +59,7 @@ function fromFile(create: boolean): Buffer | undefined {
 }
 
 /** The settings that are secrets. A backup never holds one of these unsealed, whenever it was stored. */
-export const SECRET_SETTINGS = ['anthropic_key', 'github_secret'];
+export const SECRET_SETTINGS = ['model_account', 'anthropic_key', 'github_secret'];
 
 export const isSealed = (value: unknown): value is string => typeof value === 'string' && value.startsWith(MARK);
 

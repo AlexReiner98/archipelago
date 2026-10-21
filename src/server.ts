@@ -43,7 +43,7 @@ import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
-import { hasReaderKey, readPush } from './reader.ts';
+import { hasModel } from './model-account.ts'; import { readPush } from './reader.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
@@ -354,7 +354,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const taken = await receivePush(pelago, payload, typeof deliveryId === 'string' ? deliveryId : undefined);
         // A push of commits to a branch is then read against the map, by the agent on this server. GitHub is not
         // kept waiting for that: it is answered now, and the run says what it did when it is over.
-        const reading = Boolean(taken.recorded && taken.repo && taken.branch && !taken.deleted && taken.commits && payload.after && payload.repository?.full_name) && (await hasReaderKey(pelago));
+        const reading = Boolean(taken.recorded && taken.repo && taken.branch && !taken.deleted && taken.commits && payload.after && payload.repository?.full_name) && (await hasModel(pelago));
         if (reading) {
           const release = workspaces.hold(workspace);
           void readPush(pelago, github, { installation: String(installation), name: payload.repository!.full_name!, entity: taken.repo! }, { branch: taken.branch!, default_branch: payload.repository!.default_branch ?? taken.branch!, before: payload.before ?? '0', after: payload.after! })

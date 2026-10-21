@@ -6,60 +6,25 @@
 // with nothing to set up in the repository: it has no checkout, and reads
 // through the app (which may only read).
 //
-// It runs on the workspace's own Anthropic key, set by its admin, or on the
-// model server the server is given (src/model.ts), and says what each run used
+// It runs on the workspace's own model account (src/model-account.ts), or on
+// the server's model where the server offers one, and says what each run used
 // as a run in the repository, like any other agent.
 
 import { z } from 'zod';
-import { env } from './env.ts';
 import type { GithubApp } from './github-app.ts';
-import { asker, configured, keyTaken, ModelError, provider, type Ask, type Tool, type ToolResultBlock, type ToolUseBlock, type Turn } from './model.ts';
+import { connection, hasModel, NO_MODEL } from './model-account.ts';
+import { ModelError, type Tool, type ToolResultBlock, type ToolUseBlock, type Turn } from './model.ts';
 import type { Actor, Entity, Archipelago } from './pelago.ts';
 import { recordRun } from './sessions.ts';
 import { callTool, TOOLS } from './tools.ts';
 
-let asking: (key: string | undefined) => Ask = (key) => asker(key);
-let taken: (key: string) => Promise<boolean | undefined> = (key) => keyTaken(key);
-export function configureReader(make: ((key: string | undefined) => Ask) | undefined, check: (key: string) => Promise<boolean | undefined> = async () => true): void {
-  if (!make) return;
-  asking = make;
-  taken = check;
-}
-
-/** The setting that holds a workspace's Anthropic key: sealed, since it has to be sent with every request and so cannot be kept as a hash. */
-const KEY = 'anthropic_key';
-export const READER_MODEL = env('READER_MODEL') || 'claude-sonnet-5-5';
-/** Dollars for a million tokens of the model above: what a run is said to have cost. */
+/** Dollars for a million tokens of Anthropic's reader model: what a run is said to have cost. */
 const PRICE = { input: 2, output: 10, cache_read: 0.2, cache_write: 2.5 };
 /** A run stops when it has taken this many turns or used this many tokens (not counting cached re-reads). */
 const MAX_TURNS = 40;
 const MAX_TOKENS_USED = 600_000;
 /** The most of one tool's answer that is handed back: a whole file or diff can be far more than is needed. */
 const MAX_RESULT = 60_000;
-
-/** Whether a workspace's pushes can be read: on its own key, or on the model server's when the server has one. */
-export async function hasReaderKey(l: Archipelago): Promise<boolean> {
-  const at = configured();
-  return Boolean((at.url && at.key) || (await l.secret(KEY)));
-}
-
-/**
- * Set, or with nothing clear, the key runs are paid for with. It is never read
- * back out. A key Anthropic will not take is refused here, when it is given,
- * and not found out by the first push that goes unread.
- */
-export async function setReaderKey(l: Archipelago, key: string | undefined): Promise<{ checked: boolean }> {
-  const given = key?.trim();
-  if (given) {
-    if (/^sk-ant-oat/.test(given)) throw new Error('That is a Claude sign-in token (it starts sk-ant-oat), which signs a person in to Claude Code. The server needs an API key: make one at console.anthropic.com, under API keys.');
-    const ok = await taken(given);
-    if (ok === false) throw new Error(`${provider()} refused that key, so it was not saved. Check that it was copied whole and has not been revoked, or make a new one at console.anthropic.com, under API keys.`);
-    await l.setSecret(KEY, given);
-    return { checked: ok === true };
-  }
-  await l.setSecret(KEY, undefined);
-  return { checked: false };
-}
 
 interface Repo {
   installation: string;
@@ -210,15 +175,15 @@ Finish with two or three lines saying what you sent.`;
  * recorded as a run in the repository whether it ended well or not.
  */
 async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, system: string, task: string, title: string, link: string) {
-  const key = await l.secret(KEY);
-  if (!(await hasReaderKey(l))) return { ran: false as const, reason: 'This workspace has no Anthropic key, so nothing reads its pushes. Its admin sets one on the Workspace screen.' };
+  const model = await connection(l);
+  if (!model) return { ran: false as const, reason: NO_MODEL };
   const me = await l.setting<string>('me');
   // It acts for the workspace's owner, as an agent's token does: it sees what they see, and what it makes is theirs.
   const mine = me ? l.as(me) : l;
   // And it is held to the one repository it is reading: what it reads there is someone else's text, and a file
   // that tried to steer it could reach nothing but that repository's own work.
   const actor: Actor = { kind: 'agent', name: 'reader', person: me, within: [repo.entity.id] };
-  const ask = asking(key);
+  const ask = model.ask;
   const kit = tools(app, repo, ref);
   const messages: Turn[] = [{ role: 'user', content: task }];
   const used = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
@@ -233,7 +198,7 @@ async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, syst
       }
       turns++;
       const answer = await ask({
-        model: READER_MODEL,
+        model: model.model,
         max_tokens: 16000,
         // The instructions and tools are the same for every run, and the conversation grows by its end: both are cached.
         cache_control: { type: 'ephemeral' },
@@ -278,8 +243,8 @@ async function run(l: Archipelago, app: GithubApp, repo: Repo, ref: string, syst
     }
   } catch (err) {
     // Said by kind, most particular first: what the owner can do about it differs.
-    const who = provider();
-    if (err instanceof ModelError && err.kind === 'auth') failed = `${who} refused the key. ${configured().url ? 'The server’s model key needs looking at.' : 'Set a new one on the Workspace screen.'}`;
+    const who = model.name;
+    if (err instanceof ModelError && err.kind === 'auth') failed = `${who} refused the key. ${model.from === 'server' ? 'The server’s model key needs looking at.' : 'Connect the account again on the Workspace page, under Model.'}`;
     else if (err instanceof ModelError && err.kind === 'rate') failed = `${who}’s rate limit was reached and the run gave up.`;
     else if (err instanceof ModelError) failed = `${who} answered ${err.status ?? 'with an error'}: ${err.message.slice(0, 300)}`;
     else failed = `The run broke: ${(err as Error).message.slice(0, 300)}`;
@@ -326,7 +291,7 @@ const commitLink = (repo: Repo, sha: string) => `https://github.com/${repo.name}
  * badly, is not read again.
  */
 export async function readUnread(l: Archipelago, app: GithubApp, installation: string, withinMinutes = 180): Promise<{ repo: string; branch: string; after: string }[]> {
-  if (!(await hasReaderKey(l))) return [];
+  if (!(await hasModel(l))) return [];
   const done: { repo: string; branch: string; after: string }[] = [];
   for (const repo of await readable(l, app, installation)) {
     const { rows } = await l.db.query<{ detail: { branch: string; before?: string; after?: string; commits?: unknown[] } }>(
