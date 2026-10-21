@@ -1,13 +1,16 @@
 // Publishing a document: what anyone reads at /p/<workspace>/<id> is the document as it was when a person last
 // published it, frozen (src/public-schema.ts, PUBLISHED). The draft is edited on the map, privately or not; nothing
-// public changes until it is published again. Only a human publishes: the tools are theirs alone.
+// public changes until it is published again. A human publishes; an agent only where the workspace's owner has
+// allowed it (AGENT_PUBLISH, on the Workspace page), each time logged with the authority it said it acted on.
+// Taking a document down stays the human's.
 //
 // What is frozen is what the public read gives (src/public-document.ts), and for each lens it brings in, the
 // picture's data with nothing private in it and nothing that names a person or a session.
 
+import { authorityOf } from './authority.ts';
 import { lens } from './lens.ts';
 import { notify } from './notify.ts';
-import { actorId, type Actor, type Archipelago } from './pelago.ts';
+import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
 import { publicDocument, readable } from './public-document.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
@@ -87,13 +90,26 @@ const canon = (v: unknown): unknown =>
   Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon((v as Record<string, unknown>)[k])])) : v;
 const same = (a: unknown, b: unknown) => JSON.stringify(canon(JSON.parse(JSON.stringify(a)))) === JSON.stringify(canon(b));
 
+/** The workspace setting by which its owner lets agents publish. Off unless set; only a human admin sets it. */
+export const AGENT_PUBLISH = 'agent_publish';
+
+type Said = Pick<Authority, 'of' | 'basis'>;
+
+/** Whether this actor may publish here: a human always, an agent once the owner has allowed it. */
+async function mayPublish(l: Archipelago, actor: Actor) {
+  if (actor.kind !== 'human' && (await l.setting<boolean>(AGENT_PUBLISH)) !== true)
+    throw new Error('Publishing is the owner’s here: they allow agents on the Workspace page, under Publishing. Ask them with publish_ask.');
+}
+
 /** Publish a document as it stands: it becomes public, and what anyone reads of it is this, until it is published again. */
-export async function publish(l: Archipelago, actor: Actor, id: string) {
+export async function publish(l: Archipelago, actor: Actor, id: string, said?: Said) {
+  await mayPublish(l, actor);
+  const authority = authorityOf(actor.kind === 'human', actorId(actor), said);
   const doc = ID.test(id) ? await l.entity(id) : null;
   if (!doc || !readable(l).includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
   if (doc.archived_at) throw new Error(`"${doc.title}" is archived.`);
   pathOf(doc.props.path);
-  if (doc.visibility !== 'public') await l.apply(actorId(actor), { ops: [{ op: 'update', id, visibility: 'public' }], reason: 'Published, for anyone to read' });
+  if (doc.visibility !== 'public') await l.apply(actorId(actor), { ops: [{ op: 'update', id, visibility: 'public' }], reason: 'Published, for anyone to read' }, { authority });
   const given = await freeze(l, id);
   if (given.path) {
     const { rows } = await l.db.query<{ title: string }>(`select given ->> 'title' as title from published where path = $1 and entity_id <> $2`, [given.path, id]);
@@ -106,7 +122,7 @@ export async function publish(l: Archipelago, actor: Actor, id: string) {
        on conflict (entity_id) do update set given = excluded.given, published_by = excluded.published_by, path = excluded.path, menu = excluded.menu, published_at = now()`,
       [id, l.workspace, JSON.stringify(given), by, given.path, given.menu],
     );
-    await l.log(tx, { actor: actorId(actor), action: 'document.publish', target: id, reason: 'Published as it stands', detail: { sections: given.sections.length, lenses: Object.keys(given.lenses).length } });
+    await l.log(tx, { actor: actorId(actor), action: 'document.publish', target: id, reason: 'Published as it stands', detail: { sections: given.sections.length, lenses: Object.keys(given.lenses).length, authority } });
   });
   return { published: id, sections: given.sections.length, lenses: Object.keys(given.lenses).length, ...(given.path && { path: given.path }) };
 }
@@ -192,13 +208,14 @@ export async function publishPlan(l: Archipelago, within: string) {
  * Publish every document an item holds, then publish them again, so each links to the others at the addresses they
  * now have. One that cannot be published (its path is taken) is said, and the rest go ahead.
  */
-export async function publishAll(l: Archipelago, actor: Actor, within: string) {
+export async function publishAll(l: Archipelago, actor: Actor, within: string, said?: Said) {
+  await mayPublish(l, actor);
   const { documents } = await publishPlan(l, within);
   if (!documents.length) throw new Error('It holds no document that can be published.');
   const refused = new Map<string, string>();
   for (const pass of [1, 2])
     for (const doc of documents.filter((d) => !refused.has(d.id)))
-      await publish(l, actor, doc.id).catch((err: Error) => pass === 1 && refused.set(doc.id, err.message));
+      await publish(l, actor, doc.id, said).catch((err: Error) => pass === 1 && refused.set(doc.id, err.message));
   return {
     published: documents.filter((d) => !refused.has(d.id)).map((d) => ({ id: d.id, title: d.title })),
     ...(refused.size && { refused: documents.filter((d) => refused.has(d.id)).map((d) => ({ id: d.id, title: d.title, error: refused.get(d.id) })) }),

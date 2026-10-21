@@ -228,16 +228,34 @@ export function ownerCard(owner, redraw) {
   );
 }
 
+/** A box for one thing the owner lets agents do (a workspace setting), asked again before it is turned on. */
+function allowance(key, question, note) {
+  const allow = h('input', { type: 'checkbox', disabled: true });
+  api('workspace_info').then((info) => ((allow.checked = info[key]), (allow.disabled = false)), () => null);
+  allow.onchange = async () => {
+    const on = allow.checked;
+    if (on && !(await ask({ ...question, action: 'Allow', danger: true }))) return void (allow.checked = false);
+    api('workspace_set', { [key]: on }).catch((err) => ((allow.checked = !on), (note.textContent = err.message)));
+  };
+  return allow;
+}
+
+/** Whether agents may publish this workspace's documents: the owner's to give and take back. */
+export function publishCard() {
+  const note = h('span', { class: 'muted small grow' });
+  const allow = allowance('agent_publish', { title: 'Let agents publish?', message: 'An agent could then make a document public, for anyone to read, without asking you. Each publish is logged; taking one down stays yours.' }, note);
+  return h(
+    'section',
+    { class: 'card wide' },
+    h('header', {}, h('h2', { class: 'hinted', title: 'Who may make a document public at its own address' }, 'Publishing')),
+    h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, h('label', { title: 'Lets an agent call publish and publish_all. Unpublishing stays a human’s.' }, allow, ' Agents may publish'), note),
+  );
+}
+
 /** The whole map as a file, for the owner to keep, whether agents may have one too, and a file brought in. */
 export function backupCard(done) {
   const note = h('span', { class: 'muted small grow' });
-  const allow = h('input', { type: 'checkbox', disabled: true });
-  api('workspace_info').then((info) => ((allow.checked = info.agent_backups), (allow.disabled = false)), () => null);
-  allow.onchange = async () => {
-    const on = allow.checked;
-    if (on && !(await ask({ title: 'Let agents download backups?', message: 'A backup holds the whole map, private items included. An agent with your token could then read all of it.', action: 'Allow', danger: true }))) return void (allow.checked = false);
-    api('workspace_set', { agent_backups: on }).catch((err) => ((allow.checked = !on), (note.textContent = err.message)));
-  };
+  const allow = allowance('agent_backups', { title: 'Let agents download backups?', message: 'A backup holds the whole map, private items included. An agent with your token could then read all of it.' }, note);
   const download = async (ev) => {
     ev.target.disabled = true;
     try {
