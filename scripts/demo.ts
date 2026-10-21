@@ -136,6 +136,8 @@ async function fill(): Promise<void> {
     reason: 'Codex first: its CLI reads the same MCP config, so the setup changes least',
     authority: { of: 'agent', basis: 'Read the setup script and the Codex CLI docs' },
     source,
+    // The agent asks for a look: the choice is put to you on Changes, whatever the workspace lets agents do.
+    hold: true,
     ops: [{ op: 'update', id: m.d3, status: 'decided', props: { outcome: 'Codex', rationale: 'Its CLI reads the same MCP config as Claude Code, so the setup changes least.' } }],
   });
   await agent('tell', {

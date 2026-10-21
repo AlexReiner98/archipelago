@@ -11,8 +11,14 @@ test('with auth off, one workspace and the surface decides who is calling', asyn
   assert.equal((await call('/api/workspace_info')).result.owner, null, 'a new workspace has no owner');
   assert.equal((await call('/api/init', undefined, { name: 'Alex' })).status, 200, '/api is the human');
   assert.equal((await call('/api/workspace_info')).result.owner.title, 'Alex');
+  // A workspace begins with its first owner, and from then on what its agents change takes effect as they make it.
+  const applied = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'M' }] });
+  assert.equal(applied.result.status, 'applied', 'a new workspace applies what agents change');
+  await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
   const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'N' }] });
   assert.equal(proposed.result.status, 'proposed', '/agent is an agent');
+  await call('/api/init', undefined, { name: 'Alex' });
+  assert.equal((await call('/api/workspace_info')).result.agent_changes, 'hold', 'an owner set again keeps the workspace as it chose');
   assert.match((await call('/agent/decide', undefined, { proposal: proposed.result.proposal, approve: true })).error, /humans only/);
   const who = await call('/whoami', undefined, undefined, 'GET');
   assert.deepEqual([who.auth, who.workspace.id, who.actor.kind], ['off', 'default', 'human']);
@@ -174,6 +180,7 @@ test('inside a workspace, private things are hidden from other members by the da
   assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
 
   // Someone's agent acts for them: it sees what they see and proposes to them alone.
+  await api(alex, 'workspace_set', { agent_changes: 'hold' });
   const samAgent = (await api(sam, 'token_create', { kind: 'agent', name: 'sam-claude' })).token as string;
   assert.deepEqual(await titles(samAgent), ['Sam private', 'Shared task']);
   const proposed = await api(samAgent, 'change', { reason: 'From Sam\'s inbox', ops: [{ op: 'create', type: 'work.task', title: 'Reply to the client' }] });

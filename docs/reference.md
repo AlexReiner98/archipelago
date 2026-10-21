@@ -115,12 +115,14 @@ reason and a source.
    or a hypothesis is held when an agent does it, whatever the server's policy
    (unless the workspace itself has chosen otherwise, below):
    the agent proposes the answer and you confirm it on the Changes
-   screen. By default agents
-   propose everything. Loosen it per op in `pelago.config.json`:
-   `{ "policy": { "create": "auto", "link": "auto" } }`.
+   screen. Without a choice of its own, a workspace follows the server's
+   policy, where agents propose everything; loosen it per op in
+   `pelago.config.json`: `{ "policy": { "create": "auto", "link": "auto" } }`.
    A workspace can make the choice for itself, on its Workspace screen under
    Settings ("What agents change"): held until you have looked, or taking
-   effect as agents make it, merges and archives included. Then an agent can
+   effect as agents make it, merges and archives included. A workspace
+   begins taking effect: its first owner being set chooses that for it
+   (since 21 Oct 2026; one made before keeps what it had). Then an agent can
    settle a decision or a hypothesis too: a decision must say what was chosen
    and why, and you are notified on the Changes screen. The log and Undo are the record,
    not a gate. Its admin sets it; an agent cannot.
