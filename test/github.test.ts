@@ -184,7 +184,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   const state = new URL(create).searchParams.get('state')!;
   // The page asks the pack for the manifest and sends its reader on to GitHub with it: a form only to GitHub.
   const form = await page(create.slice(base.length));
-  assert.match(form.headers.get('content-security-policy') ?? '', /form-action https:\/\/github\.test;/);
+  assert.match(form.headers.get('content-security-policy') ?? '', /form-action 'self' https:\/\/github\.test;/);
   assert.match(await form.text(), /\/x\/github_app\/public\/new\.js/);
   const handed = (await call('/x/github_app/manifest', undefined, { state })).result;
   assert.equal(handed.action, `https://github.test/settings/apps/new?state=${state}`);
