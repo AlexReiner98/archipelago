@@ -222,7 +222,9 @@ function agreeFirst(documents, again) {
   const error = h('div', { class: 'error' });
   const go = h('button', { class: 'primary', disabled: true }, 'Continue');
   box.addEventListener('change', () => (go.disabled = !box.checked));
-  const links = documents.flatMap((d, i) => [i === 0 ? '' : i === documents.length - 1 ? ' and the ' : ', the ', h('a', { href: d.url, target: '_blank', rel: 'noopener' }, d.title)]);
+  const link = (d) => h('a', { href: d.url, target: '_blank', rel: 'noopener' }, d.title);
+  // Each document, then the same in its other languages, named in their own.
+  const links = documents.flatMap((d, i) => [i === 0 ? '' : i === documents.length - 1 ? ' and the ' : ', the ', link(d), ...(d.also?.length ? [' (', ...d.also.flatMap((o, j) => [j ? ', ' : '', link(o)]), ')'] : [])]);
   go.onclick = async () => {
     go.disabled = true;
     const res = await again(documents.map(({ id, version }) => ({ id, version })));

@@ -33,6 +33,8 @@ test('a sign-in waits until the documents in force are agreed to, without spendi
   // What is in force, for a signup page: the malformed one left out.
   const { agreements } = await fetch(`${base}/connect/agreements`).then((r) => r.json());
   assert.deepEqual(agreements.map((a: Agreement) => [a.id, a.title, a.version]), [['terms', 'Terms of Service', '2026-10-21'], ['privacy', 'Privacy Policy', 'v1']]);
+  assert.deepEqual(agreements[0].also, [{ title: "Conditions d'utilisation", url: '/x/terms/terms_fr' }], 'another language, named in its own; one that is no address is left out');
+  assert.equal(agreements[1].also, undefined);
 
   const { workspace } = (await post('/x/terms/make', { name: 'Acme', members: ['rosa@acme.example', 'sam@acme.example', 'kim@acme.example'] })).result;
   const linkTo = async (email: string) => /#\/join\/(inv_[a-z0-9-]+_[0-9a-f]{40})$/.exec((await post('/x/terms/link', { workspace, email })).result.link)![1];
