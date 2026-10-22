@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { architectureCases } from './drawing-cases.ts';
+import { stepsShown } from '../src/lens-steps.ts';
 import { serve } from './serve.ts';
 
 /** A small system on the map, its picture kept as a lens drawn as architecture. */
@@ -39,7 +40,7 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   const { p, l } = await system(call);
   const first = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).result.style.drawing;
   assert.equal(first.id, 'core.architecture');
-  assert.deepEqual(Object.keys(first.modules).sort(), ['index.js', 'layout.js', 'look.js']);
+  assert.deepEqual(Object.keys(first.modules).sort(), ['index.js', 'layout.js', 'look.js', 'marks.js', 'play.js', 'route.js', 'story-look.js', 'story.js']);
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
@@ -59,6 +60,26 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   // An agent's version waits for the human: it is code that runs in whoever looks.
   const asked = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'Architecture, the agentâ€™s', status: 'current', props: { modules: { 'look.js': look } } }] });
   assert.equal(asked.result.status, 'proposed');
+});
+
+test('a picture with steps is sent them, and the finished parts they name, whatever it folds away', async () => {
+  const { call } = await serve('off');
+  const { p, l, e, a } = await system(call);
+  const old = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'software.component', title: 'Old backups', status: 'retired' }, { op: 'link', type: 'part_of', from: 'o', to: e }, { op: 'link', type: 'software.calls', from: a, to: 'o' }] })).result.created.o;
+  const steps = [{ chapter: { name: 'Then', when: '7 Oct', count: 1 }, add: [a, old], titles: { [a]: 'Old doors' }, lines: [{ by: 'Alex', text: 'Back it up.' }] }, { remove: [old], lines: [{ by: 'Agent', text: 'It is gone.' }] }];
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: l, props: { steps } }] });
+  const answer = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).result;
+  assert.deepEqual(answer.steps, steps);
+  assert.ok(answer.items.some((i: any) => i.id === old && !i.open), 'the retired part is sent');
+  assert.ok(answer.links.some((k: any) => k.from === a && k.to === old), 'and its wire');
+  // Steps that cannot be read say why.
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: l, props: { steps: [{ add: 'all of it' }] } }] });
+  assert.match((await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).error ?? '', /add and remove are lists of ids/);
+});
+
+test('a published picture keeps its steps, naming only what it shows', () => {
+  const steps = [{ add: ['e_shown000', 'e_hidden00'], titles: { e_shown000: 'Then', e_hidden00: 'Secret' }, flag: { e_hidden00: 'US' }, lines: [{ by: 'Alex', text: 'Hello.' }] }];
+  assert.deepEqual(stepsShown(steps, new Set(['e_shown000'])), [{ add: ['e_shown000'], titles: { e_shown000: 'Then' }, flag: {}, lines: [{ by: 'Alex', text: 'Hello.' }] }]);
 });
 
 const browser = chrome();

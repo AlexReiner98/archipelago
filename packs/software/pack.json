@@ -128,6 +128,7 @@
       "statuses": { "open": ["planned", "wiring", "up", "standby", "degraded", "down"], "closed": ["retired"] },
       "fields": {
         "role": { "type": "enum", "values": ["client", "edge", "app", "data", "storage", "model", "monitor", "network", "tool", "service"], "shown": true, "description": "What it does in the system. data and storage are drawn as a cylinder, client as a pill." },
+        "layer": { "type": "enum", "values": ["kernel", "type_pack", "server_pack", "store", "outside", "yours"], "shown": true, "description": "What it is, in a system of a kernel and packs: the kernel, a pack of types (a workspace's), a pack the whole server runs, a store, a service outside, or yours (your browser, your agents). A style may colour a part's dot by it (dots)." },
         "host": { "type": "string", "shown": true, "description": "Where it runs, as its operator names it: a container, a machine, a region." },
         "url": { "type": "url", "description": "The address its health is read from: what its monitor checks (http(s)://…, or tcp://host:port for a port). A monitor reporting on it moves the status between up and down." },
         "commit": { "type": "string", "system": true, "description": "The commit it runs, as its deploy last reported." }

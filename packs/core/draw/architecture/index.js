@@ -8,19 +8,8 @@
 
 import { layout } from './layout.js';
 import { css } from './look.js';
-
-/** A mark: [tag, attributes, ...what is in it]. What is left out (undefined, false, null) is not drawn. */
-const isMark = (v) => Array.isArray(v) && typeof v[0] === 'string';
-/** Lists of marks, however deep, as one list: a mark itself is kept whole. */
-const spread = (kids) => kids.flatMap((kid) => (Array.isArray(kid) && !isMark(kid) ? spread(kid) : [kid]));
-const m = (tag, attrs = {}, ...kids) => {
-  const kept = {};
-  for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== false && v !== null) kept[k] = k === 'on' ? v : String(v);
-  return [tag, kept, ...spread(kids).filter((kid) => kid !== undefined && kid !== false && kid !== null)];
-};
-const titled = (mark, text) => (mark.splice(2, 0, m('title', {}, text)), mark);
-/** A class put on a mark, after those it has. */
-const addClass = (mark, name) => (mark[1].class = mark[1].class ? `${mark[1].class} ${name}` : name);
+import { addClass, m, titled } from './marks.js';
+import { story } from './story.js';
 
 /** What each health and wire state is called, in the order the bar and the key give them. */
 const HEALTHS = [['ok', 'Up'], ['warn', 'Degraded'], ['down', 'Down'], ['building', 'Being wired'], ['standby', 'On standby'], ['planned', 'Planned'], ['unknown', 'Not known'], ['gone', 'Retired']];
@@ -67,7 +56,9 @@ function outline(shape, x, y, w, hgt, rx, lid) {
  * The system: its parts, the places they run and the wires between them, with how each is. `input` is what the page
  * gives every drawing (the answer, the style); `tools.measure(text, px, font)` is how wide a text is drawn.
  */
-export function picture({ answer, style }, tools) {
+export function picture({ answer, style, reduced }, tools) {
+  // A picture with steps plays how it came to be, and ends on the map as it is.
+  if (Array.isArray(answer.steps) && answer.steps.length) return story({ answer, style, reduced }, tools);
   const byId = lensTree(answer);
   // Every length is the style's (sizes, arch_*), named by the house style; so is the typeface.
   const z = (name) => {

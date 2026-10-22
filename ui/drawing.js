@@ -100,6 +100,8 @@ export function drawWith(host, answer, style, keep) {
   const began = performance.now();
   const keys = new Map(), moving = new Set();
   let mounted = false, ended = false;
+  // Patches that come before the scene they change (a drawing may start moving at once) wait for it.
+  const early = [];
   const end = () => ((ended = true), port.postMessage({ type: 'end' }), port.close());
   host.endDrawing = end;
   const tell = (key, name) => !ended && port.postMessage({ type: 'event', event: { key, name } });
@@ -115,11 +117,14 @@ export function drawWith(host, answer, style, keep) {
         const got = performance.now();
         mounted = true;
         mount(said.scene ?? {});
+        for (const list of early.splice(0)) patch(list, keys, tell, moving);
+        if (moving.size) requestAnimationFrame(run);
         scenes.delete(seen);
         scenes.set(seen, said.scene ?? {});
         if (scenes.size > 24) scenes.delete(scenes.keys().next().value);
         performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got) } });
       }
+      else if (said.type === 'patch' && !mounted) early.push(said.list);
       else if (said.type === 'patch') (patch(said.list, keys, tell, moving), moving.size && requestAnimationFrame(run));
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
@@ -156,6 +161,8 @@ ${JSON.stringify(input)}`;
     const picture = build(scene.svg, keys, tell);
     const legend = scene.legend ? build(scene.legend, keys, tell) : null;
     const bar = scene.bar ? build(scene.bar, keys, tell) : null;
+    // What goes above the picture and below it (a rail of chapters, what was said), drawn and checked as the rest is.
+    const [before, after] = [scene.before, scene.after].map((m) => (m ? build(m, keys, tell) : null));
     const { width, height } = scene.size ?? {};
     const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;
@@ -166,11 +173,11 @@ ${JSON.stringify(input)}`;
       // Its own size is the most it is drawn at: a small picture is not blown up to fill the page.
       picture.setAttribute('width', width);
       picture.setAttribute('height', height);
-      return host.replaceChildren(...[legend, h('div', { class: 'lf-stage still' }, picture)].filter(Boolean));
+      return host.replaceChildren(...[before, legend, h('div', { class: 'lf-stage still' }, picture), after].filter(Boolean));
     }
     const lit = litSwitch(answer.viewer, style, keep, redraw);
     const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, legend);
-    host.replaceChildren(stage);
+    host.replaceChildren(...[before, stage, after].filter(Boolean));
     if (legend) legend.hidden = stage.clientWidth > 0 && stage.clientWidth < sizeOf(style, 'flow_legend_from');
     const moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room') });
     const key = legend && h('button', { class: legend.hidden ? '' : 'on', title: 'What the marks mean', onclick: (ev) => ((legend.hidden = !legend.hidden), ev.currentTarget.classList.toggle('on', !legend.hidden)) }, 'Key');
