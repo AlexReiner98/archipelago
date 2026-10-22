@@ -1,6 +1,6 @@
-// What the kernel still keeps of GitHub until the GitHub App is a pack too: finding a repository by its address, when
-// each was last pushed to, and the Workspace card's webhook. A push itself is taken in by the pack that records
-// pushes (packs/github), at the webhook it declares; reading the commits for what else they settle is the reader's.
+// What the kernel still keeps of GitHub, none of it the App's (a server pack now, packs/github_app): finding a
+// repository by its address, when each was last pushed to, and the Workspace card's webhook added by hand. A push
+// itself is taken in by the pack that records pushes (packs/github); reading the commits is the reader's.
 
 import { hookFor } from './hooks.ts';
 import { hasPackSecret, setPackSecret } from './outside.ts';
@@ -52,29 +52,4 @@ export async function newGithubSecret(l: Archipelago): Promise<string> {
   const hook = hookFor(l, 'repo.push');
   if (!hook) throw new Error('No pack here takes pushes in: turn the GitHub pack on first.');
   return (await setPackSecret(l, { pack: hook.pack, name: hook.secret, make: true })).secret!;
-}
-
-interface PushPayload {
-  ref?: string;
-  before?: string;
-  after?: string;
-  deleted?: boolean;
-  repository?: { full_name?: string; default_branch?: string };
-  pusher?: { name?: string };
-  commits?: { id: string; message: string; url?: string; author?: { name?: string } }[];
-}
-
-/**
- * The payload of a delivery, in either content type a webhook can be set to:
- * JSON, or GitHub's default, a form with the JSON in its "payload" field.
- * Undefined when the body is neither.
- */
-export function deliveryPayload(body: Buffer, contentType: string | undefined): PushPayload | undefined {
-  const text = body.toString('utf8');
-  try {
-    const parsed: unknown = JSON.parse(/x-www-form-urlencoded/i.test(contentType ?? '') ? (new URLSearchParams(text).get('payload') ?? '') : text);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as PushPayload) : undefined;
-  } catch {
-    return undefined;
-  }
 }

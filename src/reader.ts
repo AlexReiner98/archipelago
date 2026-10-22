@@ -11,14 +11,13 @@
 // as a run in the repository, like any other agent.
 
 import { z } from 'zod';
-import type { GithubApp } from './github-app.ts';
 import { connection, hasModel, NO_MODEL } from './model-account.ts';
 import { ModelError, type Tool, type ToolResultBlock, type ToolUseBlock, type Turn } from './model.ts';
 import type { Actor, Entity, Archipelago } from './pelago.ts';
 import type { StartedBy } from './launcher.ts';
 import { recordRun } from './sessions.ts';
 import { callTool, TOOLS } from './tools.ts';
-import { commitLink, leanTools, ON_PUSH_LEAN, pushBrief, sought, within, type Push, type Repo } from './reader-push.ts';
+import { commitLink, leanTools, ON_PUSH_LEAN, pushBrief, sought, within, type Push, type Reach, type Repo } from './reader-push.ts';
 
 /** A run stops when it has taken this many turns or used this many tokens (not counting cached re-reads). */
 const MAX_TURNS = 40;
@@ -31,7 +30,7 @@ export { sought, within } from './reader-push.ts';
 const PELAGO_TOOLS = ['view', 'search', 'get', 'events', 'schema', 'proposals', 'change', 'notify', 'rechecked'];
 
 /** What the reader can do: the map's own tools, and reading the one repository through the app. */
-function tools(app: GithubApp, repo: Repo, ref: string): { defs: Tool[]; run: (l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>) => Promise<unknown> } {
+function tools(app: Reach, repo: Repo, ref: string): { defs: Tool[]; run: (l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>) => Promise<unknown> } {
   const defs: Tool[] = PELAGO_TOOLS.map((name) => {
     const { $schema: _, ...schema } = z.toJSONSchema(z.object(TOOLS[name].input)) as Record<string, unknown>;
     return { name, description: TOOLS[name].description, input_schema: schema };
@@ -212,7 +211,7 @@ async function run(l: Archipelago, kit: ReturnType<typeof tools>, repo: Repo, sy
 }
 
 /** Read one push against the map. */
-export async function readPush(l: Archipelago, app: GithubApp, repo: Repo, push: Push) {
+export async function readPush(l: Archipelago, app: Reach, repo: Repo, push: Push) {
   const me = await l.setting<string>('me');
   const actor: Actor = { kind: 'agent', name: 'reader', person: me, within: [repo.entity.id], may: 'propose' };
   const title = `Read the push to ${push.branch} (${push.after.slice(0, 7)})`;
@@ -231,7 +230,7 @@ export async function readPush(l: Archipelago, app: GithubApp, repo: Repo, push:
  * for now (by a person, from the repository's page), it does not wait: the
  * oldest items are checked whatever each project's interval.
  */
-export async function recheck(l: Archipelago, app: GithubApp, repo: Repo, branch: string, now = false) {
+export async function recheck(l: Archipelago, app: Reach, repo: Repo, branch: string, now = false) {
   const me = await l.setting<string>('me');
   const due = (await callTool(me ? l.as(me) : l, { kind: 'agent', name: 'reader', person: me }, 'view', { name: 'recheck', params: { repo: repo.entity.id, now } })) as { due: boolean; projects: { due: boolean }[] };
   if (!due.due) return { ran: false as const, reason: 'Nothing is due for a re-check.' };
@@ -251,7 +250,7 @@ export async function recheck(l: Archipelago, app: GithubApp, repo: Repo, branch
  * read is read as one, up to the newest. A push whose run ended, well or
  * badly, is not read again.
  */
-export async function readUnread(l: Archipelago, app: GithubApp, installation: string, withinMinutes = 180): Promise<{ repo: string; branch: string; after: string }[]> {
+export async function readUnread(l: Archipelago, app: Reach, installation: string, withinMinutes = 180): Promise<{ repo: string; branch: string; after: string }[]> {
   if (!(await hasModel(l))) return [];
   const done: { repo: string; branch: string; after: string }[] = [];
   for (const repo of await readable(l, app, installation)) {
@@ -283,7 +282,7 @@ export async function readUnread(l: Archipelago, app: GithubApp, installation: s
 }
 
 /** The repositories of a workspace that the app can read, as the map knows them. */
-export async function readable(l: Archipelago, app: GithubApp, installation: string): Promise<Repo[]> {
+export async function readable(l: Archipelago, app: Reach, installation: string): Promise<Repo[]> {
   const names = new Set((await app.repositories(installation)).map((n) => n.toLowerCase()));
   const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and props ? 'remote'`, [l.registry.family('software.repo')]);
   const out: Repo[] = [];

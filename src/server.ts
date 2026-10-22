@@ -8,9 +8,9 @@
 //                      is handed what the map knows about its repository
 //   POST /hook/<workspace>/<pack>/<id>  a pack's webhook, signed with the
 //                      secret the owner made for it
-//   /github/app/...    the server's GitHub App: created once, connected by
-//                      each workspace, and every push delivered to /hook
-//   GET  /whoami       which workspace and identity a request resolves to
+//   /x/<pack>/...      a server pack's pages, entries and webhooks (the GitHub
+//                      App's too), and the addresses it had before
+//   GET  /whoami      which workspace and identity a request resolves to
 //   /connect/...       the setup script that connects a project (no secret in
 //                      it), and a running system's request for its token
 //   /operator/workspaces  list and create workspaces (empty, or from a backup
@@ -36,14 +36,12 @@ import { notify } from './notify.ts';
 import { backupAll, parseBackup } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { serveConnect } from './connect.ts';
-import { deliveryPayload } from './github.ts';
-import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
-import { hookFor, runHook, serveHook } from './hooks.ts';
+import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
-import { hasModel } from './model-account.ts'; import { readPush } from './reader.ts';
+import { appReach, configureReader, READER_TOOLS, readOnPush } from './reader-app.ts'; import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
@@ -53,7 +51,7 @@ import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
-import { callTool, configureBackup, configureGithubApp, configureRestart, devMode } from './tools.ts';
+import { callTool, configureBackup, configureRestart, devMode, offerTools } from './tools.ts';
 import { UI_FILES } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
@@ -101,14 +99,18 @@ class Refused extends Error {
 }
 export { lenient } from './mcp.ts';
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; github?: GithubApp; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   const [named, sites] = [options.publicHosts ?? [], options.sites ?? {}], hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named];
   const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`)];
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
-  const github = options.github; configureGithubApp(github);
+  // The server packs are told the address this server is reached at from outside, and the reader of pushes hears what they hand a workspace.
+  const serverPacks = serverPacksOf(workspaces), reach = appReach(serverPacks);
+  serverPacks.origin = named[0] ? `https://${named[0]}` : `http://127.0.0.1:${port}`;
+  if (!serverPacks.delivered.length) serverPacks.delivered.push(readOnPush(reach));
+  configureConnections(serverPacks); configureReader(reach); offerTools(READER_TOOLS);
   configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, limitOf: async (id) => memberLimit((await workspaces.get('default')).pelago.db, id) }); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id)));
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
@@ -195,7 +197,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         return await serveBackupFile(key && (await workspaces.has(wsId)) ? (await workspaces.get(wsId)).pelago.db : undefined, key ?? '', res);
       }
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
-      if (/^\/(connect|x)\//.test(url.pathname)) return await serveConnect(req, res, url.pathname, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(url.pathname) ? deliveries : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX) });
+      // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
+      const packPath = serverPacks.aliased(url.pathname) ?? url.pathname;
+      if (/^\/(connect|x)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX) });
 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
@@ -277,76 +281,6 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           if (err instanceof Refused) throw err;
           return send(res, 400, { error: (err as Error).message });
         }
-      }
-
-      // The GitHub App. Someone is sent to GitHub and comes back to one of these three; what proves they
-      // started here is the one-time word they carry (state), so no token is asked for.
-      if (github && req.method === 'GET' && url.pathname.startsWith('/github/app/')) {
-        if (tooOften(req, res, open)) return;
-        const q = url.searchParams;
-        const page = (status: number, html: string) => res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }).end(html);
-        const back = () => res.writeHead(302, { location: '/#/workspace' }).end();
-        try {
-          if (url.pathname === '/github/app/new') return page(200, await github.createPage(q.get('state')));
-          if (url.pathname === '/github/app/created') {
-            await github.created(q.get('code'), q.get('state'));
-            return back();
-          }
-          if (url.pathname === '/github/app/installed') {
-            // Sent back after choosing repositories: the first time with the word that says whose workspace it is
-            // for, later (the choice changed on GitHub) without one, when the installation is known already.
-            const id = q.get('installation_id');
-            const known = id ? await github.workspaceOf(id) : undefined;
-            const workspace = q.get('state') || !known ? (await github.installed(id, q.get('state'))).workspace : known;
-            const release = workspaces.hold(workspace);
-            try {
-              const { pelago } = await workspaces.get(workspace);
-              await addRepositories(pelago, await github.repositories(id!), (await github.installationOf(workspace))?.account ?? '');
-            } finally {
-              release();
-            }
-            return back();
-          }
-        } catch (err) {
-          return page(400, `<!doctype html><meta charset="utf-8"><body style="font: 15px system-ui; padding: 40px"><p>${(err as Error).message.replaceAll('<', '&lt;')}</p><p><a href="/#/workspace">Back to Archipelago</a></p>`);
-        }
-      }
-      // Everything the app's installations do arrives here, signed with the app's secret; the installation says whose workspace it is for.
-      if (github && req.method === 'POST' && url.pathname === '/github/app/hook') {
-        if (tooOften(req, res, deliveries)) return;
-        const body = await readBody(req);
-        if (!(await github.signed(body, req.headers['x-hub-signature-256']))) return send(res, 401, { error: 'Not a delivery signed by this server\u2019s GitHub App.' });
-        const event = req.headers['x-github-event'];
-        const payload = deliveryPayload(body, req.headers['content-type']) as (ReturnType<typeof deliveryPayload> & { action?: string; installation?: { id?: number; account?: { login?: string } }; repositories_added?: { full_name: string }[] }) | undefined;
-        if (!payload) return send(res, 400, { error: 'The delivery is not JSON.' });
-        const installation = payload.installation?.id;
-        const workspace = await github.workspaceOf(installation);
-        if (event === 'ping') return send(res, 200, { result: { recorded: false, reason: 'pong' } });
-        if (event === 'installation' && payload.action === 'deleted' && installation !== undefined) {
-          await github.forget(installation);
-          return send(res, 200, { result: { recorded: true, forgotten: installation } });
-        }
-        if (!workspace || !(await workspaces.has(workspace))) return send(res, 200, { result: { recorded: false, reason: 'No workspace here has connected this installation. Connect GitHub from the Workspace screen.' } });
-        res.once('close', workspaces.hold(workspace));
-        const { pelago } = await workspaces.get(workspace);
-        if (event === 'installation_repositories') return send(res, 200, { result: await addRepositories(pelago, (payload.repositories_added ?? []).map((r) => r.full_name), payload.installation?.account?.login ?? '') });
-        if (event !== 'push') return send(res, 200, { result: { recorded: false, reason: `Only pushes are taken in, not "${event}".` } });
-        // The push is the pack's to take in, as from its own webhook: this delivery is already checked, by the app's secret.
-        const takes = hookFor(pelago, 'repo.push');
-        if (!takes) return send(res, 200, { result: { recorded: false, reason: 'No pack here takes pushes in: the GitHub pack is off.' } });
-        const deliveryId = req.headers['x-github-delivery'];
-        const taken = ((await runHook(pelago, takes.pack, takes.hook, { payload, headers: { 'x-github-event': 'push', ...(typeof deliveryId === 'string' && { 'x-github-delivery': deliveryId }) } })).answer ?? {}) as { recorded?: boolean; repo?: { id: string; title: string }; branch?: string; deleted?: boolean; commits?: number };
-        // A push of commits to a branch is then read against the map, by the agent on this server. GitHub is not
-        // kept waiting for that: it is answered now, and the run says what it did when it is over.
-        const reading = Boolean(taken.recorded && taken.repo && taken.branch && !taken.deleted && taken.commits && payload.after && payload.repository?.full_name) && (await hasModel(pelago));
-        if (reading) {
-          const release = workspaces.hold(workspace);
-          void readPush(pelago, github, { installation: String(installation), name: payload.repository!.full_name!, entity: taken.repo! }, { branch: taken.branch!, default_branch: payload.repository!.default_branch ?? taken.branch!, before: payload.before ?? '0', after: payload.after! })
-            .then((r) => console.log(`reader: ${payload.repository!.full_name} ${payload.after!.slice(0, 7)}: ${r.ran ? `${r.ok ? 'done' : 'failed'}, ${r.tokens} tokens` : r.reason}`))
-            .catch((err) => console.error(`reader: ${(err as Error).message}`))
-            .finally(release);
-        }
-        return send(res, 200, { result: { ...taken, reading } });
       }
 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {
@@ -448,10 +382,7 @@ If that process is not a pelago server, delete ${lock}.`);
     process.exit(1);
   }
 
-  // The GitHub App is told this server's address: the name it is reached by from outside, when it has one.
-  const origin = config.publicHosts[0] ? `https://${config.publicHosts[0]}` : `http://127.0.0.1:${config.port}`;
-  const githubApp = new GithubApp({ control: () => workspaces.control(), origin, store: async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago.db : undefined) });
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, github: githubApp, proxies: config.trustedProxies, leading: () => leader?.leading ?? false });
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, proxies: config.trustedProxies, leading: () => leader?.leading ?? false });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {
@@ -473,7 +404,7 @@ If that process is not a pelago server, delete ${lock}.`);
     if (config.databaseUrl) console.log(leader.leading ? 'leading: this server runs the clocks' : 'following: another server runs the clocks');
     leader.onChange((on) => void workspaces.lead(on));
     await workspaces.lead(leader.leading);
-    stopDuties = serverDuties(leader, workspaces, githubApp, config.backup);
+    stopDuties = serverDuties(leader, workspaces, serverPacksOf(workspaces), config.backup);
     if (config.idleMinutes > 0) {
       console.log(`workspaces unused for ${config.idleMinutes} minutes are closed until next needed`);
       idle = setInterval(() => void workspaces.closeIdle(config.idleMinutes * 60_000).then((closed) => closed.length && console.log(`closed idle workspaces: ${closed.join(', ')}`), (err) => console.error('closing idle workspaces failed:', err)), 60_000);

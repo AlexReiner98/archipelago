@@ -367,20 +367,31 @@ A push is the moment reality moved, whoever did the work. Two things act on
 it.
 
 **The GitHub App is the short way to connect.** One app serves the whole
-server, and may only read (contents and metadata):
+server, and may only read (contents and metadata). It is a server pack
+(`packs/github_app`), run in the sandbox like any pack:
 
-1. The server's owner creates it once: Workspace, GitHub, **Create the GitHub
-   App**, in the default workspace. Archipelago sends GitHub a manifest, GitHub
-   asks for a name, and hands the server the app's id, key and signing secret
-   (kept, sealed, in the default workspace's database, where every server on
-   it reads them; or given by hand as
-   `PELAGO_GITHUB_APP_ID`, `_KEY`, `_SECRET` and `_SLUG`).
-2. A workspace's admin presses **Connect GitHub** and chooses repositories on
+1. The server's owner creates it once: Workspace, Connections, **Set up**
+   beside GitHub App, in the default workspace. Archipelago sends GitHub a
+   manifest, GitHub asks for a name, and hands over the app's id, key and
+   signing secret. The kernel keeps those three, sealed, in the default
+   workspace's database, where every server on it reads them; the pack never
+   sees them. They may be given by hand instead, as `PELAGO_GITHUB_APP_ID`,
+   `_KEY` and `_SECRET` (the name is then asked of GitHub).
+2. A workspace's admin presses **Connect** and chooses repositories on
    GitHub. Each one chosen is put in the map with its address, and the
-   installation is tied to that workspace.
-3. Every push to a chosen repository arrives at `/github/app/hook`, signed
-   with the app's secret, and is taken in exactly as below. Nothing is set up
-   in the repository itself.
+   installation is tied to that workspace (a connection, in the control plane).
+3. Every push to a chosen repository arrives at `/x/github_app/hook/events`
+   (or `/github/app/hook`, for an app created before it was a pack), signed
+   with the app's secret, and is handed to the GitHub pack of the workspace
+   it is tied to, which takes it in exactly as below. Nothing is set up in
+   the repository itself.
+
+The kernel's part is generic: a server pack may declare hosts whose token
+the kernel signs with a key it keeps for the pack (RS256) and trades for an
+account's token; secrets kept at run time from a host's answer; what a
+workspace's admin may connect it to; and, once connected, two acts on that
+workspace only: adding items it does not have by their address, and handing a
+delivery to the pack there that takes that kind of event in.
 
 **An agent on the server reads each push that arrives through the app.**
 Once the workspace's admin has connected a model account (the Model card on

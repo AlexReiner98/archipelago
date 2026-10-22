@@ -35,8 +35,12 @@ async function run(call: Line) {
     settings: call.settings ?? {},
     present: call.present ?? [],
     read: (query: Record<string, unknown>) => ask(call.id, query),
-    // A server pack's: what it asks the kernel to do (only the acts it declared), and the keys it keeps.
+    // A server pack's: the address its server is reached at and where each of its hosts is, what it asks the kernel
+    // to do (only the acts it declared), a request to a host it declared, made by the kernel, and the keys it keeps.
+    origin: call.origin,
+    hosts: call.hosts ?? {},
     act: (name: string, input: unknown) => ask(call.id, { act: name, input }),
+    request: (request: Record<string, unknown>) => ask(call.id, { request }),
     store: {
       get: (key: string) => ask(call.id, { store: 'get', key }),
       put: (key: string, value: unknown, ms?: number) => ask(call.id, { store: 'put', key, value, ms }),

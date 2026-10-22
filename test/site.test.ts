@@ -15,7 +15,7 @@ function visit(base: string, path: string, host: string) {
 }
 
 test('a domain serves a workspace’s published pages at their address words, the front page at /', async () => {
-  const { call, base } = await serve('off', undefined, undefined, { 'site.test': 'default' });
+  const { call, base } = await serve('off', undefined, { 'site.test': 'default' });
   const { home, a, b, d } = (
     await call('/api/change', undefined, {
       reason: 'test',

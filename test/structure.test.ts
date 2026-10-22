@@ -56,10 +56,9 @@ const count = (files: string[], pattern: RegExp) =>
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
   'src/views.ts': 503,
-  'src/tools.ts': 966,
+  'src/tools.ts': 915,
   'src/pelago.ts': 1061,
   'ui/style.css': 732,
-  'src/server.ts': 513,
   'src/sessions.ts': 501,
 };
 
@@ -75,7 +74,6 @@ const NAMES_PACKS: Record<string, number> = {
   'src/views.ts': 6,
   'src/brief.ts': 2,
   'src/github.ts': 3,
-  'src/github-app.ts': 1,
   'src/reader.ts': 1,
   'ui/doc.js': 1,
 };
@@ -126,10 +124,7 @@ test("a pack's code comes with its tests", () => {
 });
 
 // 6. Kernel modules import one way: no cycles. Type-only imports do not count.
-const CYCLES: Record<string, number> = {
-  'reader.ts -> tools.ts': 1,
-  'tools.ts -> reader.ts': 1,
-};
+const CYCLES: Record<string, number> = {};
 
 test('kernel modules import one way', () => {
   const files = walk('src').filter((f) => f.endsWith('.ts'));

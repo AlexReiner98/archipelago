@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { openDb } from '../src/db.ts';
-import { GithubApp } from '../src/github-app.ts';
+import { begin, connectAct } from '../src/server-connect.ts';
 import { keep, kept, take } from '../src/transient.ts';
 
 test('a value is kept until it runs out, and taken once', async () => {
@@ -20,20 +20,16 @@ test('a value is kept until it runs out, and taken once', async () => {
   assert.equal(await take(db, 'gone'), undefined);
 });
 
-test('a GitHub sign-up begun on one server is finished on another, once', async () => {
+test('a connection begun on one server is finished on another, once', async () => {
+  // Every server reads the one control plane: what was begun on one is known on the next, and taken once.
   const db = await openDb();
-  const asked: string[] = [];
-  const store = async (workspace: string) => (asked.push(workspace), db);
-  const options = { origin: 'https://map.test', api: 'http://127.0.0.1:9', web: 'https://github.test', store };
-  const one = new GithubApp(options);
-  const url = await one.startCreate('acme');
-  const state = new URL(url).searchParams.get('state')!;
-  assert.match(state, /^acme\./, 'the state names its workspace, whose database keeps it');
-  const other = new GithubApp(options);
-  assert.match(await other.createPage(state), /settings\/apps\/new\?state=/, 'another server knows it');
-  await assert.rejects(other.createPage('acme.guessed'), /not started from Archipelago/);
-  // The code exchange fails (nothing answers at the api address), but only after the state is taken: it cannot be used twice.
-  await assert.rejects(other.created('code', state));
-  await assert.rejects(one.created('code', state), /not started from Archipelago/);
-  assert.ok(asked.every((w) => w === 'acme'));
+  const pack = { id: 'acme_app', version: '1', title: 'Acme App', tier: 'server' as const, acts: [] };
+  const at = { has: async () => true, get: async () => { throw new Error('no workspace is reached'); }, hold: () => () => {} } as never;
+  const state = await begin(db, pack.id, 'setup', 'acme');
+  assert.match(state, /^acme\./, 'the state names its workspace');
+  assert.deepEqual(await connectAct(at, db, pack, 'begun.get', { state }, []), { purpose: 'setup', workspace: 'acme' });
+  await assert.rejects(connectAct(at, db, pack, 'begun.get', { state: 'acme.guessed' }, []), /not started from Archipelago/);
+  await assert.rejects(connectAct(at, db, { ...pack, id: 'other_app' }, 'begun.get', { state }, []), /not started from Archipelago/, 'another pack’s word is not this one’s');
+  assert.equal((await connectAct(at, db, pack, 'begun.take', { state }, []) as { purpose: string }).purpose, 'setup');
+  await assert.rejects(connectAct(at, db, pack, 'begun.take', { state }, []), /not started from Archipelago/, 'once');
 });

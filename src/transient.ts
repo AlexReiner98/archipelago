@@ -1,5 +1,5 @@
 // What a request leaves for a later one that may reach another process: a backup link, where a session's prompt hook
-// last heard up to, a refused change kept for a retry, a sign-up begun on GitHub. Kept in the workspace's database for
+// last heard up to, a refused change kept for a retry. Kept in the workspace's database for
 // minutes or days, not in this process's memory, so a deploy or a second server answers the next request as well as
 // the one that began it. It is operational state, no fact about the map: it is written here, not through change, and
 // is in no backup. Only the whole database reaches it; no member's role is granted it.
