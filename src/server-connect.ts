@@ -121,11 +121,8 @@ async function addItems(l: Archipelago, pack: ServerPackFile, connection: Connec
   return { added, known };
 }
 
-/** What a delivery the pack took in is, once a pack in the workspace has taken it: the reader of pushes listens here. */
-export type Delivered = (d: { l: Archipelago; workspace: string; pack: string; connection: Connection; event: string; payload: unknown; answer: Record<string, unknown>; hold: () => () => void }) => Promise<Record<string, unknown> | void>;
-
 /** Do one of the connection acts for a pack. */
-export async function connectAct(at: ConnectPlaces, control: Q, pack: ServerPackFile, act: string, input: Record<string, unknown>, delivered: Delivered[]): Promise<unknown> {
+export async function connectAct(at: ConnectPlaces, control: Q, pack: ServerPackFile, act: string, input: Record<string, unknown>): Promise<unknown> {
   switch (act) {
     case 'begun.get':
     case 'begun.take': {
@@ -178,10 +175,8 @@ export async function connectAct(at: ConnectPlaces, control: Q, pack: ServerPack
       if (!takes) return { recorded: false, reason: `No pack in this workspace takes "${event}" in: turn it on first.` };
       const headers = input.headers && typeof input.headers === 'object' ? (input.headers as Record<string, unknown>) : {};
       await pelago.log(pelago.db, { actor: `pack:${pack.id}`, action: 'server.workspace.deliver', reason: `${pack.title} handed ${takes.pack} a ${event}`, detail: { pack: pack.id, connection: id, to: takes.pack, event } });
-      const answer = ((await runHook(pelago, takes.pack, takes.hook, { payload: input.payload, headers })).answer ?? {}) as Record<string, unknown>;
-      let more: Record<string, unknown> = {};
-      for (const listen of delivered) more = { ...more, ...((await listen({ l: pelago, workspace: connection.workspace, pack: pack.id, connection, event, payload: input.payload, answer, hold: () => at.hold(connection.workspace) })) ?? {}) };
-      return { ...answer, ...more };
+      // What the pack there records, the packs that hear it are told of.
+      return ((await runHook(pelago, takes.pack, takes.hook, { payload: input.payload, headers })).answer ?? {}) as Record<string, unknown>;
     }
   } finally {
     release();

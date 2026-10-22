@@ -39,10 +39,11 @@ export function packTool(reg: Registry, name: string): PackTool | undefined {
     description: def.description + verb,
     input: schema.shape ?? {},
     reads: call === 'view',
-    run: async (l, actor, input, check) =>
-      call === 'action'
-        ? hostFor(reg).act(l, actor, pack, def.id, input, def.limit_ms, 'action', check)
-        : (await hostFor(reg).call(l, actor, pack, 'view', def.id, input, def.limit_ms)).answer ?? null,
+    run: async (l, actor, input, check) => {
+      if (call === 'view') return (await hostFor(reg).call(l, actor, pack, 'view', def.id, input, def.limit_ms)).answer ?? null;
+      if ((def as ActionDef).admin && !(actor.kind === 'human' && actor.admin)) throw new Error(`"${def.id}" is for a workspace's admins only: what it starts is paid for by the workspace.`);
+      return hostFor(reg).act(l, actor, pack, def.id, input, def.limit_ms, 'action', check);
+    },
   };
 }
 

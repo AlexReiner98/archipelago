@@ -27,9 +27,9 @@ test('a connection begun on one server is finished on another, once', async () =
   const at = { has: async () => true, get: async () => { throw new Error('no workspace is reached'); }, hold: () => () => {} } as never;
   const state = await begin(db, pack.id, 'setup', 'acme');
   assert.match(state, /^acme\./, 'the state names its workspace');
-  assert.deepEqual(await connectAct(at, db, pack, 'begun.get', { state }, []), { purpose: 'setup', workspace: 'acme' });
-  await assert.rejects(connectAct(at, db, pack, 'begun.get', { state: 'acme.guessed' }, []), /not started from Archipelago/);
-  await assert.rejects(connectAct(at, db, { ...pack, id: 'other_app' }, 'begun.get', { state }, []), /not started from Archipelago/, 'another pack’s word is not this one’s');
-  assert.equal((await connectAct(at, db, pack, 'begun.take', { state }, []) as { purpose: string }).purpose, 'setup');
-  await assert.rejects(connectAct(at, db, pack, 'begun.take', { state }, []), /not started from Archipelago/, 'once');
+  assert.deepEqual(await connectAct(at, db, pack, 'begun.get', { state }), { purpose: 'setup', workspace: 'acme' });
+  await assert.rejects(connectAct(at, db, pack, 'begun.get', { state: 'acme.guessed' }), /not started from Archipelago/);
+  await assert.rejects(connectAct(at, db, { ...pack, id: 'other_app' }, 'begun.get', { state }), /not started from Archipelago/, 'another pack’s word is not this one’s');
+  assert.equal((await connectAct(at, db, pack, 'begun.take', { state }) as { purpose: string }).purpose, 'setup');
+  await assert.rejects(connectAct(at, db, pack, 'begun.take', { state }), /not started from Archipelago/, 'once');
 });

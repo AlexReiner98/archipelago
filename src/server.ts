@@ -41,7 +41,7 @@ import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
-import { appReach, configureReader, READER_TOOLS, readOnPush } from './reader-app.ts'; import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts';
+import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts'; import './agent-run.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
@@ -51,7 +51,7 @@ import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
-import { callTool, configureBackup, configureRestart, devMode, offerTools } from './tools.ts';
+import { callTool, configureBackup, configureRestart, devMode } from './tools.ts';
 import { UI_FILES } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
@@ -106,11 +106,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`)];
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
-  // The server packs are told the address this server is reached at from outside, and the reader of pushes hears what they hand a workspace.
-  const serverPacks = serverPacksOf(workspaces), reach = appReach(serverPacks);
+  // The server packs are told the address this server is reached at from outside; a workspace's packs reach them as its connections (src/pack-reach.ts).
+  const serverPacks = serverPacksOf(workspaces);
   serverPacks.origin = named[0] ? `https://${named[0]}` : `http://127.0.0.1:${port}`;
-  if (!serverPacks.delivered.length) serverPacks.delivered.push(readOnPush(reach));
-  configureConnections(serverPacks); configureReader(reach); offerTools(READER_TOOLS);
+  configureConnections(serverPacks);
+  setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
   configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, limitOf: async (id) => memberLimit((await workspaces.get('default')).pelago.db, id) }); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id)));
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.

@@ -3,10 +3,10 @@
 // handler asks what kind of thing it is rather than naming a type alone. A read that asks for some fields is given
 // those of each item's props, and no note: a session's story or a long note need not cross the pipe for nothing.
 
-import { livesIn, SCOPE } from './places.ts';
+import { livesIn, livesInFor, SCOPE } from './places.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { blockGraph } from './blocking.ts';
-import { VIEWS } from './views.ts';
+import { askPackView, VIEWS } from './views.ts';
 
 /** The most items one read gives back. */
 const READ_LIMIT = 500;
@@ -116,13 +116,14 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     return Object.fromEntries(q.blocked.map((id) => [id, { blocked: graph.isBlocked(id), waits_on_someone: graph.waitsOnSomeone(id), roots: graph.roots(id).map((r) => ({ id: r, title: titles.get(r) })) }]));
   }
   if (q.view !== undefined) {
+    // A pack's view by its short name too (repo_work), answered by its pack.
     const view = VIEWS[q.view];
-    if (!view) throw new Error(`No view "${q.view}"`);
-    return view.run(l, q.params ?? {});
+    return view ? view.run(l, q.params ?? {}) : askPackView(l, q.view, q.params ?? {});
   }
   if (q.type_info !== undefined) {
     const t = l.registry.type(q.type_info);
-    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id) } : null;
+    // lives_in: the link that puts an item in a place of this type.
+    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id), lives_in: livesInFor(l, t.id) } : null;
   }
   if (q.proposed !== undefined) {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);

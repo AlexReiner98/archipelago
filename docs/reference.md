@@ -397,13 +397,15 @@ delivery to the pack there that takes that kind of event in.
 Once the workspace's admin has connected a model account (the Model card on
 the Workspace page; kept sealed on the server, never shown again), every push of
 commits to a branch is read against the repository's open items by an agent
-that runs on the Archipelago server (`src/reader.ts`), and every hour it asks
-whether a re-check of old items is due. It has no checkout: it reads commits,
+that runs on the Archipelago server (the reader pack, `packs/reader`), and every
+hour it asks whether a re-check of old items is due. The pack hears each push the
+GitHub pack records and asks the kernel for a model run (`src/agent-run.ts`),
+answering the run's tools itself. It has no checkout: it reads commits,
 diffs, files and history through the app, which may only read. It does what
 the workflow below does, sends its changes as any agent does (held or applied
 as the workspace says), stops at 40 turns or 600k tokens, and records each run
 in the repository with what it used. The model is `claude-sonnet-5-5`
-(`PELAGO_READER_MODEL` changes it). Without a key, pushes are recorded and
+(`PELAGO_DEFAULT_MODEL`, or `PELAGO_READER_MODEL` as it was first named, changes it). Without a key, pushes are recorded and
 not read. A repository connected both ways hears each push once.
 
 Every model call goes through `src/model.ts`, with plain fetch, on the

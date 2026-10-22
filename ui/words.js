@@ -211,7 +211,7 @@ export function ageChip(e) {
 }
 
 /** Where a run was, as a person says it. */
-export const RAN = { 'github-actions': 'Sync agent', server: 'Reader', 'claude-code': 'Session' };
+export const RAN = { 'github-actions': 'Sync agent', server: 'Server agent', 'claude-code': 'Session' };
 /** Which of each item's sections are unfolded, kept while the page is open. */
 export const unfolded = new Map();
 /** A sentence of explanation, kept behind a small mark: there to be asked for, not to be read past. */
