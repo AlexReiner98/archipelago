@@ -83,12 +83,16 @@ test('a push replayed on a scripted model, against the stand-in GitHub, and scor
   countCalls(() => async (params): Promise<Answer> => {
     asked.push(params);
     const brief = String(params.messages[0].content);
-    const id = (title: string) => new RegExp(`- (e_\\w+) work\\.task \\[todo\\] ${title}`).exec(brief)![1];
+    const id = (title: string) => new RegExp(`(e_\\w+) work\\.task \\[todo\\] ${title}`).exec(brief)![1];
     const usage = { input_tokens: 1000, output_tokens: 100 };
     if (params.messages.length > 1) return { content: [{ type: 'text', text: 'Closed the hinge.' }], stop_reason: 'end_turn', usage };
+    // A reader that closes by decide is answered with a quote from the push; one that closes by update, as it was.
+    const close = params.tools?.some((t) => t.name === 'decide')
+      ? { name: 'decide', input: { id: id('Oil the hinge'), finished: true, quote: 'Oil the hinge (fixes the squeak)', why: 'bbbbbbb oils it' } }
+      : { name: 'update', input: { id: id('Oil the hinge'), status: 'done', why: 'bbbbbbb oils it' } };
     return {
       content: [
-        { type: 'tool_use', id: 't1', name: 'update', input: { id: id('Oil the hinge'), status: 'done', why: 'bbbbbbb oils it' } },
+        { type: 'tool_use', id: 't1', ...close },
         { type: 'tool_use', id: 't2', name: 'update', input: { id: id('Paint the door'), status: 'doing', why: 'near it' } },
         { type: 'tool_use', id: 't3', name: 'create', input: { type: 'work.task', title: 'Oil the hinge', why: 'a copy' } },
       ],
