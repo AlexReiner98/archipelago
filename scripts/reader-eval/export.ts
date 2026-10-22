@@ -8,12 +8,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Registry } from '../../src/packs.ts';
-import { within } from '../../src/reader-push.ts';
 import { gh, loadAnswers, saveAnswers, type Answers } from './github.ts';
 import { commitCloses, readerLabels, rewind, settle, type Ev, type Label, type Now, type ReaderChange } from './history.ts';
 import type { Fixture } from './score.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..');
+/** A path or ref as part of an address, as the reader writes it (packs/reader/github.js), so a recorded answer is found by the same key. */
+const within = (path: unknown) => String(path ?? '').split('/').map(encodeURIComponent).join('/');
 const registry = new Registry(join(ROOT, 'packs'));
 const WORK = ['work.task', 'work.decision', 'work.issue'].flatMap((t) => registry.family(t));
 /** A type the packs here do not know (a workspace's own) is closed by the words most types use. */

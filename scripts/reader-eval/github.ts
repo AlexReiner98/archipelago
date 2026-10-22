@@ -5,7 +5,6 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import type { Reach } from '../../src/reader-push.ts';
 
 export type Answers = Record<string, unknown>;
 
@@ -24,7 +23,10 @@ function fromGit(checkout: string, path: string, ref: string): unknown {
   return { type: 'file', path, size: content.length, content: content.toString('base64') };
 }
 
-export interface StandIn extends Reach {
+export interface StandIn {
+  /** GitHub's answer to a GET, as the App's installation. */
+  asInstallation(installation: string, path: string): Promise<unknown>;
+  repositories(installation: string): Promise<string[]>;
   /** What was answered from somewhere other than the recording. */
   misses: string[];
 }

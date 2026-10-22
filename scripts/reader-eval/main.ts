@@ -94,7 +94,7 @@ async function pool<T>(jobs: (() => Promise<T>)[], width: number): Promise<T[]> 
 }
 
 const runs = Number(args.runs);
-/** What a run says when the provider, not the model, stopped it (src/reader.ts words these). */
+/** What a run says when the provider, not the model, stopped it (src/agent-run.ts words these). */
 const PASSING = /rate limit|answered (408|409|429|5\d\d)|could not be reached|The run broke/i;
 const perPush: Record<string, Record<string, unknown>[]> = {};
 // The models run side by side, each a few replays at a time: a provider limits each model on its own.

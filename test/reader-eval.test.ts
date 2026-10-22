@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { commitCloses, readerLabels, rewind, settle, type Ev, type Now } from '../scripts/reader-eval/history.ts';
 import { standIn } from '../scripts/reader-eval/github.ts';
 import { countCalls, replay } from '../scripts/reader-eval/replay.ts';
-import { choose, judge, summarise, type Fixture } from '../scripts/reader-eval/score.ts';
+import { choose, judge, summarise, type Fixture, type Sent } from '../scripts/reader-eval/score.ts';
 import type { Answer, Params } from '../src/model.ts';
 
 const closed = (type: string) => (type === 'work.issue' ? ['resolved', 'wontfix'] : ['done', 'dropped']);
@@ -71,6 +71,7 @@ const fixture: Fixture = {
   ],
 };
 const answers = {
+  '/repos/Acme/Tools': { default_branch: 'main' },
   [`/repos/Acme/Tools/compare/${'a'.repeat(40)}...${'b'.repeat(40)}?per_page=100`]: {
     commits: [{ sha: 'b'.repeat(40), commit: { message: 'Oil the hinge (fixes the squeak)' } }],
     files: [{ filename: 'hinge.txt', status: 'modified', additions: 1, deletions: 0, patch: '+oiled' }],
@@ -96,20 +97,19 @@ test('a push replayed on a scripted model, against the stand-in GitHub, and scor
     };
   });
   const github = standIn(answers);
+  const judged = (sent: Sent[]) => judge(fixture, sent, closed);
   const done = await replay(fixture, { model: 'scripted', provider: 'anthropic', key: 'k', price: { input: 1, output: 5 }, currency: 'USD' }, github);
   assert.equal(done.ok, true, done.summary);
   assert.match(String(asked[0].messages[0].content), /Oil the hinge \(fixes the squeak\)[\s\S]*\+oiled[\s\S]*Open items of this repository \(2\)/);
   assert.equal(asked[0].model, 'scripted');
   assert.deepEqual(done.usage, { input: 2000, output: 200, cache_read: 0, cache_write: 0 });
   assert.equal(done.usd, (2000 * 1 + 200 * 5) / 1e6);
-  assert.deepEqual(done.sent, [
-    { op: 'update', id: 'e_hinge', status: 'done' },
-    { op: 'update', id: 'e_door', status: 'doing' },
-    { op: 'create', title: 'Oil the hinge' },
-  ]);
-
-  const judged = judge(fixture, done.sent, closed);
-  assert.deepEqual([judged.good, judged.bad, judged.unjudged, judged.copies, judged.closes], [1, 2, 0, 1, { due: 1, made: 1 }]);
+  // The reader pack refuses what the push does not show (a start) and a copy of an open item: only the close is held.
+  assert.deepEqual(done.sent, [{ op: 'update', id: 'e_hinge', status: 'done' }]);
+  assert.deepEqual([judged(done.sent).good, judged(done.sent).bad, judged(done.sent).closes], [1, 0, { due: 1, made: 1 }]);
+  // What it would have been scored had it sent them: the start refused, the copy a copy.
+  const all = judged([...done.sent, { op: 'update', id: 'e_door', status: 'doing' }, { op: 'create', title: 'Oil the hinge' }]);
+  assert.deepEqual([all.good, all.bad, all.unjudged, all.copies], [1, 2, 0, 1]);
   // Not recorded and not allowed online: said as GitHub would, as an error the model reads.
   await assert.rejects(github.asInstallation('eval', '/repos/Acme/Tools/commits/abc'), /was not recorded/);
 });

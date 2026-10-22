@@ -1,6 +1,6 @@
 // One push read again, offline: a throwaway map in memory holding the repository and its open items as they stood,
-// the stand-in GitHub, and the reader itself (readPush, unchanged) on the candidate model. What it would have sent
-// is what is held for the owner at the end, said back in the fixture's ids.
+// the stand-in GitHub, and the reader pack itself, unchanged, hearing the push and run by the kernel on the candidate
+// model. What it would have sent is what is held for the owner at the end, said back in the fixture's ids.
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { cpSync, mkdtempSync, rmSync } from 'node:fs';
@@ -12,9 +12,11 @@ import { asker, type Ask } from '../../src/model.ts';
 import { Archipelago, type Op } from '../../src/pelago.ts';
 import { Registry } from '../../src/packs.ts';
 import { livesInFor } from '../../src/places.ts';
-import { readPush } from '../../src/reader.ts';
+import { hostFor } from '../../src/packtools.ts';
+import { setReach } from '../../src/pack-reach.ts';
+import '../../src/agent-run.ts';
 import { syncTypes } from '../../src/typetable.ts';
-import type { Reach } from '../../src/reader-push.ts';
+import type { StandIn } from './github.ts';
 import type { Fixture, Sent } from './score.ts';
 
 export interface Candidate {
@@ -108,22 +110,66 @@ async function heldBack(l: Archipelago, back: Map<string, string>): Promise<Sent
   return sent;
 }
 
-export async function replay(f: Fixture, c: Candidate, github: Reach): Promise<Replayed> {
+/** The commits a push carries, as the GitHub pack records them: each its short id and first line. */
+function commitsOf(f: Fixture, github: StandIn): Promise<{ sha: string; subject: string }[]> {
+  return Promise.all(
+    f.commits.map(async (sha) => {
+      const c = (await github.asInstallation('eval', `/repos/${f.repo.name}/commits/${sha}`).catch(() => undefined)) as { commit?: { message?: string } } | undefined;
+      return { sha: sha.slice(0, 7), subject: String(c?.commit?.message ?? '').split(/\r?\n/)[0] };
+    }),
+  );
+}
+
+// The reader reaches GitHub through the github_app server pack, which the server lends; here the stand-in answers
+// in its place, the same for every throwaway map (each asks only about its own push).
+let lent: StandIn | undefined;
+function lend(github: StandIn, repo: string) {
+  if (lent === github) return;
+  lent = github;
+  setReach({
+    hold: () => () => {},
+    connection: async () => ({ id: 'eval', account: 'eval' }),
+    via: async (_workspace, _pack, _host, path) => {
+      if (path.startsWith('/installation/repositories')) return { status: 200, body: { repositories: [{ full_name: repo }] } };
+      try {
+        return { status: 200, body: await github.asInstallation('eval', path) };
+      } catch (err) {
+        return { status: 404, body: { message: (err as Error).message } };
+      }
+    },
+  });
+}
+
+/** The run the push started, once it is recorded: a run records itself when it ends, well or not. */
+async function runOf(l: Archipelago, most = 30 * 60_000): Promise<{ status: string; body: string | null; props: Record<string, unknown> } | undefined> {
+  for (const until = Date.now() + most; Date.now() < until; await new Promise((r) => setTimeout(r, 500))) {
+    const { rows } = await l.db.query<{ status: string; body: string | null; props: Record<string, unknown> }>(`select status, body, props from entity where type = any($1::text[]) limit 1`, [l.registry.family('sys.run')]);
+    if (rows[0]) return rows[0];
+  }
+  return undefined;
+}
+
+export async function replay(f: Fixture, c: Candidate, github: StandIn): Promise<Replayed> {
   if (!wrapped) countCalls();
+  lend(github, f.repo.name);
   const { l, done } = await throwaway();
   const usage = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
   try {
     const { repo, ids } = await seed(l, f);
     const account: ModelAccount = { provider: c.provider, key: c.key ?? '', model: c.model, price: c.price, ...(c.url && { url: c.url }) };
     await l.setSecret(ACCOUNT, JSON.stringify(account));
+    const event = { action: 'repo.push', target: repo, pack: 'github', detail: { repo: f.repo.name.toLowerCase(), branch: f.push.branch, before: f.push.before, after: f.push.after, commits: await commitsOf(f, github) } };
     const started = Date.now();
-    const run = await meter.run(usage, () =>
-      readPush(l, github, { installation: 'eval', name: f.repo.name, entity: { id: repo, title: f.repo.entity.title, type: f.repo.entity.type } }, { branch: f.push.branch, default_branch: f.push.default_branch, before: f.push.before, after: f.push.after }),
-    );
+    // The push as the GitHub pack tells of it: the reader pack hears it, and asks the kernel for a run, unchanged.
+    const heard = (await meter.run(usage, () => hostFor(l.registry).act(l, { kind: 'agent', name: 'pack:reader' }, 'reader', 'repo.push', { event }, 30_000, 'event'))) as { runs?: { started: boolean; reason?: string }[]; answer?: { reason?: string } };
+    const start = heard.runs?.[0];
+    if (!start?.started) return { ok: false, summary: start?.reason ?? heard.answer?.reason ?? 'The reader started no run.', sent: [], turns: 0, usage, usd: 0, ms: Date.now() - started };
+    const run = await meter.run(usage, () => runOf(l));
     const back = new Map([...ids].map(([fixture, here]) => [here, fixture]));
     const usd = (usage.input * c.price.input + usage.output * c.price.output + usage.cache_read * c.price.input * 0.1 + usage.cache_write * c.price.input * 1.25) / 1e6;
-    return { ok: run.ran && run.ok, summary: run.ran ? run.summary : run.reason, sent: await heldBack(l, back), turns: run.ran ? run.turns : 0, usage, usd, ms: Date.now() - started };
+    return { ok: run?.status === 'finished', summary: run ? String(run.body ?? '') : 'The run did not end in time.', sent: await heldBack(l, back), turns: Number(run?.props.turns ?? 0), usage, usd, ms: Date.now() - started };
   } finally {
+    hostFor(l.registry).stop();
     await done();
   }
 }
