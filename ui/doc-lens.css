@@ -21,9 +21,10 @@
 .doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }
 .doc-lens .group-place .dot { fill: var(--g-place); } .doc-lens .group-system .dot { fill: var(--g-system); }
 /* The page's first picture (ui/doc.js) is wider than its text: up to the style's reader_wide, and never past the
-   window less the page's sides, centred on the text column, so a whole system opens in sight. */
-.doc-lens.wide {
-  --doc-wide: min(var(--reader-wide), calc(var(--reader-window) - 2 * var(--reader-side)));
+   window less the page's sides, centred on the text column, so a whole system opens in sight.
+   Its section's title is as wide, so it starts over the picture's left edge. */
+section:has(> .doc-lens.wide) { --doc-wide: min(var(--reader-wide), calc(var(--reader-window) - 2 * var(--reader-side))); }
+.doc-lens.wide, section:has(> .doc-lens.wide) > h2 {
   width: var(--doc-wide);
   margin-left: calc((100% - var(--doc-wide)) / 2);
 }
