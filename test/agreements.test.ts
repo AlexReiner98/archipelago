@@ -51,6 +51,8 @@ test('a sign-in waits until the documents in force are agreed to, without spendi
 
   // A typed code: a wrong one is refused as before, saying nothing of what is owed; a right one asks first.
   await post('/connect/sign-in', { email: 'sam@acme.example' });
+  // The mail goes out after the answer: wait for it, however slow the database.
+  for (let tries = 0; tries < 100 && !mailbox.some((m) => m.to === 'sam@acme.example'); tries++) await new Promise((r) => setTimeout(r, 50));
   const typed = /type this code on the sign-in page: ([A-Z0-9]{4}-[A-Z0-9]{4})/.exec(mailbox.findLast((m) => m.to === 'sam@acme.example')!.text)![1];
   assert.equal((await post('/connect/code', { email: 'sam@acme.example', code: 'AAAA-AAAA' })).status, 410);
   assert.ok((await post('/connect/code', { email: 'sam@acme.example', code: typed })).agree);
