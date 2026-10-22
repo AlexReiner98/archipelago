@@ -200,7 +200,8 @@ function draw(d) {
   paths = d.paths ?? {};
   onSite = Boolean(d.site?.host);
   const sections = d.parts.filter((p) => p.section);
-  // The first picture is the page's own, and may be as wide as the window allows: a whole system opens in sight.
+  // The first picture is the page's own, and may be as wide as the window allows: a whole system opens in sight. One
+  // that plays how it came to be keeps to the text, with its chapters above it and what was said below.
   const first = sections.find((p) => d.lenses?.[p.section.id])?.section.id;
   const part = (p) =>
     p.section
@@ -210,7 +211,7 @@ function draw(d) {
           h('h2', {}, p.section.title),
           // A lens published with the document is its picture, drawn from what was frozen; otherwise a section shows its figure.
           d.lenses?.[p.section.id]
-            ? h('div', { class: p.section.id === first ? 'doc-lens wide' : 'doc-lens', 'data-lens': p.section.id })
+            ? h('div', { class: p.section.id === first && !d.lenses[p.section.id].steps ? 'doc-lens wide' : 'doc-lens', 'data-lens': p.section.id })
             : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
           blocks(p.section.body, titles, 3),
         )
