@@ -38,12 +38,12 @@ export async function ownGuesses(ctx, ids) {
 
 const words = (title) => String(title ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
-/** Whether two titles name the same thing, near enough: the same words, or nearly all of them. */
+/** Whether two titles name the same thing, near enough: the same words, nearly all of them, or every word of the shorter one. */
 export function alike(a, b) {
   const [x, y] = [words(a), words(b)];
   if (!x || !y) return false;
   if (x === y) return true;
   const [s, t] = [new Set(x.split(' ')), new Set(y.split(' '))];
   const shared = [...s].filter((w) => t.has(w)).length;
-  return shared / new Set([...s, ...t]).size >= 0.75;
+  return shared / new Set([...s, ...t]).size >= 0.75 || (Math.min(s.size, t.size) >= 2 && shared === Math.min(s.size, t.size));
 }

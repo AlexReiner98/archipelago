@@ -2,7 +2,7 @@
   "id": "github",
   "version": "0.1.0",
   "title": "GitHub",
-  "description": "Pushes keep the map current: each push to a repository is recorded against it, and a commit on the default branch that says it closes something proposes exactly that.",
+  "description": "Pushes keep the map current: each push to a repository is recorded against it, and a commit on any branch that says it closes something proposes exactly that.",
   "contract": 1,
   "requires": ["core", "software"],
   "webhooks": [

@@ -1,7 +1,7 @@
 // A push, taken in. GitHub tells the map when a repository changes: a push is the moment reality moved, whoever did
 // the work and whether or not an agent session was open, so it is what keeps the map from going stale. Each push is
-// recorded against its repository, and a commit on the default branch that says it closes something proposes exactly
-// that. Reading the commits for what else they settle is the reader's work, on the same push.
+// recorded against its repository, and a commit that says it closes something proposes exactly that, on any branch
+// (the owner, 22 Oct 2026: a branch closes only what a commit names). Reading the commits for what else they settle is the reader's work, on the same push.
 
 /**
  * "owner/name" from any way of writing a GitHub repository's address, or from the name itself. An address copied
@@ -53,7 +53,7 @@ const subject = (message) => message.split('\n')[0].slice(0, 200);
 
 /**
  * Take a delivery in. A push is recorded against its repository whatever the branch, and so is a tag, or a branch
- * or tag being deleted, as what it is. On the default branch, anything a commit says it closes is proposed closed, a
+ * or tag being deleted, as what it is. On any branch, anything a commit says it closes is proposed closed, a
  * change of its own each, held for the human unless policy lets it through. Questions are left alone: a commit cannot
  * say what was decided.
  *
@@ -117,7 +117,7 @@ export async function push(input, ctx) {
 
   const changes = [];
   const settled = [];
-  if (main) {
+  if (!deleted && branch !== undefined) {
     const seen = new Set();
     for (const c of commits) {
       for (const id of finishedBy(c.message)) {

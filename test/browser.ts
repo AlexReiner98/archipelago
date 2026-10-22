@@ -30,7 +30,9 @@ export async function open(url: string): Promise<Page> {
   const binary = chrome();
   if (!binary) throw new Error('No Chrome here: set CHROME');
   const dir = mkdtempSync(join(tmpdir(), 'pelago-chrome-'));
-  const proc: ChildProcess = spawn(binary, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  // A CI runner (GitHub's Ubuntu) does not let Chrome make its sandbox as a normal user, so there it runs without one.
+  const ci = process.env.CI ? ['--no-sandbox'] : [];
+  const proc: ChildProcess = spawn(binary, ['--headless=new', ...ci, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   // Chrome says on its error stream where it listens.
   const address = await new Promise<string>((resolve, reject) => {
     let said = '';
