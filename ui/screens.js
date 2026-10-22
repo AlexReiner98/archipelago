@@ -6,7 +6,7 @@
 import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
 import { attentionCard } from './attention.js';
-import { atlasStrip } from './atlas.js';
+import { savedViewsStrip } from './saved-views.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { gate } from './gate.js';
@@ -207,9 +207,9 @@ const PIECES = {
     return { node, later: () => heldPiece(node, p.title ?? p.screen.title) };
   },
   // The pictures kept on the map, pinned first: a strip of tiles, each opening its picture.
-  atlas: (ctx, p) => {
+  saved_views: (ctx, p) => {
     const node = h('div');
-    return { node, later: () => atlasStrip(node, p.title ?? p.screen.title, p.limit) };
+    return { node, later: () => savedViewsStrip(node, p.title ?? p.screen.title, p.limit) };
   },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,

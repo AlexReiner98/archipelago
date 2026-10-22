@@ -95,10 +95,10 @@ test('attention finds every reason, for the right person, within a scope, and th
   const listed = Object.keys((await callTool(l, human, 'view', {})) as Record<string, string>);
   assert.ok(listed.includes('attention') && !Object.keys(REPLACED).some((n) => listed.includes(n)));
 
-  // Home is the core pack's screen (docs/ui-strategy.md): systems asking for a token, your move capped at five, your projects as a list, the atlas.
+  // Home is the core pack's screen (docs/ui-strategy.md): systems asking for a token, your move capped at five, your projects as a list, saved views.
   const { screens } = (await callTool(l, human, 'schema', {})) as { screens: { at?: string; pieces: { piece: string; title?: string; style?: { shape?: string } }[] }[] };
   const home = screens.find((s) => s.at === 'home')!;
-  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['start', 'Start here'], ['token_ask', undefined], ['held', 'Held for you'], ['attention', 'Your move'], ['picture', 'Your projects'], ['atlas', 'Atlas']]);
+  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['start', 'Start here'], ['token_ask', undefined], ['held', 'Held for you'], ['attention', 'Your move'], ['picture', 'Your projects'], ['saved_views', 'Saved views']]);
   assert.equal((home.pieces[3] as { limit?: number }).limit, 5);
   assert.equal(home.pieces[4].style?.shape, 'list');
 });
