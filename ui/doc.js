@@ -230,12 +230,17 @@ function draw(d) {
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.type === INVOICE);
-  // Its pictures are drawn by the app's own shapes, loaded only when there is one to draw.
+  // Its pictures are drawn by the app's own shapes and by drawings, fetched and started as the page opened.
   const pictures = [...main.querySelectorAll('[data-lens]')];
-  if (pictures.length) import('/doc-lens.js').then((m) => pictures.forEach((el) => m.drawFrozen(el, d.lenses[el.dataset.lens], d.types)));
+  if (pictures.length) shapes.then((m) => pictures.forEach((el) => m.drawFrozen(el, d.lenses[el.dataset.lens], d.types)));
   // Read with the reader's sign-in, a figure is fetched the same way.
   if (own) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }
+
+// While the page's data is on its way, what draws its pictures is fetched, and the frame drawings run in is started
+// (ui/drawing.js): a picture is then drawn as soon as the data is here. A page with none has a frame it does not use.
+const shapes = import('/doc-lens.js');
+import('/drawing.js').then((m) => m.warmDrawings(), () => null);
 
 (own
   ? Promise.all([api('document', { id: own }), api('view', { name: 'style', params: {} })]).then(([d, s]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths }))
