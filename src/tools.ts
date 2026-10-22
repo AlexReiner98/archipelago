@@ -238,14 +238,14 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
  * mostly) is cut to its start and its length, so an item edited ten times does
  * not answer with its note twenty times over. A change set logs one event for
  * each thing it touched, all with the same reason and authority: those are
- * said on the first of them only. `full` asks for all of it.
+ * said on the first of them only (once). `more` says where the whole of it is.
  */
-function shortHistory<T>(events: T[]): T[] {
-  const cut = (v: unknown) => (typeof v === 'string' && v.length > 300 ? `${v.slice(0, 200)}… (${v.length} characters; ask again with full: true for all of it)` : v);
+function shortHistory<T>(events: T[], once = true, more = 'ask again with full: true for all of it'): T[] {
+  const cut = (v: unknown) => (typeof v === 'string' && v.length > 300 ? `${v.slice(0, 200)}… (${v.length} characters; ${more})` : v);
   const said = new Set<string>();
   return events.map((ev) => {
     const { changeset, detail } = ev as { changeset?: string | null; detail?: { changes?: Record<string, { from: unknown; to: unknown }>; authority?: unknown } | null };
-    const again = Boolean(changeset && said.has(changeset));
+    const again = once && Boolean(changeset && said.has(changeset));
     if (changeset) said.add(changeset);
     if (!again && !detail?.changes) return ev;
     const changes = detail?.changes && Object.fromEntries(Object.entries(detail.changes).map(([key, c]) => [key, { from: cut(c.from), to: cut(c.to) }]));
@@ -326,15 +326,15 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => l.search(input),
   },
   get: {
-    description: 'One entity in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the pictures it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in) and its relations in both directions. Its recent history too, when asked for with history: true.',
-    input: { id: z.string(), history: z.boolean().optional().describe('true to be given the last changes to it as well (recent_events).'), full: FULL },
+    description: 'One entity in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the pictures it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in) and its relations in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
+    input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe('Taken, and changes nothing here: the whole record is in events, with full: true.') },
     run: async (l, actor, input) => {
       const found = { ...(await l.get(input.id)), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
       found.shown_in = await shownIn(l, input.id, found.trail);
-      if (actor.kind === 'human' || input.full) return found;
-      // An agent mostly wants the item; its history is several times the size, so it is given when asked for.
+      // Only the last few changes, long values cut, for anyone; an agent mostly wants the item, so has them when it asks.
       const { recent_events, ...item } = found;
-      return input.history ? { ...item, recent_events: shortHistory(recent_events) } : item;
+      const recent = shortHistory(recent_events, actor.kind !== 'human', 'the events tool, with full: true, has all of it');
+      return actor.kind === 'human' || input.history ? { ...item, recent_events: recent } : item;
     },
   },
   view: {
