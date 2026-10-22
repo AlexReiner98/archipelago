@@ -87,10 +87,8 @@ export interface PackFile {
   views?: ViewDef[];
   /** What it shows on the page of every item of a kind or type: one column of pieces the kernel draws; and how it looks. */
   screens?: ScreenDef[]; styles?: StyleDef[];
-  /** What comes from and goes to the world outside: hosts it may reach, webhooks it receives, what it runs by itself. */
-  hosts?: HostDef[];
-  webhooks?: WebhookDef[];
-  schedules?: ScheduleDef[];
+  /** What comes from and goes to the world outside: hosts it may reach, webhooks it receives, what it runs by itself, and the kinds of event it records beside its changes (a push heard). */
+  hosts?: HostDef[]; webhooks?: WebhookDef[]; schedules?: ScheduleDef[]; events?: string[];
   /** Extra fields a pack adds to types owned by another pack. */
   extend?: Record<string, { fields: Record<string, FieldDef> }>;
 }

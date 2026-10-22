@@ -37,6 +37,10 @@ export type Read = {
   blocked?: string[];
   view?: string;
   params?: Record<string, unknown>;
+  /** What a type is: its statuses, and whether a person settles it (a question), so a handler need not know it. */
+  type_info?: string;
+  /** Whether a change with this op is waiting for a person already. */
+  proposed?: Record<string, unknown>;
   /** Only these of each item's props, and no note. */
   fields?: string[];
 };
@@ -116,5 +120,13 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     if (!view) throw new Error(`No view "${q.view}"`);
     return view.run(l, q.params ?? {});
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, events, pictures, blocked, view.');
+  if (q.type_info !== undefined) {
+    const t = l.registry.type(q.type_info);
+    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id) } : null;
+  }
+  if (q.proposed !== undefined) {
+    const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
+    return rows.length > 0;
+  }
+  throw new Error('A read is one of: get, items, related, trail, scope, events, pictures, blocked, view, type_info, proposed.');
 }

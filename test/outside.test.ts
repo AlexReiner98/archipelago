@@ -97,6 +97,12 @@ test('a webhook is taken only with its signature, and a schedule runs as the pac
   assert.ok((await titles(l)).includes('Delivered: flour'));
   const { rows } = await l.db.query<{ actor: string }>(`select actor from event where action = 'entity.create' order by seq desc limit 1`);
   assert.match(rows[0].actor, /pack:demo/);
+  const { rows: arrived } = await l.db.query<{ actor: string; reason: string; detail: { pack?: string } }>(`select actor, reason, detail from event where action = 'demo.arrived'`);
+  assert.deepEqual(arrived.map((e) => [e.actor, e.reason, e.detail.pack]), [['agent:pack:demo', 'flour arrived', 'demo']], 'an event of a kind it declares, recorded as the pack');
+  const stray = await fetch(`${url}/demo.delivered`, { method: 'POST', body, headers: { 'x-signature-256': sign('h00k'), 'x-demo-kind': 'stray' } });
+  assert.equal(stray.status, 500);
+  assert.match(((await stray.json()) as { error: string }).error, /declares no event "demo.stray"/, 'given the header it declares, and refused an event it does not');
+  assert.equal((await titles(l)).filter((t) => t === 'Delivered: flour').length, 1, 'and nothing it answered is written');
 
   const ran = (await runSchedule(l, 'demo', 'demo.tick')) as { requests: Outcome[] };
   assert.equal(ran.requests[0].status, 'made');
