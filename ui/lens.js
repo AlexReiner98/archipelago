@@ -1,7 +1,7 @@
 import { api, h } from './base.js';
-import { drawArch } from './arch.js';
 import { drawFlow } from './flow.js';
 import { drawGrid } from './grid.js';
+import { drawWith, drawings, warmDrawings } from './drawing.js';
 import { dress } from './lens-base.js';
 import { drawList } from './list.js';
 import { drawCode } from './style-code.js';
@@ -129,7 +129,7 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
   const load = async () => {
     let answer;
     try {
-      answer = await api('view', { name: 'lens', params: { ...lens, ...place.ask } });
+      answer = await api('view', { name: 'lens', params: { ...lens, ...place.ask, have: [...drawings.keys()] } });
     } catch (err) {
       return body.replaceChildren(h('div', { class: 'error' }, err.message));
     }
@@ -193,8 +193,11 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
     dress(body, chosen);
     // A style with code of its own is the drawing; without, one of those that come built in.
     // A lens on a time axis is drawn along it unless a shape is asked for here; a shape kept from before (nest, boxes) is drawn as the list.
-    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : (LENS_SHAPES[answer.lens.time && !style.shape ? 'time' : chosen.shape] ?? LENS_SHAPES.list))(body, answer, chosen, keep, place);
+    const timed = answer.lens.time && !style.shape;
+    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : chosen.drawing && !timed ? drawWith : (LENS_SHAPES[timed ? 'time' : chosen.shape] ?? LENS_SHAPES.list))(body, answer, chosen, keep, place);
   };
+  // The frame drawings run in is started while the answer is on its way.
+  warmDrawings();
   host.ready = load();
   // Light only these items (a beat's, pointed at beside the picture), or everything as the style says again: the shape draws itself anew.
   host.light = (ids) => {
@@ -207,4 +210,4 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
 export const lensPlace = new Map();
 
 /** The shapes the kernel draws. Each reads only what a lens answers with. */
-export const LENS_SHAPES = { list: drawList, flow: drawFlow, grid: drawGrid, time: drawTime, architecture: drawArch };
+export const LENS_SHAPES = { list: drawList, flow: drawFlow, grid: drawGrid, time: drawTime };

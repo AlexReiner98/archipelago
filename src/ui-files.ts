@@ -1,7 +1,7 @@
 // The files the web UI is served from, by the path a browser asks for.
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'held', 'search', 'item', 'item-doc', 'item-links', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'lens', 'lens-base', 'list', 'grid', 'timeline', 'style-code', 'flow', 'flow-layout', 'arch', 'arch-layout', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'theme', 'token-piece', 'token-ask', 'saved-views', 'diagram', 'start', 'plan-card', 'doc-lens'];
+const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'held', 'search', 'item', 'item-doc', 'item-links', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'lens', 'lens-base', 'list', 'grid', 'timeline', 'style-code', 'flow', 'flow-layout', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'theme', 'token-piece', 'token-ask', 'saved-views', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'drawing'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -11,7 +11,6 @@ export const UI_FILES: Record<string, string> = {
   '/layout.css': 'layout.css',
   '/style.css': 'style.css',
   '/flow.css': 'flow.css',
-  '/arch.css': 'arch.css',
   '/diagram.css': 'diagram.css',
   '/grid.css': 'grid.css',
   '/list.css': 'list.css',
@@ -24,6 +23,7 @@ export const UI_FILES: Record<string, string> = {
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
+  '/draw-marks.js': 'draw-marks.js',
   // three.js as its authors build it (MIT), offered to a style's code; loaded only when one asks for it.
   '/three.js': 'three.module.min.js',
 };
