@@ -58,10 +58,12 @@ test('a push to the default branch is recorded and proposes closing only the ope
   assert.equal(done.answer.recorded, true);
 });
 
-test('a push to another branch, a tag or a deletion is recorded and settles nothing', async () => {
+test('a push to another branch closes only what a commit names; a tag or a deletion settles nothing', async () => {
   const ctx = ctxOver([repo, task]);
   const branch = await handler['github.push'](deliver(push({ ref: 'refs/heads/wip' })), ctx);
-  assert.deepEqual(branch.changes, []);
+  assert.deepEqual(branch.changes.map((c: { ops: unknown[] }) => c.ops), [[{ op: 'update', id: task.id, status: 'done' }]]);
+  const unnamed = await handler['github.push'](deliver(push({ ref: 'refs/heads/wip', commits: [{ id: 'd'.repeat(40), message: 'Checkout fixed at last', author: { name: 'Ann' } }] })), ctx);
+  assert.deepEqual(unnamed.changes, []);
   const tag = await handler['github.push'](deliver(push({ ref: 'refs/tags/v1', commits: [] })), ctx);
   assert.equal(tag.log[0].reason, 'tag v1 pushed');
   const gone = await handler['github.push'](deliver(push({ ref: 'refs/heads/wip', deleted: true, after: '0'.repeat(40), commits: [] })), ctx);

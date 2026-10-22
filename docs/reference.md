@@ -434,11 +434,14 @@ one in the map whose `remote` is its GitHub address. From then on:
 - every push, on any branch, is recorded against the repository in the
   activity log, and `repo_work` and the GitHub card say when it was last
   pushed to;
-- on the default branch, a commit message that says what it finished
-  (`closes e_abc12345`, `fixes e_...`, `done: e_...`) closes that item the
-  way an agent would: held for you to confirm unless policy lets it through.
-  Decisions and hypotheses are left alone; a commit cannot say what was
-  decided.
+- on any branch, a commit message that says what it finished
+  (`Closes: e_abc12345` on a line of its own, `fixes e_...`, `done: e_...`)
+  closes that item the way an agent would: held for you to confirm unless
+  policy lets it through. Decisions and hypotheses are left alone; a commit
+  cannot say what was decided. An agent session that names its task in
+  `session_start` or `session_update` is told to end the commit that finishes
+  it with that line, and says its branch, so the push reader knows what the
+  branch was for.
 
 **An agent reads the push.** [examples/github/pelago.yml](../examples/github/pelago.yml)
 is a GitHub Actions workflow: on every push it runs Claude in the repository,

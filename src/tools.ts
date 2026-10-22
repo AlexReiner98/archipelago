@@ -33,7 +33,7 @@ import { type Focus, listening, point as setFocus, presence, tellStamp, took } f
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page, or a document at its own address (/p/<workspace>/<id>) with the sections it holds; only a project, feature, release, proof question, test, test result or document can be, and only a human makes it so (from an agent it waits as a proposal).');
-const confidence = z.number().min(0).max(1);
+const confidence = z.number().min(0).max(1); const BRANCH = z.string().optional().describe('The git branch you work on (git branch --show-current).');
 const field = z.object({
   type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'url', 'enum', 'json']),
   values: z.array(z.string()).optional(),
@@ -643,8 +643,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => l.release(actor, input),
   },
   session_start: {
-    description:
-      'Register this agent session in the map so the human can see it. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it. Takes effect at once.',
+    description: 'Register this agent session in the map so the human can see it. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',
     input: {
       title: z.string().optional().describe('A few words on what this session is for.'),
       task: z.string().optional().describe('Id of the entity being worked on.'),
@@ -652,16 +651,17 @@ export const TOOLS: Record<string, Tool> = {
       cwd: z.string().optional().describe('Your working directory. Used to find the repository.'),
       remote: z.string().optional().describe('The address the checkout was cloned from (git remote origin). Finds the repository on any machine; the directory is used when this is not given or not known.'),
       session_id: z.string().optional().describe('The id your surface gave this session, if you know it. Makes this call safe to repeat.'),
+      branch: BRANCH,
     },
     run: async (l, actor, input) => sessionStart(l, actor, input),
   },
   session_update: {
-    description: 'Report in from a registered session: a note worth keeping, a change to waiting or running, or a task you have picked up. With only the run, it is a heartbeat.',
+    description: 'Report in from a registered session: a note worth keeping, a change to waiting or running, a task you have picked up, or the git branch you moved to. With only the run, it is a heartbeat.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
       status: z.enum(['running', 'waiting']).optional(),
       note: z.string().optional().describe('What happened, what you found, or what you are blocked on.'),
-      task: z.string().optional(),
+      task: z.string().optional(), branch: BRANCH,
     },
     run: async (l, actor, input) => sessionUpdate(l, actor, input),
   },

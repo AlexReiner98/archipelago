@@ -7,6 +7,7 @@ import { within, sought } from './github.js';
 import handler from './handler.js';
 import { alike, unread } from './history.js';
 import { ON_PUSH } from './push.js';
+import { nearness, shortlist, shows, wordsOf } from './shortlist.js';
 
 const REPO = { id: 'e_repo0001', type: 'software.repo', title: 'Tools repo', props: { remote: 'https://github.com/acme/tools.git' } };
 const A = 'a'.repeat(40);
@@ -93,9 +94,10 @@ test('a push the GitHub pack recorded is read once: one run, held to its reposit
   assert.deepEqual([run.title, run.within, run.by, run.link, run.map_tools], ['Read the push to main (bbbbbbb)', [REPO.id], 'a push to main', link(B), undefined]);
   // Claimed by repository and head: the two servers of a deploy, or a catch-up, do not read it again.
   assert.equal(run.once, `push:acme/tools@${B}`);
-  assert.deepEqual(run.tools.map((t: any) => t.name), ['update', 'create', 'look', 'find', 'diff', 'file']);
+  assert.deepEqual(run.tools.map((t: any) => t.name), ['decide', 'update', 'create', 'look', 'find', 'diff', 'file']);
   assert.ok(JSON.stringify(run.tools).length < 3000, 'small enough to send every turn');
-  assert.match(run.task, /Branch "main"[\s\S]*a{40}\.\.b{40}[\s\S]*whetstone still needs oiling[\s\S]*tools\/sharpen\.ts[\s\S]*e_task0001 work\.task \[todo\] Oil the whetstone\n[\s\S]*work\.task: open todo, doing; closed done, dropped/);
+  // The item the push is near is asked about by itself, with the part of the diff that touches it.
+  assert.match(run.task, /Branch "main"[\s\S]*a{40}\.\.b{40}[\s\S]*whetstone still needs oiling[\s\S]*Candidates \(1\): decide on each\.\n## e_task0001 work\.task \[todo\] Oil the whetstone\nWhy asked: its words are in the push\.[\s\S]*Other open items of this repository \(0\)[\s\S]*work\.task: open todo, doing; closed done, dropped/);
   assert.deepEqual(run.context.repo, { name: 'Acme/Tools', entity: { id: REPO.id, title: 'Tools repo', type: 'software.repo' } });
 });
 
@@ -147,21 +149,39 @@ test('what it made itself and nobody has reviewed is marked as its own guess, an
   assert.match(runs[0].task, /e_task0001 work\.task \[todo\] Oil the whetstone\n/);
   assert.match(runs[0].task, /Approved since\n[\s\S]*Retitled by the owner\n/, 'what the owner approved or changed is theirs');
   assert.deepEqual(runs[0].context.own, ['e_guess001']);
-  const update = handler.tool({ name: 'update', input: { id: 'e_guess001', status: 'done', why: 'x' }, context: runs[0].context }, ctxOver({ map: { item: guess } }).ctx);
-  await assert.rejects(update, /your own guess from an earlier push, not yet reviewed/);
+  const decide = handler.tool({ name: 'decide', input: { id: 'e_guess001', finished: true, quote: 'Sharpen the tools', why: 'x' }, context: runs[0].context }, ctxOver({ github, map: { item: guess } }).ctx);
+  await assert.rejects(decide, /your own guess from an earlier push, not yet reviewed/);
 });
 
-test('update sends only what a commit shows: a closing status, on the default branch, as a change of the run’s own', async () => {
-  const { ctx } = ctxOver();
+test('decide closes only what the push shows, word for word, on the default branch; update only corrects', async () => {
+  const { ctx } = ctxOver({ github });
   const call = (name: string, input: Record<string, unknown>, context = pushContext()) => handler.tool({ name, input, context }, ctx);
-  await assert.rejects(call('update', { id: 'e_task0001', title: 'Oil the whetstone', status: 'todo', why: 'x' }), /Nothing to change: e_task0001 is already "Oil the whetstone" \[todo\]/);
+  assert.deepEqual(await call('decide', { id: 'e_task0001', finished: false, why: 'Not this one' }), { answer: 'e_task0001 left as it is.' });
+  await assert.rejects(call('decide', { id: 'e_task0001', finished: true, quote: 'The whetstone is oiled now', why: 'x' }), /That quote is not in this push/, 'a line the push does not have');
+  await assert.rejects(call('decide', { id: 'e_task0001', finished: true, quote: 'oil', why: 'x' }), /That quote is not in this push/, 'too short to show anything');
+  await assert.rejects(call('decide', { id: 'e_task0001', finished: true, quote: '+  oil()', why: 'x' }, pushContext('feat')), /"feat" is not the default branch/);
+  const done = await call('decide', { id: 'e_task0001', finished: true, quote: 'The whetstone still needs oiling.', why: 'The commit oils it' });
+  assert.deepEqual(done.changes, [{ ops: [{ op: 'update', id: 'e_task0001', status: 'done' }], reason: 'The commit oils it ("The whetstone still needs oiling.")', authority: { of: 'agent', basis: 'The commit oils it ("The whetstone still needs oiling.")' }, source: { uri: link(B), kind: 'commit' } }]);
+  assert.deepEqual((await handler.tool({ name: 'decide', input: { id: 'e_task0001', finished: true, quote: 'still needs oiling', why: 'x' }, context: pushContext() }, ctxOver({ github, map: { waiting: [] } }).ctx)).changes[0].ops, [{ op: 'update', id: 'e_task0001', status: 'done' }], 'spacing and case aside, part of a line will do');
+  await assert.rejects(call('update', { id: 'e_task0001', status: 'done', why: 'x' }), /To close an item, decide/);
+  await assert.rejects(call('update', { id: 'e_task0001', title: 'Oil the whetstone', why: 'x' }), /Nothing to change: e_task0001 is already "Oil the whetstone" \[todo\]/);
   await assert.rejects(call('update', { id: 'e_task0001', why: 'x' }), /Say what to change/);
-  await assert.rejects(call('update', { id: 'e_task0001', status: 'doing', why: 'The commit is about oil' }), /Only a closing status \(done, dropped\): a push shows what was finished, not what was begun/);
-  await assert.rejects(call('update', { id: 'e_task0001', status: 'done', why: 'x' }, pushContext('feat')), /"feat" is not the default branch: nothing is finished there/);
-  const done = await call('update', { id: 'e_task0001', title: 'Oil the whetstone', status: 'done', why: 'The commit oils it' });
-  assert.deepEqual(done.changes, [{ ops: [{ op: 'update', id: 'e_task0001', status: 'done' }], reason: 'The commit oils it', authority: { of: 'agent', basis: 'The commit oils it' }, source: { uri: link(B), kind: 'commit' } }]);
   assert.deepEqual((await call('update', { id: 'e_task0001', append: 'Oiled in bbbbbbb.', why: 'x' }, pushContext('feat'))).changes[0].ops, [{ op: 'update', id: 'e_task0001', append: 'Oiled in bbbbbbb.' }], 'a line added is always a change, on any branch');
   await assert.rejects(call('rm', {}), /No tool "rm"/);
+});
+
+test('the items asked about are found without a model: named, worked on from the branch, or near by their words', () => {
+  const items = [TASK, { id: 'e_far00001', type: 'work.task', status: 'todo', title: 'Write the invoice export' }, { id: 'e_named001', type: 'work.task', status: 'todo', title: 'Anything at all' }, { id: 'e_work0001', type: 'work.issue', status: 'open', title: 'Unrelated words here' }];
+  const pushed = { messages: ['Sharpen the tools\n\nThe whetstone still needs oiling. Closes: e_named001'], files: [{ filename: 'tools/sharpen.ts', patch: '+  oil()' }] };
+  assert.deepEqual(shortlist(items, pushed, { named: ['e_named001'], worked: ['e_work0001'] }).map((c) => [c.item.id, c.why]), [
+    ['e_named001', 'a commit names it'],
+    ['e_work0001', 'the session that pushed this branch was working on it'],
+    ['e_task0001', 'its words are in the push'],
+  ]);
+  assert.equal(nearness('Write the invoice export', wordsOf(pushed.messages[0]), wordsOf('tools/sharpen.ts oil()')), 0, 'nothing of it is in the push');
+  assert.equal(shows('  THE whetstone   still needs oiling ', pushed), true);
+  assert.equal(shows('oil()', pushed), false, 'under twelve characters shows nothing');
+  assert.equal(shows('-  removed line here', { messages: [], files: [{ filename: 'x', patch: '-  removed line here' }] }), false, 'a removed line finishes nothing');
 });
 
 test('create makes no copies: what is open already, near enough by its title, or waiting for the owner, is named back', async () => {

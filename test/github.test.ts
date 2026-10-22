@@ -67,15 +67,15 @@ test('the GitHub pack hears a push: it is recorded against its repository, and w
   assert.equal((await deliver({}, { event: 'ping' })).result.reason, 'pong');
   assert.equal((await deliver(push('main', 'x', 'Other/Repo'))).result.recorded, false, 'a repository the map does not know');
 
-  // Work on a branch is not finished work.
-  const onBranch = (await deliver(push('feat/footer', `Footer rebuilt\n\nCloses ${made.t}`))).result;
-  assert.deepEqual([onBranch.recorded, onBranch.branch, onBranch.settled], [true, 'feat/footer', []]);
-  // On the default branch the commit is taken at its word, for work; a decision is not a commit's to make.
+  // On any branch a commit is taken at its word for what it names (the owner, 22 Oct 2026), for work only.
+  const onBranch = (await deliver(push('feat/footer', `Footer rebuilt\n\nCloses: ${made.t}`))).result;
+  assert.deepEqual([onBranch.recorded, onBranch.branch, onBranch.settled], [true, 'feat/footer', [{ id: made.t, title: 'Fix the footer', status: 'done', result: 'proposed' }]]);
+  // Merged to the default branch, it is waiting already; a decision is not a commit's to make.
   const merged = (await deliver(push('main', `Merge the footer\n\nFixes ${made.t} and closes ${made.d}`))).result;
-  assert.deepEqual(merged.settled, [{ id: made.t, title: 'Fix the footer', status: 'done', result: 'proposed' }]);
+  assert.deepEqual(merged.settled, [{ id: made.t, title: 'Fix the footer', status: 'done', result: 'already proposed' }]);
 
   const [waiting] = (await call('/api/proposals', admin)).result as any[];
-  assert.match(waiting.reason, /Commit c0ffee1 says it is finished: Merge the footer/);
+  assert.match(waiting.reason, /Commit c0ffee1 says it is finished: Footer rebuilt/);
   await call('/api/decide', admin, { proposal: waiting.id, approve: true });
   const work = (await call('/agent/view', robot, { name: 'repo_work', params: { repo: 'acme/site' } })).result;
   assert.deepEqual([work.repo.id, work.last_push.branch, work.ready.length], [made.r, 'main', 0], 'found by its GitHub name, with its last push, and the task is done');
@@ -291,9 +291,9 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.equal((await call('/api/get', admin, { id: outside })).result.entity.title, 'Pay the invoice');
   // It asked with the workspace's key, on the model chosen, with the push's narrow tools, starting from what the push changed.
   assert.deepEqual([asks[0].key, asks[0].model, asks[0].fallbacks], ['sk-ant-' + 'x'.repeat(30), 'claude-sonnet-5-5', 'default']);
-  assert.deepEqual(asks[0].tools.map((t: any) => t.name), ['update', 'create', 'look', 'find', 'diff', 'file']);
+  assert.deepEqual(asks[0].tools.map((t: any) => t.name), ['decide', 'update', 'create', 'look', 'find', 'diff', 'file']);
   assert.ok(JSON.stringify(asks[0].tools).length < 3000, 'small enough to send every turn');
-  assert.match(asks[0].messages[0].content, /Branch "main"[\s\S]*a{40}\.\.b{40}[\s\S]*whetstone still needs oiling[\s\S]*tools\/sharpen\.ts[\s\S]*Open items of this repository/);
+  assert.match(asks[0].messages[0].content, /Branch "main"[\s\S]*a{40}\.\.b{40}[\s\S]*whetstone still needs oiling[\s\S]*tools\/sharpen\.ts[\s\S]*Other open items of this repository/);
   // What it asked for was done, all of a turn answered together, and a tool that is not there said so without ending the run.
   const answers = asks[1].messages.at(-1).content;
   assert.deepEqual(answers.map((a: any) => [a.tool_use_id, Boolean(a.is_error)]), [['tu_1', false], ['tu_2', false], ['tu_3', true]]);

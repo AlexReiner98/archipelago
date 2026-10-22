@@ -1,6 +1,7 @@
 // The brief: everything a session needs to start on one task, as data and as text to paste. What it is part of,
 // its repository, what blocks it, what it needs and who holds that, and what it rests on beyond structure.
 
+import { commitRule } from './commit-rule.ts';
 import { blockGraph } from './blocking.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 
@@ -88,7 +89,7 @@ export async function brief(l: Archipelago, input: { task?: string }) {
     lines.push('', `## ${title[0].toUpperCase()}${title.slice(1)}`);
     for (const r of ties.filter((t) => t.rel === rel)) lines.push(`- ${r.title} (${r.status})${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && r.body ? `: ${r.body}` : ''}`);
   }
-  lines.push('', '## Reporting', `Register with pelago (session_start, task ${task.id}), note anything worth knowing with session_update, and call session_end with a summary when done.`);
+  lines.push('', '## Reporting', `Register with pelago (session_start, task ${task.id}, with your git branch), note anything worth knowing with session_update, and call session_end with a summary when done. ${commitRule(task.id)}`);
 
   const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
   return {
