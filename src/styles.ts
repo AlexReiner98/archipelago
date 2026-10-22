@@ -101,8 +101,8 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown }) {
 
 /** What the page itself is drawn in: the colours (theme) and lengths of the workspace's style. Sent with a page read by no login. */
 export async function pageLook(l: Archipelago) {
-  const { theme, lengths } = (await pageStyle(l, {})).style;
-  return { theme, lengths };
+  const { theme, lengths, page_css } = (await pageStyle(l, {})).style as { theme: unknown; lengths: unknown; page_css?: unknown };
+  return { theme, lengths, ...(typeof page_css === 'string' && page_css.trim() && { page_css }) };
 }
 
 /** A length as a style may give it: a number of pixels, or numbers with one of these units. */

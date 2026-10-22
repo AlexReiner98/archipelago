@@ -144,3 +144,22 @@ test('in a browser, a page opened with ?live draws itself anew when published ag
     page.close();
   }
 });
+
+test('in a browser, the workspace style’s page_css is how a published page looks, checked as a drawing’s stylesheet is', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { call, base } = await serve('off');
+  const { d } = await published(call, [{ op: 'create', ref: 'look', type: 'style', title: 'The site', status: 'current', props: { page_css: 'section:has(> .doc-lens) > h2 { letter-spacing: 3px; }' } }]);
+  assert.equal((await (await fetch(`${base}/p/default/${d}/data`)).json()).page_css, 'section:has(> .doc-lens) > h2 { letter-spacing: 3px; }');
+  const page = await open(`${base}/p/default/${d}`);
+  const spacing = () => page.evaluate(`(async () => { for (let n = 0; n < 200 && !document.querySelector('section > h2'); n++) await new Promise((r) => setTimeout(r, 25)); return getComputedStyle(document.querySelector('section > h2')).letterSpacing; })()`);
+  try {
+    assert.equal(await spacing(), '3px');
+    // One that would fetch something is not read, and the page is drawn as it is.
+    const { rows } = { rows: (await call('/api/search', undefined, { q: 'The site', type: 'style' })).result };
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: 'h2 { letter-spacing: 3px; background: url(https://example.com/) }' } }] });
+    await page.go(`${base}/p/default/${d}`);
+    assert.equal(await spacing(), 'normal');
+    assert.equal(await page.evaluate(`document.querySelector('main h1').textContent`), 'The system');
+  } finally {
+    page.close();
+  }
+});

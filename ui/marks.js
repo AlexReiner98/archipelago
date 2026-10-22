@@ -108,12 +108,21 @@ export function step(moving, now) {
  * nothing it draws can cover the page. What could reach past the host, or out of the page, is refused.
  */
 export function cssFor(id, text) {
+  return `:where([data-drawing="${id}"]) {\n${checkedCss(text)}\n}`;
+}
+
+/**
+ * A stylesheet as a drawing or a published page may say it, comments taken out: refused if it could fetch anything
+ * or reach out of where it is read. A page's (`page`) may look at what a part holds (:has), which a drawing may not:
+ * that is how a drawing would reach past its host.
+ */
+export function checkedCss(text, page = false) {
   const css = String(text ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
-  const refused = [/[\\"'&<]/, /@(import|font-face|namespace|property|keyframes|layer|page|scope|charset)/i, /url\(|image-set\(|:has\(|:host|:root|expression\(/i, /(^|[{};,])\s*[~+>]/];
+  const refused = [/[\\"'&<]/, /@(import|font-face|namespace|property|keyframes|layer|page|scope|charset)/i, page ? /url\(|image-set\(|:host|:root|expression\(/i : /url\(|image-set\(|:has\(|:host|:root|expression\(/i, /(^|[{};,])\s*[~+>]/];
   const bad = refused.find((re) => re.test(css));
   if (bad) fail(`a stylesheet with ${bad}`);
   let depth = 0;
   for (const c of css) if ((depth += c === '{' ? 1 : c === '}' ? -1 : 0) < 0) fail('a stylesheet that closes more than it opens');
   if (depth) fail('a stylesheet that does not close what it opens');
-  return `:where([data-drawing="${id}"]) {\n${css}\n}`;
+  return css;
 }
