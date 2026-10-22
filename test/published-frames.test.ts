@@ -61,9 +61,10 @@ test('a published picture keeps its first frame, its page carries its data, and 
   assert.ok(inPage, 'the data is in the page');
   assert.deepEqual(JSON.parse(inPage[1]), data);
   assert.equal(html.match(/<script/g)?.length, 2, 'no script but its own and its data');
-  for (const file of ['/doc-lens.js', '/drawing.js', '/marks.js', '/base.js']) assert.match(html, new RegExp(`<link rel="modulepreload" href="${file}\?v=`), file);
+  for (const file of ['/doc-lens.js', '/drawing.js', '/marks.js', '/base.js']) assert.match(html, new RegExp(`<link rel="modulepreload" href="${file}[?]v=`), file);
   assert.ok(html.indexOf('src="/doc.js') < html.indexOf('id="page-data"'), 'its script is asked for before its data is read');
   assert.ok(!html.includes('Loading'));
+  assert.ok(!html.includes('noindex'), 'what the text says is not read as a replacement pattern');
 });
 
 test('a picture drawn by the owner’s version of a drawing is drawn only in the sandbox', async () => {
