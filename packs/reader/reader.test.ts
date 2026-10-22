@@ -57,6 +57,7 @@ function ctxOver({ github = {} as Record<string, unknown>, connected = true, map
       if (q.tool === 'search') return map.found ?? [];
       if (q.tool === 'get') return { entity: map.item ?? TASK, outgoing: [], incoming: [] };
       if ('proposed' in q) return (map.waiting ?? []).includes(q.proposed.title);
+      if (q.tool === 'proposals') return (map.waiting ?? []).map((title) => ({ ops: [{ op: 'create', title }, { op: 'link' }] }));
       if (q.get) return map.item ?? TASK;
       throw new Error(`Not read here: ${JSON.stringify(q)}`);
     },
@@ -191,6 +192,8 @@ test('create makes no copies: what is open already, near enough by its title, or
   await assert.rejects(create('Server reads no commit in a Git worktree.', { found }), /Already there: e_open0001 work\.issue \[open\] "Server reads no commit in a git worktree"\. Change that one/);
   await assert.rejects(create('The server reads no commit in a git worktree', { found }), /Already there: e_open0001/, 'a word more or less');
   await assert.rejects(create('Strop the blade', { waiting: ['Strop the blade'] }), /waiting for the owner already/);
+  await assert.rejects(create('Strop blade', { waiting: ['Strop the blade'] }), /Making "Strop the blade" is waiting for the owner already: that is this one/, 'made twice in one read, worded twice');
+  await assert.rejects(create('Evaluate open models', { found: [{ id: 'e_open0002', type: 'work.task', status: 'todo', title: 'Evaluate open models through LiteLLM' }] }), /Already there: e_open0002/, 'every word of it is in one already there');
   // Something new lives in the repository by the link its type says, or is part of what it is given.
   const made = await create('Strop the blade', { found });
   assert.deepEqual(made.changes[0].ops, [{ op: 'create', ref: 'n', type: 'work.task', title: 'Strop the blade' }, { op: 'link', type: 'software.lives_in', from: 'n', to: REPO.id }]);

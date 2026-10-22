@@ -207,7 +207,9 @@ export async function pushTool(ctx, name, input, { repo, push, own = [] }) {
       const title = String(input.title ?? '');
       const there = (await ctx.read({ tool: 'search', input: { q: title, open: true, limit: 10 } })).find((i) => alike(i.title, title));
       if (there) throw new Error(`Already there: ${there.id} ${there.type} [${there.status}] "${there.title}". Change that one if the push shows it; never make a copy.`);
-      if (await ctx.read({ proposed: { op: 'create', title } })) throw new Error(`Making "${title}" is waiting for the owner already.`);
+      // Nor a second of what this read, or an earlier one, made and the owner has not looked at yet.
+      const held = (await ctx.read({ tool: 'proposals', input: {} })).flatMap((p) => p.ops ?? []).find((o) => o.op === 'create' && alike(o.title, title));
+      if (held) throw new Error(`Making "${held.title}" is waiting for the owner already: that is this one. Make it once.`);
       const parent = typeof input.part_of === 'string' && input.part_of ? input.part_of : undefined;
       const lives = parent ? 'part_of' : ((await ctx.read({ type_info: repo.entity.type ?? '' }))?.lives_in ?? 'lives_in');
       const link = { op: 'link', type: lives, from: 'n', to: parent ?? repo.entity.id };
