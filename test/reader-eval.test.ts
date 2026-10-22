@@ -104,7 +104,7 @@ test('a push replayed on a scripted model, against the stand-in GitHub, and scor
   const judged = (sent: Sent[]) => judge(fixture, sent, closed);
   const done = await replay(fixture, { model: 'scripted', provider: 'anthropic', key: 'k', price: { input: 1, output: 5 }, currency: 'USD' }, github);
   assert.equal(done.ok, true, done.summary);
-  assert.match(String(asked[0].messages[0].content), /Oil the hinge \(fixes the squeak\)[\s\S]*\+oiled[\s\S]*Open items of this repository \(2\)/);
+  assert.match(String(asked[0].messages[0].content), /Oil the hinge \(fixes the squeak\)[\s\S]*\+oiled[\s\S]*Paint the door/);
   assert.equal(asked[0].model, 'scripted');
   assert.deepEqual(done.usage, { input: 2000, output: 200, cache_read: 0, cache_write: 0 });
   assert.equal(done.usd, (2000 * 1 + 200 * 5) / 1e6);
