@@ -32,7 +32,7 @@ export function nearness(title, said, changed) {
 
 /** How near an item has to be to be asked about, and how many are asked about at most. */
 export const NEAR = 0.4;
-export const MOST = 8;
+export const MOST = 12;
 
 /**
  * The items to ask about, each with why: the ones commits name, the ones a session on this branch worked on, then

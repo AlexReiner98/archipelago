@@ -105,7 +105,7 @@ test('a push the GitHub pack recorded is read once: one run, held to its reposit
 test('its brief asks only for what a commit shows: nothing is moved for having been started', () => {
   assert.doesNotMatch(ON_PUSH, /visibly started|status that says so/);
   assert.match(ON_PUSH, /Never set an open status such as doing/);
-  assert.match(ON_PUSH, /in its own words/);
+  assert.match(ON_PUSH, /finished is false when the push only touches\s+the same subject, does part of it, or prepares for it/);
 });
 
 test('a tag, a branch deleted, a push of no commits, or a workspace that has not connected the App, is not read', async () => {

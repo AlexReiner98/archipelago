@@ -17,9 +17,10 @@ export const ON_PUSH = `You keep a map of work true to one code repository. A pu
 items it may have finished (candidates), each with its note and the part of the diff that touches it, and the rest of
 the repository's open items. Most pushes finish little or nothing.
 
-- For each candidate, call \`decide\` once: finished true only when a commit says so in its own words (closes, fixes,
-  done, naming it) or the diff plainly does the whole of it, and give as quote one line of a commit message or of the
-  diff, copied word for word, that shows it. A commit about something near the item's subject has not done it.
+- For each candidate, call \`decide\` once. Read its title as the thing asked for. finished is true when a commit says
+  it closes it, or when a commit's message or diff does what the title asks, named or not; give as quote one line of
+  a commit message or of the diff, copied word for word, that shows it. finished is false when the push only touches
+  the same subject, does part of it, or prepares for it.
 - Another open item: \`decide\` on it only if a commit plainly finishes it.
 - Never set an open status such as doing: a push shows what was finished, not what was begun.
 - A title or note this push made wrong: \`update\` it with the correction.
