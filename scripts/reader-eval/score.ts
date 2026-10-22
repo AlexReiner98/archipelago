@@ -133,6 +133,7 @@ export function summarise(t: Tally): Summary {
  */
 export function choose(models: Summary[], slack = 0.05): { default?: Summary; fallback?: Summary; why: string } {
   const ran = models.filter((m) => m.runs > m.failed);
+  if (!models.length) return { why: 'No candidate model was run.' };
   if (!ran.length) return { why: 'No model finished a run.' };
   const best = Math.max(...ran.map((m) => m.quality));
   const fewest = Math.min(...ran.map((m) => m.failed / m.runs));

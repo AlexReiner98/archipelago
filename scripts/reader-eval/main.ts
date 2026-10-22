@@ -2,7 +2,8 @@
 // (or with --export), replays every push on each candidate model, scores the replays and names a default model and
 // a fallback. What it found is written beside the fixtures, as results/<time>.json and .md.
 //
-//   --models haiku,sonnet,opus   candidates: a short name, or provider:model@in/out (US$ a million tokens)
+//   --models none,haiku,sonnet,opus candidates: a short name, or provider:model@in/out (US$ a million tokens);
+//                                none is the baseline that changes nothing. One without a key is skipped, and said.
 //   --since 2026-10-21           export the pushes read since then (default: 14 days)
 //   --runs 2                     replay each push this many times on each model
 //   --only main@01e12e6,…        replay only these pushes; --limit 10 the first ten
@@ -20,7 +21,8 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { closedOf, exportFixtures } from './export.ts';
 import { loadAnswers, saveAnswers, standIn } from './github.ts';
-import { replay, type Candidate } from './replay.ts';
+import { countCalls, replay, type Candidate } from './replay.ts';
+import { asker } from '../../src/model.ts';
 import { choose, judge, summarise, type Fixture, type Summary, type Tally } from './score.ts';
 import { report } from './report.ts';
 
@@ -29,7 +31,7 @@ const { values: args } = parseArgs({
   options: {
     export: { type: 'boolean' },
     since: { type: 'string' },
-    models: { type: 'string', default: 'haiku,sonnet,opus' },
+    models: { type: 'string', default: 'none,haiku,sonnet,opus' },
     runs: { type: 'string', default: '1' },
     only: { type: 'string' },
     limit: { type: 'string' },
@@ -55,13 +57,15 @@ const KNOWN: Record<string, Omit<Candidate, 'key'>> = {
   fable: { model: 'claude-fable-5-1', provider: 'anthropic', price: { input: 10, output: 50 } },
 };
 
-function candidate(spec: string): Candidate {
+/** A candidate by its spec, or why it is skipped: a model without a key is said, not run. */
+function candidate(spec: string): Candidate | string {
+  if (spec === 'none') return { model: 'none', provider: 'anthropic', key: 'none', price: { input: 0, output: 0 } };
   const known = KNOWN[spec];
   const m = known ? undefined : /^(anthropic|openai|compatible):([^@]+)@([\d.]+)\/([\d.]+)$/.exec(spec);
   if (!known && !m) throw new Error(`"${spec}" is no candidate: give ${Object.keys(KNOWN).join(', ')}, or provider:model@in/out.`);
   const c: Omit<Candidate, 'key'> = known ?? { model: m![2], provider: m![1] as Candidate['provider'], price: { input: Number(m![3]), output: Number(m![4]) } };
   const key = c.provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : c.provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.READER_EVAL_KEY;
-  if (!key && c.provider !== 'compatible') throw new Error(`No key for ${c.model}: set ${c.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'} (or put it in ${envFile}).`);
+  if (!key && c.provider !== 'compatible') return `${c.model}: no key (set ${c.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'}, or put it in ${envFile})`;
   return { ...c, key, ...(c.provider === 'compatible' && { url: process.env.READER_EVAL_URL }) };
 }
 
@@ -81,7 +85,15 @@ let fixtures = readdirSync(pushesDir)
   .filter((f) => !only || only.includes(f.id))
   .sort((a, b) => a.push.ts.localeCompare(b.push.ts));
 if (args.limit) fixtures = fixtures.slice(0, Number(args.limit));
-const candidates = args.models.split(',').map((s) => candidate(s.trim()));
+const specs = args.models.split(',').map((s) => candidate(s.trim()));
+const candidates = specs.filter((c): c is Candidate => typeof c !== 'string');
+const skipped = specs.filter((c): c is string => typeof c === 'string');
+for (const s of skipped) console.log(`Skipped ${s}.`);
+// The baseline "none" sends nothing: what doing nothing scores, at no cost. Every other model is asked for real.
+countCalls((key, at) => {
+  const real = asker(key, at);
+  return (params) => (params.model === 'none' ? Promise.resolve({ content: [{ type: 'text', text: 'Nothing needs changing.' }], stop_reason: 'end_turn', usage: { input_tokens: 0, output_tokens: 0 } }) : real(params));
+});
 const answersFile = join(dir, 'github.json');
 const answers = loadAnswers(answersFile);
 const github = standIn(answers, { checkout: ROOT, online: args.online });
@@ -135,11 +147,11 @@ for (const c of candidates) {
 }
 saveAnswers(answersFile, answers);
 
-const chosen = choose(summaries);
+const chosen = choose(summaries.filter((m) => m.model !== 'none'));
 const at = new Date().toISOString().replace(/[:.]/g, '-');
 mkdirSync(join(dir, 'results'), { recursive: true });
-const result = { at, fixtures: fixtures.map((f) => ({ id: f.id, labels: f.labels.length, items: f.items.length })), summaries, chosen: { default: chosen.default?.model, fallback: chosen.fallback?.model, why: chosen.why }, perPush, misses: github.misses };
+const result = { at, fixtures: fixtures.map((f) => ({ id: f.id, labels: f.labels.length, items: f.items.length })), summaries, chosen: { default: chosen.default?.model, fallback: chosen.fallback?.model, why: chosen.why }, skipped, perPush, misses: github.misses };
 writeFileSync(join(dir, 'results', `${at}.json`), JSON.stringify(result, null, 1));
-const md = report(fixtures, summaries, chosen);
+const md = report(fixtures, summaries, chosen, skipped);
 writeFileSync(join(dir, 'results', `${at}.md`), md);
 console.log(`\n${md}\nWritten to ${join(dir, 'results', at)}.{json,md}`);

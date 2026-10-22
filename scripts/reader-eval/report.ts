@@ -5,7 +5,7 @@ import type { Fixture, Summary } from './score.ts';
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const usd = (n: number) => (n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(3)}`);
 
-export function report(fixtures: Fixture[], models: Summary[], chosen: { default?: Summary; fallback?: Summary; why: string }): string {
+export function report(fixtures: Fixture[], models: Summary[], chosen: { default?: Summary; fallback?: Summary; why: string }, skipped: string[] = []): string {
   const labels = fixtures.flatMap((f) => f.labels);
   const strong = labels.filter((l) => !l.weak);
   const count = (xs: typeof labels, v: 'good' | 'bad') => xs.filter((l) => l.verdict === v).length;
@@ -21,6 +21,7 @@ export function report(fixtures: Fixture[], models: Summary[], chosen: { default
     '|---|---|---|---|---|---|---|---|---|---|---|',
     ...rows,
     '',
+    ...(skipped.length ? ['Not run', '', ...skipped.map((s) => `- ${s}`), ''] : []),
     'What was measured',
     '',
     `${fixtures.length} pushes the reader read, replayed offline on each model against a throwaway map holding the open items as they stood and the GitHub answers recorded for the push. ${labels.length} labels: ${count(strong, 'good')} right and ${count(strong, 'bad')} wrong changes on the owner's word, the log or a copy check, and ${labels.length - strong.length} that stand only because nobody undid them.`,
