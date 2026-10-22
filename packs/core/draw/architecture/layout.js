@@ -355,9 +355,11 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
     });
     const reach = (id) => { const n = nodes.get(id), half = n.w * (n.shape === 'diamond' ? 0.12 : 0.4); return [x.get(id) - half, x.get(id) + half]; };
     const [a1, a2] = reach(c.a), [b1, b2] = reach(c.b);
-    // A wire that was there the step before keeps its line, where it still fits: staying put is the default.
+    // A wire that was there the step before keeps its line, where it still fits and still runs between its ends: staying
+    // put is the default, but not out past both ends and back, once they have moved away from it.
     const fitsAt = (d, t) => { const row = layers[nodes.get(d).layer], k = row.indexOf(d); return (k === 0 || t >= x.get(row[k - 1]) + gapTo(row[k - 1], d)) && (k === row.length - 1 || t <= x.get(row[k + 1]) - gapTo(d, row[k + 1])); };
-    if (prior && ways.every((d) => prior.x.has(d) && fitsAt(d, prior.x.get(d)))) {
+    const between = (t) => t >= Math.min(a1, b1) && t <= Math.max(a2, b2);
+    if (prior && ways.every((d) => prior.x.has(d) && fitsAt(d, prior.x.get(d)) && between(prior.x.get(d)))) {
       for (const d of ways) x.set(d, prior.x.get(d));
       continue;
     }
