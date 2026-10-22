@@ -9,7 +9,7 @@
 //   --concurrency 4              replays at once
 //   --online                     ask GitHub (gh) for what was not recorded, and keep it
 //
-// Keys come from the environment, or from a file of KEY=value lines named by READER_EVAL_ENV (default: .env beside
+// Keys come from the environment, or from a file of KEY=value lines named by READER_EVAL_ENV (default: .env beside, or one folder above,
 // the fixtures): ANTHROPIC_API_KEY, OPENAI_API_KEY, and for any OpenAI-compatible server READER_EVAL_URL and
 // READER_EVAL_KEY.
 
@@ -41,7 +41,7 @@ const { values: args } = parseArgs({
 
 const dir = process.env.READER_EVAL_DIR ?? join(homedir(), '.archipelago-eval', 'reader');
 mkdirSync(dir, { recursive: true });
-const envFile = process.env.READER_EVAL_ENV ?? join(dir, '.env');
+const envFile = process.env.READER_EVAL_ENV ?? [join(dir, '.env'), join(dir, '..', '.env')].find(existsSync) ?? join(dir, '.env');
 if (existsSync(envFile)) for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
   const m = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(line);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
