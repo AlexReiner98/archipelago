@@ -58,11 +58,40 @@ export async function heldPiece(host, title) {
       whole,
     ];
   };
+  // Every held change at once, oldest first: one that cannot be applied any more is said, and the rest go on.
+  const all = async (yes) => {
+    const n = pending.length;
+    const note = await ask(
+      yes
+        ? { title: `Apply all ${n} changes?`, message: 'Each is applied as if you had pressed its Apply, oldest first.', action: 'Apply all' }
+        : { title: `Decline all ${n} changes?`, message: 'Each is declined, with the same note for whoever made it.', input: { placeholder: 'Why not? (optional, kept in the log for whoever made them)' }, action: 'Decline all', danger: true },
+    );
+    if (note === null) return;
+    const failed = [];
+    for (const p of pending) {
+      try {
+        await api('decide', { proposal: p.id, approve: yes, note: (!yes && typeof note === 'string' && note) || undefined });
+      } catch (err) {
+        failed.push(`${said(p, names)}: ${err.message}`);
+      }
+    }
+    if (yes && pending.some((p) => p.ops.some((o) => o.op === 'define_type'))) await loadSchema();
+    if (failed.length) await tell(`${failed.length} of ${n} were not done`, failed.join('\n'));
+    again();
+  };
   host.replaceChildren(
     h(
       'section',
       { class: 'card wide needs held', style: 'margin-bottom: var(--space-8)' },
-      h('header', {}, h('h2', { title: 'Changes that wait for your word before they apply' }, title), h('span', { class: 'n' }, pending.length)),
+      h(
+        'header',
+        {},
+        h('h2', { title: 'Changes that wait for your word before they apply' }, title),
+        h('span', { class: 'n' }, pending.length),
+        pending.length > 1 && h('span', { class: 'grow' }),
+        pending.length > 1 && h('button', { class: 'quiet-button', title: 'Apply every change held here, oldest first', onclick: () => all(true) }, 'Apply all'),
+        pending.length > 1 && h('button', { class: 'quiet-button danger', title: 'Decline every change held here', onclick: () => all(false) }, 'Decline all'),
+      ),
       h('ul', { class: 'rows' }, pending.map(row)),
     ),
   );
