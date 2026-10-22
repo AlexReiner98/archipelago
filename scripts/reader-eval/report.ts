@@ -3,13 +3,13 @@
 import type { Fixture, Summary } from './score.ts';
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
-const usd = (n: number) => (n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(3)}`);
+const money = (n: number, currency: string) => `${currency === 'EUR' ? '€' : '$'}${n < 0.01 ? n.toFixed(4) : n.toFixed(3)}`;
 
 export function report(fixtures: Fixture[], models: Summary[], chosen: { default?: Summary; fallback?: Summary; why: string }, skipped: string[] = []): string {
   const labels = fixtures.flatMap((f) => f.labels);
   const strong = labels.filter((l) => !l.weak);
   const count = (xs: typeof labels, v: 'good' | 'bad') => xs.filter((l) => l.verdict === v).length;
-  const rows = models.map((m) => `| ${m.model} | ${pct(m.quality)} | ${pct(m.strict)} | ${pct(m.precision)} | ${pct(m.recall)} | ${m.copies} | ${m.perPush.toFixed(1)} | ${usd(m.usdPerPush)} | ${m.secondsPerPush.toFixed(0)}s | ${Math.round(m.tokens / Math.max(m.runs, 1)).toLocaleString('en')} | ${m.failed}/${m.runs} |`);
+  const rows = models.map((m) => `| ${m.model} | ${pct(m.quality)} | ${pct(m.strict)} | ${pct(m.precision)} | ${pct(m.recall)} | ${m.copies} | ${m.perPush.toFixed(1)} | ${money(m.usdPerPush, m.currency)} | ${m.secondsPerPush.toFixed(0)}s | ${Math.round(m.tokens / Math.max(m.runs, 1)).toLocaleString('en')} | ${m.failed}/${m.runs} |`);
   return [
     chosen.default
       ? `Use ${chosen.default.model} for the push reader${chosen.fallback ? `, with ${chosen.fallback.model} as its fallback` : ''}. ${chosen.why}`
@@ -17,7 +17,7 @@ export function report(fixtures: Fixture[], models: Summary[], chosen: { default
     '',
     'Results',
     '',
-    '| Model | Quality | Precision (strict) | Precision (judged) | Recall | Copies | Changes/push | $/push | Time/push | Tokens/push | Failed |',
+    '| Model | Quality | Precision (strict) | Precision (judged) | Recall | Copies | Changes/push | Cost/push | Time/push | Tokens/push | Failed |',
     '|---|---|---|---|---|---|---|---|---|---|---|',
     ...rows,
     '',
@@ -31,6 +31,7 @@ export function report(fixtures: Fixture[], models: Summary[], chosen: { default
     '- Recall: closes the push brought (approved, or made citing its commits and kept), that the replay made.',
     '- Quality: precision (strict) and recall together, precision weighted twice.',
     '- Copies: items created whose title matches an open one.',
+    '- Cost: in the currency the provider prices in (Scaleway in euros before tax, Anthropic in dollars).',
     '',
   ].join('\n');
 }

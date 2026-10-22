@@ -96,7 +96,7 @@ test('a push replayed on a scripted model, against the stand-in GitHub, and scor
     };
   });
   const github = standIn(answers);
-  const done = await replay(fixture, { model: 'scripted', provider: 'anthropic', key: 'k', price: { input: 1, output: 5 } }, github);
+  const done = await replay(fixture, { model: 'scripted', provider: 'anthropic', key: 'k', price: { input: 1, output: 5 }, currency: 'USD' }, github);
   assert.equal(done.ok, true, done.summary);
   assert.match(String(asked[0].messages[0].content), /Oil the hinge \(fixes the squeak\)[\s\S]*\+oiled[\s\S]*Open items of this repository \(2\)/);
   assert.equal(asked[0].model, 'scripted');
@@ -115,7 +115,7 @@ test('a push replayed on a scripted model, against the stand-in GitHub, and scor
 });
 
 test('the default is the cheapest model close to the best; the fallback the next', () => {
-  const tally = (model: string, good: number, bad: number, usd: number) => summarise({ model, runs: 10, failed: 0, good, bad, unjudged: 0, copies: 0, closes: { due: 4, made: 4 }, closesAll: { due: 4, made: 4 }, tokens: 0, usd, ms: 0 });
+  const tally = (model: string, good: number, bad: number, usd: number) => summarise({ model, currency: 'USD', runs: 10, failed: 0, good, bad, unjudged: 0, copies: 0, closes: { due: 4, made: 4 }, closesAll: { due: 4, made: 4 }, tokens: 0, usd, ms: 0 });
   const small = tally('small', 5, 5, 0.01);
   const mid = tally('mid', 9, 0, 0.1);
   const large = tally('large', 10, 0, 1);
@@ -123,4 +123,14 @@ test('the default is the cheapest model close to the best; the fallback the next
   assert.equal(chosen.default?.model, 'mid');
   assert.equal(chosen.fallback?.model, 'large');
   assert.match(chosen.why, /^mid is the cheapest whose quality/);
+});
+
+test('candidates: Scaleway by name or as a spread, priced in euros; one without a key is skipped and said', async () => {
+  const { candidate, expand } = await import('../scripts/reader-eval/candidates.ts');
+  assert.deepEqual(expand('none,scaleway').slice(0, 3), ['none', 'scw:mistral-small-3.2-24b-instruct-2506', 'scw:gpt-oss-120b']);
+  assert.match(String(candidate('scw:gpt-oss-120b', {}, 'x.env')), /^gpt-oss-120b: no key \(set SCW_SECRET_KEY, or put it in x\.env\)$/);
+  assert.deepEqual(candidate('scw:gpt-oss-120b', { SCW_SECRET_KEY: 's' }, ''), { model: 'gpt-oss-120b', provider: 'compatible', price: { input: 0.15, output: 0.6 }, currency: 'EUR', key: 's', url: 'https://api.scaleway.ai/v1' });
+  assert.match(String(candidate('scw:some-new-model', { SCW_SECRET_KEY: 's' }, '')), /no price known/);
+  assert.match(String(candidate('opus', {}, 'x.env')), /^claude-opus-5-5: no key \(set ANTHROPIC_API_KEY/);
+  assert.throws(() => candidate('gpt-9', {}, ''), /is no candidate/);
 });

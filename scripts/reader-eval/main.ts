@@ -2,8 +2,9 @@
 // (or with --export), replays every push on each candidate model, scores the replays and names a default model and
 // a fallback. What it found is written beside the fixtures, as results/<time>.json and .md.
 //
-//   --models none,haiku,sonnet,opus candidates: a short name, or provider:model@in/out (US$ a million tokens);
-//                                none is the baseline that changes nothing. One without a key is skipped, and said.
+//   --models none,haiku,sonnet   candidates (scripts/reader-eval/candidates.ts): a short name, scaleway (a spread of
+//                                its models, small to large), scw:<model>, or provider:model@in/out (a million
+//                                tokens); none is the baseline that changes nothing. One without a key is skipped, and said.
 //   --since 2026-10-21           export the pushes read since then (default: 14 days)
 //   --runs 2                     replay each push this many times on each model
 //   --only main@01e12e6,…        replay only these pushes; --limit 10 the first ten
@@ -11,8 +12,8 @@
 //   --online                     ask GitHub (gh) for what was not recorded, and keep it
 //
 // Keys come from the environment, or from a file of KEY=value lines named by READER_EVAL_ENV (default: .env beside, or one folder above,
-// the fixtures): ANTHROPIC_API_KEY, OPENAI_API_KEY, and for any OpenAI-compatible server READER_EVAL_URL and
-// READER_EVAL_KEY.
+// the fixtures): ANTHROPIC_API_KEY, OPENAI_API_KEY, SCW_SECRET_KEY (and SCW_API_BASE, with a project), and for
+// any other OpenAI-compatible server READER_EVAL_URL and READER_EVAL_KEY.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -25,13 +26,14 @@ import { countCalls, replay, type Candidate } from './replay.ts';
 import { asker } from '../../src/model.ts';
 import { choose, judge, summarise, type Fixture, type Summary, type Tally } from './score.ts';
 import { report } from './report.ts';
+import { candidate, expand } from './candidates.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const { values: args } = parseArgs({
   options: {
     export: { type: 'boolean' },
     since: { type: 'string' },
-    models: { type: 'string', default: 'none,haiku,sonnet,opus' },
+    models: { type: 'string', default: 'none,scaleway' },
     runs: { type: 'string', default: '1' },
     only: { type: 'string' },
     limit: { type: 'string' },
@@ -47,26 +49,6 @@ const envFile = process.env.READER_EVAL_ENV ?? [join(dir, '.env'), join(dir, '..
 if (existsSync(envFile)) for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
   const m = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(line);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
-}
-
-/** The candidates by short name, priced as Anthropic lists them (US$ a million tokens). */
-const KNOWN: Record<string, Omit<Candidate, 'key'>> = {
-  haiku: { model: 'claude-haiku-5-5', provider: 'anthropic', price: { input: 0.1, output: 0.5 } },
-  sonnet: { model: 'claude-sonnet-5-5', provider: 'anthropic', price: { input: 2, output: 10 } },
-  opus: { model: 'claude-opus-5-5', provider: 'anthropic', price: { input: 4, output: 20 } },
-  fable: { model: 'claude-fable-5-1', provider: 'anthropic', price: { input: 10, output: 50 } },
-};
-
-/** A candidate by its spec, or why it is skipped: a model without a key is said, not run. */
-function candidate(spec: string): Candidate | string {
-  if (spec === 'none') return { model: 'none', provider: 'anthropic', key: 'none', price: { input: 0, output: 0 } };
-  const known = KNOWN[spec];
-  const m = known ? undefined : /^(anthropic|openai|compatible):([^@]+)@([\d.]+)\/([\d.]+)$/.exec(spec);
-  if (!known && !m) throw new Error(`"${spec}" is no candidate: give ${Object.keys(KNOWN).join(', ')}, or provider:model@in/out.`);
-  const c: Omit<Candidate, 'key'> = known ?? { model: m![2], provider: m![1] as Candidate['provider'], price: { input: Number(m![3]), output: Number(m![4]) } };
-  const key = c.provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : c.provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.READER_EVAL_KEY;
-  if (!key && c.provider !== 'compatible') return `${c.model}: no key (set ${c.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'}, or put it in ${envFile})`;
-  return { ...c, key, ...(c.provider === 'compatible' && { url: process.env.READER_EVAL_URL }) };
 }
 
 const repoName = args.repo ?? /github\.com[:/]+([^/\s]+\/[^/\s]+?)(?:\.git)?\s*$/.exec(execFileSync('git', ['-C', ROOT, 'remote', 'get-url', 'origin'], { encoding: 'utf8' }))?.[1];
@@ -85,7 +67,7 @@ let fixtures = readdirSync(pushesDir)
   .filter((f) => !only || only.includes(f.id))
   .sort((a, b) => a.push.ts.localeCompare(b.push.ts));
 if (args.limit) fixtures = fixtures.slice(0, Number(args.limit));
-const specs = args.models.split(',').map((s) => candidate(s.trim()));
+const specs = expand(args.models).map((s) => candidate(s, process.env, envFile));
 const candidates = specs.filter((c): c is Candidate => typeof c !== 'string');
 const skipped = specs.filter((c): c is string => typeof c === 'string');
 for (const s of skipped) console.log(`Skipped ${s}.`);
@@ -116,7 +98,7 @@ const perPush: Record<string, Record<string, unknown>[]> = {};
 const summaries: Summary[] = [];
 for (const c of candidates) {
   console.log(`\n${c.model}: ${fixtures.length} pushes × ${runs}`);
-  const tally: Tally = { model: c.model, runs: 0, failed: 0, good: 0, bad: 0, unjudged: 0, copies: 0, closes: { due: 0, made: 0 }, closesAll: { due: 0, made: 0 }, tokens: 0, usd: 0, ms: 0 };
+  const tally: Tally = { model: c.model, currency: c.currency, runs: 0, failed: 0, good: 0, bad: 0, unjudged: 0, copies: 0, closes: { due: 0, made: 0 }, closesAll: { due: 0, made: 0 }, tokens: 0, usd: 0, ms: 0 };
   const jobs = fixtures.flatMap((f) => Array.from({ length: runs }, () => async () => {
     try {
       const done = await replay(f, c, github);

@@ -74,6 +74,8 @@ export function judge(f: Fixture, sent: Sent[], closed: (type: string) => string
 /** What one model did over every push. */
 export interface Tally {
   model: string;
+  /** What usd is counted in: a model priced in euros is said in euros. */
+  currency: 'USD' | 'EUR';
   runs: number;
   failed: number;
   good: number;
@@ -141,6 +143,7 @@ export function choose(models: Summary[], slack = 0.05): { default?: Summary; fa
   const pick = byPrice.find((m) => m.quality >= best - slack && m.failed / m.runs <= fewest + 0.05) ?? byPrice.find((m) => m.quality === best)!;
   const fallback = byPrice.find((m) => m !== pick && m.quality >= best - 2 * slack) ?? byPrice.find((m) => m !== pick);
   const pct = (n: number) => `${Math.round(n * 100)}%`;
-  const why = `${pick.model} is the cheapest whose quality (${pct(pick.quality)}) is within ${pct(slack)} of the best (${pct(best)}), at $${pick.usdPerPush.toFixed(4)} a push${fallback ? `; ${fallback.model} (${pct(fallback.quality)}, $${fallback.usdPerPush.toFixed(4)} a push) is the next that comes close` : ''}.`;
+  const money = (m: Summary) => `${m.currency === 'EUR' ? '€' : '$'}${m.usdPerPush.toFixed(4)}`;
+  const why = `${pick.model} is the cheapest whose quality (${pct(pick.quality)}) is within ${pct(slack)} of the best (${pct(best)}), at ${money(pick)} a push${fallback ? `; ${fallback.model} (${pct(fallback.quality)}, ${money(fallback)} a push) is the next that comes close` : ''}.`;
   return { default: pick, fallback, why };
 }

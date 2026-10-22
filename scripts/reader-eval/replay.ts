@@ -21,8 +21,9 @@ export interface Candidate {
   /** As the provider names it. */
   model: string;
   provider: ModelAccount['provider'];
-  /** US$ a million tokens. */
+  /** A million tokens, in the currency below. */
   price: { input: number; output: number };
+  currency: 'USD' | 'EUR';
   url?: string;
   key?: string;
 }
@@ -33,6 +34,7 @@ export interface Replayed {
   sent: Sent[];
   turns: number;
   usage: { input: number; output: number; cache_read: number; cache_write: number };
+  /** What it cost, in the candidate's currency. */
   usd: number;
   ms: number;
 }
