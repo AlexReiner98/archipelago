@@ -131,7 +131,8 @@ export function summarise(t: Tally): Summary {
 
 /**
  * The default is the cheapest model whose quality is within `slack` of the best, and that failed no more runs than
- * the best did; the fallback, for when it cannot answer, is the cheapest other one within twice that slack.
+ * the best did; the fallback, for when it cannot answer, is the cheapest other one within twice that slack,
+ * else the best of the others; none, when no other one does any good.
  */
 export function choose(models: Summary[], slack = 0.05): { default?: Summary; fallback?: Summary; why: string } {
   const ran = models.filter((m) => m.runs > m.failed);
@@ -141,9 +142,10 @@ export function choose(models: Summary[], slack = 0.05): { default?: Summary; fa
   const fewest = Math.min(...ran.map((m) => m.failed / m.runs));
   const byPrice = [...ran].sort((a, b) => a.usdPerPush - b.usdPerPush);
   const pick = byPrice.find((m) => m.quality >= best - slack && m.failed / m.runs <= fewest + 0.05) ?? byPrice.find((m) => m.quality === best)!;
-  const fallback = byPrice.find((m) => m !== pick && m.quality >= best - 2 * slack) ?? byPrice.find((m) => m !== pick);
+  const others = byPrice.filter((m) => m !== pick && m.quality > 0);
+  const fallback = others.find((m) => m.quality >= best - 2 * slack) ?? [...others].sort((a, b) => b.quality - a.quality)[0];
   const pct = (n: number) => `${Math.round(n * 100)}%`;
   const money = (m: Summary) => `${m.currency === 'EUR' ? '€' : '$'}${m.usdPerPush.toFixed(4)}`;
-  const why = `${pick.model} is the cheapest whose quality (${pct(pick.quality)}) is within ${pct(slack)} of the best (${pct(best)}), at ${money(pick)} a push${fallback ? `; ${fallback.model} (${pct(fallback.quality)}, ${money(fallback)} a push) is the next that comes close` : ''}.`;
+  const why = `${pick.model} is the cheapest whose quality (${pct(pick.quality)}) is within ${pct(slack)} of the best (${pct(best)}), at ${money(pick)} a push${fallback ? `; ${fallback.model} (${pct(fallback.quality)}, ${money(fallback)} a push) is the ${fallback.quality >= best - 2 * slack ? 'next that comes close' : 'best of the rest'}` : '; no other model does well enough to fall back on'}.`;
   return { default: pick, fallback, why };
 }

@@ -134,3 +134,11 @@ test('candidates: Scaleway by name or as a spread, priced in euros; one without 
   assert.match(String(candidate('opus', {}, 'x.env')), /^claude-opus-5-5: no key \(set ANTHROPIC_API_KEY/);
   assert.throws(() => candidate('gpt-9', {}, ''), /is no candidate/);
 });
+
+test('no fallback is named that does no good: the best of the rest, or none', () => {
+  const tally = (model: string, good: number, bad: number, made: number, usd: number) => summarise({ model, currency: 'EUR', runs: 10, failed: 0, good, bad, unjudged: 0, copies: 0, closes: { due: 8, made }, closesAll: { due: 8, made }, tokens: 0, usd, ms: 0 });
+  const chosen = choose([tally('big', 5, 0, 5, 1), tally('tiny', 0, 1, 0, 0.01), tally('mid', 1, 0, 1, 0.2)]);
+  assert.deepEqual([chosen.default?.model, chosen.fallback?.model], ['big', 'mid']);
+  assert.match(chosen.why, /mid .* is the best of the rest/);
+  assert.equal(choose([tally('big', 5, 0, 5, 1), tally('tiny', 0, 1, 0, 0.01)]).fallback, undefined);
+});
