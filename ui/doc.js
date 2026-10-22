@@ -2,6 +2,9 @@
 // Nothing drawn that the server did not say, and every text set as text, never as markup. Made to be read whole and
 // printed: the one place in Archipelago where a page is meant to be read through.
 
+import { drawFrozen } from './doc-lens.js';
+import { warmDrawings } from './drawing.js';
+
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
 // Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in; from a link (/s/...), with the link;
@@ -201,7 +204,7 @@ function draw(d) {
   onSite = Boolean(d.site?.host);
   const sections = d.parts.filter((p) => p.section);
   // The first picture is the page's own, and may be as wide as the window allows: a whole system opens in sight. One
-  // that plays how it came to be keeps to the text, with its chapters above it and what was said below.
+  // that plays how it came to be fills that width, with its chapters above it and what was said below.
   const first = sections.find((p) => d.lenses?.[p.section.id])?.section.id;
   const part = (p) =>
     p.section
@@ -211,7 +214,7 @@ function draw(d) {
           h('h2', {}, p.section.title),
           // A lens published with the document is its picture, drawn from what was frozen; otherwise a section shows its figure.
           d.lenses?.[p.section.id]
-            ? h('div', { class: p.section.id === first && !d.lenses[p.section.id].steps ? 'doc-lens wide' : 'doc-lens', 'data-lens': p.section.id })
+            ? h('div', { class: p.section.id === first ? (d.lenses[p.section.id].steps ? 'doc-lens wide plays' : 'doc-lens wide') : 'doc-lens', 'data-lens': p.section.id })
             : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
           blocks(p.section.body, titles, 3),
         )
@@ -230,19 +233,19 @@ function draw(d) {
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.type === INVOICE);
-  // Its pictures are drawn by the app's own shapes and by drawings, fetched and started as the page opened.
-  const pictures = [...main.querySelectorAll('[data-lens]')];
-  if (pictures.length) shapes.then((m) => pictures.forEach((el) => m.drawFrozen(el, d.lenses[el.dataset.lens], d.types)));
+  // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
+  for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types);
   // Read with the reader's sign-in, a figure is fetched the same way.
   if (own) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }
 
-// While the page's data is on its way, what draws its pictures is fetched, and the frame drawings run in is started
-// (ui/drawing.js): a picture is then drawn as soon as the data is here. A page with none has a frame it does not use.
-const shapes = import('/doc-lens.js');
-import('/drawing.js').then((m) => m.warmDrawings(), () => null);
-
-(own
+// A published page carries its data (src/published-page.ts); a link's and a signed-in reader's page fetch it, and
+// start the frame drawings run in while it is on its way (ui/drawing.js).
+const given = document.getElementById('page-data');
+if (!given) warmDrawings();
+(given
+  ? Promise.resolve(JSON.parse(given.textContent))
+  : own
   ? Promise.all([api('document', { id: own }), api('view', { name: 'style', params: {} })]).then(([d, s]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();

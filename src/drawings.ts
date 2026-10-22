@@ -7,7 +7,7 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { DrawingDef } from './declared.ts';
 
 /** A drawing as the page is sent it. */
@@ -55,4 +55,17 @@ export function drawingFor(
   const modules = { ...modulesOf(packs.dir, d.pack, d), ...Object.fromEntries(changed) } as Record<string, string>;
   const hash = hashOf(modules);
   return { id: d.id, title: d.title, hash, ...(!have.includes(hash) && { modules }) };
+}
+
+/**
+ * A pack's drawing as the pack ships it: its hash, and, where each module is a file of its own name in one folder,
+ * the entry's file, which the server may import (src/published-frames.ts). Code kept by the hash is the pack's own.
+ */
+export function packDrawing(packs: { dir: string; packs: { id: string; drawings?: DrawingDef[] }[] }, id: string): { hash: string; entry?: string } | undefined {
+  const d = drawingsOf(packs.packs).find((one) => one.id === id);
+  if (!d) return undefined;
+  const files = Object.entries(d.modules).map(([name, file]) => [name, join(packs.dir, d.pack, file)]);
+  const folder = dirname(files.find(([name]) => name === 'index.js')?.[1] ?? '');
+  const runnable = files.every(([name, path]) => path === join(folder, name));
+  return { hash: hashOf(modulesOf(packs.dir, d.pack, d)), ...(runnable && { entry: join(folder, 'index.js') }) };
 }

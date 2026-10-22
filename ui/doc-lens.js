@@ -1,17 +1,14 @@
 // A picture in a published document (/p/...): the lens's answer as it was frozen when the document was published,
-// drawn by the app's own shapes, read by anyone with no login. Nothing is asked of the map: the answer is all there
-// is. A part opens nowhere; clicked, it says its first line over the picture.
+// drawn by its drawing or by the app's own shapes, read by anyone with no login. Nothing is asked of the map: the
+// answer is all there is. A part opens nowhere; clicked, it says its first line over the picture.
 
 import { h } from './base.js';
 import { drawWith } from './drawing.js';
-import { drawFlow } from './flow.js';
-import { drawGrid } from './grid.js';
 import { dress } from './lens-base.js';
-import { drawTime } from './timeline.js';
 import { types } from './words.js';
 
-/** The shapes a published picture is drawn in; any other is drawn as a flow. */
-const SHAPES = { flow: drawFlow, grid: drawGrid, time: drawTime };
+/** The shapes a published picture is drawn in, each loaded when one is drawn; any other is drawn as a flow. */
+const SHAPES = { flow: () => import('./flow.js').then((m) => m.drawFlow), grid: () => import('./grid.js').then((m) => m.drawGrid), time: () => import('./timeline.js').then((m) => m.drawTime) };
 const ITEM = /^#\/e\/(e_[a-z0-9]{8})$/;
 
 /** Draw one frozen answer into host. `typeTitles` names each type the picture holds. */
@@ -25,7 +22,8 @@ export function drawFrozen(host, answer, typeTitles = {}) {
   host.replaceChildren(said, body);
   dress(body, style);
   // A picture on a time axis is drawn along it, as in the app.
-  (style.drawing ? drawWith : (SHAPES[answer.lens.time && !SHAPES[style.shape] ? 'time' : style.shape] ?? drawFlow))(body, answer, style, () => {});
+  if (style.drawing) drawWith(body, answer, style, () => {});
+  else (SHAPES[answer.lens.time && !SHAPES[style.shape] ? 'time' : style.shape] ?? SHAPES.flow)().then((draw) => draw(body, answer, style, () => {}));
   const byId = new Map(answer.items.map((item) => [item.id, item]));
   const tell = (id) => {
     const item = byId.get(id);

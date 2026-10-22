@@ -66,6 +66,7 @@ A first visit counts from when the page starts its first picture, with the frame
 
 What makes it so:
 
+- **A published picture's first frame, kept at publish.** Where a picture's drawing is the pack's own (its hash is the pack's), the server runs it once at publish and keeps the scene it opens on with the frozen lens (`first`, `src/published-frames.ts`), its text measured by a width table of the house typeface (`src/text-widths.ts`). The page carries its data and hints every module it starts with (`src/published-page.ts`), so the frame is mounted with the text, and the sandbox takes over when it answers. A version changed on the map is run only in the sandbox. The drawing's code is fetched by its hash, kept as immutable. Landing page, over HTTP/2 at a 50 ms round trip (`node scripts/hero-bench.ts <page data>`): the hero is on screen with the text, at 277 ms on a first visit (660 before) and 208 ms on a repeat one (573).
 - **One frame, started early.** The lens view starts the sandbox while its answer is on the way. The frame is drawn with no size, never hidden: a frame that is not drawn has its worker slowed about tenfold.
 - **A warm worker waiting.** The frame keeps one worker started, its text measuring warmed, for the next drawing to load into.
 - **Code sent once.** Drawings are kept by hash, the last three in this browser; the page names them in `have`, so the server does not send them again, and loads them before the first answer arrives.
