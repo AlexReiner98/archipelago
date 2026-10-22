@@ -10,7 +10,7 @@ import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './w
 import { blockGraph, heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
 import { STALE_DAYS } from './attention.ts';
-import { VIEWS } from './views.ts';
+import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts';
 
 const now = () => new Date().toISOString();
 
@@ -195,7 +195,7 @@ export async function recordUsage(l: Archipelago, sessionId: string | undefined,
 export async function recordRun(
   l: Archipelago,
   actor: Actor,
-  input: { repo: string; title: string; ok?: boolean; tokens?: number; cost_usd?: number; turns?: number; link?: string; summary?: string; surface?: string },
+  input: { repo: string; title: string; ok?: boolean; tokens?: number; cost_usd?: number; turns?: number; link?: string; summary?: string; surface?: string; started_by?: StartedBy },
 ) {
   const repo = /^e_[a-z0-9]{8}$/.test(input.repo) ? await l.entity(input.repo) : await placeFor(l, { remote: input.repo });
   if (!repo) throw new Error(`No repository "${input.repo}" in the map`);
@@ -208,7 +208,7 @@ export async function recordRun(
   if (number(input.tokens) !== undefined) props.tokens_used = Math.round(input.tokens!);
   if (number(input.cost_usd) !== undefined) props.cost_usd = Math.round(input.cost_usd! * 10_000) / 10_000;
   if (number(input.turns) !== undefined) props.turns = input.turns;
-  if (input.link) props.link = input.link;
+  if (input.link) props.link = input.link; if (input.started_by) props.started_by = input.started_by;
   const { created } = await l.apply(actorId(actor), {
     ops: [
       { op: 'create', ref: 'run', type: 'sys.run', title: input.title, status: input.ok === false ? 'failed' : 'finished', body: input.summary?.slice(0, 4000), props },

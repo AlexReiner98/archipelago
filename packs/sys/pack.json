@@ -97,6 +97,11 @@
           "description": "Set once the human has been told this session went quiet.",
           "system": true
         },
+        "started_by": {
+          "type": "json",
+          "description": "Who started the run, when it was not the owner: { kind: person, automation or webhook, id, name }. Such a run only proposes: its changes wait for the owner, whatever agents may do here.",
+          "system": true
+        },
         "tokens_used": {
           "type": "number",
           "description": "Tokens the session has used so far, as its machine counted them.",

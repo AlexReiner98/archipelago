@@ -274,6 +274,9 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   // What it sent is an agent's change like any other: here, where agents' changes are held, it waits for the owner.
   const held = (await call('/api/proposals', admin)).result;
   assert.deepEqual(held.map((p: any) => [p.actor, p.ops[0].title]), [['agent:reader', 'Oil the whetstone']]);
+  // And it would wait wherever agents' changes are applied: a push started the run, not the owner. The run says so.
+  const { rows: started } = await db.query<{ by: unknown }>(`select props->'started_by' as by from entity where title = 'Read the push to main (bbbbbbb)'`);
+  assert.deepEqual(started.map((r) => r.by), [{ kind: 'webhook', name: 'a push to main' }]);
   // The same push said twice (a webhook left in the repository beside the app) is taken in once, and read once.
   assert.deepEqual((await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result.recorded, false);
   // A push recorded while its reading was cut off (the server stopped) has no run: the next server reads it, with any
