@@ -43,6 +43,13 @@ export interface Input {
   limit?: number;
 }
 
+/** What needs a person now, by the reasons only they act on: it waits on them, it is theirs to confirm, it is due, or it is theirs to settle. */
+export async function needsOf(l: Archipelago, person: string | null): Promise<Set<string>> {
+  if (!person) return new Set();
+  const { items } = await attention(l, { person, reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 100_000 });
+  return new Set(items.map((i) => i.id));
+}
+
 export async function attention(l: Archipelago, input: Input) {
   const wanted = new Set<Reason>(input.reasons?.length ? input.reasons : REASONS);
   for (const r of wanted) if (!REASONS.includes(r)) throw new Error(`"${r}" is not a reason: one of ${REASONS.join(', ')}`);

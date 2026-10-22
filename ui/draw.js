@@ -31,7 +31,7 @@ function inside(home) {
     for (const n of byId.values()) (byId.get(n.inside) ?? root).kids.push(Object.assign(n, { up: byId.get(n.inside) ?? root }));
     for (const n of byId.values()) {
       n.all = 1 + n.within.items;
-      n.you = (me && n.state.waits_on.includes(me) ? 1 : 0) + ((me && n.within.waits_on[me]) || 0);
+      n.you = (n.state.needs_you ? 1 : 0) + (n.within.needs_you ?? 0);
       n.blk = (n.state.blocked ? 1 : 0) + n.within.blocked;
       n.work = n.size.work + n.within.work;
       n.at = n.state.sessions + n.within.sessions;
