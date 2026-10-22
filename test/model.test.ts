@@ -100,6 +100,23 @@ test('what passes is tried again, and what does not is said by kind', async () =
   assert.deepEqual([wrong.kind, wrong.message], ['api', 'no such model']);
 });
 
+test('a rate limit is waited out longer than other failures, as long as the server asks', async () => {
+  const at = { url: 'http://m/v1' };
+  const busy = () => json({ error: { message: 'slow down' } }, 429, { 'retry-after': '0' });
+  const ok = json({ choices: [{ message: { content: 'Fine.' } }] });
+  // Five times limited, then answered: the run goes on.
+  const patient = fake(busy(), busy(), busy(), busy(), busy(), ok);
+  assert.equal(((await asker('k', at, patient.f)(params)).content[0] as { text: string }).text, 'Fine.');
+  assert.equal(patient.asked.length, 6);
+  // Six times limited: it gives up, and says it was the rate limit.
+  const limited = await asker('k', at, fake(busy(), busy(), busy(), busy(), busy(), busy(), ok).f)(params).catch((e) => e);
+  assert.deepEqual([limited.kind, limited.status], ['rate', 429]);
+  // An overload is not a rate limit: tried twice more, as before.
+  const down = () => json({ error: { message: 'overloaded' } }, 503, { 'retry-after': '0' });
+  const overloaded = await asker('k', at, fake(down(), down(), down(), ok).f)(params).catch((e) => e);
+  assert.deepEqual([overloaded.kind, overloaded.status], ['api', 503]);
+});
+
 test('OpenAI itself is asked with max_completion_tokens, which its newer models require; other servers with max_tokens', async () => {
   const { f, asked } = fake(json({ choices: [{ message: { content: 'x' } }] }));
   await asker(undefined, { url: 'https://api.openai.com/v1', key: 'sk-proj', openai: true }, f)(params);

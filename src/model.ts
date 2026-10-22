@@ -79,8 +79,17 @@ export class ModelError extends Error {
 
 type Fetch = typeof fetch;
 const RETRIES = 2;
+/** A rate limit passes with time: it is waited out longer than other failures, so a run is not lost to it. */
+const RATE_RETRIES = 5;
 const retried = (status: number) => status === 408 || status === 409 || status === 429 || status >= 500;
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** How long to wait before trying again: what the server asks (up to two minutes), else longer each time. */
+function waitFor(res: Response, attempt: number): number {
+  const asked = res.headers.get('retry-after');
+  const after = asked === null || asked.trim() === '' ? NaN : Number(asked);
+  if (after >= 0 && after <= 120) return after * 1000;
+  return res.status === 429 ? Math.min(60_000, 2_000 * 2 ** attempt) : 500 * 2 ** attempt;
+}
 
 /** A request, tried again on what passes (a rate limit, an overload, a dropped connection), as the SDK did. */
 async function send(f: Fetch, url: string, init: RequestInit, timeout: number): Promise<unknown> {
@@ -94,9 +103,8 @@ async function send(f: Fetch, url: string, init: RequestInit, timeout: number): 
     }
     if (res.ok) return res.json();
     const text = await res.text().catch(() => '');
-    if (attempt < RETRIES && retried(res.status)) {
-      const after = Number(res.headers.get('retry-after'));
-      await pause(after > 0 && after < 60 ? after * 1000 : 500 * 2 ** attempt);
+    if (attempt < (res.status === 429 ? RATE_RETRIES : RETRIES) && retried(res.status)) {
+      await pause(waitFor(res, attempt));
       continue;
     }
     let said = text;
