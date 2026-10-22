@@ -65,6 +65,7 @@ export function who(actor) {
     kind === 'human' ? (name === 'local' || name === 'owner' ? 'You' : name)
     : kind === 'github' ? 'GitHub'
     : name.startsWith('automation:') ? 'Automation'
+    : name.startsWith('launched:') ? 'Launched session'
     : (name === 'pelago' || name === 'lattice') && !raw.includes('/') && !raw.includes('claude') ? 'Archipelago'
     : name.split(':').at(-1) || raw;
   return h('span', { class: `who who-${kind === 'human' ? 'human' : kind === 'github' ? 'github' : 'agent'}`, title: raw }, label);

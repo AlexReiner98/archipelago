@@ -127,10 +127,12 @@ export class Automations {
         result = `notified (${done.notification})`;
       } else if (p.action === 'tool') {
         if (!AUTOMATION_TOOLS.includes(p.tool as string)) throw new Error(`tool "${p.tool}" is not allowed in automations`);
-        result = JSON.stringify(await callTool(this.l, { kind: 'agent', name }, p.tool as string, input)).slice(0, 500);
+        // What an automation changes by itself waits for the owner, whatever agents may do here: no one asked for it just now.
+        result = JSON.stringify(await callTool(this.l, { kind: 'agent', name, may: 'propose' }, p.tool as string, input)).slice(0, 500);
       } else {
-        // A human approved this automation, launch settings included, so it launches with their authority.
-        const started = await launch(this.l, { kind: 'human', name }, { task: input.task as string, mode: input.mode as 'plan', instructions: input.instructions as string | undefined });
+        // A human approved this automation, launch settings included, so it may launch.
+        // The session it starts only proposes, and its run names the automation.
+        const started = await launch(this.l, { kind: 'human', name }, { task: input.task as string, mode: input.mode as 'plan', instructions: input.instructions as string | undefined }, { kind: 'automation', id: auto.id, name: auto.title });
         await this.l.db.query(`update entity set props = props || jsonb_build_object('last_run', $2::text) where id = $1`, [auto.id, started.run]);
         result = `launched run ${started.run} (${started.mode})`;
       }

@@ -242,6 +242,21 @@ test('launching runs a headless session on a task, holding the lane and recordin
   const failed = await ended(failing.run);
   assert.equal(failed.status, 'failed');
   assert.match(failed.body, /mode=acceptEdits/);
+
+  // Started by someone other than the owner, or by an automation, a session only proposes, and its run says who.
+  configureLauncher({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), command: [process.execPath, cli], auth: true });
+  const people = await make(l, [{ op: 'create', ref: 'ann', type: 'person', title: 'Ann' }, { op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
+  await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(people.ann)]);
+  const mayOf = async (run: string) => (await l.db.query<{ may: string }>(`select may from token where name = $1`, [`launched:${run}`])).rows[0]?.may;
+  const owners = await launch(l, { kind: 'human', name: 'ann', person: people.ann }, { task: made.live });
+  assert.deepEqual([await mayOf(owners.run), (await l.entity(owners.run))!.props.started_by], ['change', undefined], 'the owner’s own launch changes as any agent may');
+  await ended(owners.run);
+  const bos = await launch(l, { kind: 'human', name: 'bo', person: people.bo }, { task: made.live });
+  assert.deepEqual([await mayOf(bos.run), (await l.entity(bos.run))!.props.started_by], ['propose', { kind: 'person', id: people.bo, name: 'bo' }]);
+  await ended(bos.run);
+  const nightly = await launch(l, { kind: 'human', name: 'automation:e_auto0001' }, { task: made.live }, { kind: 'automation', id: 'e_auto0001', name: 'Nightly' });
+  assert.deepEqual([await mayOf(nightly.run), ((await l.entity(nightly.run))!.props.started_by as { kind: string }).kind], ['propose', 'automation']);
+  await ended(nightly.run);
 });
 
 test('tokens: an estimate is asked for, what a session uses goes to its work, and the graph adds up what is part of what', async () => {
