@@ -9,6 +9,7 @@ import { scopePills } from './token-piece.js';
 import { membersCard } from './members-card.js';
 import { planCard } from './plan-card.js';
 import { modelCard } from './model-card.js';
+import { connectionsCard } from './connections-card.js';
 import { backupCard, connectBox, githubCard, ownerCard, publishCard, secretBox, serverPacksCard } from './workspace-cards.js';
 
 /** A card a step of Start here (ui/start.js) leads to, as #/workspace?at=<step>. */
@@ -169,6 +170,7 @@ export async function workspace() {
           ),
         ),
       me.actor.admin && at('model', modelCard()),
+      me.actor.admin && at('connections', connectionsCard()),
       me.actor.admin && at('github', githubCard()),
     ),
   );

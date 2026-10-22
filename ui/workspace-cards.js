@@ -1,4 +1,4 @@
-// The Workspace screen's cards: tokens, connecting an agent, importing, GitHub, the operator.
+// The Workspace screen's cards: tokens, connecting an agent, importing, GitHub's webhook, the operator.
 
 import { api, ask, h } from './base.js';
 import { chip, hint, link, menu, when } from './words.js';
@@ -129,40 +129,20 @@ function importRow(done) {
   return [h('div', { class: 'toolbar', style: 'padding: 0 var(--space-8) var(--space-7)' }, file, h('button', { onclick: start, title: 'Merge a map kept elsewhere into this one' }, 'Import\u2026')), result];
 }
 
-// GitHub tells this workspace when a repository is pushed to. The secret it
-// signs with is made here and shown once, with where to put it.
+// GitHub tells this workspace when a repository is pushed to: through the GitHub App (the Connections card), or a
+// webhook added by hand, whose secret is made here and shown once, with where to put it.
 export function githubCard() {
   const body = h('div', {}, h('div', { class: 'empty' }, 'Loading\u2026'));
   const draw = async (made) => {
     const s = made ?? (await api('github'));
-    // The app, where the server can have one: repositories are chosen on GitHub and nothing is set up in them.
-    const app = await api('github_app').catch(() => ({ available: false }));
-    const go = (what) => () =>
-      api('github_app', { [what]: true })
-        .then((to) => (location.href = to.url))
-        .catch(fail);
-    const unhook = async () => {
-      if (!(await ask({ title: 'Stop hearing from GitHub?', message: 'Pushes to the repositories chosen there no longer reach this map. The app stays installed on GitHub until it is removed there.', action: 'Disconnect', danger: true }))) return;
-      api('github_app', { disconnect: true }).then(() => draw()).catch(fail);
-    };
-    // What reads the pushes: the agent on this server, on the workspace's model account (the Model card).
-    const on = app.reader?.from;
-    const reading =
-      app.available &&
-      app.installation &&
-      h(
-        'div',
-        { class: 'toolbar', style: 'padding: var(--space-6) var(--space-8) 0' },
-        h('span', { class: `pill ${on ? 'ok' : 'warn'}`, title: on ? 'An agent on this server reads each push against the open work' : 'Pushes are recorded, but nothing reads them until a model account is connected, under Model' }, on ? 'pushes are read' : 'pushes are not read'),
-        h('span', { class: 'grow muted small' }, on ? app.reader.model : ''),
-      );
-    const appBar =
-      app.available &&
-      (app.installation
-        ? h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8) 0' }, h('span', { class: 'pill ok' }, 'connected'), h('span', { class: 'grow' }, app.installation.account || app.app.name), h('button', { title: 'Choose on GitHub which repositories this map hears from', onclick: go('connect') }, 'Choose repositories'), menu('More', [!s.connected && ['Use a webhook as well', () => fresh()], ['Disconnect', unhook, 'danger']]))
-        : app.app
-          ? h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8) 0' }, h('span', { class: 'grow muted' }, app.app.name), h('button', { class: 'primary', title: 'Choose repositories on GitHub; each is put in the map and its pushes are heard', onclick: go('connect') }, 'Connect GitHub'), !s.connected && menu('More', [['Use a webhook instead', () => fresh()]]))
-          : app.can_create && h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8) 0' }, h('span', { class: 'grow' }), h('button', { class: 'primary', title: 'Once for this server: GitHub asks for a name, and the server then has its app', onclick: go('create') }, 'Create the GitHub App'), !s.connected && menu('More', [['Use a webhook instead', () => fresh()]])));
+    // What reads the pushes the GitHub App hands over: the agent on this server, on the workspace's model account (the Model card).
+    const on = (await api('reader').catch(() => ({}))).from;
+    const reading = h(
+      'div',
+      { class: 'toolbar', style: 'padding: var(--space-6) var(--space-8) 0' },
+      h('span', { class: `pill ${on ? 'ok' : 'warn'}`, title: on ? 'An agent on this server reads each push the GitHub App hands over against the open work' : 'Pushes are recorded, but nothing reads them until a model account is connected, under Model' }, on ? 'pushes are read' : 'pushes are not read'),
+      h('span', { class: 'grow' }),
+    );
     const url = location.origin + s.webhook_path;
     const fresh = async () => {
       if (s.connected && !(await ask({ title: 'Make a new secret?', message: 'The one GitHub has now stops working until you replace it in each repository\'s webhook.', action: 'New secret', danger: true }))) return;
@@ -170,8 +150,7 @@ export function githubCard() {
     };
     // Through a div, so that a part left out (false) is skipped, not printed.
     body.replaceChildren(h('div', {},
-      appBar || '',
-      reading || '',
+      reading,
       made?.secret
         ? h(
             'div',
@@ -198,8 +177,7 @@ export function githubCard() {
           ),
         ),
       ),
-      (s.connected || !appBar) && h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, s.connected && h('code', { class: 'grow' }, url), h('button', { title: 'A webhook added by hand in each repository, signed with a secret made here', class: s.connected ? '' : 'primary', onclick: fresh }, s.connected ? 'New secret' : 'Connect GitHub')),
-      appBar && !s.connected && h('div', { style: 'height: var(--space-7)' }),
+      h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, s.connected ? h('code', { class: 'grow' }, url) : h('span', { class: 'grow' }), h('button', { title: 'A webhook added by hand in each repository, signed with a secret made here: for a repository the GitHub App is not given', onclick: fresh }, s.connected ? 'New secret' : 'Use a webhook')),
     ));
   };
   const fail = (err) => body.replaceChildren(h('div', { class: 'error' }, err.message));

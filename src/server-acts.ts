@@ -1,6 +1,6 @@
 // The server acts: the closed list of things a server pack may ask the kernel to do, each only if the pack declares
-// it (src/server-packs.ts). A pack acts only on the workspaces it made itself: it can sell a workspace and sign its
-// buyer in, never reach into another. Every act is logged on the default workspace's map with the pack that asked,
+// it (src/server-packs.ts). These act only on the workspaces the pack made itself: it can sell a workspace and sign its
+// buyer in, never reach into another. What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
 // so what a server pack did is in the owner's history like anything else.
 
 import { recordAgreement, type Agreement } from './agreements.ts';
@@ -12,7 +12,7 @@ import type { ServerAct, ServerPackFile } from './server-packs.ts';
 import { validWorkspaceId } from './auth.ts';
 import type { Workspaces } from './workspaces.ts';
 
-export type ActPlaces = Pick<Workspaces, 'has' | 'get' | 'create'>;
+export type ActPlaces = Pick<Workspaces, 'has' | 'get' | 'create' | 'hold'>;
 
 /** Ids nobody's pack makes. */
 const RESERVED = ['default', 'www', 'app', 'api', 'admin', 'mail', 'staging', 'archipelago', 'x'];

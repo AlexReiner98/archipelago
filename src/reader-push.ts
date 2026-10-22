@@ -4,12 +4,21 @@
 // the tools, and a model on an OpenAI-compatible server caches none of it. What the model sends still goes through
 // the map's one write path (`change`), as the reader, held to the one repository.
 
-import type { GithubApp } from './github-app.ts';
 import type { Tool } from './model.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { livesInFor } from './places.ts';
 /** The map's tools, as the reader calls them: handed in, so this module does not depend on where they are kept. */
 export type Call = (l: Archipelago, actor: Actor, name: string, input: unknown) => Promise<unknown>;
+
+/**
+ * How the reader reaches the repositories it reads: as the GitHub App's installation a workspace connected, through
+ * the requests its pack declares (src/reader-app.ts).
+ */
+export interface Reach {
+  asInstallation(installation: string, path: string): Promise<unknown>;
+  /** The repositories an installation was given, as "owner/name". */
+  repositories(installation: string): Promise<string[]>;
+}
 
 export interface Repo {
   installation: string;
@@ -64,7 +73,7 @@ changes in the map, and say it with the tools. Most pushes change little or noth
 Finish with one or two lines saying what you changed, or that nothing needed changing.`;
 
 /** The one message the model starts from: the push, what it changed, and the open work it may touch. */
-export async function pushBrief(callTool: Call, l: Archipelago, actor: Actor, app: GithubApp, repo: Repo, push: Push): Promise<string> {
+export async function pushBrief(callTool: Call, l: Archipelago, actor: Actor, app: Reach, repo: Repo, push: Push): Promise<string> {
   const fresh = /^0+$/.test(push.before);
   const base = fresh ? push.default_branch : push.before;
   const at = (path: string) => app.asInstallation(repo.installation, `/repos/${repo.name}${path}`);
@@ -112,7 +121,7 @@ const text = { type: 'string' } as const;
 const def = (name: string, description: string, properties: Record<string, unknown>, required: string[]): Tool => ({ name, description, input_schema: { type: 'object', properties, required } });
 
 /** The five tools of a push read, and the two that read the repository further. */
-export function leanTools(callTool: Call, app: GithubApp, repo: Repo, push: Push): { defs: Tool[]; run: (l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>) => Promise<unknown> } {
+export function leanTools(callTool: Call, app: Reach, repo: Repo, push: Push): { defs: Tool[]; run: (l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>) => Promise<unknown> } {
   const defs = [
     def('update', 'Change one open item: its status, a correction to its title, or a line added to its note. why: what in the push shows it.', { id: text, status: text, title: text, append: text, why: text }, ['id', 'why']),
     def('create', 'Make a new item for work the push names but does not do. type: a kind from the list (or work.task); part_of: the id of the item it belongs to, if any.', { type: text, title: text, note: text, part_of: text, why: text }, ['type', 'title', 'why']),

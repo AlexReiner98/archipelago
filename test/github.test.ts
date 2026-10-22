@@ -5,9 +5,10 @@ import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { dump } from '../src/backup.ts';
-import { GithubApp } from '../src/github-app.ts';
 import { configureModels } from '../src/model-account.ts';
 import { readUnread } from '../src/reader.ts';
+import { appReach } from '../src/reader-app.ts';
+import { serverPacksOf } from '../src/server-host.ts';
 import { serve, closers } from './serve.ts';
 
 test('the GitHub pack hears a push: it is recorded against its repository, and what a commit says it finished is proposed closed', async () => {
@@ -133,7 +134,7 @@ test('the GitHub pack hears a push: it is recorded against its repository, and w
   assert.equal((await deliver(push('main', 'x'), { secret: again })).status, 200);
 });
 
-test('the GitHub App: the server\'s owner creates it once, a workspace connects by choosing repositories, and pushes arrive at one address', async () => {
+test('the GitHub App, a server pack: the server\'s owner creates it once, a workspace connects by choosing repositories, and pushes arrive at one address', async () => {
   // A stand-in for GitHub: it hands over the app for a code, and answers the app and its installation only when each proves who it is.
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }) as string;
@@ -148,7 +149,7 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
     };
     asked.push(`${req.method} ${req.url}`);
     if (req.url === '/app') return isApp() ? say(200, renamed ? { slug: 'pelago-renamed', name: 'Archipelago (renamed)' } : { slug: 'pelago-test', name: 'Archipelago (test)' }) : say(401, { message: 'Bad credentials' });
-    if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return say(201, { id: 7, slug: 'pelago-test', name: 'Archipelago (test)', pem, webhook_secret: 'whsec' });
+    if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return bearer ? say(401, { message: 'No credential is sent for this' }) : say(201, { id: 7, slug: 'pelago-test', name: 'Archipelago (test)', pem, webhook_secret: 'whsec' });
     if (req.url === '/app/installations/42') return isApp() ? say(200, { account: { login: 'acme' } }) : say(401, { message: 'Bad credentials' });
     if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
     if (req.url?.startsWith('/repos/Acme/Tools/commits/')) return say(200, { sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools. The whetstone still needs oiling.' }, files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1, patch: '+  oil()' }] });
@@ -159,56 +160,78 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   });
   await new Promise<void>((r) => hub.listen(0, '127.0.0.1', r));
   closers.push(async () => void hub.close());
-  const hubAt = `http://127.0.0.1:${(hub.address() as AddressInfo).port}`;
+  // The pack's hosts are moved to the stand-in, as a server's configuration may move them.
+  Object.assign(process.env, { PELAGO_HOST_GITHUB_APP_API: `http://127.0.0.1:${(hub.address() as AddressInfo).port}`, PELAGO_HOST_GITHUB_APP_WEB: 'https://github.test' });
+  closers.push(async () => {
+    delete process.env.PELAGO_HOST_GITHUB_APP_API;
+    delete process.env.PELAGO_HOST_GITHUB_APP_WEB;
+  });
 
-  let theApp: GithubApp | undefined;
-  const { workspaces, call, base } = await serve('tokens', (origin) => (theApp ??= new GithubApp({ origin, api: hubAt, web: 'https://github.test' })));
+  const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
   await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site.git' } }] });
   const page = (path: string) => fetch(base + path, { redirect: 'manual' });
+  const theApp = async () => ((await call('/api/connections', admin)).result.packs as any[]).find((p) => p.pack === 'github_app');
 
   // 1. The server has no app until its owner creates one. An agent cannot.
-  assert.deepEqual((await call('/api/github_app', admin)).result, { available: true, app: null, can_create: true, installation: null, reader: { model: null, from: null } });
-  assert.match((await call('/agent/github_app', robot, { create: true })).error, /humans only/);
-  assert.match((await call('/api/github_app', admin, { connect: true })).error, /no GitHub App yet/);
-  const create = (await call('/api/github_app', admin, { create: true })).result.url as string;
-  const form = await (await page(create.slice(base.length))).text();
-  const state = /settings\/apps\/new\?state=([0-9a-z.-]+)/.exec(form)![1];
-  assert.ok(form.includes('action="https://github.test/settings/apps/new?state='), 'the page sends its reader to GitHub with the manifest');
-  const manifest = JSON.parse(/name="manifest" value="([^"]+)"/.exec(form)![1].replaceAll('&quot;', '"').replaceAll('&amp;', '&'));
-  assert.deepEqual([manifest.hook_attributes.url, manifest.setup_url, manifest.default_permissions, manifest.default_events], [`${base}/github/app/hook`, `${base}/github/app/installed`, { contents: 'read', metadata: 'read' }, ['push']]);
-  assert.equal((await page('/github/app/created?code=thecode&state=not-ours')).status, 400, 'a code is taken only from someone who started here');
-  assert.equal((await page(`/github/app/created?code=thecode&state=${state}`)).status, 302);
-  assert.equal((await page(`/github/app/created?code=thecode&state=${state}`)).status, 400, 'and once');
-  assert.deepEqual((await call('/api/github_app', admin)).result.app, { slug: 'pelago-test', name: 'Archipelago (test)' });
+  assert.deepEqual(await theApp(), { pack: 'github_app', title: 'GitHub App', ready: false, name: null, can_setup: true, connected: null });
+  assert.match((await call('/agent/connections', robot, { pack: 'github_app', setup: true })).error, /humans only/);
+  assert.match((await call('/api/connections', admin, { pack: 'github_app', start: true })).error, /no GitHub App yet/);
+  const create = (await call('/api/connections', admin, { pack: 'github_app', setup: true })).result.url as string;
+  assert.match(create, new RegExp(`^${base}/x/github_app/new\\?state=default\\.[0-9a-f]{48}$`));
+  const state = new URL(create).searchParams.get('state')!;
+  // The page asks the pack for the manifest and sends its reader on to GitHub with it: a form only to GitHub.
+  const form = await page(create.slice(base.length));
+  assert.match(form.headers.get('content-security-policy') ?? '', /form-action https:\/\/github\.test;/);
+  assert.match(await form.text(), /\/x\/github_app\/public\/new\.js/);
+  const handed = (await call('/x/github_app/manifest', undefined, { state })).result;
+  assert.equal(handed.action, `https://github.test/settings/apps/new?state=${state}`);
+  const { manifest } = handed;
+  assert.deepEqual([manifest.hook_attributes.url, manifest.setup_url, manifest.redirect_url, manifest.default_permissions, manifest.default_events], [`${base}/x/github_app/hook/events`, `${base}/x/github_app/installed`, `${base}/x/github_app/created`, { contents: 'read', metadata: 'read' }, ['push']]);
+  assert.match((await call('/x/github_app/manifest', undefined, { state: 'default.guessed' })).error, /not started from Archipelago/);
+  assert.equal((await page('/x/github_app/created?code=thecode&state=not-ours')).status, 400, 'a code is taken only from someone who started here');
+  const made = await page(`/x/github_app/created?code=thecode&state=${state}`);
+  assert.deepEqual([made.status, made.headers.get('location')], [302, '/#/workspace']);
+  assert.equal((await page(`/x/github_app/created?code=thecode&state=${state}`)).status, 400, 'and once');
+  assert.deepEqual(await theApp(), { pack: 'github_app', title: 'GitHub App', ready: true, name: 'Archipelago (test)', can_setup: false, connected: null });
+  // The key and the secret GitHub handed over are the kernel's, sealed; the pack kept only the app's name.
+  const { rows: kept } = await db.query<{ key: string; value: string }>(`select key, value from control_value where key like 'pack_secret:github_app:%' order by key`);
+  assert.deepEqual(kept.map((r) => [r.key, /^sealed:v1:/.test(r.value)]), [['pack_secret:github_app:app_id', true], ['pack_secret:github_app:hook', true], ['pack_secret:github_app:key', true]]);
+  const { rows: store } = await db.query<{ value: unknown }>(`select value from pack_store where pack = 'github_app'`);
+  assert.ok(!JSON.stringify(store).includes('PRIVATE KEY') && !JSON.stringify(store).includes('whsec'));
+  assert.match((await call('/api/connections', admin, { pack: 'github_app', setup: true })).error, /already has its GitHub App/);
 
   // 2. A workspace connects: its admin is sent to choose repositories, and comes back with the installation.
-  const connect = (await call('/api/github_app', admin, { connect: true })).result.url as string;
-  assert.match(connect, /^https:\/\/github\.test\/apps\/pelago-test\/installations\/new\?state=[0-9a-z.-]+$/);
-  assert.equal((await page('/github/app/installed?installation_id=42&state=guessed')).status, 400);
-  assert.equal((await page(`/github/app/installed?installation_id=42&${connect.split('?')[1]}`)).status, 302);
-  assert.deepEqual((await call('/api/github_app', admin)).result.installation, { id: '42', account: 'acme' });
+  const connect = (await call('/api/connections', admin, { pack: 'github_app', start: true })).result.url as string;
+  assert.match(connect, /^https:\/\/github\.test\/apps\/pelago-test\/installations\/new\?state=default\.[0-9a-f]{48}$/);
+  assert.equal((await page('/x/github_app/installed?installation_id=42&state=guessed')).status, 400);
+  assert.equal((await page(`/x/github_app/installed?installation_id=42&${connect.split('?')[1]}`)).status, 302);
+  assert.deepEqual((await theApp()).connected, { id: '42', account: 'acme' });
   assert.ok(asked.includes('GET /app/installations/42'), 'the installation was asked of GitHub, as the app');
   // Each repository chosen is in the map: the one it knew is left alone, the other is made with its address.
   const repos = (await call('/api/github', admin)).result.repos.map((r: any) => [r.title, r.github]).sort();
   assert.deepEqual(repos, [['Site repo', 'acme/site'], ['Tools repo', 'acme/tools']]);
+  const connected = (await call('/agent/events', robot, { limit: 5 })).result as any[];
+  assert.ok(connected.some((e) => e.action === 'connection.made' && e.actor === 'pack:github_app'), 'logged in the workspace it connected');
 
   // 3. Pushes arrive at one address, signed with the app's secret; the installation says whose map they are for.
-  const deliver = async (event: string, payload: unknown, secret = 'whsec') => {
+  const deliver = async (event: string, payload: unknown, secret = 'whsec', path = '/x/github_app/hook/events') => {
     const body = JSON.stringify(payload);
-    const res = await fetch(`${base}/github/app/hook`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-github-event': event, 'x-hub-signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}` }, body });
+    const res = await fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', 'x-github-event': event, 'x-hub-signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}` }, body });
     return { status: res.status, ...((await res.json()) as any) };
   };
   const push = (installation: number) => ({ ref: 'refs/heads/main', before: '0'.repeat(40), after: 'a'.repeat(40), installation: { id: installation }, repository: { full_name: 'Acme/Tools', default_branch: 'main' }, pusher: { name: 'sam' }, commits: [{ id: 'a'.repeat(40), message: 'Sharpen the tools' }] });
   assert.equal((await deliver('push', push(42), 'someone-elses')).status, 401);
-  const heard = (await deliver('push', push(42))).result;
+  assert.equal((await deliver('ping', {})).result.reason, 'pong');
+  // An app created before it was a pack sends to the address it was given then, which the pack answers too.
+  const heard = (await deliver('push', push(42), 'whsec', '/github/app/hook')).result;
   assert.deepEqual([heard.recorded, heard.repo.title, heard.commits], [true, 'Tools repo', 1]);
   assert.equal((await deliver('push', push(99))).result.recorded, false, 'an installation no workspace connected is not anyone\'s');
   // 4. With a model account, the agent on this server reads the push: it looks at the commits through the app, asks the map,
   // and sends what the commits show. Here the model is a script, so what is tried is everything around it.
-  assert.deepEqual((await call('/api/github_app', admin)).result.reader, { model: null, from: null });
+  assert.deepEqual((await call('/api/reader', admin)).result, { model: null, from: null });
   assert.equal(heard.reading, false, 'without a model account a push is recorded and not read');
   assert.match((await call('/agent/model_account', robot, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) })).error, /humans only/);
   // Something that is not this repository's: the reader is held to the repository it reads, whatever it is told there.
@@ -228,18 +251,18 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   // A key is tried when it is given: one Anthropic will not take is not saved, and a sign-in token is told from an API key.
   assert.match((await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-api03-revoked-' + 'x'.repeat(20) })).error, /Anthropic refused that key, so it was not saved/);
   assert.match((await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-oat01-' + 'x'.repeat(30) })).error, /sign-in token[\s\S]*needs an API key/);
-  assert.equal((await call('/api/github_app', admin)).result.reader.from, null);
+  assert.equal((await call('/api/reader', admin)).result.from, null);
   // The Anthropic key set before there were model accounts is read as one.
   await (await workspaces.get('default')).pelago.setSecret('anthropic_key', 'sk-ant-' + 'x'.repeat(30));
-  assert.deepEqual((await call('/api/github_app', admin)).result.reader, { model: 'claude-sonnet-5-5', from: 'workspace' });
+  assert.deepEqual((await call('/api/reader', admin)).result, { model: 'claude-sonnet-5-5', from: 'workspace' });
   // The key is sealed where it is stored, so neither the database nor a backup of it holds it; nor does the log of its being set.
-  const kept = (await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value;
-  assert.match(kept, /^sealed:v1:/);
+  const sealed = (await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value;
+  assert.match(sealed, /^sealed:v1:/);
   assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
   // One stored before secrets were sealed leaves in a backup sealed all the same, and is sealed where it lies once it is read.
   await db.query(`update setting set value = $1::jsonb where key = 'anthropic_key'`, [JSON.stringify('sk-ant-' + 'x'.repeat(30))]);
   assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
-  assert.equal((await call('/api/github_app', admin)).result.reader.from, 'workspace');
+  assert.equal((await call('/api/reader', admin)).result.from, 'workspace');
   assert.match((await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value, /^sealed:v1:/);
   // Connected as an account on the Workspace page, it replaces that key, sealed the same way; the page sees its last four characters.
   const connectedModel = (await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) })).result;
@@ -282,40 +305,46 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   // A push recorded while its reading was cut off (the server stopped) has no run: the next server reads it, with any
   // pushed before it that were not read either, as one. What was read, even badly, is not read again.
   const whole = (await workspaces.get('default')).pelago;
-  const app = (await call('/api/github_app', admin)).result;
-  assert.equal(app.installation.id, '42');
+  const reach = appReach(serverPacksOf(workspaces));
+  assert.deepEqual(await reach.installationOf('default'), { id: '42', account: 'acme' });
   await whole.log(whole.db, { actor: 'github:sam', action: 'repo.push', target: heard.repo.id, origin: 'github', reason: '1 commit to main: Hone', detail: { repo: 'acme/tools', branch: 'main', before: 'b'.repeat(40), after: 'c'.repeat(40), commits: [{ sha: 'ccccccc' }] } });
   await whole.log(whole.db, { actor: 'github:sam', action: 'repo.push', target: heard.repo.id, origin: 'github', reason: '1 commit to main: Strop', detail: { repo: 'acme/tools', branch: 'main', before: 'c'.repeat(40), after: 'd'.repeat(40), commits: [{ sha: 'ddddddd' }] } });
   script.push({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Nothing needed changing.' }] });
-  assert.deepEqual(await readUnread(whole, theApp!, '42'), [{ repo: 'Acme/Tools', branch: 'main', after: 'd'.repeat(40) }]);
+  assert.deepEqual(await readUnread(whole, reach, '42'), [{ repo: 'Acme/Tools', branch: 'main', after: 'd'.repeat(40) }]);
   assert.match(asks.at(-1).messages[0].content, new RegExp(`${'b'.repeat(40)}\\.\\.${'d'.repeat(40)}`), 'from the last push that was read to the newest');
-  assert.deepEqual(await readUnread(whole, theApp!, '42'), [], 'and once');
+  assert.deepEqual(await readUnread(whole, reach, '42'), [], 'and once');
+  // The installation's token was traded for once, and kept.
+  assert.equal(asked.filter((a) => a === 'POST /app/installations/42/access_tokens').length, 1);
 
-  // Renamed on GitHub by its owner, the app is asked its name, and a workspace is sent to where it now is.
-  await theApp!.refresh();
-  assert.equal((await theApp!.app())?.slug, 'pelago-test', 'asked, and as it was');
+  // Renamed on GitHub by its owner, the app is asked its name every hour, and a workspace is sent to where it now is.
+  const refresh = () => serverPacksOf(workspaces).call('github_app', 'schedule', 'refresh', {});
+  assert.deepEqual(await refresh(), { changed: false }, 'asked, and as it was');
   renamed = true;
-  await theApp!.refresh();
-  assert.deepEqual(await theApp!.app(), { slug: 'pelago-renamed', name: 'Archipelago (renamed)' });
-  assert.match(await theApp!.startConnect('default'), /^https:\/\/github\.test\/apps\/pelago-renamed\/installations\/new\?state=/);
+  assert.deepEqual(await refresh(), { changed: true, slug: 'pelago-renamed', name: 'Archipelago (renamed)' });
+  assert.equal((await theApp()).name, 'Archipelago (renamed)');
+  assert.match((await call('/api/connections', admin, { pack: 'github_app', start: true })).result.url, /^https:\/\/github\.test\/apps\/pelago-renamed\/installations\/new\?state=/);
 
   // Its admin can ask for a re-check of a repository now; only of one the app was given, and no agent can.
-  assert.match((await call('/agent/github_app', robot, { recheck: heard.repo.id })).error, /humans only/);
-  assert.match((await call('/api/github_app', admin, { recheck: 'e_notarepo' })).error, /not a repository the GitHub App was given/);
-  assert.equal((await call('/api/github_app', admin, { recheck: heard.repo.id })).result.started, true);
+  assert.match((await call('/agent/reader', robot, { recheck: heard.repo.id })).error, /humans only/);
+  assert.match((await call('/api/reader', admin, { recheck: 'e_notarepo' })).error, /not a repository the GitHub App was given/);
+  assert.equal((await call('/api/reader', admin, { recheck: heard.repo.id })).result.started, true);
 
   // The key is never given back, and removing the account stops the reading.
-  assert.ok(!JSON.stringify((await call('/api/github_app', admin)).result).includes('sk-ant-'));
+  assert.ok(!JSON.stringify((await call('/api/connections', admin)).result).includes('sk-ant-'));
   assert.ok(!JSON.stringify((await call('/api/model_account', admin)).result).includes('sk-ant-'));
   assert.equal((await call('/api/model_account', admin, { remove: true })).result.account, null);
-  assert.equal((await call('/api/github_app', admin)).result.reader.from, null);
+  assert.equal((await call('/api/reader', admin)).result.from, null);
 
-  assert.deepEqual((await deliver('installation_repositories', { action: 'added', installation: { id: 42, account: { login: 'acme' } }, repositories_added: [{ full_name: 'Acme/Docs' }] })).result, { added: ['Acme/Docs'], known: [] });
+  assert.deepEqual((await deliver('installation_repositories', { action: 'added', installation: { id: 42, account: { login: 'acme' } }, repositories_added: [{ full_name: 'Acme/Docs' }, { full_name: 'Acme/Site' }] })).result, { added: ['Docs repo'], known: ['Site repo'] });
   // Chosen again on GitHub later, they come back with no word: the installation is known, and the map is brought up to date.
-  assert.equal((await page('/github/app/installed?installation_id=42&setup_action=update')).status, 302);
-  // Removed on GitHub, it is forgotten here.
+  assert.equal((await page('/github/app/installed?installation_id=42&setup_action=update')).status, 302, 'at the address the app had before, too');
+  // Disconnected here, a push is no one's; connected again, it is heard; removed on GitHub, it is forgotten here.
+  await call('/api/connections', admin, { pack: 'github_app', end: true });
+  assert.equal((await theApp()).connected, null);
+  assert.equal((await deliver('push', push(42))).result.recorded, false);
+  const again = (await call('/api/connections', admin, { pack: 'github_app', start: true })).result.url as string;
+  assert.equal((await page(`/x/github_app/installed?installation_id=42&${again.split('?')[1]}`)).status, 302);
   assert.equal((await deliver('installation', { action: 'deleted', installation: { id: 42 } })).result.forgotten, 42);
-  assert.equal((await call('/api/github_app', admin)).result.installation, null);
+  assert.equal((await theApp()).connected, null);
   assert.equal((await deliver('push', push(42))).result.recorded, false);
 });
-

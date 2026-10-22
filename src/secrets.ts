@@ -1,6 +1,6 @@
 // Secrets this server has to be able to use, and so cannot keep only as a
-// hash: a workspace's model account, the secret GitHub signs with, the GitHub
-// App's own key. They are sealed before they are stored (AES-256-GCM), with a
+// hash: a workspace's model account, the secret a pack's webhook is signed with,
+// the keys a server pack's hosts are called with. They are sealed before they are stored (AES-256-GCM), with a
 // key that is never in a database or a backup, so a backup file, a copy of it
 // off the server, or a database read on its own gives up none of them.
 //

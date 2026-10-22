@@ -4,7 +4,6 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after } from 'node:test';
-import type { GithubApp } from '../src/github-app.ts';
 import type { Limit } from '../src/limit.ts';
 import { setMailer, type Mail } from '../src/mail.ts';
 import { createHttpServer } from '../src/server.ts';
@@ -26,7 +25,7 @@ after(async () => {
 });
 
 /** A server on its own port with in-memory databases and its own copy of the packs. */
-export async function serve(auth: 'off' | 'tokens', github?: (origin: string) => GithubApp, limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }, sites?: Record<string, string>) {
+export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }, sites?: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), 'pelago-platform-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
@@ -35,7 +34,7 @@ export async function serve(auth: 'off' | 'tokens', github?: (origin: string) =>
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));
   const port = (probe.address() as AddressInfo).port;
   await new Promise((r) => probe.close(r));
-  const server = createHttpServer(workspaces, port, { auth, github: github?.(`http://127.0.0.1:${port}`), limits, sites });
+  const server = createHttpServer(workspaces, port, { auth, limits, sites });
   await new Promise<void>((r) => server.listen(port, '127.0.0.1', r));
   closers.push(async () => {
     server.close();

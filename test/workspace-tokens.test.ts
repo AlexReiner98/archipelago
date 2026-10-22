@@ -253,7 +253,7 @@ test('what answers without a token is asked only so often: by one address, and b
   clock = 60_000;
   assert.equal(count.take('a'), 0);
 
-  const { base, call } = await serve('tokens', undefined, { open: { each: 3, all: 5 }, deliveries: { each: 2 } });
+  const { base, call } = await serve('tokens', { open: { each: 3, all: 5 }, deliveries: { each: 2 } });
   const get = (path: string, address: string) => fetch(base + path, { headers: { 'x-forwarded-for': address } });
   const statuses = async (path: string, address: string, times: number) => {
     const seen: number[] = [];

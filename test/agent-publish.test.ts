@@ -70,7 +70,7 @@ test('a database made before step 12 lets an agent read the allowance once it ta
   // As a database at step 11 is: the read rule of step 1, without the allowance in it.
   await db.exec(`drop policy member_setting_read on setting;
     create policy member_setting_read on setting for select to pelago_member using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups'));
-    delete from schema_version where version = 12`);
+    delete from schema_version where version >= 12`);
   await callTool(l, owner, 'workspace_set', { agent_publish: true });
   assert.equal(await l.as('e_agentx').setting('agent_publish'), undefined, 'hidden from a member before the step');
   await migrate(db, false);

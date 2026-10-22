@@ -1,7 +1,7 @@
 // What the server keeps about itself is in its database, not beside it: which workspaces there are, the operator's
-// secret, the GitHub App and its installations, and the types each workspace defined for itself.
+// secret, what server packs keep and which workspaces connected each, and the types each workspace defined for itself.
 import assert from 'node:assert/strict';
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,9 +9,10 @@ import { test } from 'node:test';
 import pg from 'pg';
 import { readEnded, setEnded } from '../src/ended.ts';
 import { hashSecret } from '../src/auth.ts';
-import { controlValue, GITHUB_APP } from '../src/control.ts';
-import { GithubApp } from '../src/github-app.ts';
-import { isSealed } from '../src/secrets.ts';
+import { ADOPT_APP, setControlValue, storeGet } from '../src/control.ts';
+import { seal } from '../src/secrets.ts';
+import { connectionById, dropConnections } from '../src/server-connect.ts';
+import { serverSecret } from '../src/server-requests.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import { human } from './map.ts';
 
@@ -30,7 +31,6 @@ test('what the files beside the data held is taken into the database, and kept t
   const operator = 'latop_' + 'o'.repeat(40);
   mkdirSync(config.rootDir, { recursive: true });
   writeFileSync(join(config.rootDir, 'index.json'), JSON.stringify({ operator: hashSecret(operator), workspaces: [{ id: 'acme', name: 'Acme', created: '2026-10-01T00:00:00.000Z' }] }));
-  writeFileSync(join(config.rootDir, 'github-app.json'), JSON.stringify({ app: { id: 7, slug: 'pelago-x', name: 'X', pem: 'PEM', webhook_secret: 'whsec' }, installations: { '42': { workspace: 'acme', account: 'Acme' } } }));
   mkdirSync(join(config.packsDir, 'local'));
   writeFileSync(join(config.packsDir, 'local', 'pack.json'), JSON.stringify({ id: 'local', version: '0.1.0', title: 'Local', types: [SITE_VISIT] }));
 
@@ -38,20 +38,23 @@ test('what the files beside the data held is taken into the database, and kept t
   assert.deepEqual((await one.list()).map((w) => w.id), ['default', 'acme']);
   assert.equal(await one.isOperator(operator), true);
   assert.ok((await one.get('default')).pelago.registry.type('local.site_visit'), 'the default workspace’s own types, from the checkout');
-  const app = new GithubApp({ control: () => one.control(), origin: 'https://map.test' });
-  assert.equal(await app.workspaceOf(42), 'acme');
-  assert.deepEqual(await app.app(), { slug: 'pelago-x', name: 'X' });
-  const body = Buffer.from('{}');
-  assert.equal(await app.signed(body, `sha256=${createHmac('sha256', 'whsec').update(body).digest('hex')}`), true);
-  const kept = await controlValue<{ pem: string; webhook_secret: string }>(await one.control(), GITHUB_APP);
-  assert.ok(isSealed(kept!.pem) && isSealed(kept!.webhook_secret), 'the key brought from the file is sealed in the database');
+  // What the GitHub App kept when it was the kernel's is its server pack's after step 13 of the schema: run again here
+  // over what a server kept then, its key sealed and its installation tied to a workspace.
+  const control = await one.control();
+  await setControlValue(control, 'github_app', { id: 7, slug: 'pelago-x', name: 'X', pem: seal('PEM'), webhook_secret: seal('whsec') });
+  await control.query(`insert into github_installation (id, workspace, account) values ('42', 'acme', 'Acme')`);
+  await control.exec(ADOPT_APP);
+  const app = { id: 'github_app', secrets: [{ name: 'key' }, { name: 'hook' }, { name: 'app_id' }] };
+  assert.deepEqual(await connectionById(control, 'github_app', '42'), { id: '42', workspace: 'acme', account: 'Acme' });
+  assert.deepEqual([await serverSecret(control, app, 'key'), await serverSecret(control, app, 'hook'), await serverSecret(control, app, 'app_id')], ['PEM', 'whsec', '7']);
+  assert.deepEqual(await storeGet(control, 'github_app', 'app'), { id: 7, slug: 'pelago-x', name: 'X' });
 
   await define(await one.get('acme'), { ...SITE_VISIT, id: 'local.audit' });
   assert.equal(existsSync(join(config.rootDir, 'acme', 'local-pack')), false, 'a type defined now is written to no folder');
   await one.closeAll();
 
   // The files go; nothing is lost.
-  for (const file of ['index.json', 'github-app.json']) rmSync(join(config.rootDir, file));
+  rmSync(join(config.rootDir, 'index.json'));
   rmSync(join(config.packsDir, 'local'), { recursive: true });
   const two = new Workspaces(config);
   assert.deepEqual((await two.list()).map((w) => w.id), ['default', 'acme']);
@@ -59,10 +62,9 @@ test('what the files beside the data held is taken into the database, and kept t
   assert.ok((await two.get('acme')).pelago.registry.type('local.audit'));
   assert.ok((await two.get('default')).pelago.registry.type('local.site_visit'));
   assert.equal((await two.get('acme')).pelago.registry.type('local.site_visit'), undefined, 'one workspace’s types are not another’s');
-  const again = new GithubApp({ control: () => two.control(), origin: 'https://map.test' });
-  assert.equal(await again.workspaceOf('42'), 'acme');
-  await new GithubApp({ control: () => two.control(), origin: 'https://map.test' }).forget(42);
-  assert.equal(await again.workspaceOf('42'), undefined, 'forgotten by one, gone for the other');
+  assert.equal((await connectionById(await two.control(), 'github_app', '42'))?.workspace, 'acme');
+  await dropConnections(await two.control(), 'github_app', { id: '42' });
+  assert.equal(await connectionById(await two.control(), 'github_app', '42'), undefined, 'forgotten');
   await two.closeAll();
   rmSync(root, { recursive: true, force: true });
 });

@@ -10,7 +10,7 @@
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
 import { AGENT_PUBLISH_READ, MEMBER, ORDERED, SCHEMA, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
-import { CONTROL, PACK_STORE } from './control.ts';
+import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 
@@ -38,6 +38,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 10, name: 'a document as it was published', sql: PUBLISHED },
   { version: 11, name: 'a published document at an address word', sql: PUBLISHED_PATH },
   { version: 12, name: 'an agent reads whether it may publish', sql: AGENT_PUBLISH_READ },
+  { version: 13, name: 'the GitHub App as a server pack', sql: ADOPT_APP },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

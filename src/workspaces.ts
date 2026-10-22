@@ -340,7 +340,7 @@ export class Workspaces {
     const control = await this.control();
     await removeWorkspace(control, id);
     for (const key of [`member_limit:${id}`, `server_pack_made:${id}`]) await takeControlValue(control, key);
-    await control.query(`delete from github_installation where workspace = $1`, [id]);
+    await control.query(`delete from control_value where key like 'connection:%' and value->>'workspace' = $1`, [id]);
     await setEnded(control, id, null);
     this.known.delete(id);
     rmSync(join(this.config.rootDir, id), { recursive: true, force: true });
