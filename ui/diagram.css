@@ -1,0 +1,17 @@
+/* A diagram made from the code (ui/diagram.js), in the workspace's style: its colours and sizes are the lens's, set by dress. */
+.dg-area rect { fill: var(--ln-inner); stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
+.dg-box rect { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
+.dg-box.dashed rect, .dg-area.dashed rect { stroke-dasharray: var(--ln-flow-dash-scenario); }
+.dg-box.warn rect { stroke: var(--ln-warn); stroke-width: var(--ln-arch-stroke-warn); }
+.dg-box.strong rect { fill: var(--ln-text); }
+.dg-box.strong .dg-words { fill: var(--ln-land); }
+a:hover > .dg-box rect, a:focus > .dg-box rect { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
+.dg-words { fill: var(--ln-text); font-size: var(--ln-small-text); text-anchor: middle; dominant-baseline: middle; }
+.dg-words.left { text-anchor: start; }
+.dg-words.bold { font-weight: 600; }
+.dg-area > .dg-words { font-size: var(--ln-text-size); }
+.dg-wire { stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
+.dg-wire.dashed { stroke-dasharray: var(--ln-flow-dash-choice); }
+.dg-wire.faint { opacity: var(--ln-dim); }
+.dg-arrow { fill: var(--ln-muted); }
+.dg-wire-label { fill: var(--ln-muted); font-size: var(--ln-tiny-text); text-anchor: middle; paint-order: stroke; stroke: var(--ln-sea); stroke-width: var(--ln-flow-badge); }

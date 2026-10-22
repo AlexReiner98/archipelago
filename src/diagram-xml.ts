@@ -138,3 +138,63 @@ export function legend(id: string, x: number, y: number, lines: Array<[string, s
     style: style({ rounded: 1, html: 1, whiteSpace: 'wrap', align: 'left', verticalAlign: 'top', spacingLeft: 8, spacingTop: 4, fillColor: '#ffffff', strokeColor: '#bbbbbb', fontSize: 11 }),
   }];
 }
+
+/** A page as data a page can draw: every box where it is on the page, what kind of box it is, and its words. */
+export interface PageData {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  boxes: { id: string; x: number; y: number; w: number; h: number; kind: 'area' | 'box' | 'text'; head?: number; lines: string[]; bold?: boolean; dashed?: boolean; tone?: 'warn' | 'strong'; tooltip?: string; link?: string }[];
+  wires: { from: string; to: string; label?: string; dashed?: boolean; faint?: boolean }[];
+}
+
+const parts = (s: string) => Object.fromEntries(s.split(';').filter(Boolean).map((p) => p.split('=') as [string, string]));
+const words = (label: string) =>
+  label
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&(amp|lt|gt|quot|apos);/g, (_, e: string) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" })[e]!)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+/**
+ * A page as data, for drawing on a page of the map rather than in draw.io: a box inside an area is placed on the
+ * page, not in its area; an area keeps the height of its heading. What a style string meant is said as what it is
+ * (an area, a note in words alone, a module over the size rule, a root type), not as its colours.
+ */
+export function pageData(page: Page): PageData {
+  const byId = new Map(page.vertices.map((v) => [v.id, v]));
+  const at = (v: Vertex): [number, number] => {
+    const up = v.parent && byId.get(v.parent);
+    const [px, py] = up ? at(up) : [0, 0];
+    return [px + v.x, py + v.y];
+  };
+  const boxes = page.vertices.map((v) => {
+    const s = parts(v.style);
+    const [x, y] = at(v);
+    const kind = s.shape === 'swimlane' ? 'area' : s.strokeColor === 'none' ? 'text' : 'box';
+    const tone = s.fillColor === '#f8cecc' ? 'warn' : s.fillColor === '#4d4d4d' ? 'strong' : undefined;
+    return {
+      id: v.id,
+      x: Math.round(x),
+      y: Math.round(y),
+      w: Math.round(v.w),
+      h: Math.round(v.h),
+      kind,
+      ...(kind === 'area' && { head: Number(s.startSize ?? 30) }),
+      lines: words(v.label),
+      ...((s.fontStyle === '1' || /^<b>/.test(v.label)) && { bold: true }),
+      ...(s.dashed === '1' && { dashed: true }),
+      ...(tone && { tone }),
+      ...(v.tooltip && { tooltip: v.tooltip }),
+      ...(v.link && { link: v.link }),
+    } as PageData['boxes'][number];
+  });
+  const wires = page.edges.map((e) => {
+    const s = parts(e.style);
+    return { from: e.from, to: e.to, ...(e.label && { label: e.label }), ...(s.dashed === '1' && { dashed: true }), ...(Number(s.opacity ?? 100) < 100 && { faint: true }) };
+  });
+  return { id: page.id, name: page.name, width: Math.max(0, ...boxes.map((b) => b.x + b.w)), height: Math.max(0, ...boxes.map((b) => b.y + b.h)), boxes, wires };
+}

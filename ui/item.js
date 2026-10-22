@@ -91,7 +91,7 @@ export async function entity(id, here) {
     again();
   };
   // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
-  // A whole object (who started a run) is data drawn where it belongs, never a fact to print.
+  // A whole object (a diagram's boxes, who started a run) is data drawn where it belongs, never a fact to print.
   const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story' && !(v && typeof v === 'object' && !Array.isArray(v)) && !(run && RUN_OWN.includes(k)) && !(/^[a-z]_[a-z0-9]{8}$/.test(String(v)) && !ID.test(String(v)))); // an id that names no item is to copy, not to read
   const runFacts = run && [
     e.props.surface && h('span', { class: 'fact', title: e.props.cwd ?? '' }, e.props.surface === 'claude-code' ? 'Claude Code' : (RAN[e.props.surface] ?? e.props.surface)),
