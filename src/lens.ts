@@ -11,6 +11,7 @@ import { needsOf } from './attention.ts';
 import { blockGraph } from './blocking.ts';
 import { hubs, keptOf, type Kept } from './lens-kept.ts';
 import { styleFor, drawn as withDrawing } from './styles.ts';
+import { readSteps, stepIds } from './lens-steps.ts';
 import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
 
 // Kept where they were first imported from.
@@ -225,7 +226,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   }
   const asked = readLens(l, { ...input, ...(start !== undefined && { from: start }), ...(told && { story: told.id, from: undefined }) }, under);
   // What the story is about, in the order it came to them; and for each, the beats that are about it.
-  const about = told ? [...new Set(told.beats.flatMap((b) => b.about))] : [];
+  // A view's steps name what was once in it: sent with it whatever it folds away (src/lens-steps.ts).
+  const about = told ? [...new Set(told.beats.flatMap((b) => b.about))] : view ? stepIds(view.props.steps) : [];
   const beatsOf = (id: string) => (told ? told.beats.filter((b) => b.about.includes(id)).map((b) => b.n) : []);
   // A style is passed on as it is kept: only the page that draws reads it. The packs' presets, then the workspace's, the item's kind's, the item's, this view's, one named.
   // Asked for by its id alone (in a document), a view is drawn as the item it starts from is.
@@ -447,7 +449,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   }
 
   return {
-    lens: asked,
+    lens: asked, ...(view && Array.isArray(view.props.steps) && { steps: readSteps(view.props.steps) }),
     style: await withDrawing(l, style, input.have),
     // Which lenses and styles kept on the map went into those two, the one that weighs most last.
     kept: { lens: read.map(({ id, title }) => ({ id, title })), style: drawn },

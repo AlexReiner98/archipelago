@@ -6,6 +6,7 @@
 // their column by barycentre sweeps, and the wires routed at right angles, each on a track of its own. Pure: an
 // answer in, geometry out; `measure(text, px)` gives a title's width at a size.
 
+import { route } from './route.js';
 
 /** How a part is, read from its status word alone: no type is named. */
 const HEALTH = {
@@ -39,7 +40,16 @@ const shapeOf = (i) => (['data', 'storage', 'database', 'queue'].includes(i.role
  * Every length it lays out by is the style's (`sizes`, arch_*): the house style in packs/core/pack.json names each.
  * HEAD and PAD are the room inside a place's box: its name above its parts, and a margin around them.
  */
-export function layout({ items, links, rootId, measure, sizes }) {
+/**
+ * `prior`, when given, is the `memo` of the layout before this one (the same system a step earlier). Staying put is
+ * then the default: places keep their order, parts their row and their place across, and only what is new, or what a
+ * new wire forces, moves.
+ *
+ * `steady` lays out a picture of steps (it is set whenever there is a prior): places that only call one way are
+ * stacked, wires turn as little as they can, and no two drops run side by side. Without it, a picture is laid out as
+ * it always was.
+ */
+export function layout({ items, links, rootId, measure, sizes, prior, steady = Boolean(prior) }) {
   const need = (name) => {
     if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every one the architecture lays out by`);
     return sizes[name];
@@ -101,6 +111,28 @@ export function layout({ items, links, rootId, measure, sizes }) {
   };
   for (const id of nodes.keys()) if (!colour.get(id)) visit(id);
 
+  // ---- Places stacked. A place whose parts call into one other place, and are never called from it, sits wholly
+  // above it and shares its span across: for the layout its parts are in that place's column (col), and each row of
+  // theirs is above every row of the place below. Each is still drawn in a box of its own (home).
+  for (const n of nodes.values()) n.home = n.col;
+  const homes = steady ? [...new Set([...nodes.values()].map((n) => n.col).filter(Boolean))] : [];
+  const callsInto = (p, q) => edges.some((e) => nodes.get(e.a).col === p && nodes.get(e.b).col === q);
+  const onto = new Map();
+  for (const p of homes) {
+    const below = homes.filter((q) => q !== p && callsInto(p, q) && !callsInto(q, p));
+    if (below.length === 1) onto.set(p, below[0]);
+  }
+  const base = (c) => { let k = c; for (let i = 0; i < 8 && onto.has(k); i++) k = onto.get(k); return k; };
+  // Rows only: every part of an upper place counts as calling every part of the place it sits on.
+  const stackOut = new Map(), stackIn = new Map();
+  for (const [p, q] of onto)
+    for (const a of [...nodes.values()].filter((n) => n.home === p))
+      for (const b of [...nodes.values()].filter((n) => n.home === q)) {
+        (stackOut.get(a.id) ?? stackOut.set(a.id, []).get(a.id)).push(b.id);
+        (stackIn.get(b.id) ?? stackIn.set(b.id, []).get(b.id)).push(a.id);
+      }
+  for (const n of nodes.values()) n.col = n.col === null ? null : base(n.col);
+
   // ---- Sizes.
   for (const n of nodes.values()) {
     const text = Math.min(measure(n.item.title, TEXT), MAX_TEXT);
@@ -111,7 +143,7 @@ export function layout({ items, links, rootId, measure, sizes }) {
 
   // ---- Layers, from the bottom up: what calls nothing (a store, a model, a service outside) on the last row, and
   // each part one above the highest it calls, so a part sits just above what it sends to.
-  const outs = (id) => edges.filter((e) => e.a === id).map((e) => e.b);
+  const outs = (id) => [...edges.filter((e) => e.a === id).map((e) => e.b), ...(stackOut.get(id) ?? [])];
   const rises = new Map();
   const rise = (id) => {
     if (!rises.has(id)) rises.set(id, Math.max(0, ...outs(id).map((b) => rise(b) + 1)));
@@ -120,6 +152,29 @@ export function layout({ items, links, rootId, measure, sizes }) {
   for (const id of nodes.keys()) rise(id);
   const tallest = Math.max(...rises.values());
   const layerOf = new Map([...rises].map(([id, k]) => [id, tallest - k]));
+  // With a prior, a part keeps its row. A new part goes just above what it calls, or else just below what calls it.
+  // Where a new wire needs a part higher than what it calls, either the callers are lifted or the called pushed
+  // down: both are tried, and the one with fewer rows wins, then the one that moves fewer parts.
+  if (prior) {
+    const ins = (id) => [...edges.filter((e) => e.b === id).map((e) => e.a), ...(stackIn.get(id) ?? [])];
+    const topo = [], done = new Set();
+    const walk = (id) => { if (done.has(id)) return; done.add(id); ins(id).forEach(walk); topo.push(id); };
+    for (const id of nodes.keys()) walk(id);
+    const pushDown = (L) => { for (const id of topo) L.set(id, Math.max(L.get(id), ...ins(id).map((a) => L.get(a) + 1))); return L; };
+    const liftUp = (L) => { for (const id of [...topo].reverse()) if (outs(id).length) L.set(id, Math.max(0, Math.min(L.get(id), ...outs(id).map((b) => L.get(b) - 1)))); return L; };
+    const was = (id) => prior.layerOf.get(id);
+    const start = new Map([...nodes.keys()].map((id) => [id, was(id)]));
+    for (const id of nodes.keys()) {
+      if (start.get(id) !== undefined) continue;
+      const below = outs(id).map(was).filter((k) => k !== undefined), above = ins(id).map(was).filter((k) => k !== undefined);
+      start.set(id, below.length ? Math.max(0, Math.min(...below) - 1) : above.length ? Math.max(...above) + 1 : 0);
+    }
+    const closeUp = (L) => { const used = [...new Set(L.values())].sort((p, q) => p - q); for (const [id, k] of L) L.set(id, used.indexOf(k)); return L; };
+    const rows = (L) => new Set(L.values()).size;
+    const moves = (L) => [...L].filter(([id, k]) => was(id) !== undefined && was(id) !== k).length;
+    const pick = [pushDown(new Map(start)), pushDown(liftUp(new Map(start)))].map(closeUp).reduce((a, b) => (rows(b) < rows(a) || (rows(b) === rows(a) && moves(b) < moves(a)) ? b : a));
+    for (const [id, k] of pick) layerOf.set(id, k);
+  }
   for (const [id, k] of layerOf) nodes.get(id).layer = k;
   // A wire that passes a layer has a waypoint there, in the column it is going to, so it falls inside that place.
   const chains = edges.map((e) => {
@@ -147,6 +202,16 @@ export function layout({ items, links, rootId, measure, sizes }) {
       if (cost < least) ((least = cost), (order = [...loose, ...p]));
     }
   }
+  // With a prior, the places keep the order they had; a new one goes where it makes the wires between places shortest.
+  if (prior) {
+    const cost = (list) => { const at = new Map(list.map((c, k) => [c, k])); return across.reduce((s, [p1, q1]) => s + Math.abs(at.get(p1) - at.get(q1)), 0); };
+    order = cols.filter((c) => prior.order.includes(c)).sort((p, q) => prior.order.indexOf(p) - prior.order.indexOf(q));
+    for (const c of cols.filter((c) => !prior.order.includes(c))) {
+      const tries = order.map((_, k) => [...order.slice(0, k), c, ...order.slice(k)]).concat([[...order, c]]);
+      order = tries.reduce((a, b) => (cost(b) < cost(a) ? b : a));
+    }
+    if (order.includes(null)) order = [null, ...order.filter((c) => c !== null)];
+  }
   const colAt = new Map(order.map((c, k) => [c, k]));
 
   // ---- Order in each layer: column by column, and within a column by barycentre sweeps, kept where fewest cross.
@@ -173,12 +238,29 @@ export function layout({ items, links, rootId, measure, sizes }) {
     byColumn(layers[k], (id) => bary.get(id));
     index();
   };
+  // With a prior, each row starts in the order it had across the page; what is new goes in at the middle of what it is
+  // wired to; a sweep's reordering is kept only if it saves at least SAVES crossings, so a part is not moved for little.
+  const SAVES = 2;
+  if (prior) {
+    const was = (id) => prior.x.get(id);
+    // A waypoint stands for the two parts its wire joins.
+    const real = (v) => { if (!nodes.get(v).dummy) return [v]; const c = chains.find((c) => c.path.includes(v)); return [c.a, c.b]; };
+    const near = (id) => (nodes.get(id).dummy ? real(id) : [...up.get(id), ...down.get(id)].flatMap(real));
+    const key = (id) => {
+      if (was(id) !== undefined) return was(id);
+      const xs = near(id).map(was).filter((v) => v !== undefined);
+      return xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length + 0.5 : Infinity;
+    };
+    layers.forEach((list) => byColumn(list, key));
+    index();
+  }
   let best = layers.map((l) => [...l]), fewest = crossings();
+  const kept = fewest;
   for (let round = 0; round < 16 && fewest > 0; round++) {
     if (round % 2 === 0) for (let k = 1; k < layers.length; k++) sweep(k, up);
     else for (let k = layers.length - 2; k >= 0; k--) sweep(k, down);
     const count = crossings();
-    if (count < fewest) ((fewest = count), (best = layers.map((l) => [...l])));
+    if (count < fewest && (!prior || count <= kept - SAVES)) ((fewest = count), (best = layers.map((l) => [...l])));
   }
   layers.splice(0, layers.length, ...best);
   index();
@@ -188,12 +270,36 @@ export function layout({ items, links, rootId, measure, sizes }) {
   const cell = (k, c) => layers[k].filter((id) => nodes.get(id).col === c);
   const widthOf = (ids) => ids.reduce((s, id, k) => s + nodes.get(id).w + (k ? gap(ids[k - 1], id) : 0), 0);
   const colLeft = new Map(), colRight = new Map();
-  let at = MARGIN + PAD;
-  for (const c of order) {
-    const w = Math.max(...layers.map((_, k) => widthOf(cell(k, c))), c === null ? 0 : measure(byId.get(c).title, PLACE_TEXT) + PLACE_NAME_PAD);
-    colLeft.set(c, at);
-    colRight.set(c, at + w);
-    at += w + COL_GAP + 2 * PAD;
+  const colWidth = (c) => Math.max(...layers.map((_, k) => widthOf(cell(k, c))), c === null ? 0 : measure(byId.get(c).title, PLACE_TEXT) + PLACE_NAME_PAD);
+  const between = COL_GAP + 2 * PAD;
+  if (!prior) {
+    let at = MARGIN + PAD;
+    for (const c of order) {
+      const w = colWidth(c);
+      colLeft.set(c, at);
+      colRight.set(c, at + w);
+      at += w + between;
+    }
+  } else {
+    // With a prior, the place that holds the most stays where it was; the others keep their edge toward it and grow
+    // away from it, so a place that widens pushes nothing back across the page. The picture may then start left of 0.
+    const holds = (c) => [...nodes.values()].filter((n) => !n.dummy && n.col === c).length;
+    const known = order.filter((c) => prior.colLeft.has(c));
+    const anchor = known.length ? known.reduce((a, c) => (holds(c) > holds(a) ? c : a)) : order[0];
+    const ai = order.indexOf(anchor);
+    const aLeft = prior.colLeft.get(anchor) ?? MARGIN + PAD;
+    colLeft.set(anchor, aLeft);
+    colRight.set(anchor, aLeft + colWidth(anchor));
+    for (let k = ai + 1; k < order.length; k++) {
+      const c = order[k], left = colRight.get(order[k - 1]) + between;
+      colLeft.set(c, left);
+      colRight.set(c, left + colWidth(c));
+    }
+    for (let k = ai - 1; k >= 0; k--) {
+      const c = order[k], right = colLeft.get(order[k + 1]) - between;
+      colRight.set(c, right);
+      colLeft.set(c, right - colWidth(c));
+    }
   }
   const x = new Map();
   for (let k = 0; k < layers.length; k++)
@@ -217,95 +323,60 @@ export function layout({ items, links, rootId, measure, sizes }) {
       settle(ids, new Map(ids.map((id) => [id, toward.get(id).length ? toward.get(id).reduce((s, n) => s + x.get(n), 0) / toward.get(id).length : x.get(id)])));
     }
   };
-  for (let round = 0; round < 6; round++) {
-    for (let k = 1; k < layers.length; k++) pull(k, up);
-    for (let k = layers.length - 2; k >= 0; k--) pull(k, down);
-  }
-
-  // ---- Routing, at right angles only, as in the flow: a wire drops from the foot of a part, runs across on a track
-  // of its own in the gap below, and drops to the head of the next; each has its own place on the parts it joins.
-  const all = [...nodes.values()];
-  const segs = chains.flatMap((c) => c.path.slice(1).map((v, k) => ({ chain: c, u: c.path[k], v, gap: nodes.get(c.path[k]).layer })));
-  const range = (id) => {
-    const n = nodes.get(id), half = n.dummy ? 0 : n.w * (n.shape === 'diamond' ? 0.12 : 0.4);
-    return [x.get(id) - half, x.get(id) + half];
-  };
-  const clampTo = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
-  const slots = (id, list, want) => {
-    const [lo, hi] = range(id), k = list.length;
-    const step = k > 1 ? Math.min(SLOT, (hi - lo) / (k - 1)) : 0;
-    const v = list.map((sg) => clampTo(want(sg), [lo, hi]));
-    for (let i = 1; i < k; i++) v[i] = Math.max(v[i], v[i - 1] + step);
-    if (k) v[k - 1] = Math.min(v[k - 1], hi);
-    for (let i = k - 2; i >= 0; i--) v[i] = Math.min(v[i], v[i + 1] - step);
-    return v;
-  };
-  const leaving = (id) => segs.filter((sg) => sg.u === id), arriving = (id) => segs.filter((sg) => sg.v === id);
-  for (const n of all) {
-    const list = leaving(n.id).sort((p, q) => x.get(p.v) - x.get(q.v));
-    slots(n.id, list, (sg) => clampTo(x.get(sg.u), range(sg.v))).forEach((v, i) => (list[i].fx = v));
-  }
-  for (const n of all) {
-    const list = arriving(n.id).sort((p, q) => p.fx - q.fx);
-    slots(n.id, list, (sg) => sg.fx).forEach((v, i) => (list[i].hx = v));
-  }
-  // A port that is its part's only one that way follows the other end of its wire as far as the part allows.
-  for (const sg of segs) {
-    if (leaving(sg.u).length === 1) sg.fx = clampTo(sg.hx, range(sg.u));
-    if (arriving(sg.v).length === 1) sg.hx = clampTo(sg.fx, range(sg.v));
-  }
-  for (const sg of segs) [sg.x1, sg.x2] = [Math.min(sg.fx, sg.hx), Math.max(sg.fx, sg.hx)];
-  const inside = (v, sg) => v > sg.x1 + 0.5 && v < sg.x2 - 0.5;
-  const cost = (a, b) => Number(inside(a.hx, b)) + Number(inside(b.fx, a));
-  const tracks = layers.map(() => []);
-  for (const sg of [...segs].sort((p, q) => q.x2 - q.x1 - (p.x2 - p.x1))) {
-    const list = tracks[sg.gap];
-    let bestAt = 0, least = Infinity;
-    for (let k = 0; k <= list.length; k++) {
-      const c = list.slice(0, k).reduce((s, o) => s + cost(o, sg), 0) + list.slice(k).reduce((s, o) => s + cost(sg, o), 0);
-      if (c < least) ((least = c), (bestAt = k));
+  // With a prior, a part wants the place it had in its column; only what is new is pulled toward what it is wired to.
+  if (prior) {
+    for (let round = 0; round < 6; round++)
+      for (let k = 0; k < layers.length; k++)
+        for (const c of order) {
+          const ids = cell(k, c);
+          if (!ids.length) continue;
+          settle(ids, new Map(ids.map((id) => {
+            if (prior.offset.has(id)) return [id, colLeft.get(c) + prior.offset.get(id)];
+            const nb = [...up.get(id), ...down.get(id)];
+            return [id, nb.length ? nb.reduce((s, n) => s + x.get(n), 0) / nb.length : x.get(id)];
+          })));
+        }
+  } else
+    for (let round = 0; round < 6; round++) {
+      for (let k = 1; k < layers.length; k++) pull(k, up);
+      for (let k = layers.length - 2; k >= 0; k--) pull(k, down);
     }
-    list.splice(bestAt, 0, sg);
+
+  // Fewer turns, first (steady): a long wire's waypoints all take one x within reach of a port of one of its ends, where every
+  // waypoint fits there between its neighbours in its row; the wire then drops straight past those rows. An x within
+  // reach of both ends is best (no turn at all), then the one nearest an end's middle.
+  const gapTo = (a, b) => (nodes.get(a).w + nodes.get(b).w) / 2 + gap(a, b);
+  for (const c of steady ? chains : []) {
+    const ways = c.path.slice(1, -1);
+    if (!ways.length) continue;
+    const fits = (t) => ways.every((d) => {
+      const row = layers[nodes.get(d).layer], k = row.indexOf(d);
+      return (k === 0 || t >= x.get(row[k - 1]) + gapTo(row[k - 1], d)) && (k === row.length - 1 || t <= x.get(row[k + 1]) - gapTo(d, row[k + 1]));
+    });
+    const reach = (id) => { const n = nodes.get(id), half = n.w * (n.shape === 'diamond' ? 0.12 : 0.4); return [x.get(id) - half, x.get(id) + half]; };
+    const [a1, a2] = reach(c.a), [b1, b2] = reach(c.b);
+    // A wire that was there the step before keeps its line, where it still fits: staying put is the default.
+    const fitsAt = (d, t) => { const row = layers[nodes.get(d).layer], k = row.indexOf(d); return (k === 0 || t >= x.get(row[k - 1]) + gapTo(row[k - 1], d)) && (k === row.length - 1 || t <= x.get(row[k + 1]) - gapTo(d, row[k + 1])); };
+    if (prior && ways.every((d) => prior.x.has(d) && fitsAt(d, prior.x.get(d)))) {
+      for (const d of ways) x.set(d, prior.x.get(d));
+      continue;
+    }
+    const tries = [];
+    for (let t = Math.min(a1, b1); t <= Math.max(a2, b2); t += 2) {
+      const inA = t >= a1 && t <= a2, inB = t >= b1 && t <= b2;
+      if (inA || inB) tries.push([t, (inA && inB ? 0 : 1000) + Math.min(Math.abs(t - x.get(c.a)), Math.abs(t - x.get(c.b)))]);
+    }
+    const t = tries.sort((p, q) => p[1] - q[1]).map(([v]) => v).find(fits);
+    if (t !== undefined) for (const d of ways) x.set(d, t);
   }
-  // Rows: each layer as tall as its tallest part; each gap holds the foot of the boxes above, the tracks, and the
-  // names of the boxes that start below.
-  const y = new Map(), rowTop = [], rowBottom = [];
-  let cy = MARGIN + HEAD;
-  layers.forEach((ids, k) => {
-    const tall = Math.max(24, ...ids.map((id) => nodes.get(id).h));
-    rowTop[k] = cy;
-    for (const id of ids) y.set(id, cy + tall / 2);
-    cy += tall;
-    rowBottom[k] = cy;
-    const n = tracks[k].length;
-    const room = Math.max(LAYER_GAP, PAD + LEAD_OUT + Math.max(0, n - 1) * TRACK + LEAD_IN + HEAD);
-    const first = cy + PAD + LEAD_OUT + (room - PAD - LEAD_OUT - LEAD_IN - HEAD - Math.max(0, n - 1) * TRACK) / 2;
-    tracks[k].forEach((sg, i) => (sg.y = first + i * TRACK));
-    cy += room;
-  });
-  // The places: a box around each column, from the first layer it holds a part in to the last.
-  const boxes = order.filter((c) => c !== null).map((c) => {
-    const ks = all.filter((n) => n.col === c && !n.dummy).map((n) => n.layer);
-    const [k0, k1] = [Math.min(...ks), Math.max(...ks)];
-    return { id: c, item: byId.get(c), health: health(byId.get(c)), x: colLeft.get(c) - PAD, y: rowTop[k0] - HEAD, w: colRight.get(c) - colLeft.get(c) + 2 * PAD, h: rowBottom[k1] - rowTop[k0] + HEAD + PAD };
-  });
-  const width = Math.max(...[...colRight.values()]) + PAD + MARGIN;
-  const height = Math.max(rowBottom.at(-1) + PAD, ...boxes.map((b) => b.y + b.h)) + MARGIN;
 
-  // A part's edge at a given x: its foot or its head, along a diamond's slope where it is one.
-  const edgeY = (id, px, below) => {
-    const n = nodes.get(id);
-    if (n.dummy) return y.get(id);
-    const slope = n.shape === 'diamond' ? (Math.abs(px - x.get(id)) * n.h) / n.w : 0;
-    return y.get(id) + (below ? 1 : -1) * (n.h / 2 - slope);
-  };
-  for (const sg of segs) sg.points = [[sg.fx, edgeY(sg.u, sg.fx, true)], [sg.fx, sg.y], [sg.hx, sg.y], [sg.hx, edgeY(sg.v, sg.hx, false)]];
-  for (const c of chains) c.points = segs.filter((sg) => sg.chain === c).flatMap((sg, k) => (k ? sg.points.slice(1) : sg.points));
-  // Where a drop passes over another wire's track, the drop is broken, as in the flow.
-  const breaks = [];
-  for (const sg of segs)
-    for (const [p, q] of [[sg.points[0], sg.points[1]], [sg.points[2], sg.points[3]]])
-      for (const o of tracks[sg.gap]) if (o !== sg && inside(p[0], o) && o.y > Math.min(p[1], q[1]) + 1 && o.y < Math.max(p[1], q[1]) - 1) breaks.push([p[0], o.y]);
-
-  return { nodes, all, groups, boxes, chains, breaks, x, y, width, height };
+  const { all, boxes, breaks, y, width, height, left, rooms } = route({ nodes, chains, layers, x, byId, order, colLeft, colRight, measure, prior, steady, health, sizes: { SLOT, TRACK, LAYER_GAP, PAD, LEAD_OUT, LEAD_IN, HEAD, MARGIN, PLACE_TEXT, PLACE_NAME_PAD } });
+  // What the next step's layout is handed as its prior.
+  const parts = [...nodes.values()].filter((n) => !n.dummy);
+  // Where each part and each waypoint was across: a waypoint keeps its name while its wire and rows stay, so a step
+  // that changes nothing lays out as it was.
+  const placed = [...nodes.values()];
+  const memo = { order, colLeft, colRight, rooms, layerOf: new Map(parts.map((n) => [n.id, n.layer])), x: new Map(placed.map((n) => [n.id, x.get(n.id)])), offset: new Map(placed.map((n) => [n.id, x.get(n.id) - colLeft.get(n.col)])) };
+  // `left` is where the picture starts across: 0 but for a steady picture whose place has grown leftward.
+  return { nodes, all, groups, boxes, chains, breaks, x, y, left, width, height, memo };
 }

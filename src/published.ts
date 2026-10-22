@@ -8,6 +8,7 @@
 // picture's data with nothing private in it and nothing that names a person or a session.
 
 import { authorityOf } from './authority.ts';
+import { stepsShown } from './lens-steps.ts';
 import { lens } from './lens.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
@@ -32,6 +33,8 @@ export function freezeLens(answer: Answer, bodies: Map<string, string>) {
   return {
     lens: answer.lens,
     style,
+    // How it came to be, naming only what it shows.
+    ...(answer.steps && { steps: stepsShown(answer.steps, new Set(bodies.keys())) }),
     said: answer.said,
     views: [],
     view: null,

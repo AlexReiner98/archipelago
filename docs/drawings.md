@@ -41,6 +41,14 @@ A patch names a mark by its key: `toggle` classes, `set` attributes (with `over`
 
 A drawing's stylesheet (`css`) is read only inside its own picture: nested under `:where([data-drawing="…"])`, so its selectors weigh what they would alone, with the picture's paint contained. What could reach outside it (`&`, `:has`, `:root`, a leading combinator, `@import`, `url(`, a quote, a backslash, a brace that closes the wrapper) is refused.
 
+## A picture that plays
+
+A lens may keep `steps`: how the picture came to be, ending on the map as it is (`src/lens-steps.ts`). Each changes the one before it, from nothing: `add` and `remove` (ids), `titles` and `flag` (by id), `fields` (by id, then by name), `chapter` (`name`, `when`, `count`) and `lines` (`by`, `text`). The last step is the map as it is, whatever the steps say, so the still picture is always the last frame. What a step names is sent with the picture even when finished: a part that is gone is told of. A published picture keeps its steps, naming only what it shows.
+
+The architecture drawing plays them (`story.js`, `play.js`). Each step is laid out with the one before it as its prior: places keep their order and parts their row, a part keeps its place across, and a wire its line, unless something new needs the room. Places that only call one way are stacked, wires turn as little as they can, and no two drops run within 6 units. A step that takes something away does that first, in red, while nothing else moves; then the rest move, new parts and wires in the accent, wires drawn in, every corner square throughout. The chapters are a rail above the picture; what was said is a conversation below it. A style's `dots` colours each part by a field (`layer`: kernel, type pack, server pack, store, outside, yours), and every time is the house style's (`arch_story_*`). With less motion asked for, it is the last step at once.
+
+The landing page's story (14 steps) is checked in `packs/core/story.test.ts`: no two wires run as one, crossings (43) and turns (452) do not grow, corners stay square in every frame of every move, a step laid out again from itself moves nothing, and the last step is the map.
+
 ## The walls
 
 The drawing runs in a worker inside one sandboxed frame (`ui/draw.html`, `ui/draw.js`): an origin of its own, a policy that sends nothing anywhere, no page. Each picture talks to its worker over a channel of its own. A drawing that does not answer for 12 seconds is stopped. `test/drawings.test.ts` tries all of this against a real browser.

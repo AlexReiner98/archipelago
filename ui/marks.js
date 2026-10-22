@@ -9,7 +9,7 @@
 const SVG = 'http://www.w3.org/2000/svg';
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'a', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
 const HTML_TAGS = new Set(['div', 'span', 'p', 'b', 'strong', 'em', 'i', 'small', 'ul', 'ol', 'li', 'br', 'a', 'button']);
-const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
+const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
 /** The events a drawing may be told of, by the page's name for each. */
 const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click' };
 /** The one address a drawing may link to: an item's page. */
@@ -82,6 +82,7 @@ export function patch(list, keys, tell, moving) {
     const set = Object.entries(p.set ?? {});
     const over = Number(p.over) > 0 ? Math.min(Number(p.over), 10000) : 0;
     for (const [name, value] of set) {
+      for (const m of moving) if (m.el === el && m.name === name) moving.delete(m);
       if (value === null) {
         if (!ATTRS.has(name)) fail(`the attribute "${name}"`);
         el.removeAttribute(name);

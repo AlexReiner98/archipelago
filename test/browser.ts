@@ -16,6 +16,8 @@ export interface Page {
   /** Open another address in the same page (the same browser, its storage kept). */
   go: (url: string) => Promise<void>;
   evaluate: <T = unknown>(expression: string) => Promise<T>;
+  /** A DevTools command, for what the rest does not cover (emulating less motion, say). */
+  send: (method: string, params?: Record<string, unknown>) => Promise<any>;
   /** The page as it looks, as a PNG. */
   screenshot: () => Promise<Buffer>;
   /** What the page logged and threw. */
@@ -71,6 +73,7 @@ export async function open(url: string): Promise<Page> {
   await go(url);
   return {
     go,
+    send,
     evaluate: async (expression) => {
       const m = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
       if (m.result?.exceptionDetails) throw new Error(m.result.exceptionDetails.exception?.description ?? JSON.stringify(m.result.exceptionDetails));

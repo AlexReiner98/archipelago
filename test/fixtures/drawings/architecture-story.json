@@ -1,0 +1,1766 @@
+{
+ "lens": {
+  "from": "e_rootzzzz",
+  "by": "part_of",
+  "over": [
+   "software.calls"
+  ],
+  "fold": [
+   "closed",
+   "system",
+   "unlinked"
+  ]
+ },
+ "steps": [
+  {
+   "chapter": {
+    "name": "Lattice",
+    "when": "7–9 Oct",
+    "count": 120
+   },
+   "add": [
+    "e_agentszz",
+    "e_browserz",
+    "e_doorszzz",
+    "e_changezz",
+    "e_logzzzzz",
+    "e_pgzzzzzz"
+   ],
+   "titles": {
+    "e_pgzzzzzz": "PGlite",
+    "e_doorszzz": "MCP, CLI and web",
+    "e_modelzzz": "Anthropic API",
+    "e_placeser": "Lattice"
+   },
+   "fields": {
+    "e_pushzzzz": {
+     "layer": "kernel"
+    }
+   },
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Agents forget everything between sessions. I want the work kept where we can both see it."
+    },
+    {
+     "by": "Agent",
+     "text": "A typed map with one way to write to it, behind an MCP server, a CLI and a web UI."
+    }
+   ]
+  },
+  {
+   "add": [
+    "e_sessions",
+    "e_projects",
+    "e_question",
+    "e_lookszzz",
+    "e_supabase"
+   ],
+   "titles": {
+    "e_placeser": "Lattice · on Render"
+   },
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Put it online, so every machine reaches the same map."
+    },
+    {
+     "by": "Agent",
+     "text": "Hosted on Render, backed up to Supabase."
+    }
+   ]
+  },
+  {
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Plot each piece of work by the tokens it should take, and what it used."
+    },
+    {
+     "by": "Agent",
+     "text": "The roadmap is a token chart now. Finished work counts as used."
+    }
+   ]
+  },
+  {
+   "chapter": {
+    "name": "Tools and automations",
+    "when": "8–15 Oct",
+    "count": 196
+   },
+   "add": [
+    "e_automati",
+    "e_approval",
+    "e_costszzz"
+   ],
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Every change should say on whose authority it was made."
+    },
+    {
+     "by": "Agent",
+     "text": "Your word or my own judgment, kept apart in the log."
+    }
+   ]
+  },
+  {
+   "add": [
+    "e_pushzzzz",
+    "e_githubap",
+    "e_githubzz",
+    "e_modelzzz"
+   ],
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Keep the map current when I push."
+    },
+    {
+     "by": "Agent",
+     "text": "An agent on the server reads each push and brings the map up to date."
+    }
+   ]
+  },
+  {
+   "add": [
+    "e_publishi",
+    "e_readersz"
+   ],
+   "titles": {
+    "e_placeser": "Archipelago · on Render"
+   },
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Lattice is taken. Call it Archipelago."
+    },
+    {
+     "by": "Agent",
+     "text": "Renamed. It’s pelago wherever it’s typed."
+    }
+   ]
+  },
+  {
+   "chapter": {
+    "name": "A small core, and packs",
+    "when": "16–18 Oct",
+    "count": 256
+   },
+   "add": [
+    "e_mappacks"
+   ],
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "The core should only keep me in control. Everything else is a pack."
+    },
+    {
+     "by": "Agent",
+     "text": "Every type now extends one of seven kinds, every relation one of thirteen roots."
+    }
+   ]
+  },
+  {
+   "add": [
+    "e_viewszzz"
+   ],
+   "remove": [
+    "e_projects",
+    "e_question",
+    "e_costszzz"
+   ],
+   "lines": [
+    {
+     "by": "Agent",
+     "text": "Work, Inquiry, Money and Time leave the core. Each pack runs in a sandbox of its own."
+    }
+   ]
+  },
+  {
+   "chapter": {
+    "name": "Server packs",
+    "when": "19–20 Oct",
+    "count": 308
+   },
+   "titles": {
+    "e_pgzzzzzz": "Postgres"
+   },
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Run it on a real database server."
+    },
+    {
+     "by": "Agent",
+     "text": "Postgres on the server, PGlite on one machine. CI tests both."
+    }
+   ]
+  },
+  {
+   "add": [
+    "e_serverpa",
+    "e_lemonzzz",
+    "e_reporter"
+   ],
+   "titles": {
+    "e_modelzzz": "Your model provider"
+   },
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Billing is ours, not the open source project’s."
+    },
+    {
+     "by": "Agent",
+     "text": "Server packs: a tier for the whole server. Billing lives in a private one."
+    }
+   ]
+  },
+  {
+   "chapter": {
+    "name": "In Canada",
+    "when": "15–21 Oct",
+    "count": 328
+   },
+   "flag": {
+    "e_supabase": "US",
+    "e_placeser": "US"
+   },
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Which of our services are American?"
+    },
+    {
+     "by": "Agent",
+     "text": "Render hosts us and Supabase keeps the backups. Sign-in mail would need one too."
+    }
+   ]
+  },
+  {
+   "add": [
+    "e_mailzzzz"
+   ],
+   "remove": [
+    "e_supabase"
+   ],
+   "titles": {
+    "e_placeser": "Archipelago · OVH Beauharnois, QC"
+   },
+   "flag": {
+    "e_supabase": null,
+    "e_placeser": null
+   },
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "Find Canadian alternatives."
+    },
+    {
+     "by": "Agent",
+     "text": "OVH in Beauharnois, with our own mail relay over WireGuard. Everything stays in Canada."
+    }
+   ]
+  },
+  {
+   "chapter": {
+    "name": "A minimal kernel",
+    "when": "20–22 Oct",
+    "count": 341
+   },
+   "add": [
+    "e_styleszz"
+   ],
+   "remove": [
+    "e_lookszzz"
+   ],
+   "lines": [
+    {
+     "by": "Alex",
+     "text": "How anything looks is a style on the map, never kernel code."
+    },
+    {
+     "by": "Agent",
+     "text": "The defaults ship as style presets. Keep your own version and it wins."
+    }
+   ]
+  },
+  {
+   "remove": [
+    "e_githubap"
+   ],
+   "titles": {
+    "e_doorszzz": "Doors",
+    "e_placeser": "An Archipelago server"
+   },
+   "fields": {
+    "e_pushzzzz": {
+     "layer": "type_pack"
+    }
+   },
+   "lines": [
+    {
+     "by": "Agent",
+     "text": "The GitHub App and its webhook are packs now. The kernel keeps what keeps you in control."
+    },
+    {
+     "by": "",
+     "text": "341 commits in 15 days. One person, in conversation with agents."
+    }
+   ]
+  }
+ ],
+ "items": [
+  {
+   "id": "e_rootzzzz",
+   "type": "work.project",
+   "root": "work.project",
+   "kind": "work",
+   "title": "Archipelago, the whole system",
+   "status": "active",
+   "open": true,
+   "place": 1,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   }
+  },
+  {
+   "id": "e_placeser",
+   "type": "software.environment",
+   "root": "software.environment",
+   "kind": "place",
+   "title": "An Archipelago server",
+   "status": "up",
+   "open": true,
+   "inside": "e_rootzzzz",
+   "place": 1,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   }
+  },
+  {
+   "id": "e_placeout",
+   "type": "software.environment",
+   "root": "software.environment",
+   "kind": "place",
+   "title": "Outside services",
+   "status": "up",
+   "open": true,
+   "inside": "e_rootzzzz",
+   "place": 2,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   }
+  },
+  {
+   "id": "e_placeyou",
+   "type": "software.environment",
+   "root": "software.environment",
+   "kind": "place",
+   "title": "You and your agents",
+   "status": "up",
+   "open": true,
+   "inside": "e_rootzzzz",
+   "place": 3,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   }
+  },
+  {
+   "id": "e_readersz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Readers",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeyou",
+   "place": 1,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "yours"
+   }
+  },
+  {
+   "id": "e_styleszz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Style drawings",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeyou",
+   "place": 2,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "yours"
+   }
+  },
+  {
+   "id": "e_reporter",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Systems that report",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeyou",
+   "place": 3,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "yours"
+   }
+  },
+  {
+   "id": "e_agentszz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Your agents",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeyou",
+   "place": 4,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "yours"
+   }
+  },
+  {
+   "id": "e_browserz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Your browser",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeyou",
+   "place": 5,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "yours"
+   }
+  },
+  {
+   "id": "e_approval",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Approvals",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 1,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_automati",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Automations",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 2,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_changezz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Change",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 3,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_doorszzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Doors",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 4,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_logzzzzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Event log",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 5,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "store"
+   }
+  },
+  {
+   "id": "e_mappacks",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Map packs",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 6,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "type_pack"
+   }
+  },
+  {
+   "id": "e_pgzzzzzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Postgres",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 7,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "store"
+   }
+  },
+  {
+   "id": "e_publishi",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Publishing",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 8,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_pushzzzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Push reader",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 9,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "type_pack"
+   }
+  },
+  {
+   "id": "e_serverpa",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Server packs",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 10,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "server_pack"
+   }
+  },
+  {
+   "id": "e_sessions",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Sessions",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 11,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_viewszzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Views and lenses",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeser",
+   "place": 12,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_lookszzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "How things look",
+   "status": "retired",
+   "open": false,
+   "inside": "e_placeser",
+   "place": 13,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_projects",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Projects and roadmap",
+   "status": "retired",
+   "open": false,
+   "inside": "e_placeser",
+   "place": 14,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_question",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Questions",
+   "status": "retired",
+   "open": false,
+   "inside": "e_placeser",
+   "place": 15,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_costszzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Costs and time",
+   "status": "retired",
+   "open": false,
+   "inside": "e_placeser",
+   "place": 16,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_githubap",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "GitHub App",
+   "status": "retired",
+   "open": false,
+   "inside": "e_placeser",
+   "place": 17,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "kernel"
+   }
+  },
+  {
+   "id": "e_githubzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "GitHub",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeout",
+   "place": 1,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "outside"
+   }
+  },
+  {
+   "id": "e_lemonzzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Lemon Squeezy",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeout",
+   "place": 2,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "outside"
+   }
+  },
+  {
+   "id": "e_mailzzzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Mail",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeout",
+   "place": 3,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "outside"
+   }
+  },
+  {
+   "id": "e_modelzzz",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Your model provider",
+   "status": "up",
+   "open": true,
+   "inside": "e_placeout",
+   "place": 4,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "outside"
+   }
+  },
+  {
+   "id": "e_supabase",
+   "type": "software.component",
+   "root": "software.component",
+   "kind": "place",
+   "title": "Supabase backups",
+   "status": "retired",
+   "open": false,
+   "inside": "e_placeout",
+   "place": 5,
+   "size": {
+    "work": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    }
+   },
+   "state": {
+    "blocked": false,
+    "waits_on": [],
+    "sessions": 0,
+    "needs_you": false
+   },
+   "within": {
+    "items": 0,
+    "work": 0,
+    "blocked": 0,
+    "waiting": 0,
+    "sessions": 0,
+    "tokens": {
+     "estimated": 0,
+     "used": 0
+    },
+    "waits_on": {},
+    "needs_you": 0,
+    "not_sent": 0
+   },
+   "fields": {
+    "layer": "outside"
+   }
+  }
+ ],
+ "links": [
+  {
+   "kind": "software.calls",
+   "from": "e_agentszz",
+   "to": "e_doorszzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_browserz",
+   "to": "e_doorszzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_readersz",
+   "to": "e_doorszzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_reporter",
+   "to": "e_doorszzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_browserz",
+   "to": "e_styleszz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_doorszzz",
+   "to": "e_lookszzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_doorszzz",
+   "to": "e_changezz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_doorszzz",
+   "to": "e_sessions",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_doorszzz",
+   "to": "e_viewszzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_doorszzz",
+   "to": "e_publishi",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_doorszzz",
+   "to": "e_serverpa",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_doorszzz",
+   "to": "e_mailzzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_changezz",
+   "to": "e_logzzzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_changezz",
+   "to": "e_approval",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_changezz",
+   "to": "e_pgzzzzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_sessions",
+   "to": "e_pgzzzzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_viewszzz",
+   "to": "e_pgzzzzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_publishi",
+   "to": "e_pgzzzzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_automati",
+   "to": "e_changezz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_automati",
+   "to": "e_mappacks",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_mappacks",
+   "to": "e_changezz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_pushzzzz",
+   "to": "e_changezz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_pushzzzz",
+   "to": "e_modelzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_githubzz",
+   "to": "e_pushzzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_lemonzzz",
+   "to": "e_serverpa",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_doorszzz",
+   "to": "e_projects",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_projects",
+   "to": "e_changezz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_question",
+   "to": "e_changezz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_costszzz",
+   "to": "e_changezz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_githubap",
+   "to": "e_pushzzzz",
+   "n": 1
+  },
+  {
+   "kind": "software.calls",
+   "from": "e_pgzzzzzz",
+   "to": "e_supabase",
+   "n": 1
+  }
+ ],
+ "rest": {},
+ "viewer": null,
+ "controls": [],
+ "views": []
+}
