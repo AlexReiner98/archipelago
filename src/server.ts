@@ -200,7 +200,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (/^\/(connect|x)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX) });
 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
-      const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
+      const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
       if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named, sites }));
 
       // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so

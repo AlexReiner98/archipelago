@@ -6,6 +6,7 @@
 import type { ServerResponse } from 'node:http';
 import type { Part } from './documents.ts';
 import { GUARD, POLICY } from './public-document.ts';
+import { listen } from './published-live.ts';
 import { drawingCode, pageData, publishedPage } from './published-page.ts';
 import { publishedAt, publishedPicture, sitePages } from './published.ts';
 import { pageLook } from './styles.ts';
@@ -52,8 +53,9 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
     return send(200, 'application/xml; charset=utf-8', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`, { 'cache-control': 'public, max-age=300' });
   }
   // The front page's data and figures are read at /data and /picture/<id>, as any page's are below its own address.
-  const [path, what, extra] = parts.length === 0 || ['data', 'picture', 'drawing'].includes(parts[0]) ? [HOME, ...parts] : parts;
-  if (parts.length > 3 || (what && !['data', 'picture', 'drawing'].includes(what)) || (what !== 'data' && what && !extra) || (what === 'data' && extra)) return false;
+  const [path, what, extra] = parts.length === 0 || ['data', 'picture', 'drawing', 'live'].includes(parts[0]) ? [HOME, ...parts] : parts;
+  const whole = what === 'data' || what === 'live';
+  if (parts.length > 3 || (what && !['data', 'picture', 'drawing', 'live'].includes(what)) || (what && !whole && !extra) || (whole && extra)) return false;
   // The front page has one address.
   if (parts[0] === HOME && !what) return send(301, 'text/plain; charset=utf-8', 'Moved', { location: '/' });
   const doc = (await publishedAt(pelago, path)) as ({ id: string; title: string; parts: Part[]; path: string } & Record<string, unknown>) | null;
@@ -63,6 +65,7 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
     const picture = await publishedPicture(pelago, doc.id, extra);
     return picture ? send(200, picture.content_type, picture.bytes, { 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));
   }
+  if (what === 'live') return (listen(res, at.workspace, doc.id, GUARD), true);
   if (what === 'drawing') {
     const code = drawingCode(doc, extra);
     return code ? send(200, 'application/json', JSON.stringify(code), { 'cache-control': 'public, max-age=31536000, immutable' }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));

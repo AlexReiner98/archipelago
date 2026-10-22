@@ -14,6 +14,7 @@ import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
 import { publicDocument, readable } from './public-document.ts';
 import { framesFor } from './published-frames.ts';
+import { republished } from './published-live.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 const IDS = /[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g;
@@ -130,6 +131,8 @@ export async function publish(l: Archipelago, actor: Actor, id: string, said?: S
     );
     await l.log(tx, { actor: actorId(actor), action: 'document.publish', target: id, reason: 'Published as it stands', detail: { sections: given.sections.length, lenses: Object.keys(given.lenses).length, authority } });
   });
+  // A page open on it with ?live draws it anew.
+  republished(l.workspace, id);
   return { published: id, sections: given.sections.length, lenses: Object.keys(given.lenses).length, ...(given.path && { path: given.path }) };
 }
 

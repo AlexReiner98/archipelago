@@ -113,3 +113,34 @@ test('in a browser, the text and the first frame are on the page together, and t
     page.close();
   }
 });
+
+test('a page opened with ?live is told when its document is published again', async () => {
+  const { call, base } = await serve('off');
+  const { d } = await published(call);
+  const ac = new AbortController();
+  const res = await fetch(`${base}/p/default/${d}/live`, { signal: ac.signal });
+  assert.equal(res.headers.get('content-type'), 'text/event-stream');
+  const reader = res.body!.getReader();
+  const said = async () => new TextDecoder().decode((await reader.read()).value);
+  assert.match(await said(), /listening/);
+  await call('/api/publish', undefined, { id: d });
+  assert.match(await said(), /event: published/);
+  ac.abort();
+  assert.equal((await fetch(`${base}/p/default/e_nothere0/live`)).status, 404);
+});
+
+test('in a browser, a page opened with ?live draws itself anew when published again, with no reload', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { call, base } = await serve('off');
+  const { d, s } = await published(call);
+  const page = await open(`${base}/p/default/${d}?live`);
+  try {
+    await page.evaluate(`(async () => { for (let n = 0; n < 200 && !document.querySelector('main h1'); n++) await new Promise((r) => setTimeout(r, 25)); window.stayed = true; })()`);
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, title: 'The system, renamed' }, { op: 'update', id: s, props: { lit: 'all' } }] });
+    await call('/api/publish', undefined, { id: d });
+    const title = await page.evaluate(`(async () => { for (let n = 0; n < 200 && document.querySelector('main h1')?.textContent !== 'The system, renamed'; n++) await new Promise((r) => setTimeout(r, 25)); return document.querySelector('main h1').textContent; })()`);
+    assert.equal(title, 'The system, renamed');
+    assert.equal(await page.evaluate('window.stayed'), true, 'the page was not loaded again');
+  } finally {
+    page.close();
+  }
+});

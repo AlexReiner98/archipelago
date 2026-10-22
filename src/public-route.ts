@@ -6,6 +6,7 @@
 import type { ServerResponse } from 'node:http';
 import type { Part } from './documents.ts';
 import { GUARD, POLICY } from './public-document.ts';
+import { listen } from './published-live.ts';
 import { drawingCode, pageData, publishedPage } from './published-page.ts';
 import { publishedDocument, publishedPicture } from './published.ts';
 import { publicPage, publicPicture } from './public.ts';
@@ -48,6 +49,8 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
     if (!page) return none();
     return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
   }
+  // A page opened with ?live listens for its document being published again.
+  if (what === 'live') return doc ? listen(res, workspace, id, GUARD) : none();
   // A drawing its pictures are drawn by, by its hash: the same for as long as anything is kept.
   if (what === 'drawing') {
     const code = doc && extra ? drawingCode(doc, extra) : null;

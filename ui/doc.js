@@ -255,3 +255,7 @@ if (!given) warmDrawings();
 )
   .then(draw)
   .catch((err) => main.replaceChildren(h('p', { class: 'error' }, err.message)));
+
+// Opened with ?live, a published page is drawn anew each time its document is published again (src/published-live.ts).
+if (given && new URLSearchParams(location.search).has('live'))
+  new EventSource(`${here}/live`).addEventListener('published', () => fetch(`${here}/data`).then((res) => res.json()).then(draw, () => null));
