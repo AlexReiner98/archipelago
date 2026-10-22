@@ -7,7 +7,7 @@ import { storeGet, storePut, storeTake } from './control.ts';
 import type { Q } from './db.ts';
 import { Sandbox, type Answerer } from './packhost.ts';
 import { runAct, type ActPlaces } from './server-acts.ts';
-import { connectAct, connectionOf, type Connection, type Delivered } from './server-connect.ts';
+import { connectAct, connectionOf, type Connection } from './server-connect.ts';
 import { loadServerPacks, type ServerPack } from './server-packs.ts';
 import { hostBase, hostRequest, type HostRequest } from './server-requests.ts';
 
@@ -23,8 +23,6 @@ const CONNECT_ACTS = ['begun.get', 'begun.take', 'connection.make', 'connection.
 export class ServerPacks {
   readonly packs: ServerPack[];
   readonly refused: { folder: string; why: string[] }[];
-  /** Told of each delivery a pack hands to a connected workspace, once a pack there has taken it in. */
-  readonly delivered: Delivered[] = [];
   /** The address this server is reached at from outside, which a pack is told (ctx.origin). */
   origin = '';
   private boxes = new Map<string, Sandbox>();
@@ -56,6 +54,15 @@ export class ServerPacks {
     const pack = this.find(id);
     if (!pack) throw new Error(`No server pack "${id}".`);
     return hostRequest(await this.control(), pack.file, r);
+  }
+
+  /** A read a workspace pack makes through a host this pack lends, as that workspace's connection to it. */
+  async lent(id: string, host: string, workspace: string, path: string): Promise<{ status: number; body: unknown }> {
+    const pack = this.find(id);
+    if (!pack?.file.hosts?.some((h) => h.id === host && h.lend)) throw new Error(`The server pack "${id}" lends no host "${host}".`);
+    const c = await connectionOf(await this.control(), id, workspace);
+    if (!c) throw new Error(`This workspace has not connected ${pack.file.title}.`);
+    return this.request(id, { host, path, as: c.id });
   }
 
   /** The connection a workspace made to a pack, if it has. */
@@ -95,7 +102,7 @@ export class ServerPacks {
       if (typeof q.act === 'string') {
         const input = (q.input ?? {}) as Record<string, unknown>;
         if (!(pack.file.acts ?? []).includes(q.act as never)) throw new Error(`The pack "${id}" did not declare the act "${q.act}".`);
-        if (CONNECT_ACTS.includes(q.act)) return connectAct(this.at, await this.control(), pack.file, q.act, input, this.delivered);
+        if (CONNECT_ACTS.includes(q.act)) return connectAct(this.at, await this.control(), pack.file, q.act, input);
         return runAct(this.at, pack.file, q.act, input, () => this.agreements());
       }
       if (q.request && typeof q.request === 'object') return this.request(id, q.request as HostRequest);

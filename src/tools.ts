@@ -127,11 +127,6 @@ export interface Tool {
   run(l: Archipelago, actor: Actor, input: any): Promise<unknown>;
 }
 
-/** The server adds the tools of what it runs beside the map (the reader of pushes), which would otherwise import these. */
-export function offerTools(more: Record<string, Tool>): void {
-  Object.assign(TOOLS, more);
-}
-
 let backUp: (() => Promise<unknown>) | undefined;
 /** The server hands the tools a way to back every workspace up now. */
 export function configureBackup(run: (() => Promise<unknown>) | undefined): void {

@@ -214,8 +214,6 @@ export async function entity(id, here) {
         ...(e.archived_at ? [] : actionsFor(e.type).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),
         // Only an address on the web: what an agent wrote there is opened by the owner's click.
         /^https?:[/][/]/i.test(e.props.link ?? '') && ['Open where it ran', () => window.open(e.props.link, '_blank', 'noopener')],
-        // A repository, known by its address on GitHub: an agent on the server can re-check its oldest items against its code.
-        type?.fields.remote && !e.archived_at && e.props.remote && ['Re-check its oldest items now', () => api('reader', { recheck: id }).then(() => tell('The re-check has started', 'An agent on the server is checking this repository’s oldest open items against its code. Its run shows here, under Tokens used, in a few minutes.'), (err) => tell('The re-check did not start', err.message))],
         data.source && [`Source: ${data.source.title.replace(/\b[a-z]_[a-z0-9]{8}\b/g, (found) => titles.get(found) ?? 'a session')}`, () => (location.hash = `#/e/${data.source.id}`)],
         workish && ['Copy session brief', copyBrief],
         workish && ['Launch a session: investigate only', () => launch('plan')],

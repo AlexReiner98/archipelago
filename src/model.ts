@@ -1,6 +1,6 @@
 // Model calls: the one place the server asks a language model anything, with
 // plain fetch. A conversation is said in one shape (Anthropic's messages,
-// which the reader was written against) and sent one of two ways:
+// which the first agent here was written against) and sent one of two ways:
 //
 // - to Anthropic's own API, on an Anthropic key;
 // - to OpenAI, or any OpenAI-compatible URL (LiteLLM in front of open-weight

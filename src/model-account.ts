@@ -1,4 +1,4 @@
-// A workspace's own model account: what the reader, and anything else here that asks a model, runs on. Hosted
+// A workspace's own model account: what a pack's model runs (src/agent-run.ts), and anything else here that asks a model, run on. Hosted
 // plans do not include a model (the owner, 20 Oct 2026): each workspace brings its own, Anthropic, OpenAI or any
 // OpenAI-compatible server, connected by its admin on the Workspace page.
 //
@@ -24,7 +24,7 @@ export interface ModelAccount {
   key: string;
   /** A compatible server's base, up to and including its version (https://api.example.com/v1). */
   url?: string;
-  /** Left out for Anthropic: the server's reader model. */
+  /** Left out for Anthropic: the server's default model. */
   model?: string;
   /** What the model costs, in US$ a million tokens, as its admin read it on the provider's price list. */
   price?: Price;
@@ -35,11 +35,11 @@ export interface Price {
   output: number;
 }
 
-/** Anthropic's reader model, priced as Anthropic lists it, when its account says no price of its own. */
+/** Anthropic's default model, priced as Anthropic lists it, when its account says no price of its own. */
 const ANTHROPIC_PRICE: Price = { input: 2, output: 10 };
 
-/** The model the reader asks, on Anthropic or the server's model, unless an account names its own. */
-export const READER_MODEL = env('READER_MODEL') || 'claude-sonnet-5-5';
+/** The model asked on Anthropic or the server's model, unless an account names its own (PELAGO_READER_MODEL, as it was first named, still sets it). */
+export const DEFAULT_MODEL = env('DEFAULT_MODEL') || env('READER_MODEL') || 'claude-sonnet-5-5';
 /** The setting the account is sealed in, and the Anthropic key that came before it (still read, as an Anthropic account). */
 export const ACCOUNT = 'model_account';
 const LEGACY = 'anthropic_key';
@@ -88,9 +88,9 @@ async function stored(l: Archipelago): Promise<ModelAccount | undefined> {
 /** What this workspace's model calls run on: its own account, or the server's model where it is offered. Undefined: nothing. */
 export async function connection(l: Archipelago): Promise<Connection | undefined> {
   const a = await stored(l);
-  if (a) return { from: 'workspace', name: NAMES[a.provider], model: a.model || READER_MODEL, ask: make(a.key || undefined, endpointOf(a)), price: a.price ?? (a.provider === 'anthropic' ? ANTHROPIC_PRICE : undefined) };
+  if (a) return { from: 'workspace', name: NAMES[a.provider], model: a.model || DEFAULT_MODEL, ask: make(a.key || undefined, endpointOf(a)), price: a.price ?? (a.provider === 'anthropic' ? ANTHROPIC_PRICE : undefined) };
   const at = shared();
-  if (at) return { from: 'server', name: 'The server’s model', model: READER_MODEL, ask: make(undefined, at) };
+  if (at) return { from: 'server', name: 'The server’s model', model: DEFAULT_MODEL, ask: make(undefined, at) };
   return undefined;
 }
 
@@ -101,9 +101,9 @@ export async function modelStatus(l: Archipelago, admin = true) {
   const a = await stored(l);
   const server = shared();
   return {
-    account: a ? { provider: a.provider, name: NAMES[a.provider], model: a.model || READER_MODEL, url: a.url ?? null, price: a.price ?? (a.provider === 'anthropic' ? ANTHROPIC_PRICE : null), ...(admin && { key: a.key ? `…${a.key.slice(-4)}` : null }) } : null,
-    server_model: server ? READER_MODEL : null,
-    default_model: READER_MODEL,
+    account: a ? { provider: a.provider, name: NAMES[a.provider], model: a.model || DEFAULT_MODEL, url: a.url ?? null, price: a.price ?? (a.provider === 'anthropic' ? ANTHROPIC_PRICE : null), ...(admin && { key: a.key ? `…${a.key.slice(-4)}` : null }) } : null,
+    server_model: server ? DEFAULT_MODEL : null,
+    default_model: DEFAULT_MODEL,
     runs_on: a ? ('workspace' as const) : server ? ('server' as const) : null,
     ...(!a && !server && { note: NO_MODEL }),
   };
@@ -153,7 +153,7 @@ const said = async (res: Response): Promise<string> => {
  */
 export async function tryAccount(a: ModelAccount, f: Fetch = fetching): Promise<string | undefined> {
   const who = NAMES[a.provider];
-  const model = a.model || READER_MODEL;
+  const model = a.model || DEFAULT_MODEL;
   const signal = AbortSignal.timeout(20_000);
   let res: Response;
   try {
@@ -213,4 +213,4 @@ export async function forgetModel(l: Archipelago): Promise<void> {
 }
 
 /** In a word or two, which account and model, for the log: never the key. */
-export const named = (a: ModelAccount): string => `${NAMES[a.provider]}${a.url ? ` (${new URL(a.url).host})` : ''}, ${a.model || READER_MODEL}`;
+export const named = (a: ModelAccount): string => `${NAMES[a.provider]}${a.url ? ` (${new URL(a.url).host})` : ''}, ${a.model || DEFAULT_MODEL}`;

@@ -17,7 +17,7 @@ import { savedViews } from './saved-views.ts'; import { pageStyle } from './styl
  */
 type PackAsker = (l: Archipelago, name: string, params: Record<string, unknown>) => Promise<unknown>;
 let askPack: PackAsker | undefined;
-export const setPackAsker = (asker: PackAsker) => void (askPack = asker);
+export const setPackAsker = (asker: PackAsker) => void (askPack = asker); export const askPackView: PackAsker = (l, name, params) => (askPack ? askPack(l, name, params) : Promise.reject(new Error(`No view "${name}"`)));
 
 async function person(l: Archipelago, given?: string): Promise<string> {
   const id = given ?? (l.viewer || (await l.setting<string>('me')));

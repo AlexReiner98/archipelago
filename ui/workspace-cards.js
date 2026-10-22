@@ -135,8 +135,8 @@ export function githubCard() {
   const body = h('div', {}, h('div', { class: 'empty' }, 'Loading\u2026'));
   const draw = async (made) => {
     const s = made ?? (await api('github'));
-    // What reads the pushes the GitHub App hands over: the agent on this server, on the workspace's model account (the Model card).
-    const on = (await api('reader').catch(() => ({}))).from;
+    // What reads the pushes the GitHub App hands over: an agent on this server, on the workspace's model account (the Model card).
+    const on = (await api('model_account').catch(() => ({}))).runs_on;
     const reading = h(
       'div',
       { class: 'toolbar', style: 'padding: var(--space-6) var(--space-8) 0' },

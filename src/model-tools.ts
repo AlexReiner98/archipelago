@@ -10,14 +10,14 @@ import type { Tool } from './tools.ts';
 export const MODEL_TOOLS: Record<string, Tool> = {
   model_account: {
     description:
-      'The model account this workspace runs on: what the agent on this server that reads pushes, and anything else here that asks a model, is paid for with. With nothing given: which account and model (a key only as its last four characters), and whether the server’s own model is offered when there is none. ' +
+      'The model account this workspace runs on: what the model runs packs ask for (an agent on this server that reads pushes), and anything else here that asks a model, are paid for with. With nothing given: which account and model (a key only as its last four characters), and whether the server’s own model is offered when there is none. ' +
       'provider with key (and url for a compatible server, model unless Anthropic): connect one, replacing any before. It is tried first and refused, with the reason, if it does not answer. price_in and price_out (US$ a million tokens, from the provider’s price list): what each run is said to cost; given alone, they change the price of the account connected. remove: disconnect it. Admins only to connect, price or remove.',
     humanOnly: true,
     input: {
       provider: z.enum(PROVIDERS as [string, ...string[]]).optional().describe('anthropic, openai, or compatible (any server that answers OpenAI’s chat completions).'),
       key: z.string().max(500).optional().describe('The account’s API key. Kept sealed, never shown again.'),
       url: z.string().max(500).optional().describe('A compatible server’s address, with its version: https://api.example.com/v1'),
-      model: z.string().max(200).optional().describe('The model to ask, as the account names it. Left out for Anthropic: the server’s reader model.'),
+      model: z.string().max(200).optional().describe('The model to ask, as the account names it. Left out for Anthropic: the server’s default model.'),
       price_in: z.number().optional().describe('US$ for a million tokens the model reads.'),
       price_out: z.number().optional().describe('US$ for a million tokens the model writes.'),
       remove: z.boolean().optional(),

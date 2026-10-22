@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
-import { sought, within } from '../src/reader.ts';
 import { limiter } from '../src/limit.ts';
 import { serve } from './serve.ts';
 
@@ -299,19 +298,5 @@ test('a request larger than any honest one is refused, before it is known who se
   assert.equal(await send({ 'content-length': '33000000' }, 0, false), 413);
   assert.ok([413, 'ended'].includes(await send({}, 33)));
   assert.equal(await send({}, 1), 401, 'one that is not too large is refused for the reason it would have been: it is not signed');
-});
-
-test('the reader asks GitHub only about the one repository, whatever the text it read there tells it to ask', () => {
-  // A path or a ref is part of an address under the repository: a step up would land in another one.
-  assert.equal(within('src/a file.ts'), 'src/a%20file.ts');
-  assert.equal(within('feature/x'), 'feature/x');
-  assert.equal(within(undefined), '');
-  for (const path of ['../../other/contents/secrets.txt', 'src/../../../other', './x', '..']) assert.throws(() => within(path), /steps outside the repository/);
-  // An encoded step is a name like any other to GitHub, and stays encoded.
-  assert.equal(within('%2e%2e/x'), '%252e%252e/x');
-  // A search is of this repository: words that say where to search are dropped.
-  assert.equal(sought('api key repo:someone/private'), 'api key');
-  assert.equal(sought('ORG:acme user: me token'), 'token');
-  assert.equal(sought('reporter: is a word'), 'reporter: is a word');
 });
 

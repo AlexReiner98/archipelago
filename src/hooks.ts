@@ -70,14 +70,16 @@ export function hookFor(l: Archipelago, event: string): { pack: string; hook: st
 
 /** Run one schedule now, as the pack. */
 export function runSchedule(l: Archipelago, pack: string, id: string) {
-  return hostFor(l.registry).act(l, asPack(pack), pack, id, {}, undefined, 'schedule');
+  const limit = l.registry.packs.find((p) => p.id === pack)?.schedules?.find((s) => s.id === id)?.limit_ms;
+  return hostFor(l.registry).act(l, asPack(pack), pack, id, {}, limit, 'schedule');
 }
 
 const timers = new WeakMap<Registry, NodeJS.Timeout>();
 
 /**
- * Run the schedules of a workspace's active packs when each is due. One clock a minute reads the registry as it is,
- * so a pack turned off stops running and one turned on starts, with nothing to restart.
+ * Run the schedules of a workspace's active packs when each is due, and those that say at_start once on the first
+ * tick. One clock a minute reads the registry as it is, so a pack turned off stops running and one turned on starts,
+ * with nothing to restart.
  */
 export function startSchedules(l: Archipelago): void {
   stopSchedules(l.registry);
@@ -87,7 +89,8 @@ export function startSchedules(l: Archipelago): void {
     for (const pack of l.registry.packs)
       for (const s of pack.schedules ?? []) {
         const key = `${pack.id}/${s.id}`;
-        if (Date.now() - (last.get(key) ?? started) < s.every_minutes * 60_000) continue;
+        const first = s.at_start && !last.has(key);
+        if (!first && (s.every_minutes === undefined || Date.now() - (last.get(key) ?? started) < s.every_minutes * 60_000)) continue;
         last.set(key, Date.now());
         void runSchedule(l, pack.id, s.id).catch((err) => console.error(`schedule ${key}: ${(err as Error).message}`));
       }

@@ -40,6 +40,8 @@ export interface ServerHost {
   sign?: { key: string; issuer: string; minutes?: number };
   /** Where the signed token is traded for a token to act as one account ({as} in the path), and the answer's fields. */
   exchange?: { path: string; token: string; expires: string };
+  /** A workspace pack may read (GET) from it as that workspace's connection to this pack (its via). */
+  lend?: boolean;
 }
 
 export interface ServerPackFile {

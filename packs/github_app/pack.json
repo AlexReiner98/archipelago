@@ -11,7 +11,8 @@
       "base": "https://api.github.com",
       "headers": { "accept": "application/vnd.github+json", "x-github-api-version": "2022-11-28" },
       "sign": { "key": "key", "issuer": "app_id", "minutes": 9 },
-      "exchange": { "path": "/app/installations/{as}/access_tokens", "token": "token", "expires": "expires_at" }
+      "exchange": { "path": "/app/installations/{as}/access_tokens", "token": "token", "expires": "expires_at" },
+      "lend": true
     },
     { "id": "web", "base": "https://github.com" }
   ],
