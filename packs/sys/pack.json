@@ -82,6 +82,11 @@
         "cwd": {
           "type": "string"
         },
+        "branch": {
+          "type": "string",
+          "description": "The git branch the session said it works on: a push to it is read against the session's task.",
+          "system": true
+        },
         "session_id": {
           "type": "string",
           "description": "The id the surface gave the session.",

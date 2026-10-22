@@ -8,7 +8,7 @@ import { livesIn, livesInFor, placeFor, scopeOf } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { blockGraph, heldResources } from './blocking.ts';
-import { toConfirm } from './confirm.ts';
+import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
 import { STALE_DAYS } from './attention.ts';
 import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts';
 
@@ -48,7 +48,7 @@ export async function sessionBegan(l: Archipelago, sessionId: string | undefined
 export async function sessionStart(
   l: Archipelago,
   actor: Actor,
-  input: { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string },
+  input: { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string },
 ) {
   // A surface may announce the same session more than once (resume, compact).
   if (input.session_id) {
@@ -64,9 +64,7 @@ export async function sessionStart(
   const repo = await placeFor(l, input);
 
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
-  if (input.surface) props.surface = input.surface;
-  if (input.cwd) props.cwd = input.cwd;
-  if (input.session_id) props.session_id = input.session_id;
+  for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
   const title = input.title ?? (task ? `Session: ${task.title}` : `Session in ${repo?.title ?? input.cwd ?? 'unknown folder'}`);
   const ops: Op[] = [{ op: 'create', ref: 'run', type: 'sys.run', title, status: 'running', props }];
   if (task) ops.push({ op: 'link', type: 'sys.works_on', from: 'run', to: task.id });
@@ -104,6 +102,7 @@ export async function sessionStart(
     note: blocked.length
       ? 'Do not start work that needs the resources listed under blocked. Take work that does not need them, or wait.'
       : 'Call session_update with a note when something worth knowing happens, and session_end when you finish.',
+    commit: task ? commitRule(task.id) : undefined,
   };
 }
 
@@ -219,13 +218,13 @@ export async function recordRun(
   return { run: created.run, recorded: true };
 }
 
-export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string }) {
+export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string; branch?: string }) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
   await heard(l, run, `Session "${run.title}" reported in again`);
-  // A bare call is a heartbeat: it moves last_seen and leaves no event.
-  if (!input.status && !input.note && !input.task) {
+  // A bare call is a heartbeat: it moves last_seen and leaves no event. A branch it has not said before is kept.
+  if (!input.status && !input.note && !input.task && (!input.branch || input.branch === run.props.branch)) {
     await touch(l, run.id);
     return { run: run.id, status: run.status };
   }
@@ -235,7 +234,7 @@ export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: 
       id: run.id,
       status: input.status,
       body: input.note ? [run.body, `[${now()}] ${input.note}`].filter(Boolean).join('\n') : undefined,
-      props: { last_seen: now() },
+      props: { last_seen: now(), ...(input.branch && { branch: input.branch }) },
     },
   ];
   if (input.task) ops.push({ op: 'link', type: 'sys.works_on', from: run.id, to: input.task });
@@ -247,6 +246,7 @@ export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: 
   return {
     run: run.id,
     status: input.status ?? run.status,
+    ...(task && { commit: commitRule(task.id) }),
     ...(unestimated && { estimate: `"${task.title}" has no estimate. Say how many tokens you expect it to take (input and output, not counting cached re-reads): change, update ${task.id}, props.tokens_estimated. What it actually uses is measured for you.` }),
   };
 }
