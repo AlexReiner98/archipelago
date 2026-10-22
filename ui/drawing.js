@@ -1,5 +1,5 @@
 // A picture drawn by a drawing: code a pack ships or the map keeps (a style's `drawing`), run in the sandbox
-// (draw.html, draw-marks.js), answering with marks the page checks and mounts (marks.js). The page keeps what every
+// (draw.html, draw.js), answering with marks the page checks and mounts (marks.js). The page keeps what every
 // picture has around its marks: the stage that pans and zooms, the key, the bar with the lit switch and zoom, a
 // published page's still frame. One frame serves every picture on the page and is started before it is needed;
 // each drawing's code is sent once and kept by its hash.
@@ -9,14 +9,36 @@ import { build, cssFor, patch, step } from './marks.js';
 import { litSwitch, numberOf, sizeOf } from './lens-base.js';
 import { panZoom } from './pan-zoom.js';
 
-/** Each drawing's modules, by its hash: a lens answer leaves out those the page already has (`have`). */
+/**
+ * Each drawing's modules, by its hash: a lens answer leaves out those the page already has (`have`). The last few
+ * are kept in this browser, so a page opened again has them at once: loaded while its first answer is on its way,
+ * and not sent again. Kept by hash, a drawing kept is the drawing sent.
+ */
 export const drawings = new Map();
+const KEPT = 'pelago-drawings';
+try {
+  for (const [hash, modules] of JSON.parse(localStorage.getItem(KEPT) ?? '[]')) drawings.set(hash, modules);
+} catch {
+  // Without storage, each page is sent its drawings.
+}
+function keepDrawing(hash, modules) {
+  drawings.delete(hash);
+  drawings.set(hash, modules);
+  try {
+    localStorage.setItem(KEPT, JSON.stringify([...drawings].slice(-3)));
+  } catch {
+    // Kept for this page only.
+  }
+}
 const sheets = new Map();
+/** The scenes drawn lately, by the drawing and all it was given: drawn again from the same, a picture is mounted at once. */
+const scenes = new Map();
 let sandbox;
 
 /** The frame every drawing runs in, started once: before a picture asks, wherever one may be drawn. */
 export function warmDrawings() {
-  if (sandbox) return sandbox;
+  // A frame taken off the page (a page that draws its body anew) is started again: its workers went with it.
+  if (sandbox?.frame.isConnected) return sandbox;
   // Not hidden: a frame that is not drawn has its worker slowed many times over. It is drawn with no size instead (flow.css).
   const frame = h('iframe', { class: 'drawing-sandbox', sandbox: 'allow-scripts', src: '/draw.html', title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
   const loads = new Map();
@@ -33,7 +55,10 @@ export function warmDrawings() {
       if (said.type === 'failed' || said.type === 'stopped') (loads.delete(said.hash), load.reject(new Error(String(said.message ?? 'The drawing stopped.').slice(0, 300))), load.stopped?.());
     });
   });
-  document.body.append(frame);
+  // Beside the body, not in it, so a page that draws its body anew does not take it away.
+  document.documentElement.append(frame);
+  // What this browser drew last is loaded now, before an answer asks for it.
+  for (const [hash, modules] of drawings) loaded(hash, modules).catch(() => {});
   return sandbox;
 }
 
@@ -68,7 +93,7 @@ export function drawWith(host, answer, style, keep) {
   const modules = drawing?.modules ?? drawings.get(drawing?.hash);
   const failed = (message) => host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`));
   if (!modules) return failed('its code was not sent');
-  drawings.set(drawing.hash, modules);
+  if (drawings.get(drawing.hash) !== modules || [...drawings.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
   const id = drawing.hash.slice(0, 16);
   const channel = new MessageChannel(), port = channel.port1;
   // How long a picture took, for whoever measures the page: waiting, in the drawing, and on the page.
@@ -84,10 +109,15 @@ export function drawWith(host, answer, style, keep) {
     // A picture taken off the page is ended: its worker forgets it.
     if (!host.isConnected && mounted) return end();
     try {
+      // A scene already mounted from what was kept is the same scene: the worker's is for what comes after (hovering, lighting).
+      if (said.type === 'scene' && kept) return;
       if (said.type === 'scene') {
         const got = performance.now();
         mounted = true;
         mount(said.scene ?? {});
+        scenes.delete(seen);
+        scenes.set(seen, said.scene ?? {});
+        if (scenes.size > 24) scenes.delete(scenes.keys().next().value);
         performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got) } });
       }
       else if (said.type === 'patch') (patch(said.list, keys, tell, moving), moving.size && requestAnimationFrame(run));
@@ -101,11 +131,17 @@ export function drawWith(host, answer, style, keep) {
   };
   const { style: _sent, ...shown } = answer;
   const { drawing: _code, code: _canvas, ...fields } = style;
+  const input = { answer: shown, style: plain(fields), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  const seen = `${drawing.hash}
+${JSON.stringify(input)}`;
+  const kept = scenes.get(seen);
+  // Told what to draw before anything else, so what happens on the page waits behind it: the channel keeps it until the worker has the other end.
+  port.postMessage({ type: 'start', input });
+  if (kept) ((mounted = true), mount(kept));
   loaded(drawing.hash, modules).then(
     () => {
       if (ended) return;
       sandbox.frame.contentWindow.postMessage({ type: 'picture', hash: drawing.hash }, '*', [channel.port2]);
-      port.postMessage({ type: 'start', input: { answer: shown, style: plain(fields), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches } });
       const load = sandbox.loads.get(drawing.hash);
       if (load) load.stopped = () => !ended && (end(), failed('It did not answer for 12 seconds and was stopped.'));
     },

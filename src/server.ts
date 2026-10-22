@@ -245,7 +245,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
           ...(file === 'draw.html' && { 'content-security-policy': DRAW_POLICY }),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
-          ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
+          ...((file === 'draw.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
         return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : await readFile(join(UI_DIR, file)));
       }

@@ -15,7 +15,7 @@ const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click' };
 /** The one address a drawing may link to: an item's page. */
 const ITEM = /^#\/e\/e_[a-z0-9]{8}$/;
 /** The most marks one drawing may make: past it, the drawing is stopped. */
-export const MOST_MARKS = 60000;
+export const mostMarks = 60000;
 
 const fail = (why) => {
   throw new Error(`The drawing sent what cannot be drawn: ${why}`);
@@ -35,7 +35,7 @@ function attribute(el, name, value) {
 export function build(mark, keys, tell, svg = false, count = { n: 0 }) {
   if (typeof mark === 'string' || typeof mark === 'number') return document.createTextNode(String(mark));
   if (!Array.isArray(mark) || typeof mark[0] !== 'string') fail('a mark that is not [tag, attributes, ...]');
-  if (++count.n > MOST_MARKS) fail(`more than ${MOST_MARKS} marks`);
+  if (++count.n > mostMarks) fail(`more than ${mostMarks} marks`);
   const [tag, attrs = {}, ...kids] = mark;
   const inSvg = svg || tag === 'svg';
   if (!(inSvg ? SVG_TAGS : HTML_TAGS).has(tag)) fail(`the tag "${tag}"`);

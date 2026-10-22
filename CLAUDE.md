@@ -101,9 +101,10 @@ where, and how that server is run.
   frame `ui/draw.html`, never in the app's page; an agent that writes one
   proposes it, whatever the workspace lets agents do unreviewed. Do not give
   that code a page to touch, a way to the network, or anything typed. After
-  changing `ui/draw.js`, `ui/draw.html` or the frame's policy in
+  changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js` or the frame's policy in
   `src/server.ts`, run a hostile style against it in a real browser (the
-  browser pane will not load a sandboxed frame).
+  browser pane will not load a sandboxed frame); `test/drawings.test.ts`
+  does, in headless Chrome.
 
 ## UI rules
 
@@ -183,6 +184,13 @@ else a pack"). These rules keep it composable while that happens, and
   keeps the mechanism (layouts, renderers, CSS rules reading variables) and
   no values: a colour, a length or a number constant in `ui/` is counted,
   and the count only goes down.
+
+- **Every picture is a drawing a pack ships** (the owner, 22 Oct 2026):
+  code for one shape, in `pack.json` `drawings`, changed by the owner on
+  the map, run in the sandbox, answering with marks the page checks
+  (`docs/drawings.md`). The kernel keeps the frame every picture has. A
+  shape moved out of the kernel must draw what the kernel drew: the same
+  marks, looks and behaviour, checked in a real browser.
 
 Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may
 only shrink and goes once the rule is met: when your change brings a number

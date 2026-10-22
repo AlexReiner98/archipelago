@@ -94,6 +94,16 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
       return view.querySelectorAll('.lf-stage a.ar-part').length;
     })()`);
     assert.equal(parts, 2);
+    // A page that draws its body anew keeps the frame drawings run in: the next picture still draws.
+    const after = await page.evaluate(`(async () => {
+      const { drawWith } = await import('/drawing.js');
+      const host = document.createElement('div');
+      document.body.replaceChildren(host);
+      drawWith(host, ${JSON.stringify(cases[0].answer)}, ${JSON.stringify(cases[0].style)}, () => {});
+      for (let n = 0; n < 200 && !host.querySelector('.lf-stage svg'); n++) await new Promise((r) => setTimeout(r, 25));
+      return host.querySelectorAll('.lf-stage a.ar-part').length;
+    })()`);
+    assert.equal(after, 21);
   } finally {
     page.close();
   }

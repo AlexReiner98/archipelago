@@ -23,7 +23,6 @@ export const UI_FILES: Record<string, string> = {
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
-  '/draw-marks.js': 'draw-marks.js',
   // three.js as its authors build it (MIT), offered to a style's code; loaded only when one asks for it.
   '/three.js': 'three.module.min.js',
 };

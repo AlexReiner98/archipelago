@@ -30,13 +30,14 @@ const once = `async (answer, style, warm) => {
   document.body.append(host);
   const t0 = performance.now();
   drawWith(host, answer, { ...style }, () => {});
-  await new Promise((resolve) => { const seen = new MutationObserver(() => host.querySelector('.lf-stage') && (seen.disconnect(), host.getBoundingClientRect(), resolve())); seen.observe(host, { childList: true, subtree: true }); });
+  // Drawn again from the same, it is on the page before the call returns.
+  await new Promise((resolve) => { const done = () => host.querySelector('.lf-stage') && (seen.disconnect(), host.getBoundingClientRect(), resolve(), true); const seen = new MutationObserver(done); if (!done()) seen.observe(host, { childList: true, subtree: true }); });
   const drawn = performance.now() - t0;
   // A hover, there and back.
   const part = host.querySelector('.lf-stage a.ar-part');
   const t1 = performance.now();
   part.dispatchEvent(new MouseEvent('mouseenter'));
-  await new Promise((resolve) => { const seen = new MutationObserver(() => host.querySelector('.lit') && (seen.disconnect(), resolve())); seen.observe(host, { attributes: true, subtree: true }); });
+  await new Promise((resolve) => { const seen = new MutationObserver(() => host.querySelector('.lit') && (seen.disconnect(), resolve())); seen.observe(host, { attributes: true, subtree: true }); setTimeout(resolve, 3000); });
   const hover = performance.now() - t1;
   await new Promise((r) => setTimeout(r, 50));
   watch.disconnect();
@@ -50,7 +51,10 @@ for (const [name, answer] of Object.entries(pictures)) {
       const page = await open(`${base}/`);
       const first = await page.evaluate(`(${once})(${JSON.stringify(answer)}, ${JSON.stringify(style)}, ${warm})`);
       const second = await page.evaluate(`(${once})(${JSON.stringify(answer)}, ${JSON.stringify(style)}, false)`);
-      runs.push({ warm, first, second });
+      // The same browser, opening the page again: what it drew last is kept, and loaded while the answer is on its way.
+      await page.go(`${base}/`);
+      const back = await page.evaluate(`(${once})(${JSON.stringify(answer)}, ${JSON.stringify(style)}, true)`);
+      runs.push({ warm, first, second, back });
       page.close();
     }
   }
@@ -58,7 +62,7 @@ for (const [name, answer] of Object.entries(pictures)) {
   const of = (warm: boolean) => runs.filter((r) => r.warm === warm);
   const med = (list: any[], pick: (r: any) => number) => list.map(pick).sort((a, b) => a - b)[Math.floor(list.length / 2)];
   console.log(
-    `${name.padEnd(7)} ${String((runs[0].first as any).marks).padStart(5)} marks | first, cold: ${med(of(false), (r) => r.first.drawn)} ms | first, frame started: ${med(of(true), (r) => r.first.drawn)} ms | again: ${median((r) => r.second.drawn)} ms | hover: ${median((r) => r.second.hover)} ms | page held at most: ${median((r) => r.second.held)} ms`,
+    `${name.padEnd(7)} ${String((runs[0].first as any).marks).padStart(5)} marks | first, cold: ${med(of(false), (r) => r.first.drawn)} ms | first, frame started: ${med(of(true), (r) => r.first.drawn)} ms | page opened again: ${median((r) => r.back.drawn)} ms | again: ${median((r) => r.second.drawn)} ms | hover: ${median((r) => r.second.hover)} ms | page held at most: ${median((r) => r.second.held)} ms`,
   );
 }
 process.exit(0);

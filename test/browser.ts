@@ -13,7 +13,11 @@ const PLACES = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Pro
 export const chrome = (): string | null => [process.env.CHROME, ...PLACES].find((p): p is string => Boolean(p && existsSync(p))) ?? null;
 
 export interface Page {
+  /** Open another address in the same page (the same browser, its storage kept). */
+  go: (url: string) => Promise<void>;
   evaluate: <T = unknown>(expression: string) => Promise<T>;
+  /** The page as it looks, as a PNG. */
+  screenshot: () => Promise<Buffer>;
   /** What the page logged and threw. */
   logs: () => string[];
   close: () => void;
@@ -59,14 +63,20 @@ export async function open(url: string): Promise<Page> {
     });
   await send('Page.enable');
   await send('Runtime.enable');
-  await send('Page.navigate', { url });
-  for (let n = 0; n < 200 && !events.some((e) => e.method === 'Page.loadEventFired'); n++) await new Promise((r) => setTimeout(r, 25));
+  const go = async (to: string) => {
+    events.length = 0;
+    await send('Page.navigate', { url: to });
+    for (let n = 0; n < 200 && !events.some((e) => e.method === 'Page.loadEventFired'); n++) await new Promise((r) => setTimeout(r, 25));
+  };
+  await go(url);
   return {
+    go,
     evaluate: async (expression) => {
       const m = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
       if (m.result?.exceptionDetails) throw new Error(m.result.exceptionDetails.exception?.description ?? JSON.stringify(m.result.exceptionDetails));
       return m.result?.result?.value;
     },
+    screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).result.data, 'base64'),
     logs: () => events.filter((e) => e.method === 'Runtime.consoleAPICalled' || e.method === 'Runtime.exceptionThrown').map((e) => JSON.stringify(e.params).slice(0, 500)),
     close: () => {
       ws.close();
