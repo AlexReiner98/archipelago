@@ -1,5 +1,7 @@
-/* The architecture shape (ui/arch.js): a system, drawn in the lens's colours. The frame, the key and the breaks are
-   the flow's (ui/flow.css). Every width and number here is the style's (sizes and numbers, read as --ln-*). */
+// How the architecture drawing looks: its marks in the lens's colours. The frame, the key and the breaks are the
+// flow's (ui/flow.css). Every width and number here is the style's (sizes and numbers, read as --ln-*).
+
+export const css = `
 .ar-part { cursor: pointer; }
 .ar-part .ar-shape { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
 .ar-part .ar-lid { fill: none; stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
@@ -40,3 +42,4 @@
 .ar-says text { fill: var(--ln-muted); font-size: var(--ln-arch-says-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: middle; }
 .ar-says.broken text { fill: var(--ln-blocked); }
 .ar-tally { display: flex; gap: var(--ln-grid-gap); align-items: center; min-width: 0; overflow: hidden; }
+`;

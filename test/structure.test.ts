@@ -1,7 +1,7 @@
 // The shape of the code, checked. Files stay small; the kernel names no pack; writes to items and
 // relations go through one path; a pack reaches the kernel only through what it is handed; a pack's
 // code is tested without a database; kernel modules import one way; the UI loads as modules; and
-// there are five dependencies.
+// there are five dependencies; and every picture is a drawing a pack ships.
 //
 // Each rule keeps a list of what already broke it when the rule was made (16 Oct 2026). An entry
 // may only shrink, and goes once the rule is met: when you bring a number down, lower it here.
@@ -210,4 +210,19 @@ const LOOKS = /#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|rem|em|ch|vh|vw)\b|^(?:e
 test('how things look lives in style presets, not in the kernel', () => {
   const files = walk('ui').filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
   assert.deepEqual(ratchet(count(files, LOOKS), LOOKS_IN_KERNEL), [], "Make it a style field, give it its value in a pack's style preset (packs/*/pack.json, styles), and read it from the style.");
+});
+
+// 11. Every picture is drawn by a drawing: code a pack ships, which the owner changes on the map and which runs in
+// the sandbox (src/drawings.ts, ui/drawing.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
+// kernel keeps the frame every picture has. Counted here as the shapes the page still draws itself, as of 22 Oct
+// 2026; a shape moved into a pack's drawing comes off its list, with its modules in ui/.
+const KERNEL_SHAPES: Record<string, number> = {
+  'ui/lens.js': 4, // list, flow, grid, time
+  'ui/doc-lens.js': 3, // flow, grid, time
+};
+const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
+
+test('the kernel draws no shape of its own: each is a drawing a pack ships', () => {
+  const counted = Object.fromEntries(['ui/lens.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
+  assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/core/draw/architecture is.");
 });
