@@ -1,4 +1,4 @@
-// The architecture shape's layout (ui/arch-layout.js): a lens answer in, geometry out, checked for what a reader of
+// The architecture drawing's layout (draw/architecture/layout.js): a lens answer in, geometry out, checked for what a reader of
 // the drawing relies on: a caller above what it calls, no two parts overlap, no part sits in another place's box,
 // every wire turns only at right angles, and health and wire states are read from statuses and links alone.
 
@@ -7,7 +7,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the UI, with no types of its own.
-import { health, layout, wireState } from '../ui/arch-layout.js';
+import { health, layout, wireState } from './draw/architecture/layout.js';
+// @ts-expect-error: a plain module of the drawing, with no types of its own.
+import { picture } from './draw/architecture/index.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
 const item = (id: string, inside = 'r', status = 'up', extra: Record<string, unknown> = {}) => ({ id, kind: 'place', inside, title: `Part ${id}`, place: 0, open: status !== 'retired', status, state, ...extra });
@@ -15,7 +17,7 @@ const item = (id: string, inside = 'r', status = 'up', extra: Record<string, unk
 const call = (a: string, b: string, extra: Record<string, unknown> = {}) => ({ kind: 'depends_on', from: a, to: b, ...extra });
 const measure = (text: string, px: number) => text.length * px * 0.55;
 // Laid out by the house style's lengths, as the page lays it out (packs/core/pack.json).
-const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure, sizes: house.sizes });
 
 function checks(g: any) {
@@ -102,4 +104,52 @@ test('a larger system lays out with nothing overlapping', () => {
   const items = [...places.map((p) => item(p)), ...Array.from({ length: 24 }, (_, k) => item(`n${k}`, places[k % 4], k % 5 ? 'up' : 'planned'))];
   const links = Array.from({ length: 30 }, (_, k) => call(`n${k % 24}`, `n${(k * 7 + 3) % 24}`)).filter((l) => l.from !== l.to);
   checks(run(items, links));
+});
+
+// The drawing itself (draw/architecture/index.js): an answer in, marks out, as the page is sent them.
+
+const answerOf = (items: any[], links: any[]) => ({ lens: { from: 'r' }, items: [{ ...item('r'), inside: null }, ...items].map((i) => ({ ...i, within: { items: 0, blocked: 0, needs_you: 0 } })), links });
+const drawn = (answer: any, extra: Record<string, unknown> = {}) => picture({ answer, style: { ...house, shape: 'architecture', ...extra } }, { measure });
+/** Every mark in a mark, itself first. */
+const marks = (m: any): any[] => (Array.isArray(m) && typeof m[0] === 'string' ? [m, ...m.slice(2).flatMap(marks)] : []);
+
+test('the drawing answers with marks only: tags, attributes and words, nothing that runs', () => {
+  const { scene } = drawn(answerOf([item('a'), item('b')], [call('a', 'b', { says: 'HTTPS' })]));
+  const all = [scene.svg, scene.legend, scene.bar].flatMap(marks);
+  assert.ok(all.length > 20);
+  for (const [tag, attrs, ...kids] of all) {
+    assert.match(tag, /^[a-zA-Z]+$/);
+    for (const [name, value] of Object.entries(attrs)) {
+      assert.ok(!name.startsWith('on') || name === 'on', `${tag} has ${name}`);
+      if (name === 'href') assert.match(String(value), /^#\/e\/[a-z0-9_]+$/);
+    }
+    for (const kid of kids) assert.ok(typeof kid === 'string' || Array.isArray(kid));
+  }
+  assert.equal(typeof scene.css, 'string');
+  assert.deepEqual(Object.keys(scene.size), ['width', 'height']);
+});
+
+test('hovering a part lights its wires, leaving puts them out, and the lit switch dims by key', () => {
+  const { scene, on, restyle } = drawn(answerOf([item('a'), item('b'), item('c', 'r', 'up', { state: { ...state, needs_you: false, blocked: true } })], [call('a', 'b'), call('b', 'c')]));
+  const keyed = new Map([scene.svg].flatMap(marks).filter((m) => m[1].key).map((m) => [m[1].key, m]));
+  const lit = (list: any[]) => list.filter((p) => p.toggle.lit).map((p) => p.key).sort();
+  assert.deepEqual(lit(on({ name: 'enter', key: 'p:a' })), ['h:0', 'w:0']);
+  assert.deepEqual(lit(on({ name: 'enter', key: 'p:b' })), ['h:0', 'h:1', 'w:0', 'w:1']);
+  assert.deepEqual(lit(on({ name: 'leave', key: 'p:b' })), []);
+  for (const p of on({ name: 'enter', key: 'p:a' })) assert.ok(keyed.has(p.key), `${p.key} is a mark`);
+  const dimmed = restyle({ ...house, lit: 'blocked' }).filter((p: any) => p.toggle.dim).map((p: any) => p.key);
+  assert.deepEqual(dimmed.sort(), ['p:a', 'p:b']);
+});
+
+test('a system with no parts says so instead of drawing', () => {
+  assert.deepEqual(drawn(answerOf([], [])).scene, { message: 'Nothing here is part of a system.' });
+});
+
+test('the drawing imports only its own modules, and nothing of the kernel', () => {
+  const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
+  const d = pack.drawings.find((one: any) => one.id === 'core.architecture');
+  for (const file of Object.values(d.modules) as string[]) {
+    const code = readFileSync(join(import.meta.dirname, file), 'utf8');
+    for (const [, spec] of code.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)) assert.ok(Object.keys(d.modules).includes(spec.replace(/^\.\//, '')), `${file} imports ${spec}`);
+  }
 });

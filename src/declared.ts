@@ -151,6 +151,17 @@ export interface StyleDef {
   props: Record<string, unknown>;
 }
 
+/**
+ * The code a picture of one shape is drawn by, as a pack ships it: its modules by name, each a file in the pack's
+ * folder, entered at index.js (src/drawings.ts). The owner changes it by keeping their own version on the map.
+ */
+export interface DrawingDef {
+  id: string;
+  title: string;
+  shape: string;
+  modules: Record<string, string>;
+}
+
 /** What a pack shows on the page of every item of the kinds or types it is on: one column of pieces. */
 export interface ScreenDef {
   id: string;
@@ -251,6 +262,12 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     if (!style.title || !style.props || typeof style.props !== 'object') problems.push(`${at} needs a title and its props`);
     for (const t of style.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);
     for (const key of Object.keys(style.props ?? {})) if (!styleFields[key] || styleFields[key].system || ['code', 'on'].includes(key)) problems.push(`${at}: "${key}" is not a field a preset sets`);
+  }
+  for (const d of pack.drawings ?? []) {
+    const at = `drawing "${d.id}"`;
+    if (!own(d.id) || !d.title || !/^[a-z][a-z0-9_]*$/.test(d.shape ?? '')) problems.push(`${at} must be named "${pack.id}.<name>", with a title and the shape it draws`);
+    if (typeof d.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);
+    for (const [name, file] of Object.entries(d.modules ?? {})) if (!/^[a-z][a-z0-9_-]*.js$/.test(name) || typeof file !== 'string' || file.includes('..')) problems.push(`${at}: "${name}" is not a module's name (a-z, ending .js) with a file in the pack`);
   }
   for (const host of pack.hosts ?? []) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);
   for (const hook of pack.webhooks ?? []) {

@@ -9,6 +9,7 @@
 // the preset's place; retired, the preset is not used. Read each time, so a change shows on the next look.
 
 import { stylesOf, type StyleDef } from './declared.ts';
+import { drawingFor } from './drawings.ts';
 import { keptOf, type Kept } from './lens-kept.ts';
 import type { Archipelago } from './pelago.ts';
 
@@ -70,6 +71,12 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk): Pro
   let style: Record<string, unknown> = {};
   for (const layer of layers) style = over(style, fields(layer.props));
   return { style, used: layers.map(({ id, title, preset }) => ({ id, title, ...(preset && { preset }) })) };
+}
+
+/** A picture's style with the drawing it is drawn by, if a pack draws its shape: its modules left out when the page has them (`have`, hashes). */
+export async function drawn(l: Archipelago, style: Record<string, unknown>, have: unknown): Promise<Record<string, unknown>> {
+  const drawing = drawingFor(l.registry, style, await versionsOf(l), Array.isArray(have) ? have.map(String) : []);
+  return drawing ? { ...style, drawing } : style;
 }
 
 /** The schema with its style presets as the map keeps them: each with the owner's version, when there is one. */

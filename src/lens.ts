@@ -10,7 +10,7 @@ import { placeAll, readAxis, zoneOf, type TimeAxis } from './timeaxis.ts';
 import { needsOf } from './attention.ts';
 import { blockGraph } from './blocking.ts';
 import { hubs, keptOf, type Kept } from './lens-kept.ts';
-import { styleFor } from './styles.ts';
+import { styleFor, drawn as withDrawing } from './styles.ts';
 import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
 
 // Kept where they were first imported from.
@@ -448,7 +448,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
 
   return {
     lens: asked,
-    style,
+    style: await withDrawing(l, style, input.have),
     // Which lenses and styles kept on the map went into those two, the one that weighs most last.
     kept: { lens: read.map(({ id, title }) => ({ id, title })), style: drawn },
     // The lens in words: the rule a person reads on the page and an agent reads here.
