@@ -5,7 +5,8 @@
 // owner can. Its handler runs in the same sandbox as any pack's (src/packhost.ts), one process for the server.
 //
 // What it may declare: public pages and entries, and webhooks, all under /x/<pack>/ (src/server-routes.ts); and the
-// server acts it may ask for, from the kernel's closed list (src/server-acts.ts). It gets no database, no map, no
+// server acts it may ask for, from the kernel's closed list (src/server-acts.ts); and the documents a person agrees
+// to before they are signed in (src/agreements.ts). It gets no database, no map, no
 // token and no secret: the kernel checks a webhook's signature with a secret only the server's environment holds.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -13,7 +14,7 @@ import { delimiter, join, resolve } from 'node:path';
 import { env } from './env.ts';
 
 /** The acts a server pack may ask the kernel for, each only if it declares it. */
-export const SERVER_ACTS = ['workspace.create', 'workspace.admit', 'workspace.limit', 'workspace.end', 'signin.link', 'mail.send'] as const;
+export const SERVER_ACTS = ['workspace.create', 'workspace.admit', 'workspace.limit', 'workspace.end', 'signin.link', 'mail.send', 'agreement.record'] as const;
 export type ServerAct = (typeof SERVER_ACTS)[number];
 
 const ID = /^[a-z][a-z0-9_]{0,39}$/;
@@ -34,6 +35,11 @@ export interface ServerPackFile {
   pages?: { id: string; file: string }[];
   /** POST /x/<pack>/hook/<id>, checked before the handler sees it: the HMAC-SHA256 of the raw body with the secret named. */
   webhooks?: { id: string; secret: string; header?: string; format?: 'prefixed' | 'hex' }[];
+  /**
+   * One of its entries, answering the documents a person agrees to before they are signed in, each { id, title, url,
+   * version } (src/agreements.ts). A new version is agreed to again at the next sign-in.
+   */
+  agreements?: string;
 }
 
 export interface ServerPack {
@@ -56,6 +62,7 @@ export function checkServerPack(p: Partial<ServerPackFile>, folder: string): str
     if (!NAME.test(hook.id) || !NAME.test(hook.secret ?? '')) problems.push(`webhook "${hook.id}" needs an id and the name of its secret`);
     if (hook.format && !['prefixed', 'hex'].includes(hook.format)) problems.push(`webhook "${hook.id}": its format is prefixed (sha256=<hex>) or hex`);
   }
+  if (p.agreements !== undefined && !p.entries?.some((e) => e.id === p.agreements)) problems.push(`its agreements name no entry of its own: "${p.agreements}"`);
   if ((p.entries?.length || p.webhooks?.length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
   return problems;
 }

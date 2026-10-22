@@ -144,9 +144,11 @@ export async function api(tool, input = {}) {
   return body.result;
 }
 
+// Signed out, the style is not read with the rest: its colours are asked for on their own.
+const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
+
 export function signIn(message) {
-  // Signed out, the style is not read with the rest: its colours are asked for on their own.
-  fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
+  themeSignedOut();
   const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'email' });
   const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'off' });
   const error = h('div', { class: 'error', style: 'padding: 0 var(--space-8) var(--space-8)' }, message ?? '');
@@ -162,6 +164,7 @@ export function signIn(message) {
       const res = await fetch('/connect/code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: body.sent_to, code: code.value }) });
       const given = await res.json().catch(() => ({}));
       if (!res.ok) return (error.textContent = given.error ?? 'That code was not accepted.');
+      if (given.agree) return agreeFirst(given.agree, (agree) => fetch('/connect/code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: body.sent_to, code: code.value, agree }) }));
       enter(given.token);
     };
     code.addEventListener('keydown', (e) => e.key === 'Enter' && typed());
@@ -205,7 +208,41 @@ export async function join(code) {
   const res = await fetch('/connect/join', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return signIn(body.error ?? 'That sign-in link did not work.');
+  if (body.agree) return agreeFirst(body.agree, (agree) => fetch('/connect/join', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, agree }) }));
   enter(body.token);
+}
+
+/**
+ * Before a sign-in goes through, the documents this person has not agreed to at their current version: each a link,
+ * one box to tick for all of them, and the sign-in sent again with what was agreed to.
+ */
+function agreeFirst(documents, again) {
+  themeSignedOut();
+  const box = h('input', { type: 'checkbox', id: 'agree' });
+  const error = h('div', { class: 'error' });
+  const go = h('button', { class: 'primary', disabled: true }, 'Continue');
+  box.addEventListener('change', () => (go.disabled = !box.checked));
+  const links = documents.flatMap((d, i) => [i === 0 ? '' : i === documents.length - 1 ? ' and the ' : ', the ', h('a', { href: d.url, target: '_blank', rel: 'noopener' }, d.title)]);
+  go.onclick = async () => {
+    go.disabled = true;
+    const res = await again(documents.map(({ id, version }) => ({ id, version })));
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body.token) return enter(body.token);
+    if (res.ok && body.agree) return agreeFirst(body.agree, again);
+    error.textContent = body.error ?? 'That did not work.';
+    go.disabled = false;
+  };
+  document.querySelector('#nav .brand').replaceChildren('Archipelago');
+  main.replaceChildren(
+    h('div', { class: 'page-head' }, h('h1', {}, documents.length === 1 ? `Agree to the ${documents[0].title}` : 'Agree to our terms')),
+    h(
+      'section',
+      { class: 'card', style: 'max-width: var(--card-most)' },
+      h('div', { class: 'toolbar', style: 'padding: var(--space-8)' }, box, h('label', { for: 'agree', class: 'grow' }, 'I agree to the ', ...links)),
+      h('div', { class: 'toolbar', style: 'padding: 0 var(--space-8) var(--space-8)' }, h('span', { class: 'grow' }), go),
+      h('div', { style: 'padding: 0 var(--space-8) var(--space-8)' }, error),
+    ),
+  );
 }
 
 export async function showIdentity() {

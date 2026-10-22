@@ -11,7 +11,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
-import { LINK_MINUTES, redeem, redeemTyped, requestSignIn, workspaceOfCode } from './members.ts';
+import { recordAgreement } from './agreements.ts';
+import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, typedWorks, workspaceOfCode } from './members.ts';
+import { serverPacksOf } from './server-host.ts';
 import { serveServerPack } from './server-routes.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
@@ -95,12 +97,24 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     const { style } = await pageStyle((await at.workspaces.get(at.fallback)).pelago, {});
     return reply(res, 200, { theme: style.theme ?? null, lengths: style.lengths ?? null });
   }
+  // The documents a person agrees to before they are signed in, for a page that asks for them first (a signup).
+  if (req.method === 'GET' && path === '/connect/agreements') {
+    if (at.tooOften()) return;
+    return reply(res, 200, { agreements: await serverPacksOf(at.workspaces).agreements() });
+  }
   // Signing in by email: a link asked for at an address, and a link opened, its code traded once for a token.
   if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code')) {
     if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
     if (at.tooOften()) return;
-    const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown };
+    const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown; agree?: unknown };
     const all = async () => (await at.workspaces.list()).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
+    // Before a code is traded, the documents this person has not agreed to at their current version: recorded if the
+    // request agrees to them, else answered so the page can ask. The code is not spent while anything is owed.
+    const owes = async (email: string) => {
+      const current = await serverPacksOf(at.workspaces).agreements();
+      if (!current.length) return [];
+      return recordAgreement((await at.workspaces.get(at.fallback)).pelago.db, email, body.agree, current, 'sign-in');
+    };
     if (path === '/connect/sign-in') {
       const email = normalEmail(body.email);
       if (!email) return reply(res, 400, { error: 'That is not an email address.' });
@@ -112,6 +126,11 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     if (path === '/connect/code') {
       const email = normalEmail(body.email);
       if (!email) return reply(res, 400, { error: 'That is not an email address.' });
+      // Asked only once the code is known to work, so the answer says nothing of an address the asker cannot sign in as.
+      if (await typedWorks(await all(), email, String(body.code ?? ''))) {
+        const owed = await owes(email);
+        if (owed.length) return reply(res, 200, { agree: owed });
+      }
       const traded = await redeemTyped(await all(), (await at.workspaces.get(at.fallback)).pelago.db, email, String(body.code ?? ''));
       if (traded === 'tries') return reply(res, 429, { error: `Too many wrong codes for this address. Wait ${LINK_MINUTES} minutes, then ask for a new email.` });
       return traded === 'gone' ? reply(res, 410, { error: 'That code was not accepted: it may be mistyped, used or run out.' }) : reply(res, 200, traded);
@@ -121,7 +140,12 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     const gone = () => reply(res, 410, { error: 'This sign-in link has been used or has run out. Ask for a new one.' });
     if (!workspace || !(await at.workspaces.has(workspace))) return gone();
     res.once('close', at.workspaces.hold(workspace));
-    const token = await redeem((await at.workspaces.get(workspace)).pelago.db, workspace, code);
+    const db = (await at.workspaces.get(workspace)).pelago.db;
+    const email = await emailOfLink(db, code);
+    if (!email) return gone();
+    const owed = await owes(email);
+    if (owed.length) return reply(res, 200, { agree: owed });
+    const token = await redeem(db, workspace, code);
     return token ? reply(res, 200, { token }) : gone();
   }
   const poll = /^\/connect\/poll\/([a-z0-9-]+)\/(a_[0-9a-f]{12})$/.exec(path);
