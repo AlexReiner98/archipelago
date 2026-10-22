@@ -20,7 +20,8 @@
     "test": "node --test --test-force-exit --test-global-setup=./test/global.ts --import ./test/each.ts \"test/*.test.ts\" \"packs/*/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "diagrams": "node src/diagrams.ts",
-    "diagrams:publish": "node scripts/publish-diagrams.ts"
+    "diagrams:publish": "node scripts/publish-diagrams.ts",
+    "eval:reader": "node scripts/reader-eval/main.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
