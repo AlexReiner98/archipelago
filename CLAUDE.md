@@ -108,7 +108,7 @@ where, and how that server is run.
 ## UI rules
 
 What each screen is for (one level of the hierarchy per screen, a bounded
-Home, an atlas of named pictures) is in `docs/ui-strategy.md`; read it before
+Home, named pictures kept as saved views) is in `docs/ui-strategy.md`; read it before
 adding or changing a screen.
 
 The UI is for a person glancing at it, and most of what it shows was written

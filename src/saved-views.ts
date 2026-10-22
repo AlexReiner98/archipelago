@@ -1,4 +1,4 @@
-// The atlas: every picture kept on the map, named, with what it is a picture of, so a person finds it without
+// Saved views: every picture kept on the map, named, with what it is a picture of, so a person finds it without
 // knowing which item it hangs on (docs/ui-strategy.md). A picture is a kept lens; a style kept about that lens
 // names it, as the way it is drawn is what a person remembers. Pinned ones first, then the newest.
 
@@ -19,13 +19,13 @@ export interface Picture {
   pinned: boolean;
 }
 
-export async function atlas(l: Archipelago, input: { limit?: number } = {}): Promise<{ pictures: Picture[]; more: number }> {
+export async function savedViews(l: Archipelago, input: { limit?: number } = {}): Promise<{ pictures: Picture[]; more: number }> {
   const [lenses, styles] = await Promise.all([keptOf(l, 'lens', undefined), keptOf(l, 'style', undefined)]);
   const ofIds = [...new Set(lenses.flatMap((x) => x.about))];
   const { rows } = ofIds.length ? await l.db.query<{ id: string; title: string; type: string }>(`select id, title, type from entity where id = any($1::text[]) and archived_at is null`, [ofIds]) : { rows: [] };
   const items = new Map(rows.map((r) => [r.id, r]));
   const projectOf = await projects(l);
-  // keptOf answers oldest first; the atlas reads newest first, the pinned above the rest.
+  // keptOf answers oldest first; saved views read newest first, the pinned above the rest.
   const pictures = lenses
     .reverse()
     .map((x): Picture => {

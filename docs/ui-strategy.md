@@ -1,11 +1,11 @@
-# UI strategy: altitude, your move, an atlas
+# UI strategy: altitude, your move, saved views
 
 The map grows faster than a person can read it: agents raise two items for
 every one they close, and every screen shows all of them at once, projects
 beside tasks beside issues. This strategy keeps the map whole but the screen
 small. Three ideas, each fixing one complaint: **altitude** (one level of the
 hierarchy per screen), **your move** (Home shows only what waits on you, and
-never more than a handful), and **an atlas** (the pictures worth keeping are
+never more than a handful), and **saved views** (the pictures worth keeping are
 named, listed and found in one place).
 
 The UI rules in `CLAUDE.md` still hold; this says what the screens are for.
@@ -70,22 +70,22 @@ Home answers one question: what can only I do next? It holds:
    project's page, filtered to you.
 2. **Your projects,** one row each (altitude 1), with the same pills. Not
    their tasks.
-3. **The atlas strip:** the pinned pictures, as small tiles.
+3. **The saved views strip:** the pinned pictures, as small tiles.
 
 Nothing else is on Home by default: "ready" work, stale work and what
 agents are doing are answers to questions the owner asks on a project's page,
 not things pushed at them. A pack's screen may be added to Home by the owner,
 never by default.
 
-## 3. The atlas: pictures with names
+## 3. Saved views: pictures with names
 
 A picture is a lens in a style. Today it exists only as the first view of some
-item. In the atlas it is a thing in its own right:
+item. As a saved view it is a thing in its own right:
 
 - **Every kept picture has a title of its own,** naming what it shows ("System
   architecture"), not the item it hangs on. The server refuses a style or
   lens without one from an agent.
-- **An Atlas page in the nav** lists every picture as a tile, grouped by the
+- **A Saved views page in the nav** lists every picture as a tile, grouped by the
   project it is about, newest first, with pins on top. It is the "one page"
   of a picture; the item a picture is about links to it, and it links back.
 - **Search finds pictures** by title and by the title of what they are about,
@@ -94,7 +94,7 @@ item. In the atlas it is a thing in its own right:
 - **A picture an agent makes is announced once** in the changes feed with its
   tile, so the owner sees it was made without hunting for it.
 
-## 4. Growth: what agents raise starts below the waterline
+## 4. Growth: what agents raise starts noticed, not open
 
 The map should keep everything agents find; the screen should not show it
 until someone decides it matters. An item an agent raises on its own
@@ -118,15 +118,15 @@ Before adding or changing a screen, check:
   screen with counts.
 - Does it add a row to Home? Then it must be something only the owner can do.
 - Does it make a picture? Then the picture needs a title and a place in the
-  atlas.
+  saved views.
 - Does it raise new items? Then they arrive noticed unless the owner asked.
 
 ## Order of work
 
 1. Altitude on each type in its pack, and the breadcrumb on every item page.
-2. Home: your move (capped), your projects, the atlas strip; drop the rest
+2. Home: your move (capped), your projects, the saved views strip; drop the rest
    from the default.
-3. The Atlas page, picture titles required, pins, search grouped by level
+3. The Saved views page, picture titles required, pins, search grouped by level
    with pictures first. Give the architecture picture its title and pin it.
 4. Item pages list one level down, with pills; "loose" fold.
 5. Noticed items.
@@ -136,4 +136,5 @@ Before adding or changing a screen, check:
 - Your move is capped at five.
 - Noticed items as written in section 4, for everything an agent raises on
   its own judgment.
-- The page of pictures is called Atlas.
+- The page of pictures was called Atlas; renamed Saved views on 22 Oct 2026,
+  when the owner ruled that names say the technical mechanism, not a theme.

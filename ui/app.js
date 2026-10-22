@@ -5,7 +5,7 @@ import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, 
 import { newEntity } from './forms.js';
 import { home } from './home.js';
 import { entity } from './item.js';
-import { graph } from './atlas.js';
+import { graph } from './saved-views.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { map, mapState, searchBar } from './search.js';
