@@ -4,6 +4,7 @@
 
 import { drawFrozen } from './doc-lens.js';
 import { warmDrawings } from './drawing.js';
+import { checkedCss } from './marks.js';
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
@@ -194,9 +195,22 @@ const paint = () => {
 };
 dark.addEventListener('change', paint);
 
+// How the workspace's style says a published page looks (page_css): read after the page's own rules, only in it.
+const pageSheet = new CSSStyleSheet();
+document.adoptedStyleSheets = [...document.adoptedStyleSheets, pageSheet];
+const pageCss = (css) => {
+  try {
+    return css ? [':where(body) {', checkedCss(css, true), '}'].join('\n') : '';
+  } catch (err) {
+    console.warn(err.message);
+    return '';
+  }
+};
+
 function draw(d) {
   look = d;
   paint();
+  pageSheet.replaceSync(pageCss(d.page_css));
   document.title = d.type === INVOICE && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
   away = new Map(Object.entries(d.links ?? {}));
