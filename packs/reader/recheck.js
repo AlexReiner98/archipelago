@@ -73,6 +73,8 @@ export async function recheckRun(ctx, repo, ref, now = false) {
     by: 'the scheduled re-check',
     context: { kind: 'recheck', repo, ref },
     then: 'rechecked',
+    // A schedule asks once an hour: whichever server leads, one re-check of a repository in an hour.
+    ...(!now && { once: `recheck:${repo.entity.id}@${String(ctx.now).slice(0, 13)}` }),
   };
 }
 

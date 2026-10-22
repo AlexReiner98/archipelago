@@ -6,19 +6,34 @@
 // repository, and answers the run's tools here.
 
 import { connected, defaultBranch, readable, commitLink } from './github.js';
-import { pushRun, pushTool, readablePush } from './push.js';
+import { ownGuesses, readCommits, unread } from './history.js';
+import { openWork, pushRun, pushTool, readablePush } from './push.js';
 import { recheckRun, repoTool } from './recheck.js';
 
 /** How far back the pushes read on catching up go. */
 const CATCH_UP_MINUTES = 180;
 
-/** A push the GitHub pack recorded: commits to a branch of a repository the App can read are read against the map. */
+/**
+ * What the reader has seen of a repository: the commits a finished reading covered, and of its open work, the items
+ * the reader made itself that nobody has reviewed.
+ */
+async function seen(ctx, repo) {
+  const own = await ownGuesses(ctx, (await openWork(ctx, repo)).map((i) => i.id));
+  return { read: await readCommits(ctx, repo), own };
+}
+
+/**
+ * A push the GitHub pack recorded: commits to a branch of a repository the App can read are read against the map,
+ * unless each was read already on another branch (a pull request's branch, then the merge to the default).
+ */
 async function heard(input, ctx) {
   const push = readablePush(input.event);
   if (!push || !(await connected(ctx))) return {};
   const repo = (await readable(ctx)).find((r) => r.entity.id === input.event.target);
   if (!repo) return {};
-  return { runs: [await pushRun(ctx, repo, { ...push, default_branch: await defaultBranch(ctx, repo) })] };
+  const known = await seen(ctx, repo);
+  if (!unread(input.event.detail.commits, known.read).length) return { answer: { reason: 'Every commit of this push was read already.' } };
+  return { runs: [await pushRun(ctx, repo, { ...push, default_branch: await defaultBranch(ctx, repo) }, known)] };
 }
 
 /**
@@ -32,18 +47,21 @@ async function catchUp(_input, ctx) {
   const since = new Date(Date.parse(ctx.now) - CATCH_UP_MINUTES * 60_000).toISOString();
   const runs = [];
   for (const repo of await readable(ctx)) {
+    let known;
     const rows = (await ctx.read({ events: { action: 'repo.push', target: repo.entity.id, since, limit: 40 } })).filter((e) => e.detail?.branch && !e.detail.deleted && e.detail.after);
     let fallback;
     for (const branch of [...new Set(rows.map((r) => r.detail.branch))]) {
       // Newest first on this branch, back to the last one that was read.
-      const unread = [];
+      const pending = [];
       for (const { detail } of rows.filter((r) => r.detail.branch === branch)) {
         if ((await ctx.read({ items: { type: 'sys.run', where: { link: commitLink(repo, detail.after) } }, fields: ['link'] })).length) break;
-        unread.push(detail);
+        pending.push(detail);
       }
-      if (!unread.some((p) => p.commits?.length)) continue;
+      if (!pending.some((p) => p.commits?.length)) continue;
+      known ??= await seen(ctx, repo);
+      if (!unread(pending.flatMap((p) => p.commits ?? []), known.read).length) continue;
       fallback ??= await defaultBranch(ctx, repo);
-      runs.push(await pushRun(ctx, repo, { branch, default_branch: fallback, before: unread.at(-1).before ?? '0', after: unread[0].after }));
+      runs.push(await pushRun(ctx, repo, { branch, default_branch: fallback, before: pending.at(-1).before ?? '0', after: pending[0].after }, known));
     }
   }
   return { runs, answer: runs.map((r) => r.title) };

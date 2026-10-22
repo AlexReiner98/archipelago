@@ -9,7 +9,7 @@
   "hears": [{ "event": "repo.push", "limit_ms": 30000 }],
   "runs": ["view", "search", "get", "events", "schema", "proposals", "change", "notify", "rechecked"],
   "schedules": [
-    { "id": "catch_up", "at_start": true, "limit_ms": 30000 },
+    { "id": "catch_up", "every_minutes": 15, "at_start": true, "limit_ms": 30000 },
     { "id": "recheck", "every_minutes": 60, "at_start": true, "limit_ms": 30000 }
   ],
   "actions": [

@@ -24,6 +24,8 @@ const MAX_TOKENS_USED = 600_000;
 const MAX_RESULT = 60_000;
 /** How long the pack's handler may take over one of its tools. */
 const TOOL_MS = 30_000;
+/** How long a run taken by its once may go without ending before another may take it: one cut off when its server stopped. */
+const ONCE_MINUTES = 30;
 /** The map's tools that only read, which a pack's own tool may also call while it answers. */
 const READS = ['view', 'search', 'get', 'events', 'schema', 'proposals'];
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
@@ -42,6 +44,7 @@ function checked(pack: PackFile, r: RunAsk): RunAsk {
   for (const name of map) if (!(pack.runs ?? []).includes(name) || !TOOLS[name]) throw new Error(`The ${pack.id} pack may not offer a run the map's tool "${name}": it is not one of the tools it declares in runs.`);
   if (tools.length + map.length > 24 || new Set([...tools.map((t) => t.name), ...map]).size !== tools.length + map.length) throw new Error("A run's tools have names of their own, 24 at most.");
   if (!Array.isArray(r.within) || !r.within.length || r.within.some((id) => typeof id !== 'string')) throw new Error('A run is held to some items of the map (within).');
+  if (r.once !== undefined) text(r.once, 200, 'once as a short key');
   return { ...r, title: text(r.title, 200, 'a title'), system: text(r.system, 40_000, 'its instructions'), task: text(r.task, 200_000, 'a task'), tools, map_tools: map };
 }
 
@@ -61,6 +64,10 @@ async function startRuns(l: Archipelago, asker: Actor, pack: PackFile, call: str
       out.push({ started: false, title: r.title, reason: NO_MODEL });
       continue;
     }
+    if (r.once && !(await takeOnce(l, pack, r.once))) {
+      out.push({ started: false, title: r.title, reason: 'It is being run, or has been, already.' });
+      continue;
+    }
     // A person who asked for it stands behind what it changes; anything else (a push, a schedule) leaves its changes to the owner.
     const byHand = call === 'action' && asker.kind === 'human';
     const by: StartedBy | undefined = byHand ? undefined : { kind: call === 'schedule' ? 'automation' : 'webhook', name: String(r.by ?? `the ${pack.title} pack`).slice(0, 120) };
@@ -74,6 +81,22 @@ async function startRuns(l: Archipelago, asker: Actor, pack: PackFile, call: str
   return out;
 }
 setRunner(startRuns);
+
+const onceKey = (pack: PackFile, once: string) => `run_once:${pack.id}:${once}`;
+
+/**
+ * Take a run's once, kept in the workspace's database so the servers of one deploy share it: free, or taken by a run
+ * that has neither ended nor been heard of for ONCE_MINUTES. Those taken more than a month ago are let go.
+ */
+async function takeOnce(l: Archipelago, pack: PackFile, once: string): Promise<boolean> {
+  await l.db.query(`delete from setting where left(key, 9) = 'run_once:' and (value->>'at')::timestamptz < now() - interval '30 days'`);
+  const { rows } = await l.db.query(
+    `insert into setting (key, value) values ($1, jsonb_build_object('at', now(), 'done', false)) on conflict (key) do update set value = excluded.value
+       where (setting.value->>'done')::boolean is not true and (setting.value->>'at')::timestamptz < now() - make_interval(mins => $2::int) returning key`,
+    [onceKey(pack, once), ONCE_MINUTES],
+  );
+  return rows.length > 0;
+}
 
 /** Map the tools of a run onto the model's tool definitions. */
 function definitions(r: RunAsk): Tool[] {
@@ -187,6 +210,7 @@ async function run(l: Archipelago, pack: PackFile, r: RunAsk, by: StartedBy | un
   const price = model.price;
   const cost = price ? (used.input * price.input + used.output * price.output + used.cache_read * price.input * 0.1 + used.cache_write * price.input * 1.25) / 1e6 : undefined;
   const summary = [failed, said].filter(Boolean).join('\n\n');
+  if (r.once) await l.db.query(`update setting set value = value || '{"done": true}'::jsonb where key = $1`, [onceKey(pack, r.once)]);
   const recorded = await recordRun(l, actor, { repo: r.within[0], title: r.title, ok: !failed, tokens, cost_usd: cost, turns, link: r.link, summary, surface: 'server', started_by: by });
   if (r.then) await ended(mine, actor, pack, r, { ok: !failed, summary, run: recorded.run, tokens, turns });
   return { ok: !failed, tokens };

@@ -31,6 +31,11 @@ export interface RunAsk {
   by?: string;
   /** The entry told how it ended, which may answer calls of the map's tools the pack declares in runs. */
   then?: string;
+  /**
+   * What it is a run of, to be run once (a push, by repository and head): whichever server asks first takes it, and
+   * another asking is refused while it runs and for good once it has ended. One cut off is taken again after a while.
+   */
+  once?: string;
 }
 
 export interface RunStart {
