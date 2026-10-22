@@ -230,6 +230,18 @@ export function publishCard() {
   );
 }
 
+/** Whether agents may change the code drawings run without asking: it runs in the sandbox either way. */
+export function codeCard() {
+  const note = h('span', { class: 'muted small grow' });
+  const allow = allowance('agent_code', { title: 'Let agents change drawings?', message: 'An agent could then change the code a picture is drawn by, and it takes effect at once for whoever looks. It runs in the sandbox, reaching nothing of the page or the network; each change is logged and can be undone.' }, note);
+  return h(
+    'section',
+    { class: 'card wide' },
+    h('header', {}, h('h2', { class: 'hinted', title: 'Whether an agent’s change to a drawing’s code waits for you' }, 'Drawings')),
+    h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, h('label', { title: 'Lets an agent’s change to a style’s modules or code take effect without your approval.' }, allow, ' Agents may change drawings'), note),
+  );
+}
+
 /** The whole map as a file, for the owner to keep, whether agents may have one too, and a file brought in. */
 export function backupCard(done) {
   const note = h('span', { class: 'muted small grow' });

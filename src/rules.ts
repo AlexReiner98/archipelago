@@ -33,6 +33,8 @@ export interface RuleDef {
   type?: string;
   /** What a refusal says. {title} is the item's. */
   say?: string;
+  /** A workspace setting (agent_...) by which its owner lifts this rule there: while it is on, the rule does not apply. */
+  lifted?: string;
 }
 
 /** An item a change is written to, as it is before the change. */
@@ -54,6 +56,8 @@ export interface Written {
 }
 
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
+/** The settings an owner lifts a rule by: each one an agent's token may read (src/schema.ts, AGENT_CODE_READ). */
+export const LIFTS = ['agent_code'];
 const COMPARE = /^\s*([a-z_][a-z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?|[a-z_][a-z0-9_]*)\s*$/;
 
 /** Problems with a pack's rules, given the registry it loads into. Empty means they can be enforced. */
@@ -71,6 +75,7 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
     if (then !== 'hold' && then !== 'refuse' && !(then && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse or { require: [fields] }`);
     for (const t of [...(list(rule.when?.type) ?? []), ...(list(rule.when?.kind) ?? [])]) if (!known(t)) problems.push(`${at}: no type "${t}"`);
     if (rule.when?.compare !== undefined && !COMPARE.test(rule.when.compare)) problems.push(`${at}: compare reads like "total > 500"`);
+    if (rule.lifted !== undefined && !LIFTS.includes(rule.lifted)) problems.push(`${at}: lifted is one of ${LIFTS.join(', ')}`);
   }
   return problems;
 }
@@ -103,8 +108,8 @@ function applies(rule: RuleDef, reg: Registry, human: boolean, w: Written, targe
   return true;
 }
 
-/** What the rules make of one op: whether it waits for a person, and what refuses it. */
-export function judge(reg: Registry, human: boolean, w: Written, targets: Target[]): { hold: boolean; refused: string[] } {
+/** What the rules make of one op: whether it waits for a person, and what refuses it. `lifted`: the settings that are on. */
+export function judge(reg: Registry, human: boolean, w: Written, targets: Target[], lifted: Set<string> = new Set()): { hold: boolean; refused: string[] } {
   let hold = false;
   const refused: string[] = [];
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
@@ -113,7 +118,7 @@ export function judge(reg: Registry, human: boolean, w: Written, targets: Target
   const asleep = [w.op === 'create' || w.op === 'link' ? w.type : undefined, ...targets.map((t) => t.type)].some((t) => t && (reg.types.get(t)?.dormant || reg.relations.get(t)?.dormant));
   if (asleep && !human) hold = true;
   for (const rule of reg.rules) {
-    if (rule.unique || !applies(rule, reg, human, w, targets)) continue;
+    if (rule.unique || (rule.lifted && lifted.has(rule.lifted)) || !applies(rule, reg, human, w, targets)) continue;
     if (rule.then === 'hold') hold = hold || !human;
     else if (rule.then === 'refuse') refused.push(said(rule, `"${title}": refused by ${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`));
     else if (rule.then) {
@@ -146,12 +151,16 @@ export async function clashes(q: Q, reg: Registry, w: Written, target: Target | 
 
 /** What the packs' rules make of each op of a change: whether it waits for a person, and what refuses it. */
 export async function judgeOps(q: Q, reg: Registry, human: boolean, given: { op: string }[]) {
+  // A rule the owner has lifted here (its setting is on) does not apply to an agent's change.
+  const lifts = [...new Set(reg.rules.flatMap((r) => (r.lifted ? [r.lifted] : [])))];
+  const lit = human || !lifts.length ? [] : (await q.query<{ key: string }>(`select key from setting where key = any($1::text[]) and value = 'true'::jsonb`, [lifts])).rows;
+  const lifted = new Set(lit.map((r) => r.key));
   const ops = given as (Written & { id?: string; keep?: string; drop?: string })[];
   const on = (op: (typeof ops)[number]) => (op.op === 'merge' ? [op.keep!, op.drop!] : op.id ? [op.id] : []);
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
   return Promise.all(ops.map(async (op) => {
     const targets = on(op).flatMap((id) => found.get(id) ?? []);
-    const judged = judge(reg, human, op, targets);
+    const judged = judge(reg, human, op, targets, lifted);
     return { ...judged, refused: [...judged.refused, ...(await clashes(q, reg, op, targets[0]))] };
   }));
 }

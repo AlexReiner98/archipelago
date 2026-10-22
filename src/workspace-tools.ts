@@ -16,6 +16,7 @@ const settings = async (l: Archipelago) => ({
   accepts_from: await acceptedSenders(l),
   agent_backups: (await l.setting<boolean>('agent_backups')) === true,
   agent_publish: (await l.setting<boolean>(AGENT_PUBLISH)) === true,
+  agent_code: (await l.setting<boolean>('agent_code')) === true,
 });
 
 export const WORKSPACE_TOOLS: Record<string, Tool> = {
@@ -37,6 +38,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       accepts_from: z.array(z.string()).optional().describe('Ids of the workspaces allowed to send this one notifications. Replaces the list.'),
       agent_backups: z.boolean().optional().describe('Whether agents may download the whole workspace as a backup file (backup_download), private items included.'),
       agent_publish: z.boolean().optional().describe('Whether agents may publish documents here (publish, publish_all), each publish logged with its authority. Taking one down stays a human’s.'),
+      agent_code: z.boolean().optional().describe('Whether agents’ changes to the code a drawing or a style runs (modules, code) take effect as they make them, instead of waiting for a human. That code runs only in the sandbox; each change is logged and undoable.'),
     },
     run: async (l, actor, input) => {
       if (!actor.admin) throw new Error('Only a workspace admin can change workspace settings.');

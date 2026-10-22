@@ -448,6 +448,13 @@ $fn$;
 grant execute on function pelago_workspace_document(text, text), pelago_workspace_picture(text, text, text) to pelago_public;`;
 
 /** Step 12 (src/migrate.ts): a member, and so an agent's token, reads whether the owner lets agents publish (src/published.ts). */
+/** Step 14 (src/migrate.ts): and whether the owner lets agents change the code drawings run, unreviewed (src/rules.ts, lifted). */
+export const AGENT_CODE_READ = `
+drop policy if exists member_setting_read on setting;
+create policy member_setting_read on setting for select to pelago_member
+  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish', 'agent_code'));
+`;
+
 export const AGENT_PUBLISH_READ = `
 drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member

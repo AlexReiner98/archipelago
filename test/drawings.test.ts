@@ -60,6 +60,13 @@ test('a picture is sent the drawing its shape is drawn by, once, and the owner�
   // An agent's version waits for the human: it is code that runs in whoever looks.
   const asked = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'Architecture, the agent’s', status: 'current', props: { modules: { 'look.js': look } } }] });
   assert.equal(asked.result.status, 'proposed');
+  // Unless the owner lets agents change drawings here: it runs in the sandbox either way.
+  assert.equal((await call('/api/workspace_set', undefined, { agent_code: true, agent_changes: 'apply' })).result.agent_code, true);
+  const made = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'Architecture, the agent’s again', status: 'current', props: { modules: { 'look.js': look } } }] });
+  assert.equal(made.result.status, 'applied');
+  // What else is held is held still: a change to what anyone sees is the human's.
+  const shown = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'update', id: p, visibility: 'public' }] });
+  assert.equal(shown.result.status, 'proposed');
 });
 
 test('a picture with steps is sent them, and the finished parts they name, whatever it folds away', async () => {
