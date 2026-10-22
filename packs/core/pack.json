@@ -258,9 +258,9 @@
     { "id": "revise", "title": "Revise", "description": "Change, correct or undo what is on the map." }
   ],
   "rules": [
-    { "id": "code_runs", "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code", "modules"] }, "then": "hold", "say": "Code that runs in the browser of whoever looks is the human's to allow." },
+    { "id": "code_runs", "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code", "modules"] }, "then": "hold", "lifted": "agent_code", "say": "Code that runs in the browser of whoever looks is the human's to allow." },
     { "id": "screens_human", "when": { "actor": "agent", "type": "screen" }, "then": "hold", "say": "What a screen shows, and where, is the human's to change." },
-    { "id": "styles_merge", "when": { "actor": "agent", "op": "merge", "type": "style" }, "then": "hold", "say": "Folding one style into another can bring its code along: the human's to allow." },
+    { "id": "styles_merge", "when": { "actor": "agent", "op": "merge", "type": "style" }, "then": "hold", "lifted": "agent_code", "say": "Folding one style into another can bring its code along: the human's to allow." },
     { "id": "public", "when": { "actor": "agent", "op": ["create", "update"], "visibility": "public" }, "then": "hold", "say": "What anyone can see is the human's to decide." }
   ]
 }
