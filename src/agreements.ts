@@ -13,6 +13,8 @@ export interface Agreement {
   title: string;
   url: string;
   version: string;
+  /** The same document in other languages, each named in its own: shown beside it wherever it is agreed to. */
+  also?: { title: string; url: string }[];
 }
 
 /** What one address agreed to: per document, each version with when and how. */
@@ -20,6 +22,8 @@ export type Agreed = Record<string, { version: string; at: string; via: string }
 
 const ID = /^[a-z][a-z0-9_]{0,39}$/;
 const key = (email: string) => `agreed:${email}`;
+const titled = (t: unknown): t is string => typeof t === 'string' && t.length > 0 && t.length <= 80;
+const linked = (u: unknown): u is string => typeof u === 'string' && /^(\/(?!\/)|https:\/\/)[^\s"<>]{0,500}$/.test(u);
 
 /** The documents a pack's answer names, those that are well formed; anything else in it is left out. */
 export function agreementsFrom(answer: unknown): Agreement[] {
@@ -28,9 +32,13 @@ export function agreementsFrom(answer: unknown): Agreement[] {
     .filter((a): a is Agreement => {
       if (!a || typeof a !== 'object') return false;
       const { id, title, url, version } = a as Record<string, unknown>;
-      return typeof id === 'string' && ID.test(id) && typeof title === 'string' && title.length > 0 && title.length <= 80 && typeof url === 'string' && /^(\/(?!\/)|https:\/\/)[^\s"<>]{0,500}$/.test(url) && typeof version === 'string' && version.length > 0 && version.length <= 40;
+      return typeof id === 'string' && ID.test(id) && titled(title) && linked(url) && typeof version === 'string' && version.length > 0 && version.length <= 40;
     })
-    .map(({ id, title, url, version }) => ({ id, title, url, version }));
+    .map(({ id, title, url, version, also }) => {
+      // Other languages: up to three, each well formed, or none.
+      const others = (Array.isArray(also) ? also : []).filter((o) => o && titled(o.title) && linked(o.url)).slice(0, 3).map(({ title, url }) => ({ title, url }));
+      return { id, title, url, version, ...(others.length ? { also: others } : {}) };
+    });
 }
 
 /** What an address has agreed to. */

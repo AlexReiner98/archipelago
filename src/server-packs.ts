@@ -37,7 +37,8 @@ export interface ServerPackFile {
   webhooks?: { id: string; secret: string; header?: string; format?: 'prefixed' | 'hex' }[];
   /**
    * One of its entries, answering the documents a person agrees to before they are signed in, each { id, title, url,
-   * version } (src/agreements.ts). A new version is agreed to again at the next sign-in.
+   * version, also? } (src/agreements.ts), also naming the same document in other languages. A new version is agreed to
+   * again at the next sign-in.
    */
   agreements?: string;
 }

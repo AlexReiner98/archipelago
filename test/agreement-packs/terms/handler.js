@@ -3,7 +3,7 @@
 export default {
   documents: () => ({
     answer: [
-      { id: 'terms', title: 'Terms of Service', url: '/x/terms/terms', version: '2026-10-21' },
+      { id: 'terms', title: 'Terms of Service', url: '/x/terms/terms', version: '2026-10-21', also: [{ title: "Conditions d'utilisation", url: '/x/terms/terms_fr' }, { title: 'Bad', url: 'javascript:alert(1)' }] },
       { id: 'privacy', title: 'Privacy Policy', url: 'https://example.com/privacy', version: 'v1' },
       { id: 'Bad id', title: 'Left out', url: '/x', version: '1' },
     ],
