@@ -8,7 +8,7 @@
 //   --since 2026-10-21           export the pushes read since then (default: 14 days)
 //   --runs 2                     replay each push this many times on each model
 //   --only main@01e12e6,…        replay only these pushes; --limit 10 the first ten
-//   --concurrency 4              replays at once
+//   --concurrency 2              replays at once of each model (the models run side by side)
 //   --online                     ask GitHub (gh) for what was not recorded, and keep it
 //
 // Keys come from the environment, or from a file of KEY=value lines named by READER_EVAL_ENV (default: .env beside, or one folder above,
@@ -37,7 +37,7 @@ const { values: args } = parseArgs({
     runs: { type: 'string', default: '1' },
     only: { type: 'string' },
     limit: { type: 'string' },
-    concurrency: { type: 'string', default: '4' },
+    concurrency: { type: 'string', default: '2' },
     online: { type: 'boolean' },
     repo: { type: 'string' },
   },
@@ -94,19 +94,27 @@ async function pool<T>(jobs: (() => Promise<T>)[], width: number): Promise<T[]> 
 }
 
 const runs = Number(args.runs);
+/** What a run says when the provider, not the model, stopped it (src/reader.ts words these). */
+const PASSING = /rate limit|answered (408|409|429|5\d\d)|could not be reached|The run broke/i;
 const perPush: Record<string, Record<string, unknown>[]> = {};
-const summaries: Summary[] = [];
-for (const c of candidates) {
-  console.log(`\n${c.model}: ${fixtures.length} pushes × ${runs}`);
+// The models run side by side, each a few replays at a time: a provider limits each model on its own.
+const summaries: Summary[] = await Promise.all(candidates.map(async (c) => {
+  console.log(`${c.model}: ${fixtures.length} pushes × ${runs}`);
   const tally: Tally = { model: c.model, currency: c.currency, runs: 0, failed: 0, good: 0, bad: 0, unjudged: 0, copies: 0, closes: { due: 0, made: 0 }, closesAll: { due: 0, made: 0 }, tokens: 0, usd: 0, ms: 0 };
   const jobs = fixtures.flatMap((f) => Array.from({ length: runs }, () => async () => {
     try {
-      const done = await replay(f, c, github);
+      let done = await replay(f, c, github);
+      // A run cut off by the provider's rate limit or an outage says nothing of the model: it is read again, after a
+      // pause, and only the run that finished is counted.
+      for (let tries = 1; !done.ok && tries <= 4 && PASSING.test(done.summary); tries++) {
+        await new Promise((r) => setTimeout(r, 15_000 * tries));
+        done = await replay(f, c, github);
+      }
       const judged = judge(f, done.sent, closedOf);
-      console.log(`  ${f.id}: ${done.ok ? '' : 'FAILED '}${judged.good} good, ${judged.bad} bad, ${judged.unjudged} unjudged, $${done.usd.toFixed(4)}, ${(done.ms / 1000).toFixed(0)}s`);
+      console.log(`  ${c.model} ${f.id}: ${done.ok ? '' : `FAILED (${done.summary.split('\n')[0].slice(0, 120)}) `}${judged.good} good, ${judged.bad} bad, ${judged.unjudged} unjudged, ${c.currency === 'EUR' ? '€' : '$'}${done.usd.toFixed(4)}, ${(done.ms / 1000).toFixed(0)}s`);
       return { f, done, judged };
     } catch (err) {
-      console.log(`  ${f.id}: broke: ${(err as Error).message.slice(0, 200)}`);
+      console.log(`  ${c.model} ${f.id}: broke: ${(err as Error).message.slice(0, 200)}`);
       return { f, error: (err as Error).message };
     }
   }));
@@ -125,8 +133,8 @@ for (const c of candidates) {
     tally.usd += done.usd;
     tally.ms += done.ms;
   }
-  summaries.push(summarise(tally));
-}
+  return summarise(tally);
+}));
 saveAnswers(answersFile, answers);
 
 const chosen = choose(summaries.filter((m) => m.model !== 'none'));
