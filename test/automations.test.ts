@@ -134,16 +134,18 @@ test('a note is added to, or one passage of it replaced, without sending it agai
   await undo(l, human, { changeset: (added as { changeset: string }).changeset });
   assert.equal((await l.entity(t))!.status, 'todo', 'undone like any other edit');
 
-  // An agent reading history is given the start of a long note and its length; the whole of it when it asks, and a person always.
+  // An item's history is the last few changes, a long note cut to its start and its length, for anyone: the item says
+  // what it is now. The whole record is the log's: an agent asks events for all of it, and a person is given it whole.
   const long = 'A long note. '.repeat(100);
   await make(l, [{ op: 'update', id: t, body: long }]);
   const to = (answer: any) => (answer.recent_events ?? answer)[0].detail.changes.body.to as string;
-  for (const tool of ['get', 'events']) {
-    const input = tool === 'get' ? { id: t, history: true } : { target: t };
-    assert.match(to(await callTool(l, agent, tool, input)), /^A long note\. .{180,200}… \(1300 characters; ask again with full: true/, tool);
-    assert.equal(to(await callTool(l, agent, tool, { ...input, full: true })), long, `${tool}, in full`);
-    assert.equal(to(await callTool(l, human, tool, input)), long, `${tool}, for a person`);
-  }
+  for (const who of [agent, human]) assert.match(to(await callTool(l, who, 'get', { id: t, history: true, full: true })), /^A long note\. .{180,200}… \(1300 characters; the events tool, with full: true, has all of it\)$/, who.kind);
+  for (let i = 0; i < 10; i++) await make(l, [{ op: 'update', id: t, props: { priority: i % 2 ? 'high' : 'low' } }]);
+  assert.equal(((await callTool(l, human, 'get', { id: t })) as any).recent_events.length, 8, 'only the last few');
+  const bodyIn = async (who: typeof agent, full?: boolean) => ((await callTool(l, who, 'events', { target: t, limit: 20, full })) as any[]).find((e) => e.detail?.changes?.body).detail.changes.body.to as string;
+  assert.match(await bodyIn(agent), /^A long note\. .{180,200}… \(1300 characters; ask again with full: true for all of it\)$/, 'events, for an agent');
+  assert.equal(await bodyIn(agent, true), long, 'events, in full');
+  assert.equal(await bodyIn(human), long, 'events, for a person');
   assert.equal(((await callTool(l, agent, 'get', { id: t })) as any).entity.body, long, 'the note itself is always whole');
   // An agent that asks for an item is given the item: its history comes when asked for.
   assert.equal(((await callTool(l, agent, 'get', { id: t })) as any).recent_events, undefined);

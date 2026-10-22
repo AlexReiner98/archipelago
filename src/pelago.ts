@@ -981,7 +981,7 @@ export class Archipelago {
     const [out, inc, events, source] = await Promise.all([
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.valid_to is null`, [id]),
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.from_id where r.to_id = $1 and r.valid_to is null`, [id]),
-      this.db.query(`select seq, ts, actor, action, changeset, reason, detail from event where target_id = $1 order by seq desc limit 15`, [id]),
+      this.db.query(`select seq, ts, actor, action, changeset, reason, detail from event where target_id = $1 order by seq desc limit 8`, [id]),
       entity.source_id ? this.entity(entity.source_id) : undefined,
     ]);
     return {
