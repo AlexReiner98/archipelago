@@ -117,3 +117,8 @@ test('it lays out all its steps quickly', () => {
   for (let n = 0; n < 5; n++) run();
   assert.ok((performance.now() - t0) / 5 < 200, 'over 200 ms to lay out the story');
 });
+
+test('a story whose parts are not shown says so, and draws no picture of nothing', () => {
+  const none = { ...answer, items: answer.items.filter((i: any) => i.id === answer.lens.from), links: [] };
+  assert.deepEqual(picture({ answer: none, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene, { message: 'Nothing here is part of a system.' });
+});

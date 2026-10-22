@@ -1,18 +1,19 @@
 // How a story looks (story.js, play.js): the chapters above the picture, what was said below it, and the marks of a
 // step: what comes in, in the accent; what goes, in the colour of what is wrong; a flag in it too. Every colour and
-// length is the page's (its theme and lengths, read as --<name>).
+// length is the page's (its theme and lengths, read as --<name>). The rail's and the conversation's buttons are named
+// within them, so they weigh more than a page's own rule for buttons (a published page has one).
 
 export const css = `
 .sp-top { display: grid; gap: var(--space-6); margin-bottom: var(--space-6); }
 .sp-rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-4); overflow-x: auto; }
-.sp-era { all: unset; cursor: pointer; display: block; min-width: 0; padding: 0 var(--space-3) var(--space-4); border-bottom: var(--border-4) solid var(--line); transition: border-color 0.4s; }
-.sp-era:focus-visible { outline: var(--border-3) solid var(--accent); outline-offset: var(--space-2); }
-.sp-era b, .sp-era small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sp-era b { font-size: var(--text-3); font-weight: 600; color: var(--muted); }
-.sp-era small { font-size: var(--text-2); color: var(--muted); font-variant-numeric: tabular-nums; }
-.sp-era.done { border-bottom-color: var(--edge); }
-.sp-era.done b, .sp-era.now b { color: var(--text); }
-.sp-era.now { border-bottom-color: var(--accent); }
+.sp-rail .sp-era { all: unset; cursor: pointer; display: block; min-width: 0; padding: 0 var(--space-3) var(--space-4); border-bottom: var(--border-4) solid var(--line); transition: border-color 0.4s; }
+.sp-rail .sp-era:focus-visible { outline: var(--border-3) solid var(--accent); outline-offset: var(--space-2); }
+.sp-rail .sp-era b, .sp-rail .sp-era small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-rail .sp-era b { font-size: var(--text-3); font-weight: 600; color: var(--muted); }
+.sp-rail .sp-era small { font-size: var(--text-2); color: var(--muted); font-variant-numeric: tabular-nums; }
+.sp-rail .sp-era.done { border-bottom-color: var(--edge); }
+.sp-rail .sp-era.done b, .sp-rail .sp-era.now b { color: var(--text); }
+.sp-rail .sp-era.now { border-bottom-color: var(--accent); }
 .sp-key { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-9); margin: 0; padding: 0; list-style: none; font-size: var(--text-3); color: var(--muted); }
 .sp-key li { display: flex; align-items: center; gap: var(--space-4); white-space: nowrap; }
 .sp-swatch { width: var(--box-3); height: var(--box-3); border-radius: 50%; background: var(--muted); }
@@ -35,7 +36,7 @@ export const css = `
 .sp-head .grow { flex: 1; }
 .sp-live { width: var(--box-3); height: var(--box-3); border-radius: 50%; background: var(--ok); }
 .sp-count { font-variant-numeric: tabular-nums; }
-.sp-head button { font: inherit; color: var(--text); background: var(--bg); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); padding: var(--space-1) var(--space-7); cursor: pointer; }
+.sp-chat .sp-head button { font: inherit; color: var(--text); background: var(--bg); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); padding: var(--space-1) var(--space-7); cursor: pointer; }
 .sp-log { position: absolute; inset: var(--box-8) 0 0 0; margin: 0; padding: var(--space-6) var(--space-7); list-style: none; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--space-4); overflow: hidden; mask-image: linear-gradient(to bottom, transparent 0, black var(--box-9)); }
 .sp-line { flex: none; max-width: min(88%, 62ch); opacity: 0; transform: translateY(var(--space-4)); transition: opacity 0.35s ease, transform 0.35s ease; display: flex; gap: var(--space-5); align-items: baseline; }
 .sp-line.in { opacity: 1; transform: none; }

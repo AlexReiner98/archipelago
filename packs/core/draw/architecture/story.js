@@ -95,6 +95,8 @@ export function story({ answer, style, reduced }, tools) {
     prior = g.memo;
     return { ...s, g, parts: new Map(g.all.filter((n) => !n.dummy).map((n) => [n.id, n])), boxes: new Map(g.boxes.map((b) => [b.id, b])), wires: new Map(g.chains.map((c) => [c.key, c])) };
   });
+  // A story with nothing in it (what it names is not shown here) says so, as the still picture does.
+  if (frames.every((f) => !f.parts.size)) return { scene: { message: 'Nothing here is part of a system.' } };
   // One frame of reference for all of them: from the leftmost step to the widest, the tallest.
   const left = Math.min(...frames.map((f) => f.g.left)), right = Math.max(...frames.map((f) => f.g.width)), tall = Math.max(...frames.map((f) => f.g.height));
   const shift = -left;
