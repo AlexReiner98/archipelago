@@ -161,7 +161,15 @@ export function readerLabels(changes: ReaderChange[], later: Ev[], open: Item[],
           if (kind.change === 'title') return Boolean(ch.title);
           return false;
         });
+        // Confirmed: someone else changed or confirmed the closed item afterwards, so they looked at it, and it is still closed.
+        const confirmed =
+          !undone &&
+          kind.change === 'close' &&
+          item !== undefined &&
+          closed(item.type).includes(item.status) &&
+          later.find((e) => other(e) && e.ts > c.ts && e.target_id === op.id && e.action === 'entity.update');
         if (undone) labels.push({ ...base, verdict: 'bad', basis: 'taken back' });
+        else if (confirmed) labels.push({ ...base, verdict: 'good', basis: `confirmed by ${confirmed.actor}` });
         else labels.push({ ...base, verdict: 'good', basis: 'kept', weak: true });
       }
     }

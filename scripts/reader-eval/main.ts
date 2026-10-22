@@ -10,6 +10,7 @@
 //   --only main@01e12e6,…        replay only these pushes; --limit 10 the first ten
 //   --concurrency 2              replays at once of each model (the models run side by side)
 //   --online                     ask GitHub (gh) for what was not recorded, and keep it
+//   --rescore results/<time>.json score a run again against the labels as they are now, asking no model
 //
 // Keys come from the environment, or from a file of KEY=value lines named by READER_EVAL_ENV (default: .env beside, or one folder above,
 // the fixtures): ANTHROPIC_API_KEY, OPENAI_API_KEY, SCW_SECRET_KEY (and SCW_API_BASE, with a project), and for
@@ -27,6 +28,7 @@ import { asker } from '../../src/model.ts';
 import { choose, judge, summarise, type Fixture, type Summary, type Tally } from './score.ts';
 import { report } from './report.ts';
 import { candidate, expand } from './candidates.ts';
+import { rescore, type Kept } from './rescore.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const { values: args } = parseArgs({
@@ -40,6 +42,7 @@ const { values: args } = parseArgs({
     concurrency: { type: 'string', default: '2' },
     online: { type: 'boolean' },
     repo: { type: 'string' },
+    rescore: { type: 'string' },
   },
 });
 
@@ -67,6 +70,22 @@ let fixtures = readdirSync(pushesDir)
   .filter((f) => !only || only.includes(f.id))
   .sort((a, b) => a.push.ts.localeCompare(b.push.ts));
 if (args.limit) fixtures = fixtures.slice(0, Number(args.limit));
+
+// Scored again: a results file's replays against the labels as they are now, with no model asked.
+if (args.rescore) {
+  const kept = JSON.parse(readFileSync(args.rescore, 'utf8')) as { summaries: Summary[]; perPush: Record<string, Kept[]>; skipped?: string[] };
+  const currencyOf = (model: string) => kept.summaries.find((m) => m.model === model)?.currency ?? 'USD';
+  const again = rescore(kept.perPush, new Map(fixtures.map((f) => [f.id, f])), closedOf, currencyOf);
+  const read = fixtures.filter((f) => f.id in kept.perPush);
+  const chosen = choose(again.filter((m) => m.model !== 'none'));
+  const out = args.rescore.replace(/\.json$/, '') + '-rescored';
+  writeFileSync(`${out}.json`, JSON.stringify({ summaries: again, chosen: { default: chosen.default?.model, fallback: chosen.fallback?.model, why: chosen.why } }, null, 1));
+  const md = report(read, again, chosen, kept.skipped ?? []);
+  writeFileSync(`${out}.md`, md);
+  console.log(`${md}
+Written to ${out}.{json,md}`);
+  process.exit(0);
+}
 const specs = expand(args.models).map((s) => candidate(s, process.env, envFile));
 const candidates = specs.filter((c): c is Candidate => typeof c !== 'string');
 const skipped = specs.filter((c): c is string => typeof c === 'string');

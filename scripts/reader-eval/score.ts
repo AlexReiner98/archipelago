@@ -60,7 +60,9 @@ export function judge(f: Fixture, sent: Sent[], closed: (type: string) => string
     out[verdict === 'unjudged' ? 'unjudged' : verdict]++;
     out.details.push({ sent: s, verdict, basis });
   }
-  const due = f.labels.filter((l) => l.change === 'close' && l.verdict === 'good');
+  // A close is due only on the default branch: the reader never closes on a branch, so one approved there is not
+  // held against it (whether it should is the reader's rule to settle, not the evaluation's).
+  const due = f.push.branch === f.push.default_branch ? f.labels.filter((l) => l.change === 'close' && l.verdict === 'good') : [];
   for (const l of due) {
     out.closesAll.due++;
     if (closedNow.has(l.item!)) out.closesAll.made++;

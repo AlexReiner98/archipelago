@@ -142,3 +142,14 @@ test('no fallback is named that does no good: the best of the rest, or none', ()
   assert.match(chosen.why, /mid .* is the best of the rest/);
   assert.equal(choose([tally('big', 5, 0, 5, 1), tally('tiny', 0, 1, 0, 0.01)]).fallback, undefined);
 });
+
+test('a close the reader made that someone else later confirmed, and that still stands, is right; one nobody touched stays weak', () => {
+  const open = [{ id: 'e_a', type: 'work.task', title: 'Serve the site', status: 'doing' }, { id: 'e_b', type: 'work.task', title: 'Rank search', status: 'todo' }];
+  const now = new Map<string, Now>(open.map((i) => [i.id, { ...i, status: 'done', created_at: '2026-10-01', archived: false }]));
+  const changes = [{ from: 'c_1', ts: '2026-10-21T10:00', status: 'applied' as const, ops: [{ op: 'update', id: 'e_a', status: 'done' }, { op: 'update', id: 'e_b', status: 'done' }] }];
+  const later = [ev(9, '2026-10-21T12:00', 'agent:claude-code', 'entity.update', 'e_a', { changes: {} })];
+  assert.deepEqual(readerLabels(changes, later, open, now, closed).map((l) => [l.item, l.verdict, l.basis, Boolean(l.weak)]), [
+    ['e_a', 'good', 'confirmed by agent:claude-code', false],
+    ['e_b', 'good', 'kept', true],
+  ]);
+});
