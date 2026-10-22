@@ -43,7 +43,9 @@ export default {
   },
   // A delivery came in from outside.
   async 'demo.delivered'(input) {
-    return { ops: [{ op: 'create', type: 'work.note', title: `Delivered: ${input.payload.item}` }] };
+    // What kind of delivery it is, as its sender said in a header the webhook declares; an event of a kind it does not declare is refused.
+    const action = input.headers['x-demo-kind'] === 'stray' ? 'demo.stray' : 'demo.arrived';
+    return { ops: [{ op: 'create', type: 'work.note', title: `Delivered: ${input.payload.item}` }], log: [{ action, reason: `${input.payload.item} arrived` }] };
   },
   // Runs by itself: reads the prices.
   async 'demo.tick'() {

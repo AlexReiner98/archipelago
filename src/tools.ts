@@ -864,7 +864,7 @@ export const TOOLS: Record<string, Tool> = {
       const mine = await app.installationOf(l.workspace);
       if (mine) {
         await app.forget(mine.id);
-        await l.log(l.db, { actor: actorId(actor), action: 'github.disconnect', reason: `Stopped hearing from GitHub (${mine.account})` });
+        await l.log(l.db, { actor: actorId(actor), action: 'app.disconnect', reason: `Stopped hearing from GitHub (${mine.account})` });
       }
       return status();
     },

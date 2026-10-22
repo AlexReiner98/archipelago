@@ -10,7 +10,7 @@ import { configureModels } from '../src/model-account.ts';
 import { readUnread } from '../src/reader.ts';
 import { serve, closers } from './serve.ts';
 
-test('GitHub tells the map of a push: it is recorded against its repository, and what a commit says it finished is proposed closed', async () => {
+test('the GitHub pack hears a push: it is recorded against its repository, and what a commit says it finished is proposed closed', async () => {
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
@@ -30,7 +30,7 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   assert.equal((await call('/api/github', admin)).result.connected, false);
   assert.match((await call('/agent/github', robot, { new_secret: true })).error, /humans only/);
   const connected = (await call('/api/github', admin, { new_secret: true })).result;
-  assert.deepEqual([connected.connected, connected.webhook_path, connected.repos[0].github], [true, '/github/default', 'acme/site']);
+  assert.deepEqual([connected.connected, connected.webhook_path, connected.repos[0].github], [true, '/hook/default/github/github.push', 'acme/site']);
 
   const deliver = async (
     payload: unknown,
@@ -47,7 +47,9 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
       },
       body,
     });
-    return { status: res.status, ...((await res.json()) as any) };
+    // The pack's webhook answers with what its handler said.
+    const json = (await res.json()) as any;
+    return { status: res.status, ...json, result: json.answer };
   };
   // Each push starts where the one before it on that branch ended, as real ones do.
   const heads = new Map<string, number>();
@@ -61,7 +63,7 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   });
 
   assert.equal((await deliver(push('main', 'x'), { secret: 'not the secret' })).status, 401, 'only what GitHub signed with our secret');
-  assert.equal((await deliver(push('main', 'x'), { path: '/github/nowhere' })).status, 401);
+  assert.equal((await deliver(push('main', 'x'), { path: '/hook/nowhere/github/github.push' })).status, 410, 'no such workspace');
   assert.equal((await deliver({}, { event: 'ping' })).result.reason, 'pong');
   assert.equal((await deliver(push('main', 'x', 'Other/Repo'))).result.recorded, false, 'a repository the map does not know');
 
@@ -104,8 +106,8 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
 
   // A webhook left on GitHub's default content type sends a form; anything that is neither is refused, not crashed on.
   assert.equal((await deliver(push('feat/form', 'x'), { form: true })).result.branch, 'feat/form');
-  assert.equal((await deliver(null, { raw: 'not json' })).status, 400);
-  assert.equal((await deliver(null, { raw: 'ref=x', form: true })).status, 400);
+  assert.match((await deliver(null, { raw: 'not json' })).result.reason, /not JSON/);
+  assert.match((await deliver(null, { raw: 'ref=x', form: true })).result.reason, /not JSON/);
 
   // Only what a commit says in its own words counts: not a denial, a quotation or a revert.
   const header = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'h', type: 'work.task', title: 'Fix the header', visibility: 'shared' }] })).result.created.h;
