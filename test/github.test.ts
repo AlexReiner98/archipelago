@@ -10,7 +10,7 @@ import { configureModels } from '../src/model-account.ts';
 import { readUnread } from '../src/reader.ts';
 import { serve, closers } from './serve.ts';
 
-test('GitHub tells the map of a push: it is recorded against its repository, and what a commit says it finished is proposed closed', async () => {
+test('the GitHub pack hears a push: it is recorded against its repository, and what a commit says it finished is proposed closed', async () => {
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
@@ -30,7 +30,7 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   assert.equal((await call('/api/github', admin)).result.connected, false);
   assert.match((await call('/agent/github', robot, { new_secret: true })).error, /humans only/);
   const connected = (await call('/api/github', admin, { new_secret: true })).result;
-  assert.deepEqual([connected.connected, connected.webhook_path, connected.repos[0].github], [true, '/github/default', 'acme/site']);
+  assert.deepEqual([connected.connected, connected.webhook_path, connected.repos[0].github], [true, '/hook/default/github/github.push', 'acme/site']);
 
   const deliver = async (
     payload: unknown,
@@ -47,7 +47,9 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
       },
       body,
     });
-    return { status: res.status, ...((await res.json()) as any) };
+    // The pack's webhook answers with what its handler said.
+    const json = (await res.json()) as any;
+    return { status: res.status, ...json, result: json.answer };
   };
   // Each push starts where the one before it on that branch ended, as real ones do.
   const heads = new Map<string, number>();
@@ -61,7 +63,7 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
   });
 
   assert.equal((await deliver(push('main', 'x'), { secret: 'not the secret' })).status, 401, 'only what GitHub signed with our secret');
-  assert.equal((await deliver(push('main', 'x'), { path: '/github/nowhere' })).status, 401);
+  assert.equal((await deliver(push('main', 'x'), { path: '/hook/nowhere/github/github.push' })).status, 410, 'no such workspace');
   assert.equal((await deliver({}, { event: 'ping' })).result.reason, 'pong');
   assert.equal((await deliver(push('main', 'x', 'Other/Repo'))).result.recorded, false, 'a repository the map does not know');
 
@@ -104,8 +106,8 @@ test('GitHub tells the map of a push: it is recorded against its repository, and
 
   // A webhook left on GitHub's default content type sends a form; anything that is neither is refused, not crashed on.
   assert.equal((await deliver(push('feat/form', 'x'), { form: true })).result.branch, 'feat/form');
-  assert.equal((await deliver(null, { raw: 'not json' })).status, 400);
-  assert.equal((await deliver(null, { raw: 'ref=x', form: true })).status, 400);
+  assert.match((await deliver(null, { raw: 'not json' })).result.reason, /not JSON/);
+  assert.match((await deliver(null, { raw: 'ref=x', form: true })).result.reason, /not JSON/);
 
   // Only what a commit says in its own words counts: not a denial, a quotation or a revert.
   const header = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'h', type: 'work.task', title: 'Fix the header', visibility: 'shared' }] })).result.created.h;
@@ -272,6 +274,9 @@ test('the GitHub App: the server\'s owner creates it once, a workspace connects 
   // What it sent is an agent's change like any other: here, where agents' changes are held, it waits for the owner.
   const held = (await call('/api/proposals', admin)).result;
   assert.deepEqual(held.map((p: any) => [p.actor, p.ops[0].title]), [['agent:reader', 'Oil the whetstone']]);
+  // And it would wait wherever agents' changes are applied: a push started the run, not the owner. The run says so.
+  const { rows: started } = await db.query<{ by: unknown }>(`select props->'started_by' as by from entity where title = 'Read the push to main (bbbbbbb)'`);
+  assert.deepEqual(started.map((r) => r.by), [{ kind: 'webhook', name: 'a push to main' }]);
   // The same push said twice (a webhook left in the repository beside the app) is taken in once, and read once.
   assert.deepEqual((await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result.recorded, false);
   // A push recorded while its reading was cut off (the server stopped) has no run: the next server reads it, with any

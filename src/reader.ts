@@ -15,6 +15,7 @@ import type { GithubApp } from './github-app.ts';
 import { connection, hasModel, NO_MODEL } from './model-account.ts';
 import { ModelError, type Tool, type ToolResultBlock, type ToolUseBlock, type Turn } from './model.ts';
 import type { Actor, Entity, Archipelago } from './pelago.ts';
+import type { StartedBy } from './launcher.ts';
 import { recordRun } from './sessions.ts';
 import { callTool, TOOLS } from './tools.ts';
 import { commitLink, leanTools, ON_PUSH_LEAN, pushBrief, sought, within, type Push, type Repo } from './reader-push.ts';
@@ -126,15 +127,16 @@ Finish with two or three lines saying what you sent.`;
  * until it has nothing more to ask, or has used what a run may. What it used is
  * recorded as a run in the repository whether it ended well or not.
  */
-async function run(l: Archipelago, kit: ReturnType<typeof tools>, repo: Repo, system: string, task: string, title: string, link: string) {
+async function run(l: Archipelago, kit: ReturnType<typeof tools>, repo: Repo, system: string, task: string, title: string, link: string, by?: StartedBy) {
   const model = await connection(l);
   if (!model) return { ran: false as const, reason: NO_MODEL };
   const me = await l.setting<string>('me');
   // It acts for the workspace's owner, as an agent's token does: it sees what they see, and what it makes is theirs.
   const mine = me ? l.as(me) : l;
   // And it is held to the one repository it is reading: what it reads there is someone else's text, and a file
-  // that tried to steer it could reach nothing but that repository's own work.
-  const actor: Actor = { kind: 'agent', name: 'reader', person: me, within: [repo.entity.id] };
+  // that tried to steer it could reach nothing but that repository's own work. Started by a push or a schedule, not by
+  // the owner asking, what it changes waits for them.
+  const actor: Actor = { kind: 'agent', name: 'reader', person: me, within: [repo.entity.id], ...(by && { may: 'propose' as const }) };
   const ask = model.ask;
   const messages: Turn[] = [{ role: 'user', content: task }];
   const used = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
@@ -205,14 +207,14 @@ async function run(l: Archipelago, kit: ReturnType<typeof tools>, repo: Repo, sy
   const price = model.price;
   const cost = price ? (used.input * price.input + used.output * price.output + used.cache_read * price.input * 0.1 + used.cache_write * price.input * 1.25) / 1e6 : undefined;
   const summary = [failed, said].filter(Boolean).join('\n\n');
-  const recorded = await recordRun(l, actor, { repo: repo.entity.id, title, ok: !failed, tokens, cost_usd: cost, turns, link, summary, surface: 'server' });
+  const recorded = await recordRun(l, actor, { repo: repo.entity.id, title, ok: !failed, tokens, cost_usd: cost, turns, link, summary, surface: 'server', started_by: by });
   return { ran: true as const, ok: !failed, run: recorded.run, tokens, turns, summary };
 }
 
 /** Read one push against the map. */
 export async function readPush(l: Archipelago, app: GithubApp, repo: Repo, push: Push) {
   const me = await l.setting<string>('me');
-  const actor: Actor = { kind: 'agent', name: 'reader', person: me, within: [repo.entity.id] };
+  const actor: Actor = { kind: 'agent', name: 'reader', person: me, within: [repo.entity.id], may: 'propose' };
   const title = `Read the push to ${push.branch} (${push.after.slice(0, 7)})`;
   // What the model would ask for turn by turn is gathered first, in one message (src/reader-push.ts).
   let task: string;
@@ -221,7 +223,7 @@ export async function readPush(l: Archipelago, app: GithubApp, repo: Repo, push:
   } catch (err) {
     task = `A push has just landed on "${push.branch}" of ${repo.name} (${push.before}..${push.after}). What changed could not be gathered (${(err as Error).message.slice(0, 200)}): use \`diff\` on ${push.after}.`;
   }
-  return run(l, leanTools(callTool, app, repo, push), repo, ON_PUSH_LEAN, task, title, commitLink(repo, push.after));
+  return run(l, leanTools(callTool, app, repo, push), repo, ON_PUSH_LEAN, task, title, commitLink(repo, push.after), { kind: 'webhook', name: `a push to ${push.branch}` });
 }
 
 /**
@@ -234,7 +236,7 @@ export async function recheck(l: Archipelago, app: GithubApp, repo: Repo, branch
   const due = (await callTool(me ? l.as(me) : l, { kind: 'agent', name: 'reader', person: me }, 'view', { name: 'recheck', params: { repo: repo.entity.id, now } })) as { due: boolean; projects: { due: boolean }[] };
   if (!due.due) return { ran: false as const, reason: 'Nothing is due for a re-check.' };
   const task = `This is the ${now ? 're-check the owner asked for' : 'scheduled re-check'} for ${repo.name}. In the map the repository is "${repo.entity.title}" (${repo.entity.id}).\n\nThe projects that are due:\n${JSON.stringify(due.projects.filter((p) => p.due), null, 1)}`;
-  const done = await run(l, tools(app, repo, branch), repo, ON_RECHECK, task, now ? 'Re-check asked for by hand' : 'Scheduled re-check', `https://github.com/${repo.name}#recheck-${new Date().toISOString().slice(0, now ? 19 : 10)}`);
+  const done = await run(l, tools(app, repo, branch), repo, ON_RECHECK, task, now ? 'Re-check asked for by hand' : 'Scheduled re-check', `https://github.com/${repo.name}#recheck-${new Date().toISOString().slice(0, now ? 19 : 10)}`, now ? undefined : { kind: 'automation', name: 'the scheduled re-check' });
   // The wait starts again whether or not the run got as far as saying so: a run that broke is not tried again every hour.
   if (done.ran) await callTool(l, { kind: 'agent', name: 'reader', person: me }, 'rechecked', { repo: repo.entity.id, summary: done.ok ? undefined : 'The re-check did not finish.' }).catch(() => undefined);
   return done;

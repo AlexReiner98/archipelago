@@ -111,9 +111,11 @@
   "webhooks": [
     {
       "id": "demo.delivered",
-      "secret": "hook_key"
+      "secret": "hook_key",
+      "headers": ["x-demo-kind"]
     }
   ],
+  "events": ["demo.arrived"],
   "schedules": [
     {
       "id": "demo.tick",

@@ -8,9 +8,11 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { notify } from './notify.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
+import type { PackFile } from './packs.ts';
 import { answerRead, type Read } from './packreads.ts';
-import { actorId, type Actor, type Archipelago, type Op } from './pelago.ts';
+import { actorId, type Actor, type Archipelago, type Op, type SourceSpec } from './pelago.ts';
 // Anyone with no login cannot read the workspace's settings: a public page is counted in the default zone.
 import { DEFAULT_ZONE, zoneOf } from './timeaxis.ts';
 
@@ -28,6 +30,12 @@ export interface Done {
   requests?: OutsideRequest[];
   /** Items whose kept pictures no longer show what they are, removed once its ops are applied. */
   drop_pictures?: string[];
+  /** Further changes, each a change set of its own with its reason, authority and source: each is held or applied on its own. */
+  changes?: { ops: Op[]; reason: string; authority?: { of: 'human' | 'agent'; basis: string }; source?: SourceSpec }[];
+  /** What it records in the log beside its changes: only the kinds of event its pack declares. */
+  log?: { action: string; target?: string; reason?: string; detail?: Record<string, unknown> }[];
+  /** What the owner is told. */
+  notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string }[];
 }
 
 /** What is asked of an action's ops before they are applied: a token limited to some work is held to it. */
@@ -156,20 +164,40 @@ export class PackHost {
   async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' = 'action', check?: Check) {
     const done = await this.call(l, actor, pack, call, name, input, ms);
     await check?.(done);
-    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name }) : undefined;
     const file = l.registry.packs.find((p) => p.id === pack)!;
+    // Refused whole, before anything is written: an event of a kind its pack does not declare.
+    for (const e of done.log ?? []) if (!(file.events ?? []).includes(e.action)) throw new Error(`The ${pack} pack declares no event "${e.action}"`);
+    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name }) : undefined;
     const action = call === 'action' ? file.actions?.find((a) => a.id === name) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
     const made = (changed as { created?: Record<string, string> } | undefined)?.created ?? {};
     const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));
     const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
-    return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }) };
+    const others = await further(l, actor, file, name, done);
+    return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
   }
 
   stop(): void {
     for (const box of this.boxes.values()) box.stop();
     this.boxes.clear();
   }
+}
+
+/**
+ * What a call answered beyond its own ops: the events it records (of the kinds its pack declares, checked first), what the owner is
+ * told, and further change sets, each with its own reason, so a person approves or declines each on its own.
+ */
+async function further(l: Archipelago, actor: Actor, file: PackFile, name: string, done: Done) {
+  for (const e of done.log ?? []) {
+    await l.log(l.db, { actor: actorId(actor), action: e.action, target: e.target, reason: e.reason, detail: { ...e.detail, pack: file.id } });
+  }
+  for (const n of done.notify ?? []) await notify(l, actor, n);
+  const results = [];
+  for (const c of done.changes ?? []) {
+    const result = await l.change(actor, { ops: c.ops, reason: c.reason?.trim() || name, action: name, ...(c.authority && { authority: c.authority }), ...(c.source && { source: c.source }) });
+    results.push({ status: result.status, ...('changeset' in result && { changeset: result.changeset }), ...('proposal' in result && { proposal: result.proposal }) });
+  }
+  return results;
 }
 
 /** Remove the kept pictures of these items, those the actor can see, each logged. */

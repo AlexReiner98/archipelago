@@ -91,11 +91,14 @@ export async function entity(id, here) {
     again();
   };
   // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
-  const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story' && !(run && RUN_OWN.includes(k)) && !(/^[a-z]_[a-z0-9]{8}$/.test(String(v)) && !ID.test(String(v)))); // an id that names no item is to copy, not to read
+  // A whole object (a diagram's boxes, who started a run) is data drawn where it belongs, never a fact to print.
+  const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story' && !(v && typeof v === 'object' && !Array.isArray(v)) && !(run && RUN_OWN.includes(k)) && !(/^[a-z]_[a-z0-9]{8}$/.test(String(v)) && !ID.test(String(v)))); // an id that names no item is to copy, not to read
   const runFacts = run && [
     e.props.surface && h('span', { class: 'fact', title: e.props.cwd ?? '' }, e.props.surface === 'claude-code' ? 'Claude Code' : (RAN[e.props.surface] ?? e.props.surface)),
     e.props.last_seen && h('span', { class: 'fact' }, h('span', { class: 'muted' }, 'heard from '), ago(e.props.last_seen)),
     e.props.tokens_used > 0 && h('span', { class: 'fact', title: `${e.props.tokens_used} tokens, input and output, not counting cached re-reads` }, h('span', { class: 'muted' }, 'used '), tokensText(e.props.tokens_used)),
+    // Started by someone other than the owner, it only proposes.
+    e.props.started_by?.name && h('span', { class: 'fact', title: 'Not started by the owner: what it changes waits for them' }, h('span', { class: 'muted' }, 'started by '), e.props.started_by.name),
   ];
   const short = fields.filter(([, v]) => String(v).length <= looks.numbers.fact_most);
   // A field that holds an item's id says that item's name, as a way to it.

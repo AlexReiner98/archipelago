@@ -4,6 +4,7 @@
 // for a person, and is made once they say so. Every act is logged and never undone. A request may name a handler
 // entry to be told the answer (then), which answers ops in turn.
 
+import { newSecret } from './auth.ts';
 import { newId } from './db.ts';
 import type { ActionDef, HostDef } from './declared.ts';
 import { notify } from './notify.ts';
@@ -39,10 +40,21 @@ const TIMEOUT_MS = 10_000;
 
 const secretKey = (pack: string, name: string) => `pack_secret:${pack}:${name}`;
 
-/** Keep a secret a pack's host needs, sealed. The owner's. */
-export async function setPackSecret(l: Archipelago, input: { pack: string; name: string; value: string }) {
-  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = $2::jsonb`, [secretKey(input.pack, input.name), JSON.stringify(seal(input.value))]);
-  return { kept: secretKey(input.pack, input.name) };
+/**
+ * Keep a secret a pack's host or webhook needs, sealed. The owner's. With make, the kernel makes it (a webhook's, which
+ * the sender is then given) and shows it this once.
+ */
+export async function setPackSecret(l: Archipelago, input: { pack: string; name: string; value?: string; make?: boolean }) {
+  const value = input.make ? newSecret(input.pack.slice(0, 8)) : input.value;
+  if (!value) throw new Error('Give the secret, or make one.');
+  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = $2::jsonb`, [secretKey(input.pack, input.name), JSON.stringify(seal(value))]);
+  return { kept: secretKey(input.pack, input.name), ...(input.make && { secret: value }) };
+}
+
+/** Whether the owner has given a pack this secret. */
+export async function hasPackSecret(l: Archipelago, pack: string, name: string): Promise<boolean> {
+  const { rows } = await l.db.query<{ value: string | null }>(`select pelago_pack_secret($1) as value`, [secretKey(pack, name)]);
+  return Boolean(unseal(rows[0]?.value));
 }
 
 /** Make one request to a declared host, with its secret. */

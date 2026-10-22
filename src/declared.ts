@@ -54,6 +54,8 @@ export interface WebhookDef {
   secret: string;
   /** The header with the signature, as sha256=<hex of an HMAC of the body>: x-signature-256 unless said. */
   header?: string;
+  /** Headers of the delivery the handler is given besides content-type, such as what kind of delivery it is. */
+  headers?: string[];
 }
 
 /** A handler entry the kernel runs by itself every so often, as the pack. */
@@ -148,9 +150,9 @@ export interface ScreenDef {
 
 /**
  * The pieces the kernel draws, each with what it must be told. A tree, a gate, proof, usage and a document draw the
- * kernel's views of the item; a figure is the picture it keeps; rows and a form are the pack's own view and action.
+ * kernel's views of the item; a figure is the picture it keeps; a diagram, the boxes and wires its props.diagram holds; rows and a form are the pack's own view and action.
  */
-export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [] } as const;
+export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [] } as const;
 
 /** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
 export const PAGES = ['time'];
@@ -235,7 +237,12 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     for (const key of Object.keys(style.props ?? {})) if (!styleFields[key] || styleFields[key].system || ['code', 'on'].includes(key)) problems.push(`${at}: "${key}" is not a field a preset sets`);
   }
   for (const host of pack.hosts ?? []) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);
-  for (const hook of pack.webhooks ?? []) if (!handler || !hook.secret) problems.push(`webhook "${hook.id}" needs the handler and the name of its secret`);
+  for (const hook of pack.webhooks ?? []) {
+    if (!handler || !hook.secret) problems.push(`webhook "${hook.id}" needs the handler and the name of its secret`);
+    for (const name of hook.headers ?? []) if (!/^[a-z0-9-]+$/.test(name) || /^(authorization|cookie)$/.test(name)) problems.push(`webhook "${hook.id}": "${name}" is not a header it may be given`);
+  }
+  // What it records in the log, beside its changes: the kernel's own kinds of event are the kernel's.
+  for (const action of pack.events ?? []) if (!/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(action) || /^(entity|relation|proposal|changeset|picture|session|pack)\./.test(action)) problems.push(`event "${action}" is not one a pack may record`);
   for (const s of pack.schedules ?? []) if (!handler || !(s.every_minutes >= 1)) problems.push(`schedule "${s.id}" needs the handler and every_minutes of 1 or more`);
   return problems;
 }

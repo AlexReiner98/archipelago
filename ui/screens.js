@@ -7,6 +7,7 @@ import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
 import { attentionCard } from './attention.js';
 import { savedViewsStrip } from './saved-views.js';
+import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { gate } from './gate.js';
@@ -212,6 +213,11 @@ const PIECES = {
     return { node, later: () => savedViewsStrip(node, p.title ?? p.screen.title, p.limit) };
   },
   // Drawn with the note: the item's page reads them by name.
+  // A diagram made from the code: the boxes and wires the item keeps, with its draw.io file at the commit it came from.
+  diagram: (ctx) => {
+    const node = h('section', { class: 'card wide lens-card' });
+    return { node, later: () => drawDiagram(node, ctx.e?.props?.diagram, { download: ctx.e?.props?.diagram?.drawio }) };
+  },
   figure: () => null,
   document: () => null,
 };

@@ -15,7 +15,7 @@ export const inWords = (value) => (value == null ? 'Unfiled' : String(value).cha
  * Reads only what a lens answers with.
  */
 export function drawGrid(host, answer, style, keep, kept) {
-  const { me, byId, root } = lensTree(answer);
+  const { byId, root } = lensTree(answer);
   const start = byId.get(answer.lens.from) ?? root;
   const labels = style.labels && typeof style.labels === 'object' ? style.labels : {};
   // Lanes by person come with names: the value is an id, never something to read.
@@ -72,7 +72,7 @@ export function drawGrid(host, answer, style, keep, kept) {
     const el = h(
       'a',
       {
-        class: `lg-card${litCount(n, style) ? '' : ' dim'}${n.open ? '' : ' closed'}${me && n.state.waits_on.includes(me) ? ' you' : ''}${n.id === style.here ? ' here' : ''}`,
+        class: `lg-card${litCount(n, style) ? '' : ' dim'}${n.open ? '' : ' closed'}${n.state.needs_you ? ' you' : ''}${n.id === style.here ? ' here' : ''}`,
         href: `#/e/${n.id}`,
         title: [n.title, value !== undefined && name(value), n.fields?.[detail], n.status].filter(Boolean).join('\n'),
         style: `--lg-hue: ${colour}`,

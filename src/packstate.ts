@@ -82,8 +82,8 @@ export const PACK_STATE_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => decideAct(hostFor(l.registry), l, actor, input),
   },
   pack_secret_set: {
-    description: 'Give a pack a secret its host needs (an API key), kept sealed. The pack never sees it: the kernel adds it to the requests it makes.',
-    input: { pack: z.string(), name: z.string(), value: z.string() },
+    description: 'Give a pack a secret its host needs (an API key), kept sealed. The pack never sees it: the kernel adds it to the requests it makes. With make instead of a value, the kernel makes one (for a webhook: what its sender signs with) and shows it once.',
+    input: { pack: z.string(), name: z.string(), value: z.string().optional(), make: z.boolean().optional() },
     humanOnly: true,
     run: async (l, _actor, input) => setPackSecret(l, input),
   },

@@ -9,9 +9,19 @@ import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createToken, revokeToken } from './auth.ts';
-import type { Actor, Archipelago } from './pelago.ts';
+import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { VIEWS } from './views.ts';
+
+/**
+ * Who started a run, when it was not the owner: another person, an automation, or a delivery from outside (a push).
+ * Such a run only proposes, whatever agents may do here: what it changes waits for the owner.
+ */
+export interface StartedBy {
+  kind: 'person' | 'automation' | 'webhook';
+  id?: string;
+  name: string;
+}
 
 /** What the launched session may do without anyone there to approve it. */
 export type LaunchMode = 'plan' | 'acceptEdits';
@@ -44,8 +54,11 @@ export function configureLauncher(next: LauncherConfig): void {
   config = next;
 }
 
-export async function launch(l: Archipelago, actor: Actor, input: { task: string; mode?: LaunchMode; instructions?: string }) {
+export async function launch(l: Archipelago, actor: Actor, input: { task: string; mode?: LaunchMode; instructions?: string }, by?: StartedBy) {
   if (actor.kind !== 'human') throw new Error('Only a human can launch a session.');
+  // Started by anyone but the owner (another member, or an automation), the session only proposes.
+  const owner = await l.setting<string>('me');
+  const started = by ?? (owner && actor.person && actor.person !== owner ? { kind: 'person' as const, id: actor.person, name: actor.name } : undefined);
   if (!config) throw new Error('Launching is off on this server. It starts Claude Code in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
   const mode = input.mode ?? 'plan';
   const brief = (await VIEWS.brief.run(l, { task: input.task })) as {
@@ -60,18 +73,19 @@ export async function launch(l: Archipelago, actor: Actor, input: { task: string
   // Register first: this is what takes the lane, or tells us it is taken.
   const sessionId = randomUUID();
   const agent: Actor = { kind: 'agent', name: 'claude-headless' };
-  const started = await sessionStart(l, agent, { task: input.task, cwd, session_id: sessionId, surface: 'claude-headless', title: `Headless (${mode}): ${brief.task.title}` });
-  const run = started.run;
-  if (started.status === 'waiting') {
-    const why = (('blocked' in started ? started.blocked : undefined) ?? []).map((b) => b.why).join(' ');
+  const begun = await sessionStart(l, agent, { task: input.task, cwd, session_id: sessionId, surface: 'claude-headless', title: `Headless (${mode}): ${brief.task.title}` });
+  const run = begun.run;
+  if (begun.status === 'waiting') {
+    const why = (('blocked' in begun ? begun.blocked : undefined) ?? []).map((b) => b.why).join(' ');
     await sessionEnd(l, agent, { run, outcome: 'cancelled', summary: `Not launched: ${why}` });
     throw new Error(`Not launched. ${why}`);
   }
 
   mkdirSync(config.dir, { recursive: true });
-  // With tokens on, the session gets its own agent token, good for a day and
-  // revoked the moment it ends.
-  const key = config.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined }) : undefined;
+  // With tokens on, the session gets its own agent token, good for a day and revoked the moment it ends; one someone
+  // else started may only propose. The run says who. (With tokens off there is no identity to hold: everyone is the owner.)
+  const key = config.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined, ...(started && { may: 'propose' as const }) }) : undefined;
+  if (started) await l.apply(actorId(agent), { ops: [{ op: 'update', id: run, props: { started_by: started } }], reason: `Started by ${started.name}` });
   const mcpFile = join(config.dir, `${run}.mcp.json`);
   writeFileSync(mcpFile, JSON.stringify({ mcpServers: { pelago: { type: 'http', url: config.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
   const transcript = join(config.dir, `${run}.jsonl`);
@@ -143,7 +157,7 @@ export async function launch(l: Archipelago, actor: Actor, input: { task: string
   child.on('error', (err) => void finish(`Could not start: ${err.message}`));
   child.on('close', () => void finish());
 
-  return { run, session_id: sessionId, mode, cwd, transcript, claimed: ('claimed' in started ? started.claimed : undefined) ?? [] };
+  return { run, session_id: sessionId, mode, cwd, transcript, claimed: ('claimed' in begun ? begun.claimed : undefined) ?? [] };
 }
 
 /** Kill a launched session's process, if this server started one for the run. */

@@ -409,11 +409,14 @@ a compatible server on the server's own network (loopback, private and
 link-local addresses). Prompt caching is Anthropic's alone, and a run's cost
 is still priced at Anthropic's rates.
 
-**Or the server hears the push through a webhook added by hand.** On the Workspace screen, **GitHub** makes a
-secret and shows the address to give GitHub (`/github/<workspace>`): in each
-repository, Settings, Webhooks, Add webhook, content type `application/json`,
-that secret, push events only. A repository is matched to the one in the map
-whose `remote` is its GitHub address. From then on:
+**Or the server hears the push through a webhook added by hand.** Pushes are
+taken in by the GitHub pack (`packs/github`), at the webhook it declares. On
+the Workspace screen, **GitHub** makes the pack's secret and shows the address
+to give GitHub (`/hook/<workspace>/github/github.push`): in each repository,
+Settings, Webhooks, Add webhook, content type `application/json`, that secret,
+push events only. (Until 22 Oct 2026 the address was `/github/<workspace>`;
+a webhook still pointed there gets no answer.) A repository is matched to the
+one in the map whose `remote` is its GitHub address. From then on:
 
 - every push, on any branch, is recorded against the repository in the
   activity log, and `repo_work` and the GitHub card say when it was last

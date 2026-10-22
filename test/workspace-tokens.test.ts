@@ -272,7 +272,7 @@ test('what answers without a token is asked only so often: by one address, and b
   assert.deepEqual(await statuses('/connect/setup.mjs', '198.51.100.2', 2), [200, 200]);
   assert.equal((await get('/connect/setup.mjs', '198.51.100.3')).status, 429);
   // Deliveries are counted apart, and an unsigned one is refused as unsigned until it is asked too often.
-  const deliver = async () => (await fetch(base + '/github/default', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.1' }, body: '{}' })).status;
+  const deliver = async () => (await fetch(base + '/hook/default/github/github.push', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.1' }, body: '{}' })).status;
   assert.deepEqual([await deliver(), await deliver(), await deliver()], [401, 401, 429]);
   // What needs a token, and health, are not counted.
   assert.equal((await get('/health', '198.51.100.1')).status, 200);
@@ -283,7 +283,7 @@ test('a request larger than any honest one is refused, before it is known who se
   const { base } = await serve('tokens');
   const send = (headers: Record<string, string>, megabytes: number, whole = true) =>
     new Promise<number | 'ended'>((resolve, reject) => {
-      const req = request(base + '/github/default', { method: 'POST', agent: false, headers: { 'content-type': 'application/json', ...headers } }, (res) => {
+      const req = request(base + '/hook/default/github/github.push', { method: 'POST', agent: false, headers: { 'content-type': 'application/json', ...headers } }, (res) => {
         res.resume();
         resolve(res.statusCode ?? 0);
         if (!whole) req.destroy();

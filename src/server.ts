@@ -6,8 +6,8 @@
 //   POST /hooks/session-start, /hooks/session-end, /hooks/prompt
 //                      Claude Code HTTP hooks: a session registers itself and
 //                      is handed what the map knows about its repository
-//   POST /github/<workspace>  GitHub's webhook: pushes, signed with the
-//                      workspace's secret
+//   POST /hook/<workspace>/<pack>/<id>  a pack's webhook, signed with the
+//                      secret the owner made for it
 //   /github/app/...    the server's GitHub App: created once, connected by
 //                      each workspace, and every push delivered to /hook
 //   GET  /whoami       which workspace and identity a request resolves to
@@ -36,10 +36,10 @@ import { notify } from './notify.ts';
 import { backupAll, parseBackup } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { serveConnect } from './connect.ts';
-import { deliveryPayload, receivePush, signedByGithub } from './github.ts';
+import { deliveryPayload } from './github.ts';
 import { addRepositories, GithubApp } from './github-app.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
-import { serveHook } from './hooks.ts';
+import { hookFor, runHook, serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
@@ -254,6 +254,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       // A pack's webhook: /hook/<pack>/<id> in the default workspace, /hook/<workspace>/<pack>/<id> in another.
       const hook = req.method === 'POST' && /^\/hook\/(?:([a-z0-9-]+)\/)?([a-z0-9_]+)\/([a-z0-9_.]+)$/.exec(url.pathname);
+      if (hook && tooOften(req, res, deliveries)) return;
       if (hook) return (await workspaces.has(hook[1] ?? DEFAULT_WORKSPACE)) ? await serveHook(req, res, (await workspaces.get(hook[1] ?? DEFAULT_WORKSPACE)).pelago, hook[2], hook[3]) : send(res, 410, { error: 'No such workspace.' });
 
       if (url.pathname === '/mcp') {
@@ -330,8 +331,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const { pelago } = await workspaces.get(workspace);
         if (event === 'installation_repositories') return send(res, 200, { result: await addRepositories(pelago, (payload.repositories_added ?? []).map((r) => r.full_name), payload.installation?.account?.login ?? '') });
         if (event !== 'push') return send(res, 200, { result: { recorded: false, reason: `Only pushes are taken in, not "${event}".` } });
+        // The push is the pack's to take in, as from its own webhook: this delivery is already checked, by the app's secret.
+        const takes = hookFor(pelago, 'repo.push');
+        if (!takes) return send(res, 200, { result: { recorded: false, reason: 'No pack here takes pushes in: the GitHub pack is off.' } });
         const deliveryId = req.headers['x-github-delivery'];
-        const taken = await receivePush(pelago, payload, typeof deliveryId === 'string' ? deliveryId : undefined);
+        const taken = ((await runHook(pelago, takes.pack, takes.hook, { payload, headers: { 'x-github-event': 'push', ...(typeof deliveryId === 'string' && { 'x-github-delivery': deliveryId }) } })).answer ?? {}) as { recorded?: boolean; repo?: { id: string; title: string }; branch?: string; deleted?: boolean; commits?: number };
         // A push of commits to a branch is then read against the map, by the agent on this server. GitHub is not
         // kept waiting for that: it is answered now, and the run says what it did when it is over.
         const reading = Boolean(taken.recorded && taken.repo && taken.branch && !taken.deleted && taken.commits && payload.after && payload.repository?.full_name) && (await hasModel(pelago));
@@ -343,26 +347,6 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
             .finally(release);
         }
         return send(res, 200, { result: { ...taken, reading } });
-      }
-
-      // GitHub's deliveries carry no token: the signature over the body is who
-      // they are from, made with the secret this workspace gave GitHub.
-      const delivery = req.method === 'POST' ? /^\/github\/([^/]+)$/.exec(url.pathname) : null;
-      if (delivery) {
-        if (tooOften(req, res, deliveries)) return;
-        const id = decodeURIComponent(delivery[1]);
-        const body = await readBody(req);
-        const refused = () => send(res, 401, { error: 'Not a delivery signed for this workspace.' });
-        if (!(await workspaces.has(id))) return refused();
-        res.once('close', workspaces.hold(id));
-        const { pelago } = await workspaces.get(id);
-        if (!(await signedByGithub(pelago, body, req.headers['x-hub-signature-256']))) return refused();
-        const event = req.headers['x-github-event'];
-        if (event !== 'push') return send(res, 200, { result: { recorded: false, reason: event === 'ping' ? 'pong' : `Only pushes are taken in, not "${event}".` } });
-        const payload = deliveryPayload(body, req.headers['content-type']);
-        if (!payload) return send(res, 400, { error: 'The delivery is not JSON, nor a form with JSON in its "payload" field. Set the webhook\'s content type to application/json.' });
-        const deliveryId = req.headers['x-github-delivery'];
-        return send(res, 200, { result: await receivePush(pelago, payload, typeof deliveryId === 'string' ? deliveryId : undefined) });
       }
 
       if (req.method === 'POST' && url.pathname.startsWith('/hooks/')) {

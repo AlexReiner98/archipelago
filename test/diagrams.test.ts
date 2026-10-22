@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { readModules } from '../src/diagram-modules.ts';
 import { typeDiagram, type PackFile } from '../src/diagram-types.ts';
-import { layers, mxfile, pageXml } from '../src/diagram-xml.ts';
+import { layers, mxfile, pageData, pageXml } from '../src/diagram-xml.ts';
+import { diagramChange } from '../scripts/publish-diagrams.ts';
 import { diagrams } from '../src/diagrams.ts';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -83,4 +84,46 @@ test('the diagrams of this repository are made whole, and the same each time', (
   for (const f of files.filter((f) => /^src\/[^/]+\.ts$/.test(f.path))) assert.ok(made['modules.drawio'].includes(`>${f.path.slice(4)}<`) || made['modules.drawio'].includes(`label="${f.path.slice(4)}"`), `${f.path} is drawn`);
   const types = packs.flatMap((p) => p.types ?? []);
   assert.equal(cells(made['types.drawio'].split('</diagram>')[0], 'vertex'), types.length + 2, 'every type, the system tier heading and the key');
+});
+
+test('a page as data: boxes placed on the page, what each is said as what it is, and plain words', () => {
+  const data = pageData({
+    id: 'p1',
+    name: 'Server: GitHub',
+    vertices: [
+      { id: 'band', label: 'Server', x: 0, y: 100, w: 400, h: 200, style: 'shape=swimlane;startSize=30;fillColor=#ffffff;' },
+      { id: 'a', label: '<b>github.ts</b><br>pushes', x: 20, y: 40, w: 120, h: 34, parent: 'band', style: 'rounded=1;fillColor=#f8cecc;', tooltip: 'src/github.ts', link: 'https://x/github.ts' },
+      { id: 'b', label: 'hooks &amp; packs', x: 200, y: 40, w: 120, h: 34, parent: 'band', style: 'rounded=1;dashed=1;' },
+      { id: 'n', label: 'A note', x: 0, y: 0, w: 100, h: 20, style: 'strokeColor=none;fillColor=none;' },
+    ],
+    edges: [{ id: 'e', from: 'a', to: 'b', style: 'dashed=1;opacity=70;', label: '3' }],
+  });
+  const by = Object.fromEntries(data.boxes.map((b) => [b.id, b]));
+  assert.deepEqual([by.band.kind, by.band.head, by.a.kind, by.n.kind], ['area', 30, 'box', 'text']);
+  assert.deepEqual([by.a.x, by.a.y], [20, 140], 'a box inside an area is placed on the page');
+  assert.deepEqual([by.a.lines, by.a.bold, by.a.tone, by.a.link], [['github.ts', 'pushes'], true, 'warn', 'https://x/github.ts']);
+  assert.deepEqual([by.b.lines, by.b.dashed], [['hooks & packs'], true]);
+  assert.deepEqual(data.wires, [{ from: 'a', to: 'b', label: '3', dashed: true, faint: true }]);
+  assert.deepEqual([data.width, data.height], [400, 300]);
+});
+
+test('publishing the diagrams makes each page once, finds it again by its id, redraws only what moved, and keeps what went as removed', () => {
+  const page = (id: string, label = id) => ({ id, name: `Page ${id}`, width: 10, height: 10, boxes: [{ id: 'x', x: 0, y: 0, w: 10, h: 10, kind: 'box' as const, lines: [label] }], wires: [] });
+  const first = diagramChange([{ file: 'modules.drawio', page: page('a') }, { file: 'types.drawio', page: page('t'), url: 'https://github.com/o/r/blob/c1/docs/diagrams/types.drawio' }], [], undefined, 'c1'.padEnd(40, '0'), 'e_feature1');
+  assert.deepEqual(first.ops.map((o) => `${o.op} ${o.type ?? o.id ?? ''}`.trim()), ['create work.document', 'link part_of', 'create software.diagram', 'link part_of', 'create software.diagram', 'link part_of']);
+  const doc = first.ops[0] as { body: string };
+  assert.match(doc.body, /\n\nModules\n\{p0\}\n\nTypes\n\{p1\}$/, 'the document reads each page in, under its file');
+  const made = (i: number) => (first.ops[i] as { props: { diagram: { key: string; commit: string; drawio?: string } } }).props.diagram;
+  assert.deepEqual([made(4).key, made(4).drawio, made(4).commit.slice(0, 2)], ['types.drawio#t', 'https://github.com/o/r/blob/c1/docs/diagrams/types.drawio', 'c1']);
+  assert.equal(made(2).drawio, undefined, 'no link where the committed file is not the one drawn');
+  assert.equal(first.reason, 'Diagrams drawn at c100000');
+
+  const kept = [
+    { id: 'e_a0000001', title: 'Page a', status: 'current', props: { diagram: { ...page('a'), key: 'modules.drawio#a', commit: 'c1' } } },
+    { id: 'e_t0000001', title: 'Page t', status: 'current', props: { diagram: { ...page('t'), key: 'types.drawio#t', commit: 'c1' } } },
+  ];
+  const body = 'The code drawn: its modules, what uses what, and its types down to the seven kinds. Made by npm run diagrams at each push to main; open a page to move about in it.\n\nModules\ne_a0000001\n\nTypes\ne_t0000001';
+  assert.deepEqual(diagramChange([{ file: 'modules.drawio', page: page('a') }, { file: 'types.drawio', page: page('t') }], kept, { id: 'e_doc00001', body }, 'c2').ops, [], 'nothing moved, nothing sent');
+  const next = diagramChange([{ file: 'modules.drawio', page: page('a', 'moved') }], kept, { id: 'e_doc00001', body }, 'c3');
+  assert.deepEqual(next.ops.map((o) => [o.op, o.id, (o as { status?: string }).status]), [['update', 'e_a0000001', 'current'], ['update', 'e_t0000001', 'removed'], ['update', 'e_doc00001', undefined]]);
 });

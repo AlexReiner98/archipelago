@@ -57,8 +57,8 @@ export function drawArch(host, answer, style, keep) {
   const parts = g.all.filter((n) => !n.dummy);
   if (!parts.length) return host.replaceChildren(h('div', { class: 'empty' }, 'Nothing here is part of a system.'));
 
-  const yours = (i) => Boolean(me && i.state.waits_on.includes(me));
-  const words = (n) => [n.item.title, `${said(HEALTHS, n.health)} (${n.item.status})`, n.item.host && `On ${n.item.host}`, n.item.role && `Role: ${n.item.role}`, n.item.state.blocked && 'Blocked', yours(n.item) ? 'Waits on you' : n.item.state.waits_on.length ? 'Waits on someone' : null, ...(n.notes ?? []).map((i) => `On it: ${i.title}`)].filter(Boolean).join('\n');
+  const yours = (i) => Boolean(i.state.needs_you);
+  const words = (n) => [n.item.title, `${said(HEALTHS, n.health)} (${n.item.status})`, n.item.host && `On ${n.item.host}`, n.item.role && `Role: ${n.item.role}`, n.item.state.blocked && 'Blocked', yours(n.item) ? 'Needs you' : n.item.state.waits_on.length ? 'Waits on someone' : null, ...(n.notes ?? []).map((i) => `On it: ${i.title}`)].filter(Boolean).join('\n');
 
   const els = new Map(), wires = new Map();
   const light = (id) => {

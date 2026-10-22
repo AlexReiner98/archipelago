@@ -50,7 +50,7 @@ export function drawFlow(host, answer, style, keep) {
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return host.replaceChildren(h('div', { class: 'empty' }, 'Nothing here depends on anything.'));
 
-  const yours = (i) => Boolean(me && i.state.waits_on.includes(me));
+  const yours = (i) => Boolean(i.state.needs_you);
   const dotOf = (i) => (!i.open ? 'done' : yours(i) ? 'you' : i.state.blocked ? 'blocked' : i.state.sessions ? 'session' : '');
   const words = (n) =>
     n.stub
