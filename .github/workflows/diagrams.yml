@@ -1,0 +1,37 @@
+# The diagrams on the map: after each push to main, the code is drawn again (npm run diagrams) and each page that
+# moved is sent to the map as an item its page draws (scripts/publish-diagrams.ts). Needs, in the repository's
+# settings: the secret PELAGO_TOKEN (an agent token for the map, limited to the diagrams' document where it can be),
+# the variable PELAGO_URL (the map's address) and, if the document is to be part of something, the variable
+# PELAGO_DIAGRAMS_INTO (that item's id). Without the token it does nothing.
+
+name: Diagrams
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: diagrams
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PELAGO_TOKEN: ${{ secrets.PELAGO_TOKEN }}
+      PELAGO_URL: ${{ vars.PELAGO_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.PELAGO_TOKEN != ''
+
+      - uses: actions/setup-node@v4
+        if: env.PELAGO_TOKEN != ''
+        with:
+          node-version: 24 # package.json: engines
+
+      - if: env.PELAGO_TOKEN != ''
+        run: node scripts/publish-diagrams.ts ${{ vars.PELAGO_DIAGRAMS_INTO && format('--into {0}', vars.PELAGO_DIAGRAMS_INTO) || '' }}

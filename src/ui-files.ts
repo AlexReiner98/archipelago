@@ -1,7 +1,7 @@
 // The files the web UI is served from, by the path a browser asks for.
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'held', 'search', 'item', 'item-doc', 'item-links', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'lens', 'lens-base', 'list', 'grid', 'timeline', 'style-code', 'flow', 'flow-layout', 'arch', 'arch-layout', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'members-card', 'styles-card', 'theme', 'token-piece', 'token-ask', 'saved-views', 'start', 'plan-card', 'doc-lens'];
+const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'held', 'search', 'item', 'item-doc', 'item-links', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'lens', 'lens-base', 'list', 'grid', 'timeline', 'style-code', 'flow', 'flow-layout', 'arch', 'arch-layout', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'members-card', 'styles-card', 'theme', 'token-piece', 'token-ask', 'saved-views', 'diagram', 'start', 'plan-card', 'doc-lens'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -12,6 +12,7 @@ export const UI_FILES: Record<string, string> = {
   '/style.css': 'style.css',
   '/flow.css': 'flow.css',
   '/arch.css': 'arch.css',
+  '/diagram.css': 'diagram.css',
   '/grid.css': 'grid.css',
   '/list.css': 'list.css',
   '/public.js': 'public.js',

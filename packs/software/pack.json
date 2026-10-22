@@ -146,6 +146,16 @@
       "title": "Handoff",
       "description": "Where a working session left things for the next one.",
       "note_max": { "chars": 3000, "say": "It holds one of each part (not seen working, what bites here, next and why). Rewrite it whole with body: keep what is still so, drop what later work settled, and put what is true of one item in that item's note." }
+    },
+    {
+      "id": "software.diagram",
+      "extends": "work.file",
+      "title": "Diagram",
+      "deliverable": false,
+      "description": "One page of a diagram made from the code (npm run diagrams), kept as data its page draws: boxes, areas and the wires between them, at the commit it was made from.",
+      "fields": {
+        "diagram": { "type": "json", "description": "The page as data: its boxes with where each is, its wires, the draw.io file and page it is (key), the commit it was drawn from, and that file at the commit (drawio) when it was committed as drawn.", "system": true }
+      }
     }
   ],
   "actions": [
@@ -288,7 +298,8 @@
     { "id": "software.roadmap", "title": "Roadmap", "on": ["work.project"], "pieces": [{ "piece": "tree", "tree": "software.roadmap" }] },
     { "id": "software.proof", "title": "How we know", "on": ["work.project", "software.feature", "software.proof"], "pieces": [{ "piece": "proof" }] },
     { "id": "software.usage", "title": "Tokens used here", "on": ["software.repo"], "pieces": [{ "piece": "usage" }] },
-    { "id": "software.drawn", "title": "What it drew", "on": ["software.test_result"], "pieces": [{ "piece": "figure" }] }
+    { "id": "software.drawn", "title": "What it drew", "on": ["software.test_result"], "pieces": [{ "piece": "figure" }] },
+    { "id": "software.diagram", "title": "The diagram", "on": ["software.diagram"], "pieces": [{ "piece": "diagram" }] }
   ],
   "trees": [
     {
