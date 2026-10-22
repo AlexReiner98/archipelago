@@ -27,7 +27,6 @@
 // and the surface no longer matters.
 
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
@@ -52,7 +51,7 @@ import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode } from './tools.ts';
-import { UI_FILES } from './ui-files.ts';
+import { UI_FILES, uiFile, uiPage } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -81,7 +80,6 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
 }
 
-const UI_DIR = join(import.meta.dirname, '..', 'ui');
 // The page itself: its own script and stylesheet, this server, and the one frame a style's code is drawn in.
 const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 // The frame a style's code runs in. `sandbox` gives it an origin of its own, so it has no way to the page's token or storage, cannot open
@@ -215,7 +213,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const guard = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' };
         if (!data) {
           res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
-          return res.end(await readFile(join(UI_DIR, 'doc.html')));
+          return res.end(await uiPage('doc.html'));
         }
         if (data === 'picture') {
           const picture = figure && (await workspaces.has(wsId)) ? await sharedPicture((await workspaces.get(wsId)).pelago, secret, figure) : null;
@@ -231,15 +229,18 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // document with the reader's own token. The page holds nothing; what it shows is what that token may see.
       if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
         res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
-        return res.end(await readFile(join(UI_DIR, 'doc.html')));
+        return res.end(await uiPage('doc.html'));
       }
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname];
+        const page = file.endsWith('.html');
+        const served = page || file === 'layout.css' ? null : await uiFile(file, url.searchParams.get('v'));
         // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.
+        // A file named by the UI's current version is kept for good (src/ui-files.ts); the pages, and the rest, never.
         res.writeHead(200, {
           'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
-          'cache-control': file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
+          'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
           'x-content-type-options': 'nosniff',
           'referrer-policy': 'no-referrer',
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
@@ -247,7 +248,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
           ...((file === 'draw.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
-        return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : await readFile(join(UI_DIR, file)));
+        return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : page ? await uiPage(file) : served!.body);
       }
 
       if (req.method === 'GET' && url.pathname === '/whoami') {

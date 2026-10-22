@@ -3,16 +3,14 @@
 // whose path is home at /, with a sitemap for search engines. Read as /p/ reads them (src/public-route.ts): through
 // narrow functions that give what was published, nothing of the map as it is now. The app keeps its own address.
 
-import { readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
-import { join } from 'node:path';
 import type { Part } from './documents.ts';
 import { GUARD, POLICY, publicHead } from './public-document.ts';
 import { publishedAt, publishedPicture, sitePages } from './published.ts';
 import { pageLook } from './styles.ts';
+import { uiPage } from './ui-files.ts';
 import type { Workspaces } from './workspaces.ts';
 
-const UI_DIR = join(import.meta.dirname, '..', 'ui');
 /** The address word of a site's front page, read at /. */
 export const HOME = 'home';
 
@@ -67,6 +65,6 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
   }
   const site = { ...(await siteNav(at.workspaces, at.workspace, (page) => (page.path ? siteHref(page.path) : null))), host: at.host };
   if (what === 'data') return send(200, 'application/json', JSON.stringify({ ...doc, ...(await pageLook(pelago)), site }), { 'cache-control': 'no-cache' });
-  const page = publicHead(await readFile(join(UI_DIR, 'doc.html'), 'utf8'), doc, origin + siteHref(doc.path), site.name);
+  const page = publicHead(await uiPage('doc.html'), doc, origin + siteHref(doc.path), site.name);
   return send(200, 'text/html; charset=utf-8', page, { 'cache-control': 'no-store', 'content-security-policy': POLICY });
 }

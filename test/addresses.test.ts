@@ -98,6 +98,21 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.match(frame.headers.get('content-security-policy') ?? '', /^sandbox allow-scripts; default-src 'none'; script-src 'self' blob: data:; worker-src blob: data:;.*connect-src 'none'; webrtc 'block';/);
   assert.equal((await fetch(base + '/draw.js')).headers.get('access-control-allow-origin'), '*');
   assert.equal((await fetch(base + '/app.js')).headers.get('access-control-allow-origin'), null, 'and nothing else here is given to strangers');
+
+  // The page names its files by the UI's version, so they are kept for good, and asks for every module it imports at once.
+  const html = await page.text();
+  const version = /src="\/app\.js\?v=(\w+)"/.exec(html)?.[1];
+  assert.ok(version, 'the page names its script by version');
+  assert.match(html, new RegExp(`<link rel="modulepreload" href="/base\\.js\\?v=${version}" />`));
+  assert.match(html, new RegExp(`href="/style\\.css\\?v=${version}"`));
+  assert.match(html, /href="\/layout\.css"/, 'what the server makes from the packs is not versioned');
+  const kept = await fetch(`${base}/app.js?v=${version}`);
+  assert.equal(kept.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  assert.match(await kept.text(), new RegExp(`from '\\./base\\.js\\?v=${version}'`), 'and the modules it imports are named the same way');
+  assert.equal((await fetch(`${base}/app.js?v=old`)).headers.get('cache-control'), 'no-store', 'an address of another version is never kept');
+  assert.equal((await fetch(`${base}/app.js`)).headers.get('cache-control'), 'no-store');
+  assert.equal(page.headers.get('cache-control'), 'no-store', 'the page itself is asked for every time');
+  assert.match(await (await fetch(`${base}/draw.html`)).text(), new RegExp(`src="/draw\\.js\\?v=${version}"`));
 });
 
 test('a link to a document opens its page and its text with no login, until it is revoked', async () => {

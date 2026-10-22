@@ -3,18 +3,16 @@
 // Everything is read as the public role sees the map, so there is nothing here to guard: what is not public is not
 // there to be found.
 
-import { readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
-import { join } from 'node:path';
 import type { Part } from './documents.ts';
 import { GUARD, POLICY, publicHead } from './public-document.ts';
 import { publishedDocument, publishedPicture } from './published.ts';
 import { publicPage, publicPicture } from './public.ts';
 import { siteHref, siteNav } from './site.ts';
 import { pageLook } from './styles.ts';
+import { uiPage } from './ui-files.ts';
 import type { Workspaces } from './workspaces.ts';
 
-const UI_DIR = join(import.meta.dirname, '..', 'ui');
 
 /** Where a public item's page is read: stable for as long as it is public, whatever it is renamed. */
 export const publicPath = (workspace: string, id: string) => `/p/${workspace}/${id}`;
@@ -34,13 +32,13 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
     if (doc) {
       const path = publicPath(workspace, id);
       const canonical = domain && doc.path ? `https://${domain}${siteHref(doc.path)}` : at.named[0] ? `https://${at.named[0]}${path}` : path;
-      const page = publicHead(await readFile(join(UI_DIR, 'doc.html'), 'utf8'), doc, canonical, site?.name);
+      const page = publicHead(await uiPage('doc.html'), doc, canonical, site?.name);
       return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': POLICY }).end(page);
     }
     // A product's page reads its data once open. What is not public, or not there, has no page at all.
     const found = pelago && (await pelago.forAnyone().db.query(`select 1 from entity where id = $1`, [id])).rows.length > 0;
     res.writeHead(found ? 200 : 404, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': POLICY });
-    return res.end(await readFile(join(UI_DIR, 'public.html')));
+    return res.end(await uiPage('public.html'));
   }
   if (!pelago) return none();
   if (what === 'data') {
