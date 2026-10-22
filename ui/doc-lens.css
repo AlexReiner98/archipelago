@@ -27,3 +27,5 @@
   width: var(--doc-wide);
   margin-left: calc((100% - var(--doc-wide)) / 2);
 }
+/* One that plays how it came to be is framed step by step, each step as compact as it is: it fills that width. */
+.doc-lens.plays .lf-stage.still > svg { width: 100%; }

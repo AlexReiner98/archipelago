@@ -13,6 +13,7 @@ import { lens } from './lens.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
 import { publicDocument, readable } from './public-document.ts';
+import { framesFor } from './published-frames.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 const IDS = /[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g;
@@ -74,6 +75,8 @@ async function freeze(l: Archipelago, id: string) {
     lenses[section.id] = freezeLens(kept, shown);
     for (const i of kept.items) types[i.type] = l.registry.type(i.type)?.title ?? i.type;
   }
+  // Each picture's first frame, so a reader's page has it on screen with the text.
+  await framesFor(l, lenses);
   // Its own address word and place in the header, and the address word of each document it links to.
   const props = (await l.entity(id))?.props ?? {};
   const paths = Object.fromEntries(others.filter((o) => o.path && reader.links?.[o.id]).map((o) => [o.id, o.path]));

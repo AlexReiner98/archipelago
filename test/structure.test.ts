@@ -156,7 +156,6 @@ test('kernel modules import one way', () => {
 
 // 7. The UI loads as native modules, with no build step.
 const CLASSIC_SCRIPTS: Record<string, number> = {
-  'ui/doc.html: <script src="/doc.js">': 1,
   'ui/public.html: <script src="/public.js">': 1,
   // The sandboxed drawing frame has no origin of its own; a module there is untried.
   'ui/draw.html: <script src="/draw.js">': 1,
