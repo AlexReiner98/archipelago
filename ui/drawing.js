@@ -90,10 +90,11 @@ const plain = (value) => JSON.parse(JSON.stringify(value ?? null));
 export function drawWith(host, answer, style, keep) {
   host.endDrawing?.();
   const { drawing } = style;
-  const modules = drawing?.modules ?? drawings.get(drawing?.hash);
   const failed = (message) => host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`));
-  if (!modules) return failed('its code was not sent');
-  if (drawings.get(drawing.hash) !== modules || [...drawings.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
+  // Its code: sent with the answer, kept by this browser, or fetched from this server by its hash (a published page's).
+  const sent = drawing?.modules ?? drawings.get(drawing?.hash);
+  const code = sent ? Promise.resolve(sent) : /^\/[^/]/.test(drawing?.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : null;
+  if (!code) return failed('its code was not sent');
   const id = drawing.hash.slice(0, 16);
   const channel = new MessageChannel(), port = channel.port1;
   // How long a picture took, for whoever measures the page: waiting, in the drawing, and on the page.
@@ -134,7 +135,7 @@ export function drawWith(host, answer, style, keep) {
       failed(err.message);
     }
   };
-  const { style: _sent, ...shown } = answer;
+  const { style: _sent, first: opening, ...shown } = answer;
   const { drawing: _code, code: _canvas, ...fields } = style;
   const input = { answer: shown, style: plain(fields), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
   const seen = `${drawing.hash}
@@ -142,8 +143,22 @@ ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);
   // Told what to draw before anything else, so what happens on the page waits behind it: the channel keeps it until the worker has the other end.
   port.postMessage({ type: 'start', input });
+  // A picture published with its first frame (src/published-frames.ts) has it on screen now; the drawing's own scene
+  // takes its place when it answers.
   if (kept) ((mounted = true), mount(kept));
-  loaded(drawing.hash, modules).then(
+  else if (opening) {
+    // Checked as any scene is: one that says what a drawing may not is not drawn, and the drawing draws the picture.
+    try {
+      mount(opening);
+      mounted = true;
+    } catch {
+      host.replaceChildren();
+    }
+  }
+  code.then((modules) => {
+    if (drawings.get(drawing.hash) !== modules || [...drawings.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
+    return loaded(drawing.hash, modules);
+  }).then(
     () => {
       if (ended) return;
       sandbox.frame.contentWindow.postMessage({ type: 'picture', hash: drawing.hash }, '*', [channel.port2]);

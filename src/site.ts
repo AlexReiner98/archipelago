@@ -3,16 +3,14 @@
 // whose path is home at /, with a sitemap for search engines. Read as /p/ reads them (src/public-route.ts): through
 // narrow functions that give what was published, nothing of the map as it is now. The app keeps its own address.
 
-import { readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
-import { join } from 'node:path';
 import type { Part } from './documents.ts';
-import { GUARD, POLICY, publicHead } from './public-document.ts';
+import { GUARD, POLICY } from './public-document.ts';
+import { drawingCode, pageData, publishedPage } from './published-page.ts';
 import { publishedAt, publishedPicture, sitePages } from './published.ts';
 import { pageLook } from './styles.ts';
 import type { Workspaces } from './workspaces.ts';
 
-const UI_DIR = join(import.meta.dirname, '..', 'ui');
 /** The address word of a site's front page, read at /. */
 export const HOME = 'home';
 
@@ -54,8 +52,8 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
     return send(200, 'application/xml; charset=utf-8', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`, { 'cache-control': 'public, max-age=300' });
   }
   // The front page's data and figures are read at /data and /picture/<id>, as any page's are below its own address.
-  const [path, what, extra] = parts.length === 0 || parts[0] === 'data' || parts[0] === 'picture' ? [HOME, ...parts] : parts;
-  if (parts.length > 3 || (what && what !== 'data' && what !== 'picture') || (what === 'picture' && !extra) || (what === 'data' && extra)) return false;
+  const [path, what, extra] = parts.length === 0 || ['data', 'picture', 'drawing'].includes(parts[0]) ? [HOME, ...parts] : parts;
+  if (parts.length > 3 || (what && !['data', 'picture', 'drawing'].includes(what)) || (what !== 'data' && what && !extra) || (what === 'data' && extra)) return false;
   // The front page has one address.
   if (parts[0] === HOME && !what) return send(301, 'text/plain; charset=utf-8', 'Moved', { location: '/' });
   const doc = (await publishedAt(pelago, path)) as ({ id: string; title: string; parts: Part[]; path: string } & Record<string, unknown>) | null;
@@ -65,8 +63,13 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
     const picture = await publishedPicture(pelago, doc.id, extra);
     return picture ? send(200, picture.content_type, picture.bytes, { 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));
   }
+  if (what === 'drawing') {
+    const code = drawingCode(doc, extra);
+    return code ? send(200, 'application/json', JSON.stringify(code), { 'cache-control': 'public, max-age=31536000, immutable' }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));
+  }
   const site = { ...(await siteNav(at.workspaces, at.workspace, (page) => (page.path ? siteHref(page.path) : null))), host: at.host };
-  if (what === 'data') return send(200, 'application/json', JSON.stringify({ ...doc, ...(await pageLook(pelago)), site }), { 'cache-control': 'no-cache' });
-  const page = publicHead(await readFile(join(UI_DIR, 'doc.html'), 'utf8'), doc, origin + siteHref(doc.path), site.name);
+  const data = pageData({ ...doc, ...(await pageLook(pelago)), site }, siteHref(doc.path));
+  if (what === 'data') return send(200, 'application/json', JSON.stringify(data), { 'cache-control': 'no-cache' });
+  const page = await publishedPage(doc, origin + siteHref(doc.path), site.name, data);
   return send(200, 'text/html; charset=utf-8', page, { 'cache-control': 'no-store', 'content-security-policy': POLICY });
 }

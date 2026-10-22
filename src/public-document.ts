@@ -81,5 +81,6 @@ export function publicHead(html: string, doc: { title: string; parts: Part[] }, 
     ...share.filter(([, value]) => value).map(([name, value]) => `<meta property="${name}" content="${escape(value!)}" />`),
     '<meta name="twitter:card" content="summary" />',
   ].filter(Boolean).join('\n    ');
-  return html.replace(/<meta name="robots" content="noindex" \/>/, head).replace(/<title>[^<]*<\/title>/, `<title>${escape(doc.title)}</title>`);
+  // Put in by functions, so nothing a document says is read as a replacement pattern ($&, $').
+  return html.replace(/<meta name="robots" content="noindex" \/>/, () => head).replace(/<title>[^<]*<\/title>/, () => `<title>${escape(doc.title)}</title>`);
 }
