@@ -12,9 +12,7 @@ import { SHARE_TOOLS } from './share-tools.ts';
 import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts'; import { ASK_TOOLS } from './token-ask.ts';
 import { merge, notImported, parseBackup } from './backup.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
-import type { GithubApp } from './github-app.ts';
-import { readable, recheck } from './reader.ts';
-import { connection, NO_MODEL } from './model-account.ts';
+import { CONNECTION_TOOLS } from './connection-tools.ts';
 import { MODEL_TOOLS } from './model-tools.ts';
 import { launch, stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
@@ -129,10 +127,9 @@ export interface Tool {
   run(l: Archipelago, actor: Actor, input: any): Promise<unknown>;
 }
 
-/** The server's GitHub App, when it can have one. Set by the server. */
-let githubApp: GithubApp | undefined;
-export function configureGithubApp(app: GithubApp | undefined): void {
-  githubApp = app;
+/** The server adds the tools of what it runs beside the map (the reader of pushes), which would otherwise import these. */
+export function offerTools(more: Record<string, Tool>): void {
+  Object.assign(TOOLS, more);
 }
 
 let backUp: (() => Promise<unknown>) | undefined;
@@ -795,7 +792,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => launch(l, actor, input),
   },
   ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS, ...MODEL_TOOLS,
-  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS,
+  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS,
   notify_workspace: {
     description: 'Send a notification to another workspace on this server. It arrives only if that workspace\u2019s admin has chosen to accept notifications from this one.',
     humanOnly: true,
@@ -819,54 +816,6 @@ export const TOOLS: Record<string, Tool> = {
       const whole = await wholeMap(l);
       const secret = await newGithubSecret(whole);
       return { ...(await githubStatus(whole)), secret, note: 'Keep this secret now: it is shown once. A secret made earlier no longer works.' };
-    },
-  },
-  github_app: {
-    description:
-      'This workspace and the server\u2019s GitHub App: whether the server has its app, and whether this workspace has connected it (and as which GitHub account). ' +
-      'create: where to go to create the app, once for the whole server (an admin of the default workspace only). connect: where to go to choose repositories on GitHub; each one chosen is put in the map and its pushes are heard from then on. ' +
-      'disconnect: stop hearing from GitHub here (the app stays installed on GitHub until it is removed there). ' +
-      'reader says what the agent on this server that reads each push runs on (the workspace’s model account, see model_account, or the server’s model): without one, pushes are recorded but not read. Admins only for all of these.',
-    humanOnly: true,
-    input: {
-      create: z.boolean().optional(),
-      connect: z.boolean().optional(),
-      disconnect: z.boolean().optional(),
-      recheck: z.string().optional().describe('A repository\u2019s id: have the agent on this server re-check its oldest open items against the code now, without waiting for one to be due. It runs on the workspace\u2019s key, and its run shows on the repository\u2019s page when it is over.'),
-    },
-    run: async (l, actor, input) => {
-      const app = githubApp;
-      const whole = await wholeMap(l);
-      const reader = async () => {
-        const on = await connection(whole);
-        return on ? { model: on.model, from: on.from } : { model: null, from: null };
-      };
-      const status = async () => ({ available: Boolean(app), app: (await app?.app()) ?? null, can_create: Boolean(app) && !(await app!.app()) && Boolean(actor.admin) && l.workspace === 'default', installation: (await app?.installationOf(l.workspace)) ?? null, reader: await reader() });
-      if (!input.create && !input.connect && !input.disconnect && !input.recheck) return status();
-      if (!app) throw new Error('This server cannot have a GitHub App: it has nowhere to keep one.');
-      needAdmin(actor, 'connect GitHub');
-      if (input.recheck) {
-        const mine = await app.installationOf(l.workspace);
-        if (!mine) throw new Error('This workspace has not connected GitHub, so there is nothing for the agent to read the repository through.');
-        if (!(await connection(whole))) throw new Error(NO_MODEL);
-        const repo = (await readable(whole, app, mine.id)).find((r) => r.entity.id === input.recheck);
-        if (!repo) throw new Error('That is not a repository the GitHub App was given. Choose it on GitHub first (Workspace, GitHub, Choose repositories).');
-        const about = (await app.asInstallation(mine.id, `/repos/${repo.name}`)) as { default_branch?: string };
-        // Not waited for: it takes minutes, and says what it did as a run when it is over.
-        void recheck(whole, app, repo, about.default_branch ?? 'main', true).catch((err) => console.error(`reader: re-check of ${repo.name} failed: ${(err as Error).message}`));
-        return { ...(await status()), started: true };
-      }
-      if (input.create) {
-        if (l.workspace !== 'default') throw new Error('The GitHub App belongs to the whole server: it is created from the default workspace, by its admin.');
-        return { ...(await status()), url: await app.startCreate(l.workspace) };
-      }
-      if (input.connect) return { ...(await status()), url: await app.startConnect(l.workspace) };
-      const mine = await app.installationOf(l.workspace);
-      if (mine) {
-        await app.forget(mine.id);
-        await l.log(l.db, { actor: actorId(actor), action: 'app.disconnect', reason: `Stopped hearing from GitHub (${mine.account})` });
-      }
-      return status();
     },
   },
   seen: {

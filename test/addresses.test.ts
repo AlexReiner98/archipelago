@@ -61,7 +61,7 @@ test('where a request came from is what the trusted proxies say, not what the ca
   assert.throws(() => trustedProxies('cloudfront'), /PELAGO_TRUSTED_PROXIES: "cloudfront" is not an address/);
 
   // On a server: a caller who claims a new address with every request is still one caller.
-  const { base } = await serve('tokens', undefined, { open: { each: 3 } });
+  const { base } = await serve('tokens', { open: { each: 3 } });
   const seen: number[] = [];
   for (let i = 0; i < 5; i++) seen.push((await fetch(base + '/connect/setup.mjs', { headers: { 'x-forwarded-for': `203.0.113.${i}, 198.51.100.7` } })).status);
   assert.deepEqual(seen, [200, 200, 200, 429, 429]);
@@ -69,7 +69,7 @@ test('where a request came from is what the trusted proxies say, not what the ca
 });
 
 test('refused tokens are counted by address, a backup unpacks only so far, and the UI comes with a policy for what it may load', async () => {
-  const { base, call, workspaces } = await serve('tokens', undefined, { refused: { each: 3 } });
+  const { base, call, workspaces } = await serve('tokens', { refused: { each: 3 } });
   const db = (await workspaces.get('default')).pelago.db;
   const good = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
   const wrong = `pel_default_${'0'.repeat(40)}`;

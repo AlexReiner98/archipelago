@@ -159,6 +159,8 @@ export class Registry {
     for (const [name, file] of folders) {
       if (!existsSync(file)) continue;
       const pack = JSON.parse(readFileSync(file, 'utf8')) as PackFile;
+      // A server pack kept beside the workspace packs is the server's (src/server-packs.ts), never a workspace's.
+      if ((pack as { tier?: string }).tier === 'server') continue;
       if (pack.id !== name) throw new Error(`Pack folder "${name}" contains pack id "${pack.id}"`);
       found.set(pack.id, pack);
     }

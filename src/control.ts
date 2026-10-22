@@ -1,9 +1,9 @@
-// What the server keeps about itself rather than about one map: the workspaces it holds, the operator's secret, the
-// GitHub App and which workspace each of its installations is for. It is kept in the default workspace's database,
+// What the server keeps about itself rather than about one map: the workspaces it holds, the operator's secret, and
+// for its server packs their sealed secrets, their keys and values, and the workspaces connected to each. It is kept in the default workspace's database,
 // which on a Postgres server is the one every other workspace's database is named from, so every server on that
 // database reads the same list. Before 19 Oct 2026 it was files beside the workspaces (workspaces/index.json,
-// github-app.json); the first server to open the database takes what they held, once, and leaves them where they are
-// for the code before, should it be put back.
+// and a file of the GitHub App's); the first server to open the database took what they held, once, and left them where
+// they are for the code before, should it be put back.
 //
 // It is operational state, no fact about a map: written here, not through change, in no workspace's backup, and no
 // member's role is granted it. A workspace's own types (local_type) are its own database's, made by the same step.
@@ -84,8 +84,6 @@ export async function takeControlValue<T>(db: Q, key: string): Promise<T | undef
 /** The hash of the operator's secret, and of a reset prepared for it. */
 export const OPERATOR = 'operator';
 export const OPERATOR_RESET = 'operator_reset';
-/** The GitHub App's credentials, with its key and signing secret sealed. */
-export const GITHUB_APP = 'github_app';
 
 /** Set in a database once the files kept before it was used for this have been read into it. */
 const IMPORTED = 'files_imported';
@@ -101,13 +99,6 @@ export async function importControlFiles(db: Q, rootDir: string): Promise<string
     for (const w of was.workspaces ?? []) await db.query(`insert into control_workspace (id, name, created) values ($1, $2, $3) on conflict (id) do nothing`, [w.id, w.name, w.created ?? new Date().toISOString()]);
     if (was.operator && !(await controlValue(db, OPERATOR))) await setControlValue(db, OPERATOR, was.operator);
     brought.push(`${was.workspaces?.length ?? 0} workspaces`);
-  }
-  const app = join(rootDir, 'github-app.json');
-  if (existsSync(app)) {
-    const was = JSON.parse(readFileSync(app, 'utf8')) as { app?: unknown; installations?: Record<string, { workspace: string; account: string }> };
-    if (was.app && !(await controlValue(db, GITHUB_APP))) await setControlValue(db, GITHUB_APP, was.app);
-    for (const [id, i] of Object.entries(was.installations ?? {})) await db.query(`insert into github_installation (id, workspace, account) values ($1, $2, $3) on conflict (id) do nothing`, [id, i.workspace, i.account ?? '']);
-    brought.push('the GitHub App');
   }
   await setControlValue(db, IMPORTED, true);
   return brought;
@@ -166,3 +157,22 @@ export async function storeTake<T>(db: Q, pack: string, key: string): Promise<T 
   const { rows } = await db.query<{ value: T; live: boolean }>(`delete from pack_store where pack = $1 and key = $2 returning value, (until is null or until >= now()) as live`, [pack, key]);
   return rows[0]?.live ? rows[0].value : undefined;
 }
+
+/**
+ * Step 13 of the schema: what the GitHub App kept when it was the kernel's, as its server pack's (packs/github_app).
+ * Each installation (step 4's table) becomes a connection, its key and signing secret (still sealed) and its id the
+ * pack's secrets, and its name what the pack keeps. Copied, not moved: the code before still reads the old places
+ * during a switch. History only: nothing reads the old places now, and a later step may drop them.
+ */
+export const ADOPT_APP = `
+insert into control_value (key, value)
+  select 'connection:github_app:' || id, jsonb_build_object('workspace', workspace, 'account', account) from github_installation
+  on conflict (key) do nothing;
+insert into control_value (key, value)
+  select 'pack_secret:github_app:' || k.name, to_jsonb(k.value) from control_value c,
+    lateral (values ('key', c.value->>'pem'), ('hook', c.value->>'webhook_secret'), ('app_id', c.value->>'id')) as k (name, value)
+  where c.key = 'github_app' and k.value is not null
+  on conflict (key) do nothing;
+insert into pack_store (pack, key, value)
+  select 'github_app', 'app', jsonb_build_object('id', value->'id', 'slug', value->'slug', 'name', value->'name') from control_value where key = 'github_app'
+  on conflict (pack, key) do nothing;`;
