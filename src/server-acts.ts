@@ -3,6 +3,7 @@
 // buyer in, never reach into another. Every act is logged on the default workspace's map with the pack that asked,
 // so what a server pack did is in the owner's history like anything else.
 
+import { recordAgreement, type Agreement } from './agreements.ts';
 import { setControlValue, controlValue } from './control.ts';
 import { normalEmail, sendMail } from './mail.ts';
 import { admitMember, linkFor, memberOf, setMemberLimit } from './members.ts';
@@ -44,7 +45,7 @@ async function itsOwn(at: ActPlaces, pack: string, workspace: unknown) {
 }
 
 /** Do one act for a pack, if it declared it, and log it on the default map. Answers what the act gives back. */
-export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown> = {}): Promise<unknown> {
+export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown> = {}, agreements: () => Promise<Agreement[]> = async () => []): Promise<unknown> {
   if (!(pack.acts ?? []).includes(act as ServerAct)) throw new Error(`The pack "${pack.id}" did not declare the act "${act}".`);
   const owner = (await at.get('default')).pelago;
   const log = (reason: string, detail: Record<string, unknown>) => owner.log(owner.db, { actor: `pack:${pack.id}`, action: `server.${act}`, reason, detail });
@@ -103,6 +104,16 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       const link = await linkFor(ws.pelago.db, ws.id, email, minutes * 60_000);
       await log(`A sign-in link to "${ws.name}" for ${email}`, { workspace: ws.id, email, minutes });
       return { link };
+    }
+    case 'agreement.record': {
+      // A buyer who ticked the box when they paid is not asked again at their first sign-in. Only a member of a
+      // workspace the pack made, and only a version in force now: anything else is asked for at sign-in instead.
+      const ws = await itsOwn(at, pack.id, input.workspace);
+      const email = normalEmail(input.email);
+      if (!email || !(await memberOf(ws.pelago.db, email))) throw new Error(`${input.email} is not a member of "${ws.name}".`);
+      const owes = await recordAgreement(owner.db, email, input.agreed, await agreements(), `pack:${pack.id}`);
+      await log(`${email} agreed to the documents in force`, { workspace: ws.id, email, owes: owes.map((a) => a.id) });
+      return { owes: owes.map(({ id, version }) => ({ id, version })) };
     }
     case 'mail.send': {
       const to = normalEmail(input.to);

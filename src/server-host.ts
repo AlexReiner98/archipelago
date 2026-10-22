@@ -2,6 +2,7 @@
 // a call runs, the handler may ask for a server act it declared (ctx.act) or for its keys (ctx.store): nothing else.
 // It reads no map.
 
+import { agreementsFrom, type Agreement } from './agreements.ts';
 import { storeGet, storePut, storeTake } from './control.ts';
 import { Sandbox, type Answerer } from './packhost.ts';
 import { runAct, type ActPlaces } from './server-acts.ts';
@@ -11,6 +12,8 @@ import { loadServerPacks, type ServerPack } from './server-packs.ts';
 const CALL_MS = 10_000;
 const MOST_MS = 30_000;
 const KEY = /^[A-Za-z0-9_.:-]{1,200}$/;
+/** How long the documents in force are taken as they were last answered. */
+const AGREEMENTS_MS = 60_000;
 
 export class ServerPacks {
   readonly packs: ServerPack[];
@@ -28,6 +31,28 @@ export class ServerPacks {
     return this.packs.find((p) => p.file.id === id);
   }
 
+  private agreed?: { at: number; documents: Promise<Agreement[]> };
+  /**
+   * The documents a person agrees to before they are signed in, from every pack that declares them, asked again after
+   * a minute so a new version is in force soon after it is put in place. A pack that fails to answer adds none, and
+   * is said in the server's log.
+   */
+  agreements(): Promise<Agreement[]> {
+    if (this.agreed && Date.now() - this.agreed.at < AGREEMENTS_MS) return this.agreed.documents;
+    const documents = Promise.all(
+      this.packs
+        .filter((p) => p.file.agreements)
+        .map((p) =>
+          this.call(p.file.id, 'entry', p.file.agreements!, {}).then(agreementsFrom, (err) => {
+            console.error(`server pack ${p.file.id}: its agreements did not answer: ${(err as Error).message}`);
+            return [];
+          }),
+        ),
+    ).then((each) => each.flat());
+    this.agreed = { at: Date.now(), documents };
+    return documents;
+  }
+
   /** Call one entry of a pack's handler (a public entry or a webhook) and give back its answer. */
   async call(id: string, call: 'entry' | 'webhook', name: string, input: unknown, ms = CALL_MS): Promise<unknown> {
     const pack = this.find(id);
@@ -36,7 +61,7 @@ export class ServerPacks {
     this.boxes.set(id, box);
     const control = async () => (await this.at.get('default')).pelago.db;
     const answer: Answerer = async (q) => {
-      if (typeof q.act === 'string') return runAct(this.at, pack.file, q.act, (q.input ?? {}) as Record<string, unknown>);
+      if (typeof q.act === 'string') return runAct(this.at, pack.file, q.act, (q.input ?? {}) as Record<string, unknown>, () => this.agreements());
       if (typeof q.store === 'string') {
         const key = String(q.key ?? '');
         if (!KEY.test(key)) throw new Error('A key is 1 to 200 letters, digits and _.:-');

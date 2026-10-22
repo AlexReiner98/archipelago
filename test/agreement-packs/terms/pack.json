@@ -1,0 +1,10 @@
+{
+  "id": "terms",
+  "version": "0.1.0",
+  "title": "Terms",
+  "description": "A server pack for the tests: two documents to agree to before signing in, and a workspace to sign in to.",
+  "tier": "server",
+  "acts": ["workspace.create", "workspace.admit", "signin.link", "agreement.record"],
+  "entries": [{ "id": "documents" }, { "id": "make" }, { "id": "link" }, { "id": "agreed" }],
+  "agreements": "documents"
+}

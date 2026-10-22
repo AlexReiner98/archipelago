@@ -115,6 +115,12 @@ export const workspaceOfCode = (code: string) => /^inv_([a-z0-9][a-z0-9-]{0,39})
 /** Trade a code for a month's token, once, if the address it was sent to is still a member. */
 export const redeem = (db: Q, workspace: string, code: string) => redeemWith(db, workspace, KEY + hash(code));
 
+/** The member a link's code would sign in, without trading it: so they can be asked to agree to something first. */
+export async function emailOfLink(db: Q, code: string): Promise<string | undefined> {
+  const email = (await kept<{ email: string }>(db, KEY + hash(code)))?.email;
+  return email && (await memberOf(db, email)) ? email : undefined;
+}
+
 // A code to type, beside each link: for a browser the mail's links do not open in, such as an agent's own. It is short
 // enough to type, so it works only with the address it was sent to, and an address is allowed a few wrong ones.
 const CODE = 'signin-code:';
@@ -146,6 +152,15 @@ export async function redeemTyped(workspaces: { id: string; db: () => Promise<Q>
   }
   await keep(control, TRIES + email, tries + 1, LINK_MINUTES * 60_000);
   return 'gone';
+}
+
+/** Whether a typed code would sign this address in somewhere, without trading it or counting a wrong one. */
+export async function typedWorks(workspaces: { id: string; db: () => Promise<Q> }[], email: string, code: string): Promise<boolean> {
+  for (const ws of workspaces) {
+    const db = await ws.db();
+    if ((await memberOf(db, email)) && (await kept(db, CODE + hash(`${email}:${typed(code)}`))) !== undefined) return true;
+  }
+  return false;
 }
 
 async function redeemWith(db: Q, workspace: string, key: string): Promise<string | undefined> {
