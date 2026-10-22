@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { notify } from './notify.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
+import { answerBeyond, holdWorkspace, NOT_BEYOND, startRuns, type RunAsk } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
 import { answerRead, type Read } from './packreads.ts';
 import { actorId, type Actor, type Archipelago, type Op, type SourceSpec } from './pelago.ts';
@@ -36,12 +37,16 @@ export interface Done {
   log?: { action: string; target?: string; reason?: string; detail?: Record<string, unknown> }[];
   /** What the owner is told. */
   notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string }[];
+  /** Model runs it asks the kernel for (src/pack-reach.ts): each starts after the call and runs on by itself. */
+  runs?: RunAsk[];
+  /** From the entry told how a run ended: the map's tools to call as that run's agent, of those its pack declares in runs. */
+  calls?: { tool: string; input?: unknown }[];
 }
 
 /** What is asked of an action's ops before they are applied: a token limited to some work is held to it. */
 export type Check = (done: Done) => Promise<void>;
 
-export type Call = 'action' | 'view' | 'answer' | 'webhook' | 'schedule';
+export type Call = 'action' | 'view' | 'answer' | 'webhook' | 'schedule' | 'event' | 'tool';
 
 /** One pack's process, started when first called. */
 /** A running process, with the calls waiting on it: they end with it. */
@@ -146,14 +151,23 @@ export class PackHost {
     this.folderOf = folderOf;
   }
 
-  /** Call one entry of a pack's handler and give back what it answered, writing nothing. */
-  async call(l: Archipelago, actor: Actor, pack: string, call: Call, name: string, input: unknown, ms = CALL_MS): Promise<Done> {
+  /**
+   * Call one entry of a pack's handler and give back what it answered, writing nothing. While it runs it reads the map
+   * and what its pack reads through (src/pack-reach.ts); `answer` may answer some questions first (a run's tools).
+   */
+  async call(l: Archipelago, actor: Actor, pack: string, call: Call, name: string, input: unknown, ms = CALL_MS, answer?: (query: Record<string, unknown>, reads: Answerer) => Promise<unknown>): Promise<Done> {
     const folder = this.folderOf(pack);
     if (!existsSync(join(folder, 'handler.js'))) throw new Error(`Pack "${pack}" has no handler.`);
     const box = this.boxes.get(pack) ?? new Sandbox(folder);
     this.boxes.set(pack, box);
     const present = l.registry.packs.map((p) => p.id);
-    return box.call(l, { call, name, input, actor: { name: actor.name, kind: actor.kind }, now: new Date().toISOString(), zone: await zoneOf(l).catch(() => DEFAULT_ZONE), present }, Math.min(ms, MAX_MS));
+    const file = l.registry.packs.find((p) => p.id === pack);
+    const reads: Answerer = async (q) => {
+      const beyond = file ? await answerBeyond(l, file, q) : NOT_BEYOND;
+      return beyond === NOT_BEYOND ? answerRead(l, q as Read) : beyond;
+    };
+    const ask: Answerer = answer ? async (q) => answer(q, reads) : reads;
+    return box.call(ask, { call, name, input, actor: { name: actor.name, kind: actor.kind }, now: new Date().toISOString(), zone: await zoneOf(l).catch(() => DEFAULT_ZONE), present }, Math.min(ms, MAX_MS));
   }
 
   /**
@@ -161,7 +175,7 @@ export class PackHost {
    * world outside is made, held or refused. Only an action may act; a webhook or a schedule may only read. A {ref}
    * in its answer is the id of what its change made.
    */
-  async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' = 'action', check?: Check) {
+  async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' | 'event' = 'action', check?: Check) {
     const done = await this.call(l, actor, pack, call, name, input, ms);
     await check?.(done);
     const file = l.registry.packs.find((p) => p.id === pack)!;
@@ -174,7 +188,25 @@ export class PackHost {
     const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));
     const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
     const others = await further(l, actor, file, name, done);
-    return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
+    for (const e of done.log ?? []) this.tell(l, file.id, e);
+    const runs = done.runs?.length ? await startRuns(l, actor, file, call, done.runs) : undefined;
+    return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }), ...(runs && { runs }) };
+  }
+
+  /**
+   * Tell the packs that hear a kind of event that another pack recorded one, each at its entry of that name, as
+   * itself. Not waited for: what records it (a webhook) answers its sender now. What each answers is applied like
+   * any of its calls; it may only read beyond the map.
+   */
+  private tell(l: Archipelago, from: string, e: NonNullable<Done['log']>[number]): void {
+    for (const pack of l.registry.packs) {
+      const hears = pack.id !== from && pack.hears?.find((h) => h.event === e.action);
+      if (!hears) continue;
+      const release = holdWorkspace(l.workspace);
+      void this.act(l, { kind: 'agent', name: `pack:${pack.id}` }, pack.id, e.action, { event: { ...e, pack: from } }, hears.limit_ms, 'event')
+        .catch((err) => console.error(`${pack.id} hearing ${e.action}: ${(err as Error).message}`))
+        .finally(release);
+    }
   }
 
   stop(): void {

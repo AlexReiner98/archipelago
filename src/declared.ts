@@ -28,6 +28,8 @@ export interface ActionDef {
   limit_ms?: number;
   /** What it may ask to be done outside the map. A request to act that is not declared here is refused. */
   acts?: ActDef[];
+  /** Only a workspace's admin may call it: what it starts is paid for by the workspace. */
+  admin?: boolean;
 }
 
 /** A service outside the map a pack may reach, and the name of the secret the kernel adds (the pack never sees it). */
@@ -58,10 +60,24 @@ export interface WebhookDef {
   headers?: string[];
 }
 
-/** A handler entry the kernel runs by itself every so often, as the pack. */
+/** A handler entry the kernel runs by itself every so often, as the pack, and with at_start once when its clocks start. */
 export interface ScheduleDef {
   id: string;
-  every_minutes: number;
+  every_minutes?: number;
+  at_start?: boolean;
+  limit_ms?: number;
+}
+
+/** A kind of event another pack records that this one is told of, at its handler's entry of the same name. */
+export interface HearDef {
+  event: string;
+  limit_ms?: number;
+}
+
+/** A server pack's host this pack reads from as its workspace's connection to that pack: only one the server pack lends. */
+export interface ViaDef {
+  pack: string;
+  host: string;
 }
 
 export interface ViewDef {
@@ -243,6 +259,10 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   }
   // What it records in the log, beside its changes: the kernel's own kinds of event are the kernel's.
   for (const action of pack.events ?? []) if (!/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(action) || /^(entity|relation|proposal|changeset|picture|session|pack)\./.test(action)) problems.push(`event "${action}" is not one a pack may record`);
-  for (const s of pack.schedules ?? []) if (!handler || !(s.every_minutes >= 1)) problems.push(`schedule "${s.id}" needs the handler and every_minutes of 1 or more`);
+  for (const s of pack.schedules ?? []) if (!handler || !((s.every_minutes ?? 0) >= 1 || (s.at_start && s.every_minutes === undefined)) || !((s.limit_ms ?? 1) > 0 && (s.limit_ms ?? 1) <= 30_000)) problems.push(`schedule "${s.id}" needs the handler, every_minutes of 1 or more or at_start, and limit_ms of 30000 at most`);
+  // What it is told of, what it reads through, and the map's tools a run it asks for may offer its model.
+  for (const h of pack.hears ?? []) if (!handler || !/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(h.event) || !((h.limit_ms ?? 1) > 0 && (h.limit_ms ?? 1) <= 30_000)) problems.push(`hears "${h.event}" needs the handler, an event's name and limit_ms of 30000 at most`);
+  for (const v of pack.via ?? []) if (!/^[a-z][a-z0-9_]*$/.test(v.pack ?? '') || !/^[a-z][a-z0-9_]*$/.test(v.host ?? '')) problems.push('via names a server pack and one of its hosts');
+  for (const name of pack.runs ?? []) if (!handler || !/^[a-z][a-z0-9_]*$/.test(name)) problems.push(`runs: "${name}" is not the name of a tool, or the pack has no handler`);
   return problems;
 }

@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { configureModels, connection, connectModel, forgetModel, modelStatus, NO_MODEL, tryAccount } from '../src/model-account.ts';
 import type { Endpoint } from '../src/model.ts';
-import { readPush } from '../src/reader.ts';
+import '../src/agent-run.ts';
+import { startRuns } from '../src/pack-reach.ts';
 import { callTool } from '../src/tools.ts';
 import { fresh, human } from './map.ts';
 
@@ -124,9 +125,10 @@ test('the workspace’s own account comes first; the server’s model is the fal
 test('with no model, what needs one says so plainly', async () => {
   await withEnv(noServerModel, async () => {
     const l = await fresh();
-    const repo = { installation: '1', name: 'acme/tools', entity: { id: 'e_00000000', title: 'Tools' } };
-    const run = await readPush(l, {} as never, repo, { branch: 'main', default_branch: 'main', before: 'a'.repeat(40), after: 'b'.repeat(40) });
-    assert.deepEqual(run, { ran: false, reason: NO_MODEL });
+    // A pack's run is not started.
+    const pack = { id: 'demo', version: '0', title: 'Demo', runs: [] };
+    const runs = await startRuns(l, { kind: 'agent', name: 'pack:demo' }, pack, 'webhook', [{ title: 'Read the push', system: 'Read it.', task: 'A push.', within: ['e_00000000'] }]);
+    assert.deepEqual(runs, [{ started: false, title: 'Read the push', reason: NO_MODEL }]);
     assert.match(NO_MODEL, /^No model account is connected to this workspace[\s\S]*Workspace page/);
     // The tool says it too, and only an admin connects one; an agent cannot reach it at all.
     assert.equal(((await callTool(l, human, 'model_account', {})) as { note: string }).note, NO_MODEL);

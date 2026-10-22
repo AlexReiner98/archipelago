@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
-import { checkDeclared, KERNEL_VERBS, screensOf, stylesOf, toolName, type ActionDef, type HostDef, type ScheduleDef, type ScreenDef, type StyleDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
+import { checkDeclared, KERNEL_VERBS, screensOf, stylesOf, toolName, type ActionDef, type HearDef, type HostDef, type ScheduleDef, type ViaDef, type ScreenDef, type StyleDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
@@ -87,8 +87,8 @@ export interface PackFile {
   views?: ViewDef[];
   /** What it shows on the page of every item of a kind or type: one column of pieces the kernel draws; and how it looks. */
   screens?: ScreenDef[]; styles?: StyleDef[];
-  /** What comes from and goes to the world outside: hosts it may reach, webhooks it receives, what it runs by itself, and the kinds of event it records beside its changes (a push heard). */
-  hosts?: HostDef[]; webhooks?: WebhookDef[]; schedules?: ScheduleDef[]; events?: string[];
+  /** What comes from and goes to the world outside: hosts it may reach, webhooks it receives, what it runs by itself, the kinds of event it records beside its changes (a push heard) and those it is told of, the hosts of server packs it reads through, and the map's tools its runs may offer a model. */
+  hosts?: HostDef[]; webhooks?: WebhookDef[]; schedules?: ScheduleDef[]; events?: string[]; hears?: HearDef[]; via?: ViaDef[]; runs?: string[];
   /** Extra fields a pack adds to types owned by another pack. */
   extend?: Record<string, { fields: Record<string, FieldDef> }>;
 }

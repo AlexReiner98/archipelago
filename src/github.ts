@@ -1,6 +1,6 @@
 // What the kernel still keeps of GitHub, none of it the App's (a server pack now, packs/github_app): finding a
 // repository by its address, when each was last pushed to, and the Workspace card's webhook added by hand. A push
-// itself is taken in by the pack that records pushes (packs/github); reading the commits is the reader's.
+// itself is taken in by the pack that records pushes (packs/github); reading the commits is the work of a pack that hears it.
 
 import { hookFor } from './hooks.ts';
 import { hasPackSecret, setPackSecret } from './outside.ts';
