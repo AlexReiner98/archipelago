@@ -7,6 +7,7 @@
 import { sayLens } from './lens-words.ts';
 import type { Archipelago } from './pelago.ts';
 import { placeAll, readAxis, zoneOf, type TimeAxis } from './timeaxis.ts';
+import { needsOf } from './attention.ts';
 import { blockGraph } from './blocking.ts';
 import { hubs, keptOf, type Kept } from './lens-kept.ts';
 import { styleFor } from './styles.ts';
@@ -74,8 +75,8 @@ interface Counts {
   waiting: number;
   sessions: number;
   tokens: { estimated: number; used: number };
-  /** How many of them wait on each person. */
-  waits_on: Record<string, number>;
+  /** How many of them wait on each person, and how many need the person it is answered for (by attention's reasons). */
+  waits_on: Record<string, number>; needs_you: number;
   /** How many of them are not among the items of this answer. */
   not_sent: number;
 }
@@ -344,6 +345,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
 
   // The state of each thing, and the same counted over everything inside it, sent or not.
   const blocked = await blockGraph(l);
+  // What needs the person it is answered for: what waits on them, theirs to confirm, due, or unsettled and theirs.
+  const viewer = l.viewer || (await l.setting<string>('me')) || null, yours = await needsOf(l, viewer);
   const { rows: at } = await l.db.query<{ target: string }>(
     `select r.to_id as target from relation r join entity s on s.id = r.from_id
      where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null`,
@@ -354,13 +357,14 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     blocked: blocked.isBlocked(e.id),
     waits_on: (blocked.direct.get(e.id) ?? []).filter((edge) => edge.why === 'waits_on').map((edge) => edge.y),
     sessions: sessions.get(e.id) ?? 0,
+    needs_you: yours.has(e.id),
   });
   const size = (e: Row) => ({ work: work(e.type) && e.is_open ? 1 : 0, tokens: { estimated: Number(e.props.tokens_estimated ?? 0), used: Number(e.props.tokens_used ?? 0) } });
   const totals = new Map<string, Counts>();
   const within = (id: string): Counts => {
     const known = totals.get(id);
     if (known) return known;
-    const sum: Counts = { items: 0, work: 0, blocked: 0, waiting: 0, sessions: 0, tokens: { estimated: 0, used: 0 }, waits_on: {}, not_sent: 0 };
+    const sum: Counts = { items: 0, work: 0, blocked: 0, waiting: 0, sessions: 0, tokens: { estimated: 0, used: 0 }, waits_on: {}, needs_you: 0, not_sent: 0 };
     totals.set(id, sum);
     for (const kid of kids.get(id) ?? []) {
       const e = eligible.get(kid)!;
@@ -369,6 +373,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
       sum.work += big.work + inner.work;
       sum.blocked += (own.blocked ? 1 : 0) + inner.blocked;
       sum.waiting += (own.waits_on.length ? 1 : 0) + inner.waiting;
+      sum.needs_you += (own.needs_you ? 1 : 0) + inner.needs_you;
       sum.sessions += own.sessions + inner.sessions;
       sum.tokens.estimated += big.tokens.estimated + inner.tokens.estimated;
       sum.tokens.used += big.tokens.used + inner.tokens.used;
@@ -461,8 +466,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
     // What the person looking may change on the page, where the view says.
     // A story is what the session chose to show: there is nothing to light by but what it says.
     controls: told ? [] : holding ? ['lit', 'closed'] : when ? ['time'] : Array.isArray(view?.props.controls) ? (view!.props.controls as unknown[]).filter((c) => CONTROLS.includes(c as string)) : [],
-    // Who it was answered for, so a style can light what waits on them.
-    viewer: l.viewer || (await l.setting<string>('me')) || null,
+    // Who it was answered for, so a style can light what needs them.
+    viewer,
     items: [...sent].sort((a, b) => (told ? about.indexOf(a) - about.indexOf(b) : 0)).map((id) => {
       const e = eligible.get(id)!;
       return {

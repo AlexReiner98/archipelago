@@ -8,6 +8,27 @@ import { sessionStart } from '../src/sessions.ts';
 import { VIEWS } from '../src/views.ts';
 import { human, agent, fresh, attend, make } from './map.ts';
 
+test('what needs the person a lens is answered for is lit by attention: what waits on them, and what is due, theirs to confirm or theirs to settle', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
+    { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
+    { op: 'create', ref: 'waits', type: 'work.task', title: 'Waits' },
+    { op: 'create', ref: 'due', type: 'work.task', title: 'Due', props: { due: '2020-01-01' } },
+    { op: 'create', ref: 'calm', type: 'work.task', title: 'Calm' },
+    { op: 'link', type: 'part_of', from: 'waits', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'due', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'calm', to: 'p' },
+    { op: 'link', type: 'waits_on', from: 'waits', to: 'ann' },
+  ]);
+  await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(made.ann)]);
+  const answer = (await VIEWS.lens.run(l, {})) as any;
+  const item = (title: string) => answer.items.find((i: any) => i.title === title);
+  assert.equal(answer.viewer, made.ann);
+  assert.deepEqual(['Waits', 'Due', 'Calm'].map((t) => item(t).state.needs_you), [true, true, false], 'due work owned by no one is the owner’s, though it waits on nobody');
+  assert.deepEqual([item('P').within.needs_you, item('P').within.waits_on[made.ann]], [2, 1], 'counted inside the same way');
+});
+
 test('a lens answers with one shape of data: what is inside what, the same counts at every depth, links moved up, and what was left out', async () => {
   const l = await fresh();
   const made = await make(l, [
