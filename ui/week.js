@@ -208,11 +208,11 @@ export const confirmEntryOps = (b, v) => [
   ...(v.work.id !== b.work_id ? [...(b.link ? [{ op: 'unlink', relation: b.link }] : []), { op: 'link', type: 'part_of', from: b.id, to: v.work.id }] : []),
 ];
 
-/** The ops that confirm a day of a routine: a time entry for what happened, and the day marked done on the routine. */
-export async function confirmRoutineOps(b, v) {
+/** The ops that confirm a day of a routine: an entry (of the type the week names) for what happened, and the day marked done on the routine. */
+export async function confirmRoutineOps(b, v, entry) {
   const p = (await api('get', { id: b.id })).entity.props;
   return [
-    { op: 'create', ref: 'e', type: 'time.entry', title: v.what, status: 'logged', props: { date: v.date, hours: v.hours, ...(v.start && { start: v.start, end: v.end }) } },
+    { op: 'create', ref: 'e', type: entry, title: v.what, status: 'logged', props: { date: v.date, hours: v.hours, ...(v.start && { start: v.start, end: v.end }) } },
     { op: 'link', type: 'part_of', from: 'e', to: v.work.id },
     { op: 'update', id: b.id, props: { done: [...(Array.isArray(p.done) ? p.done : []), b.date] } },
   ];

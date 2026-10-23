@@ -7,7 +7,7 @@ import { attention, type Input } from './attention.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { spent } from './spent.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
-import { findPlace, scopeOf } from './places.ts';
+import { findPlace, livesIn, scopeOf } from './places.ts';
 import { brief } from './brief.ts';
 import { savedViews } from './saved-views.ts'; import { pageStyle } from './styles.ts';
 
@@ -47,17 +47,18 @@ const STALE_MINUTES = 30;
 
 async function sessions(l: Archipelago) {
   const runs = l.registry.family('sys.run');
+  const homes = livesIn(l);
   const { rows: open } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null order by created_at desc`, [runs]);
   const { rows: links } = await l.db.query<{ run: string; type: string; id: string; title: string; entity_type: string }>(
     `select r.from_id as run, r.type, e.id, e.title, e.type as entity_type from relation r join entity e on e.id = r.to_id
-     where r.from_id = any($1::text[]) and r.valid_to is null and r.type in ('sys.works_on', 'holds', 'software.lives_in')`,
-    [open.map((r) => r.id)],
+     where r.from_id = any($1::text[]) and r.valid_to is null and r.type = any($2::text[])`,
+    [open.map((r) => r.id), ['sys.works_on', 'holds', ...homes]],
   );
   const { rows: ended } = await l.db.query(
     `select id, title, status, updated_at from entity where type = any($1::text[]) and not is_open and archived_at is null order by updated_at desc limit 10`,
     [runs],
   );
-  const of = (run: string, type: string) => links.filter((x) => x.run === run && x.type === type).map(({ id, title, entity_type }) => ({ id, title, type: entity_type }));
+  const of = (run: string, ...types: string[]) => links.filter((x) => x.run === run && types.includes(x.type)).map(({ id, title, entity_type }) => ({ id, title, type: entity_type }));
   return {
     stale_after_minutes: STALE_MINUTES,
     open: open.map((r) => {
@@ -73,7 +74,7 @@ async function sessions(l: Archipelago) {
         stale: Date.now() - Date.parse(seen) > STALE_MINUTES * 60_000,
         working_on: of(r.id, 'sys.works_on'),
         holds: of(r.id, 'holds'),
-        repo: of(r.id, 'software.lives_in')[0],
+        repo: of(r.id, ...homes)[0],
       };
     }),
     recently_ended: ended,
@@ -288,14 +289,13 @@ const gateWork = (l: Archipelago, type: string) => Boolean(l.registry.type(type)
 async function gate(l: Archipelago, input: { event?: string }) {
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, owner, props, created_at from entity where archived_at is null`);
   const byId = new Map(entities.map((e) => [e.id, e]));
-  const { rows: links } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(
-    `select id, type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`,
-    [['part_of', 'depends_on', 'defers', 'software.ships']],
-  );
+  // What an event ships: the ships link and every flavour of it a pack gives (a release's).
+  const ships = l.registry.relationFamily('ships');
+  const { rows: links } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(`select id, type, from_id, to_id from relation where valid_to is null and type = any($1::text[])`, [['part_of', 'depends_on', 'defers', ...ships]]);
   const live = links.filter((r) => byId.has(r.from_id) && byId.has(r.to_id));
-  const from = (type: string, id: string) => live.filter((r) => r.type === type && r.from_id === id);
+  const from = (type: string | string[], id: string) => live.filter((r) => [type].flat().includes(r.type) && r.from_id === id);
   if (!input.event) {
-    const events = entities.filter((e) => l.registry.isA(e.type, 'event') && e.is_open && (from('depends_on', e.id).length || from('defers', e.id).length || from('software.ships', e.id).length));
+    const events = entities.filter((e) => l.registry.isA(e.type, 'event') && e.is_open && (from('depends_on', e.id).length || from('defers', e.id).length || from(ships, e.id).length));
     return { events: events.map((e) => ({ id: e.id, type: e.type, title: e.title, status: e.status, at: (e.props.at as string | undefined) ?? null, holding: from('depends_on', e.id).length })) };
   }
   const event = byId.get(input.event);
@@ -382,7 +382,7 @@ async function gate(l: Archipelago, input: { event?: string }) {
 
   const deferred = from('defers', event.id);
   const left = new Set(deferred.flatMap((r) => [r.to_id, ...under(r.to_id)]));
-  const scope = new Set(from('software.ships', event.id).flatMap((r) => [r.to_id, ...under(r.to_id)]));
+  const scope = new Set(from(ships, event.id).flatMap((r) => [r.to_id, ...under(r.to_id)]));
   const toSort = [...scope]
     .map((id) => byId.get(id)!)
     .filter((e) => e.id !== event.id && e.is_open && gateWork(l, e.type) && !isA(e, containers) && !placed.has(e.id) && !left.has(e.id))
@@ -390,7 +390,7 @@ async function gate(l: Archipelago, input: { event?: string }) {
 
   // What a user would ask of what this ships and of what holds it. Answered on the release's own build, or not answered:
   // a release that names its version is not helped by what passed on an earlier one.
-  const asked = new Set([...from('software.ships', event.id), ...held.filter((r) => isA(byId.get(r.to_id)!, containers))].flatMap((r) => [r.to_id, ...under(r.to_id)]));
+  const asked = new Set([...from(ships, event.id), ...held.filter((r) => isA(byId.get(r.to_id)!, containers))].flatMap((r) => [r.to_id, ...under(r.to_id)]));
   const version = typeof event.props.version === 'string' && event.props.version.trim() ? event.props.version.trim() : undefined;
   const proven = asked.size && askPack ? ((await askPack(l, 'proof', { build: version, within: [...asked] }).catch(() => undefined)) as { build?: string | null; counts?: Record<string, number> & { answered: number; questions: number }; proofs?: (Record<string, unknown> & { tests: unknown })[] } | undefined) : undefined;
   const known = proven?.proofs?.length && proven.counts ? { build: proven.build ?? null, counts: proven.counts, proofs: proven.proofs } : undefined;

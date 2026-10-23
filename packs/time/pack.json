@@ -207,6 +207,9 @@
     { "id": "time.week", "title": "Time", "nav": true, "pieces": [{ "piece": "page", "page": "time" }] },
     { "id": "time.invoices", "title": "Invoices", "on": ["company"], "pieces": [{ "piece": "picture", "lens": { "kinds": ["time.invoice"], "far": 1 }, "style": { "shape": "list", "show": ["status"] } }] }
   ],
+  "styles": [
+    { "id": "time.invoice_page", "title": "An invoice's page", "on": ["time.invoice"], "props": { "page": { "head": "invoice" } } }
+  ],
   "rules": [
     { "id": "routine_days", "when": { "actor": "agent", "op": "update", "type": "time.routine", "fields": ["done"] }, "then": "refuse", "say": "\"{title}\" is a routine: only a person confirms a day of it, on the Time screen. Its days wait there under To confirm." },
     { "id": "planned_time", "when": { "actor": "agent", "op": "update", "type": "time.entry", "status": { "from": "planned" } }, "then": "refuse", "say": "\"{title}\" is planned time: only a person confirms that it happened, on the Time screen. It waits there under To confirm." },

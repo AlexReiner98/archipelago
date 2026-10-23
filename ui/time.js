@@ -143,7 +143,7 @@ export async function time() {
         if (said.days)
           await api('change', {
             ops: [
-              { op: 'create', ref: 'r', type: 'time.routine', title: said.what, status: 'active', props: { from_time: clockText(from), to_time: clockText(to), days: said.days, starts: day } },
+              { op: 'create', ref: 'r', type: wk.types.routine, title: said.what, status: 'active', props: { from_time: clockText(from), to_time: clockText(to), days: said.days, starts: day } },
               ...(said.work ? [{ op: 'link', type: 'part_of', from: 'r', to: said.work.id }] : []),
             ],
             reason: 'Made a routine on the Time screen',
@@ -182,11 +182,11 @@ export async function time() {
       h('span', { class: 'tq-h' }, hoursText(b.hours)),
       h('button', { title: 'It happened as planned: count it', onclick: async () => {
         const v = { work: { id: b.work_id }, what: b.what, date: b.date, start: b.start, end: b.end, hours: b.hours };
-        write(b.routine ? await confirmRoutineOps(b, v) : [{ op: 'update', id: b.id, status: 'logged' }], 'Confirmed on the Time screen');
+        write(b.routine ? await confirmRoutineOps(b, v, wk.types.entry) : [{ op: 'update', id: b.id, status: 'logged' }], 'Confirmed on the Time screen');
       } }, 'Confirm'),
       h('button', { title: 'Say what actually happened, then count it', onclick: async () => {
         const v = await happenedDialog(b);
-        if (v) write(b.routine ? await confirmRoutineOps(b, v) : confirmEntryOps(b, v), 'Confirmed on the Time screen, as it happened');
+        if (v) write(b.routine ? await confirmRoutineOps(b, v, wk.types.entry) : confirmEntryOps(b, v), 'Confirmed on the Time screen, as it happened');
       } }, 'Adjust'),
       menu('\u22ef', [['Drop', async () => {
         if (!b.routine) return write([{ op: 'archive', id: b.id }], 'Dropped on the Time screen: it did not happen');
@@ -208,7 +208,7 @@ export async function time() {
             const byRoutine = Map.groupBy(due.filter((b) => b.routine), (b) => b.id);
             for (const [id, bs] of byRoutine) {
               const p = (await api('get', { id })).entity.props;
-              bs.forEach((b, i) => ops.push({ op: 'create', ref: `e${id}${i}`, type: 'time.entry', title: b.what, status: 'logged', props: { date: b.date, hours: b.hours, start: b.start, end: b.end } }, { op: 'link', type: 'part_of', from: `e${id}${i}`, to: b.work_id }));
+              bs.forEach((b, i) => ops.push({ op: 'create', ref: `e${id}${i}`, type: wk.types.entry, title: b.what, status: 'logged', props: { date: b.date, hours: b.hours, start: b.start, end: b.end } }, { op: 'link', type: 'part_of', from: `e${id}${i}`, to: b.work_id }));
               ops.push({ op: 'update', id, props: { done: [...(Array.isArray(p.done) ? p.done : []), ...bs.map((b) => b.date)] } });
             }
             write(ops, 'Confirmed on the Time screen');

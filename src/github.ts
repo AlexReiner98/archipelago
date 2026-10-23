@@ -17,11 +17,16 @@ export function repoName(remote: string | undefined): string | undefined {
   return match ? `${match[1]}/${match[2]}`.toLowerCase() : undefined;
 }
 
-/** The repository in the map whose remote is this GitHub repository. */
+/** The places a repository can be: every type of place known by an address (src/places.ts), and the address of one. */
+const addressed = (l: Archipelago) => l.registry.having('where').filter((t) => l.registry.type(t)!.capabilities.where!.address);
+const addressOf = (l: Archipelago, e: Entity) => e.props[l.registry.type(e.type)!.capabilities.where!.address!] as string | undefined;
+
+/** The repository in the map whose address is this GitHub repository. */
 export async function repoByName(l: Archipelago, name: string | undefined): Promise<Entity | undefined> {
-  if (!name || !l.registry.type('software.repo')) return undefined;
-  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and props ? 'remote'`, [l.registry.family('software.repo')]);
-  return rows.find((r) => repoName(r.props.remote as string) === name.toLowerCase());
+  const types = addressed(l);
+  if (!name || !types.length) return undefined;
+  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null`, [types]);
+  return rows.find((r) => repoName(addressOf(l, r)) === name.toLowerCase());
 }
 
 /** When each repository was last pushed to, as GitHub told us. */
@@ -36,14 +41,14 @@ export async function lastPushes(l: Archipelago): Promise<Map<string, { at: stri
 }
 
 export async function githubStatus(l: Archipelago) {
-  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null order by title`, [l.registry.family('software.repo')]);
+  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null order by title`, [addressed(l)]);
   const pushes = await lastPushes(l);
   // The webhook added by hand is the pack's: where it is served, and whether the owner has made its secret.
   const hook = hookFor(l, 'repo.push');
   return {
     connected: Boolean(hook && (await hasPackSecret(l, hook.pack, hook.secret))),
     webhook_path: hook ? `/hook/${l.workspace}/${hook.pack}/${hook.hook}` : null,
-    repos: rows.map((r) => ({ id: r.id, title: r.title, github: repoName(r.props.remote as string) ?? null, last_push: pushes.get(r.id) ?? null })),
+    repos: rows.map((r) => ({ id: r.id, title: r.title, github: repoName(addressOf(l, r)) ?? null, last_push: pushes.get(r.id) ?? null })),
   };
 }
 

@@ -58,6 +58,14 @@ export function livesInFor(l: Archipelago, placeType: string): string {
   return fits.sort((a, b) => a.at - b.at)[0]?.id ?? 'lives_in';
 }
 
+/** What a place is known by, as its own fields give it (address, folder): undefined for anything not known by either. */
+export function whereOf(l: Archipelago, e: Entity): { address?: string; folder?: string } | undefined {
+  const where = l.registry.type(e.type)?.capabilities.where;
+  if (!where?.address && !where?.folder) return undefined;
+  const field = (name: string | undefined) => (name && typeof e.props[name] === 'string' ? (e.props[name] as string) : undefined);
+  return { address: field(where.address), folder: field(where.folder) };
+}
+
 /** The relations a thing lives in a place by, read whichever flavour tied it. */
 export const livesIn = (l: Archipelago) => l.registry.relationFamily('lives_in');
 

@@ -68,14 +68,7 @@ test(`no file is over ${MAX_LINES} lines`, () => {
 });
 
 // 2. The kernel never names a pack's types or relations: it works from kinds and capabilities.
-const NAMES_PACKS: Record<string, number> = {
-  'ui/time.js': 2,
-  'ui/week.js': 1,
-  'src/views.ts': 6,
-  'src/brief.ts': 2,
-  'src/github.ts': 3,
-  'ui/doc.js': 1,
-};
+const NAMES_PACKS: Record<string, number> = {};
 
 test('the kernel names no pack', () => {
   const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p));
