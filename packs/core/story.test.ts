@@ -12,7 +12,7 @@ import { picture } from './draw/architecture/index.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
 import { layout } from './draw/architecture/layout.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { squareMorph, statesOf } from './draw/architecture/story.js';
+import { nameLeft, squareMorph, statesOf } from './draw/architecture/story.js';
 
 const house = { ...JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props, shape: 'architecture' };
 const answer = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'drawings', 'architecture-story.json'), 'utf8'));
@@ -121,4 +121,20 @@ test('it lays out all its steps quickly', () => {
 test('a story whose parts are not shown says so, and draws no picture of nothing', () => {
   const none = { ...answer, items: answer.items.filter((i: any) => i.id === answer.lens.from), links: [] };
   assert.deepEqual(picture({ answer: none, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene, { message: 'Nothing here is part of a system.' });
+});
+
+test('a place’s name sits where no wire of the step comes in across it, wherever the place has room', () => {
+  const z = (k: string) => house.sizes[`arch_${k}`];
+  let crossed = 0;
+  for (const { g } of frames) {
+    const wires = g.chains.map((c: any) => c.points);
+    for (const b of g.boxes) {
+      const inset = z('place_name_inset'), width = measure(b.item.title, z('place_text')) + z('place_name_room') - inset, top = b.y, bottom = b.y + inset + z('place_name_height');
+      const at = nameLeft(b.x + inset, width, b.x + b.w - inset, top, bottom, wires, inset);
+      assert.ok((at >= b.x + inset - 1e-6 && at + width <= b.x + b.w - inset + 1e-6) || at === b.x + inset, `${b.item.title}: inside its place`);
+      if (wires.some((p: number[][]) => p.some((q, k) => k > 0 && Math.max(p[k - 1][1], q[1]) >= top && Math.min(p[k - 1][1], q[1]) <= bottom && Math.max(p[k - 1][0], q[0]) > at && Math.min(p[k - 1][0], q[0]) < at + width))) crossed++;
+    }
+  }
+  // Where a place is narrower than its name beside a wire through it, the name stays at its corner: none more than now.
+  assert.ok(crossed <= 3, `${crossed} names crossed by a wire`);
 });
