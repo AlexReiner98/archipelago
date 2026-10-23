@@ -1,32 +1,19 @@
-// The kernel's drawing of a lens on a time axis. Two layouts of the same answer: a calendar (a column for each day,
-// hours running down, each item a block where it falls) and bars (each lane a row, each item a bar across the
-// days it covers: a Gantt chart). Colour is what a block counts toward (the part of the item it is in), else its kind; a name too long for its block is cut, and is whole in
-// its tooltip. Nothing is written here: an item opens on its own page.
+// A lens answer drawn on its time axis. Two layouts of the same answer: a calendar (a column for each day, hours
+// running down, each item a block where it falls) and bars (each lane a row, each item a bar across the days it
+// covers: a Gantt chart). Colour is what a block counts toward (the part of the item it is in), else its kind; a name
+// too long for its block is cut, and is whole in its tooltip. A block opens its item's page. It is drawn as wide as
+// the page gives it (`width`), and laid out by the page: the frame does not pan or zoom it. Its look is ./look.js. A
+// lens with steps tells the plan as it comes together (./story.js), the conversation beside it.
 
-import { numberOf, sizeOf } from './lens-base.js';
+import { css, hueClass, hueRule } from './look.js';
+import { m } from './marks.js';
+import { play } from './play.js';
+import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 
-const SVG = 'http://www.w3.org/2000/svg';
 const DAY = 86_400_000;
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
+const HEX = /^#[0-9a-f]{3,8}$/i;
 
-/** How the drawing's parts look, set through the CSSOM (the page allows no inline style attributes): the style's colours and sizes (time_*), named by the house style. */
-const LOOK = {
-  't-rule': 'stroke: var(--ln-line); stroke-width: var(--ln-rule)',
-  't-head': 'fill: var(--ln-muted); font-size: var(--ln-time-head-text)',
-  't-hour': 'fill: var(--ln-muted); font-size: var(--ln-time-hour-text)',
-  't-row': 'fill: var(--ln-text); font-size: var(--ln-small-text)',
-  't-lane': 'stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-time-lane-dash)',
-};
-
-const svg = (tag, attrs = {}, ...kids) => {
-  const el = document.createElementNS(SVG, tag);
-  for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) el.setAttribute(k, v);
-  const look = LOOK[attrs.class] ?? (String(attrs.class).startsWith('t-block') ? 'cursor: pointer' : undefined);
-  if (look) el.style.cssText = look;
-  el.append(...kids.filter(Boolean));
-  return el;
-};
-const tip = (text) => svg('title', {}, text);
 /** The start of a day in this browser's time, from a date or a date-time. */
 const dayOf = (value) => {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
@@ -41,22 +28,35 @@ const cutAt = (letter) => (text, width) => {
 };
 
 /** Every block an answer places: one for each span of each item. */
-function blocks(answer) {
-  return answer.items.flatMap((item) =>
+const blocks = (answer) =>
+  answer.items.flatMap((item) =>
     (item.time ?? []).map((span) => ({ item, start: Date.parse(span.start), end: Math.max(Date.parse(span.end), Date.parse(span.start)), by: span.by, on: span.on_title, stream: span.stream !== undefined ? span.stream : item.stream })),
   );
-}
-
 const group = (item) => `t-block group-${KINDS.includes(item.kind) ? item.kind : 'system'}${item.open ? '' : ' closed'}`;
-const open = (item) => () => (location.hash = `#/e/${item.id}`);
 /** What a block is called: the work a session was on in that stretch, else the item itself. */
 const nameOf = (b) => b.on ?? b.item.title;
 const said = (b) => `${nameOf(b)}${b.on ? `\n${b.item.title}` : ''}\n${b.end - b.start >= DAY ? fmtDay(b.start) : `${fmtDay(b.start)}, ${fmtTime(b.start)}`}${b.end > b.start ? ` to ${b.end - b.start >= DAY ? fmtDay(b.end - 1) : fmtTime(b.end)}` : ''}${b.by === 'bound' ? ' (due)' : ''}`;
-
 /** The lanes of an answer, each with a name: lanes by person come named; any other lane is its value. */
 const lanesOf = (answer) => (answer.lanes ?? []).map((lane) => (lane && typeof lane === 'object' ? { key: lane.key, title: lane.title } : { key: lane, title: String(lane) }));
-/** The lane the sessions on the work are filed in: drawn narrow, as many columns as were at work at once. */
-const SESSIONS = 'sessions';
+
+/** What every layout shares: its sizes, its marks so far, and a block drawn so it opens its item. */
+function canvas(answer, style, width, story) {
+  const z = (name) => {
+    const v = style.sizes?.[`time_${name}`];
+    if (typeof v !== 'number') throw new Error(`The style names no size "time_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+    return v;
+  };
+  const rules = new Set(), opens = new Map(), shown = [];
+  const hued = (hex) => (typeof hex === 'string' && HEX.test(hex) ? (rules.add(hueRule(hex)), hueClass(hex)) : 't-h-none');
+  // A block is its colour; what it is, is said on hover. In a story it waits hidden until a step brings its item.
+  const block = (b, rect, colour) => {
+    const key = `b:${opens.size}`;
+    opens.set(key, b.item.id);
+    shown.push({ key, ids: [b.item.id] });
+    return m('g', { key, on: ['click'], class: group(b.item), role: 'link', ...(story && { opacity: 0 }) }, m('title', {}, rect.title), m('rect', { class: `dot${colour ? ` t-hued ${colour}` : ''}`, x: rect.x, y: rect.y, width: rect.width, height: rect.height, rx: 3 }));
+  };
+  return { z, cut: cutAt(z('letter')), width: Math.max(width || 800, 320), rules, opens, shown, hued, block };
+}
 
 /**
  * A column for each day, hours running down; within a day, a column for each lane (each person, and the sessions), so
@@ -64,9 +64,8 @@ const SESSIONS = 'sessions';
  * week, so a busy lane has room and an empty one is a sliver. Blocks that overlap in a lane sit side by side in it.
  * The hours shown are those things fall in, the working day at least, unless the style says (hours).
  */
-function calendar(host, answer, style) {
-  const z = (name) => sizeOf(style, `time_${name}`);
-  const cut = cutAt(z('letter'));
+function calendar(answer, style, c) {
+  const { z, cut, width } = c;
   const MIN_BLOCK = z('least_block');
   const from = dayOf(answer.lens.time.from);
   const days = Math.max(1, Math.round((dayOf(answer.lens.time.to) - from) / DAY) + 1);
@@ -80,7 +79,6 @@ function calendar(host, answer, style) {
     : [Math.min(z('day_start'), ...timed.map((b) => Math.floor(hourOf(b.start)))), Math.max(z('day_end'), ...timed.map((b) => (dayOf(b.end) > dayOf(b.start) ? 24 : Math.ceil(hourOf(b.end)))))];
   const lanes = lanesOf(answer);
   const laneOf = (b) => Math.max(0, lanes.findIndex((l) => l.key === (b.item.lane ?? null)));
-  const width = Math.max(host.clientWidth || 800, 320);
   const gutter = z('gutter');
   const hourPx = z('hour');
   const colW = (width - gutter) / days;
@@ -128,20 +126,20 @@ function calendar(host, answer, style) {
   const top = named ? z('head_named') : z('head');
   const head = top + strip * chip;
   const height = head + (h1 - h0) * hourPx;
-  const out = svg('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` });
+  const marks = [];
   for (let d = 0; d < days; d++) {
     const x = gutter + d * colW;
-    out.append(svg('line', { class: 't-rule', x1: x, x2: x, y1: 0, y2: height }), svg('text', { class: 't-head', x: x + 4, y: 15 }, cut(fmtDay(from + d * DAY), colW - 6)));
+    marks.push(m('line', { class: 't-rule', x1: x, x2: x, y1: 0, y2: height }), m('text', { class: 't-head', x: x + 4, y: 15 }, cut(fmtDay(from + d * DAY), colW - 6)));
     // The lanes, named under the day where there is room, and parted by a fainter rule.
     lanes.forEach((l, i) => {
       const [lx, lw] = laneX[i];
-      if (i > 0) out.append(svg('line', { class: 't-lane', x1: x + lx, x2: x + lx, y1: top, y2: height }));
-      if (named && laneX[i][1] >= z('lane_named_from')) out.append(svg('text', { class: 't-hour', x: x + lx + 3, y: 30 }, tip(l.title), cut(l.title, lw - 6)));
+      if (i > 0) marks.push(m('line', { class: 't-lane', x1: x + lx, x2: x + lx, y1: top, y2: height }));
+      if (named && laneX[i][1] >= z('lane_named_from')) marks.push(m('text', { class: 't-hour', x: x + lx + 3, y: 30 }, m('title', {}, l.title), cut(l.title, lw - 6)));
     });
   }
   for (let hr = h0; hr <= h1; hr++) {
     const y = head + (hr - h0) * hourPx;
-    out.append(svg('line', { class: 't-rule', x1: gutter, x2: width, y1: y, y2: y }), hr < h1 && svg('text', { class: 't-hour', x: 2, y: y + 11 }, `${String(hr).padStart(2, '0')}:00`));
+    marks.push(m('line', { class: 't-rule', x1: gutter, x2: width, y1: y, y2: y }), hr < h1 && m('text', { class: 't-hour', x: 2, y: y + 11 }, `${String(hr).padStart(2, '0')}:00`));
   }
   // What each block counts toward, as a colour of its own (the Time screen's colours, by project); none, the kind's colour.
   const streams = answer.streams ?? [];
@@ -149,11 +147,7 @@ function calendar(host, answer, style) {
   const streamTitle = new Map(streams.map((st) => [st.key, st.title]));
   const place = (b, x, y, w, hgt) => {
     const title = [said(b), b.stream && streamTitle.get(b.stream), lanes.length > 1 && lanes[laneOf(b)].title].filter(Boolean).join('\n');
-    const box = svg('rect', { class: 'dot', x, y, width: Math.max(w, 3), height: hgt, rx: 3 });
-    if (streams.length) box.style.fill = hueOf.get(b.stream) ?? 'var(--ln-muted)';
-    // A block is its colour; what it is, is said on hover.
-    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(title), box));
-    out.lastChild.addEventListener('click', open(b.item));
+    marks.push(c.block(b, { title, x, y, width: Math.max(w, 3), height: hgt }, streams.length ? c.hued(hueOf.get(b.stream)) : null));
   };
   // The strip: each whole-day thing a bar across the days it covers, on the first row free on all of them.
   const rows = [];
@@ -186,24 +180,16 @@ function calendar(host, answer, style) {
   }
   // The key: what the colours count toward this week, each a link to its page.
   const used = streams.filter((st) => all.some((b) => b.stream === st.key));
-  const key = document.createElement('div');
-  key.style.cssText = 'display: flex; flex-wrap: wrap; gap: var(--ln-time-key-gap); padding: var(--ln-grid-legend-pad-y) var(--ln-grid-legend-pad-x); font-size: var(--ln-legend-text); color: var(--ln-muted)';
-  for (const st of used) {
-    const a = Object.assign(document.createElement('a'), { href: `#/e/${st.key}`, title: st.title, textContent: st.title });
-    a.style.cssText = `color: inherit; text-decoration: none; white-space: nowrap; max-width: var(--ln-time-key-most); overflow: hidden; text-overflow: ellipsis; border-left: var(--ln-time-key-stripe) solid ${hueOf.get(st.key)}; padding-left: var(--ln-time-key-pad)`;
-    key.append(a);
-  }
-  host.replaceChildren(out, ...(used.length ? [key] : []));
+  const key = used.length ? m('div', { class: 't-key' }, used.map((st) => m('a', { href: `#/e/${st.key}`, title: st.title, class: c.hued(hueOf.get(st.key)) }, st.title))) : null;
+  return { svg: m('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` }, marks), key };
 }
 
 /** Each lane a row (each item its own when there are no lanes), its spans as bars across the days. */
-function bars(host, answer, style) {
-  const z = (name) => sizeOf(style, `time_${name}`);
-  const cut = cutAt(z('letter'));
+function bars(answer, style, c) {
+  const { z, cut, width } = c;
   const from = dayOf(answer.lens.time.from);
   const to = dayOf(answer.lens.time.to) + DAY;
-  const width = Math.max(host.clientWidth || 800, 320);
-  const label = Math.min(z('bar_label_most'), width * numberOf(style, 'time_bar_label_share'));
+  const label = Math.min(z('bar_label_most'), width * style.numbers?.time_bar_label_share);
   const rowH = z('bar_row');
   const head = z('head');
   const all = blocks(answer);
@@ -211,24 +197,46 @@ function bars(host, answer, style) {
   const rowOf = (b) => rows.findIndex((r) => r.key === (answer.lanes?.length ? (b.item.lane ?? null) : b.item.id));
   const height = head + rows.length * rowH + 4;
   const x = (t) => label + ((Math.min(Math.max(t, from), to) - from) / (to - from)) * (width - label - 4);
-  const out = svg('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` });
+  const marks = [];
   const days = Math.round((to - from) / DAY);
   const every = Math.max(1, Math.ceil(days / Math.floor((width - label) / z('bar_day_every'))));
-  for (let d = 0; d <= days; d += every) out.append(svg('line', { class: 't-rule', x1: x(from + d * DAY), x2: x(from + d * DAY), y1: 0, y2: height }), d < days && svg('text', { class: 't-head', x: x(from + d * DAY) + 3, y: 15 }, fmtDay(from + d * DAY)));
-  rows.forEach((r, i) => out.append(svg('text', { class: 't-row', x: 4, y: head + i * rowH + 16 }, tip(r.title), cut(r.title, label - 10))));
+  for (let d = 0; d <= days; d += every) marks.push(m('line', { class: 't-rule', x1: x(from + d * DAY), x2: x(from + d * DAY), y1: 0, y2: height }), d < days && m('text', { class: 't-head', x: x(from + d * DAY) + 3, y: 15 }, fmtDay(from + d * DAY)));
+  // A row of its own item's waits hidden in a story, as its bar does.
+  rows.forEach((r, i) => marks.push(m('text', { class: 't-row', x: 4, y: head + i * rowH + 16, ...(!answer.lanes?.length && c.story && { key: `r:${i}`, opacity: 0 }) }, m('title', {}, r.title), cut(r.title, label - 10))));
+  if (!answer.lanes?.length && c.story) rows.forEach((r, i) => c.shown.push({ key: `r:${i}`, ids: [r.key] }));
   for (const b of all) {
     const i = rowOf(b);
     if (i < 0) continue;
     const x0 = x(b.start);
-    const w = Math.max(x(b.end) - x0, 6);
-    out.append(svg('g', { class: group(b.item), tabindex: 0, role: 'link' }, tip(said(b)), svg('rect', { class: 'dot', x: x0, y: head + i * rowH + 4, width: w, height: rowH - 8, rx: 3 })));
-    out.lastChild.addEventListener('click', open(b.item));
+    marks.push(c.block(b, { title: said(b), x: x0, y: head + i * rowH + 4, width: Math.max(x(b.end) - x0, 6), height: rowH - 8 }, null));
   }
-  host.replaceChildren(out);
+  return { svg: m('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` }, marks), key: null };
 }
 
-/** Draw a lens's answer along its time axis, in the style's layout. */
-export function drawTime(host, answer, style) {
-  if (!answer.lens.time) return host.replaceChildren(Object.assign(document.createElement('div'), { className: 'empty', textContent: 'This view has no time axis.' }));
-  (style.layout === 'bars' ? bars : calendar)(host, answer, style);
+/** Draw a lens's answer along its time axis, in the style's layout, as wide as the page gives it (`width`). */
+export function picture({ answer, style, width, reduced }, tools) {
+  if (!answer.lens.time) return { scene: { message: 'This view has no time axis.' } };
+  // A story lays out what its steps bring in, all of it, each block hidden until a step shows it.
+  const story = Array.isArray(answer.steps) && answer.steps.length > 0;
+  if (story) {
+    const named = everyNamed(answer.steps);
+    answer = { ...answer, items: answer.items.filter((i) => named.has(i.id) || i.id === answer.lens.from) };
+  }
+  const c = { ...canvas(answer, style, width, story), story };
+  const { svg, key } = (style.layout === 'bars' ? bars : calendar)(answer, style, c);
+  let player = null;
+  if (story) {
+    const frames = statesOf(answer.steps);
+    player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks: c.shown, ...ctx }) } });
+  }
+  return {
+    scene: { css: [css, ...c.rules, story ? storyCss : ''].join('\n'), svg, legend: key, flat: true, ...(player && { before: player.before, aside: player.after }) },
+    end: player?.end,
+    on(event) {
+      if (player && (event.key === 'play' || event.key === 'chat' || event.key.startsWith('c:'))) return player.on(event);
+      if (event.name === 'click' && c.opens.has(event.key)) tools.open(c.opens.get(event.key));
+      return [];
+    },
+    restyle: () => [],
+  };
 }

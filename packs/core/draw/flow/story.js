@@ -23,7 +23,6 @@ export const everyNamed = (steps) => new Set(steps.flatMap((s) => s.add ?? []));
 
 /** How a story's marks look besides the flow's own: what comes in, and what a step lights. */
 export const css = `${storyLook}
-.lf-beside > .lf-stage { min-width: calc(var(--side-least) * 2); }
 .lf-step .lf-shape, .lf-wire, .lf-head { transition: stroke 0.8s, stroke-width 0.8s, fill 0.8s; }
 .lf-step.sp-new .lf-shape { stroke: var(--accent); stroke-width: var(--border-3); }
 .lf-wire.sp-new, .lf-wire.sp-lit { stroke: var(--accent); stroke-width: var(--border-3); }

@@ -1,10 +1,8 @@
 import { api, h } from './base.js';
-import { drawGrid } from './grid.js';
 import { drawWith, drawings, warmDrawings } from './drawing.js';
 import { dress } from './lens-base.js';
 import { drawList } from './list.js';
 import { drawCode } from './style-code.js';
-import { drawTime } from './timeline.js';
 import { ago, idsAsLinks, titles } from './words.js';
 
 // ---- A session's story -----------------------------------------------------
@@ -192,8 +190,10 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
     dress(body, chosen);
     // A style with code of its own is the drawing; without, one of those that come built in.
     // A lens on a time axis is drawn along it unless a shape is asked for here; a shape kept from before (nest, boxes) is drawn as the list.
-    const timed = answer.lens.time && !style.shape;
-    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : chosen.drawing && !timed ? drawWith : (LENS_SHAPES[timed ? 'time' : chosen.shape] ?? LENS_SHAPES.list))(body, answer, chosen, keep, place);
+    // A drawing draws the shape it is for; a drawing kept from before that names none, whatever the map keeps.
+    const shape = answer.lens.time && !style.shape ? 'time' : chosen.shape;
+    const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === shape;
+    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : drawn ? drawWith : (LENS_SHAPES[shape] ?? LENS_SHAPES.list))(body, answer, chosen, keep, place);
   };
   // The frame drawings run in is started while the answer is on its way.
   warmDrawings();
@@ -209,4 +209,4 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
 export const lensPlace = new Map();
 
 /** The shapes the kernel draws. Each reads only what a lens answers with. */
-export const LENS_SHAPES = { list: drawList, grid: drawGrid, time: drawTime };
+export const LENS_SHAPES = { list: drawList };

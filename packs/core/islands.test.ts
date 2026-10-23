@@ -128,7 +128,10 @@ test('played, a quick step goes by at the fast-forward pace, and the key is the 
   const realSet = globalThis.setTimeout;
   (globalThis as any).setTimeout = (fn: () => void, ms: number) => (timers.push([ms, fn]), timers.length);
   try {
-    const { scene } = picture({ answer, style: house, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+    const drawn = picture({ answer, style: house, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+    const { scene } = drawn;
+    // It starts once its conversation is scrolled into sight.
+    drawn.on({ name: 'seen', key: 'chat' });
     const keys = JSON.stringify(scene.before);
     assert.match(keys, /"key:islands","class":"sp-key sp-islands sp-hide"/);
     assert.match(keys, /To do.*Doing.*Done/);
@@ -252,6 +255,7 @@ test('paused before its first step is drawn, a story stops and plays on from the
   (globalThis as any).clearTimeout = () => {};
   try {
     const drawn = picture({ answer, style: house, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+    drawn.on({ name: 'seen', key: 'chat' });
     timers.splice(0, 1)[0][1]();
     assert.doesNotThrow(() => drawn.on({ name: 'click', key: 'play' }));
     assert.ok(sent.some((p) => p.key === 'play' && p.text === 'Play'));

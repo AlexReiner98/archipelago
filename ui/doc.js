@@ -195,6 +195,18 @@ const paint = () => {
 };
 dark.addEventListener('change', paint);
 
+/** The address word of a site's front page (src/site.ts). */
+const FRONT = 'home';
+/** Whether the window has room right of the text for a story's conversation: its least width, the gap, and the page's side. */
+function roomy() {
+  const main = document.querySelector('main');
+  if (!main) return;
+  const css = getComputedStyle(document.documentElement), px = (name) => parseFloat(css.getPropertyValue(name)) || 0;
+  const text = main.getBoundingClientRect().right - parseFloat(getComputedStyle(main).paddingRight);
+  document.body.classList.toggle('roomy', document.documentElement.clientWidth - text >= px('--space-8') + px('--side-least') + px('--reader-side'));
+}
+addEventListener('resize', roomy);
+
 // How the workspace's style says a published page looks (page_css): read after the page's own rules, only in it.
 const pageSheet = new CSSStyleSheet();
 document.adoptedStyleSheets = [...document.adoptedStyleSheets, pageSheet];
@@ -217,9 +229,11 @@ function draw(d) {
   paths = d.paths ?? {};
   onSite = Boolean(d.site?.host);
   const sections = d.parts.filter((p) => p.section);
-  // The first picture is the page's own, and may be as wide as the window allows: a whole system opens in sight. One
-  // that plays how it came to be fills that width, with its chapters above it and what was said below.
-  const first = sections.find((p) => d.lenses?.[p.section.id])?.section.id;
+  // The front page's first picture is the site's own, and may be as wide as the window allows: a whole system opens in
+  // sight. One that plays how it came to be fills that width. Every other picture is as wide as the text, and what a
+  // story says goes in a column of its own to the right of the text, where the window has room (roomy).
+  const first = d.path === FRONT ? sections.find((p) => d.lenses?.[p.section.id])?.section.id : null;
+  const lensClass = (id) => ['doc-lens', id === first && 'wide', d.lenses[id].steps && 'plays'].filter(Boolean).join(' ');
   const part = (p) =>
     p.section
       ? h(
@@ -228,20 +242,16 @@ function draw(d) {
           h('h2', {}, p.section.title),
           // A lens published with the document is its picture, drawn from what was frozen; otherwise a section shows its figure.
           d.lenses?.[p.section.id]
-            ? h('div', { class: p.section.id === first ? (d.lenses[p.section.id].steps ? 'doc-lens wide plays' : 'doc-lens wide') : 'doc-lens', 'data-lens': p.section.id })
+            ? h('div', { class: lensClass(p.section.id), 'data-lens': p.section.id })
             : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
           blocks(p.section.body, titles, 3),
         )
       : h('div', { class: 'text' }, blocks(p.text, titles, 2));
-  // What it opens on is read before its contents: the point first, then the way through it.
-  const opening = 'text' in (d.parts[0] ?? {}) ? 1 : 0;
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
     d.site && siteHead(d.site),
     d.type === INVOICE ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
-    d.parts.slice(0, opening).map(part),
-    sections.length > 2 && h('nav', { class: 'contents' }, h('ol', {}, sections.map((p) => h('li', {}, h('a', { href: `#${p.section.id}` }, p.section.title))))),
-    d.parts.slice(opening).map(part),
+    d.parts.map(part),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
     // A published page is read on the web: only a link's or an invoice's has a way to print it.
@@ -249,6 +259,7 @@ function draw(d) {
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.type === INVOICE);
+  roomy();
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
   for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types);
   // Read with the reader's sign-in, a figure is fetched the same way.

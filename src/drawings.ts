@@ -15,6 +15,8 @@ import type { DrawingDef } from './declared.ts';
 export interface Drawing {
   id: string;
   title: string;
+  /** The shape it draws: a page draws with it only a picture of that shape. */
+  shape: string;
   hash: string;
   modules?: Record<string, string>;
 }
@@ -55,7 +57,7 @@ export function drawingFor(
   const changed = mine?.props.modules && typeof mine.props.modules === 'object' ? Object.entries(mine.props.modules as Record<string, unknown>).filter(([name, text]) => NAME.test(name) && typeof text === 'string') : [];
   const modules = { ...modulesOf(packs.dir, d.pack, d), ...Object.fromEntries(changed) } as Record<string, string>;
   const hash = hashOf(modules);
-  return { id: d.id, title: d.title, hash, ...(!have.includes(hash) && { modules }) };
+  return { id: d.id, title: d.title, shape: d.shape, hash, ...(!have.includes(hash) && { modules }) };
 }
 
 /**

@@ -65,17 +65,6 @@ a {
 header {
   margin-bottom: var(--rhythm-8);
 }
-nav.contents {
-  border: var(--border-1) solid var(--reader-line);
-  border-radius: var(--radius-3);
-  padding: var(--space-6) var(--space-9);
-  margin: 0 0 var(--rhythm-8);
-  font-size: var(--reader-small);
-}
-nav.contents ol {
-  margin: 0;
-  padding-left: var(--rhythm-6);
-}
 /* A site's header: its name and its main pages on one line; what does not fit scrolls sideways, never wraps. */
 nav.site-head {
   display: flex;
@@ -142,8 +131,7 @@ button.print {
     max-width: none;
     padding: 0;
   }
-  footer,
-  nav.contents {
+  footer {
     display: none;
   }
   h2 {
