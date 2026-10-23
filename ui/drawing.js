@@ -10,7 +10,7 @@ import { tipOf } from './drawing-tip.js';
 import { build, cssFor, patch, step } from './marks.js';
 import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './lens-base.js';
 import { surfaceOf } from './surface.js';
-import { typeTitle } from './words.js';
+import { relations, types as registry, typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
 
 /**
@@ -90,6 +90,15 @@ function adopt(id, css) {
 
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null));
 
+/** What a drawing is told of the types and links an answer holds, as this page knows them: the values each type's
+ * fields may take (`fields`, by type then field) and each link's title (`relations`). A drawing has no registry. */
+function typeWords(answer) {
+  const held = [...new Set((answer.items ?? []).map((i) => i.type).filter(Boolean))];
+  const fields = Object.fromEntries(held.map((t) => [t, Object.fromEntries(Object.entries(registry.get(t)?.fields ?? {}).filter(([, f]) => Array.isArray(f?.values)).map(([name, f]) => [name, f.values]))]).filter(([, f]) => Object.keys(f).length));
+  const kinds = [...new Set((answer.links ?? []).map((l) => l.kind).filter(Boolean))];
+  return { fields, relations: Object.fromEntries(kinds.map((k) => [k, relations.get(k)?.title ?? k])) };
+}
+
 /** The colours a picture is drawn in, as the page has them now: the page's own (by the theme's names) and the lens's. */
 function colours(host, style) {
   const css = getComputedStyle(host), read = (name) => css.getPropertyValue(name).trim();
@@ -163,7 +172,7 @@ export function drawWith(host, answer, style, keep) {
   const { drawing: _code, code: _canvas, ...fields } = style;
   // The titles of the types the picture holds, as this page knows them: a drawing has no registry of its own.
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
-  const input = { answer: shown, style: plain(fields), types, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);
@@ -211,9 +220,17 @@ ${JSON.stringify(input)}`;
     surface = scene.surface ? surfaceOf(picture, port, () => colours(host, style)) : null;
     if (surface) keys.set(String(scene.surface.key ?? 'surface'), surface.canvas);
     const over = surface?.canvas;
-    const { width, height } = scene.size ?? {};
     const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;
+    // A picture the page lays out (HTML, a grid of cards) is not panned or zoomed: it is as wide as it needs, scrolled
+    // across where the page is narrower, its key below it, brought to what it was opened from (`focus`, a mark's key).
+    if (!(picture instanceof SVGElement)) {
+      host.replaceChildren(...[before, beside(picture), legend, after].filter(Boolean));
+      const focus = keys.get(String(scene.focus));
+      if (focus) requestAnimationFrame(() => focus.scrollIntoView({ block: 'center', inline: 'center' }));
+      return;
+    }
+    const { width, height } = scene.size ?? {};
     // Read on a published page, a picture holds still: all of it in sight at the width it is given, its key open
     // above it, where it covers no part and no wire.
     if (style.still) {

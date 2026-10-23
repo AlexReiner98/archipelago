@@ -165,7 +165,7 @@ export async function publishedDocument(l: Archipelago, id: string) {
 }
 
 /** The shapes a published page draws with the app's own code; any other is a pack's drawing. */
-const PAGE_SHAPES = ['grid', 'time'];
+const PAGE_SHAPES = ['time'];
 /**
  * A published document with a drawing for each picture frozen before its shape had one: the pack's own drawing for
  * that shape, or the flow's, as the page drew such a picture then. A page published since keeps the drawing it was

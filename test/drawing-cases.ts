@@ -122,3 +122,49 @@ export function bigSystem() {
   const links = Array.from({ length: 11 }, (_, p) => Array.from({ length: 16 }, (_, k) => [0, 3, 7].map((d) => ({ kind: 'software.calls', from: id(p, k), to: id(p + 1, (k + d) % 16), n: 1 })))).flat(2);
   return { ...hero, items, links };
 }
+
+/** Every mark a grid has: rows at two depths and loose things, lanes named and by person, a colour by a field and the
+ * style's own, a second line, a date marked, what is finished, what needs you, what was opened from, and rows by a link. */
+function gridVariety(byLink: boolean) {
+  const card = (id: string, title: string, inside: string, place: number, lane: string | null, fields: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) => item(id, title, inside, place, { lane, fields, ...extra });
+  const items = [
+    item('e_groot000', 'A grid', undefined, 1, { kind: 'work', type: 'work.project' }),
+    item('e_grow1000', 'The first row, with a name long enough to be cut', 'e_groot000', 1, { kind: 'work', type: 'work.project' }),
+    card('e_gcard100', 'A store', 'e_grow1000', 1, 'doing', { role: 'data', layer: 'store' }),
+    card('e_gcard200', 'A browser with a title long enough to be cut in its card', 'e_grow1000', 2, 'doing', { role: 'client', layer: 'yours', due: '2026-11-05', due_note: 'Due' }),
+    card('e_gcard300', 'Finished', 'e_grow1000', 3, 'done', { role: 'app' }, { open: false, status: 'retired' }),
+    item('e_gsub0000', 'Inside the first', 'e_grow1000', 4, { kind: 'work', type: 'work.project', lane: 'doing' }),
+    card('e_gdeep000', 'Two down', 'e_gsub0000', 1, 'e_gperson0', { role: 'monitor', due: '2026-12-01' }, { state: { ...quiet, needs_you: true } }),
+    item('e_grow2000', 'The second row', 'e_groot000', 2, { kind: 'work', type: 'work.project' }),
+    card('e_gcard400', 'Nothing filed', 'e_grow2000', 1, null, {}),
+    card('e_gcard500', 'A model', 'e_grow2000', 2, 'odd_value', { role: 'model', layer: 'outside' }),
+    card('e_gloose00', 'Held directly', 'e_groot000', 3, 'doing', { role: 'tool' }),
+  ];
+  const links = byLink
+    ? [
+        { kind: 'depends_on', from: 'e_gcard100', to: 'e_gcard400', n: 1, says: 'needs it' },
+        { kind: 'depends_on', from: 'e_gcard200', to: 'e_gcard400', n: 1 },
+        { kind: 'depends_on', from: 'e_gcard200', to: 'e_gcard500', n: 1, says: 'calls' },
+      ]
+    : [];
+  return { lens: { from: 'e_groot000', by: 'part_of', over: ['depends_on'], fold: ['system'] }, lanes: ['doing', { key: 'e_gperson0', title: 'Someone' }, 'done'], items, links, rest: {}, viewer: 'e_gperson0', controls: [], views: [] };
+}
+
+/** The grid shape's cases: two real answers (pages of the public site, 23 Oct 2026) and two with every mark. */
+export function gridCases(): DrawingCase[] {
+  const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'drawings', `grid-${name}.json`), 'utf8'));
+  const style = house('grid');
+  const cases: DrawingCase[] = [];
+  const answers: [string, unknown, Record<string, unknown>][] = [
+    ['kernels', fixture('kernels'), { labels: { null: 'Its kinds of thing' } }],
+    ['plans', fixture('plans'), { labels: { null: 'Price' } }],
+    ['variety', gridVariety(false), { color_by: 'role', detail: 'layer', mark: 'due', here: 'e_gdeep000', labels: { doing: 'Under way' } }],
+    ['links', gridVariety(true), { rows: 'link:depends_on', color_by: 'role', palette: { data: '#123456' }, lit: 'you' }],
+  ];
+  for (const [name, answer, own] of answers) {
+    cases.push({ name: `${name}, wide`, answer: answer as Record<string, unknown>, style: { ...style, ...own, noLit: true }, width: 1100 });
+    cases.push({ name: `${name}, narrow`, answer: answer as Record<string, unknown>, style: { ...style, ...own, noLit: true }, width: 560 });
+    cases.push({ name: `${name}, still`, answer: answer as Record<string, unknown>, style: { ...style, ...own, noLit: true, still: true }, width: 900 });
+  }
+  return cases;
+}

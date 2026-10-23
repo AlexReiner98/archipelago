@@ -1,5 +1,4 @@
 import { api, h } from './base.js';
-import { drawGrid } from './grid.js';
 import { drawWith, drawings, warmDrawings } from './drawing.js';
 import { dress } from './lens-base.js';
 import { drawList } from './list.js';
@@ -209,4 +208,4 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
 export const lensPlace = new Map();
 
 /** The shapes the kernel draws. Each reads only what a lens answers with. */
-export const LENS_SHAPES = { list: drawList, grid: drawGrid, time: drawTime };
+export const LENS_SHAPES = { list: drawList, time: drawTime };

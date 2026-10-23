@@ -1,6 +1,6 @@
 # Drawings
 
-Every picture is drawn by a drawing: code a pack ships for one shape, which the owner changes on the map, run in the browser's sandbox and answering with marks the page checks. The kernel keeps only the frame every picture has (the stage that pans and zooms, the key, the bar, a published page's still frame). The architecture shape was the first, and the flow (a process map, `packs/core/draw/flow/`) the second, each proven in a real browser to draw what the kernel drew (`test/drawings.test.ts`, against what the kernel's code drew, kept in `test/fixtures/drawings/`); the list, grid and time shapes follow, one at a time. A picture published before its shape had a drawing is given the pack's own drawing for it when its page is served (`src/published.ts`), so it draws as it did until it is published again.
+Every picture is drawn by a drawing: code a pack ships for one shape, which the owner changes on the map, run in the browser's sandbox and answering with marks the page checks. The kernel keeps only the frame every picture has (the stage that pans and zooms, the key, the bar, a published page's still frame). The architecture shape was the first, the flow (a process map, `packs/core/draw/flow/`) the second and the grid (`packs/core/draw/grid/`) the third, each proven in a real browser to draw what the kernel drew (`test/drawings.test.ts`, against what the kernel's code drew, kept in `test/fixtures/drawings/`); the list and time shapes follow, one at a time. A picture published before its shape had a drawing is given the pack's own drawing for it when its page is served (`src/published.ts`), so it draws as it did until it is published again.
 
 ## Where a drawing comes from
 
@@ -30,7 +30,8 @@ export function picture({ answer, style, reduced }, { measure, patch, open, fram
 - `answer` is the lens answer, `style` the style's fields, `reduced` whether the reader asked for less motion.
 - `measure(text, px, font)` is a text's width, as the page's canvas would give it.
 - `patch(list)` changes what is drawn, at any time; `open(id)` opens an item's page; `frame()` resolves at the page's next frame, for what moves.
-- `scene` is `{ svg, legend, bar, css, size: { width, height }, start }`, or `{ message }` when there is nothing to draw.
+- `scene` is `{ svg, legend, bar, css, size: { width, height }, start }`, or `{ message }` when there is nothing to draw. A picture whose root is HTML, not an SVG (the grid's cards), is laid out by the page: not panned or zoomed, its key below it, and brought to the mark `focus` names.
+- The page tells a drawing the values each type's fields may take (`fields`, by type then field) and each link's title (`relations`), for the types and links the answer holds: a drawing has no registry of its own.
 - `surface()` resolves, once the scene has asked for one (`surface: { key }`), to `{ canvas, size, colours, three, resized, show }`: a canvas of the drawing's own to paint (an OffscreenCanvas, 2D or WebGL), the size of its picture, the page's colours (`page`, by the theme's names, and `lens`), three.js, a way to hear the size change, and `show()`, which sends what is painted to the page as an image, shown on a canvas laid over the picture (`ui/surface.js`). Where the scene asked for none, it resolves to null.
 - `on({ name, key })` is told of `enter`, `leave` and `click` on a mark that asked for them, and answers with patches; `restyle(style)` is told when the reader changes what stays lit.
 
