@@ -44,7 +44,7 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
-  assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', hash: first.hash });
+  assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', shape: 'architecture', hash: first.hash });
   // What holds an item is drawn as a flow, by the core pack's flow drawing.
   const holding = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: 'holding' } })).result.style;
   assert.equal(holding.drawing.id, 'core.flow');

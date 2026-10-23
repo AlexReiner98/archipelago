@@ -214,6 +214,8 @@
   ],
   "drawings": [
     { "id": "core.architecture", "title": "Architecture", "shape": "architecture", "modules": { "index.js": "draw/architecture/index.js", "layout.js": "draw/architecture/layout.js", "route.js": "draw/architecture/route.js", "look.js": "draw/architecture/look.js", "marks.js": "draw/architecture/marks.js", "story.js": "draw/architecture/story.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js", "says.js": "draw/architecture/says.js", "sides.js": "draw/architecture/sides.js", "islands.js": "draw/architecture/islands.js", "deep.js": "draw/architecture/deep.js", "boats.js": "draw/architecture/boats.js", "boards.js": "draw/architecture/boards.js", "moves.js": "draw/architecture/moves.js" } },
+    { "id": "core.grid", "title": "Grid", "shape": "grid", "modules": { "index.js": "draw/grid/index.js", "look.js": "draw/grid/look.js", "story.js": "draw/grid/story.js", "marks.js": "draw/architecture/marks.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js" } },
+    { "id": "core.time", "title": "Time", "shape": "time", "modules": { "index.js": "draw/time/index.js", "look.js": "draw/time/look.js", "story.js": "draw/time/story.js", "marks.js": "draw/architecture/marks.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js" } },
     { "id": "core.flow", "title": "Flow", "shape": "flow", "modules": { "index.js": "draw/flow/index.js", "layout.js": "draw/flow/layout.js", "look.js": "draw/flow/look.js", "story.js": "draw/flow/story.js", "marks.js": "draw/architecture/marks.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js" } }
   ],
   "screens": [

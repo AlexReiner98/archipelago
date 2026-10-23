@@ -179,7 +179,7 @@ export function picture({ answer, style, types = {}, reduced }, tools) {
     end: player?.end,
     on(event) {
       const { name, key } = event;
-      if (player && (key === 'play' || key.startsWith('c:'))) return player.on(event);
+      if (player && (key === 'play' || key === 'chat' || key.startsWith('c:'))) return player.on(event);
       if (name === 'leave') return light(null);
       return keyed.has(key) ? light(keyed.get(key)) : [];
     },
