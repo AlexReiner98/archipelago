@@ -178,7 +178,7 @@ function drawLens({ lens = {}, style = {}, key = lens.story ? `story:${lens.stor
       lens.from && builtIn.length > 0 &&
         h(
           'span',
-          { class: 'switch', title: 'What this picture shows' },
+          { class: 'switch', title: 'What this view shows' },
           h('button', { class: current ? '' : 'on', onclick: again({ lens: home?.id ?? 'in', time: undefined }) }, home?.title ?? 'What is in it'),
           builtIn.map((view) => h('button', { class: current === view.id ? 'on' : '', title: BUILT_IN[view.id], onclick: again({ lens: view.id, time: undefined }) }, view.title)),
         ),

@@ -110,7 +110,7 @@ function importRow(done) {
         `Added: ${e.added}${list(p.examples.added, e.added)}`,
         `Replaced by the file's later edit: ${e.updated}${list(p.examples.updated, e.updated)}`,
         `Kept, because edited later here: ${e.kept_newer_here}${list(p.examples.kept_newer_here, e.kept_newer_here)}`,
-        `Relations: ${p.relations.added} added, ${p.relations.ended} ended. Activity: ${p.events.added} events. Proposals: ${p.proposals.added} added, ${p.proposals.decided} decided.`,
+        `Links: ${p.relations.added} added, ${p.relations.ended} ended. Activity: ${p.events.added} events. Proposals: ${p.proposals.added} added, ${p.proposals.decided} decided.`,
         p.types_added.length ? `Types added: ${p.types_added.join(', ')}` : '',
         p.left_out.open_sessions ? `Left out: ${p.left_out.open_sessions} sessions still open there.` : '',
         'Nothing is deleted. The server backs this map up first.',
@@ -233,7 +233,7 @@ export function publishCard() {
 /** Whether agents may change the code drawings run without asking: it runs in the sandbox either way. */
 export function codeCard() {
   const note = h('span', { class: 'muted small grow' });
-  const allow = allowance('agent_code', { title: 'Let agents change drawings?', message: 'An agent could then change the code a picture is drawn by, and it takes effect at once for whoever looks. It runs in the sandbox, reaching nothing of the page or the network; each change is logged and can be undone.' }, note);
+  const allow = allowance('agent_code', { title: 'Let agents change drawings?', message: 'An agent could then change the code a view is drawn by, and it takes effect at once for whoever looks. It runs in the sandbox, reaching nothing of the page or the network; each change is logged and can be undone.' }, note);
   return h(
     'section',
     { class: 'card wide' },

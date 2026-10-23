@@ -46,7 +46,7 @@ The web UI has five places, and one page for each thing.
 - **Home** is where it opens: each active project with its open questions
   (most-blocking first) and its next release, with how much of it is done.
 - **Search** finds anything in the map by words or type, and **New** makes a
-  thing by hand. **Map** draws the whole map as a picture.
+  thing by hand. **Map** draws the whole map as a view.
 - **Time** is a week as a calendar: the hours you logged or planned, beside
   the lanes of agent sessions at work. Planned time counts once a person
   confirms it; a routine repeats a block. What is owed per client, and
@@ -59,7 +59,7 @@ The web UI has five places, and one page for each thing.
   may change unreviewed, importing a backup, and what the work has cost.
 
 Every item has a single page, and every way to it leads there: its fields,
-its note folded to the first paragraph, its relations drawn as a graph, and
+its note folded to the first paragraph, its links drawn as a graph, and
 its history. A project's page also draws its **roadmap** (its features in
 the order they are to be built, with progress, and marked where a session is
 open) and lists its open **questions**: decisions not made and hypotheses not
@@ -76,7 +76,7 @@ pack can declare another tree the same way, with no code.
 **Following agents.** With "Follow agents" ticked (in the menu), an
 agent can bring your page to what it is working on: every change it makes
 opens what it touched (or Changes, when the change waits there), and the `show`
-tool opens any entity or screen with a one-line note. Anything you are in the
+tool opens any item or screen with a one-line note. Anything you are in the
 middle of is kept, and so is a page you are reading (scrolled, pointed or typed
 in the last 20 seconds); the note offers the jump instead. Until you choose, it
 is ticked only while one agent at most is at work. Without following, a page
@@ -89,15 +89,15 @@ while one waits. A Claude Code session in this repository is also told, with
 your next message, what you did since it last heard (the `UserPromptSubmit`
 hook the setup writes into `.claude/settings.json`).
 
-**Pictures.** An item's page draws it among what it is tied to. What a
-picture holds is a `lens` (which kinds, how far, along which links) and how
+**Views.** An item's page draws it among what it is tied to. What a
+view holds is a `lens` (which kinds, how far, along which links) and how
 it looks is a `style`; both are items on the map, so a project can keep views
 of its own, each named for the question it answers. A style may carry its own
 drawing code, which runs in a sandboxed worker with no page and no network
 (`ui/draw.html`).
 
 **Documents.** A `work.document` is made of the map: its sections can be notes or
-live pictures. It can be printed or saved as a PDF, and shared by a link that
+live views. It can be printed or saved as a PDF, and shared by a link that
 needs no login.
 
 **A session's story.** As an agent works it tells what it concluded (the
@@ -152,8 +152,8 @@ npm run pelago -- reject <id> "why"
 
 **Undo.** Any change set can be reversed, from its line in Activity or with
 the `undo` tool. The opposite is applied as a new change, so the log keeps
-both: created entities are archived, edits put back, links removed or
-restored, archived entities restored. An edit that has been changed again
+both: created items are archived, edits put back, links removed or
+restored, archived items restored. An edit that has been changed again
 since is left alone and reported. A merge cannot be undone automatically.
 
 `claim` and `release` (taking an exclusive resource, such as the one live session
@@ -181,7 +181,7 @@ at once; they are the session's own state, not facts about the world.
   repository: the open work nothing blocks, the blocked work and what it waits
   on, and whether each exclusive resource is free. The repository is matched
   by the address the checkout was cloned from (the `remote` on a
-  `software.repo` entity), which is the same on every machine, and failing
+  `software.repo` item), which is the same on every machine, and failing
   that by its `path`.
 - **A project with nothing of Archipelago's in it** is connected by one command,
   given under "Connect an agent" on the Workspace screen and run in the
@@ -206,7 +206,7 @@ at once; they are the session's own state, not facts about the world.
 - **From a script:** `POST /agent/<tool>` takes the same tools as plain JSON
   with agent authority.
 
-- **Launched from the map:** an entity page's **Launch session** button (or
+- **Launched from the map:** an item page's **Launch session** button (or
   the human-only `launch` tool) starts a headless Claude Code session in the
   task's repository with its brief as the prompt. You choose what it may do:
   *investigate only* (plan mode, the default) or *may edit files*. It is
@@ -216,7 +216,7 @@ at once; they are the session's own state, not facts about the world.
   the process. This needs the `claude` CLI on the PATH.
 
 A session's page has **End session**, which releases what it holds; one that
-has not reported for 30 minutes raises a notification. An entity page has
+has not reported for 30 minutes raises a notification. An item page has
 **Copy session brief**: the task's context, blockers, needed resources and the
 rules that govern them, as text to start a session with.
 
@@ -225,7 +225,7 @@ rules that govern them, as text to start a session with.
 - **Notifications:** an agent (`notify`), an automation or the system can leave
   you a message. Unread ones are on the Changes screen. A session that stops
   reporting raises one, saying what it still holds.
-- **Automations:** a trigger and an action, stored as an entity.
+- **Automations:** a trigger and an action, stored as an item.
   - Triggers: `every` N minutes, `daily` at a local time, or an `event` in the
     activity log (`proposal.create`, or a prefix such as `resource.*`).
   - Actions: `notify`, call `check_connections` or `import_audit`, or `launch`
@@ -257,7 +257,7 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 | `questions` | What is still to be decided in a project? |
 | `gate` | What does a release wait for, and what can follow it? |
 | `tree` | A project's roadmap |
-| `lens` | What is in a picture |
+| `lens` | What is in a view |
 | `to_confirm` | What did agents settle that I have not confirmed? |
 | `oldest` | What has gone longest without being checked? |
 | `costs` | What does the work cost? |
@@ -266,9 +266,9 @@ There are more (`hubs`, `proof`, `changelog`, `recheck`, `agent_usage`,
 `notifications`, `graph`).
 
 Blockers are never stored. They are derived each time from `depends_on`,
-`waits_on` and `needs` relations, so they cannot go stale. `depends_on` is
+`waits_on` and `needs` links, so they cannot go stale. `depends_on` is
 other work that has to be closed first; `waits_on` is a person, company or
-agent who has to answer or act (say what for in the relation's `props.for`,
+agent who has to answer or act (say what for in the link's `props.for`,
 and remove the link once they have); `needs` is a resource.
 
 In a change, a title or note can name an item the same change makes: `{ref}`
@@ -289,7 +289,7 @@ Types live in files under `packs/`, one folder per pack:
 
 - `core`: the seven kinds of the work and the system kind, the common
   types of them (person, company, agent, goal, area, event, resource), the
-  system's own (lens, style, screen) and the root relations, which name
+  system's own (lens, style, screen) and the root links, which name
   kinds at their ends.
 - `work`, on in every workspace: project, task, decision, issue, meeting,
   idea, note, file, document and procedure, as `work.task` and so on.
@@ -573,10 +573,10 @@ tool). It merges, matching by id, and can be repeated as often as wanted, in
 either direction:
 
 - What the file has and the map lacks is added. Nothing is deleted.
-- An entity on both sides keeps whichever was edited later, as a whole. Two
-  edits to different fields of the same entity do not combine: the later one
+- An item on both sides keeps whichever was edited later, as a whole. Two
+  edits to different fields of the same item do not combine: the later one
   wins.
-- A relation ended on either side is ended; a proposal decided on either side
+- A link ended on either side is ended; a proposal decided on either side
   is decided; the file's history is added to the activity log.
 - Tokens and settings are not touched. Sessions still open where the file
   came from, and what they hold, are left out.
@@ -699,7 +699,7 @@ change that:
   - New things are **private to their author** unless created or edited as
     shared. An admin can flip that default with `workspace_set`.
   - Private means hidden from other members everywhere: search, by id,
-    relations, the graph, the activity log and every view. The database
+    links, the graph, the activity log and every view. The database
     enforces it (row level security), so no query has to remember to filter.
   - Each person's views are their own: "needs me" is what needs *them*.
   - Anyone can make an **agent token that acts for themselves**. That agent

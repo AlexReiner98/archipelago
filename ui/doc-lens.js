@@ -25,7 +25,7 @@ export function drawFrozen(host, answer, typeTitles = {}) {
   }
   // Every picture has a drawing: src/published.ts gives one to a picture frozen without.
   if (style.drawing) drawWith(body, answer, style, () => {});
-  else body.replaceChildren(h('div', { class: 'empty' }, 'This picture cannot be drawn here.'));
+  else body.replaceChildren(h('div', { class: 'empty' }, 'This view cannot be drawn here.'));
   const byId = new Map(answer.items.map((item) => [item.id, item]));
   // A part is a way to its page in the app; here it leads nowhere.
   body.addEventListener('click', (ev) => ev.target.closest?.('a') && ev.preventDefault());

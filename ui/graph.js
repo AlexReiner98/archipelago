@@ -75,7 +75,7 @@ export function graphView({ focus, key, defaults, extras } = {}) {
         'div',
         { class: 'toolbar fold-bar' },
         prefs.full && h('strong', { class: 'graph-title' }, data.nodes.find((n) => n.id === focus)?.title ?? 'The whole map'),
-        !extras?.workOnly && pick('kind', KIND_LABELS, 'Which relations to draw'),
+        !extras?.workOnly && pick('kind', KIND_LABELS, 'Which links to draw'),
         !extras?.workOnly && focus && pick('steps', [[1, 'Near'], [2, '2 steps'], [3, '3 steps']], 'How far out to draw'),
         h('span', { class: 'grow' }),
         h('button', { title: prefs.full ? 'Back to the page (Esc)' : 'Fill the window with the drawing', onclick: set({ full: !prefs.full }, false) }, prefs.full ? 'Close' : 'Full screen'),

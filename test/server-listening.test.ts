@@ -16,7 +16,7 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   await call('/agent/show', undefined, { actor: 'robot', lens: {} });
   assert.equal((await call('/api/pulse')).result.focus.hash, 'graph?lens', 'the whole map as it opens');
   assert.match((await call('/agent/show', undefined, { lens: { by: 'nope' } })).error, /unknown kind of link/);
-  assert.match((await call('/agent/show', undefined, { lens: { from: 'e_nothing0' } })).error, /No entity/);
+  assert.match((await call('/agent/show', undefined, { lens: { from: 'e_nothing0' } })).error, /No item/);
 
   await call('/agent/show', undefined, { actor: 'robot', screen: 'roadmap', of: 'e_x', note: 'Look here' });
   const shown = (await call('/api/pulse')).result.focus;

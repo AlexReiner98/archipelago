@@ -161,7 +161,7 @@ function proposalCard(p, names, done) {
       ...[
         section('New', (o) => o.op === 'create'),
         section('Updates', (o) => o.op === 'update'),
-        section('Relations', (o) => o.op === 'link' || o.op === 'unlink'),
+        section('Links', (o) => o.op === 'link' || o.op === 'unlink'),
         section('Other', (o) => !['create', 'update', 'link', 'unlink'].includes(o.op)),
       ].flat(Infinity),
     );

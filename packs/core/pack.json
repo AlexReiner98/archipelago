@@ -2,13 +2,13 @@
   "id": "core",
   "version": "0.1.0",
   "title": "Core",
-  "description": "The seven kinds every type extends, the root relations every relation extends, and the system tier.",
+  "description": "The kinds every type extends (the seven of the work, and system), the root links every link type extends, and the system tier.",
   "types": [
     {
       "id": "actor",
       "title": "Actor",
       "kind": true,
-      "description": "Holds authority, owns work and is waited on: a person, a company, an agent. One of the seven kinds every type extends.",
+      "description": "Holds authority, owns work and is waited on: a person, a company, an agent. One of the seven kinds of the work; every type extends one of them or the system kind.",
       "statuses": { "open": ["active"], "closed": ["inactive"] }
     },
     {
@@ -16,7 +16,7 @@
       "altitude": "workspace",
       "title": "Aim",
       "kind": true,
-      "description": "Why work exists: what serves points at, such as a goal or an area. One of the seven kinds every type extends.",
+      "description": "Why work exists: what serves points at, such as a goal or an area. One of the seven kinds of the work; every type extends one of them or the system kind.",
       "statuses": { "open": ["active"], "closed": ["achieved", "retired"] }
     },
     {
@@ -24,7 +24,7 @@
       "altitude": "step",
       "title": "Work",
       "kind": true,
-      "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. One of the seven kinds every type extends.",
+      "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. One of the seven kinds of the work; every type extends one of them or the system kind.",
       "statuses": { "open": ["todo", "doing"], "closed": ["done", "dropped"] }
     },
     {
@@ -32,7 +32,7 @@
       "altitude": "step",
       "title": "Question",
       "kind": true,
-      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. One of the seven kinds every type extends.",
+      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. One of the seven kinds of the work; every type extends one of them or the system kind.",
       "statuses": { "open": ["open"], "closed": ["settled", "dropped"] }
     },
     {
@@ -40,7 +40,7 @@
       "altitude": "step",
       "title": "Record",
       "kind": true,
-      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. One of the seven kinds every type extends.",
+      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. One of the seven kinds of the work; every type extends one of them or the system kind.",
       "statuses": { "open": ["current"], "closed": ["superseded"] }
     },
     {
@@ -48,14 +48,14 @@
       "altitude": "step",
       "title": "Occurrence",
       "kind": true,
-      "description": "Happens at a time, and can be a gate: an event, a meeting, a release. One of the seven kinds every type extends.",
+      "description": "Happens at a time, and can be a gate: an event, a meeting, a release. One of the seven kinds of the work; every type extends one of them or the system kind.",
       "statuses": { "open": ["upcoming"], "closed": ["happened", "cancelled"] }
     },
     {
       "id": "place",
       "title": "Place",
       "kind": true,
-      "description": "Exists somewhere, physical or not; work lives in it or uses it: a resource, a repository, a file. One of the seven kinds every type extends.",
+      "description": "Exists somewhere, physical or not; work lives in it or uses it: a resource, a repository, a file. One of the seven kinds of the work; every type extends one of them or the system kind.",
       "statuses": { "open": ["available"], "closed": ["retired"] }
     },
     {

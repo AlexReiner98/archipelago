@@ -150,7 +150,7 @@ test('inside a workspace, private things are hidden from other members by the da
   assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
 
   // Hidden means hidden everywhere: by id, in relations, the graph, the log and the views.
-  assert.match((await call('/api/get', sam, { id: mine.created.x })).error, /No entity/);
+  assert.match((await call('/api/get', sam, { id: mine.created.x })).error, /No item/);
   const project = await api(sam, 'get', { id: mine.created.p });
   assert.deepEqual(project.incoming.map((r: any) => r.title), ['Shared task']);
   const graph = await api(sam, 'view', { name: 'graph', params: { relations: 'all' } });

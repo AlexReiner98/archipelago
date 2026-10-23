@@ -29,7 +29,7 @@ async function briefs(l: Archipelago, ids: Iterable<string>): Promise<Map<string
 export async function brief(l: Archipelago, input: { task?: string }) {
   if (!input.task) throw new Error('brief needs "task": the id of the entity to work on');
   const task = await l.entity(input.task);
-  if (!task) throw new Error(`No entity "${input.task}"`);
+  if (!task) throw new Error(`No item "${input.task}"`);
 
   // The task, then what it is part of, outwards.
   const chain: Entity[] = [task];

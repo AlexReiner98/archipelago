@@ -46,7 +46,7 @@ export async function proofPart(rootId, withLog = false) {
     h(
       'a',
       { class: 'ptile', href: `#/e/${t.id}`, title: [t.title, t.compares, t.environment].filter(Boolean).join('\n') },
-      t.result?.stored ? kept(t.result) : t.result?.picture ? h('span', { class: 'shot muted small', title: `In the repository, not sent here: ${t.result.picture}` }, 'on disk') : h('span', { class: 'shot muted small' }, 'no picture'),
+      t.result?.stored ? kept(t.result) : t.result?.picture ? h('span', { class: 'shot muted small', title: `In the repository, not sent here: ${t.result.picture}` }, 'on disk') : h('span', { class: 'shot muted small' }, 'no image'),
       h('span', { class: 'cap' }, t.title),
       mark(t),
     );
@@ -89,7 +89,7 @@ export async function proofPart(rootId, withLog = false) {
           counts.tests > 0 && bar(counts.passed, counts.tests),
           h('span', { class: `pill${counts.answered === counts.questions ? ' ok' : ''}` }, `${counts.answered}/${counts.questions} answered`),
           counts.failed > 0 && h('span', { class: 'pill bad' }, `${counts.failed} failed`),
-          data.to_send?.length > 0 && h('span', { class: 'pill warn', title: `Public results whose picture is still only in its repository:\n${data.to_send.map((p) => p.picture).join('\n')}` }, `${data.to_send.length} picture${data.to_send.length === 1 ? '' : 's'} to send`),
+          data.to_send?.length > 0 && h('span', { class: 'pill warn', title: `Public results whose image is still only in its repository:\n${data.to_send.map((p) => p.picture).join('\n')}` }, `${data.to_send.length} image${data.to_send.length === 1 ? '' : 's'} to send`),
         ),
         h('ul', { class: 'tree top' }, data.proofs.map(question)),
       ),

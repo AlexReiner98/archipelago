@@ -215,3 +215,46 @@ test('the kernel draws no shape of its own: each is a drawing a pack ships', () 
   const counted = Object.fromEntries(['ui/lens.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
   assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/core/draw/architecture is.");
 });
+
+// 12. One name for each idea (docs/glossary.md; Rule 9 of the rework's target model, the owner, 23 Oct 2026). The
+// words it retires are counted in what a person or agent reads: the prose strings of the UI and of the tool and view
+// descriptions, leaving out comments, SQL, markup, `code spans` and "field" names. Frozen at what remains, 23 Oct 2026.
+const RETIRED_WORDS: Record<string, number> = {};
+const RETIRED = /\b(?:entit(?:y|ies)|relations?|knowledge graphs?|type packs?|pictures?|shapes?)\b/gi;
+
+/** The string literals of a file, comments skipped. A template's `${...}` is kept in its string, to be blanked. */
+function literals(text: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '/' && text[i + 1] === '/') { i = text.indexOf('\n', i); if (i < 0) break; continue; }
+    if (c === '/' && text[i + 1] === '*') { i = text.indexOf('*/', i + 2) + 1; if (i < 1) break; continue; }
+    if (c !== "'" && c !== '"' && c !== '`') continue;
+    let j = i + 1, depth = 0;
+    for (; j < text.length; j++) {
+      if (text[j] === '\\') { j++; continue; }
+      if (c === '`' && text[j] === '$' && text[j + 1] === '{') { depth++; j++; continue; }
+      if (depth && text[j] === '}') { depth--; continue; }
+      if (!depth && (text[j] === c || (c !== '`' && text[j] === '\n'))) break;
+    }
+    out.push(text.slice(i + 1, j));
+    i = j;
+  }
+  return out;
+}
+const prose = (s: string) =>
+  s.replace(/\$\{[^}]*\}/g, ' ').replace(/\\?`[^`]*\\?`/g, ' ').replace(/"[a-z_]+"/g, ' ').replace(/<[^>]*>/g, ' ');
+const isProse = (s: string) => (/[a-z] [a-z]/i.test(s) || /^[A-Z][a-z]/.test(s)) && !/\b(?:select|insert|update|delete)\b[\s\S]*\b(?:from|into|set|where)\b/i.test(s);
+
+test('the UI and the tools use one name for each idea', () => {
+  const files = [
+    ...walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f)),
+    ...walk('src').filter((f) => /^src\/(?:tools|views|declared|[a-z-]+-tools)\.ts$/.test(f)),
+  ];
+  const counted = Object.fromEntries(
+    files
+      .map((f) => [f, literals(read(f)).map(prose).filter(isProse).reduce((n, s) => n + (s.match(RETIRED)?.length ?? 0), 0)] as const)
+      .filter(([, n]) => n > 0),
+  );
+  assert.deepEqual(ratchet(counted, RETIRED_WORDS), [], 'Say it with the word docs/glossary.md gives: item, link, the map, pack, view, drawing.');
+});

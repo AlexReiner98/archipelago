@@ -57,7 +57,7 @@ const NAME = `A name, not a sentence: ${TITLE_MAX} characters at most. What else
 const op = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('create'),
-    ref: z.string().optional().describe('A name for this new entity that later ops in the same change can use in place of an id.'),
+    ref: z.string().optional().describe('A name for this new item that later ops in the same change can use in place of an id.'),
     type: z.string(),
     title: z.string().describe(NAME),
     body: z.string().optional(),
@@ -86,24 +86,24 @@ const op = z.discriminatedUnion('op', [
   }),
   z.object({
     op: z.literal('link'),
-    type: z.string().describe('A relation type, e.g. depends_on.'),
+    type: z.string().describe('A link type, e.g. depends_on.'),
     from: z.string().describe('Id or ref.'),
     to: z.string().describe('Id or ref.'),
     props: props.optional(),
     confidence: confidence.optional(),
     source: opSource,
   }),
-  z.object({ op: z.literal('unlink'), relation: z.string().describe('The relation id, from the get tool.') }),
+  z.object({ op: z.literal('unlink'), relation: z.string().describe('The link\'s id, from the get tool.') }),
   z.object({ op: z.literal('archive'), id: z.string() }),
-  z.object({ op: z.literal('restore'), id: z.string().describe('An archived entity to bring back.') }),
-  z.object({ op: z.literal('merge'), keep: z.string(), drop: z.string().describe('Its relations move to keep, then it is archived.') }),
+  z.object({ op: z.literal('restore'), id: z.string().describe('An archived item to bring back.') }),
+  z.object({ op: z.literal('merge'), keep: z.string(), drop: z.string().describe('Its links move to keep, then it is archived.') }),
   z.object({
     op: z.literal('define_type'),
     type: z.object({
       id: z.string().describe('Must look like "local.my_type".'),
       title: z.string(),
       description: z.string(),
-      extends: z.string().optional().describe('Needed: one of the seven kinds (actor, aim, work, question, record, occurrence, place) or a type of one; it inherits fields, statuses and the kind.'),
+      extends: z.string().optional().describe('Needed: one of the seven kinds of the work (actor, aim, work, question, record, occurrence, place) or a type of one; it inherits fields, statuses and the kind.'),
       statuses: z.object({ open: z.array(z.string()).min(1), closed: z.array(z.string()) }).optional(),
       fields: z.record(z.string(), field).optional(),
       deliverable: z.boolean().optional().describe('true when it is made for a reader or a customer, like a document or a release: what it is part of names it under its title.'),
@@ -303,12 +303,12 @@ type Refused = { who: string; input: Record<string, unknown> & { ops: unknown[] 
 
 export const TOOLS: Record<string, Tool> = {
   schema: {
-    description: 'Describe the map\'s model: every entity type with its statuses and the fields you set, and every relation with its ends. Read this before writing. With type (a type, a relation or a pack): those whole, each field explained; full: true for everything, screens and verbs too.',
-    input: { type: z.string().optional().describe('A type, a relation or a pack, by its id as the brief lists it.'), full: z.boolean().optional() },
+    description: 'Describe the map\'s model: every type of item with its statuses and the fields you set, and every link type with its ends. Read this before writing. With type (a type, a link type or a pack): those whole, each field explained; full: true for everything, screens and verbs too.',
+    input: { type: z.string().optional().describe('A type, a link type or a pack, by its id as the brief lists it.'), full: z.boolean().optional() },
     run: async (l, actor, input) => input.type ? schemaOf(l.registry.describe(), input.type) : actor.kind === 'human' || input.full ? withStyles(l, await withScreens(l, l.registry.describe())) : schemaBrief(l.registry),
   },
   search: {
-    description: 'Find entities by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. Always search before creating, to avoid duplicates.',
+    description: 'Find items by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. Always search before creating, to avoid duplicates.',
     input: {
       q: z.string().optional().describe('Matches title and body.'),
       type: z.string().optional(),
@@ -321,7 +321,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => l.search(input),
   },
   get: {
-    description: 'One entity in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the pictures it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in) and its relations in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
+    description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
     input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe('Taken, and changes nothing here: the whole record is in events, with full: true.') },
     run: async (l, actor, input) => {
       const found = { ...(await l.get(input.id)), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
@@ -355,7 +355,7 @@ export const TOOLS: Record<string, Tool> = {
     description: 'The activity log, newest first: every change to the map and every imported external tool call, with who did it and why. A change set logs an event for each thing it touched; its reason and authority are on the first of them.',
     input: {
       since: z.string().optional().describe('ISO date-time.'),
-      target: z.string().optional().describe('An entity id.'),
+      target: z.string().optional().describe('An item id.'),
       actor: z.string().optional().describe('e.g. "agent:claude" or "human:local".'),
       by: z.string().optional().describe('Only what this actor did, e.g. "agent:reader" or "human:owner". For an agent, whose own name travels as actor, this is the filter.'),
       before: z.number().int().positive().optional().describe('Only events older than this seq: the seq of the oldest event of the answer before, to read the log back a page at a time.'),
@@ -393,10 +393,10 @@ export const TOOLS: Record<string, Tool> = {
   },
   import_backup: {
     description:
-      'Merge a backup file into this workspace, matching by id. Nothing is deleted: what the file has and this map lacks is added; an entity on both sides keeps whichever was edited later; ' +
-      'a relation ended or a proposal decided on either side is ended or decided; the file’s history is added to the activity log. Tokens and settings are not touched, and sessions still open in the file are left out. ' +
+      'Merge a backup file into this workspace, matching by id. Nothing is deleted: what the file has and this map lacks is added; an item on both sides keeps whichever was edited later; ' +
+      'a link ended or a proposal decided on either side is ended or decided; the file’s history is added to the activity log. Tokens and settings are not touched, and sessions still open in the file are left out. ' +
       'Without `apply` nothing changes and the answer says what would. With it, the server backs up first. Admins only.' +
-      ' If the file\u2019s owner and this workspace\u2019s are different people entities, the answer names both as `owners`; see `same_owner`.',
+      ' If the file\u2019s owner and this workspace\u2019s are different people, the answer names both as `owners`; see `same_owner`.',
     humanOnly: true,
     input: {
       backup: z.string().min(1).describe('The backup file (.json.gz) in base64.'),
@@ -475,17 +475,17 @@ export const TOOLS: Record<string, Tool> = {
   },
   show: {
     description:
-      'Point the human\'s web UI at something, so they can follow what you are doing: an entity, a screen (optionally "of" one entity: the graph around it, or a project\'s roadmap), or a picture of the map (a lens, with a style). ' +
+      'Point the human\'s web UI at something, so they can follow what you are doing: an item, a screen (optionally "of" one item: the graph around it, or a project\'s roadmap), or a view of the map (a lens, with a style). ' +
       'Their page goes there within a couple of seconds if they have "Follow agents" on. Add a short note saying what they are looking at. ' +
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
     input: {
-      entity: z.string().optional().describe('An entity id: open its page.'),
+      entity: z.string().optional().describe('An item id: open its page.'),
       screen: z.enum(['today', 'review', 'map', 'graph', 'roadmap', 'questions', 'automations', 'activity', 'workspace']).optional(),
-      of: z.string().optional().describe('With screen graph, roadmap or questions: the entity (for the last two, a project) it is drawn for.'),
+      of: z.string().optional().describe('With screen graph, roadmap or questions: the item (for the last two, a project) it is drawn for.'),
       lens: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('A picture of the map, drawn on the graph screen for this one look: the params of the lens view (from, story, kinds, by, over, far, lanes, order, measure, fold). {} is the whole map as it opens; story: a run id draws what that session told of.'),
+        .describe('A view of the map, drawn on the graph screen for this one look: the params of the lens view (from, story, kinds, by, over, far, lanes, order, measure, fold). {} is the whole map as it opens; story: a run id draws what that session told of.'),
       style: z
         .object({
           lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
@@ -493,14 +493,14 @@ export const TOOLS: Record<string, Tool> = {
           id: z.string().optional().describe('A style kept on the map (an item of type style), drawn with for this one look.'),
         })
         .optional()
-        .describe('How the picture is drawn, for this one look. The style a picture opens in is kept on the map: an item of type style, about the project or item it is for, or about nothing for the whole workspace; change it with change.'),
+        .describe('How the view is drawn, for this one look. The style a view opens in is kept on the map: an item of type style, about the project or item it is for, or about nothing for the whole workspace; change it with change.'),
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
     },
     run: async (l, actor, input) => {
       if (input.lens || input.style) {
         // Read as the lens view reads it, so a lens the page could not draw is refused here and not on the owner's screen.
         const asked = readLens(l, input.lens ?? {});
-        if (asked.from && !(await l.entity(asked.from))) throw new Error(`No entity "${asked.from}"`);
+        if (asked.from && !(await l.entity(asked.from))) throw new Error(`No item "${asked.from}"`);
         const query = new URLSearchParams();
         for (const [key, value] of Object.entries(input.lens ?? {})) if (key in asked || key === 'lens') query.set(key, Array.isArray(value) ? value.join(',') : String(value));
         if (input.style?.lit) query.set('lit', input.style.lit);
@@ -618,7 +618,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   undo: {
     description:
-      'Reverse one change set (its id is on every event it logged) by applying the opposite as a new change: created entities are archived, edits put back, links removed or restored. An edit changed again since is left alone and reported. Subject to the same policy as any change.',
+      'Reverse one change set (its id is on every event it logged) by applying the opposite as a new change: created items are archived, edits put back, links removed or restored. An edit changed again since is left alone and reported. Subject to the same policy as any change.',
     input: { changeset: z.string() },
     run: async (l, actor, input) => undo(l, actor, input),
   },
@@ -646,7 +646,7 @@ export const TOOLS: Record<string, Tool> = {
     description: 'Register this agent session in the map so the human can see it. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',
     input: {
       title: z.string().optional().describe('A few words on what this session is for.'),
-      task: z.string().optional().describe('Id of the entity being worked on.'),
+      task: z.string().optional().describe('Id of the item being worked on.'),
       surface: z.string().optional().describe('Where you are running, e.g. claude-code, claude-desktop.'),
       cwd: z.string().optional().describe('Your working directory. Used to find the repository.'),
       remote: z.string().optional().describe('The address the checkout was cloned from (git remote origin). Finds the repository on any machine; the directory is used when this is not given or not known.'),
@@ -667,7 +667,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   tell: {
     description:
-      'Tell the story of your session as you work, so the owner sees what you see: one beat at a time, what you have concluded and why, in a sentence (said), the items it is about, and the ties between them you want seen (links, each saying in a few words what ties the two: "blocks", "is why", "same fault as"). Tell what matters, not every step: a cause, a choice and its reason, what stands in the way. Your session’s page opens on your finding: send finding: true with what you have found so far, said whole for someone who has read nothing else (a few plain sentences: the point, what it rests on, what is left; item ids in it are shown as their names), its items and the ties between them, which are its picture. Send a new finding whenever what you have found changes; the beats are the history under it. When you change your mind, take the old beat back with replaces (its number) and say what you think now. Takes effect at once.',
+      'Tell the story of your session as you work, so the owner sees what you see: one beat at a time, what you have concluded and why, in a sentence (said), the items it is about, and the ties between them you want seen (links, each saying in a few words what ties the two: "blocks", "is why", "same fault as"). Tell what matters, not every step: a cause, a choice and its reason, what stands in the way. Your session’s page opens on your finding: send finding: true with what you have found so far, said whole for someone who has read nothing else (a few plain sentences: the point, what it rests on, what is left; item ids in it are shown as their names), its items and the ties between them, which are what it draws. Send a new finding whenever what you have found changes; the beats are the history under it. When you change your mind, take the old beat back with replaces (its number) and say what you think now. Takes effect at once.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
       said: z.string().min(1).describe('What you concluded and why, in a sentence or two: 280 characters at most.'),
@@ -705,7 +705,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   picture_put: {
     description:
-      'Keep a picture for one item: the picture a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text, or a still of a lens, which a link to a document shows where the app draws the lens live. A test result\u2019s only when the result is shown in public: until then the picture stays in the repository it was made in, and the result says where (its picture field). One picture per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
+      'Keep an image for one item: the screenshot a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text, or a still of a lens, which a link to a document shows where the app draws the lens live. A test result\u2019s only when the result is shown in public: until then the image stays in the repository it was made in, and the result says where (its `picture` field). One image per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
     input: {
       result: z.string().describe('The id of the test result, or of the note or file the figure belongs to.'),
       data: z.string().min(1).describe('The file, as base64.'),
@@ -714,7 +714,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => putPicture(l, actor, input),
   },
   picture: {
-    description: 'The picture kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; the document tool, which sections have a figure).',
+    description: 'The image kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; the document tool, which sections have a figure).',
     input: { result: z.string().describe('The id of the test result, note or file.') },
     run: async (l, _actor, input) => getPicture(l, input),
   },
@@ -743,7 +743,7 @@ export const TOOLS: Record<string, Tool> = {
       title: z.string().min(1).describe('The whole message in one line if possible.'),
       body: z.string().optional(),
       level: z.enum(['info', 'warning', 'urgent']).optional(),
-      about: z.string().optional().describe('Id of the entity it concerns.'),
+      about: z.string().optional().describe('Id of the item it concerns.'),
     },
     run: async (l, actor, input) => notify(l, actor, input),
   },
@@ -867,7 +867,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => l.decide(actor, input),
   },
   init: {
-    description: 'Set the workspace owner, creating their person entity if needed.',
+    description: 'Set the workspace owner, creating their person item if needed.',
     humanOnly: true,
     input: { name: z.string().min(1), email: z.string().optional() },
     run: async (l, actor, input) => {

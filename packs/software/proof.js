@@ -45,7 +45,7 @@ export async function proof(input, ctx) {
     return { products: [...counts.values()].sort((a, b) => b.questions - a.questions || a.title.localeCompare(b.title)) };
   }
   const root = input.of ? await ctx.read({ get: input.of }) : undefined;
-  if (input.of && !root) throw new Error(`No entity "${input.of}"`);
+  if (input.of && !root) throw new Error(`No item "${input.of}"`);
   const scope = await under(ctx, input.within ?? [root.id]);
   const mine = [];
   for (const q of questions) if (scope.has(q.id) || (await ctx.read({ related: q.id, relation: 'about', fields: [] })).some((e) => scope.has(e.id))) mine.push(q);
@@ -126,7 +126,7 @@ export async function proof(input, ctx) {
 export async function changelog(input, ctx) {
   if (!input.of) throw new Error('changelog needs "of": the id of a project or feature.');
   const root = await ctx.read({ get: input.of });
-  if (!root) throw new Error(`No entity "${input.of}"`);
+  if (!root) throw new Error(`No item "${input.of}"`);
   // Asked for the public page, the scope is given: what is public under the product, whatever lies between.
   const scope = input.within ? new Map(input.within.map((id) => [id, undefined])) : await under(ctx, [root.id]);
   if (!input.within) scope.delete(root.id);

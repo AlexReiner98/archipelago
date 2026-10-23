@@ -238,7 +238,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   if (holding) (delete style.code, (style.shape = 'flow'));
   // And when things happen, as a calendar of days, each person a lane.
   if (when) (delete style.code, (style.shape = 'time'), (style.layout = 'calendar'));
-  if (asked.from && !all.has(asked.from)) throw new Error(`No entity "${asked.from}"`);
+  if (asked.from && !all.has(asked.from)) throw new Error(`No item "${asked.from}"`);
 
   const isA = (type: string, kind: string) => l.registry.isA(type, kind);
   // The system kind (a lens, a style, a run) is how the map is kept and looked at, not part of what is seen.

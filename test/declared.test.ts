@@ -98,7 +98,7 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['work.task'], pieces: [{ piece: 'view', view: 'demo.none' }] }]), /declares no view "demo.none" of rows/);
   assert.throws(bad([{ id: 's', title: 'S', on: ['work.task'], pieces: [{ piece: 'gate' }] }]), /must be named "demo.<name>"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', nav: true, pieces: [{ piece: 'page', page: 'nowhere' }] }]), /draws no page "nowhere"/);
-  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['work.task'], pieces: [{ piece: 'picture', lens: {}, style: { code: 'x' } }] }]), /a picture's style has no code/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['work.task'], pieces: [{ piece: 'picture', lens: {}, style: { code: 'x' } }] }]), /a view's style has no code/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', pieces: [{ piece: 'note', text: 'Hi' }] }]), /the kinds or types it is on or a place offered in the nav/);
   assert.doesNotThrow(bad([{ id: 'demo.s', title: 'S', on: ['work'], pieces: [{ piece: 'note', text: 'Hello' }] }]));
 });

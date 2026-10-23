@@ -81,7 +81,7 @@ test('a proof question is answered on a build when every test of it passed there
   assert.deepEqual([older.counts.passed, older.counts.failed, older.counts.not_run], [0, 1, 1]);
   const listed = (await handler['software.proof']({}, ctx)).answer;
   assert.deepEqual(listed.products, [{ id: 'prod', type: 'work.project', title: 'Apex', status: 'open', questions: 2 }]);
-  await assert.rejects(handler['software.proof']({ of: 'nowhere' }, ctx), /No entity "nowhere"/);
+  await assert.rejects(handler['software.proof']({ of: 'nowhere' }, ctx), /No item "nowhere"/);
 });
 
 test('a changelog is what is built or shipped, with its release, built and unreleased first', async () => {

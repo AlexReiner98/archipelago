@@ -19,7 +19,7 @@ you choose that.
 
 - **Home:** each project's open questions and its next release.
 - **One page per item:** its fields, its note folded to the point, and a
-  picture of what it is tied to and what blocks it.
+  view of what it is tied to and what blocks it.
 - **Changes:** what agents sent, to apply, trim or decline, and what they
   changed on their own, each with Undo.
 - **Sessions that tell their story:** each agent session registers itself,
@@ -43,7 +43,7 @@ npm run demo
 
 Open `http://127.0.0.1:3200`: a map of Archipelago itself, with a release
 waiting on you, two open questions and an agent's proposal on **Changes**.
-The picture above is its project page, drawn by a style of its own
+The screenshot above is its project page, drawn by a style of its own
 ([examples/demo/overview.js](examples/demo/overview.js)).
 
 For your own map, `npm start` and open `http://127.0.0.1:3100`, go to
@@ -78,6 +78,7 @@ One Node server with a persistent disk. Set `PELAGO_HOST=0.0.0.0`, `PELAGO_AUTH=
 
 - [Reference](docs/reference.md): every screen, tool, view, setting and
   limit.
+- [Glossary](docs/glossary.md): the one word for each idea.
 - [CONTRIBUTING.md](CONTRIBUTING.md) to work on Archipelago itself. It is
   published as it is, with no promise of answers or fixes.
 - [SECURITY.md](SECURITY.md) to report a security problem in private.

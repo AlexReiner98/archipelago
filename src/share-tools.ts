@@ -19,7 +19,7 @@ export const SHARE_TOOLS: Record<string, Tool> = {
   document: {
     description:
       'A document read whole, as its reader meets it: its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. A document another workspace shares with this one (sys.shared_document) is read from that workspace once it is accepted. ' +
-      'To write one, make an item of type work.document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its picture, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
+      'To write one, make an item of type work.document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its view, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
     input: { id: z.string() },
     run: async (l, _actor, input) => readAny(l, input.id),
   },
@@ -48,7 +48,7 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => endShare(l, actor, input.id),
   },
   publish: {
-    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as pictures a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with publish_ask.',
+    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with publish_ask.',
     input: { id: z.string().describe('The document.'), authority },
     run: async (l, actor, input) => publish(l, actor, input.id, input.authority),
   },

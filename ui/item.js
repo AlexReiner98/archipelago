@@ -179,7 +179,7 @@ export async function entity(id, here) {
       data.shown_in?.length > 0 &&
         h(
           'div',
-          { class: 'delivers shown-in', title: 'The pictures this is drawn in' },
+          { class: 'delivers shown-in', title: 'The views this is drawn in' },
           h('span', { class: 'muted small' }, 'Shown in'),
           data.shown_in.map((v) => [
             h('a', { class: 'trail-view', href: `#/graph?from=${v.of.id}&lens=${v.id}&here=${id}`, title: `Open "${v.title}" of ${v.of.title}, with this marked in it` }, v.title),
@@ -211,7 +211,7 @@ export async function entity(id, here) {
       h('span', { class: 'grow' }),
       !e.archived_at && h('button', { onclick: edit }, 'Edit'),
       menu('More', [
-        !e.archived_at && ties.any && ['Edit relations', ties.open],
+        !e.archived_at && ties.any && ['Edit links', ties.open],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.
         ...(e.archived_at ? [] : actionsFor(e.type).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),
@@ -230,7 +230,7 @@ export async function entity(id, here) {
         shown && [
           shown.published ? 'Publish again' : 'Publish',
           async () =>
-            (await ask({ title: `Publish "${e.title}"?`, message: 'Anyone will be able to read it at its own address, with no login, and search engines to list it: its text, the sections it holds that are shared with the workspace and its pictures, as they are now. What you change afterwards stays a draft until you publish again.', action: 'Publish', danger: !shown.published })) &&
+            (await ask({ title: `Publish "${e.title}"?`, message: 'Anyone will be able to read it at its own address, with no login, and search engines to list it: its text, the sections it holds that are shared with the workspace and its views, as they are now. What you change afterwards stays a draft until you publish again.', action: 'Publish', danger: !shown.published })) &&
             api('publish', { id }).then(again, (err) => tell('It was not published', err.message)),
         ],
         shown?.published && ['Unpublish', async () => (await ask({ title: `Unpublish "${e.title}"?`, message: 'Its address will answer nothing; it stays shared with the workspace.', action: 'Unpublish', danger: true })) && api('unpublish', { id }).then(again, (err) => tell('It was not unpublished', err.message))],

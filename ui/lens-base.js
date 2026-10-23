@@ -4,7 +4,7 @@
 import { h } from './base.js';
 
 export const LIT = [
-  ['all', 'All', 'Everything in the picture'],
+  ['all', 'All', 'Everything in the view'],
   ['you', 'Needs you', 'Only what needs you stays lit: it waits on you, is yours to confirm, is due, or is yours to settle'],
   ['blocked', 'Blocked', 'Only what is blocked stays lit'],
 ];

@@ -92,14 +92,14 @@ const GRAPH_LIMIT = 400;
 /** Nodes and edges for drawing: the whole map under a preset, or the neighbourhood of one entity. */
 async function graph(l: Archipelago, input: { focus?: string; depth?: number; relations?: string; include_closed?: boolean; include_system?: boolean }) {
   const preset = input.relations ?? (input.focus ? 'all' : 'blocking');
-  if (!(preset in GRAPH_PRESETS)) throw new Error(`relations must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
+  if (!(preset in GRAPH_PRESETS)) throw new Error(`\`relations\` (which links to draw) must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
   const only = GRAPH_PRESETS[preset] && l.registry.relationFamily(...GRAPH_PRESETS[preset]);
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, created_at from entity where archived_at is null`);
   const system = (type: string) => l.registry.type(type)?.system ?? false;
   const eligible = new Map(
     entities.filter((e) => e.id === input.focus || ((input.include_closed || e.is_open) && (input.include_system || !system(e.type)))).map((e) => [e.id, e]),
   );
-  if (input.focus && !eligible.has(input.focus)) throw new Error(`No entity "${input.focus}"`);
+  if (input.focus && !eligible.has(input.focus)) throw new Error(`No item "${input.focus}"`);
   const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(
     `select id, type, from_id, to_id from relation where valid_to is null and ($1::text[] is null or type = any($1::text[]))`,
     [only ?? null],
@@ -215,7 +215,7 @@ async function tree(l: Archipelago, input: { tree?: string; root?: string }) {
     return { tree: about, roots: roots.sort((a, b) => b.branches - a.branches || a.title.localeCompare(b.title)) };
   }
   const root = byId.get(input.root);
-  if (!root) throw new Error(`No entity "${input.root}"`);
+  if (!root) throw new Error(`No item "${input.root}"`);
 
   const { rows: sessions } = await l.db.query<{ target: string; id: string; title: string }>(
     `select r.to_id as target, s.id, s.title from relation r join entity s on s.id = r.from_id
@@ -299,7 +299,7 @@ async function gate(l: Archipelago, input: { event?: string }) {
     return { events: events.map((e) => ({ id: e.id, type: e.type, title: e.title, status: e.status, at: (e.props.at as string | undefined) ?? null, holding: from('depends_on', e.id).length })) };
   }
   const event = byId.get(input.event);
-  if (!event) throw new Error(`No entity "${input.event}"`);
+  if (!event) throw new Error(`No item "${input.event}"`);
   if (!l.registry.isA(event.type, 'event')) throw new Error(`gate needs an event (a release, a launch, a deadline); "${event.title}" is a ${event.type}`);
 
   const kids = new Map<string, string[]>();
@@ -416,7 +416,7 @@ async function gate(l: Archipelago, input: { event?: string }) {
     to_sort: toSort.sort((a, b) => (a.stream?.title ?? '').localeCompare(b.stream?.title ?? '') || a.title.localeCompare(b.title)),
     streams: out,
     can_follow: deferred.map((r) => ({ ...slim(byId.get(r.to_id)!), open: byId.get(r.to_id)!.is_open, relation: r.id })),
-    how: 'To sort an item: link the event to it with depends_on (the event waits for it) or defers (it can follow). To move one across, unlink the relation given here and link the other.',
+    how: 'To sort an item: link the event to it with depends_on (the event waits for it) or defers (it can follow). To move one across, unlink the link given here and link the other.',
   };
 }
 
@@ -451,7 +451,7 @@ export const VIEWS: Record<string, View> = {
   },
   graph: {
     description:
-      'Nodes and edges for drawing the map. Params: relations (blocking, structure or all), focus (an entity id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system.',
+      'Nodes and edges for drawing the map. Params: `relations` (blocking, structure or all), focus (an item id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system.',
     run: graph,
   },
   hubs: {
@@ -461,18 +461,18 @@ export const VIEWS: Record<string, View> = {
   },
   lens: {
     description:
-      'What is in a picture, as data of one fixed shape, whatever is asked: `lens` (the lens as it was read), `items` (each with what it is `inside`, its `place` among those beside it, its `size`, its `state`: blocked, who it waits on, sessions at work; and `within`: the same counted over everything inside it, sent or not), `links` (kind, from, to, and how many each stands for: a link whose end was not sent is moved up to the nearest thing that was) and `rest` (how many items were left out, by reason). The lens is the built-in one, under the view chosen (an item of type lens: about the item the picture is of, or about nothing for any picture), under what is asked here: a field that is named replaces it whole. How it looks is not decided here: `style` is what the map keeps for the page that draws (items of type style, combined the same way), passed on as it is, and `kept` names the lenses and styles that went in. Every lens that applies can be chosen: `views` names them in order (those about the item asked for, then "holding": what the item waits on, step by step, and nothing else, offered while some of it is open; then "when": what is in it placed in time, a week at a time, each person a lane and the sessions on it one more, offered while any of it is dated; then the workspace’s, which are about nothing; each by place); an item opens on its first own view that is not a shortcut, else on "holding" when it is offered, else on what is in it, `view` says which this is (the first, unless lens names another; a field it does not name is the built-in one), one whose own from is another item is a shortcut to there (`to`), `controls` says what the person may change on the page, and `hub` says whether the item holds enough to be a hub. `said` is the lens in words. Params, each optional: lens and style (the id of one kept on the map, used outright; lens "holding" for what holds an item, "when" for when what is in it happens, with time to move the week; "in" for what is in it), from (an entity id; without it, the whole map), kinds (types to keep, or "work"; with a leading "-", to leave out), by (the kind of link that says what is inside what; part_of), over (the kinds of link sent along, or "all"; depends_on and waits_on), far (steps down from the start), lanes (stage, link or person: what each item is filed under, as `lane`), order (the number field that orders things beside each other; order), measure (work or tokens), fold (what to leave out, of: closed, system, unlinked; all three).',
+      'What is in a view, as data of one fixed form, whatever is asked: `lens` (the lens as it was read), `items` (each with what it is `inside`, its `place` among those beside it, its `size`, its `state`: blocked, who it waits on, sessions at work; and `within`: the same counted over everything inside it, sent or not), `links` (kind, from, to, and how many each stands for: a link whose end was not sent is moved up to the nearest thing that was) and `rest` (how many items were left out, by reason). The lens is the built-in one, under the view chosen (an item of type lens: about the item the view is of, or about nothing for any view), under what is asked here: a field that is named replaces it whole. How it looks is not decided here: `style` is what the map keeps for the page that draws (items of type style, combined the same way), passed on as it is, and `kept` names the lenses and styles that went in. Every lens that applies can be chosen: `views` names them in order (those about the item asked for, then "holding": what the item waits on, step by step, and nothing else, offered while some of it is open; then "when": what is in it placed in time, a week at a time, each person a lane and the sessions on it one more, offered while any of it is dated; then the workspace’s, which are about nothing; each by place); an item opens on its first own view that is not a shortcut, else on "holding" when it is offered, else on what is in it, `view` says which this is (the first, unless lens names another; a field it does not name is the built-in one), one whose own from is another item is a shortcut to there (`to`), `controls` says what the person may change on the page, and `hub` says whether the item holds enough to be a hub. `said` is the lens in words. Params, each optional: lens and style (the id of one kept on the map, used outright; lens "holding" for what holds an item, "when" for when what is in it happens, with time to move the week; "in" for what is in it), from (an item id; without it, the whole map), kinds (types to keep, or "work"; with a leading "-", to leave out), by (the kind of link that says what is inside what; part_of), over (the kinds of link sent along, or "all"; depends_on and waits_on), far (steps down from the start), lanes (stage, link or person: what each item is filed under, as `lane`), order (the number field that orders things beside each other; order), measure (work or tokens), fold (what to leave out, of: closed, system, unlinked; all three).',
     run: lens,
   },
   tree: {
     description:
-      'A tree a pack declares over "is part of", such as software.roadmap: one root and its branches in order, the work under each, progress rolled up, and what is being worked on now. Params: root (an entity id; without it, the roots to choose from), tree (needed only when packs declare more than one).',
+      'A tree a pack declares over "is part of", such as software.roadmap: one root and its branches in order, the work under each, progress rolled up, and what is being worked on now. Params: root (an item id; without it, the roots to choose from), tree (needed only when packs declare more than one).',
     run: tree,
   },
 
   gate: {
     description:
-      'An event as a gate (a release, a launch): what it waits for (everything it depends_on), grouped by stream (the feature or project each is part of) with progress and what the owner owes; what it goes ahead without (what it defers); what is not yet sorted (open tasks, issues and decisions under what it ships, on neither side); and how we know (the proof questions of what it ships and of what holds it, answered or not on the release\u2019s build: its version). Params: event (an entity id; without it, the open events that have a gate).',
+      'An event as a gate (a release, a launch): what it waits for (everything it depends_on), grouped by stream (the feature or project each is part of) with progress and what the owner owes; what it goes ahead without (what it defers); what is not yet sorted (open tasks, issues and decisions under what it ships, on neither side); and how we know (the proof questions of what it ships and of what holds it, answered or not on the release\u2019s build: its version). Params: event (an item id; without it, the open events that have a gate).',
     run: gate,
   },
 
@@ -493,11 +493,11 @@ export const VIEWS: Record<string, View> = {
     run: brief,
   },
   saved_views: {
-    description: 'Every picture kept on the map (a lens, named by the style that draws it), with what it is a picture of: pinned first, then the newest. Params: limit (100).',
+    description: 'Every view kept on the map (a lens, named by the style that draws it), with what it is a view of: pinned first, then the newest. Params: limit (100).',
     run: (l, input) => savedViews(l, input as { limit?: number }),
   },
   style: {
-    description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page and the pages that are not pictures are drawn by. Params: of (an entity id).',
+    description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page and the pages that are not views are drawn by. Params: of (an item id).',
     run: (l, input) => pageStyle(l, input),
   },
 };

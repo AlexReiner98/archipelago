@@ -293,7 +293,7 @@ say({ type: 'ready' });
       const t0 = performance.now();
       try {
         made = await load(said.modules, blob).catch(() => load(said.modules, data));
-        if (typeof made.picture !== 'function') throw new Error('A drawing must export a function picture(input, tools) that answers with { scene }');
+        if (typeof made.picture !== 'function') throw new Error('A drawing must export a function `picture(input, tools)` that answers with { scene }');
         post({ type: 'loaded', took: performance.now() - t0 });
       } catch (err) {
         made = undefined;
