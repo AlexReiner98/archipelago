@@ -7,6 +7,7 @@ import { layout } from './layout.js';
 import { css as base } from './look.js';
 import { m, titled } from './marks.js';
 import { play } from './play.js';
+import { saysSpots } from './says.js';
 import { css as storyLook } from './story-look.js';
 
 const NAME = /^[a-z][a-z0-9_]*$/;
@@ -162,6 +163,17 @@ export function story({ answer, style, reduced }, tools) {
   };
   const wireAt = (c) => c.points.map(([px, py]) => [px + shift, py]);
   for (const f of frames) for (const n of f.parts.values()) ((n.x0 = f.g.x.get(n.id)), (n.y0 = f.g.y.get(n.id)));
+  // What a wire carries, written on it where the still picture would write it; and whether the step lights it.
+  for (const f of frames) {
+    const labels = [...f.wires.values()].filter((c) => c.says).map((c) => ({ c, text: fit(c.says, z('says_most'), z('says_text')) }));
+    f.says = new Map(saysSpots({ labels, chains: [...f.wires.values()], boxes: f.g.boxes, measure, z }).map((s) => [s.c.key, s]));
+    const lit = new Set((f.step.lit ?? []).map((w) => [...w].sort().join(' ')));
+    f.lit = new Set([...f.wires.values()].filter((c) => lit.has([c.a, c.b].sort().join(' '))).map((c) => c.key));
+  }
+  const saysAt = (key, f) => {
+    const s = f.says.get(key);
+    return s && { r: { x: s.x + shift - s.w / 2, y: s.y - z('says_height') / 2, width: s.w, height: z('says_height') }, t: { x: s.x + shift, y: s.y }, text: s.text };
+  };
 
   // Every mark there will ever be, first as nothing at all.
   const everyPart = new Map(), everyPlace = new Map(), everyWire = new Map();
@@ -185,10 +197,11 @@ export function story({ answer, style, reduced }, tools) {
     const pts = wireAt(c);
     return [m('path', { key: `w:${keyOf(key)}`, d: pathOf(pts), pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 0, class: 'ar-wire wired sp-off', opacity: 0 }), m('path', { key: `h:${keyOf(key)}`, d: heads(pts, c), class: 'ar-head wired sp-off', opacity: 0 })];
   });
-  const svg = m('svg', { key: 'svg', viewBox: `0 0 ${right - left} ${tall}`, role: 'img', 'aria-label': `How the system came to be, in ${frames.length} steps` }, placeMarks.map((p) => p.box), wireMarks, m('g', { key: 'breaks' }), placeMarks.map((p) => p.name), partMarks);
+  const saysMarks = [...everyWire.keys()].filter((key) => frames.some((f) => f.says.has(key))).map((key) => m('g', { key: `s:${keyOf(key)}`, class: 'ar-says sp-off', opacity: 0 }, m('rect', { key: `s:${keyOf(key)}:r`, rx: z('says_height') / 2 }), m('text', { key: `s:${keyOf(key)}:t` }, '')));
+  const svg = m('svg', { key: 'svg', viewBox: `0 0 ${right - left} ${tall}`, role: 'img', 'aria-label': `How the system came to be, in ${frames.length} steps` }, placeMarks.map((p) => p.box), wireMarks, m('g', { key: 'breaks' }), saysMarks, placeMarks.map((p) => p.name), partMarks);
 
   // How a frame is reached: every mark set as that frame has it.
-  const shape = { frames, partAt, placeAt, wireAt, keyOf, view, heads, pathOf, squareMorph, z, shift };
+  const shape = { frames, partAt, placeAt, wireAt, saysAt, keyOf, view, heads, pathOf, squareMorph, z, shift };
   const player = play({ answer, style, reduced, tools, shape });
   const css = `${base}\n${storyLook}\n${(Object.entries(style.dots?.colours ?? {}))
     .filter(([v, c]) => NAME.test(v) && NAME.test(String(c)))

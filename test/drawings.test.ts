@@ -85,8 +85,8 @@ test('a picture with steps is sent them, and the finished parts they name, whate
 });
 
 test('a published picture keeps its steps, naming only what it shows', () => {
-  const steps = [{ add: ['e_shown000', 'e_hidden00'], titles: { e_shown000: 'Then', e_hidden00: 'Secret' }, flag: { e_hidden00: 'US' }, lines: [{ by: 'Alex', text: 'Hello.' }] }];
-  assert.deepEqual(stepsShown(steps, new Set(['e_shown000'])), [{ add: ['e_shown000'], titles: { e_shown000: 'Then' }, flag: {}, lines: [{ by: 'Alex', text: 'Hello.' }] }]);
+  const steps = [{ add: ['e_shown000', 'e_hidden00'], titles: { e_shown000: 'Then', e_hidden00: 'Secret' }, flag: { e_hidden00: 'US' }, lit: [['e_shown000', 'e_hidden00'], ['e_shown000', 'e_shown001']] as [string, string][], lines: [{ by: 'Alex', text: 'Hello.' }] }];
+  assert.deepEqual(stepsShown(steps, new Set(['e_shown000', 'e_shown001'])), [{ add: ['e_shown000'], titles: { e_shown000: 'Then' }, flag: {}, lit: [['e_shown000', 'e_shown001']], lines: [{ by: 'Alex', text: 'Hello.' }] }]);
 });
 
 const browser = chrome();

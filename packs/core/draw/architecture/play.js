@@ -7,7 +7,7 @@
 import { m } from './marks.js';
 
 export function play({ answer, style, reduced, tools, shape }) {
-  const { frames, partAt, placeAt, wireAt, keyOf, view, heads, pathOf, squareMorph, shift } = shape;
+  const { frames, partAt, placeAt, wireAt, saysAt, keyOf, view, heads, pathOf, squareMorph, shift } = shape;
   const t = (name) => {
     const v = style.numbers?.[`arch_story_${name}`];
     if (typeof v !== 'number') throw new Error(`The style names no number "arch_story_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
@@ -131,6 +131,20 @@ export function play({ answer, style, reduced, tools, shape }) {
       shown.set(key, pts);
     }
     for (const [key] of was?.wires ?? []) if (!f.wires.has(key)) (shown.delete(key), list.push(...[`w:${keyOf(key)}`, `h:${keyOf(key)}`].map((w) => ({ key: w, toggle: { 'sp-off': true, 'sp-gone': false, 'sp-new': false }, set: { opacity: 0 } }))));
+    // What a wire carries, on it: moved with it, or shown once a new wire is drawn in. What the step lights, lit.
+    for (const [key] of f.wires) {
+      const s = `s:${keyOf(key)}`, at = saysAt(key, f), lit = f.lit.has(key);
+      list.push(...[`w:${keyOf(key)}`, `h:${keyOf(key)}`].map((w) => ({ key: w, toggle: { 'sp-lit': lit } })));
+      if (!at) {
+        if (frames.some((g) => g.says.has(key))) list.push({ key: s, toggle: { 'sp-off': true }, set: { opacity: 0 } });
+        continue;
+      }
+      const moves = Boolean(dur && was?.says.has(key));
+      list.push({ key: `${s}:r`, set: at.r, ...(moves ? over : {}) }, { key: `${s}:t`, set: at.t, ...(moves ? over : {}) }, { key: `${s}:t`, text: at.text }, { key: s, toggle: { 'sp-off': false, 'sp-lit': lit } });
+      if (moves || !dur || !was) list.push({ key: s, set: { opacity: 1 } });
+      else (list.push({ key: s, set: { opacity: 0 } }), later(dur, () => send([{ key: s, set: { opacity: 1 }, over: t('draw') }])));
+    }
+    for (const [key] of was?.says ?? []) if (!f.says.has(key) && !f.wires.has(key)) list.push({ key: `s:${keyOf(key)}`, toggle: { 'sp-off': true }, set: { opacity: 0 } });
     // Where a wire passes under another, it is broken: drawn again once all has come to rest.
     const breaks = m('g', { key: 'breaks', class: 'sp-breaks' }, f.g.breaks.map(([bx, by]) => m('g', { class: 'ar-break' }, m('rect', { x: bx + shift - 3, y: by - 8, width: 6, height: 16 }), m('path', { d: `M${bx + shift - 6} ${by}H${bx + shift + 6}` }))));
     if (dur) (list.push({ key: 'breaks', mark: m('g', { key: 'breaks' }) }), later(dur, () => send([{ key: 'breaks', mark: breaks }])));

@@ -32,6 +32,10 @@ export const css = `
 .ar-wire.sp-gone { stroke: var(--bad); stroke-width: var(--border-3); }
 .ar-head.sp-gone { fill: var(--bad); }
 .sp-flag { fill: var(--bad); font-size: var(--ln-arch-text); font-family: var(--ln-font); text-anchor: end; dominant-baseline: middle; }
+.ar-wire.sp-lit { stroke: var(--accent); stroke-width: var(--border-4); }
+.ar-head.sp-lit { fill: var(--accent); }
+.ar-says.sp-lit rect { stroke: var(--accent); }
+.ar-says.sp-lit text { fill: var(--accent); }
 .ar-part.sp-flagged .ar-shape { fill: var(--bad-soft); stroke: var(--bad); }
 .ar-place-box.sp-flagged { stroke: var(--bad); stroke-width: var(--border-2); }
 .ar-place.sp-flagged text { fill: var(--bad); }

@@ -12,6 +12,8 @@ export interface Step {
   titles?: Record<string, string | null>;
   /** Fields things had then, by id and name; null takes one back to its own. */
   fields?: Record<string, Record<string, unknown>>;
+  /** The wires lit in this step, each as [from, to]: what passes along them then. */
+  lit?: [string, string][];
   /** A word marked on a thing then (a flag), by id; null takes it off. */
   flag?: Record<string, string | null>;
   /** The chapter this step starts: its name, when, and how far it got (a count, such as commits). */
@@ -33,6 +35,7 @@ export function readSteps(value: unknown): Step[] {
     if (typeof s !== 'object' || s === null) throw new Error(`${at} is not a step`);
     if ((s.add !== undefined && !ids(s.add)) || (s.remove !== undefined && !ids(s.remove))) throw new Error(`${at}: add and remove are lists of ids`);
     if (!byId(s.titles) || !byId(s.fields) || !byId(s.flag)) throw new Error(`${at}: titles, fields and flag are kept by id`);
+    if (s.lit !== undefined && !(Array.isArray(s.lit) && s.lit.every((w: unknown) => Array.isArray(w) && w.length === 2 && ids(w)))) throw new Error(`${at}: lit is a list of wires, each [from, to]`);
     if (s.chapter !== undefined && typeof s.chapter?.name !== 'string') throw new Error(`${at}: a chapter has a name`);
     for (const line of s.lines ?? []) if (typeof line?.by !== 'string' || typeof line?.text !== 'string' || line.text.length > MOST_LINE) throw new Error(`${at}: each line says by whom and what, in ${MOST_LINE} characters at most`);
   });
@@ -57,5 +60,6 @@ export function stepsShown(steps: Step[], shown: Set<string>): Step[] {
     ...(s.titles && { titles: only(s.titles) }),
     ...(s.fields && { fields: only(s.fields) }),
     ...(s.flag && { flag: only(s.flag) }),
+    ...(s.lit && { lit: s.lit.filter(([a, b]) => shown.has(a) && shown.has(b)) }),
   }));
 }
