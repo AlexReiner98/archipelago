@@ -7,7 +7,6 @@ export const css = `
 .lf-beside { gap: var(--space-8); }
 .lf-beside > .lf-stage { flex: 3 1 var(--card-least); min-width: 0; }
 .sp-top { display: grid; gap: var(--space-6); margin-bottom: var(--space-6); }
-.lf-stage { flex: 3 1 var(--card-least); min-width: 0; }
 .sp-rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-4); overflow-x: auto; }
 .sp-rail .sp-era { all: unset; cursor: pointer; display: block; min-width: 0; padding: 0 var(--space-3) var(--space-4); border-bottom: var(--border-4) solid var(--line); transition: border-color 0.4s; }
 .sp-rail .sp-era:focus-visible { outline: var(--border-3) solid var(--accent); outline-offset: var(--space-2); }
