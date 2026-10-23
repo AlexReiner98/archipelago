@@ -325,7 +325,7 @@ export function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     seen.waiting && key('stroke waits', 'Waits on something unfinished'),
     seen.met && key('stroke blocking', 'Waited on something now finished'),
     seen.lifted && key('stroke lifted', 'Through their tasks'),
-    seen.other && key('stroke dotted', 'Other relation'),
+    seen.other && key('stroke dotted', 'Other link'),
     nodes.some((n) => n.active) && key(axis ? 'swatch g-active' : 'swatch rm-active', 'Being worked on'),
     !axis && nodes.some((n) => !n.open) && key('swatch rm-closed', 'Finished'),
     nodes.some((n) => n.blocked) && key('swatch rm-blocked', 'Blocked'),

@@ -42,5 +42,5 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Mine', props: { preset: 'work.reading', page: { notes: 'folded' } } }]);
   const mine = await of(made.d);
   assert.deepEqual([mine.style.page.picture, mine.style.page.notes], [false, 'folded']);
-  await assert.rejects(of('e_nothing0'), /No entity/);
+  await assert.rejects(of('e_nothing0'), /No item/);
 });

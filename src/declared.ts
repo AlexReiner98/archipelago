@@ -233,7 +233,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
         if (!verbs.includes(action.verb)) problems.push(`${at} specialises "${action.verb}", which is not a verb: one of ${verbs.join(', ')}`);
         for (const t of action.on ?? []) if (!types.has(t)) problems.push(`${at} acts on unknown type "${t}"`);
         for (const act of action.acts ?? []) if (!(pack.hosts ?? []).some((h) => h.id === act.host)) problems.push(`${at}: act "${act.id}" goes to undeclared host "${act.host}"`);
-      } else if (!['rows', 'data'].includes((def as ViewDef).shape)) problems.push(`${at}: shape is rows or data`);
+      } else if (!['rows', 'data'].includes((def as ViewDef).shape)) problems.push(`${at}: \`shape\` is rows or data`);
     }
   }
   for (const screen of pack.screens ?? []) {
@@ -251,7 +251,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (piece.action && !(pack.actions ?? []).some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
       if (piece.page && !PAGES.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}`);
       for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
-      if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a picture's style has no code: code runs only from a style kept on the map`);
+      if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a view's style has no code: code runs only from a style kept on the map`);
     }
   }
   // A preset says only what a style can say, and carries no code: code runs only from a style kept on the map, where a person approves it.
@@ -265,7 +265,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   }
   for (const d of pack.drawings ?? []) {
     const at = `drawing "${d.id}"`;
-    if (!own(d.id) || !d.title || !/^[a-z][a-z0-9_]*$/.test(d.shape ?? '')) problems.push(`${at} must be named "${pack.id}.<name>", with a title and the shape it draws`);
+    if (!own(d.id) || !d.title || !/^[a-z][a-z0-9_]*$/.test(d.shape ?? '')) problems.push(`${at} must be named "${pack.id}.<name>", with a title and the \`shape\` it draws`);
     if (typeof d.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);
     for (const [name, file] of Object.entries(d.modules ?? {})) if (!/^[a-z][a-z0-9_-]*.js$/.test(name) || typeof file !== 'string' || file.includes('..')) problems.push(`${at}: "${name}" is not a module's name (a-z, ending .js) with a file in the pack`);
   }

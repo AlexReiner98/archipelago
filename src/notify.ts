@@ -2,7 +2,7 @@ import { actorId, type Actor, type Archipelago } from './pelago.ts';
 
 /** Send the human a notification. Not a fact about the world, so it needs no approval. */
 export async function notify(l: Archipelago, actor: Actor, input: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string }) {
-  if (input.about && !(await l.entity(input.about))) throw new Error(`No entity "${input.about}"`);
+  if (input.about && !(await l.entity(input.about))) throw new Error(`No item "${input.about}"`);
   const { created } = await l.apply(actorId(actor), {
     ops: [
       // A notification from someone's agent is for that someone, whatever the workspace default.

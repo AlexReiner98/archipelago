@@ -59,7 +59,7 @@ where, and how that server is run.
   when the server has restarted under the session. A tool or input the server has and your list
   lacks can be called as plain JSON (`POST /agent/<tool>` with the agent
   token from the environment, never printed), or the owner can reconnect.
-- **Say who is waited on with a relation, not a sentence.** Work that cannot
+- **Say who is waited on with a link, not a sentence.** Work that cannot
   move until a person answers or acts gets a `waits_on` link to that person
   (what for goes in the link's `props.for`), and the link is removed once
   they have. Other work is `depends_on`, a resource is `needs`.
@@ -77,9 +77,9 @@ where, and how that server is run.
   point a second server at `data/`; the lock refuses it.
 - **Before changing the database schema, take a backup** with the `backup`
   tool (the server also writes one every 6 hours, to `backups/default/`), then
-  confirm the entity and event counts are unchanged after the restart. Never copy `data/` while the
+  confirm the item and event counts are unchanged after the restart. Never copy `data/` while the
   server runs and call it a backup.
-- **One write path.** Every change to entities and relations goes through
+- **One write path.** Every change to items and links goes through
   `Archipelago.change` / `apply`. Sessions, claims and notifications are the only
   writes that skip approval, because they are operational state.
 - **Visibility is enforced by the database** (row level security in
@@ -111,7 +111,7 @@ where, and how that server is run.
 ## UI rules
 
 What each screen is for (one level of the hierarchy per screen, a bounded
-Home, named pictures kept as saved views) is in `docs/ui-strategy.md`; read it before
+Home, named views kept on the map) is in `docs/ui-strategy.md`; read it before
 adding or changing a screen.
 
 The UI is for a person glancing at it, and most of what it shows was written
@@ -141,11 +141,14 @@ spatial where it can be):
 - **Names, not identifiers.** Actors through `who`, events through `verb`,
   times through `ago`, authority through `authorityMark`. An id is something
   to copy, never something to read.
+- **One word for each idea.** Item, link, kind, type, field, view,
+  drawing, pack, change, rule, the map, as `docs/glossary.md` defines them;
+  `npm test` refuses the retired words in the UI and the tool text.
 - **A mark for a state.** Status, age, authority and counts are pills, marks
   and numbers, not sentences.
 - **One or two actions in sight.** What is done rarely goes in a `menu`.
 - **Draw it when it has a shape.** Structure, order and neighbourhood are
-  pictures (the roadmap, the graph, an item's relations), with the list as
+  drawn (the roadmap, the graph, an item's links), with the list as
   the second view.
 - **A name is a few words.** An item's title is read in a row, in a box on a
   chart and in a tooltip: name the thing, in 60 characters at most (the
@@ -166,9 +169,9 @@ else a pack"). These rules keep it composable while that happens, and
 `test/structure.test.ts` checks each one in `npm test`:
 
 - **No file over 500 lines.** Split it into modules, each one thing.
-- **The kernel names no pack.** No pack's type or relation by name in `src/`
+- **The kernel names no pack.** No pack's type or link type by name in `src/`
   or `ui/`: ask the registry for a kind or a capability.
-- **One write path, checked.** Items and relations are written in
+- **One write path, checked.** Items and links are written in
   `src/pelago.ts`; the operational state named above is the only exception.
 - **A pack's code imports nothing of the kernel.** It is handed what it reads
   and answers with ops and requests.
@@ -187,11 +190,11 @@ else a pack"). These rules keep it composable while that happens, and
   no values: a colour, a length or a number constant in `ui/` is counted,
   and the count only goes down.
 
-- **Every picture is a drawing a pack ships** (the owner, 22 Oct 2026):
-  code for one shape, in `pack.json` `drawings`, changed by the owner on
+- **Every view is drawn by a drawing a pack ships** (the owner, 22 Oct 2026):
+  code for one form (list, flow, grid...), in `pack.json` `drawings`, changed by the owner on
   the map, run in the sandbox, answering with marks the page checks
-  (`docs/drawings.md`). The kernel keeps the frame every picture has. A
-  shape moved out of the kernel must draw what the kernel drew: the same
+  (`docs/drawings.md`). The kernel keeps the frame every view has. A
+  drawing moved out of the kernel must draw what the kernel drew: the same
   marks, looks and behaviour, checked in a real browser.
 
 Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may

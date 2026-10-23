@@ -57,7 +57,7 @@ export async function savedViewsStrip(host, title, limit = 6) {
   };
   const fold =
     all.length > limit &&
-    h('button', { class: 'quiet-button', style: 'margin-left: auto; white-space: nowrap', title: 'Every picture kept on the map, or only the pinned and the newest', onclick: () => ((open = !open), show()) });
+    h('button', { class: 'quiet-button', style: 'margin-left: auto; white-space: nowrap', title: 'Every view kept on the map, or only the pinned and the newest', onclick: () => ((open = !open), show()) });
   host.replaceChildren(h('section', { class: 'card wide saved-views', style: 'margin-bottom: var(--space-8); min-width: 0' }, h('header', {}, h('h2', {}, title), fold), tiles));
   show();
 }
@@ -76,7 +76,7 @@ async function pictureHead(lens, view) {
     'div',
     { class: 'page-head' },
     // Where it sits, from Home down to what it is a picture of, each a way there.
-    h('nav', { class: 'trail', title: 'Where this picture sits' }, h('a', { class: 'trail-step', href: '#/' }, 'Home'), steps.map((t) => [h('span', { class: 'trail-sep' }, '›'), h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title)])),
+    h('nav', { class: 'trail', title: 'Where this view sits' }, h('a', { class: 'trail-step', href: '#/' }, 'Home'), steps.map((t) => [h('span', { class: 'trail-sep' }, '›'), h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title)])),
     h('h1', { style: 'margin-top: var(--space-4)' }, title),
   );
 }

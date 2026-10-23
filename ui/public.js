@@ -56,7 +56,7 @@ function draw(d) {
             h(
               'div',
               { class: 'tile', title: [t.title, t.compares, t.environment].filter(Boolean).join('\n') },
-              t.result?.picture ? h('img', { src: `${here}/picture/${t.result.picture}`, alt: t.title, loading: 'lazy' }) : h('span', { class: 'shot muted small' }, 'no picture'),
+              t.result?.picture ? h('img', { src: `${here}/picture/${t.result.picture}`, alt: t.title, loading: 'lazy' }) : h('span', { class: 'shot muted small' }, 'no image'),
               h('span', { class: 'cap' }, t.title),
               mark(t),
             ),

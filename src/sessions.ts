@@ -60,7 +60,7 @@ export async function sessionStart(
     }
   }
   const task = input.task ? await l.entity(input.task) : undefined;
-  if (input.task && !task) throw new Error(`No entity "${input.task}" to work on`);
+  if (input.task && !task) throw new Error(`No item "${input.task}" to work on`);
   const repo = await placeFor(l, input);
 
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };

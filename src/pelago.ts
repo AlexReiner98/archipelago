@@ -779,8 +779,8 @@ export class Archipelago {
       const resource = await this.entity(input.resource, tx);
       if (!resource || !this.registry.capacity(resource)) throw new Error(`"${input.resource}" is not a resource: nothing of its type can be held`);
       const holder = await this.entity(input.holder, tx);
-      if (!holder) throw new Error(`No entity "${input.holder}" to hold it`);
-      if (input.for && !(await this.entity(input.for, tx))) throw new Error(`No entity "${input.for}"`);
+      if (!holder) throw new Error(`No item "${input.holder}" to hold it`);
+      if (input.for && !(await this.entity(input.for, tx))) throw new Error(`No item "${input.for}"`);
       if (resource.status !== 'available') throw new Error(`"${resource.title}" is ${resource.status}`);
 
       const { rows: held } = await tx.query<{ id: string; from_id: string; valid_from: Date; title: string }>(
@@ -976,7 +976,7 @@ export class Archipelago {
 
   async get(id: string) {
     const entity = await this.entity(id);
-    if (!entity) throw new Error(`No entity "${id}"`);
+    if (!entity) throw new Error(`No item "${id}"`);
     const rel = `r.id as relation, r.type, r.props, r.confidence, e.id, e.type as entity_type, e.title, e.status`;
     const [out, inc, events, source] = await Promise.all([
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.valid_to is null`, [id]),

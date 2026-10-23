@@ -28,7 +28,7 @@ export function relationEditor(e, data, change, redraw) {
               {
                 class: 'danger',
                 onclick: async () =>
-                  (await ask({ title: 'Remove this relation?', message: `${e.title} ${phrase} ${r.title}`, action: 'Remove', danger: true })) && change([{ op: 'unlink', relation: r.relation }], 'Relation removed in the UI'),
+                  (await ask({ title: 'Remove this link?', message: `${e.title} ${phrase} ${r.title}`, action: 'Remove', danger: true })) && change([{ op: 'unlink', relation: r.relation }], 'Link removed in the UI'),
               },
               'Remove',
             ),
@@ -73,7 +73,7 @@ export function relationEditor(e, data, change, redraw) {
                     chip(x.type),
                     h('span', { class: 'grow' }, x.title),
                     pill(x.type, x.status),
-                    h('button', { onclick: () => change([{ op: 'link', type: p.rel, from: p.out ? id : x.id, to: p.out ? x.id : id }], 'Relation added in the UI') }, 'Link'),
+                    h('button', { onclick: () => change([{ op: 'link', type: p.rel, from: p.out ? id : x.id, to: p.out ? x.id : id }], 'Link added in the UI') }, 'Link'),
                   ),
                 ),
               )

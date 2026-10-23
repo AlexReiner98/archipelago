@@ -101,7 +101,7 @@ test('a lens answers with one shape of data: what is inside what, the same count
 
   await assert.rejects(run({ by: 'nope' }), /unknown kind of link/);
   await assert.rejects(run({ fold: ['everything'] }), /fold must be of/);
-  await assert.rejects(run({ from: 'e_nothing0' }), /No entity/);
+  await assert.rejects(run({ from: 'e_nothing0' }), /No item/);
 
   // The packs' presets first: with nothing kept on the map, a picture is drawn in the core pack's house style.
   const house = { id: 'core.house', title: 'House style', preset: 'core.house' };

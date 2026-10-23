@@ -95,7 +95,7 @@ export async function withStyles<T extends { styles: Preset[] }>(l: Archipelago,
 export async function pageStyle(l: Archipelago, input: { of?: unknown }) {
   const of = typeof input.of === 'string' ? input.of : undefined;
   const item = of === undefined ? undefined : (await l.db.query<{ id: string; type: string }>('select id, type from entity where id = $1', [of])).rows[0];
-  if (of !== undefined && !item) throw new Error(`No entity "${of}"`);
+  if (of !== undefined && !item) throw new Error(`No item "${of}"`);
   return styleFor(l, await keptOf(l, 'style', undefined), item ? { hub: item } : {});
 }
 

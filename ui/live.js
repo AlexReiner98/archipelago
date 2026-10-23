@@ -56,7 +56,7 @@ export const STEP_KINDS = [
   ['change', 'What they change'],
   ['story', 'The story they tell'],
   ['read', 'What they read'],
-  ['view', 'Views and pictures they ask for'],
+  ['view', 'Views they ask for'],
   ['search', 'What they search for'],
   ['other', 'Sessions and the rest'],
 ];
