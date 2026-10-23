@@ -77,7 +77,10 @@ pack can declare another tree the same way, with no code.
 agent can bring your page to what it is working on: every change it makes
 opens what it touched (or Changes, when the change waits there), and the `show`
 tool opens any entity or screen with a one-line note. Anything you are in the
-middle of is kept; the note offers the jump instead.
+middle of is kept, and so is a page you are reading (scrolled, pointed or typed
+in the last 20 seconds); the note offers the jump instead. Until you choose, it
+is ticked only while one agent at most is at work. Without following, a page
+stays still: a change redraws it, in place, only when it touches an item on it.
 
 **Agents hear you.** What you do in the UI reaches the agents working with
 you. An agent waiting in the `watch` tool is answered the moment you decide,
@@ -284,9 +287,10 @@ seen working, what bites when working here, what to do next and why.
 
 Types live in files under `packs/`, one folder per pack:
 
-- `core`: the seven kinds, the types the root relations name (person,
-  company, agent, goal, area, event, resource), the system's own (lens,
-  style, screen) and the root relations.
+- `core`: the seven kinds of the work and the system kind, the common
+  types of them (person, company, agent, goal, area, event, resource), the
+  system's own (lens, style, screen) and the root relations, which name
+  kinds at their ends.
 - `work`, on in every workspace: project, task, decision, issue, meeting,
   idea, note, file, document and procedure, as `work.task` and so on.
 - `inquiry`: hypothesis, experiment and result, with tests, supports,

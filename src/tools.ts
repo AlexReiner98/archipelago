@@ -21,7 +21,7 @@ import type { Registry, TypeDef } from './packs.ts';
 import { packActionByShort, packTool, packTools } from './packtools.ts';
 import { withinScope } from './scope.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
-import { undo } from './undo.ts';
+import { undo } from './undo.ts'; import { importAudit } from './audit.ts';
 import { withScreens } from './screens.ts'; import { withStyles } from './styles.ts'; import { schemaBrief, schemaOf } from './schema-brief.ts';
 import { getPicture, putPicture } from './pictures.ts';
 import { pictureOf, readLens, shownIn } from './lens.ts';
@@ -29,7 +29,7 @@ import { askView, viewList } from './askview.ts';
 import { toConfirm } from './confirm.ts';
 import { VIEWS } from './views.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
-import { type Focus, listening, point as setFocus, presence, tellStamp, took } from './presence.ts';
+import { type Focus, listening, point as setFocus, presence, tellStamp, took } from './presence.ts'; import { touched } from './touched.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page, or a document at its own address (/p/<workspace>/<id>) with the sections it holds; only a project, feature, release, proof question, test, test result or document can be, and only a human makes it so (from an agent it waits as a proposal).');
@@ -375,12 +375,12 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => l.proposals(input),
   },
   pulse: {
-    description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
+    description: 'A stamp that moves whenever the map or the review queue changes, and what the changes since `since` (an event seq) touched. The web UI watches it to know what to redraw.',
     humanOnly: true,
-    input: {},
-    run: async (l) => {
-      const [p, { told, ...seen }] = await Promise.all([l.pulse(), presence((await wholeMap(l)).db, l)]);
-      return { stamp: `${p.stamp}.${told}`, ...seen, ui: uiStamp() };
+    input: { since: z.number().int().nonnegative().optional().describe('The `touched.seq` of the last answer: what changed after it is said.') },
+    run: async (l, _actor, { since }) => {
+      const [p, { told, ...seen }, changed] = await Promise.all([l.pulse(), presence((await wholeMap(l)).db, l), touched(l.db, since)]);
+      return { stamp: `${p.stamp}.${told}`, ...seen, ui: uiStamp(), touched: changed };
     },
   },
   backup: {
@@ -764,8 +764,7 @@ export const TOOLS: Record<string, Tool> = {
       const at = new Date().toISOString();
       for (const p of projects) {
         // Bookkeeping stays out of the project's history; the re-check itself is the event.
-        await l.db.query(`update entity set props = props || jsonb_build_object('rechecked_at', $2::text) where id = $1`, [p.id, at]);
-        await l.log(l.db, { actor: actorId(actor), action: 'recheck.done', target: p.id, reason: input.summary ?? 'Scheduled re-check of the oldest open items' });
+        await l.operational(p.id, { props: { rechecked_at: at } }, { actor: actorId(actor), action: 'recheck.done', reason: input.summary ?? 'Scheduled re-check of the oldest open items' });
       }
       return { rechecked: projects.map((p) => ({ id: p.id, title: p.title })), at };
     },
@@ -773,7 +772,7 @@ export const TOOLS: Record<string, Tool> = {
   import_audit: {
     description: 'Copy new entries from a connection\'s tool-call log into the activity log, so actions taken in that tool are visible here.',
     input: { connection: z.string() },
-    run: async (l, actor, input) => l.importAudit(actor, input),
+    run: async (l, actor, input) => importAudit(l, actor, input),
   },
   launch: {
     description:

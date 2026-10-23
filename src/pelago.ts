@@ -2,7 +2,6 @@
 // goes through change(): it is validated, checked against policy, then either
 // applied or stored as a proposal for a human, and always logged.
 
-import { existsSync, readFileSync } from 'node:fs';
 import { checkWritten } from './automation-rules.ts';
 import { judgeOps } from './rules.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { authorityOf } from './authority.ts';
@@ -11,6 +10,7 @@ import { bodyAfter, dropExcepted } from './ops.ts';
 import { readEvents, type EventQuery } from './eventlog.ts';
 import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
+import { KEPT_FIELDS } from './operational.ts';
 
 export interface Actor {
   kind: 'human' | 'agent';
@@ -769,9 +769,25 @@ export class Archipelago {
     );
   }
 
-  // ---- resources and connections ----------------------------------------
-  // These take effect at once for agents too: coordination that waits for
-  // approval is no coordination.
+  // ---- operational state (src/operational.ts) ------------------------------
+  // These take effect at once for agents too and are never held: coordination
+  // that waits for approval is no coordination.
+
+  /**
+   * The one write to an item that skips change: bookkeeping no one states as a fact (a session's heartbeat, an
+   * automation's last firing), and who may read a notification. Only the fields src/operational.ts names; out of the
+   * item's history, so it does not look newly confirmed. The event, when given, is logged with it.
+   */
+  async operational(id: string, set: { props?: Props; unset?: string[]; add?: Record<string, number>; reach?: { private_to: string | null; visibility?: 'shared' } }, event?: { actor: string; action: string; reason?: string; detail?: Props }) {
+    const named = [...Object.keys(set.props ?? {}), ...(set.unset ?? []), ...Object.keys(set.add ?? {})].filter((k) => !KEPT_FIELDS.includes(k));
+    if (named.length) throw new Error(`${named.join(', ')} is a fact about the item: change it through change`);
+    await this.db.query(
+      `update entity set props = ((props || $2::jsonb) - $3::text[]) || coalesce((select jsonb_object_agg(k, coalesce((props->>k)::numeric, 0) + v::numeric) from jsonb_each_text($4::jsonb) a(k, v)), '{}'),
+         visibility = coalesce($5, visibility), private_to = case when $6 then $7 else private_to end where id = $1`,
+      [id, JSON.stringify(set.props ?? {}), set.unset ?? [], JSON.stringify(set.add ?? {}), set.reach?.visibility ?? null, Boolean(set.reach), set.reach?.private_to ?? null],
+    );
+    if (event) await this.log(this.db, { ...event, target: id });
+  }
 
   async claim(actor: Actor, input: { resource: string; holder: string; for?: string; reason: string }) {
     return this.db.transaction(async (tx) => {
@@ -837,57 +853,6 @@ export class Archipelago {
       out.push({ id: conn.id, title: conn.title, url, status });
     }
     return out;
-  }
-
-  /**
-   * Copy new entries from a connection's JSON-lines tool-call log into the
-   * event log. Expects lines shaped {ts, tool, params, durationMs, ok, error}.
-   */
-  async importAudit(actor: Actor, input: { connection: string }) {
-    const conn = await this.entity(input.connection);
-    if (!conn || !this.registry.isA(conn.type, 'sys.connection')) throw new Error(`"${input.connection}" is not a connection`);
-    const path = conn.props.audit_log as string | undefined;
-    if (!path) throw new Error(`"${conn.title}" has no audit_log path`);
-    if (!existsSync(path)) return { imported: 0, path, note: 'Log file does not exist yet.' };
-
-    const cursorKey = `audit_cursor:${conn.id}`;
-    const cursor = (await this.setting<string>(cursorKey)) ?? '';
-    let latest = cursor;
-    let imported = 0;
-    let skipped = 0;
-    await this.db.transaction(async (tx) => {
-      for (const line of readFileSync(path, 'utf8').split('\n')) {
-        if (!line.trim()) continue;
-        let entry: { ts?: string; tool?: string; params?: unknown; durationMs?: number; ok?: boolean; error?: unknown };
-        try {
-          entry = JSON.parse(line);
-        } catch {
-          skipped++;
-          continue;
-        }
-        if (!entry.ts || !entry.tool || Number.isNaN(Date.parse(entry.ts))) {
-          skipped++;
-          continue;
-        }
-        if (entry.ts <= cursor) continue;
-        await this.log(tx, {
-          actor: `external:${conn.title}`,
-          action: entry.tool,
-          target: conn.id,
-          origin: 'external',
-          ts: entry.ts,
-          detail: { params: entry.params, durationMs: entry.durationMs, ok: entry.ok, error: entry.error },
-        });
-        if (entry.ts > latest) latest = entry.ts;
-        imported++;
-      }
-      await tx.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [
-        cursorKey,
-        JSON.stringify(latest),
-      ]);
-    });
-    if (imported) await this.log(this.db, { actor: actorId(actor), action: 'audit.import', target: conn.id, detail: { imported, path } });
-    return { imported, skipped, path };
   }
 
   // ---- settings --------------------------------------------------------
@@ -1058,4 +1023,23 @@ export class Archipelago {
     const { rows } = await this.db.query<Proposal>(`select * from proposal where status = $1 order by ts`, [input.status ?? 'pending']);
     return rows;
   }
+}
+
+/**
+ * The restore path (src/operational.ts): a backup's items and links merged into the map as they were, never applied
+ * again as changes, since their events come with them. An item on both sides keeps whichever was edited later; a link
+ * ended on either side is ended. Answers, for each link written, whether it was new.
+ */
+export async function restoreRows(tx: Q, entities: string, relations: string): Promise<{ added: boolean }[]> {
+  const { rows: cols } = await tx.query<{ set: string }>(`select string_agg(format('%I = excluded.%I', column_name, column_name), ', ') as set from information_schema.columns where table_schema = 'public' and table_name = 'entity' and column_name <> 'id'`);
+  // One statement: rows that point at each other (an entity's owner) are checked together.
+  await tx.query(`insert into entity select * from jsonb_populate_recordset(null::entity, $1::jsonb) on conflict (id) do update set ${cols[0].set} where excluded.updated_at > entity.updated_at`, [entities]);
+  const { rows } = await tx.query<{ added: boolean }>(
+    `insert into relation select i.* from jsonb_populate_recordset(null::relation, $1::jsonb) i
+     where exists (select 1 from entity where id = i.from_id) and exists (select 1 from entity where id = i.to_id)
+     on conflict (id) do update set valid_to = excluded.valid_to where relation.valid_to is null and excluded.valid_to is not null
+     returning (xmax = 0) as added`,
+    [relations],
+  );
+  return rows;
 }

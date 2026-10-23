@@ -131,8 +131,8 @@ async function touch(l: Archipelago, run: string, how: 'at' | 'until' | 'close' 
   const at = now();
   const { rows } = await l.db.query<{ active: unknown }>(`select props -> 'active' as active from entity where id = $1`, [run]);
   const active = stretch(rows[0]?.active, at, how === 'begin' ? 'at' : how);
-  const busy = how === 'begin' ? `, 'busy', true` : how === 'until' || how === 'close' ? `, 'busy', false` : '';
-  await l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text, 'active', $3::jsonb${busy}) where id = $1`, [run, at, JSON.stringify(active)]);
+  const busy = how === 'begin' ? { busy: true } : how === 'until' || how === 'close' ? { busy: false } : {};
+  await l.operational(run, { props: { last_seen: at, active, ...busy } });
 }
 
 /**
@@ -142,7 +142,7 @@ async function touch(l: Archipelago, run: string, how: 'at' | 'until' | 'close' 
  */
 async function heard(l: Archipelago, run: Entity, why: string): Promise<void> {
   if (!run.props.stale_flagged) return;
-  await l.db.query(`update entity set props = props - 'stale_flagged' where id = $1`, [run.id]);
+  await l.operational(run.id, { unset: ['stale_flagged'] });
   const { rows } = await l.db.query<{ id: string }>(
     `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
      where r.to_id = $1 and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.props->>'from' in ('agent:pelago', 'agent:lattice')`,
@@ -173,14 +173,13 @@ export async function recordUsage(l: Archipelago, sessionId: string | undefined,
   if (!run) return undefined;
   const added = Math.round(tokens) - Number(run.props.tokens_used ?? 0);
   if (added <= 0) return { run: run.id, added: 0, to: [] };
-  const set = `update entity set props = props || jsonb_build_object('tokens_used', coalesce((props->>'tokens_used')::numeric, 0) + $2::numeric) where id = $1`;
-  await l.db.query(set, [run.id, added]);
+  await l.operational(run.id, { add: { tokens_used: added } });
   const { rows } = await l.db.query<{ id: string; type: string }>(
     `select e.id, e.type from relation r join entity e on e.id = r.to_id where r.type = 'sys.works_on' and r.from_id = $1 and r.valid_to is null and e.archived_at is null`,
     [run.id],
   );
   const work = rows.filter((w) => l.registry.type(w.type)?.fields.tokens_used);
-  for (const w of work) await l.db.query(set, [w.id, Math.round(added / work.length)]);
+  for (const w of work) await l.operational(w.id, { add: { tokens_used: Math.round(added / work.length) } });
   return { run: run.id, added, to: work.map((w) => w.id) };
 }
 
@@ -316,7 +315,7 @@ export async function tell(
   if (input.finding && !about.length) throw new Error('A finding names the items it is about (about, or the ends of links): they are its picture.');
   const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }) };
   const next = [...story.map((b) => (b.n === input.replaces ? { ...b, replaced_by: beat.n } : b)), beat];
-  await l.db.query(`update entity set props = props || jsonb_build_object('story', $2::jsonb, 'last_seen', $3::text) where id = $1`, [run.id, JSON.stringify(next), now()]);
+  await l.operational(run.id, { props: { story: next, last_seen: now() } });
   await touch(l, run.id);
   await heard(l, run, `Session "${run.title}" told of its work`);
   return { run: run.id, beat: beat.n, standing: next.filter((b) => !b.replaced_by).length };

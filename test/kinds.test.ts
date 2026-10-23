@@ -1,5 +1,5 @@
-// The seven kinds every type extends, the root relations every relation extends, and the system tier
-// outside both. What the kernel computes from a root holds for a pack's relation extending it.
+// The kinds every type extends (the seven of the work, and system for the app's own), the root relations every
+// relation extends, naming kinds at their ends. What the kernel computes from a root holds for a pack's relation extending it.
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,7 @@ import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { VIEWS } from '../src/views.ts';
 
-const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
+const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place', 'system'];
 const ROOTS = ['part_of', 'depends_on', 'defers', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'supersedes', 'relates_to'];
 const SYSTEM = ['lens', 'style', 'screen', 'sys.source', 'sys.run', 'sys.notification', 'sys.automation'];
 const human: Actor = { kind: 'human', name: 'test' };
@@ -26,20 +26,19 @@ function packsWith(extra?: PackFile): string {
   return dir;
 }
 
-test('every shipped type extends one of the seven kinds, or is of the system tier', () => {
+test('every shipped type extends one of the kinds, the system tier included', () => {
   const reg = new Registry(packsWith());
   assert.deepEqual(reg.kinds().map((t) => t.id), KINDS);
   for (const type of reg.types.values()) {
-    if (SYSTEM.includes(type.id)) {
-      assert.equal(type.kind, undefined, `${type.id} is outside the kinds`);
-      assert.ok(type.system);
-    } else assert.ok(type.kind && KINDS.includes(type.kind), `${type.id} has a kind`);
+    assert.ok(type.kind && KINDS.includes(type.kind), `${type.id} has a kind`);
+    if (type.id === 'system' || SYSTEM.includes(type.id)) assert.ok(type.kind === 'system' && type.system, `${type.id} is of the system kind`);
+    else assert.ok(type.kind !== 'system' && !type.system, `${type.id} is of the work`);
   }
   assert.equal(reg.type('inquiry.experiment')!.kind, 'work');
   assert.equal(reg.type('sys.connection')!.kind, 'place');
   assert.equal(reg.type('time.invoice')!.kind, 'record');
   assert.deepEqual(reg.ancestry('inquiry.experiment'), { root: 'work.task', kind: 'work' });
-  assert.deepEqual(reg.ancestry('sys.run'), { root: 'sys.run', kind: null });
+  assert.deepEqual(reg.ancestry('sys.run'), { root: 'sys.run', kind: 'system' });
 });
 
 test('every relation extends one of the thirteen roots', () => {
@@ -56,7 +55,7 @@ test('a pack cannot leave a type without a kind, declare a kind, or stretch a ro
   const statuses = { open: ['open'], closed: ['done'] };
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.thing', title: 'T', description: '', statuses }]))), /must extend one of the kinds: actor, aim/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.kind', title: 'K', description: '', kind: true, statuses }]))), /only the core pack declares kinds/);
-  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.tier', title: 'S', description: '', tier: 'system', statuses }]))), /system tier/);
+  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.tier', title: 'S', description: '', extends: 'system', statuses }]))), /cannot be of the system kind/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.lens', title: 'L', description: '', extends: 'lens' }]))), /kernel's own/);
   const rel = { title: 'r', inverse: 'r', description: '', from: ['*'], to: ['*'] };
   assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel }]))), /must extend one of the root relations/);
@@ -91,4 +90,62 @@ test('a new type extends a kind or a type of one', async () => {
   assert.match(reg.checkNewType({ id: 'local.site', title: 'Site', description: '' }).join(), /extends one of the kinds/);
   assert.deepEqual(reg.checkNewType({ id: 'local.site', title: 'Site', description: '', extends: 'place' }), []);
   assert.match(reg.checkNewType({ id: 'local.view', title: 'V', description: '', extends: 'lens' }).join(), /kernel's own/);
+  assert.match(reg.checkNewType({ id: 'local.conf', title: 'C', description: '', extends: 'system' }).join(), /kernel's own/);
+  assert.doesNotMatch(reg.checkNewType({ id: 'local.site', title: 'Site', description: '' }).join(), /system/, 'a workspace is offered the kinds of the work');
+});
+
+test("the roots name kinds at their ends, so a pack's own actor can be waited on and its place needed", async () => {
+  const reg = new Registry(packsWith({
+    id: 'x', version: '1', title: 'X', requires: ['core'],
+    types: [
+      { id: 'x.crew', extends: 'actor', title: 'Crew', description: '' },
+      { id: 'x.crane', extends: 'place', title: 'Crane', description: '', capabilities: { capacity: { field: 'seats' } }, fields: { seats: { type: 'number', default: 1 } } },
+    ],
+  }));
+  const ends = (id: string) => { const r = reg.relations.get(id)!; return [r.from, r.to]; };
+  assert.deepEqual(ends('waits_on'), [['*'], ['actor']]);
+  assert.deepEqual(ends('involves'), [['*'], ['actor']]);
+  assert.deepEqual(ends('needs'), [['*'], ['place']]);
+  assert.deepEqual(ends('holds'), [['*'], ['place']]);
+  assert.deepEqual(ends('serves'), [['*'], ['aim']]);
+  assert.deepEqual(ends('bears_on'), [['*'], ['question']]);
+  assert.deepEqual(ends('defers'), [['occurrence'], ['*']]);
+  const core = new Set([...reg.types.keys()].filter((t) => reg.type(t)!.pack === 'core' && reg.type(t)!.kind !== t));
+  for (const r of reg.relations.values()) if (r.root === r.id) for (const end of [...r.from, ...r.to]) assert.ok(!core.has(end), `${r.id} names the kind, not core's ${end}`);
+  assert.equal(reg.checkRelation('waits_on', 'work.task', 'x.crew'), undefined);
+  assert.equal(reg.checkRelation('needs', 'work.task', 'x.crane'), undefined);
+  assert.match(reg.checkRelation('waits_on', 'work.task', 'x.crane')!, /must point to actor/);
+  const l = new Archipelago(await openDb(), reg);
+  const made = await l.change(human, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'crew', type: 'x.crew', title: 'Night crew' },
+      { op: 'create', ref: 'crane', type: 'x.crane', title: 'Tower crane' },
+      { op: 'create', ref: 't', type: 'work.task', title: 'Lift the trusses' },
+      { op: 'link', type: 'waits_on', from: 't', to: 'crew', props: { for: 'Say when you can start' } },
+      { op: 'link', type: 'needs', from: 't', to: 'crane' },
+    ],
+  });
+  const { t } = (made as { created: Record<string, string> }).created;
+  const answer = (await VIEWS.attention.run(l, { reasons: ['waits_on'] })) as { items: { id: string; reasons: { why: string }[] }[] };
+  assert.ok(answer.items.find((x) => x.id === t)?.reasons.some((x) => x.why === 'waits_on'), 'the task waits on the crew');
+});
+
+test('views of the work leave the system kind out by default', async () => {
+  const l = new Archipelago(await openDb(), new Registry(packsWith()));
+  const made = await l.change(human, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'p', type: 'work.project', title: 'House' },
+      { op: 'create', ref: 't', type: 'work.task', title: 'Pour the slab' },
+      { op: 'link', type: 'part_of', from: 't', to: 'p' },
+      { op: 'create', ref: 'v', type: 'lens', title: 'Everything' },
+    ],
+  });
+  const { t, v } = (made as { created: Record<string, string> }).created;
+  const answer = (await VIEWS.lens.run(l, { fold: [] })) as { items: { id: string }[] };
+  assert.ok(answer.items.some((x) => x.id === v), 'asked to, a view shows the system kind');
+  const folded = (await VIEWS.lens.run(l, {})) as { items: { id: string }[]; rest: { system: number } };
+  assert.ok(folded.items.some((x) => x.id === t) && !folded.items.some((x) => x.id === v));
+  assert.ok(folded.rest.system >= 1);
 });
