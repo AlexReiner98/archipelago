@@ -133,7 +133,7 @@ export class Automations {
         // A human approved this automation, launch settings included, so it may launch.
         // The session it starts only proposes, and its run names the automation.
         const started = await launch(this.l, { kind: 'human', name }, { task: input.task as string, mode: input.mode as 'plan', instructions: input.instructions as string | undefined }, { kind: 'automation', id: auto.id, name: auto.title });
-        await this.l.db.query(`update entity set props = props || jsonb_build_object('last_run', $2::text) where id = $1`, [auto.id, started.run]);
+        await this.l.operational(auto.id, { props: { last_run: started.run } });
         result = `launched run ${started.run} (${started.mode})`;
       }
     } catch (err) {
@@ -141,12 +141,11 @@ export class Automations {
       result = (err as Error).message;
     }
     // Bookkeeping stays out of the entity's history; the firing itself is the event.
-    await this.l.db.query(`update entity set props = props || jsonb_build_object('last_fired', $2::text, 'last_result', $3::text) where id = $1`, [
+    await this.l.operational(
       auto.id,
-      now.toISOString(),
-      `${ok ? 'ok' : 'failed'}: ${result}`.slice(0, 500),
-    ]);
-    await this.l.log(this.l.db, { actor: `agent:${name}`, action: 'automation.fire', target: auto.id, reason: ev ? `Triggered by ${ev.action}` : `Scheduled (${p.trigger})`, detail: { ok, result, trigger_event: ev?.seq } });
+      { props: { last_fired: now.toISOString(), last_result: `${ok ? 'ok' : 'failed'}: ${result}`.slice(0, 500) } },
+      { actor: `agent:${name}`, action: 'automation.fire', reason: ev ? `Triggered by ${ev.action}` : `Scheduled (${p.trigger})`, detail: { ok, result, trigger_event: ev?.seq } },
+    );
     return { automation: auto.id, ok, result };
   }
 
@@ -163,8 +162,7 @@ export class Automations {
       }
       const entity = await this.l.entity(run.id);
       if (entity?.props.stale_flagged) continue;
-      await this.l.db.query(`update entity set props = props || '{"stale_flagged": true}' where id = $1`, [run.id]);
-      await this.l.log(this.l.db, { actor: 'agent:pelago', action: 'run.stale', target: run.id, reason: `No report for over ${view.stale_after_minutes} minutes` });
+      await this.l.operational(run.id, { props: { stale_flagged: true } }, { actor: 'agent:pelago', action: 'run.stale', reason: `No report for over ${view.stale_after_minutes} minutes` });
       // Worth a person's attention only when it keeps something from everyone else: the rest end by themselves.
       if (!run.holds.length) continue;
       await notify(
