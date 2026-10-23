@@ -193,7 +193,7 @@ say({ type: 'ready' });
   const say = (message) => parent.postMessage(message, '*');
 
   /** What runs in a worker, around a drawing's code. Written as a function and handed over as its text. */
-  function inside() {
+  function inside(home) {
     const post = (message) => self.postMessage(message);
     const text = (err) => String(err?.message ?? err).slice(0, 300);
     const ctx = new OffscreenCanvas(1, 1).getContext('2d');
@@ -240,6 +240,26 @@ say({ type: 'ready' });
         open: (id) => send({ type: 'open', id: String(id) }),
         // The page's next frame: a drawing that moves is moved in time with the page, and not at all while it is hidden.
         frame: () => new Promise((resolve) => (waiting.push(resolve), send({ type: 'frame?' }))),
+        // A surface, if its scene asked for one (ui/surface.js): a canvas here to paint, shown over its picture frame by
+        // frame (show), its size as it changes, the page's colours and three.js. Null where there is none.
+        surface: () => (surface ??= new Promise((resolve) => ((gotSurface = resolve), send({ type: 'surface?' })))),
+      };
+      let surface, gotSurface;
+      const sized = [];
+      // A canvas of its own here, the surface's size; each frame painted on it goes to the page as an image (show).
+      const paintable = (said) => {
+        const canvas = new OffscreenCanvas(1, 1);
+        return {
+          canvas,
+          size: { ...said.size },
+          colours: said.colours ?? {},
+          three: () => import(`${home}/three.js`),
+          resized: (fn) => sized.push(fn),
+          show: () => {
+            const image = canvas.transferToImageBitmap();
+            if (!ended) port.postMessage({ type: 'surface-frame', image }, [image]);
+          },
+        };
       };
       let ready = Promise.resolve();
       port.onmessage = (ev) => {
@@ -254,6 +274,8 @@ say({ type: 'ready' });
             } else if (said.type === 'event' && drawn?.on) send({ type: 'patch', list: (await drawn.on(said.event)) ?? [] });
             else if (said.type === 'restyle' && drawn?.restyle) send({ type: 'patch', list: (await drawn.restyle(said.style)) ?? [] });
             else if (said.type === 'frame') waiting.splice(0).forEach((resolve) => resolve(said.t));
+            else if (said.type === 'surface') gotSurface?.(said.none ? null : paintable(said));
+            else if (said.type === 'surface-size') sized.forEach((fn) => fn({ ...said.size }));
             else if (said.type === 'end') (drawn?.end?.(), (ended = true), port.close());
           } catch (err) {
             send({ type: 'error', message: text(err) });
@@ -281,7 +303,7 @@ say({ type: 'ready' });
   }
 
   // A page with no origin may not start a worker every way a page can, and browsers differ in which: each is tried until one answers.
-  const source = `(${inside})()`;
+  const source = `(${inside})(${JSON.stringify(home)})`;
   // A classic worker first: it starts at once where a module worker from a blob is refused, and imports the drawing all the same.
   const WAYS = [
     () => new Worker(URL.createObjectURL(new Blob([source], { type: 'text/javascript' }))),

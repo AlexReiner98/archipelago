@@ -155,3 +155,21 @@ test('played, a quick step goes by at the fast-forward pace, and the key is the 
     globalThis.setTimeout = realSet;
   }
 });
+
+test('in relief, the islands are still islands: the scene asks for a surface, and with none given the flat islands stay', async () => {
+  const steps = [answer.steps[0], { look: 'islands' }, { look: 'islands_3d', remove: [OLD] }, ...answer.steps.slice(2)];
+  const relief = { ...answer, steps };
+  assert.deepEqual(statesOf(relief).map((s: any) => s.look), [null, 'islands', 'islands_3d', 'islands_3d', 'islands_3d', 'islands_3d']);
+  const sent: any[] = [];
+  let asked = 0;
+  const { scene } = picture({ answer: relief, style: house, reduced: true }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {}, surface: () => (asked++, Promise.resolve(null)) });
+  assert.deepEqual(scene.surface, { key: 'deep' });
+  // Played to the end at once (less motion): the last frame is in relief, laid out and keyed as islands.
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(sent.some((p) => p.key === `p:${SKETCH}` && p.toggle?.['sp-islands'] === true && p.toggle?.['sp-islands_3d'] === true));
+  assert.ok(sent.some((p) => p.key === 'key:islands' && p.toggle?.['sp-hide'] === false));
+  assert.equal(asked, 1, 'the surface is asked for once');
+  assert.ok(!sent.some((p) => p.key === 'deep' || p.toggle?.['sp-deep']), 'with no surface, nothing covers the flat islands');
+  // A story with no step in relief asks for no surface.
+  assert.equal(picture({ answer, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene.surface, undefined);
+});

@@ -26,16 +26,31 @@ export function boxPath(x, y, w, h, r) {
   return outline(P[0], [side(P[0], P[1]), [[R - r + k, y], [R, y + r - k], P[2]], side(P[2], P[3]), [[R, B - r + k], [R - r + k, B], P[4]], side(P[4], P[5]), [[x + r - k, B], [x, B - r + k], P[6]], side(P[6], P[7]), [[x, y + r - k], [x + r - k, y], P[0]]]);
 }
 
-/** An island centred on cx, cy as eight curves through eight points around it, each a little in or out (wobble). */
-export function islandPath(cx, cy, rx, ry, seed, wobble) {
+/** An island's outline: eight curves through eight points around cx, cy, each a little in or out (wobble). */
+function islandCurves(cx, cy, rx, ry, seed, wobble) {
   const P = [-112.5, -67.5, -22.5, 22.5, 67.5, 112.5, 157.5, 202.5].map((deg, k) => {
     const a = (deg * Math.PI) / 180, s = 1 + wobble * (hashOf(`${seed}:${k}`) * 2 - 1);
     return [cx + rx * s * Math.cos(a), cy + ry * s * Math.sin(a)];
   });
   const at = (k) => P[(k + 8) % 8];
   // Through every point smoothly: each curve's handles along the line through the points either side.
-  return outline(P[0], P.map((_, k) => [[at(k)[0] + (at(k + 1)[0] - at(k - 1)[0]) / 6, at(k)[1] + (at(k + 1)[1] - at(k - 1)[1]) / 6], [at(k + 1)[0] - (at(k + 2)[0] - at(k)[0]) / 6, at(k + 1)[1] - (at(k + 2)[1] - at(k)[1]) / 6], at(k + 1)]));
+  return [P[0], P.map((_, k) => [[at(k)[0] + (at(k + 1)[0] - at(k - 1)[0]) / 6, at(k)[1] + (at(k + 1)[1] - at(k - 1)[1]) / 6], [at(k + 1)[0] - (at(k + 2)[0] - at(k)[0]) / 6, at(k + 1)[1] - (at(k + 2)[1] - at(k)[1]) / 6], at(k + 1)])];
 }
+/** An island centred on cx, cy, as a path. */
+export const islandPath = (...args) => outline(...islandCurves(...args));
+/** The same island as points along its outline, `each` to a curve. */
+export function islandPoints(cx, cy, rx, ry, seed, wobble, each = 8) {
+  const [start, segs] = islandCurves(cx, cy, rx, ry, seed, wobble);
+  let from = start;
+  return segs.flatMap(([a, b, p]) => {
+    const pts = Array.from({ length: each }, (_, k) => along([from, a, b, p], k / each));
+    from = p;
+    return pts;
+  });
+}
+
+/** How the islands look beyond their marks: a look's key is shown only while the story is in it. */
+export const css = `.sp-key.sp-hide { display: none; }`;
 
 /** A route as a path: one curve, [start, handle, handle, end]. */
 export const curveOf = (p) => `M${pt(p[0])}C${pt(p[1])} ${pt(p[2])} ${pt(p[3])}`;

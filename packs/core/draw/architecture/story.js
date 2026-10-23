@@ -3,9 +3,11 @@
 // mark, shown or not; a step moves the marks from where they were to where they go (play.js runs the steps).
 // The last step is the map as it is, whatever the steps say, so the picture always ends on what is true. From a step
 // with a look (`islands`) on, the story is drawn in that look (islands.js): a part's outline moves from its box to
-// its island, and its wires are drawn again as routes.
+// its island, and its wires are drawn again as routes; in `islands_3d` the same islands rise out of the sea, painted
+// on a surface over the picture (deep.js).
 
-import { boxPath, curveOf, islandPath, islands, routeSpots } from './islands.js';
+import { LOOK as DEEP, css as deepLook, deep } from './deep.js';
+import { boxPath, curveOf, islandPath, islands, css as islandsLook, routeSpots } from './islands.js';
 import { finished, layout } from './layout.js';
 import { css as base } from './look.js';
 import { m, titled } from './marks.js';
@@ -15,8 +17,10 @@ import { css as storyLook } from './story-look.js';
 
 const NAME = /^[a-z][a-z0-9_]*$/;
 
-/** The looks a story may be drawn in, besides its own. */
-const LOOKS = ['islands'];
+/** The looks a story may be drawn in, besides its own, each with the look it is one of (its dots and its key). */
+const LOOKS = { islands: null, [DEEP]: 'islands' };
+/** A look and the one it is one of. */
+const family = (look) => [look, LOOKS[look]].filter(Boolean);
 
 /**
  * What each step shows: its items (with the titles, fields and status they had then), its links, its flags, its
@@ -36,7 +40,7 @@ export function statesOf(answer) {
     for (const [id, f] of Object.entries(s.fields ?? {})) fields.set(id, Object.fromEntries(Object.entries({ ...fields.get(id), ...f }).filter(([, v]) => v !== null)));
     for (const [id, w] of Object.entries(s.flag ?? {})) (w === null ? flags.delete(id) : flags.set(id, String(w)));
     if (s.chapter) chapter++;
-    if (s.look !== undefined) look = LOOKS.includes(s.look) ? s.look : null;
+    if (s.look !== undefined) look = s.look in LOOKS ? s.look : null;
     // The last step is the map as it is.
     const final = k === last;
     const done = (id) => present.has(id) && byId.has(id) && finished(byId.get(id));
@@ -135,7 +139,9 @@ export function story({ answer, style, reduced }, tools) {
   let prior, was = new Set();
   // What a part's dot says in a look: the value of the field the look's dots name (dots.islands, else dots), its
   // status where they name status; else its health.
-  const dotsOf = (look) => (look && style.dots?.[look]) || style.dots;
+  const dotsOf = (look) => family(look).map((l) => style.dots?.[l]).find(Boolean) || style.dots;
+  /** The look whose key a frame shows: the one it is one of, unless it has dots of its own. */
+  const keyLook = (look) => (look && !style.dots?.[look] && LOOKS[look]) || look;
   const valueOf = (n, look) => {
     const by = dotsOf(look)?.field;
     if (!NAME.test(by ?? '')) return null;
@@ -154,7 +160,7 @@ export function story({ answer, style, reduced }, tools) {
     was = s.ids;
     const boxes = layout({ items: s.items, links: s.links, rootId: answer.lens.from, measure, sizes: style.sizes, prior, steady: true, room });
     prior = boxes.memo;
-    const g = s.look === 'islands' ? islands(boxes, { z, n: num, done: isDone(s.look) }) : boxes;
+    const g = family(s.look).includes('islands') ? islands(boxes, { z, n: num, done: isDone(s.look) }) : boxes;
     return { ...s, g, parts: new Map(g.all.filter((n) => !n.dummy).map((n) => [n.id, n])), boxes: new Map(g.boxes.map((b) => [b.id, b])), wires: new Map(g.chains.map((c) => [c.key, c])) };
   });
   // A story with nothing in it (what it names is not shown here) says so, as the still picture does.
@@ -244,11 +250,15 @@ export function story({ answer, style, reduced }, tools) {
   const svg = m('svg', { key: 'svg', viewBox: `0 0 ${right - left} ${tall}`, role: 'img', 'aria-label': `How the system came to be, in ${frames.length} steps` }, placeMarks.map((p) => p.box), wireMarks, m('g', { key: 'breaks' }), saysMarks, placeMarks.map((p) => p.name), partMarks);
 
   // How a frame is reached: every mark set as that frame has it.
-  const shape = { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, z, shift, looks: LOOKS.filter((l) => frames.some((f) => f.look === l)), dotsOf };
+  const used = Object.keys(LOOKS).filter((l) => frames.some((f) => family(f.look).includes(l)));
+  const shape = { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, z, shift, looks: used, keyLooks: used.filter((l) => keyLook(l) === l), keyLook, family, dotsOf, valueOf };
+  // Islands in 3D, where a step asks for them: painted on a surface over the picture.
+  const sea = used.includes(DEEP);
+  if (sea) shape.deep = deep({ style, tools, z, num, shape });
   const player = play({ answer, style, reduced, tools, shape });
   // The colour of each value a dot is coloured by, in the story's own look and in each other; an island is tinted with it.
-  const colours = [[null, style.dots], ...LOOKS.map((l) => [l, style.dots?.[l]])].flatMap(([look, dots]) => Object.entries(dots?.colours ?? {}).filter(([v, c]) => NAME.test(v) && NAME.test(String(c))).map(([v, c]) => [look ? `.sp-${look} ` : '', v, `var(--${String(c).replaceAll('_', '-')})`, look]));
-  const css = `${base}\n${storyLook}\n${colours
+  const colours = [[null, style.dots], ...Object.keys(LOOKS).map((l) => [l, style.dots?.[l]])].flatMap(([look, dots]) => Object.entries(dots?.colours ?? {}).filter(([v, c]) => NAME.test(v) && NAME.test(String(c))).map(([v, c]) => [look ? `.sp-${look} ` : '', v, `var(--${String(c).replaceAll('_', '-')})`, look]));
+  const css = `${base}\n${storyLook}\n${islandsLook}\n${sea ? deepLook : ''}\n${colours
     .map(([within, v, c, look]) => `${within}.ar-dot.k-${v}, ${within}.sp-swatch.k-${v} { fill: ${c}; background: ${c}; stroke: none; }${look ? `\n.ar-part.sp-${look} .ar-shape.k-${v} { stroke: ${c}; fill: color-mix(in srgb, ${c} var(--ln-arch-island-tint), var(--ln-land)); }` : ''}`)
     .join('\n')}`;
   // What a part or a place says of itself, in a tip beside it: its name as the step shows it, and its first line.
@@ -259,7 +269,7 @@ export function story({ answer, style, reduced }, tools) {
     return shown && m('div', { class: 'sp-tip' }, m('b', {}, shown.title), byId.get(id)?.gist && m('span', {}, byId.get(id).gist));
   };
   return {
-    scene: { css, svg, before: player.before, aside: player.after, size: style.still ? { width: widest, height: widest / aspect } : { width: right - left, height: tall } },
+    scene: { css, svg, before: player.before, aside: player.after, ...(sea && { surface: { key: 'deep' } }), size: style.still ? { width: widest, height: widest / aspect } : { width: right - left, height: tall } },
     on(event) {
       if (!/^[pb]:e_[a-z0-9]{8}$/.test(event.key)) return player.on(event);
       if (event.name === 'leave') return [{ tip: null }];

@@ -2,12 +2,14 @@
 // (draw.html, draw.js), answering with marks the page checks and mounts (marks.js). The page keeps what every
 // picture has around its marks: the stage that pans and zooms, the key, the bar with the lit switch and zoom, a
 // published page's still frame. One frame serves every picture on the page and is started before it is needed;
-// each drawing's code is sent once and kept by its hash.
+// each drawing's code is sent once and kept by its hash. A drawing whose scene asks for a surface has the frames it
+// paints in its worker shown on a canvas laid over its picture (surface.js).
 
 import { h } from './base.js';
 import { tipOf } from './drawing-tip.js';
 import { build, cssFor, patch, step } from './marks.js';
-import { litSwitch, numberOf, sizeOf } from './lens-base.js';
+import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './lens-base.js';
+import { surfaceOf } from './surface.js';
 import { panZoom } from './pan-zoom.js';
 
 /**
@@ -87,6 +89,15 @@ function adopt(id, css) {
 
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null));
 
+/** The colours a picture is drawn in, as the page has them now: the page's own (by the theme's names) and the lens's. */
+function colours(host, style) {
+  const css = getComputedStyle(host), read = (name) => css.getPropertyValue(name).trim();
+  return {
+    page: Object.fromEntries(Object.keys(style.theme?.light ?? {}).map((name) => [name, read(`--${name.replaceAll('_', '-')}`)])),
+    lens: Object.fromEntries(STYLE_COLORS.map((name) => [name, read(`--ln-${name}`)])),
+  };
+}
+
 /** Draw the answer in host with the drawing its style names. The same call as any of the kernel's shapes. */
 export function drawWith(host, answer, style, keep) {
   host.endDrawing?.();
@@ -104,7 +115,9 @@ export function drawWith(host, answer, style, keep) {
   let mounted = false, ended = false;
   // Patches that come before the scene they change (a drawing may start moving at once) wait for it.
   const early = [];
-  const end = () => ((ended = true), port.postMessage({ type: 'end' }), port.close());
+  // The canvas a scene asked for (surface.js): handed to the drawing when it asks for it, and only then.
+  let surface = null;
+  const end = () => ((ended = true), surface?.end(), port.postMessage({ type: 'end' }), port.close());
   host.endDrawing = end;
   const tell = (key, name) => !ended && port.postMessage({ type: 'event', event: { key, name } });
   const run = (now) => step(moving, now) && requestAnimationFrame(run);
@@ -136,6 +149,8 @@ export function drawWith(host, answer, style, keep) {
       else if (said.type === 'patch' && !mounted) early.push(said.list);
       else if (said.type === 'patch') (apply(said.list), moving.size && requestAnimationFrame(run));
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
+      else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });
+      else if (said.type === 'surface-frame') surface?.paint(said.image);
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
       else if (said.type === 'error') failed(said.message);
     } catch (err) {
@@ -188,6 +203,11 @@ ${JSON.stringify(input)}`;
     // rest is. What is beside it shares a row with it, and goes under it where the row has no room for both.
     const [before, aside, after] = [scene.before, scene.aside, scene.after].map((m) => (m ? build(m, keys, tell) : null));
     const beside = (stage) => (aside ? h('div', { class: 'lf-beside' }, stage, aside) : stage);
+    // A surface over the picture, if the scene asks for one: a new one with each scene, the last one ended.
+    surface?.end();
+    surface = scene.surface ? surfaceOf(picture, port, () => colours(host, style)) : null;
+    if (surface) keys.set(String(scene.surface.key ?? 'surface'), surface.canvas);
+    const over = surface?.canvas;
     const { width, height } = scene.size ?? {};
     const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;
@@ -198,10 +218,10 @@ ${JSON.stringify(input)}`;
       // Its own size is the most it is drawn at: a small picture is not blown up to fill the page.
       picture.setAttribute('width', width);
       picture.setAttribute('height', height);
-      return host.replaceChildren(...[before, legend, beside(h('div', { class: 'lf-stage still' }, picture)), after].filter(Boolean));
+      return host.replaceChildren(...[before, legend, beside(h('div', { class: 'lf-stage still' }, picture, over)), after].filter(Boolean));
     }
     const lit = litSwitch(answer.viewer, style, keep, redraw);
-    const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, legend);
+    const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, over, legend);
     host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
     if (legend) legend.hidden = stage.clientWidth > 0 && stage.clientWidth < sizeOf(style, 'flow_legend_from');
     const moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room') });

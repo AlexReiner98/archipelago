@@ -58,6 +58,4 @@ export const css = `
 .sp-line.chapter p { font-size: var(--text-1); letter-spacing: var(--track-2); }
 .sp-line.note { align-self: center; }
 .sp-line.note p { font-weight: 600; }
-/* A key for another look is hidden until the story is in it. */
-.sp-key.sp-hide { display: none; }
 `;

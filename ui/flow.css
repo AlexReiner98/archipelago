@@ -52,5 +52,7 @@
 .drawing-tip { position: absolute; z-index: 1; pointer-events: none; transform: translate(-50%, calc(-100% - var(--space-4))); }
 .drawing-tip.below { transform: translate(-50%, var(--space-4)); }
 .drawing-tip[hidden] { display: none; }
+/* A drawing's surface (ui/surface.js): over its picture, where the page puts it, taking no pointer. */
+.lf-surface { position: absolute; display: block; pointer-events: none; }
 /* The frame drawings run in: drawn, with no size, so the browser does not slow it as a frame that is not drawn. */
 .drawing-sandbox { position: fixed; left: 0; top: 0; width: 0; height: 0; border: 0; pointer-events: none; }

@@ -40,7 +40,7 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   const { p, l } = await system(call);
   const first = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).result.style.drawing;
   assert.equal(first.id, 'core.architecture');
-  assert.deepEqual(Object.keys(first.modules).sort(), ['index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js']);
+  assert.deepEqual(Object.keys(first.modules).sort(), ['deep.js', 'index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js']);
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
@@ -208,6 +208,49 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       return host.textContent;
     })()`);
     assert.match(String(stopped), /did not answer for 12 seconds/);
+  } finally {
+    page.close();
+  }
+});
+
+test('in a browser, a drawing that asks for a surface paints pixels over its picture, and reaches nothing more', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base } = await serve('off');
+  const page = await open(`${base}/`);
+  try {
+    // One paints its surface red and says what it was given; one whose scene asks for no surface is given none.
+    const painter = `export async function picture(input, tools) {
+      setTimeout(async () => {
+        const s = await tools.surface();
+        s.canvas.width = 4; s.canvas.height = 4;
+        const g = s.canvas.getContext('2d'); g.fillStyle = 'red'; g.fillRect(0, 0, 4, 4); s.show();
+        const three = typeof (await s.three()).WebGLRenderer;
+        tools.patch([{ key: 's', toggle: { ['got-' + s.canvas.constructor.name]: true, ['doc-' + typeof document]: true, ['three-' + three]: true, ['sized-' + (s.size.width > 0)]: true } }]);
+      }, 10);
+      return { scene: { svg: ['svg', { width: 40, height: 40 }], surface: { key: 's' } } };
+    }`;
+    const plain = `export async function picture(input, tools) { setTimeout(async () => { const s = await tools.surface(); tools.patch([{ key: 'svg', toggle: { ['none-' + (s === null)]: true } }]); }, 10); return { scene: { svg: ['svg', { key: 'svg' }] } }; }`;
+    const got: any = await page.evaluate(`(async () => {
+      const { drawWith } = await import('/drawing.js');
+      const draw = async (name, code, done) => {
+        const host = document.createElement('div');
+        document.body.append(host);
+        drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
+        for (let n = 0; n < 400 && !done(host); n++) await new Promise((r) => setTimeout(r, 25));
+        return host;
+      };
+      const a = await draw('painter', ${JSON.stringify(painter)}, (h) => h.querySelector('canvas.lf-surface')?.className.includes('got-'));
+      const b = await draw('plain', ${JSON.stringify(plain)}, (h) => h.querySelector('svg')?.getAttribute('class')?.includes('none-'));
+      const c = a.querySelector('canvas.lf-surface'), seen = document.createElement('canvas');
+      seen.width = seen.height = 4;
+      seen.getContext('2d').drawImage(c, 0, 0, 4, 4);
+      return { cls: c?.className, inside: a.contains(c), pixel: [...seen.getContext('2d').getImageData(1, 1, 1, 1).data], said: a.textContent, plain: b.querySelector('svg')?.getAttribute('class'), surfaces: b.querySelectorAll('canvas').length };
+    })()`);
+    assert.doesNotMatch(got.said, /This drawing stopped/, 'the painter was not stopped');
+    for (const cls of ['got-OffscreenCanvas', 'doc-undefined', 'three-function', 'sized-true']) assert.ok(got.cls.includes(cls), `${cls} in ${got.cls}`);
+    assert.ok(got.inside, 'the surface is inside the picture');
+    assert.deepEqual(got.pixel, [255, 0, 0, 255], 'what it painted is shown');
+    assert.match(got.plain, /none-true/);
+    assert.equal(got.surfaces, 0);
   } finally {
     page.close();
   }

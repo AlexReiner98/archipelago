@@ -7,7 +7,7 @@
 import { m } from './marks.js';
 
 export function play({ answer, style, reduced, tools, shape }) {
-  const { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, shift, looks, dotsOf } = shape;
+  const { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, shift, looks, keyLooks, keyLook, family, dotsOf } = shape;
   const t = (name) => {
     const v = style.numbers?.[`arch_story_${name}`];
     if (typeof v !== 'number') throw new Error(`The style names no number "arch_story_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
@@ -29,7 +29,7 @@ export function play({ answer, style, reduced, tools, shape }) {
     'div',
     { class: 'sp-top' },
     chapters.length > 0 && m('div', { class: 'sp-rail' }, chapters.map((c, k) => m('button', { key: `c:${k}`, on: ['click'], class: 'sp-era', title: [c.name, c.when].filter(Boolean).join(', ') }, m('b', {}, c.name), c.when && m('small', {}, c.when)))),
-    [null, ...looks].map(keyFor),
+    [null, ...keyLooks].map(keyFor),
   );
   const after = m(
     'div',
@@ -107,7 +107,7 @@ export function play({ answer, style, reduced, tools, shape }) {
     const list = [], fresh = [], flags = [];
     const over = dur ? { over: dur } : {};
     // The look a part is drawn in: its outline moves from one to the other.
-    const inLook = Object.fromEntries(looks.map((l) => [`sp-${l}`, f.look === l]));
+    const inLook = Object.fromEntries(looks.map((l) => [`sp-${l}`, family(f.look).includes(l)]));
     for (const [id, n] of f.parts) {
       const at = partAt(n, f), key = `p:${id}`, there = was?.parts.has(id);
       if (there && dur) list.push({ key: `${key}:r`, set: { d: at.s.d }, ...over }, { key: `${key}:d`, set: { cx: at.d.cx, cy: at.d.cy }, ...over }, { key: `${key}:t`, set: at.t, ...over }, { key: `${key}:f`, set: at.f, ...over });
@@ -162,11 +162,13 @@ export function play({ answer, style, reduced, tools, shape }) {
     else list.push({ key: 'breaks', mark: breaks });
     // A published picture is framed as each step is; the key is its look's.
     if (style.still) list.push({ key: 'svg', set: { viewBox: view(f.g) }, ...over });
-    list.push(...[null, ...looks].map((l) => ({ key: `key:${l ?? ''}`, toggle: { 'sp-hide': (f.look ?? null) !== l } })));
+    list.push(...[null, ...keyLooks].map((l) => ({ key: `key:${l ?? ''}`, toggle: { 'sp-hide': (keyLook(f.look) ?? null) !== l } })));
     // What a step brings is in the accent a while.
     if (fresh.length) (list.push(...fresh.map((key) => ({ key, toggle: { 'sp-new': true } }))), later(t('new_for'), () => send(fresh.map((key) => ({ key, toggle: { 'sp-new': false } })))));
     send(list);
     if (flags.length) later(dur, () => send(flags));
+    // Islands in 3D, where the look is theirs (deep.js); the flat picture again where it is not.
+    shape.deep?.go(f, dur);
     cur = k;
   };
 
