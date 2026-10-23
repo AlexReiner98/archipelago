@@ -25,13 +25,15 @@ export const css = `${storyLook}
 .lf-beside > .lg-stage { flex: 3 1 0; min-width: calc(var(--side-least) * 2); }
 .lg-card, .lg-row, .lg-lane { transition: opacity 0.6s, border-color 0.8s, box-shadow 0.8s; }
 .lg-card.sp-off, .lg-row.sp-off, .lg-lane.sp-off { opacity: 0; }
+.lg-cell { transition: border-color 0.6s; }
+.lg-row.sp-off, .lg-cell.sp-off { border-top-color: transparent; }
 .lg-card.sp-new { border-color: var(--accent); box-shadow: 0 0 0 var(--border-2) var(--accent); }
 .lg-row.sp-new { color: var(--accent); }
 `;
 
 /**
  * The grid's stage for play.js: `apply(k, dur)` shows step k. `marks` says what the picture drew: each card's key, the
- * item it is of and its lane (`cards`), each row's key and the items in it (`rows`), and each lane head's (`lanes`).
+ * item it is of and its lane (`cards`), each row's key, its cells' and the items in it (`rows`), and each lane head's (`lanes`).
  */
 export function reveal({ frames, marks, t, send, later }) {
   let was = null;
@@ -45,7 +47,8 @@ export function reveal({ frames, marks, t, send, later }) {
         if (now && !then && dur) fresh.push(key);
       };
       for (const c of marks.cards) show(c.key, on(c.ids, f), on(c.ids, was));
-      for (const r of marks.rows) show(r.key, on(r.ids, f), on(r.ids, was));
+      // A row comes in with its rules, and its head in the accent.
+      for (const r of marks.rows) (show(r.key, on(r.ids, f), on(r.ids, was)), list.push(...r.cells.map((key) => ({ key, toggle: { 'sp-off': !on(r.ids, f) } }))));
       // A lane's head is in once a card in it is.
       const lanes = (frame) => new Set(marks.cards.filter((c) => on(c.ids, frame)).map((c) => c.lane));
       const [now, then] = [lanes(f), lanes(was)];

@@ -150,7 +150,7 @@ export function picture({ answer, style, fields = {}, relations = {}, reduced },
           ? m('div', { key, class: `lg-row loose${off}`, title: `Tied to nothing by ${relations[byLink] ?? byLink}` }, 'Not tied yet')
           : m('div', { key, class: `lg-row loose${off}`, title: `What ${start.title} holds directly` }, 'Across all'),
     );
-    for (const value of lanes) cells.push(m('div', { class: 'lg-cell' }, row.cards.filter((n) => (n.lane ?? null) === value).sort((a, b) => a.place - b.place || a.title.localeCompare(b.title)).map((n) => card(n, row.head, r))));
+    lanes.forEach((value, k) => cells.push(m('div', { ...(story && { key: `x:${r}:${k}` }), class: `lg-cell${off}` }, row.cards.filter((n) => (n.lane ?? null) === value).sort((a, b) => a.place - b.place || a.title.localeCompare(b.title)).map((n) => card(n, row.head, r)))));
   });
   const grid = m('div', { class: 'lg-stage' }, m('div', { class: `lg-grid ${columnsClass(lanes.length, head, lane, gap)}` }, cells));
   const legend = field && declared.length ? m('div', { class: 'lg-legend' }, declared.map((value) => m('span', { class: `lg-swatch ${hueOf(value)}` }, m('span', { class: 'lg-chip' }), name(value)))) : null;
@@ -161,7 +161,7 @@ export function picture({ answer, style, fields = {}, relations = {}, reduced },
     const frames = statesOf(answer.steps);
     const marks = {
       cards: [...cards].flatMap(([id, list]) => list.map((c) => ({ key: c.key, ids: [id], lane: c.lane }))),
-      rows: [...heads].map(([key, row]) => ({ key, ids: [...(row.head ? [row.head.id] : []), ...row.cards.map((n) => n.id)] })),
+      rows: [...heads].map(([key, row], r) => ({ key, cells: lanes.map((_, k) => `x:${r}:${k}`), ids: [...(row.head ? [row.head.id] : []), ...row.cards.map((n) => n.id)] })),
       lanes: [...laneKeys].map(([k, value]) => ({ key: `l:${k}`, value })),
     };
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks, ...ctx }) } });
