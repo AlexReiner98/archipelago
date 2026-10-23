@@ -163,3 +163,32 @@ test('in a browser, the workspace style’s page_css is how a published page loo
     page.close();
   }
 });
+
+test('in a browser, a part hovered says what it is in a tip beside it, not in a line over the picture', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { call, base } = await serve('off');
+  const { d, a } = await published(call);
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: a, body: 'Where everything comes in: the MCP server, the CLI and the web.' }] });
+  await call('/api/publish', undefined, { id: d });
+  const page = await open(`${base}/p/default/${d}`);
+  try {
+    const got = await page.evaluate(`(async () => {
+      let part;
+      for (let n = 0; n < 400 && !(part = document.querySelector('[data-lens] svg a[href="#/e/${a}"][opacity="1"]')); n++) await new Promise((r) => setTimeout(r, 25));
+      part.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      const tip = document.querySelector('.lens-tip');
+      const shown = { hidden: tip.hidden, text: tip.textContent, title: part.querySelector('title') === null, said: document.querySelector('.lens-said') === null };
+      part.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+      const left = { after: tip.hidden, back: part.querySelector('title') !== null };
+      // A place says what it is from its name only: its box, around its parts, says nothing.
+      const box = document.querySelector('[data-lens] svg rect.ar-place-box[opacity="1"]');
+      box.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      const boxSays = !tip.hidden;
+      const name = box && document.querySelector('[data-lens] svg a.ar-place[opacity="1"] text');
+      name.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      return { ...shown, ...left, boxSays, nameSays: !tip.hidden };
+    })()`);
+    assert.deepEqual(got, { hidden: false, text: 'DoorsWhere everything comes in: the MCP server, the CLI and the web.', title: true, said: true, after: true, back: true, boxSays: false, nameSays: true });
+  } finally {
+    page.close();
+  }
+});
