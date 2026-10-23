@@ -1,9 +1,10 @@
 // The islands look of a story (a step's `look: "islands"`): the same parts and wires as the boxes, drawn as an
 // archipelago. Each part is an island around its name, placed on a soft arc in the order its work comes (what it
-// needs before it), sized by what it holds and rising a little once it is done; each wire is a curved sea route
-// from what is needed to what needs it, with what it carries written beside it, clear of every route, island and
-// route end. A box and an island are both outlines of eight curves from the same corner, so one moves into the
-// other point by point. Pure: a layout in, geometry out. Every length is the style's (sizes, arch_island_*).
+// needs before it), sized by what it holds and rising a little once it is done; each wire is a curved sea route the
+// way the wire goes (between two pieces of work, from what is needed to what needs it), with what it carries written
+// beside it, clear of every route, island and route end. A box and an island are both outlines of eight curves from
+// the same corner, so one moves into the other point by point. Pure: a layout in, geometry out. Every length is the
+// style's (sizes, arch_island_*).
 
 const round = (v) => Math.round(v * 100) / 100;
 const pt = (p) => `${round(p[0])} ${round(p[1])}`;
@@ -59,8 +60,8 @@ export const along = (p, t) => [0, 1].map((i) => (1 - t) ** 3 * p[0][i] + 3 * (1
 
 /**
  * A layout (layout.js) as islands: where each part sits (x, y), how big its island is (radii: rx, ry, and `rise`, what a
- * finished one grows by), each wire as a route (points: a curve's four points, from what is needed to what needs it)
- * and the whole size. `done(n)` says whether a part's work is finished.
+ * finished one grows by), each wire as a route (points: a curve's four points, the way the wire goes) and the whole
+ * size. `done(n)` says whether a part's work is finished.
  */
 export function islands(g, { z, n: num, done }) {
   const parts = g.all.filter((n) => !n.dummy);
@@ -70,11 +71,11 @@ export function islands(g, { z, n: num, done }) {
   const size = (n) => PAD * (1 + Math.log2(1 + Math.max(0, Number(n.item.within?.items) || 0)) / 2);
   // Rounder than the box it holds: more sea above and below its name than beside it.
   const radii = new Map(parts.map((n) => [n.id, { rx: n.w / 2 + size(n) * 0.6, ry: n.h / 2 + size(n) * 1.5, rise: done(n) ? RISE : 0 }]));
-  // The order work comes in: a part after everything it needs (the wire's start needs its end, unless turned back).
+  // The order things come in: a part after everything whose wires come to it (as drawn: turned back, the other way).
   const needs = new Map(parts.map((n) => [n.id, []]));
   for (const c of g.chains) {
     const [from, to] = c.back ? [c.b, c.a] : [c.a, c.b];
-    if (needs.has(from) && needs.has(to)) needs.get(from).push(to);
+    if (needs.has(from) && needs.has(to)) needs.get(to).push(from);
   }
   const depth = new Map();
   const deep = (id, seen = new Set()) => {
@@ -130,19 +131,19 @@ export function islands(g, { z, n: num, done }) {
   for (const n of parts) (x.set(n.id, x.get(n.id) - left + MARGIN), y.set(n.id, y.get(n.id) - top + MARGIN));
   const width = Math.max(...parts.map((n) => ext(n.id, 1, x))) + MARGIN, height = Math.max(...parts.map((n) => ext(n.id, 1, y))) + MARGIN;
 
-  // A route leaves the island of what is needed and comes to the one that needs it, at their edges, bowed to one side.
+  // A route goes the way its wire does, from the edge of one island to the edge of the other, bowed to one side.
   const edge = (id, ux, uy, more) => {
     const r = radii.get(id), t = 1 / Math.hypot(ux / (r.rx + r.rise), uy / (r.ry + r.rise));
     return [x.get(id) + ux * (t + more), y.get(id) + uy * (t + more)];
   };
   const chains = g.chains.flatMap((c) => {
     if (!x.has(c.a) || !x.has(c.b)) return [];
-    const [from, to] = c.back ? [c.b, c.a] : [c.a, c.b];
-    const dx = x.get(from) - x.get(to), dy = y.get(from) - y.get(to), len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
-    const p0 = edge(to, ux, uy, 2), p3 = edge(from, -ux, -uy, 3);
+    const [start, end] = c.back ? [c.b, c.a] : [c.a, c.b];
+    const dx = x.get(end) - x.get(start), dy = y.get(end) - y.get(start), len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+    const p0 = edge(start, ux, uy, 2), p3 = edge(end, -ux, -uy, 3);
     const side = hashOf(c.key) < 0.5 ? -1 : 1, b = bow * Math.hypot(p3[0] - p0[0], p3[1] - p0[1]) * side;
     const handle = (f) => [p0[0] + (p3[0] - p0[0]) * f - uy * b, p0[1] + (p3[1] - p0[1]) * f + ux * b];
-    return [{ ...c, a: to, b: from, back: false, curve: true, points: [p0, handle(1 / 3), handle(2 / 3), p3] }];
+    return [{ ...c, a: start, b: end, back: false, curve: true, points: [p0, handle(1 / 3), handle(2 / 3), p3] }];
   });
   return { ...g, x, y, chains, boxes: [], breaks: [], left: 0, width, height, radii };
 }

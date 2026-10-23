@@ -92,17 +92,20 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
   if (!nodes.size) return { nodes, all: [], groups: [], boxes: [], chains: [], breaks: [], x: new Map(), y: new Map(), width: 0, height: 0 };
 
   // ---- Wires: a calls b when a link goes from a to b (a depends on b, needs it, sends to it). One a pair: a link
-  // back the other way makes it a wire both ways (both).
+  // back the other way makes it a wire both ways (both). Between two pieces of work, a dependency is drawn the way
+  // the work goes: from what is needed to what needs it.
+  const flow = (l) => (l.kind === 'depends_on' && nodes.get(l.from).item.kind === 'work' && nodes.get(l.to).item.kind === 'work' ? [l.to, l.from] : [l.from, l.to]);
   let edges = [];
   const seen = new Map();
   for (const l of links) {
     if (!nodes.has(l.from) || !nodes.has(l.to) || l.from === l.to) continue;
-    const key = [l.from, l.to].sort().join(' ');
+    const [from, to] = flow(l);
+    const key = [from, to].sort().join(' ');
     if (seen.has(key)) {
-      if (seen.get(key).a !== l.from) seen.get(key).both = true;
+      if (seen.get(key).a !== from) seen.get(key).both = true;
       continue;
     }
-    seen.set(key, { a: l.from, b: l.to, link: l, ...(l.says && { says: l.says }), state: wireState(l, nodes.get(l.from).item, nodes.get(l.to).item) });
+    seen.set(key, { a: from, b: to, link: l, ...(l.says && { says: l.says }), state: wireState(l, nodes.get(from).item, nodes.get(to).item) });
     edges.push(seen.get(key));
   }
   // A loop is drawn with one wire turned back, so the rest still reads down the page. Where it comes back to whoever
