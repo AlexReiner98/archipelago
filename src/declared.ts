@@ -83,11 +83,21 @@ export interface ViaDef {
 export interface ViewDef {
   id: string;
   description: string;
-  input: Record<string, unknown>;
+  /** What it is asked with, as JSON Schema: a view the pack's code answers needs it. */
+  input?: Record<string, unknown>;
   /** rows: one-line rows the kernel draws, each with an item; data: for agents only. */
   shape: 'rows' | 'data';
   limit_ms?: number;
+  /** A lens preset: the view is this lens (its fields, under what is asked), answered by the kernel's lens query, never by the pack's code. */
+  lens?: Record<string, unknown>;
+  /** With lens: how the lens's answer is read (one of LENS_ANSWERS); the lens's own form when left out. */
+  answer?: string;
+  /** With lens: for a param, the lens fields each of its values stands for. */
+  choices?: Record<string, Record<string, Record<string, unknown>>>;
 }
+
+/** How a lens preset's answer may be read, each kept to the form its view had (src/lens-presets.ts). */
+export const LENS_ANSWERS = ['lens', 'graph', 'tree', 'hubs', 'attention'] as const;
 
 /**
  * A tree a pack declares over "is part of": a roadmap, for one. The `tree`
@@ -225,8 +235,13 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (!own(def.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
       if (seen.has(def.id)) problems.push(`${at} is declared twice`);
       seen.add(def.id);
-      if (!handler) problems.push(`${at} needs the pack's handler.js: a verb with nothing to compute is a generic op`);
-      if (!isObjectSchema(def.input)) problems.push(`${at}: input is the JSON Schema of an object`);
+      const preset = what === 'view' && (def as ViewDef).lens !== undefined;
+      if (preset) {
+        const view = def as ViewDef;
+        if (typeof view.lens !== 'object' || view.lens === null || Array.isArray(view.lens)) problems.push(`${at}: lens is the fields of a lens`);
+        if (view.answer !== undefined && !(LENS_ANSWERS as readonly string[]).includes(view.answer)) problems.push(`${at}: answer is one of ${LENS_ANSWERS.join(', ')}`);
+      } else if (!handler) problems.push(`${at} needs the pack's handler.js: a verb with nothing to compute is a generic op`);
+      if (!(preset && def.input === undefined) && !isObjectSchema(def.input)) problems.push(`${at}: input is the JSON Schema of an object`);
       if (def.limit_ms !== undefined && !(def.limit_ms > 0 && def.limit_ms <= 30_000)) problems.push(`${at}: limit_ms is at most 30000`);
       if (what === 'action') {
         const action = def as ActionDef;

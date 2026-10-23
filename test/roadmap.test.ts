@@ -5,8 +5,11 @@ import { openDb } from '../src/db.ts';
 import { pictureOf } from '../src/lens.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
 import { sessionStart } from '../src/sessions.ts';
-import { VIEWS } from '../src/views.ts';
+import { askView } from '../src/askview.ts';
 import { human, agent, fresh, attend, make } from './map.ts';
+
+/** A view asked by its name, as the view tool asks it. */
+const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 test('what needs the person a lens is answered for is lit by attention: what waits on them, and what is due, theirs to confirm or theirs to settle', async () => {
   const l = await fresh();
@@ -22,7 +25,7 @@ test('what needs the person a lens is answered for is lit by attention: what wai
     { op: 'link', type: 'waits_on', from: 'waits', to: 'ann' },
   ]);
   await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(made.ann)]);
-  const answer = (await VIEWS.lens.run(l, {})) as any;
+  const answer = (await ask(l, 'lens', {})) as any;
   const item = (title: string) => answer.items.find((i: any) => i.title === title);
   assert.equal(answer.viewer, made.ann);
   assert.deepEqual(['Waits', 'Due', 'Calm'].map((t) => item(t).state.needs_you), [true, true, false], 'due work owned by no one is the owner’s, though it waits on nobody');
@@ -54,7 +57,7 @@ test('a lens answers with one shape of data: what is inside what, the same count
     { op: 'link', type: 'depends_on', from: 'x', to: 'a' },
     { op: 'link', type: 'waits_on', from: 'b', to: 'sam' },
   ]);
-  const run = async (params: Record<string, unknown> = {}) => (await VIEWS.lens.run(l, params)) as any;
+  const run = async (params: Record<string, unknown> = {}) => (await ask(l, 'lens', params)) as any;
   const titles = (answer: any) => answer.items.map((i: any) => i.title).sort();
   const item = (answer: any, title: string) => answer.items.find((i: any) => i.title === title);
   const name = (answer: any, id: string) => answer.items.find((i: any) => i.id === id)?.title;
@@ -169,9 +172,9 @@ test('a lens answers with one shape of data: what is inside what, the same count
   await make(l, [{ op: 'archive', id: onlyShortcut.s }]);
 
   // A hub is an item that holds enough to need views of its own: how much is enough is its project's to say.
-  assert.deepEqual([hubP.hub, ((await VIEWS.hubs.run(l, {})) as any).hubs], [{ is: false }, []], 'six things are not twelve');
+  assert.deepEqual([hubP.hub, ((await ask(l, 'hubs', {})) as any).hubs], [{ is: false }, []], 'six things are not twelve');
   await make(l, [{ op: 'update', id: made.p, props: { hub_at: 2 } }]);
-  const found = ((await VIEWS.hubs.run(l, {})) as any).hubs.map((h: any) => [h.title, h.inside, h.at, h.views]);
+  const found = ((await ask(l, 'hubs', {})) as any).hubs.map((h: any) => [h.title, h.inside, h.at, h.views]);
   assert.deepEqual(found, [['P', 5, 2, 3], ['Early', 2, 2, 0]], 'while a project is shaped, most of what is in it is a hub; Q is another project and keeps the usual size');
   assert.deepEqual((await run({ from: made.early })).hub, { is: true, inside: 2, at: 2 });
 
@@ -210,10 +213,10 @@ test('the roadmap tree orders a project\'s features, rolls up progress, and show
     { op: 'link', type: 'part_of', from: 't3', to: 'late' },
   ]);
 
-  const roots = (await VIEWS.tree.run(l, {})) as any;
+  const roots = (await ask(l, 'tree', {})) as any;
   assert.deepEqual(roots.roots.map((r: any) => [r.title, r.branches]), [['Proj', 3], ['Other', 0]], 'without a root, the projects to choose from');
 
-  const tree = (await VIEWS.tree.run(l, { root: made.p })) as any;
+  const tree = (await ask(l, 'tree', { root: made.p })) as any;
   assert.deepEqual(tree.branches.map((b: any) => b.title), ['Early', 'Late', 'No place yet'], 'placed features in order, the rest after');
   const early = tree.branches[0];
   assert.deepEqual(early.progress, { done: 1, total: 2 }, 'a feature counts the work under its sub-features; a note is not work');
@@ -229,13 +232,13 @@ test('the roadmap tree orders a project\'s features, rolls up progress, and show
     { op: 'link', type: 'depends_on', from: made.late, to: made.early },
     { op: 'link', type: 'depends_on', from: made.t1, to: made.other },
   ]);
-  const withSession = (await VIEWS.tree.run(l, { root: made.p })) as any;
+  const withSession = (await ask(l, 'tree', { root: made.p })) as any;
   assert.deepEqual(withSession.depends, [{ from: made.late, to: made.early }], 'only dependencies between things in the tree');
   const late = withSession.branches[1];
   assert.deepEqual([late.active, late.work[0].sessions[0].id], [true, session.run], 'an open session marks its task and the feature above it');
 
   await make(l, [{ op: 'link', type: 'part_of', from: made.loose, to: made.late }]);
-  const placed = (await VIEWS.tree.run(l, { root: made.p })) as any;
+  const placed = (await ask(l, 'tree', { root: made.p })) as any;
   assert.deepEqual([placed.unplaced.length, placed.branches[1].work.map((w: any) => w.title).sort()], [0, ['Loose', 'T3']], 'work given a feature sits under it, though still part of the project');
 });
 

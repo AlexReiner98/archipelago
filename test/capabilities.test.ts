@@ -9,7 +9,10 @@ import { checkCapabilities, occurs } from '../src/capabilities.ts';
 import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
-import { VIEWS } from '../src/views.ts';
+import { askView } from '../src/askview.ts';
+
+/** A view asked by its name, as the view tool asks it. */
+const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
@@ -73,7 +76,7 @@ test('at risk is what crosses its bound, whatever the field is called', async ()
     { op: 'create', ref: 'ok', type: 'shop.stock', title: 'Salt', props: { on_hand: 30, reorder_at: 10 } },
   ]);
   type Due = { items: { id: string; reasons: { on?: string; limit?: number }[] }[] };
-  const due = (await VIEWS.attention.run(l, { reasons: ['due'] })) as Due;
+  const due = (await ask(l, 'attention', { reasons: ['due'] })) as Due;
   assert.deepEqual(due.items.filter((r) => r.reasons[0].on).map((r) => r.id).sort(), [made.grant, made.task].sort());
   assert.equal(due.items.find((r) => r.id === made.grant)!.reasons[0].on, soon);
   assert.deepEqual(due.items.filter((r) => r.reasons[0].limit !== undefined).map((r) => r.id), [made.low]);
@@ -87,7 +90,7 @@ test('a resource holds as many as its capacity, and blocks what needs it once fu
   ]);
   for (const t of ['a', 'b']) assert.equal((await l.claim(human, { resource: made.room, holder: made[t], reason: 'test' })).status, 'claimed');
   await assert.rejects(l.claim(human, { resource: made.room, holder: made.c, reason: 'test' }), /is held by/);
-  const blocked = (await VIEWS.attention.run(l, { reasons: ['blocked'] })) as { items: { id: string }[] };
+  const blocked = (await ask(l, 'attention', { reasons: ['blocked'] })) as { items: { id: string }[] };
   assert.deepEqual(blocked.items.map((b) => b.id), [made.c]);
   await assert.rejects(l.claim(human, { resource: made.a, holder: made.b, reason: 'test' }), /nothing of its type can be held/);
 });

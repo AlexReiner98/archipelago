@@ -1,7 +1,8 @@
 // The shape of the code, checked. Files stay small; the kernel names no pack; writes to items and
 // relations go through one path; a pack reaches the kernel only through what it is handed; a pack's
 // code is tested without a database; kernel modules import one way; the UI loads as modules; and
-// there are five dependencies; and every picture is a drawing a pack ships.
+// there are five dependencies; every picture is a drawing a pack ships; and every view the kernel answers is a
+// lens preset or named as operational.
 //
 // Each rule keeps a list of what already broke it when the rule was made (16 Oct 2026). An entry
 // may only shrink, and goes once the rule is met: when you bring a number down, lower it here.
@@ -11,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
-import { MAP_TABLES, RESTORE, STORES } from '../src/operational.ts';
+import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
@@ -56,8 +57,7 @@ const count = (files: string[], pattern: RegExp) =>
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
-  'src/views.ts': 503,
-  'src/tools.ts': 909,
+  'src/tools.ts': 908,
   'src/pelago.ts': 1003,
   'ui/style.css': 732,
 };
@@ -271,4 +271,20 @@ test('the UI and the tools use one name for each idea', () => {
       .filter(([, n]) => n > 0),
   );
   assert.deepEqual(ratchet(counted, RETIRED_WORDS), [], 'Say it with the word docs/glossary.md gives: item, link, the map, pack, view, drawing.');
+});
+
+// 13. One way to read (Rule 6 of the rework's target model, the owner, 23 Oct 2026): every picture, view and agent
+// read is a lens. A view the kernel answers with its own code is one src/operational.ts names, with what it reads
+// instead of the work; every other is a view a pack declares, and the core pack's are lens presets, answered by the
+// lens query (src/lens-presets.ts). A kernel view that is neither is refused.
+test('every kernel view is a lens preset or named as operational', async () => {
+  await import('../src/tools.ts'); // every module that adds a view of its own (src/sessions.ts adds story) is loaded
+  const { VIEWS } = await import('../src/views.ts');
+  const unnamed = Object.keys(VIEWS).filter((name) => !(name in VIEWS_OPERATIONAL));
+  assert.deepEqual(unnamed, [], 'Make it a lens preset (packs/core/pack.json views, with lens), or a pack view, or name it in src/operational.ts with what it reads.');
+  assert.deepEqual(Object.keys(VIEWS_OPERATIONAL).filter((name) => !(name in VIEWS)), [], 'A view src/operational.ts names that the kernel no longer answers: take it out.');
+  const core = JSON.parse(read('packs/core/pack.json')) as { views?: { id: string; lens?: unknown }[] };
+  assert.deepEqual((core.views ?? []).filter((v) => !v.lens).map((v) => v.id), [], 'The core pack carries no code: each of its views is a lens preset.');
+  const presets = (core.views ?? []).map((v) => v.id.slice(v.id.indexOf('.') + 1));
+  assert.deepEqual(presets.filter((name) => name in VIEWS), [], 'A kernel view of the same name hides the lens preset: one name, one view.');
 });

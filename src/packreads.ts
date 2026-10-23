@@ -37,8 +37,10 @@ export type Read = {
   blocked?: string[];
   view?: string;
   params?: Record<string, unknown>;
-  /** What a type is: its statuses, and whether a person settles it (a question), so a handler need not know it. */
+  /** What a type is: its statuses, whether a person settles it (a question) and how, and whether it is estimated, so a handler need not know it. */
   type_info?: string;
+  /** Who the answer is for: the person asking, else the workspace's owner. */
+  me?: boolean;
   /** Whether a change with this op is waiting for a person already. */
   proposed?: Record<string, unknown>;
   /** Only these of each item's props, and no note. */
@@ -111,23 +113,25 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
   if (q.blocked) {
     const graph = await blockGraph(l);
     const roots = [...new Set(q.blocked.flatMap((id) => graph.roots(id)))];
-    const { rows } = roots.length ? await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[])`, [roots]) : { rows: [] };
-    const titles = new Map(rows.map((r) => [r.id, r.title]));
-    return Object.fromEntries(q.blocked.map((id) => [id, { blocked: graph.isBlocked(id), waits_on_someone: graph.waitsOnSomeone(id), roots: graph.roots(id).map((r) => ({ id: r, title: titles.get(r) })) }]));
+    const { rows } = roots.length ? await l.db.query<{ id: string; type: string; title: string; status: string }>(`select id, type, title, status from entity where id = any($1::text[])`, [roots]) : { rows: [] };
+    const found = new Map(rows.map((r) => [r.id, r]));
+    const root = (r: string) => ({ id: r, title: found.get(r)?.title, type: found.get(r)?.type, status: found.get(r)?.status });
+    return Object.fromEntries(q.blocked.map((id) => [id, { blocked: graph.isBlocked(id), waits_on_someone: graph.waitsOnSomeone(id), roots: graph.roots(id).map(root) }]));
   }
   if (q.view !== undefined) {
-    // A pack's view by its short name too (repo_work), answered by its pack.
+    // A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work).
     const view = VIEWS[q.view];
     return view ? view.run(l, q.params ?? {}) : askPackView(l, q.view, q.params ?? {});
   }
   if (q.type_info !== undefined) {
     const t = l.registry.type(q.type_info);
     // lives_in: the link that puts an item in a place of this type.
-    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id), lives_in: livesInFor(l, t.id) } : null;
+    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id), settled_by: t.capabilities.settles?.by ?? null, estimated: Boolean(t.fields.tokens_estimated), lives_in: livesInFor(l, t.id) } : null;
   }
+  if (q.me) return l.viewer || (await l.setting<string>('me')) || null;
   if (q.proposed !== undefined) {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, events, pictures, blocked, view, type_info, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, events, pictures, blocked, view, type_info, me, proposed.');
 }

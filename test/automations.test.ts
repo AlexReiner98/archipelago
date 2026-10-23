@@ -6,7 +6,11 @@ import { Archipelago, type Op } from '../src/pelago.ts';
 import { sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
+import { askView } from '../src/askview.ts';
 import { human, agent, fresh, make } from './map.ts';
+
+/** A view asked by its name, as the view tool asks it. */
+const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 test('an agent can notify the human; a stale session raises one notification', async () => {
   const l = await fresh();
@@ -254,17 +258,17 @@ test('the graph view returns a preset of the whole map, or one entity\'s neighbo
   ]);
   const titles = (g: any) => g.nodes.map((n: any) => n.title).sort();
 
-  const blocking = (await VIEWS.graph.run(l, {})) as any;
+  const blocking = (await ask(l, 'graph', {})) as any;
   assert.deepEqual(titles(blocking), ['A', 'B'], 'only what blocking relations connect; finished work left out');
   assert.deepEqual(blocking.edges.map((e: any) => e.type), ['depends_on']);
   const a = blocking.nodes.find((n: any) => n.title === 'A');
   assert.deepEqual([a.blocked, a.root], [true, 'work.task']);
   assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'work.issue', 'a flavour reports its root type');
 
-  assert.deepEqual(titles(await VIEWS.graph.run(l, { relations: 'all', include_closed: true })), ['A', 'B', 'C', 'Far', 'Proj']);
-  assert.deepEqual(titles(await VIEWS.graph.run(l, { focus: made.far, depth: 1 })), ['Far', 'Proj']);
-  assert.deepEqual(titles(await VIEWS.graph.run(l, { focus: made.far, depth: 2 })), ['A', 'Far', 'Proj']);
-  assert.deepEqual(titles(await VIEWS.graph.run(l, { focus: made.lonely })), ['Lonely'], 'a focus is shown even with no relations');
-  await assert.rejects(VIEWS.graph.run(l, { relations: 'everything' }), /must be one of/);
+  assert.deepEqual(titles(await ask(l, 'graph', { relations: 'all', include_closed: true })), ['A', 'B', 'C', 'Far', 'Proj']);
+  assert.deepEqual(titles(await ask(l, 'graph', { focus: made.far, depth: 1 })), ['Far', 'Proj']);
+  assert.deepEqual(titles(await ask(l, 'graph', { focus: made.far, depth: 2 })), ['A', 'Far', 'Proj']);
+  assert.deepEqual(titles(await ask(l, 'graph', { focus: made.lonely })), ['Lonely'], 'a focus is shown even with no relations');
+  await assert.rejects(ask(l, 'graph', { relations: 'everything' }), /must be one of/);
 });
 

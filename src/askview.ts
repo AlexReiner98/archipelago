@@ -1,11 +1,14 @@
-// Asking a standing question by its name: the kernel's views, and the views packs declare, by their short names
-// (a pack's software.handoff answers as handoff), so what agents and hooks ask for does not change as views move
-// into packs. A kernel view's name wins; among packs, the first to load.
+// Asking a standing question by its name: the kernel's operational views, and the views packs declare, by their
+// short names (a pack's software.handoff answers as handoff, core's core.attention as attention), so what agents and
+// hooks ask for does not change as views move into packs. A view a pack declares is a lens preset, answered by the
+// lens query (src/lens-presets.ts), or its own code's. A kernel view's name wins; among packs, the first to load.
 
 import type { ViewDef } from './declared.ts';
 import { hostFor } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
+import type { Registry } from './packs.ts';
 import { REPLACED } from './attention.ts';
+import { answerPreset } from './lens-presets.ts';
 import { setPackAsker, VIEWS } from './views.ts';
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);
@@ -22,8 +25,19 @@ function packView(l: Archipelago, name: string): { pack: string; def: ViewDef } 
 /** Every question that can be asked here, with what each answers. */
 export function viewList(l: Archipelago): Record<string, string> {
   const out = Object.fromEntries(Object.entries(VIEWS).map(([name, v]) => [name, v.description]));
-  for (const pack of l.registry.packs) for (const v of pack.views ?? []) out[short(v.id)] ??= `${v.description} (from the ${pack.id} pack)`;
+  for (const pack of l.registry.packs) for (const v of pack.views ?? []) out[short(v.id)] ??= pack.id === 'core' ? v.description : `${v.description} (from the ${pack.id} pack)`;
   return out;
+}
+
+/** What the view tool says it answers: the lenses the core pack declares (none without a registry), then the kernel's own views, then the packs'. */
+export function viewsSaid(reg?: Registry): string {
+  const lenses = (reg?.packs.find((p) => p.id === 'core')?.views ?? []).map((v): [string, string] => [short(v.id), v.description]);
+  const views = [...lenses, ...Object.entries(VIEWS).map(([name, v]): [string, string] => [name, v.description])];
+  return (
+    'Answer one of the standing questions. Call with no name to list them. An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ' +
+    views.map(([name, said]) => `${name}: ${said}`).join(' ') +
+    ' The packs here add their own (the repository views handoff, repo_work, recheck and agent_usage, and a release’s gate, are the software pack’s): call with no name for all of them.'
+  );
 }
 
 /** Whether a question of this name can be asked here. */
@@ -39,5 +53,6 @@ export async function askView(l: Archipelago, actor: Actor, name: string, params
   const found = packView(l, name);
   if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask view attention with params ${REPLACED[name]}.`);
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(l)).join(', ')}`);
+  if (found.def.lens) return answerPreset(l, found.def, params);
   return (await hostFor(l.registry).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;
 }

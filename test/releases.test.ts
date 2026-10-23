@@ -5,8 +5,11 @@ import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
 import { publicPage, publicPicture } from '../src/public.ts';
 import { callTool } from '../src/tools.ts';
-import { VIEWS } from '../src/views.ts';
+import { askView } from '../src/askview.ts';
 import { human, agent, fresh, make } from './map.ts';
+
+/** A view asked by its name, as the view tool asks it. */
+const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 test('a picture is kept for a result only when sent, travels in a backup, and goes when the test is run again', async () => {
   const l = await fresh();
@@ -77,7 +80,7 @@ test('a release is not clear until what it ships is proven on its own build, and
     { op: 'link', type: 'depends_on', from: 'release', to: 'proofs' },
   ]);
   type Gate = { clear: boolean; proof: { build: string | null; named: boolean; counts: { questions: number; answered: number }; questions: { id: string; answered: boolean }[] } | null };
-  const gate = async () => (await VIEWS.gate.run(l, { event: made.release })) as Gate;
+  const gate = async () => (await ask(l, 'gate', { event: made.release })) as Gate;
 
   // Passing on an earlier build does not answer for the build that is released.
   await callTool(l, human, 'test_report', { build: '0.9.0', results: [{ test: made.noaa, passed: true }] });
