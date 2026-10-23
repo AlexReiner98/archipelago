@@ -242,6 +242,8 @@ function draw(d) {
     d.parts.slice(0, opening).map(part),
     sections.length > 2 && h('nav', { class: 'contents' }, h('ol', {}, sections.map((p) => h('li', {}, h('a', { href: `#${p.section.id}` }, p.section.title))))),
     d.parts.slice(opening).map(part),
+    // A site's pages each end with what its footer page says (src/site.ts).
+    d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
     // A published page is read on the web: only a link's or an invoice's has a way to print it.
     !published && !d.site && h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
   ];

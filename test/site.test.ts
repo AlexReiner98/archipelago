@@ -125,3 +125,21 @@ test('a path must be an address word, and one published path belongs to one docu
   assert.match((await call('/api/publish', undefined, { id: z })).error, /cannot be an address/);
   assert.equal((await call('/api/get', undefined, { id: z })).result.entity.visibility, 'shared', 'refused before it was made public');
 });
+
+test('a site’s pages each end with what its footer page says, and the sitemap leaves the footer out', async () => {
+  const { call, base } = await serve('off', undefined, { 'site.test': 'default' });
+  const { home, foot } = (
+    await call('/api/change', undefined, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'home', type: 'work.document', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' },
+        { op: 'create', ref: 'foot', type: 'work.document', title: 'Footer', visibility: 'shared', props: { path: 'footer' }, body: 'Made in Canada. Questions: hello@example.com.' },
+      ],
+    })
+  ).result.created;
+  assert.equal((await call('/api/publish', undefined, { id: home })).status, 200);
+  assert.equal(JSON.parse((await visit(base, '/data', 'site.test')).body).site.footer, undefined, 'none before it is published');
+  assert.equal((await call('/api/publish', undefined, { id: foot })).status, 200);
+  assert.equal(JSON.parse((await visit(base, '/data', 'site.test')).body).site.footer, 'Made in Canada. Questions: hello@example.com.');
+  assert.ok(!(await visit(base, '/sitemap.xml', 'site.test')).body.includes('/footer'));
+});
