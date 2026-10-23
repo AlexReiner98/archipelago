@@ -29,7 +29,7 @@ import { askView, viewList } from './askview.ts';
 import { toConfirm } from './confirm.ts';
 import { VIEWS } from './views.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
-import { type Focus, listening, point as setFocus, presence, tellStamp, took } from './presence.ts';
+import { type Focus, listening, point as setFocus, presence, tellStamp, took } from './presence.ts'; import { touched } from './touched.ts';
 
 const props = z.record(z.string(), z.unknown());
 const visibility = z.enum(['private', 'shared', 'public']).describe('private: only its author. shared: everyone in the workspace. public: anyone, with no login, on the product\u2019s public page, or a document at its own address (/p/<workspace>/<id>) with the sections it holds; only a project, feature, release, proof question, test, test result or document can be, and only a human makes it so (from an agent it waits as a proposal).');
@@ -375,12 +375,12 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => l.proposals(input),
   },
   pulse: {
-    description: 'A stamp that moves whenever the map or the review queue changes. The web UI watches it to know when to redraw.',
+    description: 'A stamp that moves whenever the map or the review queue changes, and what the changes since `since` (an event seq) touched. The web UI watches it to know what to redraw.',
     humanOnly: true,
-    input: {},
-    run: async (l) => {
-      const [p, { told, ...seen }] = await Promise.all([l.pulse(), presence((await wholeMap(l)).db, l)]);
-      return { stamp: `${p.stamp}.${told}`, ...seen, ui: uiStamp() };
+    input: { since: z.number().int().nonnegative().optional().describe('The `touched.seq` of the last answer: what changed after it is said.') },
+    run: async (l, _actor, { since }) => {
+      const [p, { told, ...seen }, changed] = await Promise.all([l.pulse(), presence((await wholeMap(l)).db, l), touched(l.db, since)]);
+      return { stamp: `${p.stamp}.${told}`, ...seen, ui: uiStamp(), touched: changed };
     },
   },
   backup: {

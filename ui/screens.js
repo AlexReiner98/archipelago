@@ -268,9 +268,8 @@ export function drawScreen(screen, redraw) {
 /** The nodes in a column, and what to run once it is on the page. */
 const settle = (drawn) => ({
   column: h('div', { class: 'screens' }, drawn.map((d) => d.node)),
-  after: () => {
-    for (const d of drawn) Promise.resolve(d.later?.()).catch((err) => d.node.isConnected && d.node.replaceChildren(h('div', { class: 'error' }, err.message)));
-  },
+  // Answers once every piece is filled: a page drawn again in place shows them then.
+  after: () => Promise.all(drawn.map((d) => Promise.resolve(d.later?.()).catch((err) => d.node.isConnected && d.node.replaceChildren(h('div', { class: 'error' }, err.message))))),
 });
 
 /** The column of pieces the screens on this item draw, and what to run once it is on the page. */

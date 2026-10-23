@@ -8,6 +8,7 @@ import { automationDoes, entityForm } from './forms.js';
 import { documentMenu, documentNote, figureOf, readDocument } from './item-doc.js';
 import { relationEditor } from './item-links.js';
 import { lensView, storyPart } from './lens.js';
+import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, drawScreens, fold, keepsFigure, readWhole } from './screens.js';
 import { RAN, ageChip, ago, changeRow, chip, eventLine, gist, idsAsLinks, idsIn, isA, isClosed, link, menu, pill, relations, statusesOf, titles, tokensText, typeTitle, types, when } from './words.js';
 
@@ -23,8 +24,9 @@ const ID = /^e_[a-z0-9]{8}$/;
 export async function entity(id, here) {
   const page = part('item');
   const again = () => entity(id, here);
-  // Drawn again in place (after a change, a step further out), the page keeps its height and its scroll.
-  if (page.dataset.item !== id) page.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
+  // Drawn again in place (after a change, a step further out, the map changing under it), only what differs is swapped.
+  const inPlace = page.dataset.item === id && page.childElementCount > 0;
+  if (!inPlace) page.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
   page.dataset.item = id;
   let data;
   let past;
@@ -146,6 +148,7 @@ export async function entity(id, here) {
     }
   };
 
+  redraw.inPlace = inPlace;
   const note = doc
     ? documentNote(doc, id, here, looks)
     : h(
@@ -157,7 +160,7 @@ export async function entity(id, here) {
       );
   const screens = drawScreens({ e, data, id, redraw: again });
 
-  page.replaceChildren(
+  const kids = [
     h(
       'div',
       { class: 'page-head' },
@@ -259,6 +262,9 @@ export async function entity(id, here) {
     h('div', { class: 'grid', style: 'margin-bottom: var(--space-8)' }, story ? fold(id, 'log', 'Log', 0, false, note) : note),
     screens.column,
     h('div', { class: 'grid' }, fold(id, 'history', 'History', lines.length, looks.page.history === 'open', lines)),
-  );
+  ].map((k) => (k?.nodeType ? k : document.createTextNode(String(k))));
+  redraw.inPlace = false;
+  if (inPlace) return settleWhenFilled(page, kids, screens.after);
+  page.replaceChildren(...kids);
   screens.after();
 }
