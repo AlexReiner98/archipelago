@@ -34,6 +34,19 @@ where, and how that server is run.
   with `basis` (what the owner said and where) when the owner told you to or
   decided it, `of: "agent"` when it is your own reading of the work. Do not
   claim the owner's word for your own judgment; the log keeps both apart.
+  Settling a question needs it said (the core rule `settle_said`).
+- **A rule decides what waits.** Whether a change applies, waits for a person
+  or is refused is decided by rules as data alone (`rules` in a pack file,
+  judged by `decide` in `src/rules.ts`), and a held change names the rule
+  that held it (`held_by`, in the answer and on the proposal). The kernel's
+  own are core's: an agent's change waits (`agent_changes`), settling a
+  question is the owner's (`settle`), code that runs, what is public,
+  publishing, backups. A workspace setting only lifts a rule its pack
+  declared liftable (`lifted`); the server's policy (`pelago.config.json`)
+  only lifts `agent_changes` where the workspace has not chosen, or forbids
+  an op. Never decide an approval anywhere else: `test/structure.test.ts`
+  refuses it, and `test/approvals.test.ts` keeps the table of what becomes
+  of each change.
 - **Restart the local server yourself in dev mode.** After changing anything
   under `src/` or `packs/`, run `npm test` and `npm run typecheck`, then
   restart it and wait for `GET /health`: with the `restart` tool if your
@@ -49,7 +62,8 @@ where, and how that server is run.
   `show` before each step worth seeing (a change you make already moves it). Say in the reason that it is a test, and undo what you
   made when you are done (`undo` with the change set). Drive a browser only
   when you need to click, and then a visible one on that same server. To see
-  how a held change looks there, send it with `hold: true`; it leaves the
+  how a held change looks there, send it with `hold: true` (core's rule
+  `asked` holds it); it leaves the
   queue by itself when the same change is then sent unheld.
 - **Name what a change makes by its ref.** A title or note in the same change
   as a new item names it as `{ref}`, which becomes the item's id when the

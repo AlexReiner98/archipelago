@@ -47,7 +47,7 @@ export async function heldPiece(host, title) {
       h(
         'li',
         { class: 'row-top', style: 'flex-wrap: nowrap' },
-        h('span', { class: 'pill warn', style: 'flex: none' }, 'Approve'),
+        h('span', { class: 'pill warn', style: 'flex: none', title: p.held_by?.say ?? 'Waits for you' }, 'Approve'),
         h('span', { class: 'grow', title: p.reason, style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, said(p, names)),
         h('span', { class: 'muted small', style: 'flex: none' }, who(p.actor)),
         h('span', { class: 'muted small nowrap', style: 'flex: none' }, `${n} change${n === 1 ? '' : 's'}`),
