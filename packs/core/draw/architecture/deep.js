@@ -3,7 +3,7 @@
 // island a mountain whose shore is its flat outline, with a contour at every level, one level for each piece of work
 // inside it. The levels are coloured from the shore up as that work is done, and bare above. It comes in seen from
 // straight above, where it is a map of the flat picture, then the eye tilts down while the land rises out of the sea,
-// and follows the work: closer, lower and round to the side of the islands under way, back to the whole map at the end.
+// and stays there while the work goes on.
 // Routes lie on the water, in the accent while a step lights them, with what they carry beside them; each island's
 // name stands over its peak, with how much of its work is done. The sea runs on past the picture into a haze, and
 // whoever owns work under way sails to it as a boat (boats.js). Where the page gives no surface (a still picture drawn on the server, no WebGL), the
@@ -281,35 +281,13 @@ export function deep({ style, tools, z, num, shape }) {
       const corners = [x, x + w].flatMap((px) => [y, y + h].flatMap((pz) => [made.base, peakMost * rise].map((py) => new THREE.Vector3(px, tilt ? py : 0, pz))));
       return fit(corners, x + w / 2, y + h / 2, deg(90 - (90 - num('arch_deep_angle')) * tilt), 0, 1 - (1 - num('arch_deep_near')) * tilt);
     };
-    /** The islands at work, closer and lower, seen from the side they lie on. */
-    const close = (ids) => {
-      const [x, , w] = tile, at = ids.map((id) => islands.get(id));
-      const points = at.flatMap((i) => [-1, 1].flatMap((sx) => [-1, 1].flatMap((sz) => [0, i.peak].map((py) => new THREE.Vector3(i.cx + sx * i.rx, py, i.cy + sz * i.ry)))));
-      const cx = at.reduce((t, i) => t + i.cx, 0) / at.length, cz = at.reduce((t, i) => t + i.cy, 0) / at.length;
-      const side = Math.max(-1, Math.min(1, (cx - (x + w / 2)) / (w / 2)));
-      const c = fit(points, cx, cz, deg(num('arch_deep_close_angle')), deg(num('arch_deep_swing')) * side, num('arch_deep_close_room'));
-      // Never so close that one island fills the picture (the map stays around it), nor further back than the whole map.
-      const all = whole().far;
-      return { ...c, far: Math.min(all, Math.max(c.far, all * num('arch_deep_closest'))) };
+    // The eye stays where the rise leaves it: the whole map, at the style's angle.
+    const sunOn = (eye) => (sun.position.set(eye.cx - tile[2], eye.far, eye.cz - tile[3] / 2), sun.target.position.set(eye.cx, 0, eye.cz));
+    const look = () => {
+      const eye = whole();
+      (place(eye), sunOn(eye));
     };
-    // The eye glides to where it is to go, and a new goal on the way bends its path: steps that come quickly blend
-    // into one move.
-    let eye = null, goal = null;
-    const sunOn = () => (sun.position.set(eye.cx - tile[2], eye.far, eye.cz - tile[3] / 2), sun.target.position.set(eye.cx, 0, eye.cz));
-    const glide = {
-      tick(dt) {
-        const k = 1 - Math.exp(-dt / num('arch_deep_glide'));
-        let still = true;
-        for (const p of ['cx', 'cz', 'el', 'az', 'far']) {
-          eye[p] += (goal[p] - eye[p]) * k;
-          if (Math.abs(goal[p] - eye[p]) > (p === 'el' || p === 'az' ? 1e-3 : 0.5)) still = false;
-        }
-        (place(eye), sunOn());
-        return still;
-      },
-    };
-    const head = (to, at) => ((goal = to), at ? ((eye = { ...to }), place(eye), sunOn()) : (moving.add(glide), run()));
-    surface.resized((now) => ((size = now), fitRenderer(), made && eye && head(goal?.whole ? { ...whole(), whole: true } : { ...goal }, true), draw()));
+    surface.resized((now) => ((size = now), fitRenderer(), made && look(), draw()));
     const lift = z('deep_name_lift');
     const stand = () => {
       made.relief.scale.y = Math.max(0.02, rise);
@@ -323,16 +301,9 @@ export function deep({ style, tools, z, num, shape }) {
     const run = async () => {
       if (running) return;
       running = true;
-      let then = null;
       while (moving.size) {
         const now = await tools.frame();
-        const dt = then === null ? 16 : Math.min(100, now - then);
-        then = now;
         for (const m of moving) {
-          if (m.tick) {
-            if (m.tick(dt)) moving.delete(m);
-            continue;
-          }
           const k = Math.min(1, (now - (m.t0 ??= now)) / m.over);
           m.step(ease(k));
           if (k >= 1) moving.delete(m);
@@ -350,32 +321,21 @@ export function deep({ style, tools, z, num, shape }) {
         made ??= ground(f);
         for (const [key, c] of f.wires) if (!routes.has(key)) routes.set(key, route(key, c));
         for (const [key, r] of routes) (routeWords(r, f, f.lit.has(key)), r.paint.color.copy(colour(f.lit.has(key) ? 'accent' : 'muted')));
-        // The islands at work: those whose work moves on in this step, and those under way.
-        const busy = [];
         for (const [id, n] of f.parts) {
           const it = islands.get(id);
           if (!it) continue;
           if (valueOf(n, f.look) !== it.value || labelOf(it.title, n) !== it.text) ((it.value = valueOf(n, f.look)), (it.text = labelOf(it.title, n)), swap(it.name, nameOf(it.title, n, f)));
           const from = uniforms.uDone.value[it.k], to = doneOf(n, f);
-          if (to !== from) busy.push(id);
           tween(enter ? 0 : dur, (k) => (uniforms.uDone.value[it.k] = from + (to - from) * k));
         }
         // The boats sail to the work they have under way.
         boats.sail(f.boats ?? [], enter && !dur ? 0 : num('arch_deep_sail'));
-        // Where the eye goes: to the islands whose work moves on, else to those the boats are at, and back to the whole
-        // map once all of it is done.
-        if (!busy.length) busy.push(...new Set((f.boats ?? []).map((b) => b.at).filter((id) => islands.has(id))));
-        const finished = [...f.parts].every(([, n]) => doneOf(n, f) >= 1);
-        const there = () => (!enter && busy.length && !finished ? close(busy) : { ...whole(), whole: true });
         if (enter && dur) {
           // From above, flat, where the picture was; then down to the water while the land rises.
-          ((tilt = 0), (rise = 0), stand(), head(whole(), true), draw());
-          tween(num('arch_deep_rise'), (k) => ((tilt = k), (rise = k), stand(), head(whole(), true)));
-        } else if (enter) ((tilt = 1), (rise = 1), stand(), head(whole(), true), draw());
-        else {
-          head(there(), !dur);
-          draw();
-        }
+          ((tilt = 0), (rise = 0), stand(), look(), draw());
+          tween(num('arch_deep_rise'), (k) => ((tilt = k), (rise = k), stand(), look()));
+        } else if (enter) ((tilt = 1), (rise = 1), stand(), look(), draw());
+        else draw();
       },
     };
   }
