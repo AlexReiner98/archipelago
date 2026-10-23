@@ -1,6 +1,8 @@
 // A system's wires, routed: at right angles only, as in the flow, each on a track of its own in the gap below the
 // row it leaves; then the rows' heights, the places' boxes and the whole size. Given what layout.js has placed.
 
+import { sideWires } from './sides.js';
+
 /** Route the wires of what is placed, and size the picture. */
 export function route({ nodes, chains, layers, x, byId, order, colLeft, colRight, measure, prior, steady, health, sizes }) {
   const { SLOT, TRACK, LAYER_GAP, PAD, LEAD_OUT, LEAD_IN, HEAD, MARGIN, PLACE_TEXT, PLACE_NAME_PAD } = sizes;
@@ -138,11 +140,12 @@ export function route({ nodes, chains, layers, x, byId, order, colLeft, colRight
   }
   for (const sg of segs) sg.points = [[sg.fx, edgeY(sg.u, sg.fx, true)], [sg.fx, sg.y], [sg.hx, sg.y], [sg.hx, edgeY(sg.v, sg.hx, false)]];
   for (const c of chains) c.points = segs.filter((sg) => sg.chain === c).flatMap((sg, k) => (k ? sg.points.slice(1) : sg.points));
+  const turned = steady ? sideWires({ chains, nodes, x, y, LANE }) : new Set();
   // Where a drop passes over another wire's track, the drop is broken, as in the flow.
   const breaks = [];
-  for (const sg of segs)
+  for (const sg of segs.filter((s) => !turned.has(s.chain)))
     for (const [p, q] of [[sg.points[0], sg.points[1]], [sg.points[2], sg.points[3]]])
-      for (const o of tracks[sg.gap]) if (o !== sg && inside(p[0], o) && o.y > Math.min(p[1], q[1]) + 1 && o.y < Math.max(p[1], q[1]) - 1) breaks.push([p[0], o.y]);
+      for (const o of tracks[sg.gap]) if (o !== sg && !turned.has(o.chain) && inside(p[0], o) && o.y > Math.min(p[1], q[1]) + 1 && o.y < Math.max(p[1], q[1]) - 1) breaks.push([p[0], o.y]);
 
   return { all, boxes, breaks, y, width, height, left: steady ? Math.min(0, left) : 0, rooms };
 }

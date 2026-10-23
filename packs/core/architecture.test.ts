@@ -119,6 +119,20 @@ test("a wire's words are never written over another wire, or at either end of an
   }
 });
 
+test('with steps, a wire that would turn twice goes in at the side of what it calls, through no part', () => {
+  const ids = ['s1', 's2', 's3', 's4', 's5'];
+  const g = layout({ items: [{ ...item('r'), inside: null }, ...ids.map((id) => item(id)), item('m')], links: ids.map((id) => call(id, 'm')), rootId: 'r', measure, sizes: house.sizes, steady: true });
+  const m = g.all.find((n: any) => n.id === 'm'), [mx, my] = [g.x.get('m'), g.y.get('m')];
+  const sides = g.chains.filter((c: any) => c.points.length === 3 && Math.abs(Math.abs(c.points[2][0] - mx) - m.w / 2) < 0.01);
+  assert.ok(sides.length >= 2, `some go in at the sides (${sides.length})`);
+  for (const c of sides) {
+    assert.ok(Math.abs(c.points[2][1] - my) <= m.h / 2, `${c.key} goes in within the side`);
+    for (const n of g.all.filter((p: any) => !p.dummy && p.id !== 'm' && p.id !== c.path[0]))
+      for (const [[x1, y1], [x2, y2]] of [[c.points[0], c.points[1]], [c.points[1], c.points[2]]])
+        assert.ok(Math.max(x1, x2) <= g.x.get(n.id) - n.w / 2 || Math.min(x1, x2) >= g.x.get(n.id) + n.w / 2 || Math.max(y1, y2) <= g.y.get(n.id) - n.h / 2 || Math.min(y1, y2) >= g.y.get(n.id) + n.h / 2, `${c.key} runs through ${n.id}`);
+  }
+});
+
 test('what sits in a part, wired to nothing, is a mark on it', () => {
   const g = run([item('a'), item('b'), { ...item('t', 'a', 'todo'), kind: 'work' }], [call('a', 'b')]);
   assert.equal(g.nodes.has('t'), false);

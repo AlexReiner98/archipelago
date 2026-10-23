@@ -1,5 +1,5 @@
-// What a wire carries is written on it where there is room: on its drop into what it calls, else on its drop from
-// the caller, else on its run across; otherwise only in its tooltip. A spot has room when no other wire runs through
+// What a wire carries is written on it where there is room: on its run into what it calls, else on its run from the
+// caller, else on a run between; otherwise only in its tooltip. A spot has room when no other wire runs through
 // the words, they keep clear of both ends of every wire (its arrowhead and its base, its own wire's too), and no
 // place's name or other wire's words are there.
 
@@ -17,7 +17,11 @@ export function saysSpots({ labels, chains, boxes, measure, z }) {
   const onEnd = (x, y, w) => ends.some(([ex, ey]) => Math.abs(ex - x) <= w / 2 + HEAD_HALF && Math.abs(ey - y) <= HIGH / 2 + HEAD_LONG);
   return labels.flatMap(({ c, text }) => {
     const w = measure(text, SAYS_TEXT) + 2 * z('says_pad'), p = c.points;
-    const spots = [[p.at(-1)[0], (p.at(-2)[1] + p.at(-1)[1]) / 2], [p[0][0], (p[0][1] + p[1][1]) / 2], p.length > 2 && Math.abs(p[2][0] - p[1][0]) > w + 16 && [(p[1][0] + p[2][0]) / 2, p[1][1]]].filter(Boolean);
+    // The middle of each run long enough to hold the words: the run in first, then the run out, then the rest.
+    const runs = p.slice(1).map((q, k) => [p[k], q]);
+    const spots = [runs.at(-1), runs[0], ...runs.slice(1, -1)]
+      .filter(([[x1, y1], [x2, y2]]) => (Math.abs(y1 - y2) < 0.01 ? Math.abs(x2 - x1) > w + 16 : Math.abs(y2 - y1) > HIGH))
+      .map(([[x1, y1], [x2, y2]]) => [(x1 + x2) / 2, (y1 + y2) / 2]);
     const spot = spots.find(([lx, ly]) => !crossed(c, lx, ly, w) && !onEnd(lx, ly, w) && !placed.some(([px, py, pw]) => Math.abs(px - lx) < (pw + w) / 2 + 4 && Math.abs(py - ly) < HIGH));
     if (!spot) return [];
     placed.push([...spot, w]);
