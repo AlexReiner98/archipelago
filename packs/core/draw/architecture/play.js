@@ -17,7 +17,7 @@ export function play({ answer, style, reduced, tools, shape }) {
   const chapters = steps.flatMap((s, k) => (s.chapter ? [{ ...s.chapter, at: k }] : []));
   const total = chapters.at(-1)?.count;
 
-  // ---- Above the picture: the chapters, and what each dot says. Below it: the conversation.
+  // ---- Above the picture: the chapters, and what each dot says. Beside it: the conversation.
   const names = style.dots?.names ?? {};
   const before = m(
     'div',

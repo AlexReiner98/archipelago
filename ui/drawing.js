@@ -184,8 +184,10 @@ ${JSON.stringify(input)}`;
     const picture = build(scene.svg, keys, tell);
     const legend = scene.legend ? build(scene.legend, keys, tell) : null;
     const bar = scene.bar ? build(scene.bar, keys, tell) : null;
-    // What goes above the picture and below it (a rail of chapters, what was said), drawn and checked as the rest is.
-    const [before, after] = [scene.before, scene.after].map((m) => (m ? build(m, keys, tell) : null));
+    // What goes above the picture, beside it and below it (a rail of chapters, what was said), drawn and checked as the
+    // rest is. What is beside it shares a row with it, and goes under it where the row has no room for both.
+    const [before, aside, after] = [scene.before, scene.aside, scene.after].map((m) => (m ? build(m, keys, tell) : null));
+    const beside = (stage) => (aside ? h('div', { class: 'lf-beside' }, stage, aside) : stage);
     const { width, height } = scene.size ?? {};
     const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;
@@ -196,11 +198,11 @@ ${JSON.stringify(input)}`;
       // Its own size is the most it is drawn at: a small picture is not blown up to fill the page.
       picture.setAttribute('width', width);
       picture.setAttribute('height', height);
-      return host.replaceChildren(...[before, legend, h('div', { class: 'lf-stage still' }, picture), after].filter(Boolean));
+      return host.replaceChildren(...[before, legend, beside(h('div', { class: 'lf-stage still' }, picture)), after].filter(Boolean));
     }
     const lit = litSwitch(answer.viewer, style, keep, redraw);
     const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, legend);
-    host.replaceChildren(...[before, stage, after].filter(Boolean));
+    host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
     if (legend) legend.hidden = stage.clientWidth > 0 && stage.clientWidth < sizeOf(style, 'flow_legend_from');
     const moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room') });
     const key = legend && h('button', { class: legend.hidden ? '' : 'on', title: 'What the marks mean', onclick: (ev) => ((legend.hidden = !legend.hidden), ev.currentTarget.classList.toggle('on', !legend.hidden)) }, 'Key');

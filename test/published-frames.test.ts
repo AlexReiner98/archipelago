@@ -45,7 +45,7 @@ test('a published picture keeps its first frame, its page carries its data, and 
   const data = await (await fetch(`${base}/p/default/${d}/data`)).json();
   const lens = data.lenses[l];
   assert.equal(lens.first.svg[0], 'svg', 'the scene the drawing opens on is kept');
-  assert.ok(lens.first.before && lens.first.after, 'with what is drawn above and below it');
+  assert.ok(lens.first.before && lens.first.aside, 'with what is drawn above and beside it');
   const { drawing } = lens.style;
   assert.equal(drawing.modules, undefined, 'its code is not in the data');
   assert.equal(drawing.src, `/p/default/${d}/drawing/${drawing.hash}`);

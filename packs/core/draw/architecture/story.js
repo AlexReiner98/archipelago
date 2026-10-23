@@ -219,7 +219,7 @@ export function story({ answer, style, reduced }, tools) {
     return shown && m('div', { class: 'sp-tip' }, m('b', {}, shown.title), byId.get(id)?.gist && m('span', {}, byId.get(id).gist));
   };
   return {
-    scene: { css, svg, before: player.before, after: player.after, size: style.still ? { width: widest, height: widest / aspect } : { width: right - left, height: tall } },
+    scene: { css, svg, before: player.before, aside: player.after, size: style.still ? { width: widest, height: widest / aspect } : { width: right - left, height: tall } },
     on(event) {
       if (!/^[pb]:e_[a-z0-9]{8}$/.test(event.key)) return player.on(event);
       if (event.name === 'leave') return [{ tip: null }];
