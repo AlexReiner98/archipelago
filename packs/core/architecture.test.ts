@@ -10,6 +10,7 @@ import test from 'node:test';
 import { health, layout, wireState } from './draw/architecture/layout.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
 import { picture } from './draw/architecture/index.js';
+import { saysSpots } from './draw/architecture/says.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
 const item = (id: string, inside = 'r', status = 'up', extra: Record<string, unknown> = {}) => ({ id, kind: 'place', inside, title: `Part ${id}`, place: 0, open: status !== 'retired', status, state, ...extra });
@@ -89,6 +90,32 @@ test('a wire both ways is laid out the way that closes no loop, so none is turne
     checks(g);
     assert.ok(!g.chains.some((c: any) => c.back), 'no wire is turned back');
     assert.ok(g.y.get('a') < g.y.get('b') && g.y.get('b') < g.y.get('c'), 'a above b above c');
+  }
+});
+
+test('a loop back to whoever uses the system is turned back at them, so they stay at the top', () => {
+  const g = run([item('you', 'r', 'up', { fields: { role: 'client' } }), item('a'), item('b'), item('c')], [call('you', 'a'), call('a', 'b'), call('b', 'c'), call('c', 'you')]);
+  checks(g);
+  assert.deepEqual(g.chains.filter((c: any) => c.back).map((c: any) => c.key), ['you c']);
+  assert.ok(['a', 'b', 'c'].every((id) => g.y.get('you') < g.y.get(id)), 'you above the rest');
+});
+
+test("a wire's words are never written over another wire, or at either end of any wire: its arrowhead or its base", () => {
+  const links = [call('a', 'm', { says: 'approved changes' }), call('m', 'a', { says: 'where things stand' }), call('x', 'm', { says: 'kinds of work' }), call('m', 'p', { says: 'what you publish' }), call('p', 'q', { says: 'what you share' }), call('a', 'p', { says: 'more' })];
+  const g = run([item('a', 'r', 'up', { fields: { role: 'client' } }), item('m'), item('x'), item('p'), item('q')], links);
+  const z = (name: string) => house.sizes[`arch_${name}`];
+  const spots = saysSpots({ labels: g.chains.filter((c: any) => c.link.says).map((c: any) => ({ c, text: c.link.says })), chains: g.chains, boxes: g.boxes, measure, z });
+  assert.ok(spots.length >= 2, `wires with room have their words (${spots.length})`);
+  const high = z('says_height');
+  for (const { c, x, y, w } of spots) {
+    for (const o of g.chains) {
+      if (o !== c)
+        for (let k = 1; k < o.points.length; k++) {
+          const [[x1, y1], [x2, y2]] = [o.points[k - 1], o.points[k]];
+          assert.ok(Math.max(x1, x2) < x - w / 2 || Math.min(x1, x2) > x + w / 2 || Math.max(y1, y2) < y - high / 2 || Math.min(y1, y2) > y + high / 2, `"${c.link.says}" is over the wire ${o.key}`);
+        }
+      for (const end of [o.points[0], o.points.at(-1)]) assert.ok(Math.abs(end[0] - x) > w / 2 || Math.abs(end[1] - y) > high / 2 + 9, `"${c.link.says}" is at an end of ${o.key}`);
+    }
   }
 });
 

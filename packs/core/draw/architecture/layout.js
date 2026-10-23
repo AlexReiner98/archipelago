@@ -103,8 +103,24 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
     seen.set(key, { a: l.from, b: l.to, link: l, ...(l.says && { says: l.says }), state: wireState(l, nodes.get(l.from).item, nodes.get(l.to).item) });
     edges.push(seen.get(key));
   }
-  // A loop is drawn with one wire turned back, so the rest still reads down the page. A wire both ways is no loop:
-  // it is laid out afterwards, in whichever way closes none.
+  // A loop is drawn with one wire turned back, so the rest still reads down the page. Where it comes back to whoever
+  // uses the system (a client, a person), it is turned back there: they stay at the top and the rest falls from them.
+  const user = (id) => {
+    const i = nodes.get(id).item;
+    return ['client', 'person', 'user'].includes(i.role ?? i.fields?.role) || i.kind === 'actor';
+  };
+  const leads = (from, to) => {
+    const been = new Set([from]), next = [from];
+    while (next.length) {
+      const id = next.pop();
+      if (id === to) return true;
+      for (const e of edges) if (e.a === id && !e.both && !been.has(e.b)) (been.add(e.b), next.push(e.b));
+    }
+    return false;
+  };
+  for (const e of edges) if (!e.both && user(e.b) && !user(e.a) && leads(e.b, e.a)) ([e.a, e.b] = [e.b, e.a]), (e.back = true);
+  // Any other loop is turned back where it is first met. A wire both ways is no loop: it is laid out afterwards, in
+  // whichever way closes none.
   const colour = new Map();
   const visit = (id) => {
     colour.set(id, 1);

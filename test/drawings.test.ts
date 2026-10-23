@@ -5,7 +5,7 @@
 // is stopped, and reaches nothing.
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
@@ -102,8 +102,10 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
     const cases = architectureCases().map((c) => ({ ...c, style: { ...c.style, drawing } }));
     const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
     for (const c of cases) assert.ok(now[c.name].html.includes('ar-part'), `${c.name} is drawn: ${now[c.name].html.slice(0, 200)}`);
-    // Text is measured by the fonts of the machine: compared with what was drawn on one like it.
-    if (existsSync(GOLDEN)) {
+    // Text is measured by the fonts of the machine: compared with what was drawn on one like it. A change meant to
+    // draw otherwise keeps what it now draws, with GOLDEN_WRITE=1.
+    if (process.env.GOLDEN_WRITE) writeFileSync(GOLDEN, `${JSON.stringify(now)}\n`);
+    else if (existsSync(GOLDEN)) {
       const was = JSON.parse(readFileSync(GOLDEN, 'utf8'));
       for (const name of Object.keys(was)) {
         const [a, b] = [was[name], now[name]];
