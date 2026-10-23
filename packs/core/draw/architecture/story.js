@@ -72,8 +72,9 @@ export function squareMorph(from, to) {
   return [A, B];
 }
 /**
- * Where a place's name sits along its top edge: from `from`, moved right past every wire that crosses the band it is
- * in (`wires`, as lists of points), while it still fits before `end`; at `from` when it fits nowhere clear.
+ * Where a place's name sits along its top edge: in its left corner (`from`) when no wire crosses the band it is in
+ * (`wires`, as lists of points), else in its right corner (ending at `end`); else moved right from the left corner past
+ * every wire, while it still fits; at the left corner when it fits nowhere clear.
  */
 export function nameLeft(from, width, end, top, bottom, wires, clear) {
   const blocked = [];
@@ -82,6 +83,9 @@ export function nameLeft(from, width, end, top, bottom, wires, clear) {
       const [[x1, y1], [x2, y2]] = [pts[k - 1], pts[k]];
       if (Math.max(y1, y2) >= top && Math.min(y1, y2) <= bottom) blocked.push([Math.min(x1, x2) - clear, Math.max(x1, x2) + clear]);
     }
+  const clearAt = (x) => !blocked.some(([l, r]) => x < r && x + width > l);
+  if (clearAt(from)) return from;
+  if (end - width >= from && clearAt(end - width)) return end - width;
   let at = from;
   for (let moved = true; moved; ) {
     moved = false;

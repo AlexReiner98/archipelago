@@ -131,7 +131,7 @@ test('a place’s name sits where no wire of the step comes in across it, wherev
     for (const b of g.boxes) {
       const inset = z('place_name_inset'), width = measure(b.item.title, z('place_text')) + z('place_name_room') - inset, top = b.y, bottom = b.y + inset + z('place_name_height');
       const at = nameLeft(b.x + inset, width, b.x + b.w - inset, top, bottom, wires, inset);
-      assert.ok(at >= b.x + inset && at + width <= b.x + b.w - inset || at === b.x + inset, `${b.item.title}: inside its place`);
+      assert.ok((at >= b.x + inset - 1e-6 && at + width <= b.x + b.w - inset + 1e-6) || at === b.x + inset, `${b.item.title}: inside its place`);
       if (wires.some((p: number[][]) => p.some((q, k) => k > 0 && Math.max(p[k - 1][1], q[1]) >= top && Math.min(p[k - 1][1], q[1]) <= bottom && Math.max(p[k - 1][0], q[0]) > at && Math.min(p[k - 1][0], q[0]) < at + width))) crossed++;
     }
   }
