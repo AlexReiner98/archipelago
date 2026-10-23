@@ -111,10 +111,12 @@ addEventListener('message', (ev) => {
     () => new Worker(URL.createObjectURL(new Blob([text], { type: 'text/javascript' }))),
     () => new Worker(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}`),
   ];
-  let answered = Date.now();
+  // How many pings in a row have gone unanswered: counted, not timed, so a page the browser has slowed (a tab left in
+  // the background runs its timers once a minute) does not stop code that answers whenever it is asked.
+  let unanswered = 0;
   let started = false;
   const hear = ({ data: said }) => {
-    answered = Date.now();
+    unanswered = 0;
     // Only these, and each one checked: what the code says is never trusted.
     if (said?.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) say({ type: 'open', id: said.id });
     else if (said?.type === 'error') fail(said.message);
@@ -170,9 +172,8 @@ addEventListener('message', (ev) => {
   addEventListener('resize', () => tell('resize', room()));
   // Code that stops answering is ended: it cannot hold the page, and it is not left to burn.
   const watch = setInterval(() => {
-    if (!started) return void (answered = Date.now());
-    worker.postMessage({ type: 'ping' });
-    if (Date.now() - answered < 12000) return;
+    if (!started) return void (unanswered = 0);
+    if (unanswered++ < 6) return void worker.postMessage({ type: 'ping' });
     clearInterval(watch);
     worker.terminate();
     tip.hidden = true;
@@ -321,13 +322,13 @@ say({ type: 'ready' });
 
   const load = (hash, modules) => {
     if (workers.has(hash)) return;
-    const w = { answered: Date.now(), worker: null, queue: [] };
+    const w = { unanswered: 0, worker: null, queue: [] };
     workers.set(hash, w);
     take().then(
       (worker) => {
         w.worker = worker;
         worker.onmessage = ({ data: said }) => {
-          w.answered = Date.now();
+          w.unanswered = 0;
           // Once loaded, it takes the pictures that waited, and every one after at once.
           if (said?.type === 'loaded') (say({ type: 'loaded', hash, took: said.took }), w.queue.splice(0).forEach((port) => worker.postMessage({ type: 'picture' }, [port])), (w.queue = null));
           else if (said?.type === 'error') (workers.delete(hash), worker.terminate(), say({ type: 'failed', hash, message: String(said.message).slice(0, 300) }));
@@ -351,12 +352,15 @@ say({ type: 'ready' });
       else w.queue.push(ev.ports[0]);
     }
   });
-  // Code that stops answering is ended: it cannot hold the page, and it is not left to burn.
+  // Code that stops answering is ended: it cannot hold the page, and it is not left to burn. Pings unanswered are
+  // counted, not timed: a page the browser has slowed in the background is asked less often, and is not stopped for it.
   setInterval(() => {
     for (const [hash, w] of workers) {
       if (!w.worker) continue;
-      w.worker.postMessage({ type: 'ping' });
-      if (Date.now() - w.answered < 12000) continue;
+      if (w.unanswered++ < 6) {
+        w.worker.postMessage({ type: 'ping' });
+        continue;
+      }
       w.worker.terminate();
       workers.delete(hash);
       say({ type: 'stopped', hash, message: 'It did not answer for 12 seconds and was stopped.' });
