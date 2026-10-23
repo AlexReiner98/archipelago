@@ -22,7 +22,7 @@ export const everyNamed = (steps) => new Set(steps.flatMap((s) => s.add ?? []));
 
 /** How a story's marks look besides the time drawing's own: what comes in. */
 export const css = `${storyLook}
-.lf-beside > svg.timeline { flex: 3 1 0; min-width: var(--side-least); height: auto; }
+.lf-beside > svg.timeline { flex: 3 1 0; min-width: var(--side-least); max-width: 100%; height: auto; }
 .t-block .dot { transition: stroke 0.8s, stroke-width 0.8s; }
 .t-block.sp-new .dot { stroke: var(--accent); stroke-width: var(--border-3); }
 `;
