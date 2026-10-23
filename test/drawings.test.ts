@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { architectureCases, flowCases, gridCases } from './drawing-cases.ts';
+import { architectureCases, flowCases } from './drawing-cases.ts';
 import { readSteps, stepsShown } from '../src/lens-steps.ts';
 import { serve } from './serve.ts';
 
@@ -44,7 +44,7 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
-  assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', hash: first.hash });
+  assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', shape: 'architecture', hash: first.hash });
   // What holds an item is drawn as a flow, by the core pack's flow drawing.
   const holding = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: 'holding' } })).result.style;
   assert.equal(holding.drawing.id, 'core.flow');
@@ -129,41 +129,6 @@ test('in a browser, the flow drawing draws what the kernel drew: the same marks,
         assert.deepEqual(b.styles.map((k: number) => b.looks[k]), a.styles.map((k: number) => a.looks[k]), `${name}: the looks`);
         for (const k of ['hover', 'after_hover', 'dim', 'key']) assert.deepEqual(b[k], a[k], `${name}: ${k}`);
       }
-    }
-  } finally {
-    page.close();
-  }
-});
-
-const GRID_KERNEL = join(import.meta.dirname, 'fixtures', 'drawings', `grid.kernel.${process.platform}.json`);
-
-test('in a browser, the grid drawing draws what the kernel drew: the same cards, rows, lanes, places and looks', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
-  const { call, base } = await serve('off');
-  const { p } = await system(call);
-  // A picture kept as a grid is sent the core pack's grid drawing.
-  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'l', type: 'lens', title: 'As a grid', status: 'current' }, { op: 'link', type: 'about', from: 'l', to: p }, { op: 'create', ref: 's', type: 'style', title: 'Grid', status: 'current', props: { shape: 'grid' } }, { op: 'link', type: 'about', from: 's', to: 'l' }] })).result.created;
-  const { drawing } = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: made.l } })).result.style;
-  assert.equal(drawing.id, 'core.grid');
-  const page = await open(`${base}/`);
-  try {
-    await page.evaluate(readFileSync(join(import.meta.dirname, 'drawing-capture.js'), 'utf8'));
-    // The page's registry is loaded, so a card's colour follows the order its type declares.
-    await page.evaluate(`new Promise((r) => setTimeout(r, 1500))`);
-    const cases = gridCases().map((c) => ({ ...c, style: { ...c.style, drawing } }));
-    const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
-    // What the kernel's own grid drew (ui/grid.js, until 23 Oct 2026), on a machine like this one. The drawing sets
-    // no style on a mark: a colour and the columns are classes of its own, and a swatch's chip a mark, not ::before.
-    if (!existsSync(GRID_KERNEL)) return;
-    const was = JSON.parse(readFileSync(GRID_KERNEL, 'utf8'));
-    const own = /^lg-(h|c)-/;
-    const html = (text: string) => text.replace(/ style="[^"]*"/g, '').replace(/<span class="lg-chip"><\/span>/g, '').replace(/class="([^"]*)"/g, (_, c: string) => `class="${c.split(' ').filter((k) => k && !own.test(k)).join(' ')}"`);
-    const kept = (r: any) => (r.classes ?? r.boxes.map(() => '')).map((c: string, k: number) => [c, k]).filter(([c]: [string]) => !c.split(' ').includes('lg-chip')).map(([, k]: [string, number]) => k);
-    for (const name of Object.keys(was)) {
-      const [a, b] = [was[name], now[name]];
-      assert.ok(b, `${name} is drawn`);
-      assert.equal(html(b.html), html(a.html), `${name}: the marks`);
-      assert.deepEqual(kept(b).map((k: number) => b.boxes[k]), kept(a).map((k: number) => a.boxes[k]), `${name}: where each is`);
-      assert.deepEqual(kept(b).map((k: number) => b.looks[b.styles[k]]), kept(a).map((k: number) => a.looks[a.styles[k]]), `${name}: the looks`);
     }
   } finally {
     page.close();

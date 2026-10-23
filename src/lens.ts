@@ -450,7 +450,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
 
   return {
     lens: asked, ...(view && Array.isArray(view.props.steps) && { steps: readSteps(view.props.steps) }),
-    style: await withDrawing(l, style, input.have),
+    style: await withDrawing(l, asked.time ? { ...style, shape: 'time' } : style, input.have), // drawn along its time axis, if it has one
     // Which lenses and styles kept on the map went into those two, the one that weighs most last.
     kept: { lens: read.map(({ id, title }) => ({ id, title })), style: drawn },
     // The lens in words: the rule a person reads on the page and an agent reads here.

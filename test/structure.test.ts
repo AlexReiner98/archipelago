@@ -198,7 +198,6 @@ const LOOKS_IN_KERNEL: Record<string, number> = {
   'ui/pan-zoom.js': 1,
   'ui/public.css': 1,
   'ui/style.css': 17,
-  'ui/timeline.js': 1,
   'ui/token-ask.js': 1,
   'ui/week.js': 1,
 };
@@ -214,8 +213,7 @@ test('how things look lives in style presets, not in the kernel', () => {
 // kernel keeps the frame every picture has. Counted here as the shapes the page still draws itself, as of 22 Oct
 // 2026; a shape moved into a pack's drawing comes off its list, with its modules in ui/.
 const KERNEL_SHAPES: Record<string, number> = {
-  'ui/lens.js': 2, // list, time
-  'ui/doc-lens.js': 1, // time
+  'ui/lens.js': 1, // list
 };
 const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 

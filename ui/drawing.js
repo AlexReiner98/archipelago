@@ -172,7 +172,7 @@ export function drawWith(host, answer, style, keep) {
   const { drawing: _code, code: _canvas, ...fields } = style;
   // The titles of the types the picture holds, as this page knows them: a drawing has no registry of its own.
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
-  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: host.clientWidth, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);
@@ -222,9 +222,9 @@ ${JSON.stringify(input)}`;
     const over = surface?.canvas;
     const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;
-    // A picture the page lays out (HTML, a grid of cards) is not panned or zoomed: it is as wide as it needs, scrolled
+    // A picture the page lays out (HTML, a grid of cards; or one drawn to the page's width, `flat`) is not panned or zoomed: it is as wide as it needs, scrolled
     // across where the page is narrower, its key below it, brought to what it was opened from (`focus`, a mark's key).
-    if (!(picture instanceof SVGElement)) {
+    if (!(picture instanceof SVGElement) || scene.flat) {
       host.replaceChildren(...[before, beside(picture), legend, after].filter(Boolean));
       const focus = keys.get(String(scene.focus));
       if (focus) requestAnimationFrame(() => focus.scrollIntoView({ block: 'center', inline: 'center' }));

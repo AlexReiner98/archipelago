@@ -168,3 +168,37 @@ export function gridCases(): DrawingCase[] {
   }
   return cases;
 }
+
+/** A week on a time axis with every mark: two lanes (a person and the sessions), things that overlap, a stretch of a
+ * session's minutes, a due date and a span of days in the strip, what each counts toward, and an early start. */
+function timeVariety() {
+  const at = (id: string, title: string, kind: string, lane: string, time: Record<string, unknown>[], extra: Record<string, unknown> = {}) => item(id, title, 'e_troot000', 1, { kind, type: kind === 'work' ? 'work.task' : 'event', lane, time, ...extra });
+  const items = [
+    item('e_troot000', 'A week', undefined, 1, { kind: 'work', type: 'work.project' }),
+    at('e_ttask100', 'Write the copy, with a long name to cut', 'work', 'e_tsam0000', [{ start: '2026-11-03T09:00:00', end: '2026-11-03T11:30:00', by: 'logged', stream: 'e_tproj000' }]),
+    at('e_ttask200', 'Review', 'work', 'e_tsam0000', [{ start: '2026-11-03T10:00:00', end: '2026-11-03T12:00:00', by: 'logged', stream: 'e_tproj100' }, { start: '2026-11-04T14:00:00', end: '2026-11-04T15:00:00', by: 'logged', stream: 'e_tproj100' }]),
+    at('e_tdue0000', 'Due', 'work', 'e_tsam0000', [{ start: '2026-11-05', end: '2026-11-05', by: 'bound' }]),
+    at('e_tspan000', 'Away', 'occurrence', 'e_tsam0000', [{ start: '2026-11-04T00:00:00', end: '2026-11-07T00:00:00', by: 'planned' }]),
+    at('e_tsess000', 'A session', 'work', 'sessions', [{ start: '2026-11-03T13:00:00', end: '2026-11-03T13:03:00', on_title: 'Fix it' }, { start: '2026-11-03T13:04:00', end: '2026-11-03T13:40:00', on_title: 'Fix it' }, { start: '2026-11-06T06:15:00', end: '2026-11-06T07:00:00', on_title: 'Early' }], { open: false }),
+  ];
+  return { lens: { from: 'e_troot000', by: 'part_of', over: [], fold: ['system'], time: { from: '2026-11-02', to: '2026-11-08' } }, lanes: [{ key: 'e_tsam0000', title: 'Sam' }, { key: 'sessions', title: 'Sessions' }], streams: [{ key: 'e_tproj000', title: 'Website' }, { key: 'e_tproj100', title: 'Billing' }], items, links: [], rest: {}, viewer: 'e_tsam0000', controls: [], views: [] };
+}
+
+/** The time shape's cases: the public site's plan as bars (23 Oct 2026), and a week with every mark as a calendar and as bars. */
+export function timeCases(): DrawingCase[] {
+  const launch = JSON.parse(readFileSync(here('fixtures', 'drawings', 'time-launch.json'), 'utf8'));
+  const style = house('time');
+  const cases: DrawingCase[] = [];
+  const answers: [string, unknown, Record<string, unknown>][] = [
+    ['launch', launch, { layout: 'bars' }],
+    ['week', timeVariety(), {}],
+    ['week bars', timeVariety(), { layout: 'bars' }],
+    ['week hours', timeVariety(), { hours: [7, 15] }],
+  ];
+  for (const [name, answer, own] of answers) {
+    cases.push({ name: `${name}, wide`, answer: answer as Record<string, unknown>, style: { ...style, ...own, noLit: true }, width: 1100 });
+    cases.push({ name: `${name}, narrow`, answer: answer as Record<string, unknown>, style: { ...style, ...own, noLit: true }, width: 560 });
+    cases.push({ name: `${name}, still`, answer: answer as Record<string, unknown>, style: { ...style, ...own, noLit: true, still: true }, width: 900 });
+  }
+  return cases;
+}
