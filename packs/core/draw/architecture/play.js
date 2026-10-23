@@ -7,7 +7,7 @@
 import { m } from './marks.js';
 
 export function play({ answer, style, reduced, tools, shape }) {
-  const { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, shift, looks, keyLooks, keyLook, family, dotsOf } = shape;
+  const { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, shift, looks, keyLooks, keyLook, family, dotsOf, everyTask, taskAt, boardMark } = shape;
   const t = (name) => {
     const v = style.numbers?.[`arch_story_${name}`];
     if (typeof v !== 'number') throw new Error(`The style names no number "arch_story_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
@@ -156,6 +156,19 @@ export function play({ answer, style, reduced, tools, shape }) {
       else (list.push({ key: s, set: { opacity: 0 } }), later(dur, () => send([{ key: s, set: { opacity: 1 }, over: t('draw') }])));
     }
     for (const [key] of was?.says ?? []) if (!f.says.has(key) && !f.wires.has(key)) list.push({ key: `s:${keyOf(key)}`, toggle: { 'sp-off': true }, set: { opacity: 0 } });
+    // The work a plan or a board draws: a bar moves into a card, a new one comes in, one that goes fades.
+    for (const id of everyTask.keys()) {
+      const at = taskAt(id, f), key = `t:${id}`, there = Boolean(was && taskAt(id, was));
+      if (!at) {
+        list.push({ key, toggle: { 'sp-off': true }, set: { opacity: 0 }, ...over });
+        continue;
+      }
+      const o = there && dur ? over : {};
+      list.push({ key: `${key}:r`, set: { d: at.d }, ...o }, { key: `${key}:r`, set: { class: at.cls } }, { key: `${key}:t`, set: at.t, ...o }, { key: `${key}:t`, text: at.text }, { key, toggle: { 'sp-off': false }, set: { opacity: 1 }, ...over });
+    }
+    // A plan's lines and a board's columns, drawn again once all has come to rest.
+    if (dur) (list.push({ key: 'board', mark: m('g', { key: 'board' }) }), later(dur, () => send([{ key: 'board', mark: boardMark(f) }])));
+    else list.push({ key: 'board', mark: boardMark(f) });
     // Where a wire passes under another, it is broken: drawn again once all has come to rest.
     const breaks = m('g', { key: 'breaks', class: 'sp-breaks' }, f.g.breaks.map(([bx, by]) => m('g', { class: 'ar-break' }, m('rect', { x: bx + shift - 3, y: by - 8, width: 6, height: 16 }), m('path', { d: `M${bx + shift - 6} ${by}H${bx + shift + 6}` }))));
     if (dur) (list.push({ key: 'breaks', mark: m('g', { key: 'breaks' }) }), later(dur, () => send([{ key: 'breaks', mark: breaks }])));

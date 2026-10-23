@@ -6,6 +6,7 @@
 // its island, and its wires are drawn again as routes; in `islands_3d` the same islands rise out of the sea, painted
 // on a surface over the picture (deep.js).
 
+import { board, css as boardsLook } from './boards.js';
 import { LOOK as DEEP, css as deepLook, deep } from './deep.js';
 import { boxPath, curveOf, islandPath, islands, css as islandsLook, routeSpots } from './islands.js';
 import { finished, health, layout } from './layout.js';
@@ -18,7 +19,9 @@ import { css as storyLook } from './story-look.js';
 const NAME = /^[a-z][a-z0-9_]*$/;
 
 /** The looks a story may be drawn in, besides its own, each with the look it is one of (its dots and its key). */
-const LOOKS = { islands: null, [DEEP]: 'islands' };
+const LOOKS = { islands: null, [DEEP]: 'islands', gantt: 'islands', kanban: 'islands' };
+/** The looks that lay work out as a plan or a board (boards.js), and those that draw it as islands. */
+const BOARDS = ['gantt', 'kanban'], SEAS = ['islands', DEEP];
 /** A look and the one it is one of. */
 const family = (look) => [look, LOOKS[look]].filter(Boolean);
 
@@ -171,10 +174,10 @@ export function story({ answer, style, reduced }, tools) {
     const kept = [...s.ids].filter((id) => was.has(id)).length;
     if (prior && s.ids.size - kept > kept) prior = undefined;
     was = s.ids;
-    const sea = family(s.look).includes('islands');
+    const sea = SEAS.includes(s.look);
     const boxes = layout({ items: sea ? s.items.filter((i) => !crew.has(i.id)) : s.items, links: s.links, rootId: answer.lens.from, measure, sizes: style.sizes, prior, steady: true, room });
     prior = boxes.memo;
-    const g = sea ? islands(boxes, { z, n: num, done: isDone(s.look) }) : boxes;
+    const g = sea ? islands(boxes, { z, n: num, done: isDone(s.look) }) : BOARDS.includes(s.look) ? board(s.look, boxes, { z, order: dotsOf(s.look)?.order ?? [], names: dotsOf(s.look)?.names ?? {} }) : boxes;
     const parts = new Map(g.all.filter((n) => !n.dummy).map((n) => [n.id, n]));
     const boats = sea ? s.items.filter((i) => crew.has(i.id)).map((i) => ({ id: i.id, title: i.title, at: s.items.find((t) => t.fields?.owner === i.id && underWay(s.look, t.status) && parts.has(t.inside))?.inside ?? null })) : [];
     return { ...s, g, parts, boats, boxes: new Map(g.boxes.map((b) => [b.id, b])), wires: new Map(g.chains.map((c) => [c.key, c])) };
@@ -263,19 +266,31 @@ export function story({ answer, style, reduced }, tools) {
     return [m('path', { key: `w:${keyOf(key)}`, d: wireD(c), pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 0, class: 'ar-wire wired sp-off', opacity: 0 }), m('path', { key: `h:${keyOf(key)}`, d: heads(pts, c), class: 'ar-head wired sp-off', opacity: 0 })];
   });
   const saysMarks = [...everyWire.keys()].filter((key) => frames.some((f) => f.says.has(key))).map((key) => m('g', { key: `s:${keyOf(key)}`, class: 'ar-says sp-off', opacity: 0 }, m('rect', { key: `s:${keyOf(key)}:r`, rx: z('says_height') / 2 }), m('text', { key: `s:${keyOf(key)}:t` }, '')));
-  const svg = m('svg', { key: 'svg', viewBox: `0 0 ${right - left} ${tall}`, role: 'img', 'aria-label': `How the system came to be, in ${frames.length} steps` }, placeMarks.map((p) => p.box), wireMarks, m('g', { key: 'breaks' }), saysMarks, placeMarks.map((p) => p.name), partMarks);
+  // Each piece of work a plan or a board draws: a box (a bar, a card) with its name in it.
+  const everyTask = new Map();
+  for (const f of frames) for (const [id, t] of f.g.tasks ?? []) if (!everyTask.has(id)) everyTask.set(id, t.item);
+  const taskAt = (id, f) => {
+    const t = f.g.tasks?.get(id);
+    if (!t) return null;
+    const pad = z('board_pad'), [X, Y] = [t.x + shift, t.y];
+    return { d: boxPath(X - t.w / 2, Y - t.h / 2, t.w, t.h, Math.min(z('corner'), t.h / 4)), cls: `ar-shape k-${NAME.test(String(t.item.status)) ? t.item.status : 'none'}`, t: { x: X - t.w / 2 + pad, y: Y }, text: fit(t.item.title, t.w - 2 * pad, z('says_text')), title: t.item.title };
+  };
+  const taskMarks = [...everyTask].map(([id, t]) => m('g', { key: `t:${id}`, class: 'sp-task sp-off', opacity: 0 }, m('title', { key: `t:${id}:n` }, t.title), m('path', { key: `t:${id}:r`, d: boxPath(0, 0, 1, 1, 0), class: 'ar-shape' }), m('text', { key: `t:${id}:t`, x: 0, y: 0 }, '')));
+  // A plan's lines of time, a board's lines and its columns' names.
+  const boardMark = (f) => m('g', { key: 'board', class: 'sp-board' }, (f.g.lines ?? []).map(([x1, y1, x2, y2]) => m('line', { x1: x1 + shift, y1, x2: x2 + shift, y2 })), (f.g.heads ?? []).map((h) => m('text', { x: h.x + shift, y: h.y }, h.text)));
+  const svg = m('svg', { key: 'svg', viewBox: `0 0 ${right - left} ${tall}`, role: 'img', 'aria-label': `How the system came to be, in ${frames.length} steps` }, placeMarks.map((p) => p.box), m('g', { key: 'board' }), wireMarks, m('g', { key: 'breaks' }), saysMarks, placeMarks.map((p) => p.name), taskMarks, partMarks);
 
   // How a frame is reached: every mark set as that frame has it.
   const used = Object.keys(LOOKS).filter((l) => frames.some((f) => family(f.look).includes(l)));
-  const shape = { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, z, shift, looks: used, keyLooks: used.filter((l) => keyLook(l) === l), keyLook, family, dotsOf, valueOf };
+  const shape = { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, z, shift, looks: used, keyLooks: used.filter((l) => keyLook(l) === l), keyLook, family, dotsOf, valueOf, everyTask, taskAt, boardMark };
   // Islands in 3D, where a step asks for them: painted on a surface over the picture.
   const sea = used.includes(DEEP);
   if (sea) shape.deep = deep({ style, tools, z, num, shape });
   const player = play({ answer, style, reduced, tools, shape });
   // The colour of each value a dot is coloured by, in the story's own look and in each other; an island is tinted with it.
   const colours = [[null, style.dots], ...Object.keys(LOOKS).map((l) => [l, style.dots?.[l]])].flatMap(([look, dots]) => Object.entries(dots?.colours ?? {}).filter(([v, c]) => NAME.test(v) && NAME.test(String(c))).map(([v, c]) => [look ? `.sp-${look} ` : '', v, `var(--${String(c).replaceAll('_', '-')})`, look]));
-  const css = `${base}\n${storyLook}\n${islandsLook}\n${sea ? deepLook : ''}\n${colours
-    .map(([within, v, c, look]) => `${within}.ar-dot.k-${v}, ${within}.sp-swatch.k-${v} { fill: ${c}; background: ${c}; stroke: none; }${look ? `\n.ar-part.sp-${look} .ar-shape.k-${v} { stroke: ${c}; fill: color-mix(in srgb, ${c} var(--ln-arch-island-tint), var(--ln-land)); }` : ''}`)
+  const css = `${base}\n${storyLook}\n${islandsLook}\n${sea ? deepLook : ''}\n${everyTask.size ? boardsLook : ''}\n${colours
+    .map(([within, v, c, look]) => `${within}.ar-dot.k-${v}, ${within}.sp-swatch.k-${v} { fill: ${c}; background: ${c}; stroke: none; }${look ? `\n.ar-part.sp-${look} .ar-shape.k-${v}, .sp-task .ar-shape.k-${v} { stroke: ${c}; fill: color-mix(in srgb, ${c} var(--ln-arch-island-tint), var(--ln-land)); }` : ''}`)
     .join('\n')}`;
   // What a part or a place says of itself, in a tip beside it: its name as the step shows it, and its first line.
   const byId = new Map(answer.items.map((i) => [i.id, i]));

@@ -207,3 +207,21 @@ test('whoever a step names as the owner of work is a boat, never an island of it
   assert.ok(layoutOf(states[1]).nodes.has(WRITE));
   assert.ok(!sent.some((p) => p.key === `p:${AGENT}` && p.set?.opacity === 1), 'the agent is not a part');
 });
+
+test('as a plan, each part is a row and its work runs done, under way, to do; as a board, each piece sits in its status column', async () => {
+  // @ts-expect-error: a plain module of the drawing, with no types of its own.
+  const { board } = await import('./draw/architecture/boards.js');
+  const PROJECT = 'e_projectz', [A, B, C] = ['e_taskaaaa', 'e_taskbbbb', 'e_taskcccc'];
+  const work = { ...answer, items: [item(ROOT, 'Root', { open: true, status: 'active', inside: undefined }), item(PROJECT, 'Website', { type: 'work.project', open: true, status: 'active' }), ...[A, B, C].map((id, k) => item(id, `Task ${k}`, { inside: PROJECT, place: k }))], links: [] };
+  const statuses = { [A]: 'todo', [B]: 'done', [C]: 'doing' };
+  const items = work.items.map((i: any) => (statuses[i.id] ? { ...i, status: statuses[i.id], open: true } : i));
+  const g = layout({ items, links: [], rootId: ROOT, measure, sizes: house.sizes });
+  const order = house.dots.islands.order, names = house.dots.islands.names;
+  const plan = board('gantt', g, { z, order, names });
+  const along = [A, B, C].sort((a, b) => plan.tasks.get(a).x - plan.tasks.get(b).x);
+  assert.deepEqual(along, [B, C, A], 'done, then under way, then to do');
+  for (const id of [A, B, C]) assert.equal(plan.tasks.get(id).y, plan.y.get(PROJECT), 'on its part\'s row');
+  const kanban = board('kanban', g, { z, order, names });
+  assert.deepEqual(kanban.heads.map((h: any) => h.text), ['To do', 'Doing', 'Done']);
+  for (const [id, v] of Object.entries(statuses)) assert.equal(kanban.tasks.get(id).x, kanban.heads.find((h: any) => h.key === v).x, `${id} in ${v}`);
+});
