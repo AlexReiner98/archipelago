@@ -1,9 +1,12 @@
 // A field's value checked against its definition: what a pack file says a field holds.
 
 import type { FieldDef } from './packs.ts';
+import { LARGE, sizeOf } from './head.ts';
 
 /** What is wrong with a value for a field, or nothing. */
 export function checkValue(field: FieldDef, value: unknown): string | undefined {
+  // A large value (code, a stylesheet, a story) is a system item's, in a field declared large: never the work's.
+  if (!field.large && sizeOf(value) > LARGE) return `is too large (${sizeOf(value)} characters; a field holds ${LARGE} at most, unless it is a system item's declared large)`;
   switch (field.type) {
     case 'string':
       return typeof value === 'string' ? undefined : 'must be a string';

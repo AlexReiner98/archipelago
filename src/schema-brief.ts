@@ -17,10 +17,11 @@ export function schemaBrief(registry: Registry) {
       id: t.id,
       kind: t.kind ?? 'system',
       statuses: `${t.statuses.open.join(' ')} / ${t.statuses.closed.join(' ')}`,
-      fields: Object.entries(t.fields).filter(([, f]) => !f.system).map(([name, f]) => field(name, f)).join('; ') || undefined,
+      // owner and confidence first, where its kind declares them: the head's other fields a writer sets.
+      fields: Object.entries({ ...t.columns, ...t.fields }).filter(([name, f]) => !f.system && name !== 'status').map(([name, f]) => field(name, f as FieldDef)).join('; ') || undefined,
     })),
     relations: Object.fromEntries(relations.map((r) => [r.id, `${r.from.join(' ')} -> ${r.to.join(' ')}`])),
-    common_fields: 'title (60 characters at most), body, status, owner, visibility (private or shared), confidence (0 to 1)',
+    common_fields: 'title (60 characters at most), body, status, visibility (private or shared); owner and confidence (0 to 1) only where a type lists them',
     more: 'Statuses read open / closed. For what a type or relation is for and what each field means, call again with type (a type, a relation or a pack); full: true for everything.',
   };
 }
