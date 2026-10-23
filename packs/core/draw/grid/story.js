@@ -22,7 +22,7 @@ export const everyNamed = (steps) => new Set(steps.flatMap((s) => s.add ?? []));
 
 /** How a story's marks look besides the grid's own: what is not in yet, and what comes in. */
 export const css = `${storyLook}
-.lf-beside > .lg-stage { flex: 3 1 0; min-width: calc(var(--side-least) * 2); }
+.lf-beside > .lg-stage { flex: 3 1 0; min-width: var(--side-least); }
 .lg-card, .lg-row, .lg-lane { transition: opacity 0.6s, border-color 0.8s, box-shadow 0.8s; }
 .lg-card.sp-off, .lg-row.sp-off, .lg-lane.sp-off { opacity: 0; }
 .lg-cell { transition: border-color 0.6s; }

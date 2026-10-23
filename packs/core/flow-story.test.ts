@@ -42,6 +42,8 @@ function played() {
   (globalThis as any).setTimeout = (fn: () => void, ms: number) => (timers.push([ms, fn]), timers.length);
   try {
     const out = picture({ answer, style: house, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+    // It starts once its conversation is scrolled into sight.
+    out.on({ name: 'seen', key: 'chat' });
     let now = 0;
     const due: [number, () => void][] = [];
     const take = () => (due.push(...timers.splice(0).map(([ms, fn]) => [now + ms, fn] as [number, () => void])), due.sort((a, b) => a[0] - b[0]));
@@ -83,4 +85,22 @@ test('without steps the picture is the flow as it always was: nothing hidden, no
   const out = picture({ answer: still, style: house }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} });
   assert.ok(!JSON.stringify(out.scene.svg).includes('"opacity":"0"'));
   assert.equal(out.scene.before, undefined);
+});
+
+test('a story waits until its conversation is scrolled into sight, and starts once', () => {
+  const timers: (() => void)[] = [];
+  const realSet = globalThis.setTimeout;
+  (globalThis as any).setTimeout = (fn: () => void) => (timers.push(fn), timers.length);
+  try {
+    const sent: any[] = [];
+    const out = picture({ answer, style: house, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+    assert.equal(timers.length, 0, 'nothing plays before it is seen');
+    assert.match(JSON.stringify(out.scene.aside), /"key":"chat","on":\["seen"\]/);
+    out.on({ name: 'seen', key: 'chat' });
+    out.on({ name: 'seen', key: 'chat' });
+    assert.equal(timers.length, 1, 'seen, it starts, and only once');
+    assert.ok(sent.some((p) => p.key === 'play' && p.text === 'Pause'));
+  } finally {
+    globalThis.setTimeout = realSet;
+  }
 });

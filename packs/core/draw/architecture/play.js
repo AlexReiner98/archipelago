@@ -33,8 +33,8 @@ export function play({ answer, style, reduced, tools, shape }) {
   );
   const after = m(
     'div',
-    { key: 'chat', class: 'sp-chat' },
-    m('div', { class: 'sp-head' }, m('span', { class: 'sp-live' }), m('span', { class: 'grow' }), total !== undefined && m('span', { key: 'count', class: 'sp-count' }, ''), m('button', { key: 'play', on: ['click'] }, reduced ? 'Play' : 'Pause')),
+    { key: 'chat', on: ['seen'], class: 'sp-chat' },
+    m('div', { class: 'sp-head' }, m('span', { class: 'sp-live' }), m('span', { class: 'grow' }), total !== undefined && m('span', { key: 'count', class: 'sp-count' }, ''), m('button', { key: 'play', on: ['click'] }, 'Play')),
     m('ol', { key: 'log', class: 'sp-log', 'aria-live': 'polite' }),
   );
 
@@ -137,13 +137,18 @@ export function play({ answer, style, reduced, tools, shape }) {
     else if (playing) later(t('beat_least'), () => beat(k + 1));
   };
 
-  // It starts on its own, once the scene is on the page, unless less motion is asked for: then it is the last step at once.
-  later(0, () => (reduced ? jump(last, 0) : ((playing = true), rail(-1), later(t('start'), () => beat(0)))));
+  // It starts on its own once the conversation is scrolled into sight (`seen`), unless less motion is asked for: then
+  // it is the last step at once. Played or paused before, it is not started again.
+  let started = false;
+  const begin = () => !started && ((started = true), (playing = true), send([{ key: 'play', text: 'Pause' }]), rail(-1), later(t('start'), () => beat(0)));
+  if (reduced) later(0, () => ((started = true), jump(last, 0)));
   return {
     before,
     after,
     on({ name, key }) {
+      if (name === 'seen') return (begin(), []);
       if (name !== 'click') return [];
+      started = true;
       if (key === 'play') {
         if (!playing && cur === last) replay();
         // Paused before its first step is drawn, the story only stops: there is no step to hold.

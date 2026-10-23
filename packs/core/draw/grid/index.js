@@ -171,7 +171,7 @@ export function picture({ answer, style, fields = {}, relations = {}, reduced },
     scene: { css: look, svg: grid, legend, ...(player && { before: player.before, aside: player.after }), ...(cards.has(style.here) && { focus: cards.get(style.here)[0].key }) },
     end: player?.end,
     on(event) {
-      if (player && (event.key === 'play' || event.key.startsWith('c:'))) return player.on(event);
+      if (player && (event.key === 'play' || event.key === 'chat' || event.key.startsWith('c:'))) return player.on(event);
       return [];
     },
     restyle(now) {

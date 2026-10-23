@@ -1,4 +1,5 @@
-// How a story looks (story.js, play.js): the chapters above the picture, what was said beside it, and the marks of a
+// How a story looks (story.js, play.js): the chapters above the picture, what was said beside it (on its right, three
+// to one, under it only where the row cannot hold both at side_least), and the marks of a
 // step: what comes in, in the accent; what goes, in the colour of what is wrong; a flag in it too. Every colour and
 // length is the page's (its theme and lengths, read as --<name>). The rail's and the conversation's buttons are named
 // within them, so they weigh more than a page's own rule for buttons (a published page has one).

@@ -293,10 +293,7 @@ export function story({ answer, style, reduced }, tools) {
   const player = play({ answer, style, reduced, tools, shape });
   // The colour of each value a dot is coloured by, in the story's own look and in each other; an island is tinted with it.
   const colours = [[null, style.dots], ...Object.keys(LOOKS).map((l) => [l, style.dots?.[l]])].flatMap(([look, dots]) => Object.entries(dots?.colours ?? {}).filter(([v, c]) => NAME.test(v) && NAME.test(String(c))).map(([v, c]) => [look ? `.sp-${look} ` : '', v, `var(--${String(c).replaceAll('_', '-')})`, look]));
-  // The conversation sits beside the picture only where the picture keeps twice its width; in a narrow column it goes
-  // below, the picture taking the whole width.
-  const room = '.lf-beside > .lf-stage { min-width: calc(var(--side-least) * 2); }';
-  const css = `${base}\n${storyLook}\n${room}\n${islandsLook}\n${sea ? deepLook : ''}\n${everyTask.size ? boardsLook : ''}\n${colours
+  const css = `${base}\n${storyLook}\n${islandsLook}\n${sea ? deepLook : ''}\n${everyTask.size ? boardsLook : ''}\n${colours
     .map(([within, v, c, look]) => `${within}.ar-dot.k-${v}, ${within}.sp-swatch.k-${v} { fill: ${c}; background: ${c}; stroke: none; }${look ? `\n.ar-part.sp-${look} .ar-shape.k-${v}, .sp-task .ar-shape.k-${v} { stroke: ${c}; fill: color-mix(in srgb, ${c} var(--ln-arch-island-tint), var(--ln-land)); }` : ''}`)
     .join('\n')}`;
   // What a part or a place says of itself, in a tip beside it: its name as the step shows it, and its first line.
