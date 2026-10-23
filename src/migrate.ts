@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
-import { AGENT_CODE_READ, AGENT_PUBLISH_READ, MEMBER, ORDERED, SCHEMA, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
+import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, MEMBER, ORDERED, SCHEMA, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
@@ -42,6 +42,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 13, name: 'the GitHub App as a server pack', sql: ADOPT_APP },
   { version: 14, name: 'an agent reads whether it may change the code drawings run', sql: AGENT_CODE_READ },
   { version: 15, name: 'an item keeps its kind in its row', sql: ITEM_KIND },
+  { version: 16, name: 'a held change keeps the rule that held it', sql: HELD_BY },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

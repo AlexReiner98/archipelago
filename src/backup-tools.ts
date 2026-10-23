@@ -1,5 +1,5 @@
 // The whole map as a file, for its owner to keep or to rehearse a change on. A backup holds everything, private
-// items included, so an agent is given one only when the owner has said agents may (agent_backups, on Workspace).
+// items included, so an agent is given one only when the owner has said agents may (core's rule agent_backups, which the owner lifts on Workspace).
 // The file is not put in an answer: the answer is a link that gives it once, within minutes, to be saved to disk.
 
 import { randomBytes } from 'node:crypto';
@@ -9,6 +9,7 @@ import { dump, localPackOf } from './backup.ts';
 import type { Q } from './db.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
+import { mayDo } from './rules.ts';
 import type { Tool } from './tools.ts';
 import { keep, take } from './transient.ts';
 
@@ -41,7 +42,7 @@ export const BACKUP_TOOLS: Record<string, Tool> = {
     input: {},
     run: async (l, actor) => {
       if (actor.kind === 'human' && !actor.admin) throw new Error('Only a workspace admin can download its backup.');
-      if (actor.kind !== 'human' && (await l.setting<boolean>('agent_backups')) !== true) throw new Error('Agents may not download this workspaceâ€™s backups: the owner allows it on the Workspace page, under Backups.');
+      await mayDo(l.db, l.registry, actor.kind === 'human', 'backup_download');
       const whole = await wholeMap(l);
       const taken = await dump(whole.db, { id: l.workspace, name: l.workspace }, localPackOf(whole.registry));
       const key = randomBytes(24).toString('base64url');

@@ -317,6 +317,15 @@
     { "id": "code_runs", "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code", "modules", "page_css"] }, "then": "hold", "lifted": "agent_code", "say": "Code that runs in the browser of whoever looks is the human's to allow." },
     { "id": "screens_human", "when": { "actor": "agent", "type": "screen" }, "then": "hold", "say": "What a screen shows, and where, is the human's to change." },
     { "id": "styles_merge", "when": { "actor": "agent", "op": "merge", "type": "style" }, "then": "hold", "lifted": "agent_code", "say": "Folding one style into another can bring its code along: the human's to allow." },
-    { "id": "public", "when": { "actor": "agent", "op": ["create", "update"], "visibility": "public" }, "then": "hold", "say": "What anyone can see is the human's to decide." }
+    { "id": "public", "when": { "actor": "agent", "op": ["create", "update"], "visibility": "public" }, "then": "hold", "say": "What anyone can see is the human's to decide." },
+    { "id": "dormant", "when": { "actor": "agent", "dormant": true }, "then": "hold", "say": "Its pack is gone, and its rules with it: a person looks at what is written to it." },
+    { "id": "settle", "when": { "actor": "agent", "op": "update", "capability": "settles", "status": { "from": "open", "to": "closed" } }, "then": "hold", "lifted": "agent_changes", "readings": true, "say": "Settling \"{title}\" is the owner's: the agent proposes the answer, and they confirm it." },
+    { "id": "settle_why", "when": { "actor": "agent", "op": "update", "capability": { "settles": { "by": "word" } }, "status": { "from": "open", "to": "closed" }, "held": false }, "then": { "require": ["outcome", "rationale"] }, "say": "\"{title}\": to settle a decision, say what was chosen (props.outcome) and why (props.rationale)." },
+    { "id": "settle_said", "when": { "actor": "agent", "op": "update", "capability": "settles", "status": { "from": "open", "to": "closed" }, "held": false, "said": false }, "then": "refuse", "say": "\"{title}\": to settle a question, say on whose authority (authority.of: \"human\" with where they said so, or \"agent\" for your own judgment)." },
+    { "id": "asked", "when": { "actor": "agent", "asked": true }, "then": "hold", "say": "The agent asked for a look before it takes effect." },
+    { "id": "propose_only", "when": { "actor": "agent", "may": "propose" }, "then": "hold", "say": "This agent's token may only propose." },
+    { "id": "agent_changes", "when": { "actor": "agent", "op": ["create", "update", "link", "unlink", "archive", "restore", "merge", "define_type"] }, "then": "hold", "lifted": "agent_changes", "server": true, "say": "An agent's change waits for a person until the owner lets agents' changes apply." },
+    { "id": "agent_publish", "when": { "actor": "agent", "op": "publish" }, "then": "refuse", "lifted": "agent_publish", "say": "Publishing is the owner’s here: they allow agents on the Workspace page, under Publishing. Ask them with publish_ask." },
+    { "id": "agent_backups", "when": { "actor": "agent", "op": "backup_download" }, "then": "refuse", "lifted": "agent_backups", "say": "Agents may not download this workspace’s backups: the owner allows it on the Workspace page, under Backups." }
   ]
 }

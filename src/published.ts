@@ -1,7 +1,7 @@
 // Publishing a document: what anyone reads at /p/<workspace>/<id> is the document as it was when a person last
 // published it, frozen (src/public-schema.ts, PUBLISHED). The draft is edited on the map, privately or not; nothing
 // public changes until it is published again. A human publishes; an agent only where the workspace's owner has
-// allowed it (AGENT_PUBLISH, on the Workspace page), each time logged with the authority it said it acted on.
+// allowed it (agent_publish, a rule of the core pack the owner lifts on the Workspace page), each time logged with the authority it said it acted on.
 // Taking a document down stays the human's.
 //
 // What is frozen is what the public read gives (src/public-document.ts), and for each lens it brings in, the
@@ -16,6 +16,7 @@ import { actorId, type Actor, type Archipelago, type Authority } from './pelago.
 import { publicDocument, readable } from './public-document.ts';
 import { framesFor } from './published-frames.ts';
 import { republished } from './published-live.ts';
+import { mayDo } from './rules.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 const IDS = /[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g;
@@ -98,16 +99,10 @@ const canon = (v: unknown): unknown =>
   Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon((v as Record<string, unknown>)[k])])) : v;
 const same = (a: unknown, b: unknown) => JSON.stringify(canon(JSON.parse(JSON.stringify(a)))) === JSON.stringify(canon(b));
 
-/** The workspace setting by which its owner lets agents publish. Off unless set; only a human admin sets it. */
-export const AGENT_PUBLISH = 'agent_publish';
-
 type Said = Pick<Authority, 'of' | 'basis'>;
 
-/** Whether this actor may publish here: a human always, an agent once the owner has allowed it. */
-async function mayPublish(l: Archipelago, actor: Actor) {
-  if (actor.kind !== 'human' && (await l.setting<boolean>(AGENT_PUBLISH)) !== true)
-    throw new Error('Publishing is the owner’s here: they allow agents on the Workspace page, under Publishing. Ask them with publish_ask.');
-}
+/** Whether this actor may publish here: a human always, an agent where no rule refuses it (core's agent_publish, lifted by the owner). */
+const mayPublish = (l: Archipelago, actor: Actor) => mayDo(l.db, l.registry, actor.kind === 'human', 'publish');
 
 /** Publish a document as it stands: it becomes public, and what anyone reads of it is this, until it is published again. */
 export async function publish(l: Archipelago, actor: Actor, id: string, said?: Said) {

@@ -1,8 +1,8 @@
-// The map and its single write path. Every change to items and links goes through change(): it is validated, checked
-// against policy, then either applied or stored as a proposal for a human, and always logged.
+// The map and its single write path. Every change to items and links goes through change(): it is validated, judged
+// by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
 import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts';
-import { judgeOps } from './rules.ts';
+import { AGENT_CHANGES, agentChanges, decide, DEFAULT_AGENT_POLICY, type Policy, type Ruled } from './rules.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts';
@@ -28,24 +28,8 @@ export interface Actor {
 
 export type May = 'report' | 'propose' | 'change';
 
-export type Level = 'auto' | 'propose' | 'forbidden';
-export type OpKind = 'create' | 'update' | 'link' | 'unlink' | 'archive' | 'restore' | 'merge' | 'define_type';
-export type Policy = Record<OpKind, Level>;
-
-/** Agents propose everything until trust is built; loosen per op in pelago.config.json. */
-export const DEFAULT_AGENT_POLICY: Policy = {
-  create: 'propose',
-  update: 'propose',
-  link: 'propose',
-  unlink: 'propose',
-  archive: 'propose',
-  restore: 'propose',
-  merge: 'propose',
-  define_type: 'propose',
-};
-
-/** The setting that holds a workspace's own choice between applying agents' changes and holding them. */
-const AGENT_CHANGES = 'agent_changes';
+export type { Level, OpKind, Policy } from './rules.ts';
+export { DEFAULT_AGENT_POLICY } from './rules.ts';
 
 type Props = Record<string, unknown>;
 
@@ -175,6 +159,8 @@ export interface Proposal {
   decided_by: string | null;
   decided_at: Date | null;
   note: string | null;
+  /** The rule that held it (src/rules.ts): null for one held before rules named themselves. */
+  held_by: Ruled | null;
 }
 
 export const actorId = (actor: Actor) => `${actor.kind}:${actor.name}`;
@@ -244,9 +230,7 @@ export class Archipelago {
    * settle a decision or a hypothesis.
    */
   async agentChanges(): Promise<'apply' | 'hold'> {
-    const chosen = await this.setting<string>(AGENT_CHANGES);
-    if (chosen === 'apply' || chosen === 'hold') return chosen;
-    return Object.values(this.policy).every((level) => level === 'auto') ? 'apply' : 'hold';
+    return agentChanges(this.db, this.policy);
   }
 
   /** Who a new private thing is private to: the viewer, when there is one. */
@@ -264,59 +248,33 @@ export class Archipelago {
     const me = actorId(actor);
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);
-    // The workspace's own choice, when it has made one, stands in for the
-    // server's policy on everything the policy does not forbid outright.
-    const chosen = actor.kind === 'human' ? undefined : await this.setting<string>(AGENT_CHANGES);
-    // The packs' rules: what waits for a person, whatever else agents may do unreviewed, and what is refused.
-    const judged = await judgeOps(this.db, this.registry, actor.kind === 'human', input.ops);
-    if (judged.some((j) => j.refused.length)) throw new Error(`Change rejected:\n${judged.flatMap((j) => j.refused).map((r) => `- ${r}`).join('\n')}`);
-    const levels = input.ops.map((op, i): Level => {
-      if (actor.kind === 'human' || measured) return 'auto';
-      const level = this.policy[op.op];
-      if (level === 'forbidden') return level;
-      if (judged[i].hold) return 'propose';
-      // An agent may always ask for a look before its change takes effect, and one whose token may only propose always does.
-      if (input.hold || actor.may === 'propose') return 'propose';
-      return chosen === 'apply' ? 'auto' : chosen === 'hold' ? 'propose' : level;
-    });
-    const forbidden = input.ops.filter((_, i) => levels[i] === 'forbidden').map((op) => op.op);
-    if (forbidden.length) throw new Error(`Policy forbids agents from: ${[...new Set(forbidden)].join(', ')}`);
-    // Settling a question is the human's, whatever the server's policy lets
-    // agents do unreviewed: an agent that sees one settled proposes the answer,
-    // and the human confirms it. Only a workspace that has itself chosen to
-    // have agents' changes applied lets an agent settle one, and then the
-    // record has to stand on its own: a decision says what was chosen and why,
-    // and the human is told (see `answered`).
+    // Whether it applies, waits or is refused is the rules' to say (src/rules.ts), and the answer names the rule.
+    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed) };
+    const verdict = await decide(this.db, this.registry, who, input.ops, this.policy);
+    if (verdict.outcome === 'refuse') throw new Error(`Change rejected:\n${verdict.refused.map((r) => `- ${r}`).join('\n')}`);
+    // A question an agent settled, where the owner lets it, is put to them by the next session they talk to.
     const answered: { id: string; title: string; status: string; outcome?: string; authority: Authority }[] = [];
-    if (actor.kind !== 'human') {
+    if (actor.kind !== 'human' && verdict.outcome === 'apply') {
       const questions = new Set(this.registry.having('settles'));
-      const decisions = new Set([...questions].filter((t) => this.registry.type(t)!.capabilities.settles!.by === 'word'));
-      for (const [i, op] of input.ops.entries()) {
-        if (op.op !== 'update' || !op.status || levels[i] !== 'auto') continue;
+      for (const op of input.ops) {
+        if (op.op !== 'update' || !op.status) continue;
         const e = await this.entity(op.id);
         if (!e || !questions.has(e.type) || !e.is_open || !this.registry.type(e.type)?.statuses.closed.includes(op.status)) continue;
-        if (chosen !== 'apply') {
-          levels[i] = 'propose';
-          continue;
-        }
-        const props = { ...e.props, ...op.props };
-        if (decisions.has(e.type) && !(props.outcome && props.rationale))
-          throw new Error(`Change rejected:\n- "${e.title}": to settle a decision, say what was chosen (props.outcome) and why (props.rationale).`);
-        if (!claimed) throw new Error(`Change rejected:\n- "${e.title}": to settle a question, say on whose authority (authority.of: "human" with where they said so, or "agent" for your own judgment).`);
-        answered.push({ id: e.id, title: e.title, status: op.status, outcome: props.outcome as string | undefined, authority });
+        answered.push({ id: e.id, title: e.title, status: op.status, outcome: { ...e.props, ...op.props }.outcome as string | undefined, authority });
       }
     }
 
-    if (levels.includes('propose')) {
+    if (verdict.outcome === 'hold') {
       const id = newId('p');
       await this.db.query(
-        `insert into proposal (id, actor, reason, source, ops, warnings, private_to) values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7)`,
-        [id, actorId(actor), input.reason, JSON.stringify(input.source ?? null), JSON.stringify(input.ops), JSON.stringify(warnings), this.viewer || null],
+        `insert into proposal (id, actor, reason, source, ops, warnings, private_to, held_by) values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8::jsonb)`,
+        [id, actorId(actor), input.reason, JSON.stringify(input.source ?? null), JSON.stringify(input.ops), JSON.stringify(warnings), this.viewer || null, JSON.stringify(verdict.by ?? null)],
       );
-      await this.log(this.db, { actor: actorId(actor), action: 'proposal.create', reason: input.reason, detail: { proposal: id, ops: input.ops.length } });
+      await this.log(this.db, { actor: actorId(actor), action: 'proposal.create', reason: input.reason, detail: { proposal: id, ops: input.ops.length, held_by: verdict.by?.rule } });
       return {
         status: 'proposed' as const,
         proposal: id,
+        held_by: verdict.by,
         warnings,
         note: 'Nothing has changed yet. A human must approve this proposal before it appears in the map.',
       };

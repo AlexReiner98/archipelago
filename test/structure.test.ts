@@ -58,7 +58,7 @@ const count = (files: string[], pattern: RegExp) =>
 const LONG_FILES: Record<string, number> = {
   'src/views.ts': 503,
   'src/tools.ts': 909,
-  'src/pelago.ts': 1045,
+  'src/pelago.ts': 1003,
   'ui/style.css': 732,
 };
 
@@ -92,6 +92,20 @@ test('every store is named, with its rule', () => {
   assert.deepEqual(tables.filter((t) => !named.includes(t)), [], 'Name the store in src/operational.ts, with the one rule it keeps.');
   assert.deepEqual(named.filter((t) => !tables.includes(t)), [], 'A store src/operational.ts names that no longer exists: take it out.');
   assert.ok(read('src/pelago.ts').includes(`function ${RESTORE}(`), 'The restore path src/operational.ts names is in src/pelago.ts.');
+});
+
+// Whether a change applies, waits for a person or is refused is decided by the rules (src/rules.ts, decide) and
+// nowhere else: a change is held only with the rule that held it, a setting is read only as the lift of a rule, and
+// the server's policy only as the rules it lifts or adds.
+test('every approval is decided by a rule', () => {
+  const src = walk('src').filter((f) => f.endsWith('.ts'));
+  const held = count(src, /insert\s+into\s+proposal\s*\(/gi);
+  assert.deepEqual(held, { 'src/pelago.ts': 1 }, 'A change waits only where Archipelago.change holds it on the verdict of decide.');
+  assert.match(read('src/pelago.ts'), /verdict\.outcome === 'hold'/, 'Archipelago.change holds a change on the verdict of decide.');
+  const lifts = count(src.filter((f) => f !== 'src/rules.ts' && f !== 'src/schema.ts'), /['"`](?:agent_changes|agent_code|agent_publish|agent_backups)['"`]/g);
+  assert.deepEqual(lifts, {}, 'A setting lifts a rule a pack declared liftable: read it through src/rules.ts (decide, mayDo, liftsOn).');
+  const policy = count(src.filter((f) => f !== 'src/rules.ts'), /\bpolicy\s*\[|['"]forbidden['"]|level\s*===/g);
+  assert.deepEqual(policy, {}, "The server's policy is read only by the rules: what it lifts, and what it forbids (serverRules).");
 });
 
 // 4. A pack's code imports only its own files and Node's built-ins: never the kernel's source.

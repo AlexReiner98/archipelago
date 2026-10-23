@@ -76,8 +76,14 @@ held for a person as a proposal. The one way to write the map. In the code:
 a change set, which `undo` reverses.
 
 **rule.** A condition, kept as data in a pack file, that decides whether a
-change applies, waits for a person or is refused. In the code: `rules` in a
-pack file, `RuleDef` in `src/rules.ts`.
+change applies, waits for a person or is refused: the only thing that does.
+It reads who acts, which op, kind, type, capability or fields, the change of
+status and the visibility, and answers hold, refuse or the fields it
+requires. One the pack declares liftable names the workspace setting that
+lifts it (`lifted`); a setting does nothing else. A held change names the
+rule that held it. The kernel's own (an agent's change waits, settling a
+question, code that runs, publishing, backups) are core's. In the code:
+`rules` in a pack file, `RuleDef` and `decide` in `src/rules.ts`.
 
 ## Retired words
 

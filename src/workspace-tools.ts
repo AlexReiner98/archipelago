@@ -6,18 +6,13 @@ import { endedOf } from './ended.ts';
 import { limitOf } from './members.ts';
 import { acceptedSenders } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
-import { AGENT_PUBLISH } from './published.ts';
+import { liftsOn } from './rules.ts';
 import type { Tool } from './tools.ts';
 
-const settings = async (l: Archipelago) => ({
-  id: l.workspace,
-  default_visibility: await l.defaultVisibility(),
-  agent_changes: await l.agentChanges(),
-  accepts_from: await acceptedSenders(l),
-  agent_backups: (await l.setting<boolean>('agent_backups')) === true,
-  agent_publish: (await l.setting<boolean>(AGENT_PUBLISH)) === true,
-  agent_code: (await l.setting<boolean>('agent_code')) === true,
-});
+const settings = async (l: Archipelago) => {
+  const { agent_backups, agent_publish, agent_code } = await liftsOn(l.db);
+  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code };
+};
 
 export const WORKSPACE_TOOLS: Record<string, Tool> = {
   workspace_info: {

@@ -68,3 +68,26 @@ test('a rule that names what is not there stops its pack from loading', async ()
   await assert.rejects(map([{ ...SHOP, rules: [{ when: { compare: 'total is big' }, then: 'hold' }] }]), /compare reads like/);
   await assert.rejects(map([{ ...SHOP, rules: [{ unique: ['colour'], type: 'shop.order' }] }]), /has no field "colour"/);
 });
+
+test('a held change names the rule that held it, in its answer and on the proposal', async () => {
+  const l = await map();
+  const held = (await change(l, agent, [{ op: 'create', type: 'shop.order', title: 'Oven', props: { total: 900 } }])) as { proposal: string; held_by: { rule: string; pack: string } };
+  assert.deepEqual([held.held_by.pack, held.held_by.rule], ['shop', 'big']);
+  const [kept] = (await l.db.query<{ held_by: { rule: string } }>(`select held_by from proposal where id = $1`, [held.proposal])).rows;
+  assert.equal(kept.held_by.rule, 'big');
+  // Under review, the most particular rule is named: the one about code, not the one every agent's change is under.
+  const strict = new Archipelago(l.db, l.registry);
+  const code = (await change(strict, agent, [{ op: 'create', type: 'style', title: 'Loud', props: { code: 'export default () => {}' } }])) as { held_by: { rule: string } };
+  assert.equal(code.held_by.rule, 'code_runs');
+  const plain = (await change(strict, agent, [{ op: 'create', type: 'work.task', title: 'Plain' }])) as { held_by: { rule: string } };
+  assert.equal(plain.held_by.rule, 'agent_changes');
+});
+
+test('a setting lifts only a rule its pack declared liftable', async () => {
+  await assert.rejects(map([{ ...SHOP, rules: [{ when: { type: 'shop.order' }, then: 'hold', lifted: 'agent_shopping' }] }]), /lifted is one of/);
+  const shop = await map();
+  const l = new Archipelago(shop.db, shop.registry);
+  await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"'::jsonb)`);
+  assert.equal((await change(l, agent, [{ op: 'create', type: 'work.task', title: 'Plain' }])).status, 'applied', 'agent_changes lifts core’s agent_changes');
+  assert.equal((await change(l, agent, [{ op: 'create', type: 'shop.order', title: 'Oven', props: { total: 900 } }])).status, 'proposed', 'and not a rule declared without a lift');
+});
