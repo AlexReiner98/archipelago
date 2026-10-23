@@ -1,6 +1,7 @@
 // A lens's steps: how the picture came to be, step by step, ending on the map as it is (the lens type's `steps`).
 // Each step changes the one before it, from nothing: what it adds and takes away, the titles and fields things had
-// then, the words flagged on them, the chapter it starts and what was said. The last step is the map as it is, whatever
+// then (a status among them), the words flagged on them, the chapter it starts, what was said, the look it is drawn
+// in from then on, and whether it goes by quickly. The last step is the map as it is, whatever
 // the steps before it say. The kernel reads nothing in them but the items they name, which are sent with the picture
 // even when finished (a part that is gone is told of); how they are played is the drawing's.
 
@@ -20,10 +21,15 @@ export interface Step {
   chapter?: { name: string; when?: string; count?: number };
   /** What was said: each line by whom (a name) and what. */
   lines?: { by: string; text: string }[];
+  /** The look it is drawn in from this step on, by name (the drawing's, such as "islands"); null takes it back to its own. */
+  look?: string | null;
+  /** Played at a fast-forward pace, not waiting for its lines. */
+  quick?: boolean;
 }
 
 const MOST_STEPS = 100;
 const MOST_LINE = 240;
+const LOOK = /^[a-z][a-z0-9_]{0,30}$/;
 
 /** The steps a lens keeps, checked: a sentence on what is wrong, else the steps. */
 export function readSteps(value: unknown): Step[] {
@@ -37,6 +43,8 @@ export function readSteps(value: unknown): Step[] {
     if (!byId(s.titles) || !byId(s.fields) || !byId(s.flag)) throw new Error(`${at}: titles, fields and flag are kept by id`);
     if (s.lit !== undefined && !(Array.isArray(s.lit) && s.lit.every((w: unknown) => Array.isArray(w) && w.length === 2 && ids(w)))) throw new Error(`${at}: lit is a list of wires, each [from, to]`);
     if (s.chapter !== undefined && typeof s.chapter?.name !== 'string') throw new Error(`${at}: a chapter has a name`);
+    if (s.look !== undefined && s.look !== null && !(typeof s.look === 'string' && LOOK.test(s.look))) throw new Error(`${at}: a look is named in a word of small letters, such as "islands"`);
+    if (s.quick !== undefined && typeof s.quick !== 'boolean') throw new Error(`${at}: quick is true or false`);
     for (const line of s.lines ?? []) if (typeof line?.by !== 'string' || typeof line?.text !== 'string' || line.text.length > MOST_LINE) throw new Error(`${at}: each line says by whom and what, in ${MOST_LINE} characters at most`);
   });
   return value as Step[];
@@ -53,8 +61,12 @@ export function stepIds(steps: unknown): string[] {
 /** The steps as a reader of a published picture may have them: naming only what the picture shows them. */
 export function stepsShown(steps: Step[], shown: Set<string>): Step[] {
   const only = <T>(byId: Record<string, T> | undefined) => byId && Object.fromEntries(Object.entries(byId).filter(([id]) => shown.has(id)));
+  // Only what a step is known to say: anything else kept in it is not the reader's.
   return steps.map((s) => ({
-    ...s,
+    ...(s.chapter && { chapter: { name: s.chapter.name, ...(s.chapter.when !== undefined && { when: s.chapter.when }), ...(s.chapter.count !== undefined && { count: s.chapter.count }) } }),
+    ...(s.lines && { lines: s.lines.map((l) => ({ by: l.by, text: l.text })) }),
+    ...(s.look !== undefined && { look: s.look }),
+    ...(s.quick && { quick: true }),
     ...(s.add && { add: s.add.filter((id) => shown.has(id)) }),
     ...(s.remove && { remove: s.remove.filter((id) => shown.has(id)) }),
     ...(s.titles && { titles: only(s.titles) }),

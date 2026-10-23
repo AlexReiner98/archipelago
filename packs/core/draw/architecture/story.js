@@ -1,9 +1,12 @@
 // A system as it came to be: the lens's steps, each laid out with the one before it as its prior (layout.js,
 // steady), so what a step does not change stays where it was. Every part, place and wire that is ever drawn is one
 // mark, shown or not; a step moves the marks from where they were to where they go (play.js runs the steps).
-// The last step is the map as it is, whatever the steps say, so the picture always ends on what is true.
+// The last step is the map as it is, whatever the steps say, so the picture always ends on what is true. From a step
+// with a look (`islands`) on, the story is drawn in that look (islands.js): a part's outline moves from its box to
+// its island, and its wires are drawn again as routes.
 
-import { layout } from './layout.js';
+import { boxPath, curveOf, islandPath, islands, routeSpots } from './islands.js';
+import { finished, layout } from './layout.js';
 import { css as base } from './look.js';
 import { m, titled } from './marks.js';
 import { play } from './play.js';
@@ -12,13 +15,19 @@ import { css as storyLook } from './story-look.js';
 
 const NAME = /^[a-z][a-z0-9_]*$/;
 
-/** What each step shows: its items (with the titles and fields they had then), its links, its flags, its chapter. */
+/** The looks a story may be drawn in, besides its own. */
+const LOOKS = ['islands'];
+
+/**
+ * What each step shows: its items (with the titles, fields and status they had then), its links, its flags, its
+ * chapter and its look. Work the steps leave in and the map has finished (done, not dropped) is shown at the end.
+ */
 export function statesOf(answer) {
   const steps = answer.steps, last = steps.length - 1, root = answer.lens.from;
   const byId = new Map(answer.items.map((i) => [i.id, i]));
   const moving = new Set(steps.flatMap((s) => [...(s.add ?? []), ...(s.remove ?? [])]));
   const present = new Set(), titles = new Map(), fields = new Map(), flags = new Map();
-  let chapter = -1;
+  let chapter = -1, look = null;
   const states = [];
   steps.forEach((s, k) => {
     for (const id of s.add ?? []) present.add(id);
@@ -27,18 +36,20 @@ export function statesOf(answer) {
     for (const [id, f] of Object.entries(s.fields ?? {})) fields.set(id, Object.fromEntries(Object.entries({ ...fields.get(id), ...f }).filter(([, v]) => v !== null)));
     for (const [id, w] of Object.entries(s.flag ?? {})) (w === null ? flags.delete(id) : flags.set(id, String(w)));
     if (s.chapter) chapter++;
+    if (s.look !== undefined) look = LOOKS.includes(s.look) ? s.look : null;
     // The last step is the map as it is.
     const final = k === last;
-    const shows = (id) => (final ? byId.get(id)?.open !== false : present.has(id));
+    const done = (id) => present.has(id) && byId.has(id) && finished(byId.get(id));
+    const shows = (id) => (final ? byId.get(id)?.open !== false || done(id) : present.has(id));
     // A place is shown while it holds something shown; what no step moves is shown as it is.
     const holds = new Map();
     for (const i of answer.items) if (i.inside) holds.set(i.inside, [...(holds.get(i.inside) ?? []), i.id]);
     const kept = (id, depth = 0) => id === root || (moving.has(id) ? shows(id) : final ? byId.get(id)?.open !== false || (holds.get(id) ?? []).some((c) => kept(c, depth + 1)) : depth < 16 && (holds.get(id) ?? []).some((c) => kept(c, depth + 1)));
     const items = answer.items
       .filter((i) => kept(i.id))
-      .map((i) => (final ? i : { ...i, open: true, status: i.open ? i.status : 'up', title: titles.get(i.id) ?? i.title, fields: { ...i.fields, ...fields.get(i.id) } }));
+      .map((i) => (final ? (done(i.id) ? { ...i, open: true } : i) : { ...i, open: true, status: String(fields.get(i.id)?.status ?? (i.open ? i.status : 'up')), title: titles.get(i.id) ?? i.title, fields: { ...i.fields, ...fields.get(i.id) } }));
     const ids = new Set(items.map((i) => i.id));
-    states.push({ items, links: answer.links.filter((l) => ids.has(l.from) && ids.has(l.to)), flags: final ? new Map() : new Map(flags), chapter, step: s, ids });
+    states.push({ items, links: answer.links.filter((l) => ids.has(l.from) && ids.has(l.to)), flags: final ? new Map() : new Map(flags), chapter, look, step: s, ids });
   });
   return states;
 }
@@ -105,6 +116,11 @@ export function story({ answer, style, reduced }, tools) {
     if (typeof v !== 'number') throw new Error(`The style names no size "arch_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
     return v;
   };
+  const num = (name) => {
+    const v = style.numbers?.[name];
+    if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+    return v;
+  };
   const measure = (text, px) => tools.measure(text, px, style.font);
   const fit = (text, width, px) => {
     if (measure(text, px) <= width) return text;
@@ -117,13 +133,28 @@ export function story({ answer, style, reduced }, tools) {
   const states = statesOf(answer);
   const flagRoom = (w) => measure(w, z('text')) + z('text_after') / 2;
   let prior, was = new Set();
+  // What a part's dot says in a look: the value of the field the look's dots name (dots.islands, else dots), its
+  // status where they name status; else its health.
+  const dotsOf = (look) => (look && style.dots?.[look]) || style.dots;
+  const valueOf = (n, look) => {
+    const by = dotsOf(look)?.field;
+    if (!NAME.test(by ?? '')) return null;
+    const v = by === 'status' ? n.item.status : n.item.fields?.[by];
+    return NAME.test(String(v ?? '')) ? String(v) : 'none';
+  };
+  // Done, for an island to rise: the last value its look's key gives (dots.order), else up.
+  const isDone = (look) => {
+    const last = dotsOf(look)?.order?.at?.(-1);
+    return (n) => (last && valueOf(n, look) !== null ? valueOf(n, look) === last : n.health === 'ok');
+  };
   const frames = states.map((s) => {
     const room = new Map([...s.flags].map(([id, w]) => [id, flagRoom(w)]));
     const kept = [...s.ids].filter((id) => was.has(id)).length;
     if (prior && s.ids.size - kept > kept) prior = undefined;
     was = s.ids;
-    const g = layout({ items: s.items, links: s.links, rootId: answer.lens.from, measure, sizes: style.sizes, prior, steady: true, room });
-    prior = g.memo;
+    const boxes = layout({ items: s.items, links: s.links, rootId: answer.lens.from, measure, sizes: style.sizes, prior, steady: true, room });
+    prior = boxes.memo;
+    const g = s.look === 'islands' ? islands(boxes, { z, n: num, done: isDone(s.look) }) : boxes;
     return { ...s, g, parts: new Map(g.all.filter((n) => !n.dummy).map((n) => [n.id, n])), boxes: new Map(g.boxes.map((b) => [b.id, b])), wires: new Map(g.chains.map((c) => [c.key, c])) };
   });
   // A story with nothing in it (what it names is not shown here) says so, as the still picture does.
@@ -135,20 +166,25 @@ export function story({ answer, style, reduced }, tools) {
   const span = (g) => g.width - g.left;
   const aspect = Math.max(style.numbers?.arch_story_aspect ?? 1.6, Math.min(...frames.map((f) => span(f.g) / f.g.height)));
   const least = z('story_least');
+  // Islands sit in the middle of their frame, top to bottom too.
   const view = (g) => {
     const w = Math.max(span(g), least, g.height * aspect);
-    return `${g.left + shift + (span(g) - w) / 2} 0 ${w} ${w / aspect}`;
+    return `${g.left + shift + (span(g) - w) / 2} ${g.radii ? (g.height - w / aspect) / 2 : 0} ${w} ${w / aspect}`;
   };
   const widest = Math.max(...frames.map((f) => Math.max(span(f.g), least, f.g.height * aspect)));
 
   // What a part, a place, a wire looks like in a frame: the attributes of each of its marks.
-  const dotsBy = style.dots && NAME.test(style.dots.field ?? '') ? style.dots.field : null;
-  const dotClass = (n) => `ar-dot ${dotsBy ? `k-${n.item.fields?.[dotsBy] ?? 'none'}` : n.health}`;
+  const markOf = (n, f) => (valueOf(n, f.look) === null ? n.health : `k-${valueOf(n, f.look)}`);
+  // A part's outline: its box, or its island once the story is drawn as islands.
+  const outlineOf = (n, f, X, Y) => {
+    const r = f.g.radii?.get(n.id);
+    return r ? islandPath(X, Y, r.rx + r.rise, r.ry + r.rise, n.id, num('arch_island_wobble')) : boxPath(X - n.w / 2, Y - n.h / 2, n.w, n.h, Math.min(z('corner'), n.h / 5));
+  };
   const partAt = (n, f) => {
     const X = n.x0 + shift, Y = n.y0, left = X - n.w / 2 + z('text_x');
     return {
-      r: { x: X - n.w / 2, y: Y - n.h / 2, width: n.w, height: n.h },
-      d: { cx: left - z('dot_gap'), cy: Y, class: dotClass(n) },
+      s: { d: outlineOf(n, f, X, Y), class: `ar-shape ${markOf(n, f)}` },
+      d: { cx: left - z('dot_gap'), cy: Y, class: `ar-dot ${markOf(n, f)}` },
       t: { x: left, y: Y },
       f: { x: X + n.w / 2 - z('text_after') / 2, y: Y },
       title: n.item.title,
@@ -166,11 +202,14 @@ export function story({ answer, style, reduced }, tools) {
     return { box: { x, y: b.y, width: b.w, height: b.h }, n: { x: x + inset + dx, y: b.y + inset, width }, d: { cx: x + z('place_dot_x') + dx, cy: mid }, t: { x: x + z('place_text_x') + dx, y: mid }, text, title: b.item.title, flag: f.flags.get(b.id) ?? '' };
   };
   const wireAt = (c) => c.points.map(([px, py]) => [px + shift, py]);
+  /** A wire's path: a route's one curve, else its runs. */
+  const wireD = (c) => (c.curve ? curveOf(wireAt(c)) : pathOf(wireAt(c)));
   for (const f of frames) for (const n of f.parts.values()) ((n.x0 = f.g.x.get(n.id)), (n.y0 = f.g.y.get(n.id)));
   // What a wire carries, written on it where the still picture would write it; and whether the step lights it.
   for (const f of frames) {
     const labels = [...f.wires.values()].filter((c) => c.says).map((c) => ({ c, text: fit(c.says, z('says_most'), z('says_text')) }));
-    f.says = new Map(saysSpots({ labels, chains: [...f.wires.values()], boxes: f.g.boxes, parts: partBoxes(f.g), measure, z }).map((s) => [s.c.key, s]));
+    const spots = f.g.radii ? routeSpots({ labels, chains: [...f.wires.values()], radii: f.g.radii, x: f.g.x, y: f.g.y, measure, z }) : saysSpots({ labels, chains: [...f.wires.values()], boxes: f.g.boxes, parts: partBoxes(f.g), measure, z });
+    f.says = new Map(spots.map((s) => [s.c.key, s]));
     const lit = new Set((f.step.lit ?? []).map((w) => [...w].sort().join(' ')));
     f.lit = new Set([...f.wires.values()].filter((c) => lit.has([c.a, c.b].sort().join(' '))).map((c) => c.key));
   }
@@ -193,23 +232,24 @@ export function story({ answer, style, reduced }, tools) {
   });
   const partMarks = [...everyPart].map(([id, [n, f]]) => {
     const at = partAt(n, f);
-    const mark = m('a', { key: `p:${id}`, on: ['enter', 'leave', 'click'], href: `#/e/${id}`, class: 'ar-part sp-off', opacity: 0 }, m('rect', { key: `p:${id}:r`, ...at.r, rx: Math.min(z('corner'), n.h / 5), class: 'ar-shape' }), m('circle', { key: `p:${id}:d`, ...at.d, r: z('dot') }), m('text', { key: `p:${id}:t`, ...at.t }, at.text), m('text', { key: `p:${id}:f`, ...at.f, class: 'sp-flag' }, ''));
-    mark.splice(2, 0, m('title', { key: `p:${id}:n` }, at.title));
-    return mark;
+    const part = m('a', { key: `p:${id}`, on: ['enter', 'leave', 'click'], href: `#/e/${id}`, class: 'ar-part sp-off', opacity: 0 }, m('path', { key: `p:${id}:r`, ...at.s }), m('circle', { key: `p:${id}:d`, ...at.d, r: z('dot') }), m('text', { key: `p:${id}:t`, ...at.t }, at.text), m('text', { key: `p:${id}:f`, ...at.f, class: 'sp-flag' }, ''));
+    part.splice(2, 0, m('title', { key: `p:${id}:n` }, at.title));
+    return part;
   });
   const wireMarks = [...everyWire].map(([key, c]) => {
     const pts = wireAt(c);
-    return [m('path', { key: `w:${keyOf(key)}`, d: pathOf(pts), pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 0, class: 'ar-wire wired sp-off', opacity: 0 }), m('path', { key: `h:${keyOf(key)}`, d: heads(pts, c), class: 'ar-head wired sp-off', opacity: 0 })];
+    return [m('path', { key: `w:${keyOf(key)}`, d: wireD(c), pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 0, class: 'ar-wire wired sp-off', opacity: 0 }), m('path', { key: `h:${keyOf(key)}`, d: heads(pts, c), class: 'ar-head wired sp-off', opacity: 0 })];
   });
   const saysMarks = [...everyWire.keys()].filter((key) => frames.some((f) => f.says.has(key))).map((key) => m('g', { key: `s:${keyOf(key)}`, class: 'ar-says sp-off', opacity: 0 }, m('rect', { key: `s:${keyOf(key)}:r`, rx: z('says_height') / 2 }), m('text', { key: `s:${keyOf(key)}:t` }, '')));
   const svg = m('svg', { key: 'svg', viewBox: `0 0 ${right - left} ${tall}`, role: 'img', 'aria-label': `How the system came to be, in ${frames.length} steps` }, placeMarks.map((p) => p.box), wireMarks, m('g', { key: 'breaks' }), saysMarks, placeMarks.map((p) => p.name), partMarks);
 
   // How a frame is reached: every mark set as that frame has it.
-  const shape = { frames, partAt, placeAt, wireAt, saysAt, keyOf, view, heads, pathOf, squareMorph, z, shift };
+  const shape = { frames, partAt, placeAt, wireAt, wireD, saysAt, keyOf, view, heads, pathOf, squareMorph, z, shift, looks: LOOKS.filter((l) => frames.some((f) => f.look === l)), dotsOf };
   const player = play({ answer, style, reduced, tools, shape });
-  const css = `${base}\n${storyLook}\n${(Object.entries(style.dots?.colours ?? {}))
-    .filter(([v, c]) => NAME.test(v) && NAME.test(String(c)))
-    .map(([v, c]) => `.ar-dot.k-${v}, .sp-swatch.k-${v} { fill: var(--${String(c).replaceAll('_', '-')}); background: var(--${String(c).replaceAll('_', '-')}); stroke: none; }`)
+  // The colour of each value a dot is coloured by, in the story's own look and in each other; an island is tinted with it.
+  const colours = [[null, style.dots], ...LOOKS.map((l) => [l, style.dots?.[l]])].flatMap(([look, dots]) => Object.entries(dots?.colours ?? {}).filter(([v, c]) => NAME.test(v) && NAME.test(String(c))).map(([v, c]) => [look ? `.sp-${look} ` : '', v, `var(--${String(c).replaceAll('_', '-')})`, look]));
+  const css = `${base}\n${storyLook}\n${colours
+    .map(([within, v, c, look]) => `${within}.ar-dot.k-${v}, ${within}.sp-swatch.k-${v} { fill: ${c}; background: ${c}; stroke: none; }${look ? `\n.ar-part.sp-${look} .ar-shape.k-${v} { stroke: ${c}; fill: color-mix(in srgb, ${c} var(--ln-arch-island-tint), var(--ln-land)); }` : ''}`)
     .join('\n')}`;
   // What a part or a place says of itself, in a tip beside it: its name as the step shows it, and its first line.
   const byId = new Map(answer.items.map((i) => [i.id, i]));

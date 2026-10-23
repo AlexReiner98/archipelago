@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { architectureCases } from './drawing-cases.ts';
-import { stepsShown } from '../src/lens-steps.ts';
+import { readSteps, stepsShown } from '../src/lens-steps.ts';
 import { serve } from './serve.ts';
 
 /** A small system on the map, its picture kept as a lens drawn as architecture. */
@@ -40,7 +40,7 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   const { p, l } = await system(call);
   const first = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).result.style.drawing;
   assert.equal(first.id, 'core.architecture');
-  assert.deepEqual(Object.keys(first.modules).sort(), ['index.js', 'layout.js', 'look.js', 'marks.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js']);
+  assert.deepEqual(Object.keys(first.modules).sort(), ['index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js']);
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
@@ -87,6 +87,13 @@ test('a picture with steps is sent them, and the finished parts they name, whate
 test('a published picture keeps its steps, naming only what it shows', () => {
   const steps = [{ add: ['e_shown000', 'e_hidden00'], titles: { e_shown000: 'Then', e_hidden00: 'Secret' }, flag: { e_hidden00: 'US' }, lit: [['e_shown000', 'e_hidden00'], ['e_shown000', 'e_shown001']] as [string, string][], lines: [{ by: 'Alex', text: 'Hello.' }] }];
   assert.deepEqual(stepsShown(steps, new Set(['e_shown000', 'e_shown001'])), [{ add: ['e_shown000'], titles: { e_shown000: 'Then' }, flag: {}, lit: [['e_shown000', 'e_shown001']], lines: [{ by: 'Alex', text: 'Hello.' }] }]);
+});
+
+test('steps keep a look and a pace, checked, and a reader is sent only what a step is known to say', () => {
+  assert.throws(() => readSteps([{ look: 'Islands!' }]), /a look is named/);
+  assert.throws(() => readSteps([{ quick: 'yes' }]), /quick is true or false/);
+  assert.equal(readSteps([{ look: 'islands', quick: true }, { look: null }]).length, 2);
+  assert.deepEqual(stepsShown([{ look: 'islands', quick: true, lines: [{ by: 'Agent', text: 'Hi.', secret: 1 } as any], kept: 'no' } as any], new Set()), [{ look: 'islands', quick: true, lines: [{ by: 'Agent', text: 'Hi.' }] }]);
 });
 
 const browser = chrome();

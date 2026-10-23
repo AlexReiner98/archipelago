@@ -22,6 +22,8 @@ export function health(item) {
   for (const [h, words] of Object.entries(HEALTH)) if (words.includes(item.status)) return h;
   return 'unknown';
 }
+/** Whether an item is closed because its work was done (not dropped, not retired). */
+export const finished = (item) => !item.open && HEALTH.ok.includes(item.status);
 /** A wire's state: what the link says of itself (props.state), else what its two ends make it. */
 export function wireState(link, a, b) {
   if (['wired', 'planned', 'broken'].includes(link.state)) return link.state;
