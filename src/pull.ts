@@ -1,5 +1,7 @@
 // The live map, here: `npm run pull` copies the map this machine is connected to (PELAGO_URL, with its agent
 // token) into the local server's data folder, so a change is tried on real data before it is pushed.
+// `npm run pull -- <name>` copies another map this machine is connected to instead: the MCP server of that name, as
+// Claude Code reaches it from here (.mcp.json, this project's servers in ~/.claude.json, then the user's).
 //
 // The copy acts on nothing outside: its automations are paused, and the secrets in it were sealed with the
 // hosted server's key, so here they read as not set. What was in the data folder is kept beside it, as
@@ -8,7 +10,8 @@
 // With the local server stopped, the copy goes in place at once. Under `npm run dev` the server is asked to
 // restart, and the copy goes in place while it is down. Under `npm start`, stop it first.
 
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parseBackup, restore } from './backup.ts';
 import { loadConfig } from './config.ts';
@@ -27,14 +30,43 @@ export function takePulled(dataDir: string): string | undefined {
   return kept;
 }
 
+type Server = { url?: string; headers?: Record<string, string> };
+const readJson = (file: string): any => {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return undefined;
+  }
+};
+
+/** A map this machine reaches under a name, as Claude Code does from cwd: its address and agent token, never printed. */
+export function connection(name: string, cwd = process.cwd(), home = homedir(), env = process.env): { url: string; token: string } | undefined {
+  const norm = (p: string) => `${p.replaceAll('\\', '/').replace(/\/$/, '').toLowerCase()}/`;
+  const user = readJson(join(home, '.claude.json')) ?? {};
+  // A project's servers apply in it and in every folder under it (a worktree of it too), the nearest first.
+  const projects = Object.entries((user.projects ?? {}) as Record<string, { mcpServers?: Record<string, Server> }>)
+    .filter(([dir]) => norm(cwd).startsWith(norm(dir)))
+    .sort(([a], [b]) => b.length - a.length)
+    .map(([, p]) => p.mcpServers);
+  const server: Server | undefined = [readJson(join(cwd, '.mcp.json'))?.mcpServers, ...projects, user.mcpServers].map((s) => s?.[name]).find(Boolean);
+  // As Claude Code reads it: ${NAME} and ${NAME:-default} from the environment.
+  const expand = (v = '') => v.replace(/\$\{(\w+)(?::-([^}]*))?\}/g, (_, k: string, d = '') => env[k] || d);
+  const url = expand(server?.url).replace(/\/mcp\/?$/, '');
+  const token = expand(Object.entries(server?.headers ?? {}).find(([k]) => k.toLowerCase() === 'authorization')?.[1]).replace(/^Bearer\s+/i, '');
+  return url && token ? { url, token } : undefined;
+}
+
 const fail = (why: string): never => {
   console.error(why);
   process.exit(1);
 };
 
 async function pull() {
-  const url = process.env.PELAGO_URL?.replace(/\/$/, '');
-  const token = process.env.PELAGO_AGENT_TOKEN;
+  const name = process.argv[2];
+  const named = name ? connection(name) : undefined;
+  if (name && !named) return fail(`No map named "${name}" is connected here: no MCP server of that name with an address and a token.`);
+  const url = (named?.url ?? process.env.PELAGO_URL)?.replace(/\/$/, '');
+  const token = named?.token ?? process.env.PELAGO_AGENT_TOKEN;
   if (!url || !token) return fail('This machine is not connected to a hosted map: PELAGO_URL and PELAGO_AGENT_TOKEN are set by the setup.');
   if (['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname)) return fail(`PELAGO_URL is this machine (${url}): there is nothing to pull.`);
   const { dataDir, port } = loadConfig();
