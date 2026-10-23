@@ -112,12 +112,16 @@ export function story({ answer, style, reduced }, tools) {
     while (t.length > 1 && measure(`${t}…`, px) > width) t = t.slice(0, -1);
     return `${t}…`;
   };
-  // Each step laid out with the one before it as its prior, a flagged part made wider by its flag.
+  // Each step laid out with the one before it as its prior, a flagged part made wider by its flag. A step that brings
+  // in more than it keeps is a new scene: laid out afresh, what it keeps moving to where that puts it.
   const states = statesOf(answer);
   const flagRoom = (w) => measure(w, z('text')) + z('text_after') / 2;
-  let prior;
+  let prior, was = new Set();
   const frames = states.map((s) => {
     const room = new Map([...s.flags].map(([id, w]) => [id, flagRoom(w)]));
+    const kept = [...s.ids].filter((id) => was.has(id)).length;
+    if (prior && s.ids.size - kept > kept) prior = undefined;
+    was = s.ids;
     const g = layout({ items: s.items, links: s.links, rootId: answer.lens.from, measure, sizes: style.sizes, prior, steady: true, room });
     prior = g.memo;
     return { ...s, g, parts: new Map(g.all.filter((n) => !n.dummy).map((n) => [n.id, n])), boxes: new Map(g.boxes.map((b) => [b.id, b])), wires: new Map(g.chains.map((c) => [c.key, c])) };
