@@ -103,17 +103,32 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
     seen.set(key, { a: l.from, b: l.to, link: l, ...(l.says && { says: l.says }), state: wireState(l, nodes.get(l.from).item, nodes.get(l.to).item) });
     edges.push(seen.get(key));
   }
-  // A loop is drawn with one wire turned back, so the rest still reads down the page.
+  // A loop is drawn with one wire turned back, so the rest still reads down the page. A wire both ways is no loop:
+  // it is laid out afterwards, in whichever way closes none.
   const colour = new Map();
   const visit = (id) => {
     colour.set(id, 1);
-    for (const e of edges.filter((f) => f.a === id)) {
+    for (const e of edges.filter((f) => f.a === id && !f.both)) {
       if (colour.get(e.b) === 1) ([e.a, e.b] = [e.b, e.a]), (e.back = true);
       else if (!colour.get(e.b)) visit(e.b);
     }
     colour.set(id, 2);
   };
   for (const id of nodes.keys()) if (!colour.get(id)) visit(id);
+  const laid = new Set(edges.filter((e) => !e.both));
+  const reaches = (from, to) => {
+    const been = new Set([from]), next = [from];
+    while (next.length) {
+      const id = next.pop();
+      if (id === to) return true;
+      for (const e of laid) if (e.a === id && !been.has(e.b)) (been.add(e.b), next.push(e.b));
+    }
+    return false;
+  };
+  for (const e of edges.filter((f) => f.both)) {
+    if (reaches(e.b, e.a)) [e.a, e.b] = [e.b, e.a];
+    laid.add(e);
+  }
 
   // ---- Places stacked. A place whose parts call into one other place, and are never called from it, sits wholly
   // above it and shares its span across: for the layout its parts are in that place's column (col), and each row of

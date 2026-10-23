@@ -82,6 +82,16 @@ test('two parts that call each other are one wire both ways, with an arrow at ea
   assert.deepEqual(heads.map(([, attrs]) => (attrs.d.match(/M/g) ?? []).length).sort(), [1, 2]);
 });
 
+test('a wire both ways is laid out the way that closes no loop, so none is turned back', () => {
+  // a → b → c, and c both ways with a: read as c → a it would close a loop.
+  for (const links of [[call('a', 'b'), call('b', 'c'), call('c', 'a'), call('a', 'c')], [call('a', 'b'), call('b', 'c'), call('a', 'c'), call('c', 'a')]]) {
+    const g = run([item('a'), item('b'), item('c')], links);
+    checks(g);
+    assert.ok(!g.chains.some((c: any) => c.back), 'no wire is turned back');
+    assert.ok(g.y.get('a') < g.y.get('b') && g.y.get('b') < g.y.get('c'), 'a above b above c');
+  }
+});
+
 test('what sits in a part, wired to nothing, is a mark on it', () => {
   const g = run([item('a'), item('b'), { ...item('t', 'a', 'todo'), kind: 'work' }], [call('a', 'b')]);
   assert.equal(g.nodes.has('t'), false);
