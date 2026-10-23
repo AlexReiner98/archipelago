@@ -85,9 +85,10 @@ export function play({ answer, style, reduced, tools, shape }) {
     const goneParts = was ? [...was.parts.keys()].filter((id) => !f.parts.has(id)) : [];
     const goneWires = was ? [...was.wires.keys()].filter((key) => !f.wires.has(key)) : [];
     if (dur && (goneParts.length || goneWires.length)) {
-      // First what goes: marked where it stands, then faded there, while nothing else moves.
+      // First what goes: marked where it stands, then faded there, while nothing else moves. A wire's words go with it.
+      const said = goneWires.filter((key) => was.says.has(key)).map((key) => `s:${keyOf(key)}`);
       send([...goneParts.map((id) => ({ key: `p:${id}`, toggle: { 'sp-gone': true, 'sp-new': false } })), ...goneWires.flatMap((key) => [`w:${keyOf(key)}`, `h:${keyOf(key)}`].map((w) => ({ key: w, toggle: { 'sp-gone': true, 'sp-new': false } })))]);
-      later(t('gone_hold'), () => send([...goneParts.map((id) => ({ key: `p:${id}`, set: { opacity: 0 }, over: t('gone_fade') })), ...goneWires.flatMap((key) => [`w:${keyOf(key)}`, `h:${keyOf(key)}`].map((w) => ({ key: w, set: { opacity: 0 }, over: t('gone_fade') })))]));
+      later(t('gone_hold'), () => send([...goneParts.map((id) => ({ key: `p:${id}`, set: { opacity: 0 }, over: t('gone_fade') })), ...[...goneWires.flatMap((key) => [`w:${keyOf(key)}`, `h:${keyOf(key)}`]), ...said].map((w) => ({ key: w, set: { opacity: 0 }, over: t('gone_fade') }))]));
       later(t('gone_hold') + t('gone_fade'), () => move(k, dur));
       return;
     }
