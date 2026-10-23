@@ -33,7 +33,7 @@ export function play({ answer, style, reduced, tools, shape }) {
   );
   const after = m(
     'div',
-    { class: 'sp-chat' },
+    { key: 'chat', class: 'sp-chat' },
     m('div', { class: 'sp-head' }, m('span', { class: 'sp-live' }), m('span', { class: 'grow' }), total !== undefined && m('span', { key: 'count', class: 'sp-count' }, ''), m('button', { key: 'play', on: ['click'] }, reduced ? 'Play' : 'Pause')),
     m('ol', { key: 'log', class: 'sp-log', 'aria-live': 'polite' }),
   );

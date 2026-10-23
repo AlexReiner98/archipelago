@@ -19,7 +19,11 @@ export const css = `
 .lf-surface { opacity: 0; transition: opacity 0.6s ease; border-radius: var(--radius-4); }
 .lf-surface.sp-on { opacity: 1; }
 svg.sp-deep { visibility: hidden; }
+/* At the end, the conversation folds away to the right: its words fade, then it closes, the picture taking the room. */
+.sp-chat { transition: flex-basis 0.9s ease 0.2s, flex-grow 0.9s ease 0.2s, min-width 0.9s ease 0.2s, margin 0.9s ease 0.2s, opacity 0.4s ease, border-color 0.4s ease; }
+.sp-chat.sp-away { flex: 0 0 0; min-width: 0; margin-left: calc(-1 * var(--space-8)); opacity: 0; border-color: transparent; overflow: hidden; }
 `;
+
 
 const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 const smooth = (a, b, x) => {
@@ -287,7 +291,7 @@ export function deep({ style, tools, z, num, shape }) {
       const eye = whole();
       (place(eye), sunOn(eye));
     };
-    surface.resized((now) => ((size = now), fitRenderer(), made && look(), draw()));
+    surface.resized((now) => ((size = now), fitRenderer(), made && (aloft ? (camera.aspect = size.width / Math.max(1, size.height), camera.updateProjectionMatrix(), cardFit()) : look()), draw()));
     const lift = z('deep_name_lift');
     const stand = () => {
       made.relief.scale.y = Math.max(0.02, rise);
@@ -315,6 +319,125 @@ export function deep({ style, tools, z, num, shape }) {
     // What moves at once is drawn with the rest of the step, once.
     const tween = (over, step) => (over > 0 ? (moving.add({ over, step }), run()) : step(1));
 
+    // ---- The end (a step's card): the eye rises and looks up, the sea falls away into space, stars come out, and the
+    // card's words stand in the sky.
+    const space = colour('relief_space', 'text');
+    scene.add(camera);
+    const stars = (() => {
+      // Scattered the same way every time (a small seeded generator), over the sky and a little below it.
+      let seed = 0x9e3779b9;
+      const next = () => ((seed = (Math.imul(seed ^ (seed >>> 15), 2246822507) + 0x6d2b79f5) >>> 0), seed / 4294967296);
+      const at = [];
+      for (let k = 0; k < 900; k++) {
+        const a = next() * Math.PI * 2, y = next() * 1.3 - 0.3, r = Math.sqrt(1 - Math.min(1, y * y));
+        at.push(Math.cos(a) * r, y, Math.sin(a) * r);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(at, 3));
+      const points = new THREE.Points(geo, new THREE.PointsMaterial({ color: colour('relief_top', 'panel'), size: 2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+      points.visible = false;
+      scene.add(points);
+      return points;
+    })();
+    /** The card's words, fixed to the eye: a name, and a line under it. */
+    let card = null;
+    const cardOf = ({ title, text }) => {
+      const ink = page.relief_top || lens.land;
+      const line = (words, px, weight) => {
+        const c = new OffscreenCanvas(1, 1), g = c.getContext('2d'), font = `${weight} ${px}px ${style.font || 'system-ui'}`;
+        g.font = font;
+        c.width = Math.ceil(g.measureText(words).width + px);
+        c.height = Math.ceil(px * 1.4);
+        g.font = font;
+        g.fillStyle = ink;
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText(words, c.width / 2, c.height / 2);
+        const map = new THREE.CanvasTexture(c);
+        map.colorSpace = THREE.SRGBColorSpace;
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, opacity: 0, depthTest: false, fog: false }));
+        sprite.renderOrder = 10;
+        camera.add(sprite);
+        return { sprite, aspect: c.width / c.height };
+      };
+      return [line(title, 160, 700), text && line(text, 56, 400)].filter(Boolean);
+    };
+    // Set in the middle of the picture, the name large and the line under it, each no wider than the picture allows.
+    const cardFit = () => {
+      if (!card) return;
+      const d = camera.near * 4, high = 2 * d * Math.tan((camera.fov * Math.PI) / 360), wide = high * camera.aspect;
+      card.forEach(({ sprite, aspect }, k) => {
+        let h = high * (k ? 0.055 : 0.15);
+        h = Math.min(h, (wide * 0.9) / aspect);
+        sprite.scale.set(h * aspect, h, 1);
+        sprite.position.set(0, high * (k ? -0.08 : 0.05), -d);
+      });
+    };
+    // aloft: on the way up or among the stars, where the eye is the flight's, not the map's.
+    let flight = 0, aloft = false;
+    /** How far into space: 0 at sea, 1 among the stars. */
+    const ascend = (k) => {
+      const sky = haze.clone().lerp(space, k);
+      (renderer.setClearColor(sky, 1), scene.fog.color.copy(sky));
+      stars.visible = k > 0;
+      stars.material.opacity = k;
+      stars.position.copy(camera.position);
+    };
+    /** The eye on its way up, `k` of the way: rising over the map while it looks down at it, then looking up to the sky
+     * as the sea falls away into space. */
+    const fly = (from, k) => {
+      const centre = new THREE.Vector3(from.cx, 0, from.cz);
+      const at = new THREE.Vector3(from.x, from.y + from.far * num('arch_deep_fly_up') * k, from.z + (from.cz - from.z) * 0.5 * k);
+      const sky = deg(num('arch_deep_fly_pitch')), s = smooth(0.3, 1, k);
+      const toward = centre.clone().sub(at).normalize().lerp(new THREE.Vector3(0, Math.sin(sky), -Math.cos(sky)), s).normalize();
+      camera.position.copy(at);
+      camera.far = from.far * 40;
+      camera.up.set(0, 1, 0);
+      camera.lookAt(at.clone().add(toward));
+      camera.updateProjectionMatrix();
+      // The map stays in sight while the eye rises and begins to look up; then the haze closes over it into space.
+      const away = at.distanceTo(centre), into = smooth(0.5, 1, k);
+      scene.fog.near = away * (1.1 - 0.9 * into);
+      scene.fog.far = away * (3 - 2 * into);
+      stars.scale.setScalar(from.far * 20);
+      ascend(into);
+    };
+    /** Back at sea: no stars, no words, the haze, and the conversation open. */
+    const land = () => {
+      flight++;
+      aloft = false;
+      tools.patch([{ key: 'chat', toggle: { 'sp-away': false } }]);
+      for (const { sprite } of card ?? []) sprite.material.opacity = 0;
+      ascend(0);
+    };
+    /** Rise to the card: over time after `wait`, or at once. */
+    const end = (words, wait) => {
+      const mine = ++flight;
+      card ??= cardOf(words);
+      const show = (k) => card.forEach(({ sprite }) => (sprite.material.opacity = k));
+      const fold = () => tools.patch([{ key: 'chat', toggle: { 'sp-away': true } }]);
+      // Up from the whole map, as the picture frames it then.
+      const start = () => {
+        aloft = true;
+        const eye = whole();
+        place(eye);
+        cardFit();
+        return { x: camera.position.x, y: camera.position.y, z: camera.position.z, far: eye.far, cx: eye.cx, cz: eye.cz };
+      };
+      if (!wait) return (fold(), fly(start(), 1), show(1), draw());
+      // The conversation folds away first, the map widening with the picture; then the flight, the words last.
+      setTimeout(() => {
+        if (mine !== flight) return;
+        fold();
+        setTimeout(() => {
+          if (mine !== flight) return;
+          const from = start();
+          tween(num('arch_deep_fly'), (k) => mine === flight && fly(from, k));
+          setTimeout(() => mine === flight && tween(num('arch_deep_card_in'), (k) => mine === flight && show(k)), num('arch_deep_fly') * 0.7);
+        }, num('arch_deep_fold'));
+      }, wait);
+    };
+
     return {
       /** Frame f in relief: the rest moves to how f has it over `dur`; `enter` comes from above, the land rising. */
       show(f, dur, enter) {
@@ -330,12 +453,15 @@ export function deep({ style, tools, z, num, shape }) {
         }
         // The boats sail to the work they have under way.
         boats.sail(f.boats ?? [], enter && !dur ? 0 : num('arch_deep_sail'));
+        if (enter || !f.step.card) land();
         if (enter && dur) {
           // From above, flat, where the picture was; then down to the water while the land rises.
           ((tilt = 0), (rise = 0), stand(), look(), draw());
           tween(num('arch_deep_rise'), (k) => ((tilt = k), (rise = k), stand(), look()));
         } else if (enter) ((tilt = 1), (rise = 1), stand(), look(), draw());
         else draw();
+        // A card: once the boats are home, up into space and the words.
+        if (f.step.card) end(f.step.card, dur ? num('arch_deep_card_after') : 0);
       },
     };
   }

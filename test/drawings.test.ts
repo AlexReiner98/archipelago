@@ -96,6 +96,13 @@ test('steps keep a look and a pace, checked, and a reader is sent only what a st
   assert.deepEqual(stepsShown([{ look: 'islands', quick: true, lines: [{ by: 'Agent', text: 'Hi.', secret: 1 } as any], kept: 'no' } as any], new Set()), [{ look: 'islands', quick: true, lines: [{ by: 'Agent', text: 'Hi.' }] }]);
 });
 
+test('a card is what a story ends on: a name of a few words and a line, sent to readers as it is kept', () => {
+  assert.throws(() => readSteps([{ card: { text: 'No name' } }]), /a card has a title/);
+  assert.throws(() => readSteps([{ card: { title: 'x'.repeat(61) } }]), /a card has a title/);
+  const steps = [{ card: { title: 'Archipelago', text: 'Knowledge is power.' } }];
+  assert.deepEqual(stepsShown(readSteps(steps), new Set()), steps);
+});
+
 const browser = chrome();
 const GOLDEN = join(import.meta.dirname, 'fixtures', 'drawings', `architecture.golden.${process.platform}.json`);
 

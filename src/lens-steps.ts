@@ -1,7 +1,7 @@
 // A lens's steps: how the picture came to be, step by step, ending on the map as it is (the lens type's `steps`).
 // Each step changes the one before it, from nothing: what it adds and takes away, the titles and fields things had
 // then (a status among them), the words flagged on them, the chapter it starts, what was said, the look it is drawn
-// in from then on, and whether it goes by quickly. The last step is the map as it is, whatever
+// in from then on, whether it goes by quickly, and the words a story ends on (a card). The last step is the map as it is, whatever
 // the steps before it say. The kernel reads nothing in them but the items they name, which are sent with the picture
 // even when finished (a part that is gone is told of); how they are played is the drawing's.
 
@@ -25,11 +25,14 @@ export interface Step {
   look?: string | null;
   /** Played at a fast-forward pace, not waiting for its lines. */
   quick?: boolean;
+  /** Words the picture ends on after this step, a name and a line: "Archipelago", and what it is for. */
+  card?: { title: string; text?: string };
 }
 
 const MOST_STEPS = 100;
 const MOST_LINE = 240;
 const LOOK = /^[a-z][a-z0-9_]{0,30}$/;
+const MOST_TITLE = 60;
 
 /** The steps a lens keeps, checked: a sentence on what is wrong, else the steps. */
 export function readSteps(value: unknown): Step[] {
@@ -45,6 +48,7 @@ export function readSteps(value: unknown): Step[] {
     if (s.chapter !== undefined && typeof s.chapter?.name !== 'string') throw new Error(`${at}: a chapter has a name`);
     if (s.look !== undefined && s.look !== null && !(typeof s.look === 'string' && LOOK.test(s.look))) throw new Error(`${at}: a look is named in a word of small letters, such as "islands"`);
     if (s.quick !== undefined && typeof s.quick !== 'boolean') throw new Error(`${at}: quick is true or false`);
+    if (s.card !== undefined && !(typeof s.card?.title === 'string' && s.card.title.length <= MOST_TITLE && (s.card.text === undefined || (typeof s.card.text === 'string' && s.card.text.length <= MOST_LINE)))) throw new Error(`${at}: a card has a title of ${MOST_TITLE} characters at most, and may have a line of text`);
     for (const line of s.lines ?? []) if (typeof line?.by !== 'string' || typeof line?.text !== 'string' || line.text.length > MOST_LINE) throw new Error(`${at}: each line says by whom and what, in ${MOST_LINE} characters at most`);
   });
   return value as Step[];
@@ -67,6 +71,7 @@ export function stepsShown(steps: Step[], shown: Set<string>): Step[] {
     ...(s.lines && { lines: s.lines.map((l) => ({ by: l.by, text: l.text })) }),
     ...(s.look !== undefined && { look: s.look }),
     ...(s.quick && { quick: true }),
+    ...(s.card && { card: { title: s.card.title, ...(s.card.text !== undefined && { text: s.card.text }) } }),
     ...(s.add && { add: s.add.filter((id) => shown.has(id)) }),
     ...(s.remove && { remove: s.remove.filter((id) => shown.has(id)) }),
     ...(s.titles && { titles: only(s.titles) }),
