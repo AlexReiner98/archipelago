@@ -105,7 +105,7 @@ test('with less motion asked for, it is the last step at once, and all that was 
   assert.equal(sent.length, 0);
   await new Promise((r) => setTimeout(r, 10));
   end();
-  assert.ok(scene.before && scene.after && scene.svg);
+  assert.ok(scene.before && scene.aside && scene.svg);
   assert.equal(sent.find((p) => p.key === 'count')?.text, '341 of 341');
   assert.equal(sent.filter((p) => p.append).length, answer.steps.reduce((n: number, s: any) => n + (s.lines?.length ?? 0) + (s.chapter ? 1 : 0), 0));
   const shown = new Set(sent.filter((p) => p.key?.startsWith('p:') && p.key.split(':').length === 2 && p.set?.opacity === 1).map((p) => p.key.slice(2)));

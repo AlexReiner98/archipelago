@@ -5,12 +5,12 @@
 // is stopped, and reaches nothing.
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { architectureCases } from './drawing-cases.ts';
-import { stepsShown } from '../src/lens-steps.ts';
+import { architectureCases, flowCases } from './drawing-cases.ts';
+import { readSteps, stepsShown } from '../src/lens-steps.ts';
 import { serve } from './serve.ts';
 
 /** A small system on the map, its picture kept as a lens drawn as architecture. */
@@ -40,14 +40,14 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   const { p, l } = await system(call);
   const first = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).result.style.drawing;
   assert.equal(first.id, 'core.architecture');
-  assert.deepEqual(Object.keys(first.modules).sort(), ['index.js', 'layout.js', 'look.js', 'marks.js', 'play.js', 'route.js', 'story-look.js', 'story.js']);
+  assert.deepEqual(Object.keys(first.modules).sort(), ['boards.js', 'boats.js', 'deep.js', 'index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'moves.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js']);
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
   assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', hash: first.hash });
-  // What holds an item is drawn as a flow, which no drawing draws yet: no drawing is sent.
+  // What holds an item is drawn as a flow, by the core pack's flow drawing.
   const holding = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: 'holding' } })).result.style;
-  assert.equal(holding.drawing, undefined);
+  assert.equal(holding.drawing.id, 'core.flow');
 
   // The owner's version changes one module; the rest are the pack's.
   const look = 'export const css = `.ar-part { cursor: help; }`;\n';
@@ -85,12 +85,55 @@ test('a picture with steps is sent them, and the finished parts they name, whate
 });
 
 test('a published picture keeps its steps, naming only what it shows', () => {
-  const steps = [{ add: ['e_shown000', 'e_hidden00'], titles: { e_shown000: 'Then', e_hidden00: 'Secret' }, flag: { e_hidden00: 'US' }, lines: [{ by: 'Alex', text: 'Hello.' }] }];
-  assert.deepEqual(stepsShown(steps, new Set(['e_shown000'])), [{ add: ['e_shown000'], titles: { e_shown000: 'Then' }, flag: {}, lines: [{ by: 'Alex', text: 'Hello.' }] }]);
+  const steps = [{ add: ['e_shown000', 'e_hidden00'], titles: { e_shown000: 'Then', e_hidden00: 'Secret' }, flag: { e_hidden00: 'US' }, lit: [['e_shown000', 'e_hidden00'], ['e_shown000', 'e_shown001']] as [string, string][], lines: [{ by: 'Alex', text: 'Hello.' }] }];
+  assert.deepEqual(stepsShown(steps, new Set(['e_shown000', 'e_shown001'])), [{ add: ['e_shown000'], titles: { e_shown000: 'Then' }, flag: {}, lit: [['e_shown000', 'e_shown001']], lines: [{ by: 'Alex', text: 'Hello.' }] }]);
+});
+
+test('steps keep a look and a pace, checked, and a reader is sent only what a step is known to say', () => {
+  assert.throws(() => readSteps([{ look: 'Islands!' }]), /a look is named/);
+  assert.throws(() => readSteps([{ quick: 'yes' }]), /quick is true or false/);
+  assert.equal(readSteps([{ look: 'islands', quick: true }, { look: null }]).length, 2);
+  assert.deepEqual(stepsShown([{ look: 'islands', quick: true, lines: [{ by: 'Agent', text: 'Hi.', secret: 1 } as any], kept: 'no' } as any], new Set()), [{ look: 'islands', quick: true, lines: [{ by: 'Agent', text: 'Hi.' }] }]);
+});
+
+test('a card is what a story ends on: a name of a few words and a line, sent to readers as it is kept', () => {
+  assert.throws(() => readSteps([{ card: { text: 'No name' } }]), /a card has a title/);
+  assert.throws(() => readSteps([{ card: { title: 'x'.repeat(61) } }]), /a card has a title/);
+  const steps = [{ card: { title: 'Archipelago', text: 'Knowledge is power.' } }];
+  assert.deepEqual(stepsShown(readSteps(steps), new Set()), steps);
 });
 
 const browser = chrome();
 const GOLDEN = join(import.meta.dirname, 'fixtures', 'drawings', `architecture.golden.${process.platform}.json`);
+const FLOW_GOLDEN = join(import.meta.dirname, 'fixtures', 'drawings', `flow.golden.${process.platform}.json`);
+
+test('in a browser, the flow drawing draws what the kernel drew: the same marks, looks, hovering, lighting and key', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { call, base } = await serve('off');
+  const { p } = await system(call);
+  // The pack's flow drawing, as a picture of what holds an item is sent it.
+  const { drawing } = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: 'holding' } })).result.style;
+  const page = await open(`${base}/`);
+  try {
+    await page.evaluate(readFileSync(join(import.meta.dirname, 'drawing-capture.js'), 'utf8'));
+    const cases = flowCases().map((c) => ({ ...c, style: { ...c.style, drawing } }));
+    const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
+    for (const c of cases) assert.ok(now[c.name].html.includes('lf-step'), `${c.name} is drawn: ${now[c.name].html.slice(0, 200)}`);
+    // What the kernel's own flow drew (ui/flow.js, until 23 Oct 2026), on a machine like this one. A change meant to
+    // draw otherwise keeps what it now draws, with GOLDEN_WRITE=1.
+    if (process.env.GOLDEN_WRITE) writeFileSync(FLOW_GOLDEN, `${JSON.stringify(now)}\n`);
+    else if (existsSync(FLOW_GOLDEN)) {
+      const was = JSON.parse(readFileSync(FLOW_GOLDEN, 'utf8'));
+      for (const name of Object.keys(was)) {
+        const [a, b] = [was[name], now[name]];
+        assert.equal(b.html, a.html, `${name}: the marks`);
+        assert.deepEqual(b.styles.map((k: number) => b.looks[k]), a.styles.map((k: number) => a.looks[k]), `${name}: the looks`);
+        for (const k of ['hover', 'after_hover', 'dim', 'key']) assert.deepEqual(b[k], a[k], `${name}: ${k}`);
+      }
+    }
+  } finally {
+    page.close();
+  }
+});
 
 test('in a browser, the architecture drawing draws what the kernel drew: the same marks, looks, hovering, lighting and key', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
@@ -102,8 +145,10 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
     const cases = architectureCases().map((c) => ({ ...c, style: { ...c.style, drawing } }));
     const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
     for (const c of cases) assert.ok(now[c.name].html.includes('ar-part'), `${c.name} is drawn: ${now[c.name].html.slice(0, 200)}`);
-    // Text is measured by the fonts of the machine: compared with what was drawn on one like it.
-    if (existsSync(GOLDEN)) {
+    // Text is measured by the fonts of the machine: compared with what was drawn on one like it. A change meant to
+    // draw otherwise keeps what it now draws, with GOLDEN_WRITE=1.
+    if (process.env.GOLDEN_WRITE) writeFileSync(GOLDEN, `${JSON.stringify(now)}\n`);
+    else if (existsSync(GOLDEN)) {
       const was = JSON.parse(readFileSync(GOLDEN, 'utf8'));
       for (const name of Object.keys(was)) {
         const [a, b] = [was[name], now[name]];
@@ -199,6 +244,49 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       return host.textContent;
     })()`);
     assert.match(String(stopped), /did not answer for 12 seconds/);
+  } finally {
+    page.close();
+  }
+});
+
+test('in a browser, a drawing that asks for a surface paints pixels over its picture, and reaches nothing more', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base } = await serve('off');
+  const page = await open(`${base}/`);
+  try {
+    // One paints its surface red and says what it was given; one whose scene asks for no surface is given none.
+    const painter = `export async function picture(input, tools) {
+      setTimeout(async () => {
+        const s = await tools.surface();
+        s.canvas.width = 4; s.canvas.height = 4;
+        const g = s.canvas.getContext('2d'); g.fillStyle = 'red'; g.fillRect(0, 0, 4, 4); s.show();
+        const three = typeof (await s.three()).WebGLRenderer;
+        tools.patch([{ key: 's', toggle: { ['got-' + s.canvas.constructor.name]: true, ['doc-' + typeof document]: true, ['three-' + three]: true, ['sized-' + (s.size.width > 0)]: true } }]);
+      }, 10);
+      return { scene: { svg: ['svg', { width: 40, height: 40 }], surface: { key: 's' } } };
+    }`;
+    const plain = `export async function picture(input, tools) { setTimeout(async () => { const s = await tools.surface(); tools.patch([{ key: 'svg', toggle: { ['none-' + (s === null)]: true } }]); }, 10); return { scene: { svg: ['svg', { key: 'svg' }] } }; }`;
+    const got: any = await page.evaluate(`(async () => {
+      const { drawWith } = await import('/drawing.js');
+      const draw = async (name, code, done) => {
+        const host = document.createElement('div');
+        document.body.append(host);
+        drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
+        for (let n = 0; n < 400 && !done(host); n++) await new Promise((r) => setTimeout(r, 25));
+        return host;
+      };
+      const a = await draw('painter', ${JSON.stringify(painter)}, (h) => h.querySelector('canvas.lf-surface')?.className.includes('got-'));
+      const b = await draw('plain', ${JSON.stringify(plain)}, (h) => h.querySelector('svg')?.getAttribute('class')?.includes('none-'));
+      const c = a.querySelector('canvas.lf-surface'), seen = document.createElement('canvas');
+      seen.width = seen.height = 4;
+      seen.getContext('2d').drawImage(c, 0, 0, 4, 4);
+      return { cls: c?.className, inside: a.contains(c), pixel: [...seen.getContext('2d').getImageData(1, 1, 1, 1).data], said: a.textContent, plain: b.querySelector('svg')?.getAttribute('class'), surfaces: b.querySelectorAll('canvas').length };
+    })()`);
+    assert.doesNotMatch(got.said, /This drawing stopped/, 'the painter was not stopped');
+    for (const cls of ['got-OffscreenCanvas', 'doc-undefined', 'three-function', 'sized-true']) assert.ok(got.cls.includes(cls), `${cls} in ${got.cls}`);
+    assert.ok(got.inside, 'the surface is inside the picture');
+    assert.deepEqual(got.pixel, [255, 0, 0, 255], 'what it painted is shown');
+    assert.match(got.plain, /none-true/);
+    assert.equal(got.surfaces, 0);
   } finally {
     page.close();
   }

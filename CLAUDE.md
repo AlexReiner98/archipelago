@@ -94,14 +94,16 @@ where, and how that server is run.
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
   Postgres server; model calls are plain fetch, in `src/model.ts`) unless the owner agrees to another. One library is kept as a file, not a
   dependency: `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
-  2026 at the owner's asking), offered to a style's own drawing code and
-  loaded only when one asks for it. The app's own pages do not use it.
+  2026 at the owner's asking), offered to a style's own drawing code and to
+  a drawing that paints on a surface (`ui/surface.js`, since 23 Oct 2026, for
+  the landing page's relief), loaded only when one asks for it, in the
+  sandbox. The app's own pages do not use it.
 - **A style's code runs behind two walls, and only there.** A style item may
   carry a drawing module (`code`). It runs in a worker inside the sandboxed
   frame `ui/draw.html`, never in the app's page; an agent that writes one
   proposes it, whatever the workspace lets agents do unreviewed. Do not give
   that code a page to touch, a way to the network, or anything typed. After
-  changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js` or the frame's policy in
+  changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
   `src/server.ts`, run a hostile style against it in a real browser (the
   browser pane will not load a sandboxed frame); `test/drawings.test.ts`
   does, in headless Chrome.

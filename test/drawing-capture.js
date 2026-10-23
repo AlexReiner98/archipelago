@@ -37,7 +37,7 @@ window.captureDrawings = async (shape, cases) => {
     const record = { html: host.innerHTML, styles: els.map((el) => { const cs = getComputedStyle(el); const look = PROPS.map((p) => cs.getPropertyValue(p)).join('|'); if (!looks.includes(look)) looks.push(look); return looks.indexOf(look); }), looks };
     // Hovering a part lights its wires; leaving puts them back.
     record.hover = [];
-    for (const part of [...host.querySelectorAll('.ar-part')].slice(0, 4)) {
+    for (const part of [...host.querySelectorAll('.ar-part, .lf-step')].slice(0, 4)) {
       part.dispatchEvent(new MouseEvent('mouseenter'));
       await settle(host);
       record.hover.push(indexOf(host, [...host.querySelectorAll('.lit')]));

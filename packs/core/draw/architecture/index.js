@@ -7,6 +7,7 @@
 // every name is in the page and every part a link. Its look is ./look.js, in the lens's colours.
 
 import { layout } from './layout.js';
+import { partBoxes, saysSpots } from './says.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
 import { story } from './story.js';
@@ -99,30 +100,20 @@ export function picture({ answer, style, reduced }, tools) {
   const wireLayer = g.chains.map((c, n) => {
     const d = `M${c.points.map((p) => p.join(' ')).join('L')}`;
     const path = m('path', { key: `w:${n}`, d, class: `ar-wire ${c.state}` });
-    // A wire drawn turned back (a loop) has its arrow at its start, pointing up at what is called.
-    const [ex, ey] = c.back ? c.points[0] : c.points.at(-1);
-    const head = m('path', { key: `h:${n}`, d: c.back ? `M${ex} ${ey}L${ex - 4.5} ${ey + 9}L${ex + 4.5} ${ey + 9}Z` : `M${ex} ${ey}L${ex - 4.5} ${ey - 9}L${ex + 4.5} ${ey - 9}Z`, class: `ar-head ${c.state}` });
+    // A wire drawn turned back (a loop) has its arrow at its start, pointing up at what is called; one both ways has
+    // an arrow at each end.
+    const up = ([ex, ey]) => `M${ex} ${ey}L${ex - 4.5} ${ey + 9}L${ex + 4.5} ${ey + 9}Z`, down = ([ex, ey]) => `M${ex} ${ey}L${ex - 4.5} ${ey - 9}L${ex + 4.5} ${ey - 9}Z`;
+    const ends = c.back ? [up(c.points[0]), down(c.points.at(-1))] : [down(c.points.at(-1)), up(c.points[0])];
+    const head = m('path', { key: `h:${n}`, d: c.both ? ends.join('') : ends[0], class: `ar-head ${c.state}` });
     const [from, to] = c.back ? [c.b, c.a] : [c.a, c.b];
-    const hit = titled(m('path', { key: `x:${n}`, on: ['enter', 'leave'], d, class: 'ar-hit' }), [`${g.nodes.get(from).item.title} → ${g.nodes.get(to).item.title}`, c.says, said(WIRES, c.state)].filter(Boolean).join('\n'));
+    const hit = titled(m('path', { key: `x:${n}`, on: ['enter', 'leave'], d, class: 'ar-hit' }), [`${g.nodes.get(from).item.title} ${c.both ? '↔' : '→'} ${g.nodes.get(to).item.title}`, c.says, said(WIRES, c.state)].filter(Boolean).join('\n'));
     wires.push(c);
     if (c.says) labels.push({ c, text: fit(c.says, z('says_most'), SAYS_TEXT) });
     return [path, head, hit];
   });
-  // What a wire carries is written on it where there is room: on its drop into what it calls when nothing else
-  // drops there, else on its drop from the caller, else on its run across; otherwise only in its tooltip.
-  const once = (list, v) => list.filter((p) => p === v).length === 1;
-  const heads = g.chains.map((c) => c.points.at(-1)[0]), feet = g.chains.map((c) => c.points[0][0]);
-  // A place's name is never written over.
-  const placed = g.boxes.map((b) => [b.x + Math.min(b.w, measure(b.item.title, PLACE_TEXT) + z('place_name_room')) / 2, b.y + z('place_name_inset') + z('place_name_height') / 2, Math.min(b.w, measure(b.item.title, PLACE_TEXT) + z('place_name_room'))]);
-  const labelLayer = labels.flatMap(({ c, text }) => {
-    const w = measure(text, SAYS_TEXT) + 2 * z('says_pad'), p = c.points;
-    const spots = [once(heads, p.at(-1)[0]) && [p.at(-1)[0], (p.at(-2)[1] + p.at(-1)[1]) / 2], once(feet, p[0][0]) && [p[0][0], (p[0][1] + p[1][1]) / 2], Math.abs(p[2][0] - p[1][0]) > w + 16 && [(p[1][0] + p[2][0]) / 2, p[1][1]]].filter(Boolean);
-    const spot = spots.find(([lx, ly]) => !placed.some(([px, py, pw]) => Math.abs(px - lx) < (pw + w) / 2 + 4 && Math.abs(py - ly) < 16));
-    if (!spot) return [];
-    placed.push([...spot, w]);
-    const [lx, ly] = spot;
-    return [m('g', { class: `ar-says ${c.state}` }, m('rect', { x: lx - w / 2, y: ly - z('says_height') / 2, width: w, height: z('says_height'), rx: z('says_height') / 2 }), m('text', { x: lx, y: ly }, text))];
-  });
+  const labelLayer = saysSpots({ labels, chains: g.chains, boxes: g.boxes, parts: partBoxes(g), measure, z }).map(({ c, text, x: lx, y: ly, w }) =>
+    m('g', { class: `ar-says ${c.state}` }, m('rect', { x: lx - w / 2, y: ly - z('says_height') / 2, width: w, height: z('says_height'), rx: z('says_height') / 2 }), m('text', { x: lx, y: ly }, text)),
+  );
   const breakLayer = g.breaks.map(([bx, by]) => m('g', { class: 'ar-break' }, m('rect', { x: bx - 3, y: by - 8, width: 6, height: 16 }), m('path', { d: `M${bx - 6} ${by}H${bx + 6}` })));
   // Last, the parts over all of it.
   const partLayer = parts.map((n) => {

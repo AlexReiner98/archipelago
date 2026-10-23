@@ -8,6 +8,7 @@
 // picture's data with nothing private in it and nothing that names a person or a session.
 
 import { authorityOf } from './authority.ts';
+import { drawingFor } from './drawings.ts';
 import { stepsShown } from './lens-steps.ts';
 import { lens } from './lens.ts';
 import { notify } from './notify.ts';
@@ -160,7 +161,30 @@ export async function publishedState(l: Archipelago, id: string) {
 export async function publishedDocument(l: Archipelago, id: string) {
   if (!ID.test(id)) return null;
   const { rows } = await l.forAnyone().db.query<{ doc: Record<string, unknown> | null }>(`select pelago_published($1, $2::text[]) as doc`, [id, readable(l)]);
-  return rows[0]?.doc ?? null;
+  return withDrawings(l, rows[0]?.doc ?? null);
+}
+
+/** The shapes a published page draws with the app's own code; any other is a pack's drawing. */
+const PAGE_SHAPES = ['grid', 'time'];
+/**
+ * A published document with a drawing for each picture frozen before its shape had one: the pack's own drawing for
+ * that shape, or the flow's, as the page drew such a picture then. A page published since keeps the drawing it was
+ * published with.
+ */
+function withDrawings(l: Archipelago, doc: Record<string, unknown> | null) {
+  const lenses = doc?.lenses as Record<string, { lens?: { time?: unknown }; style?: Record<string, unknown> }> | undefined;
+  if (!doc || !lenses) return doc;
+  const given = Object.fromEntries(
+    Object.entries(lenses).map(([id, frozen]) => {
+      const style = frozen.style ?? {};
+      if (style.drawing || (typeof style.code === 'string' && style.code.trim())) return [id, frozen];
+      const shape = frozen.lens?.time && !PAGE_SHAPES.includes(String(style.shape)) && style.shape !== 'flow' ? 'time' : String(style.shape);
+      if (PAGE_SHAPES.includes(shape)) return [id, frozen];
+      const drawing = drawingFor(l.registry, { shape }, []) ?? drawingFor(l.registry, { shape: 'flow' }, []);
+      return [id, drawing ? { ...frozen, style: { ...style, drawing } } : frozen];
+    }),
+  );
+  return { ...doc, lenses: given };
 }
 
 /** The figure of one section a published document holds, or null. */
@@ -177,7 +201,7 @@ export async function publishedPicture(l: Archipelago, id: string, section: stri
 export async function publishedAt(l: Archipelago, path: string) {
   if (!PATH.test(path)) return null;
   const { rows } = await l.forAnyone().db.query<{ doc: Record<string, unknown> | null }>(`select pelago_published_at($1, $2::text[]) as doc`, [path, readable(l)]);
-  return rows[0]?.doc ?? null;
+  return withDrawings(l, rows[0]?.doc ?? null);
 }
 
 /** A site's published pages, for its header and its sitemap: id, title as published, path and place. */

@@ -1,4 +1,4 @@
-// A process map’s layout, apart from its drawing: which items of a lens answer are steps, the wires between them,
+// A process map’s layout, apart from its drawing (the core pack's flow drawing, index.js): which items of a lens answer are steps, the wires between them,
 // and where each sits. A step leads to another when the other depends on it; the steps are laid out by Sugiyama’s
 // method (layers by longest path, a waypoint where a wire passes a layer, barycentre sweeps and sifting for the
 // order, a step with room to sit lower moved down where that takes crossings away) and the wires routed at right

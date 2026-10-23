@@ -1,13 +1,13 @@
-// The steps of a story played, as patches to its marks (story.js): what a step takes away goes first, marked where it
-// stands and then faded, while nothing else moves; then the rest move to where they go and what is new comes in, in
-// the accent for a while, its wires drawn in. Beside the picture: the chapters (a rail) and what was said (a
-// conversation), a line at a time. It plays on its own; a chapter can be chosen; with less motion asked for, it is
-// the last step at once. Every time is the style's (numbers, arch_story_*).
+// The steps of a story played: above the picture, the chapters (a rail); beside it, what was said (a conversation), a
+// line at a time; and each step shown on the picture's own stage (`shape.stage`: the architecture's moves.js, the
+// flow's reveal). It plays on its own, a quick step at a fast-forward pace; a chapter can be chosen; with less motion
+// asked for, it is the last step at once. Once a step changes the look, the key is the look's. Every time is the
+// style's (numbers, arch_story_*). Shared by the drawings that tell stories.
 
 import { m } from './marks.js';
 
 export function play({ answer, style, reduced, tools, shape }) {
-  const { frames, partAt, placeAt, wireAt, keyOf, view, arrow, pathOf, squareMorph, shift } = shape;
+  const { frames, keyLooks = [], dotsOf = () => null } = shape;
   const t = (name) => {
     const v = style.numbers?.[`arch_story_${name}`];
     if (typeof v !== 'number') throw new Error(`The style names no number "arch_story_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
@@ -17,17 +17,23 @@ export function play({ answer, style, reduced, tools, shape }) {
   const chapters = steps.flatMap((s, k) => (s.chapter ? [{ ...s.chapter, at: k }] : []));
   const total = chapters.at(-1)?.count;
 
-  // ---- Above the picture: the chapters, and what each dot says. Below it: the conversation.
-  const names = style.dots?.names ?? {};
+  // ---- Above the picture: the chapters, and what each dot says. Beside it: the conversation.
+  // A key for the story's own look and one for each other look it changes to, each shown while its look is.
+  const keyFor = (look) => {
+    const names = dotsOf(look)?.names ?? {}, order = Array.isArray(dotsOf(look)?.order) ? dotsOf(look).order.map(String) : [];
+    // In the order the dots give, then the rest.
+    const values = [...order.filter((v) => v in names), ...Object.keys(names).filter((v) => !order.includes(v))];
+    return values.length > 0 && m('ul', { key: `key:${look ?? ''}`, class: `sp-key${look ? ` sp-${look} sp-hide` : ''}` }, values.map((v) => m('li', {}, m('span', { class: `sp-swatch k-${v}` }), String(names[v]))));
+  };
   const before = m(
     'div',
     { class: 'sp-top' },
     chapters.length > 0 && m('div', { class: 'sp-rail' }, chapters.map((c, k) => m('button', { key: `c:${k}`, on: ['click'], class: 'sp-era', title: [c.name, c.when].filter(Boolean).join(', ') }, m('b', {}, c.name), c.when && m('small', {}, c.when)))),
-    Object.keys(names).length > 0 && m('ul', { class: 'sp-key' }, Object.entries(names).map(([v, label]) => m('li', {}, m('span', { class: `sp-swatch k-${v}` }), String(label)))),
+    [null, ...keyLooks].map(keyFor),
   );
   const after = m(
     'div',
-    { class: 'sp-chat' },
+    { key: 'chat', class: 'sp-chat' },
     m('div', { class: 'sp-head' }, m('span', { class: 'sp-live' }), m('span', { class: 'grow' }), total !== undefined && m('span', { key: 'count', class: 'sp-count' }, ''), m('button', { key: 'play', on: ['click'] }, reduced ? 'Play' : 'Pause')),
     m('ol', { key: 'log', class: 'sp-log', 'aria-live': 'polite' }),
   );
@@ -37,7 +43,6 @@ export function play({ answer, style, reduced, tools, shape }) {
   const later = (ms, fn) => timers.push(setTimeout(fn, ms));
   const stop = () => (timers.forEach(clearTimeout), (timers = []));
   const send = (list) => list.length && tools.patch(list);
-  const shown = new Map(); // what each wire's route is now
 
   const kept = t('lines_kept');
   const say = (kind, text, by) => {
@@ -79,73 +84,24 @@ export function play({ answer, style, reduced, tools, shape }) {
     send(list);
   };
 
-  /** Show step k: over `dur` milliseconds, or at once. */
-  const apply = (k, dur) => {
-    const was = cur >= 0 ? frames[cur] : null, f = frames[k];
-    const goneParts = was ? [...was.parts.keys()].filter((id) => !f.parts.has(id)) : [];
-    const goneWires = was ? [...was.wires.keys()].filter((key) => !f.wires.has(key)) : [];
-    if (dur && (goneParts.length || goneWires.length)) {
-      // First what goes: marked where it stands, then faded there, while nothing else moves.
-      send([...goneParts.map((id) => ({ key: `p:${id}`, toggle: { 'sp-gone': true, 'sp-new': false } })), ...goneWires.flatMap((key) => [`w:${keyOf(key)}`, `h:${keyOf(key)}`].map((w) => ({ key: w, toggle: { 'sp-gone': true, 'sp-new': false } })))]);
-      later(t('gone_hold'), () => send([...goneParts.map((id) => ({ key: `p:${id}`, set: { opacity: 0 }, over: t('gone_fade') })), ...goneWires.flatMap((key) => [`w:${keyOf(key)}`, `h:${keyOf(key)}`].map((w) => ({ key: w, set: { opacity: 0 }, over: t('gone_fade') })))]));
-      later(t('gone_hold') + t('gone_fade'), () => move(k, dur));
-      return;
-    }
-    move(k, dur);
-  };
-  const away = (k) => k > 0 && ([...frames[k - 1].parts.keys()].some((id) => !frames[k].parts.has(id)) || [...frames[k - 1].wires.keys()].some((key) => !frames[k].wires.has(key)));
-
-  const move = (k, dur) => {
-    const was = cur >= 0 ? frames[cur] : null, f = frames[k];
-    const list = [], fresh = [];
-    const over = dur ? { over: dur } : {};
-    for (const [id, n] of f.parts) {
-      const at = partAt(n, f), key = `p:${id}`, there = was?.parts.has(id);
-      if (there && dur) list.push({ key: `${key}:r`, set: at.r, ...over }, { key: `${key}:d`, set: { cx: at.d.cx, cy: at.d.cy }, ...over }, { key: `${key}:t`, set: at.t, ...over }, { key: `${key}:f`, set: at.f, ...over });
-      else list.push({ key: `${key}:r`, set: at.r }, { key: `${key}:d`, set: { cx: at.d.cx, cy: at.d.cy } }, { key: `${key}:t`, set: at.t }, { key: `${key}:f`, set: at.f });
-      list.push({ key: `${key}:d`, set: { class: at.d.class } }, { key: `${key}:t`, text: at.text }, { key: `${key}:n`, text: at.title }, { key: `${key}:f`, text: at.flag });
-      list.push({ key, toggle: { 'sp-off': false, 'sp-gone': false, 'sp-flagged': Boolean(at.flag) }, set: { opacity: 1 }, ...over });
-      if (!there && dur && was) fresh.push(key);
-    }
-    for (const [id] of was?.parts ?? []) if (!f.parts.has(id)) list.push({ key: `p:${id}`, toggle: { 'sp-off': true, 'sp-gone': false, 'sp-new': false }, set: { opacity: 0 } });
-    for (const [id, b] of f.boxes) {
-      const at = placeAt(b, f), there = was?.boxes.has(id), o = there && dur ? over : {};
-      list.push({ key: `b:${id}:box`, set: at.box, ...o }, { key: `b:${id}:n`, set: at.n, ...o }, { key: `b:${id}:d`, set: at.d, ...o }, { key: `b:${id}:t`, set: at.t, ...o }, { key: `b:${id}:f`, set: { x: at.box.x + at.box.width - shape.z('text_after'), y: at.t.y }, ...o });
-      list.push({ key: `b:${id}:t`, text: at.text }, { key: `b:${id}:f`, text: at.flag });
-      for (const part of [`b:${id}:box`, `b:${id}`]) list.push({ key: part, toggle: { 'sp-off': false, 'sp-flagged': Boolean(at.flag) }, set: { opacity: 1 }, ...over });
-    }
-    for (const [id] of was?.boxes ?? []) if (!f.boxes.has(id)) for (const part of [`b:${id}:box`, `b:${id}`]) list.push({ key: part, toggle: { 'sp-off': true }, set: { opacity: 0 }, ...over });
-    // Wires: one that stays keeps its corners square as it moves; a new one is drawn in once its ends have come to rest.
-    for (const [key, c] of f.wires) {
-      const pts = wireAt(c), w = `w:${keyOf(key)}`, hd = `h:${keyOf(key)}`, there = was?.wires.has(key) && shown.has(key);
-      if (there && dur) {
-        const [A, B] = squareMorph(shown.get(key), pts);
-        list.push({ key: w, set: { d: pathOf(A) } }, { key: w, set: { d: pathOf(B) }, ...over }, { key: hd, set: { d: arrow(pts, c.back) }, ...over });
-      } else if (dur && was) {
-        list.push({ key: w, set: { d: pathOf(pts), 'stroke-dashoffset': 1, opacity: 0 } }, { key: hd, set: { d: arrow(pts, c.back), opacity: 0 } });
-        later(dur * 0.9, () => send([{ key: w, toggle: { 'sp-off': false, 'sp-gone': false, 'sp-new': true }, set: { opacity: 1 } }, { key: w, set: { 'stroke-dashoffset': 0 }, over: t('draw') }, { key: hd, toggle: { 'sp-off': false, 'sp-gone': false, 'sp-new': true }, set: { opacity: 1 }, over: t('draw') }]));
-        fresh.push(w, hd);
-      } else list.push({ key: w, set: { d: pathOf(pts), 'stroke-dashoffset': 0, opacity: 1 }, toggle: { 'sp-off': false, 'sp-gone': false } }, { key: hd, set: { d: arrow(pts, c.back), opacity: 1 }, toggle: { 'sp-off': false, 'sp-gone': false } });
-      shown.set(key, pts);
-    }
-    for (const [key] of was?.wires ?? []) if (!f.wires.has(key)) (shown.delete(key), list.push(...[`w:${keyOf(key)}`, `h:${keyOf(key)}`].map((w) => ({ key: w, toggle: { 'sp-off': true, 'sp-gone': false, 'sp-new': false }, set: { opacity: 0 } }))));
-    // Where a wire passes under another, it is broken: drawn again once all has come to rest.
-    const breaks = m('g', { key: 'breaks', class: 'sp-breaks' }, f.g.breaks.map(([bx, by]) => m('g', { class: 'ar-break' }, m('rect', { x: bx + shift - 3, y: by - 8, width: 6, height: 16 }), m('path', { d: `M${bx + shift - 6} ${by}H${bx + shift + 6}` }))));
-    if (dur) (list.push({ key: 'breaks', mark: m('g', { key: 'breaks' }) }), later(dur, () => send([{ key: 'breaks', mark: breaks }])));
-    else list.push({ key: 'breaks', mark: breaks });
-    // A published picture is framed as each step is.
-    if (style.still) list.push({ key: 'svg', set: { viewBox: view(f.g) }, ...over });
-    // What a step brings is in the accent a while.
-    if (fresh.length) (list.push(...fresh.map((key) => ({ key, toggle: { 'sp-new': true } }))), later(t('new_for'), () => send(fresh.map((key) => ({ key, toggle: { 'sp-new': false } })))));
-    send(list);
-    cur = k;
-  };
+  // ---- Showing a step, on the picture's own stage.
+  const stage = shape.stage({ t, send, later });
+  const apply = (k, dur) => ((cur = k), stage.apply(k, dur));
+  const away = (k) => stage.away(k);
 
   // ---- Playing.
   const read = (text) => t('read_base') + text.length * t('read_per_char');
   const beat = (k) => {
     if (k > last) return finish();
     const s = steps[k], { before, end, after } = partsOf(k);
+    // A quick step goes by at once, what it says with it, and the next follows as soon as it has.
+    if (s.quick) {
+      sayLines(k);
+      apply(k, t('quick_move'));
+      rail(k);
+      later(t('quick') + (away(k) ? t('gone_hold') + t('gone_fade') : 0), () => beat(k + 1));
+      return;
+    }
     let at = 0;
     if (s.chapter) (later(at, () => say('chapter', [s.chapter.when, s.chapter.name].filter(Boolean).join(' · '))), (at += t('chapter_pause')));
     for (const l of before) (later(at, () => say(kindOf(l, end), l.text, l.by)), (at += read(l.text)));
@@ -190,9 +146,15 @@ export function play({ answer, style, reduced, tools, shape }) {
       if (name !== 'click') return [];
       if (key === 'play') {
         if (!playing && cur === last) replay();
-        else if (playing) ((playing = false), jump(cur, 0), send([{ key: 'play', text: 'Play' }]));
+        // Paused before its first step is drawn, the story only stops: there is no step to hold.
+        else if (playing) ((playing = false), cur >= 0 ? jump(cur, 0) : (stop(), typingOn(false)), send([{ key: 'play', text: 'Play' }]));
         else ((playing = true), send([{ key: 'play', text: 'Pause' }]), beat(cur + 1));
-      } else if (key.startsWith('c:')) jump(chapters[Number(key.slice(2))]?.at ?? 0, t('jump'));
+      } else if (key.startsWith('c:')) {
+        // A chapter chosen plays from its start, paused or not.
+        playing = true;
+        send([{ key: 'play', text: 'Pause' }]);
+        jump(chapters[Number(key.slice(2))]?.at ?? 0, t('jump'));
+      }
       return [];
     },
     end: stop,

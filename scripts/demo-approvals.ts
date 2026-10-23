@@ -18,7 +18,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 
 /** The process map's style as the one module a style keeps: the built-in flow layout joined in before its drawing. */
 function processCode(): string {
-  const layout = readFileSync(join(ROOT, 'ui', 'flow-layout.js'), 'utf8').replace(/^export function layout/m, 'function layout');
+  const layout = readFileSync(join(ROOT, 'packs', 'core', 'draw', 'flow', 'layout.js'), 'utf8').replace(/^export function layout/m, 'function layout');
   const drawing = readFileSync(join(ROOT, 'examples', 'approvals', 'process.js'), 'utf8');
   return `${layout}\n${drawing.replace(/^import \{ layout \} from .*\n/m, '')}`;
 }

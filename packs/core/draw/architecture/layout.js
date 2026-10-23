@@ -22,6 +22,8 @@ export function health(item) {
   for (const [h, words] of Object.entries(HEALTH)) if (words.includes(item.status)) return h;
   return 'unknown';
 }
+/** Whether an item is closed because its work was done (not dropped, not retired). */
+export const finished = (item) => !item.open && HEALTH.ok.includes(item.status);
 /** A wire's state: what the link says of itself (props.state), else what its two ends make it. */
 export function wireState(link, a, b) {
   if (['wired', 'planned', 'broken'].includes(link.state)) return link.state;
@@ -49,7 +51,7 @@ const shapeOf = (i) => (['data', 'storage', 'database', 'queue'].includes(i.role
  * stacked, wires turn as little as they can, and no two drops run side by side. Without it, a picture is laid out as
  * it always was.
  */
-export function layout({ items, links, rootId, measure, sizes, prior, steady = Boolean(prior) }) {
+export function layout({ items, links, rootId, measure, sizes, prior, steady = Boolean(prior), room }) {
   const need = (name) => {
     if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every one the architecture lays out by`);
     return sizes[name];
@@ -89,27 +91,65 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
   const groups = [...new Set([...nodes.values()].map((n) => n.col).filter(Boolean))].map((id) => byId.get(id));
   if (!nodes.size) return { nodes, all: [], groups: [], boxes: [], chains: [], breaks: [], x: new Map(), y: new Map(), width: 0, height: 0 };
 
-  // ---- Wires: a calls b when a link goes from a to b (a depends on b, needs it, sends to it). One a pair.
+  // ---- Wires: a calls b when a link goes from a to b (a depends on b, needs it, sends to it). One a pair: a link
+  // back the other way makes it a wire both ways (both). Between two pieces of work, a dependency is drawn the way
+  // the work goes: from what is needed to what needs it.
+  const flow = (l) => (l.kind === 'depends_on' && nodes.get(l.from).item.kind === 'work' && nodes.get(l.to).item.kind === 'work' ? [l.to, l.from] : [l.from, l.to]);
   let edges = [];
-  const seen = new Set();
+  const seen = new Map();
   for (const l of links) {
     if (!nodes.has(l.from) || !nodes.has(l.to) || l.from === l.to) continue;
-    const key = [l.from, l.to].sort().join(' ');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    edges.push({ a: l.from, b: l.to, link: l, ...(l.says && { says: l.says }), state: wireState(l, nodes.get(l.from).item, nodes.get(l.to).item) });
+    const [from, to] = flow(l);
+    const key = [from, to].sort().join(' ');
+    if (seen.has(key)) {
+      if (seen.get(key).a !== from) seen.get(key).both = true;
+      continue;
+    }
+    seen.set(key, { a: from, b: to, link: l, ...(l.says && { says: l.says }), state: wireState(l, nodes.get(from).item, nodes.get(to).item) });
+    edges.push(seen.get(key));
   }
-  // A loop is drawn with one wire turned back, so the rest still reads down the page.
+  // A loop is drawn with one wire turned back, so the rest still reads down the page. Where it comes back to whoever
+  // uses the system (a client, a person), it is turned back there: they stay at the top and the rest falls from them.
+  const user = (id) => {
+    const i = nodes.get(id).item;
+    return ['client', 'person', 'user'].includes(i.role ?? i.fields?.role) || i.kind === 'actor';
+  };
+  const leads = (from, to) => {
+    const been = new Set([from]), next = [from];
+    while (next.length) {
+      const id = next.pop();
+      if (id === to) return true;
+      for (const e of edges) if (e.a === id && !e.both && !been.has(e.b)) (been.add(e.b), next.push(e.b));
+    }
+    return false;
+  };
+  for (const e of edges) if (!e.both && user(e.b) && !user(e.a) && leads(e.b, e.a)) ([e.a, e.b] = [e.b, e.a]), (e.back = true);
+  // Any other loop is turned back where it is first met. A wire both ways is no loop: it is laid out afterwards, in
+  // whichever way closes none.
   const colour = new Map();
   const visit = (id) => {
     colour.set(id, 1);
-    for (const e of edges.filter((f) => f.a === id)) {
+    for (const e of edges.filter((f) => f.a === id && !f.both)) {
       if (colour.get(e.b) === 1) ([e.a, e.b] = [e.b, e.a]), (e.back = true);
       else if (!colour.get(e.b)) visit(e.b);
     }
     colour.set(id, 2);
   };
   for (const id of nodes.keys()) if (!colour.get(id)) visit(id);
+  const laid = new Set(edges.filter((e) => !e.both));
+  const reaches = (from, to) => {
+    const been = new Set([from]), next = [from];
+    while (next.length) {
+      const id = next.pop();
+      if (id === to) return true;
+      for (const e of laid) if (e.a === id && !been.has(e.b)) (been.add(e.b), next.push(e.b));
+    }
+    return false;
+  };
+  for (const e of edges.filter((f) => f.both)) {
+    if (reaches(e.b, e.a)) [e.a, e.b] = [e.b, e.a];
+    laid.add(e);
+  }
 
   // ---- Places stacked. A place whose parts call into one other place, and are never called from it, sits wholly
   // above it and shares its span across: for the layout its parts are in that place's column (col), and each row of
@@ -135,7 +175,8 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
 
   // ---- Sizes.
   for (const n of nodes.values()) {
-    const text = Math.min(measure(n.item.title, TEXT), MAX_TEXT);
+    // Beside its name, the room a part is given for more (a story's flag on it), by id.
+    const text = Math.min(measure(n.item.title, TEXT), MAX_TEXT) + (room?.get(n.id) ?? 0);
     if (n.shape === 'diamond') [n.w, n.h] = [text + DIAMOND_PAD, DIAMOND_H];
     else if (n.shape === 'store') [n.w, n.h] = [text + STORE_PAD, STORE_H];
     else [n.w, n.h] = [text + BOX_PAD, BOX_H];

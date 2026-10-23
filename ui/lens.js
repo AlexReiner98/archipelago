@@ -1,5 +1,4 @@
 import { api, h } from './base.js';
-import { drawFlow } from './flow.js';
 import { drawGrid } from './grid.js';
 import { drawWith, drawings, warmDrawings } from './drawing.js';
 import { dress } from './lens-base.js';
@@ -65,9 +64,9 @@ export function storyPart(data) {
 
 // A lens says what is in a picture and the server answers it with data of one
 // shape (the `lens` view). A style says how that data looks, and is only ever
-// read here: which shape, and what stays lit. The kernel draws five shapes:
-// list (the core pack's house style); flow, a process map; grid, rows by lanes; time, along a
-// time axis; and architecture, a system's parts, where they run and their wires. Any other look is a style with code of its own, written for the
+// read here: which shape, and what stays lit. The kernel draws three shapes: list (the core pack's house style); grid,
+// rows by lanes; time, along a time axis. The core pack's drawings draw flow, a process map, and architecture, a
+// system's parts, where they run and their wires. Any other look is a style with code of its own, written for the
 // project by its people or agents.
 /** The views every item may have beside its own, by the id the server gives each, with what each shows. */
 const BUILT_IN = { holding: 'Everything it waits on, step by step, and nothing else', when: 'When what is in it happens, by day, each person a lane' };
@@ -210,4 +209,4 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
 export const lensPlace = new Map();
 
 /** The shapes the kernel draws. Each reads only what a lens answers with. */
-export const LENS_SHAPES = { list: drawList, flow: drawFlow, grid: drawGrid, time: drawTime };
+export const LENS_SHAPES = { list: drawList, grid: drawGrid, time: drawTime };

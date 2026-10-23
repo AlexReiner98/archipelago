@@ -10,6 +10,7 @@ import test from 'node:test';
 import { health, layout, wireState } from './draw/architecture/layout.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
 import { picture } from './draw/architecture/index.js';
+import { partBoxes, saysSpots } from './draw/architecture/says.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
 const item = (id: string, inside = 'r', status = 'up', extra: Record<string, unknown> = {}) => ({ id, kind: 'place', inside, title: `Part ${id}`, place: 0, open: status !== 'retired', status, state, ...extra });
@@ -71,6 +72,66 @@ test('a wire that passes layers falls in the place it goes to, and a loop still 
   const g = run([item('a'), item('b'), item('c'), item('d', 'p'), item('p')], [call('a', 'b'), call('b', 'c'), call('c', 'd'), call('d', 'a')]);
   checks(g);
   assert.ok(g.chains.some((c: any) => c.back), 'one wire of the loop is turned back');
+});
+
+test('two parts that call each other are one wire both ways, with an arrow at each end', () => {
+  const g = run([item('a'), item('b'), item('c')], [call('a', 'b'), call('b', 'a'), call('b', 'c')]);
+  checks(g);
+  assert.deepEqual(g.chains.map((c: any) => [c.key, Boolean(c.both)]), [['a b', true], ['b c', false]]);
+  const { scene } = drawn(answerOf([item('a'), item('b'), item('c')], [call('a', 'b'), call('b', 'a'), call('b', 'c')]));
+  const heads = marks(scene.svg).filter(([tag, attrs]) => tag === 'path' && String(attrs.class).startsWith('ar-head'));
+  assert.deepEqual(heads.map(([, attrs]) => (attrs.d.match(/M/g) ?? []).length).sort(), [1, 2]);
+});
+
+test('a wire both ways is laid out the way that closes no loop, so none is turned back', () => {
+  // a → b → c, and c both ways with a: read as c → a it would close a loop.
+  for (const links of [[call('a', 'b'), call('b', 'c'), call('c', 'a'), call('a', 'c')], [call('a', 'b'), call('b', 'c'), call('a', 'c'), call('c', 'a')]]) {
+    const g = run([item('a'), item('b'), item('c')], links);
+    checks(g);
+    assert.ok(!g.chains.some((c: any) => c.back), 'no wire is turned back');
+    assert.ok(g.y.get('a') < g.y.get('b') && g.y.get('b') < g.y.get('c'), 'a above b above c');
+  }
+});
+
+test('a loop back to whoever uses the system is turned back at them, so they stay at the top', () => {
+  const g = run([item('you', 'r', 'up', { fields: { role: 'client' } }), item('a'), item('b'), item('c')], [call('you', 'a'), call('a', 'b'), call('b', 'c'), call('c', 'you')]);
+  checks(g);
+  assert.deepEqual(g.chains.filter((c: any) => c.back).map((c: any) => c.key), ['you c']);
+  assert.ok(['a', 'b', 'c'].every((id) => g.y.get('you') < g.y.get(id)), 'you above the rest');
+});
+
+test("a wire's words are never written over another wire, or at either end of any wire: its arrowhead or its base", () => {
+  const links = [call('a', 'm', { says: 'approved changes' }), call('m', 'a', { says: 'where things stand' }), call('x', 'm', { says: 'kinds of work' }), call('m', 'p', { says: 'what you publish' }), call('p', 'q', { says: 'what you share' }), call('a', 'p', { says: 'more' })];
+  const g = run([item('a', 'r', 'up', { fields: { role: 'client' } }), item('m'), item('x'), item('p'), item('q')], links);
+  const z = (name: string) => house.sizes[`arch_${name}`];
+  const spots = saysSpots({ labels: g.chains.filter((c: any) => c.link.says).map((c: any) => ({ c, text: c.link.says })), chains: g.chains, boxes: g.boxes, parts: partBoxes(g), measure, z });
+  assert.ok(spots.length >= 2, `wires with room have their words (${spots.length})`);
+  const high = z('says_height');
+  for (const { c, x, y, w } of spots) {
+    for (const o of g.chains) {
+      if (o !== c)
+        for (let k = 1; k < o.points.length; k++) {
+          const [[x1, y1], [x2, y2]] = [o.points[k - 1], o.points[k]];
+          assert.ok(Math.max(x1, x2) < x - w / 2 || Math.min(x1, x2) > x + w / 2 || Math.max(y1, y2) < y - high / 2 || Math.min(y1, y2) > y + high / 2, `"${c.link.says}" is over the wire ${o.key}`);
+        }
+      for (const [l, t, r, b] of partBoxes(g)) assert.ok(x + w / 2 <= l || x - w / 2 >= r || y + high / 2 <= t || y - high / 2 >= b, `"${c.link.says}" is over a part`);
+      for (const end of [o.points[0], o.points.at(-1)]) assert.ok(Math.abs(end[0] - x) > w / 2 || Math.abs(end[1] - y) > high / 2 + 9, `"${c.link.says}" is at an end of ${o.key}`);
+    }
+  }
+});
+
+test('with steps, a wire that would turn twice goes in at the side of what it calls, through no part', () => {
+  const ids = ['s1', 's2', 's3', 's4', 's5'];
+  const g = layout({ items: [{ ...item('r'), inside: null }, ...ids.map((id) => item(id)), item('m')], links: ids.map((id) => call(id, 'm')), rootId: 'r', measure, sizes: house.sizes, steady: true });
+  const m = g.all.find((n: any) => n.id === 'm'), [mx, my] = [g.x.get('m'), g.y.get('m')];
+  const sides = g.chains.filter((c: any) => c.points.length === 3 && Math.abs(Math.abs(c.points[2][0] - mx) - m.w / 2) < 0.01);
+  assert.ok(sides.length >= 2, `some go in at the sides (${sides.length})`);
+  for (const c of sides) {
+    assert.ok(Math.abs(c.points[2][1] - my) <= m.h / 2, `${c.key} goes in within the side`);
+    for (const n of g.all.filter((p: any) => !p.dummy && p.id !== 'm' && p.id !== c.path[0]))
+      for (const [[x1, y1], [x2, y2]] of [[c.points[0], c.points[1]], [c.points[1], c.points[2]]])
+        assert.ok(Math.max(x1, x2) <= g.x.get(n.id) - n.w / 2 || Math.min(x1, x2) >= g.x.get(n.id) + n.w / 2 || Math.max(y1, y2) <= g.y.get(n.id) - n.h / 2 || Math.min(y1, y2) >= g.y.get(n.id) + n.h / 2, `${c.key} runs through ${n.id}`);
+  }
 });
 
 test('what sits in a part, wired to nothing, is a mark on it', () => {
