@@ -439,6 +439,7 @@ export function deep({ style, tools, z, num, shape }) {
     };
 
     return {
+      land,
       /** Frame f in relief: the rest moves to how f has it over `dur`; `enter` comes from above, the land rising. */
       show(f, dur, enter) {
         made ??= ground(f);
@@ -471,7 +472,8 @@ export function deep({ style, tools, z, num, shape }) {
     go(f, dur) {
       if (f.look !== LOOK) {
         want = null;
-        if (on) ((on = false), tools.patch([{ key: 'deep', toggle: { 'sp-on': false } }, { key: 'svg', toggle: { 'sp-deep': false } }]));
+        // Back to the flat picture, and back to sea: the conversation open again, should it have folded away.
+        if (on) ((on = false), tools.patch([{ key: 'deep', toggle: { 'sp-on': false } }, { key: 'svg', toggle: { 'sp-deep': false } }, { key: 'chat', toggle: { 'sp-away': false } }]), world?.then((w) => w?.land()));
         return;
       }
       want = { f, dur };

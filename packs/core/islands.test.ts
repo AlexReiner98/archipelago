@@ -262,3 +262,17 @@ test('paused before its first step is drawn, a story stops and plays on from the
     ((globalThis.setTimeout = realSet), (globalThis.clearTimeout = realClear));
   }
 });
+
+test('the last step shows what the steps leave in, as it is now: not what they took out, nor what they never name', () => {
+  const STRAY = 'e_strayzzz', GONE = 'e_gonezzzz';
+  const ending = {
+    ...answer,
+    items: [...answer.items, item(STRAY, 'Never named', { open: true, status: 'todo' }), item(GONE, 'Taken out', { open: true, status: 'todo' })],
+    steps: [{ add: [...plan, GONE] }, { remove: [GONE] }, { titles: { [SKETCH]: 'Then' } }],
+  };
+  const last = statesOf(ending).at(-1);
+  for (const id of plan) assert.ok(last.ids.has(id), `${id} is left in`);
+  assert.ok(!last.ids.has(GONE), 'what the steps took out stays out');
+  assert.ok(!last.ids.has(STRAY), 'what no step names is not drawn');
+  assert.equal(last.items.find((i: any) => i.id === SKETCH).title, 'Sketch the look', 'titles are their own at the end');
+});

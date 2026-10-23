@@ -1,7 +1,8 @@
 // A system as it came to be: the lens's steps, each laid out with the one before it as its prior (layout.js,
 // steady), so what a step does not change stays where it was. Every part, place and wire that is ever drawn is one
 // mark, shown or not; a step moves the marks from where they were to where they go (play.js runs the steps).
-// The last step is the map as it is, whatever the steps say, so the picture always ends on what is true. From a step
+// The last step is the map as it is: what the steps leave in, with the titles, fields and status it has now, and gone
+// if it is retired, so the picture always ends on what is true of what it shows. From a step
 // with a look (`islands`) on, the story is drawn in that look (islands.js): a part's outline moves from its box to
 // its island, and its wires are drawn again as routes; in `islands_3d` the same islands rise out of the sea, painted
 // on a surface over the picture (deep.js).
@@ -44,14 +45,14 @@ export function statesOf(answer) {
     for (const [id, w] of Object.entries(s.flag ?? {})) (w === null ? flags.delete(id) : flags.set(id, String(w)));
     if (s.chapter) chapter++;
     if (s.look !== undefined) look = s.look in LOOKS ? s.look : null;
-    // The last step is the map as it is.
+    // The last step is the map as it is: what the steps leave in, open or finished; what they took out stays out.
     const final = k === last;
     const done = (id) => present.has(id) && byId.has(id) && finished(byId.get(id));
-    const shows = (id) => (final ? byId.get(id)?.open !== false || done(id) : present.has(id));
+    const shows = (id) => (final ? (byId.get(id)?.open !== false && present.has(id)) || done(id) : present.has(id));
     // A place is shown while it holds something shown; what no step moves is shown as it is.
     const holds = new Map();
     for (const i of answer.items) if (i.inside) holds.set(i.inside, [...(holds.get(i.inside) ?? []), i.id]);
-    const kept = (id, depth = 0) => id === root || (moving.has(id) ? shows(id) : final ? byId.get(id)?.open !== false || (holds.get(id) ?? []).some((c) => kept(c, depth + 1)) : depth < 16 && (holds.get(id) ?? []).some((c) => kept(c, depth + 1)));
+    const kept = (id, depth = 0) => id === root || (moving.has(id) ? shows(id) : depth < 16 && (holds.get(id) ?? []).some((c) => kept(c, depth + 1)));
     const items = answer.items
       .filter((i) => kept(i.id))
       .map((i) => (final ? (done(i.id) ? { ...i, open: true } : i) : { ...i, open: true, status: String(fields.get(i.id)?.status ?? (i.open ? i.status : 'up')), title: titles.get(i.id) ?? i.title, fields: { ...i.fields, ...fields.get(i.id) } }));
