@@ -9,7 +9,7 @@ import { spent } from './spent.ts';
 import { hubs, HUB_AT, lens } from './lens.ts';
 import { findPlace, livesIn, scopeOf } from './places.ts';
 import { brief } from './brief.ts';
-import { savedViews } from './saved-views.ts'; import { pageStyle } from './styles.ts';
+import { savedViews } from './saved-views.ts'; import { pageStyle } from './styles.ts'; import { SYSTEM } from './head.ts';
 
 /**
  * How a kernel view asks a question a pack answers (the gate asks proof of the software pack). Handed in by
@@ -94,10 +94,10 @@ async function graph(l: Archipelago, input: { focus?: string; depth?: number; re
   const preset = input.relations ?? (input.focus ? 'all' : 'blocking');
   if (!(preset in GRAPH_PRESETS)) throw new Error(`\`relations\` (which links to draw) must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
   const only = GRAPH_PRESETS[preset] && l.registry.relationFamily(...GRAPH_PRESETS[preset]);
-  const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, created_at from entity where archived_at is null`);
-  const system = (type: string) => l.registry.type(type)?.system ?? false;
+  const { rows: entities } = await l.db.query<Entity>(`select id, type, kind, title, status, is_open, props, created_at from entity where archived_at is null`);
+  const system = (e: Entity) => e.kind === SYSTEM;
   const eligible = new Map(
-    entities.filter((e) => e.id === input.focus || ((input.include_closed || e.is_open) && (input.include_system || !system(e.type)))).map((e) => [e.id, e]),
+    entities.filter((e) => e.id === input.focus || ((input.include_closed || e.is_open) && (input.include_system || !system(e)))).map((e) => [e.id, e]),
   );
   if (input.focus && !eligible.has(input.focus)) throw new Error(`No item "${input.focus}"`);
   const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(

@@ -461,5 +461,5 @@ create policy member_setting_read on setting for select to pelago_member
   using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish'));
 `;
 
-/** Step 15 (src/migrate.ts): a held change keeps the rule that held it (src/rules.ts, decide). */
+/** Step 16 (src/migrate.ts): a held change keeps the rule that held it (src/rules.ts, decide). */
 export const HELD_BY = `alter table proposal add column if not exists held_by jsonb;`;

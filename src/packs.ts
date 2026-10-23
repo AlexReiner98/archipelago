@@ -7,6 +7,7 @@ import { capacityOf, checkCapabilities, type Capabilities } from './capabilities
 import { checkDeclared, KERNEL_VERBS, screensOf, stylesOf, toolName, type ActionDef, type HearDef, type HostDef, type ScheduleDef, type ViaDef, type ScreenDef, type StyleDef, type DrawingDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
+import { checkFieldDecls, headOf, SYSTEM, type ColumnField } from './head.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 
@@ -21,6 +22,7 @@ export interface FieldDef {
   system?: boolean;
   /** Sent with the item in a lens answer, so a style can draw by it (a kind to colour, an amount, a date). */
   shown?: boolean;
+  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a kind (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean;
 }
 
 export interface Statuses {
@@ -105,7 +107,8 @@ export interface ResolvedType {
   /** Of the system kind: the app's own configuration, which views of the work leave out. */
   system: boolean;
   statuses: Statuses;
-  fields: Record<string, FieldDef>;
+  /** The fields kept in props, and those kept in the item's row (status and the rest a kind declares). */
+  fields: Record<string, FieldDef>; columns: Partial<Record<ColumnField, FieldDef>>;
   deliverable: boolean; altitude?: Altitude;
   public: boolean;
   belongs_with?: BelongsWith[];
@@ -118,7 +121,7 @@ export interface ResolvedType {
 export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root: string; dormant?: boolean };
 
 /** The pack that approved type proposals are written to. */ export const LOCAL_PACK = 'local';
-/** The kind of the app's own configuration (views, styles, screens, runs), which views of the work leave out. */ export const SYSTEM = 'system';
+export { SYSTEM } from './head.ts';
 
 export class Registry {
   readonly dir: string;
@@ -223,7 +226,7 @@ export class Registry {
         base: !parent || parent.id === parent.kind ? id : parent.base,
         system: kind === SYSTEM,
         statuses,
-        fields: { ...parent?.fields, ...def.fields, ...extra.get(id) },
+        ...headOf({ ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
@@ -269,7 +272,7 @@ export class Registry {
     for (const rel of relations.values()) rel.root = rootOf(declared.get(rel.id)!, []);
 
     for (const type of types.values()) {
-      const problems = checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed]);
+      const problems = [...checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed]), ...checkFieldDecls(type, raw.get(type.id), extra.get(type.id))];
       if (problems.length) throw new Error(`Type "${type.id}" in pack "${type.pack}": ${problems.join('; ')}`);
     }
 
@@ -465,14 +468,8 @@ export class Registry {
   describe() {
     return {
       packs: this.packs.map((p) => ({ id: p.id, version: p.version, title: p.title, description: p.description })),
-      common_fields: {
-        title: 'Required. A short name.',
-        body: 'Free-form markdown detail.',
-        status: 'One of the type\'s statuses. Open statuses mean unfinished.',
-        owner: 'Id of the person or agent responsible.',
-        visibility: 'private (default) or shared.',
-        confidence: '0 to 1. How sure the author is that this is true.',
-      },
+      // The head every item has; status, owner, confidence and source are each type's columns, as its kind declares them.
+      common_fields: { title: 'Required. A short name.', body: 'Free-form markdown detail.', visibility: 'private (default) or shared.' },
       types: [...this.types.values()].map((t) => ({
         id: t.id,
         pack: t.pack,
@@ -482,6 +479,7 @@ export class Registry {
         kind: t.kind,
         statuses: t.statuses,
         fields: t.fields,
+        columns: t.columns,
         ...(t.deliverable && { deliverable: true }), ...(t.altitude && { altitude: t.altitude }),
         ...(t.public && { public: true }),
         ...(t.belongs_with && { belongs_with: t.belongs_with }),

@@ -15,9 +15,11 @@ in the `entity`, `relation` and `event` tables (`src/schema.ts`).
 Replaces *knowledge graph*.
 
 **item.** One thing on the map: a task, a person, a decision, a document, a
-view. It has an id, a type, a title, a note and its fields. In the code: a
-row of the `entity` table, `Entity` in `src/pelago.ts`, read with `get`.
-Replaces *entity*.
+view. It is a small **head** and its fields. The head is what the store needs
+to hold any item: id, kind, type, title, body (its note), visibility, and when
+it was made, changed and archived. Everything else is a field its kind or type
+declares (`src/head.ts`). In the code: a row of the `entity` table, `Entity`
+in `src/pelago.ts`, read with `get`. Replaces *entity*.
 
 **link.** A typed tie from one item to another: `depends_on`, `part_of`,
 `waits_on`. In the code: a row of the `relation` table; link types are a
@@ -28,16 +30,25 @@ field that identifies a link in `unlink`).
 **kind.** One of the seven broad sorts every type belongs to: actor, aim,
 work, question, record, occurrence, place. The kernel reasons by kind, never
 by a pack's type. In the code: the core pack's root types; a type's `kind`, as the
-registry gives it (`reg.type(id).kind`, `src/packs.ts`).
+registry gives it (`reg.type(id).kind`, `src/packs.ts`), and an item's, kept
+in its row (`entity.kind`), read without walking the type's ancestry.
 
 **type.** What an item is within its kind (`work.task`, `software.repo`),
 with its statuses and fields. Declared in a pack file's `types`, or by a
 workspace with `define_type`. In the code: `TypeDef` in `src/packs.ts`.
 A flavour is a type that extends another.
 
-**field.** A named value an item holds, declared by its type: a due date, an
-outcome, a url. In the code: the item's `props`, checked against `FieldDef`
-(`src/fields.ts`). Also *prop* in the JSON.
+**field.** A named value an item holds, declared by its kind or type: a due
+date, an outcome, a url. Every field written is checked against its
+declaration; one the type does not declare is refused. In the code: the item's
+`props`, checked against `FieldDef` (`src/fields.ts`). Also *prop* in the JSON.
+Four fields the kinds declare are kept in columns of the row, not in props, so
+the store can index them and row-level security read them: status (with
+`is_open`), owner, confidence and source (`"column": true` in
+`packs/core/pack.json`). A kind that does not declare one has none: a person
+has no owner, a view no confidence. A value longer than 4000 characters is
+refused unless its field is declared `"large": true`, which only a type of the
+system kind may do: a drawing's code, a story's steps, a stylesheet.
 
 **view.** A named way of looking at part of the map: a **lens** (what is in
 it: which kinds, from where, how far, along which links; `src/lens.ts`)

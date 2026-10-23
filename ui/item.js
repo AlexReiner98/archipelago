@@ -70,7 +70,7 @@ export async function entity(id, here) {
   // What can be shown to anyone is what its pack says can be; public work (a product) has a page of its own.
   const publishable = !e.archived_at && type?.public;
   // Work an agent can take on: what can be estimated.
-  const workish = !e.archived_at && type?.kind === 'work' && Boolean(type.fields.tokens_estimated);
+  const workish = !e.archived_at && e.kind === 'work' && Boolean(type?.fields.tokens_estimated);
   const ties = relationEditor(e, data, change, again);
   // What happened to it, as the same lines Changes shows.
   const sets = [];
@@ -243,7 +243,7 @@ export async function entity(id, here) {
               change([{ op: 'update', id, visibility: 'public' }], 'Made public in the UI'),
           ],
         publishable && !shown && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
-        e.visibility === 'public' && type?.public && (type.kind === 'work' || shown?.published) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
+        e.visibility === 'public' && type?.public && (e.kind === 'work' || shown?.published) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
         ...(doc ? documentMenu(e, links, page, again, doc) : []),
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
