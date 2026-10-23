@@ -79,12 +79,12 @@ async function loaded(hash, modules) {
   return box.loads.get(hash).promise;
 }
 
-/** A drawing's stylesheet, on the page once however many pictures it draws. */
+/** A drawing's stylesheet, on the page once however many pictures it draws; a picture that says more (a story) adds its own. */
 function adopt(id, css) {
-  if (!css || sheets.has(id)) return;
+  if (!css || sheets.has(`${id}\n${css}`)) return;
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(cssFor(id, css));
-  sheets.set(id, sheet);
+  sheets.set(`${id}\n${css}`, sheet);
   document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 }
 
