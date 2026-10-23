@@ -225,3 +225,40 @@ test('as a plan, each part is a row and its work runs done, under way, to do; as
   assert.deepEqual(kanban.heads.map((h: any) => h.text), ['To do', 'Doing', 'Done']);
   for (const [id, v] of Object.entries(statuses)) assert.equal(kanban.tasks.get(id).x, kanban.heads.find((h: any) => h.key === v).x, `${id} in ${v}`);
 });
+
+test('choosing a chapter plays it, even when the story was paused', () => {
+  const sent: any[] = [];
+  const timers: [number, () => void][] = [];
+  const realSet = globalThis.setTimeout;
+  (globalThis as any).setTimeout = (fn: () => void, ms: number) => (timers.push([ms, fn]), timers.length);
+  try {
+    const drawn = picture({ answer, style: house, reduced: true }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+    timers.splice(0).forEach(([, fn]) => fn());
+    assert.ok(sent.some((p) => p.key === 'play' && p.text === 'Replay'), 'with less motion, it starts at the end');
+    sent.length = 0;
+    drawn.on({ name: 'click', key: 'c:0' });
+    assert.ok(sent.some((p) => p.key === 'play' && p.text === 'Pause'), 'and plays once a chapter is chosen');
+    assert.ok(timers.length > 0, 'its next step is on its way');
+  } finally {
+    globalThis.setTimeout = realSet;
+  }
+});
+
+test('paused before its first step is drawn, a story stops and plays on from there', () => {
+  const sent: any[] = [];
+  const timers: [number, () => void][] = [];
+  const realSet = globalThis.setTimeout, realClear = globalThis.clearTimeout;
+  (globalThis as any).setTimeout = (fn: () => void, ms: number) => (timers.push([ms, fn]), timers.length);
+  (globalThis as any).clearTimeout = () => {};
+  try {
+    const drawn = picture({ answer, style: house, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+    timers.splice(0, 1)[0][1]();
+    assert.doesNotThrow(() => drawn.on({ name: 'click', key: 'play' }));
+    assert.ok(sent.some((p) => p.key === 'play' && p.text === 'Play'));
+    timers.length = 0;
+    drawn.on({ name: 'click', key: 'play' });
+    assert.ok(sent.some((p) => p.key === 'play' && p.text === 'Pause') && timers.length > 0, 'and plays on');
+  } finally {
+    ((globalThis.setTimeout = realSet), (globalThis.clearTimeout = realClear));
+  }
+});

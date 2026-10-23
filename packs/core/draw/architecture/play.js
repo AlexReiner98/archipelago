@@ -242,9 +242,15 @@ export function play({ answer, style, reduced, tools, shape }) {
       if (name !== 'click') return [];
       if (key === 'play') {
         if (!playing && cur === last) replay();
-        else if (playing) ((playing = false), jump(cur, 0), send([{ key: 'play', text: 'Play' }]));
+        // Paused before its first step is drawn, the story only stops: there is no step to hold.
+        else if (playing) ((playing = false), cur >= 0 ? jump(cur, 0) : (stop(), typingOn(false)), send([{ key: 'play', text: 'Play' }]));
         else ((playing = true), send([{ key: 'play', text: 'Pause' }]), beat(cur + 1));
-      } else if (key.startsWith('c:')) jump(chapters[Number(key.slice(2))]?.at ?? 0, t('jump'));
+      } else if (key.startsWith('c:')) {
+        // A chapter chosen plays from its start, paused or not.
+        playing = true;
+        send([{ key: 'play', text: 'Pause' }]);
+        jump(chapters[Number(key.slice(2))]?.at ?? 0, t('jump'));
+      }
       return [];
     },
     end: stop,
