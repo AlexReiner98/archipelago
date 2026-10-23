@@ -112,6 +112,14 @@ footer {
   padding-top: var(--rhythm-5);
   border-top: var(--border-1) solid var(--reader-line);
 }
+/* A site's footer: its legal and contact lines, quieter than the page above them. */
+footer.site-foot {
+  color: var(--reader-muted);
+  font-size: var(--reader-small);
+}
+footer.site-foot p {
+  margin: var(--rhythm-2) 0;
+}
 button.print {
   font: inherit;
   padding: var(--space-4) var(--space-7);

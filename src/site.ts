@@ -14,6 +14,9 @@ import type { Workspaces } from './workspaces.ts';
 
 /** The address word of a site's front page, read at /. */
 export const HOME = 'home';
+/** The address word of the page every page of a site ends with: its legal and contact lines, say. */
+export const FOOTER = 'footer';
+const PARAGRAPH = '\n\n';
 
 /** Domains and the workspace each serves, from "archipelago.tools=archipelago,docs.example.com=acme". */
 export function readSites(text: string | undefined): Record<string, string> {
@@ -24,11 +27,18 @@ export function readSites(text: string | undefined): Record<string, string> {
 /** Where a page of a site is read: its front page at /, every other at /<path>. */
 export const siteHref = (path: string) => (path === HOME ? '/' : `/${path}`);
 
-/** The site's name and the pages its header shows, in their menu's order, each as an address on this site. */
+/**
+ * The site's name, the pages its header shows, in their menu's order, each as an address on this site, and what every
+ * page ends with: the words of the page published at /footer, as published.
+ */
 export async function siteNav(workspaces: Workspaces, workspace: string, href: (page: { id: string; path: string | null }) => string | null) {
-  const pages = await sitePages((await workspaces.get(workspace)).pelago);
+  const pelago = (await workspaces.get(workspace)).pelago;
+  const pages = await sitePages(pelago);
   const home = pages.find((page) => page.path === HOME);
+  const foot = pages.some((page) => page.path === FOOTER) ? ((await publishedAt(pelago, FOOTER)) as { parts?: { text?: string }[] } | null) : null;
+  const footer = (foot?.parts ?? []).flatMap((part) => (typeof part.text === 'string' ? [part.text] : [])).join(PARAGRAPH);
   return {
+    ...(footer && { footer }),
     name: (await workspaces.list()).find((ws) => ws.id === workspace)?.name ?? workspace,
     home: home ? href(home) : null,
     pages: pages.filter((page) => page.menu != null && page.path !== HOME).map((page) => ({ title: page.title, href: href(page) })).filter((page) => page.href),
@@ -49,7 +59,7 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
   const pelago = (await at.workspaces.get(at.workspace)).pelago;
   if (pathname === '/robots.txt') return send(200, 'text/plain; charset=utf-8', `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`);
   if (pathname === '/sitemap.xml') {
-    const urls = (await sitePages(pelago)).filter((page) => page.path).map((page) => `  <url><loc>${xml(origin + siteHref(page.path!))}</loc><lastmod>${new Date(page.published_at).toISOString().slice(0, 10)}</lastmod></url>`);
+    const urls = (await sitePages(pelago)).filter((page) => page.path && page.path !== FOOTER).map((page) => `  <url><loc>${xml(origin + siteHref(page.path!))}</loc><lastmod>${new Date(page.published_at).toISOString().slice(0, 10)}</lastmod></url>`);
     return send(200, 'application/xml; charset=utf-8', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`, { 'cache-control': 'public, max-age=300' });
   }
   // The front page's data and figures are read at /data and /picture/<id>, as any page's are below its own address.

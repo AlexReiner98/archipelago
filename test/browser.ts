@@ -32,17 +32,24 @@ export async function open(url: string): Promise<Page> {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-chrome-'));
   // A CI runner (GitHub's Ubuntu) does not let Chrome make its sandbox as a normal user, so there it runs without one.
   const ci = process.env.CI ? ['--no-sandbox'] : [];
-  const proc: ChildProcess = spawn(binary, ['--headless=new', ...ci, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
-  // Chrome says on its error stream where it listens.
-  const address = await new Promise<string>((resolve, reject) => {
-    let said = '';
-    const timer = setTimeout(() => reject(new Error(`Chrome did not start: ${said.slice(0, 300)}`)), 15000);
-    proc.stderr!.on('data', (chunk) => {
-      said += String(chunk);
-      const found = /DevTools listening on (ws:\/\/\S+)/.exec(said);
-      if (found) (clearTimeout(timer), resolve(found[1]));
+  // Chrome says on its error stream where it listens. On a busy runner (many test files each starting one) it can be
+  // slow to: it is given 45 seconds, and started once more if it says nothing by then.
+  const start = () => {
+    const proc: ChildProcess = spawn(binary, ['--headless=new', ...ci, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const address = new Promise<string>((resolve, reject) => {
+      let said = '';
+      const timer = setTimeout(() => (proc.kill(), reject(new Error(`Chrome did not start: ${said.slice(0, 300)}`))), 45000);
+      proc.stderr!.on('data', (chunk) => {
+        said += String(chunk);
+        const found = /DevTools listening on (ws:\/\/\S+)/.exec(said);
+        if (found) (clearTimeout(timer), resolve(found[1]));
+      });
     });
-  });
+    return { proc, address };
+  };
+  let started = start();
+  const address = await started.address.catch(() => ((started = start()), started.address));
+  const { proc } = started;
   const port = new URL(address).port;
   let target: { type: string; webSocketDebuggerUrl: string } | undefined;
   for (let n = 0; n < 50 && !target; n++) {
