@@ -8,6 +8,7 @@ import { pastBounds } from './bounds.ts';
 import { blockGraph, heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
 import type { Archipelago } from './pelago.ts';
+import { SYSTEM } from './head.ts';
 import { scopeOf } from './places.ts';
 
 export const REASONS = ['waits_on', 'to_confirm', 'holding_up', 'due', 'unsettled', 'blocked', 'stale', 'under_way', 'ready'] as const;
@@ -17,6 +18,7 @@ export type Reason = (typeof REASONS)[number];
 export const STALE_DAYS = 14;
 
 interface Row {
+  kind: string | null;
   id: string;
   type: string;
   title: string;
@@ -59,11 +61,10 @@ export async function attention(l: Archipelago, input: Input) {
   const scope = input.within ? await scopeOf(l, input.within) : null;
   const staleDays = input.stale_days ?? STALE_DAYS;
 
-  const { rows } = await l.db.query<Row>(`select id, type, title, status, owner, is_open, props->>'due' as due, updated_at from entity where archived_at is null and is_open`);
+  const { rows } = await l.db.query<Row>(`select id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at from entity where archived_at is null and is_open`);
   const reg = l.registry;
   // Only what is work or a question to someone: not people, places, records of the past, or the system's own.
-  const kindOf = (type: string) => reg.type(type)?.kind;
-  const live = new Map(rows.filter((e) => !reg.type(e.type)?.system && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
+  const live = new Map(rows.filter((e) => e.kind !== SYSTEM && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
   // Someone's: owned by them, or owned by nobody when they are the workspace's owner.
   const theirs = (e: Row) => me === null || e.owner === me || (e.owner === null && me === owner);
   const found = new Map<string, { row: Row; reasons: Record<string, unknown>[] }>();
@@ -91,7 +92,7 @@ export async function attention(l: Archipelago, input: Input) {
   const holding = new Map<string, number>();
   for (const roots of rootsOf.values()) for (const r of roots) holding.set(r, (holding.get(r) ?? 0) + 1);
   // Only work or a question holds others up: a person who is waited on is said so by waits_on.
-  for (const [id, n] of holding) if (live.get(id) && theirs(live.get(id)!) && ['work', 'question'].includes(kindOf(live.get(id)!.type) ?? '')) add(live.get(id), 'holding_up', { count: n });
+  for (const [id, n] of holding) if (live.get(id) && theirs(live.get(id)!) && ['work', 'question'].includes(live.get(id)!.kind ?? '')) add(live.get(id), 'holding_up', { count: n });
   // A resource held by others says who holds it (as the asker may see them: a private session is not named).
   const holders = await heldResources(l);
   for (const id of blockedIds) {
@@ -124,7 +125,7 @@ export async function attention(l: Archipelago, input: Input) {
   // estimated and taken up, with nothing in its way.
   const cutoff = Date.now() - staleDays * 86_400_000;
   for (const e of live.values()) {
-    const kind = kindOf(e.type);
+    const kind = e.kind;
     if (!theirs(e) || (kind !== 'work' && kind !== 'question')) continue;
     if (new Date(e.updated_at).getTime() <= cutoff) add(e, 'stale', { days: Math.floor((Date.now() - new Date(e.updated_at).getTime()) / 86_400_000) });
     if (kind === 'work' && reg.type(e.type)?.fields.tokens_estimated && !graph.isBlocked(e.id)) add(e, 'ready');
@@ -133,8 +134,8 @@ export async function attention(l: Archipelago, input: Input) {
   // What agents settled and the owner has not confirmed: the owner's to look at, closed though it is.
   const confirm = wanted.has('to_confirm') && (me === null || me === owner) ? await toConfirm(l, { limit: 40 }) : undefined;
   for (const q of confirm?.questions ?? []) {
-    const row = { id: q.id, type: '', title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
-    const { rows: [e] } = await l.db.query<Row>(`select id, type, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);
+    const row = { id: q.id, type: '', kind: null, title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
+    const { rows: [e] } = await l.db.query<Row>(`select id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);
     if (!scope || scope.has(q.id)) add(e ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
   }
 
@@ -158,7 +159,7 @@ export async function attention(l: Archipelago, input: Input) {
     .sort((a, b) => (input.order === 'latest' && newer(a, b)) || rank(a.reasons) - rank(b.reasons) || place(a.row.id) - place(b.row.id) || String(a.row.due ?? '9').localeCompare(String(b.row.due ?? '9')) || +new Date(b.row.updated_at) - +new Date(a.row.updated_at))
     .map(({ row, reasons }) => {
       const top = topOf(row.id);
-      return { id: row.id, type: row.type, kind: kindOf(row.type) ?? null, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons, top: top ? { id: top, title: tops.get(top) ?? top } : null };
+      return { id: row.id, type: row.type, kind: row.kind ?? null, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons, top: top ? { id: top, title: tops.get(top) ?? top } : null };
     });
   const counts = Object.fromEntries([...wanted].map((r) => [r, items.filter((i) => i.reasons.some((x) => x.why === r)).length]));
   const limit = input.limit ?? 100;

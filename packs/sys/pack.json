@@ -124,6 +124,7 @@
         },
         "story": {
           "type": "json",
+          "large": true,
           "description": "The story the session tells of its work, beat by beat (the tell tool).",
           "system": true
         },

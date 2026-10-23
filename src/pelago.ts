@@ -1,8 +1,7 @@
-// The map and its single write path. Every change to entities and relations
-// goes through change(): it is validated, checked against policy, then either
-// applied or stored as a proposal for a human, and always logged.
+// The map and its single write path. Every change to items and links goes through change(): it is validated, checked
+// against policy, then either applied or stored as a proposal for a human, and always logged.
 
-import { checkWritten } from './automation-rules.ts';
+import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts';
 import { judgeOps } from './rules.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
@@ -146,7 +145,7 @@ export interface ChangeInput {
 }
 
 export interface Entity {
-  id: string;
+  id: string; /** Its kind, kept in its row (src/head.ts). */ kind: string | null;
   type: string;
   title: string;
   body: string;
@@ -398,7 +397,7 @@ export class Archipelago {
           const type = reg.type(op.type);
           if (!type) break;
           if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
-          errors.push(...checkWritten(reg, op.type, op.props ?? {}).map((p) => `${where}: ${p}`));
+          errors.push(...[...checkWritten(reg, op.type, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
           if (op.ref) {
             if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
             refs.set(op.ref, op.type);
@@ -417,7 +416,7 @@ export class Archipelago {
         case 'update': {
           const target = await existing(op.id, where);
           if (!target) break;
-          errors.push(...reg.check(target.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
+          errors.push(...[...reg.check(target.type, op.status, op.props ?? {}), ...undeclaredColumns(reg.type(target.type), op)].map((p) => `${where}: ${p}`));
           if (op.visibility === 'public' && !reg.type(target.type)?.public) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
           if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
           try {
@@ -570,8 +569,8 @@ export class Archipelago {
             const id = created[op.ref ?? `#${i + 1}`];
             const status = op.status ?? type.statuses.open[0];
             await tx.query(
-              `insert into entity (id, type, title, body, status, is_open, owner, visibility, confidence, props, source_id, private_to)
-               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)`,
+              `insert into entity (id, type, title, body, status, is_open, owner, visibility, confidence, props, source_id, private_to, kind)
+               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13)`,
               [
                 id,
                 op.type,
@@ -583,8 +582,8 @@ export class Archipelago {
                 op.visibility ?? fallback,
                 op.confidence ?? 1,
                 JSON.stringify({ ...reg.defaults(op.type), ...op.props }),
-                await sourceOf(op),
-                this.privateTo(op.visibility ?? fallback),
+                type.columns && !type.columns.source ? null : await sourceOf(op),
+                this.privateTo(op.visibility ?? fallback), type.kind ?? null,
               ],
             );
             await log('entity.create', id, { type: op.type, title: named(op.title.trim()), status });
@@ -740,6 +739,8 @@ export class Archipelago {
    * (moved_from): a one-time migration as a pack takes it out of another, logged as one event. All else stays. The
    * lenses and screens that name the old one in their settings (kinds and on, or over) name the new one.
    */
+  /** Each item's kind in its row, from the type table, where the row lacks it or has another (src/head.ts): when a workspace opens. */
+  fillKinds = async () => (await this.db.query(`update entity e set kind = t.def->>'kind' from type_def t where t.id = e.type and e.kind is distinct from t.def->>'kind' returning e.id`)).rows.length;
   async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity'): Promise<number> {
     return this.db.transaction(async (tx) => {
       const { rows } = await tx.query<{ id: string }>(`update ${what === 'entity' ? 'entity' : 'relation'} set type = $2 where type = $1 returning id`, [from, to]);
@@ -770,8 +771,7 @@ export class Archipelago {
   }
 
   // ---- operational state (src/operational.ts) ------------------------------
-  // These take effect at once for agents too and are never held: coordination
-  // that waits for approval is no coordination.
+  // These take effect at once for agents too and are never held: coordination that waits for approval is no coordination.
 
   /**
    * The one write to an item that skips change: bookkeeping no one states as a fact (a session's heartbeat, an

@@ -16,6 +16,7 @@ export const ON_THE_MAP: Record<string, string> = {
   notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational.',
   automations: "An automation's last_run, last_fired and last_result: kept by operational, the firing itself logged.",
   rechecks: "A project's rechecked_at: kept by operational, the re-check itself logged.",
+  kinds: "An item's kind column, read from its type: filled by fillKinds when a workspace opens, and by the database for a row written without it; never a fact anyone states.",
 };
 
 /** The fields operational may write on an item. Anything else on an item is a fact, and changes through change. */

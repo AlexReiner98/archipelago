@@ -10,7 +10,7 @@ import { placeAll, readAxis, zoneOf, type TimeAxis } from './timeaxis.ts';
 import { needsOf } from './attention.ts';
 import { blockGraph } from './blocking.ts';
 import { hubs, keptOf, type Kept } from './lens-kept.ts';
-import { styleFor, drawn as withDrawing } from './styles.ts';
+import { styleFor, drawn as withDrawing } from './styles.ts'; import { SYSTEM } from './head.ts';
 import { readSteps, stepIds } from './lens-steps.ts';
 import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
 
@@ -60,7 +60,7 @@ const UNDER_WAY = ['doing', 'building', 'investigating'];
 
 interface Row {
   id: string;
-  type: string;
+  type: string; kind: string | null;
   title: string;
   status: string;
   is_open: boolean;
@@ -186,7 +186,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const own = hub === undefined ? [] : lenses.filter((one) => one.about.includes(hub)).sort((a, b) => placed(a) - placed(b));
   const shared = lenses.filter((one) => !one.about.length).sort((a, b) => placed(a) - placed(b));
   const views = told ? [] : [...own, ...shared];
-  const { rows: entities } = await l.db.query<Row>(`select id, type, title, status, is_open, owner, ${l.props}, created_at, updated_at from entity where archived_at is null`);
+  const { rows: entities } = await l.db.query<Row>(`select id, type, kind, title, status, is_open, owner, ${l.props}, created_at, updated_at from entity where archived_at is null`);
   const all = new Map(entities.map((e) => [e.id, e]));
   const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null; state: string | null }>(
     `select id, type, from_id, to_id, props ->> 'says' as says, props ->> 'state' as state from relation where valid_to is null order by id`,
@@ -242,7 +242,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
 
   const isA = (type: string, kind: string) => l.registry.isA(type, kind);
   // The system kind (a lens, a style, a run) is how the map is kept and looked at, not part of what is seen.
-  const system = (type: string) => l.registry.type(type)?.system ?? false;
+  const system = (e: Row) => e.kind === SYSTEM;
   // What is work: what can be estimated, and what such things are part of.
   const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || isA(type, 'work');
   const wanted = (asked.kinds ?? []).filter((k) => !k.startsWith('-'));
@@ -255,7 +255,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   const standing = new Set<string>();
   for (const e of entities) {
     if (e.id === asked.from || about.includes(e.id)) (eligible.set(e.id, e), standing.add(e.id));
-    else if (asked.fold.includes('system') && system(e.type)) rest.system++;
+    else if (asked.fold.includes('system') && system(e)) rest.system++;
     else if (asked.fold.includes('closed') && !e.is_open) rest.closed++;
     else if ((wanted.length && !wanted.some((k) => is(e.type, k))) || unwanted.some((k) => is(e.type, k))) (rest.kinds++, standing.add(e.id));
     else (eligible.set(e.id, e), standing.add(e.id));

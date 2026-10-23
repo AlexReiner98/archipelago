@@ -81,6 +81,7 @@ export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; 
   const moved: Record<string, number> = {};
   for (const t of reg.types.values()) for (const old of t.dormant ? [] : (t.movedFrom ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, t.id)) === 0) delete moved[old];
   for (const r of reg.relations.values()) for (const old of r.dormant ? [] : (r.moved_from ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, r.id, 'relation')) === 0) delete moved[old];
+  await l.fillKinds(); // each item's kind in its row, now the type table is whole
   const asleep = rows.filter((r) => !now.has(r.id));
   reg.keep({
     types: asleep.filter((r) => r.what === 'type').map((r) => r.def as ResolvedType),
