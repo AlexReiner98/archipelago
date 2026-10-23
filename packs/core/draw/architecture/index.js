@@ -7,7 +7,7 @@
 // every name is in the page and every part a link. Its look is ./look.js, in the lens's colours.
 
 import { layout } from './layout.js';
-import { saysSpots } from './says.js';
+import { partBoxes, saysSpots } from './says.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
 import { story } from './story.js';
@@ -111,7 +111,7 @@ export function picture({ answer, style, reduced }, tools) {
     if (c.says) labels.push({ c, text: fit(c.says, z('says_most'), SAYS_TEXT) });
     return [path, head, hit];
   });
-  const labelLayer = saysSpots({ labels, chains: g.chains, boxes: g.boxes, measure, z }).map(({ c, text, x: lx, y: ly, w }) =>
+  const labelLayer = saysSpots({ labels, chains: g.chains, boxes: g.boxes, parts: partBoxes(g), measure, z }).map(({ c, text, x: lx, y: ly, w }) =>
     m('g', { class: `ar-says ${c.state}` }, m('rect', { x: lx - w / 2, y: ly - z('says_height') / 2, width: w, height: z('says_height'), rx: z('says_height') / 2 }), m('text', { x: lx, y: ly }, text)),
   );
   const breakLayer = g.breaks.map(([bx, by]) => m('g', { class: 'ar-break' }, m('rect', { x: bx - 3, y: by - 8, width: 6, height: 16 }), m('path', { d: `M${bx - 6} ${by}H${bx + 6}` })));

@@ -7,7 +7,7 @@ import { layout } from './layout.js';
 import { css as base } from './look.js';
 import { m, titled } from './marks.js';
 import { play } from './play.js';
-import { saysSpots } from './says.js';
+import { partBoxes, saysSpots } from './says.js';
 import { css as storyLook } from './story-look.js';
 
 const NAME = /^[a-z][a-z0-9_]*$/;
@@ -166,7 +166,7 @@ export function story({ answer, style, reduced }, tools) {
   // What a wire carries, written on it where the still picture would write it; and whether the step lights it.
   for (const f of frames) {
     const labels = [...f.wires.values()].filter((c) => c.says).map((c) => ({ c, text: fit(c.says, z('says_most'), z('says_text')) }));
-    f.says = new Map(saysSpots({ labels, chains: [...f.wires.values()], boxes: f.g.boxes, measure, z }).map((s) => [s.c.key, s]));
+    f.says = new Map(saysSpots({ labels, chains: [...f.wires.values()], boxes: f.g.boxes, parts: partBoxes(f.g), measure, z }).map((s) => [s.c.key, s]));
     const lit = new Set((f.step.lit ?? []).map((w) => [...w].sort().join(' ')));
     f.lit = new Set([...f.wires.values()].filter((c) => lit.has([c.a, c.b].sort().join(' '))).map((c) => c.key));
   }
