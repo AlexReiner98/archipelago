@@ -3,6 +3,7 @@
 
 import { commitRule } from './commit-rule.ts';
 import { blockGraph } from './blocking.ts';
+import { whereOf } from './places.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 
 interface Brief {
@@ -50,7 +51,8 @@ export async function brief(l: Archipelago, input: { task?: string }) {
       )
     ).rows;
 
-  const [repo] = l.registry.relations.has('software.lives_in') ? await related('software.lives_in', ids) : [];
+  // Its repository: a place it or what holds it lives in that is known by an address or a folder.
+  const [repo] = (await related('lives_in', ids)).filter((p) => whereOf(l, p));
   const needs = await related('needs', [task.id]);
   // What the task rests on beyond structure (a rule that governs it, an issue it addresses, a question it assumes), by
   // the kind of link. From what holds it or what it needs, only questions and records: the rules and the decisions.
@@ -72,7 +74,8 @@ export async function brief(l: Archipelago, input: { task?: string }) {
   const lines = [`# ${task.title}`, `${l.registry.type(task.type)?.title ?? task.type}, ${task.status}. Archipelago id: ${task.id}`];
   if (task.body) lines.push('', task.body);
   if (chain.length > 1) lines.push('', `Part of: ${chain.slice(1).map((c) => c.title).join(' > ')}`);
-  if (repo) lines.push(`Repository: ${repo.title} (${repo.props.path ?? repo.props.remote ?? 'no path recorded'})`);
+  const at = repo && whereOf(l, repo);
+  if (repo) lines.push(`Repository: ${repo.title} (${at?.folder ?? at?.address ?? 'no path recorded'})`);
   if (roots.length) {
     lines.push('', '## Blocked', 'This cannot finish until:');
     for (const id of roots) lines.push(`- ${names.get(id)?.title} (${names.get(id)?.type}, ${names.get(id)?.status})`);

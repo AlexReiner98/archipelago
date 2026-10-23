@@ -119,6 +119,8 @@ export async function week(input, ctx) {
     from,
     to,
     zone,
+    // What the Time screen makes when it logs time or keeps a routine: this pack's types, so the page names none.
+    types: { entry: 'time.entry', routine: 'time.routine' },
     // Every project the week touches, in a fixed order, so each keeps one colour all week.
     projects: await Promise.all([...counted].sort().map(async (id) => ({ id, title: await r.title(id) }))),
     days: days.map((date, i) => ({

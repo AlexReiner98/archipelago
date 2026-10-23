@@ -158,11 +158,10 @@ function siteHead(site) {
   );
 }
 
-const INVOICE = 'time.invoice';
 const money = (n, currency = 'CAD') => new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(Number(n) || 0);
 const longDay = (ts) => new Date(`${ts}T12:00:00Z`).toLocaleDateString('en-CA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
-/** An invoice's heading: its number, its dates and what is due, and a mark once it is paid. */
+/** An invoice's heading, for a document whose style gives its page that head (page.head): its number, its dates and what is due, and a mark once it is paid. */
 function invoiceHead(d) {
   const f = d.fields ?? {};
   const owing = Number(f.total ?? 0) - Number(f.paid ?? 0);
@@ -223,7 +222,7 @@ function draw(d) {
   look = d;
   paint();
   pageSheet.replaceSync(pageCss(d.page_css));
-  document.title = d.type === INVOICE && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
+  document.title = d.head === 'invoice' && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
   away = new Map(Object.entries(d.links ?? {}));
   paths = d.paths ?? {};
@@ -250,7 +249,7 @@ function draw(d) {
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
     d.site && siteHead(d.site),
-    d.type === INVOICE ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
+    d.head === 'invoice' ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
     d.parts.map(part),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
@@ -258,7 +257,7 @@ function draw(d) {
     !published && !d.site && h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
-  document.body.classList.toggle('invoice', d.type === INVOICE);
+  document.body.classList.toggle('invoice', d.head === 'invoice');
   roomy();
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
   for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types);
@@ -273,7 +272,7 @@ if (!given) warmDrawings();
 (given
   ? Promise.resolve(JSON.parse(given.textContent))
   : own
-  ? Promise.all([api('document', { id: own }), api('view', { name: 'style', params: {} })]).then(([d, s]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths }))
+  ? Promise.all([api('document', { id: own }), api('view', { name: 'style', params: {} }), api('view', { name: 'style', params: { of: own } })]).then(([d, s, mine]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths, head: mine.style.page?.head }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');

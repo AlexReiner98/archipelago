@@ -99,10 +99,14 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown }) {
   return styleFor(l, await keptOf(l, 'style', undefined), item ? { hub: item } : {});
 }
 
-/** What the page itself is drawn in: the colours (theme) and lengths of the workspace's style. Sent with a page read by no login. */
-export async function pageLook(l: Archipelago) {
+/**
+ * What the page itself is drawn in: the colours (theme) and lengths of the workspace's style. Sent with a page read by
+ * no login. Of a document, also the head its own style gives its page (page.head), when one does: an invoice's.
+ */
+export async function pageLook(l: Archipelago, doc?: { id?: unknown; type: string }) {
   const { theme, lengths, page_css } = (await pageStyle(l, {})).style as { theme: unknown; lengths: unknown; page_css?: unknown };
-  return { theme, lengths, ...(typeof page_css === 'string' && page_css.trim() && { page_css }) };
+  const page = doc && ((await styleFor(l, await keptOf(l, 'style', undefined), { hub: { id: String(doc.id ?? ''), type: doc.type } })).style.page as { head?: unknown } | undefined);
+  return { theme, lengths, ...(typeof page_css === 'string' && page_css.trim() && { page_css }), ...(typeof page?.head === 'string' && { head: page.head }) };
 }
 
 /** A length as a style may give it: a number of pixels, or numbers with one of these units. */

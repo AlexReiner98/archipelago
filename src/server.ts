@@ -222,7 +222,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         }
         const doc = (await workspaces.has(wsId)) ? await sharedDocument((await workspaces.get(wsId)).pelago, secret) : null;
         if (!doc) return res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'This link does not open anything: it may have been revoked.' }));
-        return res.writeHead(200, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago)) }));
+        return res.writeHead(200, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }));
       }
 
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
