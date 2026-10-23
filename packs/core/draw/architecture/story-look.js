@@ -18,6 +18,10 @@ export const css = `
 .sp-key li { display: flex; align-items: center; gap: var(--space-4); white-space: nowrap; }
 .sp-swatch { width: var(--box-3); height: var(--box-3); border-radius: 50%; background: var(--muted); }
 .sp-off { pointer-events: none; }
+/* A part's tip (the page puts it beside the part): its name, then its first line, as many lines as it takes. */
+.sp-tip { max-width: var(--tip-most); padding: var(--space-5) var(--space-7); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--edge); border-radius: var(--radius-3); font-size: var(--text-3); line-height: 1.4; }
+.sp-tip b { display: block; margin-bottom: var(--space-2); }
+.sp-tip span { color: var(--muted); }
 .ar-part .ar-shape { transition: fill 0.5s, stroke 0.8s, stroke-width 0.8s; }
 .ar-wire, .ar-head { transition: stroke 0.8s, stroke-width 0.8s, fill 0.8s; }
 .ar-part.sp-new .ar-shape { stroke: var(--accent); stroke-width: var(--border-3); }

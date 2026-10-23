@@ -39,6 +39,8 @@ A mark is `[tag, attributes, ...what is in it]`; a string is text. `key` names a
 
 A patch names a mark by its key: `toggle` classes, `set` attributes (with `over`, in milliseconds, numbers and paths move there), `text`, `mark` to replace it, `remove`, `append`.
 
+A drawing can say what a mark is in a tip beside it: `{ tip: { key, mark } }` shows `mark` (checked as every mark is) beside the mark with that key, and `{ tip: null }` takes it away. The drawing decides when, answering `enter`, `leave` or `click` (a tap, where there is no pointer to hover), and how it looks, in its own stylesheet; the page keeps where (`ui/drawing-tip.js`): above the mark or below where there is no room, inside the picture, gone when the pointer leaves it or a tap lands elsewhere, the mark's own title set aside meanwhile. The architecture drawing gives each part and each place's name one: its name as the step shows it, and its first line.
+
 A drawing's stylesheet (`css`) is read only inside its own picture: nested under `:where([data-drawing="…"])`, so its selectors weigh what they would alone, with the picture's paint contained. What could reach outside it (`&`, `:has`, `:root`, a leading combinator, `@import`, `url(`, a quote, a backslash, a brace that closes the wrapper) is refused.
 
 ## A picture that plays

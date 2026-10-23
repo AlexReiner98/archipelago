@@ -154,6 +154,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       escape: hostile(`{ css: '} body { display: none } x {', svg: ['svg', {}] }`),
       sibling: hostile(`{ css: '~ * { display: none }', svg: ['svg', {}] }`),
       fetch: hostile(`{ css: 'x { background: url(https://example.com/) }', svg: ['svg', {}] }`),
+      tip: hostile(`{ svg: ['svg', { key: 'x' }] }`, `setTimeout(() => tools.patch([{ tip: { key: 'x', mark: ['script', {}, 'parent.document.body.remove()'] } }]), 50)`),
     };
     const body = await page.evaluate('getComputedStyle(document.body).display');
     const got: Record<string, string> = await page.evaluate(`(async () => {
@@ -163,7 +164,8 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
         const host = document.createElement('div');
         document.body.append(host);
         drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
-        for (let n = 0; n < 200 && !host.textContent; n++) await new Promise((r) => setTimeout(r, 25));
+        // What it sends after its scene (a tip) is checked when it comes: wait for what it says then.
+        for (let n = 0; n < 200 && !host.textContent.startsWith('This drawing stopped'); n++) await new Promise((r) => setTimeout(r, 25));
         out[name] = host.textContent;
       }
       return out;

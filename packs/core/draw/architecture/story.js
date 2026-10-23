@@ -169,11 +169,11 @@ export function story({ answer, style, reduced }, tools) {
   const keyOf = (key) => key.replace(' ', '>');
   const placeMarks = [...everyPlace].map(([id, [b, f]]) => {
     const at = placeAt(b, f);
-    return { box: m('rect', { key: `b:${id}:box`, ...at.box, rx: z('place_corner'), class: 'ar-place-box sp-off', opacity: 0 }), name: titled(m('a', { key: `b:${id}`, href: `#/e/${id}`, class: 'ar-place sp-off', opacity: 0 }, m('rect', { key: `b:${id}:n`, ...at.n, height: z('place_name_height'), rx: z('corner'), class: 'ar-place-name' }), m('circle', { key: `b:${id}:d`, ...at.d, r: z('dot_small'), class: 'ar-dot ok' }), m('text', { key: `b:${id}:t`, ...at.t }, at.text), m('text', { key: `b:${id}:f`, x: at.box.x + at.box.width - z('text_after'), y: at.t.y, class: 'sp-flag' }, '')), at.title) };
+    return { box: m('rect', { key: `b:${id}:box`, ...at.box, rx: z('place_corner'), class: 'ar-place-box sp-off', opacity: 0 }), name: titled(m('a', { key: `b:${id}`, on: ['enter', 'leave', 'click'], href: `#/e/${id}`, class: 'ar-place sp-off', opacity: 0 }, m('rect', { key: `b:${id}:n`, ...at.n, height: z('place_name_height'), rx: z('corner'), class: 'ar-place-name' }), m('circle', { key: `b:${id}:d`, ...at.d, r: z('dot_small'), class: 'ar-dot ok' }), m('text', { key: `b:${id}:t`, ...at.t }, at.text), m('text', { key: `b:${id}:f`, x: at.box.x + at.box.width - z('text_after'), y: at.t.y, class: 'sp-flag' }, '')), at.title) };
   });
   const partMarks = [...everyPart].map(([id, [n, f]]) => {
     const at = partAt(n, f);
-    const mark = m('a', { key: `p:${id}`, href: `#/e/${id}`, class: 'ar-part sp-off', opacity: 0 }, m('rect', { key: `p:${id}:r`, ...at.r, rx: Math.min(z('corner'), n.h / 5), class: 'ar-shape' }), m('circle', { key: `p:${id}:d`, ...at.d, r: z('dot') }), m('text', { key: `p:${id}:t`, ...at.t }, at.text), m('text', { key: `p:${id}:f`, ...at.f, class: 'sp-flag' }, ''));
+    const mark = m('a', { key: `p:${id}`, on: ['enter', 'leave', 'click'], href: `#/e/${id}`, class: 'ar-part sp-off', opacity: 0 }, m('rect', { key: `p:${id}:r`, ...at.r, rx: Math.min(z('corner'), n.h / 5), class: 'ar-shape' }), m('circle', { key: `p:${id}:d`, ...at.d, r: z('dot') }), m('text', { key: `p:${id}:t`, ...at.t }, at.text), m('text', { key: `p:${id}:f`, ...at.f, class: 'sp-flag' }, ''));
     mark.splice(2, 0, m('title', { key: `p:${id}:n` }, at.title));
     return mark;
   });
@@ -190,9 +190,21 @@ export function story({ answer, style, reduced }, tools) {
     .filter(([v, c]) => NAME.test(v) && NAME.test(String(c)))
     .map(([v, c]) => `.ar-dot.k-${v}, .sp-swatch.k-${v} { fill: var(--${String(c).replaceAll('_', '-')}); background: var(--${String(c).replaceAll('_', '-')}); stroke: none; }`)
     .join('\n')}`;
+  // What a part or a place says of itself, in a tip beside it: its name as the step shows it, and its first line.
+  const byId = new Map(answer.items.map((i) => [i.id, i]));
+  const tipFor = (key) => {
+    const id = key.slice(2), f = frames[Math.max(player.step(), 0)];
+    const shown = (key[0] === 'p' ? f.parts.get(id) : f.boxes.get(id))?.item ?? byId.get(id);
+    return shown && m('div', { class: 'sp-tip' }, m('b', {}, shown.title), byId.get(id)?.gist && m('span', {}, byId.get(id).gist));
+  };
   return {
     scene: { css, svg, before: player.before, after: player.after, size: style.still ? { width: widest, height: widest / aspect } : { width: right - left, height: tall } },
-    on: player.on,
+    on(event) {
+      if (!/^[pb]:e_[a-z0-9]{8}$/.test(event.key)) return player.on(event);
+      if (event.name === 'leave') return [{ tip: null }];
+      const mark = tipFor(event.key);
+      return mark ? [{ tip: { key: event.key, mark } }] : [];
+    },
     end: player.end,
   };
 }
