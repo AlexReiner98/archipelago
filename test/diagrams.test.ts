@@ -55,14 +55,14 @@ test('the XML escapes what it is given and refuses an edge to nothing', () => {
 
 test('every type is drawn under what it extends, down to the kinds, and an unknown parent is refused', () => {
   const packs: PackFile[] = [
-    { id: 'core', types: [{ id: 'work', kind: true }, { id: 'question', kind: true }, { id: 'lens', tier: 'system' }], relations: [{ id: 'relates_to', root: true }, { id: 'about', root: true }] },
+    { id: 'core', types: [{ id: 'work', kind: true }, { id: 'question', kind: true }, { id: 'system', kind: true }, { id: 'lens', extends: 'system' }], relations: [{ id: 'relates_to', root: true }, { id: 'about', root: true }] },
     { id: 'work', requires: ['core'], types: [{ id: 'work.task', extends: 'work', capabilities: { bound: {}, where: {} } }], relations: [{ id: 'work.based_on', extends: 'relates_to', from: ['*'], to: ['work.task'] }] },
     { id: 'lab', requires: ['core', 'work'], types: [{ id: 'lab.trial', extends: 'work.task' }], extend: { 'work.task': { fields: { cost: {} } } } },
   ];
   const [inheritance, relations, packMap] = typeDiagram(packs);
   const xml = pageXml(inheritance);
   for (const id of ['work', 'question', 'lens', 'work.task', 'lab.trial']) assert.match(xml, new RegExp(`id="t-${id.replace('.', '-')}"`));
-  assert.equal(inheritance.edges.length, 2, 'one edge for each type that extends another');
+  assert.equal(inheritance.edges.length, 3, 'one edge for each type that extends another');
   assert.ok(inheritance.edges.some((e) => e.from === 't-lab-trial' && e.to === 't-work-task'));
   const at = (id: string) => inheritance.vertices.find((v) => v.id === id)!;
   assert.ok(at('t-work').x < at('t-work-task').x && at('t-work-task').x < at('t-lab-trial').x, 'each level a column to the right');
@@ -83,7 +83,7 @@ test('the diagrams of this repository are made whole, and the same each time', (
   assert.deepEqual(diagrams(files, packs), made);
   for (const f of files.filter((f) => /^src\/[^/]+\.ts$/.test(f.path))) assert.ok(made['modules.drawio'].includes(`>${f.path.slice(4)}<`) || made['modules.drawio'].includes(`label="${f.path.slice(4)}"`), `${f.path} is drawn`);
   const types = packs.flatMap((p) => p.types ?? []);
-  assert.equal(cells(made['types.drawio'].split('</diagram>')[0], 'vertex'), types.length + 2, 'every type, the system tier heading and the key');
+  assert.equal(cells(made['types.drawio'].split('</diagram>')[0], 'vertex'), types.length + 1, 'every type and the key');
 });
 
 test('a page as data: boxes placed on the page, what each is said as what it is, and plain words', () => {

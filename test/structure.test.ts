@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
+import { MAP_TABLES, RESTORE, STORES } from '../src/operational.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
@@ -56,10 +57,9 @@ const count = (files: string[], pattern: RegExp) =>
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
   'src/views.ts': 503,
-  'src/tools.ts': 910,
-  'src/pelago.ts': 1061,
+  'src/tools.ts': 909,
+  'src/pelago.ts': 1045,
   'ui/style.css': 732,
-  'src/sessions.ts': 501,
 };
 
 test(`no file is over ${MAX_LINES} lines`, () => {
@@ -83,21 +83,22 @@ test('the kernel names no pack', () => {
   assert.deepEqual(ratchet(named, NAMES_PACKS), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
 
-// 3. Writes to items and relations go through the write path (src/pelago.ts), apart from the
-// operational state CLAUDE.md allows (sessions, claims, notifications) and restoring a backup.
-const WRITES_ELSEWHERE: Record<string, number> = {
-  'src/sessions.ts': 4,
-  'src/automations.ts': 3,
-  'src/backup.ts': 2,
-  'src/notify.ts': 1,
-  'src/outbox.ts': 1,
-  'src/tools.ts': 1,
-};
+// 3. Writes to items and relations go through the write path (src/pelago.ts): change for facts, and the
+// operational writes and the restore path src/operational.ts names. Every other store is named there too.
+const WRITES_ELSEWHERE: Record<string, number> = {};
 
 test('items and relations are written in one place', () => {
   const others = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/pelago.ts');
   const writes = count(others, /\b(?:insert\s+into|update|delete\s+from)\s+(?:entity|relation)\b/gi);
   assert.deepEqual(ratchet(writes, WRITES_ELSEWHERE), [], 'Send the change through Archipelago.change.');
+});
+
+test('every store is named, with its rule', () => {
+  const tables = [...new Set(codeFiles.filter((f) => f.startsWith('src/')).flatMap((f) => [...read(f).matchAll(/create table if not exists (\w+)/gi)].map((m) => m[1])))];
+  const named = [...MAP_TABLES, ...Object.keys(STORES)];
+  assert.deepEqual(tables.filter((t) => !named.includes(t)), [], 'Name the store in src/operational.ts, with the one rule it keeps.');
+  assert.deepEqual(named.filter((t) => !tables.includes(t)), [], 'A store src/operational.ts names that no longer exists: take it out.');
+  assert.ok(read('src/pelago.ts').includes(`function ${RESTORE}(`), 'The restore path src/operational.ts names is in src/pelago.ts.');
 });
 
 // 4. A pack's code imports only its own files and Node's built-ins: never the kernel's source.

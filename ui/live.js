@@ -2,10 +2,11 @@ import { api, h, main, route, state } from './base.js';
 
 // ---- live updates --------------------------------------------------------
 
-// The server's pulse moves whenever the map or what is held for the owner does. The page
-// is drawn again when it moves, unless that would throw away something half
-// done (typed text, ticked boxes, an open question, a graph being explored);
-// then a notice offers the refresh instead.
+// The server's pulse moves whenever the map or what is held for the owner does, and says
+// which items the changes since the last look touched. The page is drawn again, in place,
+// only when one of them is on it, unless that would throw away something half done
+// (typed text, ticked boxes, an open question, a graph being explored); then a notice
+// offers the refresh instead. A change elsewhere on the map leaves the page still.
 export let uiFiles;
 export let outdated = false;
 export const stale = h('div', { id: 'stale', hidden: true }, 'The map has changed.', h('button', { onclick: () => (outdated ? location.reload() : route()) }, 'Refresh'));
@@ -17,14 +18,19 @@ main.addEventListener('input', (e) => {
 // Following: an agent can point this page at what it is working on (the `show`
 // tool, and every change it makes). With "Follow agents" on, the page goes
 // there; a line at the bottom says who sent it and why. Anything half done on
-// the page is kept, and the line offers the jump instead.
+// the page, or a reader in the middle of reading it, is kept, and the line offers
+// the jump instead. Until the reader chooses, it is on only while one agent at most is at work.
 export const following = {
+  /** How many agents took a step lately: more than one, and nothing is followed unless the reader asks. */
+  working: 0,
   get on() {
     try {
-      return localStorage.getItem('pelago-follow') !== 'off';
+      const kept = localStorage.getItem('pelago-follow');
+      if (kept) return kept !== 'off';
     } catch {
-      return true;
+      // Without storage, as if nothing was chosen.
     }
+    return this.working <= 1;
   },
   set on(value) {
     try {
@@ -81,6 +87,10 @@ document.getElementById('follow-what').addEventListener('toggle', (ev) => ev.tar
 export const followed = h('div', { id: 'followed', hidden: true });
 document.body.append(followed);
 export let seenStep;
+/** When the reader last scrolled, pointed or typed: a page being read is not moved under them. */
+let readAt = 0;
+for (const name of ['scroll', 'wheel', 'pointermove', 'pointerdown', 'keydown']) addEventListener(name, () => (readAt = Date.now()), { passive: true, capture: true });
+const reading = () => Date.now() - readAt < 20_000 || Boolean(getSelection()?.toString());
 export let followedTimer;
 /** Where each agent that tells a story tells it: following it goes there, not from item to item. */
 export const storyOf = new Map();
@@ -93,6 +103,8 @@ export function follow(steps = []) {
     heardFrom.add(s.actor);
     if (s.kind === 'story') storyOf.set(s.actor, s.hash);
   }
+  following.working = new Set(steps.filter((s) => Date.now() - s.at < 600_000).map((s) => s.actor)).size;
+  followBox.checked = following.on;
   if (!following.on) return;
   const wanted = fresh.filter((s) => chosen.kinds.has(s.kind) && !chosen.muted.has(s.actor));
   // The line says the last thing done; the page goes to the last that has a place. A step may have none: then the page stays.
@@ -100,7 +112,7 @@ export function follow(steps = []) {
   if (!to) return;
   const place = wanted.findLast((s) => s.hash || storyOf.has(s.actor));
   const there = place && `#/${storyOf.get(place.actor) ?? place.hash}`;
-  const busy = state.dirty || document.querySelector('dialog[open]');
+  const busy = state.dirty || document.querySelector('dialog[open]') || reading();
   followed.replaceChildren(
     ...[
       // One line: who, and the first few words of why. The whole reason is on the page it brought you to.
@@ -116,15 +128,36 @@ export function follow(steps = []) {
   if (!busy && there && location.hash !== there) location.hash = there;
 }
 
-/** A page that has just drawn itself again after its own change: the change the pulse then sees is already on it. */
+/** The items the page shows: what it is the page of, what it names or links to, and what its pictures hold. */
+export function shownIds() {
+  const ids = new Set(location.hash.match(/e_[a-z0-9]{8}/g) ?? []);
+  for (const a of main.querySelectorAll('a[href*="e_"]')) for (const id of a.getAttribute('href').match(/e_[a-z0-9]{8}/g) ?? []) ids.add(id);
+  for (const n of main.querySelectorAll('[data-root], [data-item]')) ids.add(n.dataset.root ?? n.dataset.item);
+  for (const host of main.querySelectorAll('.lens-wrap')) for (const item of host.answer?.items ?? []) ids.add(item.id);
+  return ids;
+}
+
+/** Whether what changed (the pulse's `touched`, and whether the held changes or a story moved) bears on the page in view. */
+export function bears(touched, queueMoved) {
+  if (!touched || touched.ids === null) return true;
+  // A list or a screen may hold an item just made; Home holds what waits for the owner.
+  if (/^#\/(map|s\/)/.test(location.hash) && touched.made) return true;
+  if (queueMoved && (!/^#\/e\//.test(location.hash) || main.querySelector('.story'))) return true;
+  const ids = shownIds();
+  return touched.ids.some((id) => ids.has(id));
+}
+
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;
 export async function checkPulse() {
   if (document.hidden || redrawing) return;
   let now;
+  let touched;
   try {
-    const beat = await api('pulse');
+    const beat = await api('pulse', state.seq === undefined ? {} : { since: state.seq });
     now = beat.stamp;
+    touched = beat.touched;
+    state.seq = touched?.seq ?? state.seq;
     // The page's own files changed on the server: load them, unless that would
     // throw away something half done.
     if (uiFiles !== undefined && beat.ui !== uiFiles) {
@@ -142,15 +175,18 @@ export async function checkPulse() {
   } catch {
     return;
   }
-  const moved = state.pulse !== undefined && now !== state.pulse;
+  const was = state.pulse;
+  const moved = was !== undefined && now !== was;
   state.pulse = now;
   if (!moved) return;
   if (state.selfDrawn) return void (state.selfDrawn = false);
+  // Only the map's events moved, and none of them is on this page: it stays as it is.
+  if (!bears(touched, now.split('.').slice(1).join() !== was.split('.').slice(1).join())) return;
   if (state.dirty || document.querySelector('dialog[open]') || /^#\/new/.test(location.hash)) {
     stale.hidden = false;
     return;
   }
-  // Hold the page's height while it is redrawn, so the scroll position stays.
+  // Hold the page's height while it is redrawn, so the scroll position stays: an item's page swaps only what changed.
   main.style.minHeight = `${main.offsetHeight}px`;
   redrawing = true;
   try {

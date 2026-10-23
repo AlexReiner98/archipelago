@@ -229,7 +229,7 @@ test('an event is a gate: what holds it by stream, what can follow, and what is 
   assert.equal(sorted.streams.find((s) => s.id === made.docs)!.items[0].id, made.guide);
 
   await assert.rejects(VIEWS.gate.run(l, { event: made.app }), /needs an event/);
-  await assert.rejects(l.change(human, { ops: [{ op: 'link', type: 'defers', from: made.app, to: made.hover }], reason: 'test' }), /must start from event/);
+  await assert.rejects(l.change(human, { ops: [{ op: 'link', type: 'defers', from: made.app, to: made.hover }], reason: 'test' }), /must start from occurrence/);
   const listed = (await VIEWS.gate.run(l, {})) as { events: { id: string }[] };
   assert.deepEqual(listed.events.map((e) => e.id), [made.release]);
 });

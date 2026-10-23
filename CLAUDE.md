@@ -80,8 +80,9 @@ where, and how that server is run.
   confirm the item and event counts are unchanged after the restart. Never copy `data/` while the
   server runs and call it a backup.
 - **One write path.** Every change to items and links goes through
-  `Archipelago.change` / `apply`. Sessions, claims and notifications are the only
-  writes that skip approval, because they are operational state.
+  `Archipelago.change` / `apply`. What skips approval is operational state,
+  and every store of it is named in `src/operational.ts` with its rule: add a
+  new one there, or the structure test refuses it.
 - **Visibility is enforced by the database** (row level security in
   `src/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
@@ -171,8 +172,9 @@ else a pack"). These rules keep it composable while that happens, and
 - **No file over 500 lines.** Split it into modules, each one thing.
 - **The kernel names no pack.** No pack's type or link type by name in `src/`
   or `ui/`: ask the registry for a kind or a capability.
-- **One write path, checked.** Items and links are written in
-  `src/pelago.ts`; the operational state named above is the only exception.
+- **One write path, checked.** Items and links are written only in
+  `src/pelago.ts`: through `change`, or through the operational writes and the
+  restore path `src/operational.ts` names.
 - **A pack's code imports nothing of the kernel.** It is handed what it reads
   and answers with ops and requests.
 - **A pack's code comes with its tests,** run without a database: input in,

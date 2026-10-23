@@ -71,9 +71,9 @@ async function route(pulse = false) {
       const el = part(p);
       el.hidden = !draw[p];
       if (!draw[p]) return el.replaceChildren();
-      // The graph is as someone has arranged it: a change elsewhere does not draw it again.
+      // The graph is as someone has arranged it: a change elsewhere does not draw it again; nor the search box over an item.
       // The whole map is as someone has arranged it: a change elsewhere does not draw it again.
-      if (pulse && el.childElementCount && p === 'graph' && !query) return;
+      if (pulse && el.childElementCount && ((p === 'graph' && !query) || draw[p] === searchBar)) return;
       try {
         await draw[p]();
       } catch (err) {
