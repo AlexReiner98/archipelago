@@ -241,8 +241,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>) {
   if (asked.from && !all.has(asked.from)) throw new Error(`No entity "${asked.from}"`);
 
   const isA = (type: string, kind: string) => l.registry.isA(type, kind);
-  // A lens and a style are how the map is looked at, not part of what is seen.
-  const system = (type: string) => (type.startsWith('sys.') && !isA(type, 'resource')) || isA(type, 'lens') || isA(type, 'style');
+  // The system kind (a lens, a style, a run) is how the map is kept and looked at, not part of what is seen.
+  const system = (type: string) => l.registry.type(type)?.system ?? false;
   // What is work: what can be estimated, and what such things are part of.
   const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || isA(type, 'work');
   const wanted = (asked.kinds ?? []).filter((k) => !k.startsWith('-'));
