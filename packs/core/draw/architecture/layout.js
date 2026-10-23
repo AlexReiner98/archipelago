@@ -49,7 +49,7 @@ const shapeOf = (i) => (['data', 'storage', 'database', 'queue'].includes(i.role
  * stacked, wires turn as little as they can, and no two drops run side by side. Without it, a picture is laid out as
  * it always was.
  */
-export function layout({ items, links, rootId, measure, sizes, prior, steady = Boolean(prior) }) {
+export function layout({ items, links, rootId, measure, sizes, prior, steady = Boolean(prior), room }) {
   const need = (name) => {
     if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every one the architecture lays out by`);
     return sizes[name];
@@ -135,7 +135,8 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
 
   // ---- Sizes.
   for (const n of nodes.values()) {
-    const text = Math.min(measure(n.item.title, TEXT), MAX_TEXT);
+    // Beside its name, the room a part is given for more (a story's flag on it), by id.
+    const text = Math.min(measure(n.item.title, TEXT), MAX_TEXT) + (room?.get(n.id) ?? 0);
     if (n.shape === 'diamond') [n.w, n.h] = [text + DIAMOND_PAD, DIAMOND_H];
     else if (n.shape === 'store') [n.w, n.h] = [text + STORE_PAD, STORE_H];
     else [n.w, n.h] = [text + BOX_PAD, BOX_H];

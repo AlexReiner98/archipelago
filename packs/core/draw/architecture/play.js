@@ -97,13 +97,15 @@ export function play({ answer, style, reduced, tools, shape }) {
 
   const move = (k, dur) => {
     const was = cur >= 0 ? frames[cur] : null, f = frames[k];
-    const list = [], fresh = [];
+    const list = [], fresh = [], flags = [];
     const over = dur ? { over: dur } : {};
     for (const [id, n] of f.parts) {
       const at = partAt(n, f), key = `p:${id}`, there = was?.parts.has(id);
       if (there && dur) list.push({ key: `${key}:r`, set: at.r, ...over }, { key: `${key}:d`, set: { cx: at.d.cx, cy: at.d.cy }, ...over }, { key: `${key}:t`, set: at.t, ...over }, { key: `${key}:f`, set: at.f, ...over });
       else list.push({ key: `${key}:r`, set: at.r }, { key: `${key}:d`, set: { cx: at.d.cx, cy: at.d.cy } }, { key: `${key}:t`, set: at.t }, { key: `${key}:f`, set: at.f });
-      list.push({ key: `${key}:d`, set: { class: at.d.class } }, { key: `${key}:t`, text: at.text }, { key: `${key}:n`, text: at.title }, { key: `${key}:f`, text: at.flag });
+      list.push({ key: `${key}:d`, set: { class: at.d.class } }, { key: `${key}:t`, text: at.text }, { key: `${key}:n`, text: at.title });
+      // A flag is put up once its part has grown to hold it, and taken down at once.
+      (dur && at.flag ? flags : list).push({ key: `${key}:f`, text: at.flag });
       list.push({ key, toggle: { 'sp-off': false, 'sp-gone': false, 'sp-flagged': Boolean(at.flag) }, set: { opacity: 1 }, ...over });
       if (!there && dur && was) fresh.push(key);
     }
@@ -138,6 +140,7 @@ export function play({ answer, style, reduced, tools, shape }) {
     // What a step brings is in the accent a while.
     if (fresh.length) (list.push(...fresh.map((key) => ({ key, toggle: { 'sp-new': true } }))), later(t('new_for'), () => send(fresh.map((key) => ({ key, toggle: { 'sp-new': false } })))));
     send(list);
+    if (flags.length) later(dur, () => send(flags));
     cur = k;
   };
 

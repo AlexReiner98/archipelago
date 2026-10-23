@@ -31,7 +31,7 @@ export const css = `
 .ar-head.sp-new { fill: var(--accent); }
 .ar-wire.sp-gone { stroke: var(--bad); stroke-width: var(--border-3); }
 .ar-head.sp-gone { fill: var(--bad); }
-.sp-flag { fill: var(--bad); font-size: var(--text-1); font-weight: 700; text-anchor: end; dominant-baseline: middle; }
+.sp-flag { fill: var(--bad); font-size: var(--ln-arch-text); font-family: var(--ln-font); text-anchor: end; dominant-baseline: middle; }
 .ar-part.sp-flagged .ar-shape { fill: var(--bad-soft); stroke: var(--bad); }
 .ar-place-box.sp-flagged { stroke: var(--bad); stroke-width: var(--border-2); }
 .ar-place.sp-flagged text { fill: var(--bad); }
