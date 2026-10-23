@@ -3,11 +3,14 @@
 // depends on it, broken where one passes under another, and what follows an open question dashed, as a scenario.
 // Many plain things before one step (a release's prerequisites) are checklists, one for each type, a row each.
 // The layout is ./layout.js; this answers with the marks to draw (SVG and HTML as data), which the page checks and
-// mounts, so every name is in the page and every step a link. Its look is ./look.js, in the lens's colours.
+// mounts, so every name is in the page and every step a link. Its look is ./look.js, in the lens's colours. A lens
+// with steps tells the process as it happens (./story.js), the conversation beside it.
 
 import { layout } from './layout.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
+import { play } from './play.js';
+import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 
 /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it. */
 function lensTree(answer) {
@@ -46,7 +49,14 @@ function outline(shape, x, y, w, hgt, rx) {
  * gives every drawing (the answer, the style, the titles of the types it holds); `tools.measure(text, px, font)` is
  * how wide a text is drawn.
  */
-export function picture({ answer, style, types = {} }, tools) {
+export function picture({ answer, style, types = {}, reduced }, tools) {
+  // A story lays out what its steps bring in, all of it, each mark hidden until a step shows it.
+  const story = Array.isArray(answer.steps) && answer.steps.length > 0;
+  if (story) {
+    const named = everyNamed(answer.steps);
+    answer = { ...answer, items: answer.items.filter((i) => named.has(i.id) || i.id === answer.lens.from) };
+  }
+  const hidden = story ? { opacity: 0 } : {};
   const byId = lensTree(answer);
   // Every length is the style's (sizes, flow_*), named by the house style; so is the typeface.
   const z = (name) => {
@@ -80,8 +90,8 @@ export function picture({ answer, style, types = {} }, tools) {
   const wireLayer = g.chains.map((c, n) => {
     const [ex, ey] = c.points.at(-1);
     return [
-      m('path', { key: `w:${n}`, d: `M${c.points.map((p) => p.join(' ')).join('L')}`, class: `lf-wire${c.dashed ? ' dashed' : ''}` }),
-      m('path', { key: `h:${n}`, d: `M${ex} ${ey}L${ex - z('head_half')} ${ey - z('head_length')}L${ex + z('head_half')} ${ey - z('head_length')}Z`, class: 'lf-head' }),
+      m('path', { key: `w:${n}`, d: `M${c.points.map((p) => p.join(' ')).join('L')}`, class: `lf-wire${c.dashed ? ' dashed' : ''}`, ...(story && { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 }), ...hidden }),
+      m('path', { key: `h:${n}`, d: `M${ex} ${ey}L${ex - z('head_half')} ${ey - z('head_length')}L${ex + z('head_half')} ${ey - z('head_length')}Z`, class: 'lf-head', ...hidden }),
     ];
   });
   const breakLayer = g.breaks.map(([bx, by]) => m('g', { class: 'lf-break' }, m('rect', { x: bx - z('break_half'), y: by - z('break_reach'), width: 2 * z('break_half'), height: 2 * z('break_reach') }), m('path', { d: `M${bx - z('break_track')} ${by}H${bx + z('break_track')}` })));
@@ -97,7 +107,7 @@ export function picture({ answer, style, types = {} }, tools) {
     });
     const key = `s:${n.id}`;
     keyed.set(key, n.id);
-    return m('g', { key, on: ['enter', 'leave'], class: 'lf-step lf-list' }, outline('list', X, Y, n.w, n.h, CORNER), m('text', { x: left + z('list_head_x'), y: top + LIST_HEAD / 2, class: 'lf-list-head' }, `${types[n.type] ?? n.type} · ${open} of ${n.list.length} open`), m('path', { d: `M${left} ${top + LIST_HEAD - z('list_rule_above')}H${left + n.w}`, class: 'lf-list-rule' }), rows);
+    return m('g', { key, on: ['enter', 'leave'], class: 'lf-step lf-list', ...hidden }, outline('list', X, Y, n.w, n.h, CORNER), m('text', { x: left + z('list_head_x'), y: top + LIST_HEAD / 2, class: 'lf-list-head' }, `${types[n.type] ?? n.type} · ${open} of ${n.list.length} open`), m('path', { d: `M${left} ${top + LIST_HEAD - z('list_rule_above')}H${left + n.w}`, class: 'lf-list-rule' }), rows);
   };
   const stepLayer = steps.map((n) => {
     if (n.shape === 'list') return checklist(n);
@@ -114,7 +124,7 @@ export function picture({ answer, style, types = {} }, tools) {
     ];
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
-    const el = titled(n.stub ? m('g', { key, on: ['enter', 'leave'], class: cls }, body) : m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls }, body), words(n));
+    const el = titled(n.stub ? m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body) : m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), words(n));
     if (!n.stub) dims.set(n.id, el);
     return el;
   });
@@ -124,7 +134,7 @@ export function picture({ answer, style, types = {} }, tools) {
   const saysLayer = [...said.values()].map((c) => {
     const d = g.nodes.get(c.a), text = fit(c.says, z('says_most'), z('says_text')), w = measure(text, z('says_text')) + 2 * z('says_pad');
     const lx = g.x.get(d.id) + w / 2 + z('says_aside'), ly = (g.y.get(d.id) + d.h / 2 + c.points[1][1]) / 2, sh = z('says_height');
-    return titled(m('g', { class: 'lf-says' }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
+    return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
   const svg = m('svg', { viewBox: `0 0 ${g.width} ${g.height}`, role: 'img', 'aria-label': `A process of ${steps.length} steps` }, wireLayer, breakLayer, stepLayer, saysLayer);
 
@@ -149,9 +159,27 @@ export function picture({ answer, style, types = {} }, tools) {
   const light = (id) => g.chains.flatMap((c, n) => [`w:${n}`, `h:${n}`].map((key) => ({ key, toggle: { lit: Boolean(id) && (c.a === id || c.b === id) } })));
   // Opened from an item's page, the picture is brought to that item; else to where the process starts.
   const start = g.nodes.has(style.here) ? style.here : steps.find((n) => !n.stub && n.layer === 0)?.id;
+  // Told as a story: each step of the process shown as the story's steps bring it, on the stage of story.js.
+  let player = null;
+  if (story) {
+    const idsOf = (id) => {
+      const n = g.nodes.get(id);
+      return n?.list ? n.list.map((i) => i.id) : [n?.item.id ?? id];
+    };
+    const marks = {
+      steps: new Map(steps.map((n) => [`s:${n.id}`, idsOf(n.id)])),
+      wires: g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: idsOf(c.a), to: idsOf(c.b), item: { from: c.a, to: c.b } })),
+      says: new Map([...said.values()].map((c) => [g.chains.indexOf(c), `t:${g.chains.indexOf(c)}`])),
+    };
+    const frames = statesOf(answer.steps);
+    player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks, ...ctx }) } });
+  }
   return {
-    scene: { css, svg, legend, size: { width: g.width, height: g.height }, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
-    on({ name, key }) {
+    scene: { css: story ? `${css}\n${storyCss}` : css, svg, legend, ...(player && { before: player.before, aside: player.after }), size: { width: g.width, height: g.height }, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
+    end: player?.end,
+    on(event) {
+      const { name, key } = event;
+      if (player && (key === 'play' || key.startsWith('c:'))) return player.on(event);
       if (name === 'leave') return light(null);
       return keyed.has(key) ? light(keyed.get(key)) : [];
     },

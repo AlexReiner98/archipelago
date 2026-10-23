@@ -13,6 +13,7 @@ import { boxPath, curveOf, islandPath, islands, css as islandsLook, routeSpots }
 import { finished, health, layout } from './layout.js';
 import { css as base } from './look.js';
 import { m, titled } from './marks.js';
+import { moves } from './moves.js';
 import { play } from './play.js';
 import { partBoxes, saysSpots } from './says.js';
 import { css as storyLook } from './story-look.js';
@@ -287,6 +288,8 @@ export function story({ answer, style, reduced }, tools) {
   // Islands in 3D, where a step asks for them: painted on a surface over the picture.
   const sea = used.includes(DEEP);
   if (sea) shape.deep = deep({ style, tools, z, num, shape });
+  // Each step is shown on the architecture's stage: what goes, then what moves, then what comes in.
+  shape.stage = (ctx) => moves({ style, shape, ...ctx });
   const player = play({ answer, style, reduced, tools, shape });
   // The colour of each value a dot is coloured by, in the story's own look and in each other; an island is tinted with it.
   const colours = [[null, style.dots], ...Object.keys(LOOKS).map((l) => [l, style.dots?.[l]])].flatMap(([look, dots]) => Object.entries(dots?.colours ?? {}).filter(([v, c]) => NAME.test(v) && NAME.test(String(c))).map(([v, c]) => [look ? `.sp-${look} ` : '', v, `var(--${String(c).replaceAll('_', '-')})`, look]));
