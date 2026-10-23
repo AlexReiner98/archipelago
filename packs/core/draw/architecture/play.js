@@ -7,7 +7,7 @@
 import { m } from './marks.js';
 
 export function play({ answer, style, reduced, tools, shape }) {
-  const { frames, partAt, placeAt, wireAt, keyOf, view, arrow, pathOf, squareMorph, shift } = shape;
+  const { frames, partAt, placeAt, wireAt, keyOf, view, heads, pathOf, squareMorph, shift } = shape;
   const t = (name) => {
     const v = style.numbers?.[`arch_story_${name}`];
     if (typeof v !== 'number') throw new Error(`The style names no number "arch_story_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
@@ -122,12 +122,12 @@ export function play({ answer, style, reduced, tools, shape }) {
       const pts = wireAt(c), w = `w:${keyOf(key)}`, hd = `h:${keyOf(key)}`, there = was?.wires.has(key) && shown.has(key);
       if (there && dur) {
         const [A, B] = squareMorph(shown.get(key), pts);
-        list.push({ key: w, set: { d: pathOf(A) } }, { key: w, set: { d: pathOf(B) }, ...over }, { key: hd, set: { d: arrow(pts, c.back) }, ...over });
+        list.push({ key: w, set: { d: pathOf(A) } }, { key: w, set: { d: pathOf(B) }, ...over }, { key: hd, set: { d: heads(pts, c) }, ...over });
       } else if (dur && was) {
-        list.push({ key: w, set: { d: pathOf(pts), 'stroke-dashoffset': 1, opacity: 0 } }, { key: hd, set: { d: arrow(pts, c.back), opacity: 0 } });
+        list.push({ key: w, set: { d: pathOf(pts), 'stroke-dashoffset': 1, opacity: 0 } }, { key: hd, set: { d: heads(pts, c), opacity: 0 } });
         later(dur * 0.9, () => send([{ key: w, toggle: { 'sp-off': false, 'sp-gone': false, 'sp-new': true }, set: { opacity: 1 } }, { key: w, set: { 'stroke-dashoffset': 0 }, over: t('draw') }, { key: hd, toggle: { 'sp-off': false, 'sp-gone': false, 'sp-new': true }, set: { opacity: 1 }, over: t('draw') }]));
         fresh.push(w, hd);
-      } else list.push({ key: w, set: { d: pathOf(pts), 'stroke-dashoffset': 0, opacity: 1 }, toggle: { 'sp-off': false, 'sp-gone': false } }, { key: hd, set: { d: arrow(pts, c.back), opacity: 1 }, toggle: { 'sp-off': false, 'sp-gone': false } });
+      } else list.push({ key: w, set: { d: pathOf(pts), 'stroke-dashoffset': 0, opacity: 1 }, toggle: { 'sp-off': false, 'sp-gone': false } }, { key: hd, set: { d: heads(pts, c), opacity: 1 }, toggle: { 'sp-off': false, 'sp-gone': false } });
       shown.set(key, pts);
     }
     for (const [key] of was?.wires ?? []) if (!f.wires.has(key)) (shown.delete(key), list.push(...[`w:${keyOf(key)}`, `h:${keyOf(key)}`].map((w) => ({ key: w, toggle: { 'sp-off': true, 'sp-gone': false, 'sp-new': false }, set: { opacity: 0 } }))));

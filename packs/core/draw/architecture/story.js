@@ -50,6 +50,8 @@ function arrow(pts, back) {
   const bx = tip[0] - ux * 9, by = tip[1] - uy * 9;
   return `M${tip[0]} ${tip[1]}L${bx - uy * 4.5} ${by + ux * 4.5}L${bx + uy * 4.5} ${by - ux * 4.5}Z`;
 }
+/** A wire's arrowheads: at what it calls, and at its other end too when it goes both ways. */
+const heads = (pts, c) => arrow(pts, c.back) + (c.both ? arrow(pts, !c.back) : '');
 const EPS = 0.01;
 const same = (p, q) => Math.abs(p[0] - q[0]) < EPS && Math.abs(p[1] - q[1]) < EPS;
 const down = (p, q) => Math.abs(p[0] - q[0]) < EPS;
@@ -181,12 +183,12 @@ export function story({ answer, style, reduced }, tools) {
   });
   const wireMarks = [...everyWire].map(([key, c]) => {
     const pts = wireAt(c);
-    return [m('path', { key: `w:${keyOf(key)}`, d: pathOf(pts), pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 0, class: 'ar-wire wired sp-off', opacity: 0 }), m('path', { key: `h:${keyOf(key)}`, d: arrow(pts, c.back), class: 'ar-head wired sp-off', opacity: 0 })];
+    return [m('path', { key: `w:${keyOf(key)}`, d: pathOf(pts), pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 0, class: 'ar-wire wired sp-off', opacity: 0 }), m('path', { key: `h:${keyOf(key)}`, d: heads(pts, c), class: 'ar-head wired sp-off', opacity: 0 })];
   });
   const svg = m('svg', { key: 'svg', viewBox: `0 0 ${right - left} ${tall}`, role: 'img', 'aria-label': `How the system came to be, in ${frames.length} steps` }, placeMarks.map((p) => p.box), wireMarks, m('g', { key: 'breaks' }), placeMarks.map((p) => p.name), partMarks);
 
   // How a frame is reached: every mark set as that frame has it.
-  const shape = { frames, partAt, placeAt, wireAt, keyOf, view, arrow, pathOf, squareMorph, z, shift };
+  const shape = { frames, partAt, placeAt, wireAt, keyOf, view, heads, pathOf, squareMorph, z, shift };
   const player = play({ answer, style, reduced, tools, shape });
   const css = `${base}\n${storyLook}\n${(Object.entries(style.dots?.colours ?? {}))
     .filter(([v, c]) => NAME.test(v) && NAME.test(String(c)))

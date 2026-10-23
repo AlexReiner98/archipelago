@@ -99,11 +99,13 @@ export function picture({ answer, style, reduced }, tools) {
   const wireLayer = g.chains.map((c, n) => {
     const d = `M${c.points.map((p) => p.join(' ')).join('L')}`;
     const path = m('path', { key: `w:${n}`, d, class: `ar-wire ${c.state}` });
-    // A wire drawn turned back (a loop) has its arrow at its start, pointing up at what is called.
-    const [ex, ey] = c.back ? c.points[0] : c.points.at(-1);
-    const head = m('path', { key: `h:${n}`, d: c.back ? `M${ex} ${ey}L${ex - 4.5} ${ey + 9}L${ex + 4.5} ${ey + 9}Z` : `M${ex} ${ey}L${ex - 4.5} ${ey - 9}L${ex + 4.5} ${ey - 9}Z`, class: `ar-head ${c.state}` });
+    // A wire drawn turned back (a loop) has its arrow at its start, pointing up at what is called; one both ways has
+    // an arrow at each end.
+    const up = ([ex, ey]) => `M${ex} ${ey}L${ex - 4.5} ${ey + 9}L${ex + 4.5} ${ey + 9}Z`, down = ([ex, ey]) => `M${ex} ${ey}L${ex - 4.5} ${ey - 9}L${ex + 4.5} ${ey - 9}Z`;
+    const ends = c.back ? [up(c.points[0]), down(c.points.at(-1))] : [down(c.points.at(-1)), up(c.points[0])];
+    const head = m('path', { key: `h:${n}`, d: c.both ? ends.join('') : ends[0], class: `ar-head ${c.state}` });
     const [from, to] = c.back ? [c.b, c.a] : [c.a, c.b];
-    const hit = titled(m('path', { key: `x:${n}`, on: ['enter', 'leave'], d, class: 'ar-hit' }), [`${g.nodes.get(from).item.title} → ${g.nodes.get(to).item.title}`, c.says, said(WIRES, c.state)].filter(Boolean).join('\n'));
+    const hit = titled(m('path', { key: `x:${n}`, on: ['enter', 'leave'], d, class: 'ar-hit' }), [`${g.nodes.get(from).item.title} ${c.both ? '↔' : '→'} ${g.nodes.get(to).item.title}`, c.says, said(WIRES, c.state)].filter(Boolean).join('\n'));
     wires.push(c);
     if (c.says) labels.push({ c, text: fit(c.says, z('says_most'), SAYS_TEXT) });
     return [path, head, hit];

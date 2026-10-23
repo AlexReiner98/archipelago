@@ -89,15 +89,19 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
   const groups = [...new Set([...nodes.values()].map((n) => n.col).filter(Boolean))].map((id) => byId.get(id));
   if (!nodes.size) return { nodes, all: [], groups: [], boxes: [], chains: [], breaks: [], x: new Map(), y: new Map(), width: 0, height: 0 };
 
-  // ---- Wires: a calls b when a link goes from a to b (a depends on b, needs it, sends to it). One a pair.
+  // ---- Wires: a calls b when a link goes from a to b (a depends on b, needs it, sends to it). One a pair: a link
+  // back the other way makes it a wire both ways (both).
   let edges = [];
-  const seen = new Set();
+  const seen = new Map();
   for (const l of links) {
     if (!nodes.has(l.from) || !nodes.has(l.to) || l.from === l.to) continue;
     const key = [l.from, l.to].sort().join(' ');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    edges.push({ a: l.from, b: l.to, link: l, ...(l.says && { says: l.says }), state: wireState(l, nodes.get(l.from).item, nodes.get(l.to).item) });
+    if (seen.has(key)) {
+      if (seen.get(key).a !== l.from) seen.get(key).both = true;
+      continue;
+    }
+    seen.set(key, { a: l.from, b: l.to, link: l, ...(l.says && { says: l.says }), state: wireState(l, nodes.get(l.from).item, nodes.get(l.to).item) });
+    edges.push(seen.get(key));
   }
   // A loop is drawn with one wire turned back, so the rest still reads down the page.
   const colour = new Map();

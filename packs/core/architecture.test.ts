@@ -73,6 +73,15 @@ test('a wire that passes layers falls in the place it goes to, and a loop still 
   assert.ok(g.chains.some((c: any) => c.back), 'one wire of the loop is turned back');
 });
 
+test('two parts that call each other are one wire both ways, with an arrow at each end', () => {
+  const g = run([item('a'), item('b'), item('c')], [call('a', 'b'), call('b', 'a'), call('b', 'c')]);
+  checks(g);
+  assert.deepEqual(g.chains.map((c: any) => [c.key, Boolean(c.both)]), [['a b', true], ['b c', false]]);
+  const { scene } = drawn(answerOf([item('a'), item('b'), item('c')], [call('a', 'b'), call('b', 'a'), call('b', 'c')]));
+  const heads = marks(scene.svg).filter(([tag, attrs]) => tag === 'path' && String(attrs.class).startsWith('ar-head'));
+  assert.deepEqual(heads.map(([, attrs]) => (attrs.d.match(/M/g) ?? []).length).sort(), [1, 2]);
+});
+
 test('what sits in a part, wired to nothing, is a mark on it', () => {
   const g = run([item('a'), item('b'), { ...item('t', 'a', 'todo'), kind: 'work' }], [call('a', 'b')]);
   assert.equal(g.nodes.has('t'), false);
