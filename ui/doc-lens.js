@@ -7,8 +7,9 @@ import { drawWith } from './drawing.js';
 import { dress } from './lens-base.js';
 import { types } from './words.js';
 
-/** The shapes a published picture is drawn in, each loaded when one is drawn; any other is drawn as a flow. */
-const SHAPES = { flow: () => import('./flow.js').then((m) => m.drawFlow), grid: () => import('./grid.js').then((m) => m.drawGrid), time: () => import('./timeline.js').then((m) => m.drawTime) };
+/** The shapes a published picture is drawn in by the app's own code, each loaded when one is drawn; any other has a
+ * pack's drawing (src/published.ts gives one to a picture frozen without). */
+const SHAPES = { grid: () => import('./grid.js').then((m) => m.drawGrid), time: () => import('./timeline.js').then((m) => m.drawTime) };
 const ITEM = /^#\/e\/(e_[a-z0-9]{8})$/;
 
 /** Draw one frozen answer into host. `typeTitles` names each type the picture holds. */
@@ -21,7 +22,7 @@ export function drawFrozen(host, answer, typeTitles = {}) {
   dress(body, style);
   // A picture on a time axis is drawn along it, as in the app.
   if (style.drawing) drawWith(body, answer, style, () => {});
-  else (SHAPES[answer.lens.time && !SHAPES[style.shape] ? 'time' : style.shape] ?? SHAPES.flow)().then((draw) => draw(body, answer, style, () => {}));
+  else (SHAPES[answer.lens.time && !SHAPES[style.shape] ? 'time' : style.shape] ?? SHAPES.grid)().then((draw) => draw(body, answer, style, () => {}));
   const byId = new Map(answer.items.map((item) => [item.id, item]));
   // A part is a way to its page in the app; here it leads nowhere.
   body.addEventListener('click', (ev) => ev.target.closest?.('a') && ev.preventDefault());

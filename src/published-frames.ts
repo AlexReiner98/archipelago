@@ -19,13 +19,13 @@ type Frozen = { style?: Record<string, unknown>; first?: unknown } & Record<stri
 const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value ?? null));
 
 /** The scene a drawing opens on, given what the page would give it; null when it cannot be had here. */
-export async function openingScene(entry: string, frozen: Frozen) {
+export async function openingScene(entry: string, frozen: Frozen, types: Record<string, string> = {}) {
   // What the page gives a drawing on a published page (ui/doc-lens.js, ui/drawing.js): the answer without its style,
   // and the style held still, without its code.
   const { style = {}, first: _first, ...answer } = frozen;
   const { drawing: _drawing, code: _code, ...fields } = { ...style, noLit: true, still: true } as Record<string, unknown>;
   const { picture } = await import(pathToFileURL(entry).href);
-  const drawn = picture({ answer: plain(answer), style: plain(fields), reduced: false }, { measure, patch: () => {}, open: () => {}, frame: () => new Promise(() => {}) });
+  const drawn = picture({ answer: plain(answer), style: plain(fields), types, reduced: false }, { measure, patch: () => {}, open: () => {}, frame: () => new Promise(() => {}) });
   // What plays after the first frame is the reader's: stopped before it starts.
   drawn?.end?.();
   return drawn?.scene ? plain(drawn.scene) : null;
@@ -37,7 +37,10 @@ export async function framesFor(l: Pick<Archipelago, 'registry'>, lenses: Record
     const sent = frozen.style?.drawing as { id?: string; hash?: string } | undefined;
     const own = sent?.id ? packDrawing(l.registry, sent.id) : undefined;
     if (!own?.entry || own.hash !== sent?.hash) continue;
-    const scene = await openingScene(own.entry, frozen).catch(() => null);
+    // The titles of the types it holds, as the page would give them.
+    const held = new Set(((frozen.items as { type?: string; root?: string }[] | undefined) ?? []).flatMap((i) => [i.type, i.root]).filter((t): t is string => Boolean(t)));
+    const types = Object.fromEntries([...held].map((t) => [t, l.registry.type(t)?.title ?? t]));
+    const scene = await openingScene(own.entry, frozen, types).catch(() => null);
     if (scene && !scene.message) frozen.first = scene;
   }
   return lenses;

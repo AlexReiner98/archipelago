@@ -1,4 +1,4 @@
-// The flow shape's layout (ui/flow-layout.js): a lens answer in, geometry out, checked for what a reader of the
+// The flow drawing's layout (draw/flow/layout.js): a lens answer in, geometry out, checked for what a reader of the
 // drawing relies on: no two steps overlap, every wire turns only at right angles and runs straight into its head,
 // and wires cross only where they must.
 
@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-// @ts-expect-error: a plain module of the UI, with no types of its own.
-import { layout, LARGE } from '../ui/flow-layout.js';
+// @ts-expect-error: a plain module of the drawing, with no types of its own.
+import { layout, LARGE } from './draw/flow/layout.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
 const item = (id: string, kind = 'work', extra: Record<string, unknown> = {}) => ({ id, kind, inside: 'r', title: `Step ${id}`, place: 0, open: true, status: 'todo', state, ...extra });
@@ -15,7 +15,7 @@ const item = (id: string, kind = 'work', extra: Record<string, unknown> = {}) =>
 const dep = (b: string, a: string, says?: string) => ({ kind: 'depends_on', from: b, to: a, ...(says && { says }) });
 const measure = (text: string, px: number) => text.length * px * 0.55;
 // Laid out by the house style's lengths, as the page lays it out (packs/core/pack.json).
-const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, rootId: 'r', measure, sizes: house.sizes, numbers: house.numbers });
 
 function checks(g: any) {

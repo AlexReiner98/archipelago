@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { architectureCases } from './drawing-cases.ts';
+import { architectureCases, flowCases } from './drawing-cases.ts';
 import { readSteps, stepsShown } from '../src/lens-steps.ts';
 import { serve } from './serve.ts';
 
@@ -45,9 +45,9 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
   assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', hash: first.hash });
-  // What holds an item is drawn as a flow, which no drawing draws yet: no drawing is sent.
+  // What holds an item is drawn as a flow, by the core pack's flow drawing.
   const holding = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: 'holding' } })).result.style;
-  assert.equal(holding.drawing, undefined);
+  assert.equal(holding.drawing.id, 'core.flow');
 
   // The owner's version changes one module; the rest are the pack's.
   const look = 'export const css = `.ar-part { cursor: help; }`;\n';
@@ -105,6 +105,35 @@ test('a card is what a story ends on: a name of a few words and a line, sent to 
 
 const browser = chrome();
 const GOLDEN = join(import.meta.dirname, 'fixtures', 'drawings', `architecture.golden.${process.platform}.json`);
+const FLOW_GOLDEN = join(import.meta.dirname, 'fixtures', 'drawings', `flow.golden.${process.platform}.json`);
+
+test('in a browser, the flow drawing draws what the kernel drew: the same marks, looks, hovering, lighting and key', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { call, base } = await serve('off');
+  const { p } = await system(call);
+  // The pack's flow drawing, as a picture of what holds an item is sent it.
+  const { drawing } = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: 'holding' } })).result.style;
+  const page = await open(`${base}/`);
+  try {
+    await page.evaluate(readFileSync(join(import.meta.dirname, 'drawing-capture.js'), 'utf8'));
+    const cases = flowCases().map((c) => ({ ...c, style: { ...c.style, drawing } }));
+    const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
+    for (const c of cases) assert.ok(now[c.name].html.includes('lf-step'), `${c.name} is drawn: ${now[c.name].html.slice(0, 200)}`);
+    // What the kernel's own flow drew (ui/flow.js, until 23 Oct 2026), on a machine like this one. A change meant to
+    // draw otherwise keeps what it now draws, with GOLDEN_WRITE=1.
+    if (process.env.GOLDEN_WRITE) writeFileSync(FLOW_GOLDEN, `${JSON.stringify(now)}\n`);
+    else if (existsSync(FLOW_GOLDEN)) {
+      const was = JSON.parse(readFileSync(FLOW_GOLDEN, 'utf8'));
+      for (const name of Object.keys(was)) {
+        const [a, b] = [was[name], now[name]];
+        assert.equal(b.html, a.html, `${name}: the marks`);
+        assert.deepEqual(b.styles.map((k: number) => b.looks[k]), a.styles.map((k: number) => a.looks[k]), `${name}: the looks`);
+        for (const k of ['hover', 'after_hover', 'dim', 'key']) assert.deepEqual(b[k], a[k], `${name}: ${k}`);
+      }
+    }
+  } finally {
+    page.close();
+  }
+});
 
 test('in a browser, the architecture drawing draws what the kernel drew: the same marks, looks, hovering, lighting and key', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');

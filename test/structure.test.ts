@@ -194,7 +194,6 @@ test('every UI module parses', () => {
 const LOOKS_IN_KERNEL: Record<string, number> = {
   'ui/saved-views.js': 1,
   'ui/draw.html': 6,
-  'ui/flow-layout.js': 1,
   'ui/grid.css': 1,
   'ui/list.css': 2,
   'ui/pan-zoom.js': 1,
@@ -216,8 +215,8 @@ test('how things look lives in style presets, not in the kernel', () => {
 // kernel keeps the frame every picture has. Counted here as the shapes the page still draws itself, as of 22 Oct
 // 2026; a shape moved into a pack's drawing comes off its list, with its modules in ui/.
 const KERNEL_SHAPES: Record<string, number> = {
-  'ui/lens.js': 4, // list, flow, grid, time
-  'ui/doc-lens.js': 3, // flow, grid, time
+  'ui/lens.js': 3, // list, grid, time
+  'ui/doc-lens.js': 2, // grid, time
 };
 const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 

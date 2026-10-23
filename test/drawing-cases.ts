@@ -66,6 +66,52 @@ export function architectureCases(): DrawingCase[] {
   return cases;
 }
 
+/** Every mark a process map has: each shape, each dot, a checklist, a question's choices, work on a step, a break. */
+function flowVariety() {
+  const step = (id: string, title: string, kind: string, extra: Record<string, unknown> = {}) => item(id, title, 'e_froot000', 1, { kind, type: kind === 'work' ? 'work.task' : kind === 'question' ? 'inquiry.question' : kind === 'record' ? 'inquiry.record' : 'work.milestone', root: kind === 'work' ? 'work.task' : undefined, status: 'todo', ...extra });
+  const items = [
+    item('e_froot000', 'A release', undefined, 1, { kind: 'work', type: 'work.project' }),
+    step('e_fstart00', 'Start', 'occurrence', { open: false, status: 'happened' }),
+    step('e_fwork100', 'Write it', 'work', { status: 'doing', state: { ...quiet, sessions: 1 } }),
+    item('e_fnote000', 'A note on it', 'e_fwork100', 1, { kind: 'work', type: 'work.task', state: { ...quiet, needs_you: true } }),
+    step('e_fask0000', 'Which way, with a long question to cut?', 'question', { choices: ['This way', 'That way', 'Neither'] }),
+    step('e_fthis000', 'Go this way', 'work'),
+    step('e_frec0000', 'The notes', 'record', { status: 'current' }),
+    step('e_fblock00', 'Blocked work', 'work', { state: { ...quiet, blocked: true, waits_on: ['e_fperson0'] } }),
+    ...[1, 2, 3, 4, 5].map((k) => step(`e_fpre${k}000`, `Check ${k}`, 'work', { open: k > 2, status: k > 2 ? 'todo' : 'done', ...(k === 3 && { state: { ...quiet, blocked: true, waits_on: [] } }), ...(k === 4 && { state: { ...quiet, needs_you: true } }) })),
+    step('e_fgate000', 'Release', 'occurrence', { state: { ...quiet, needs_you: true } }),
+  ];
+  const on = (from: string, to: string, says?: string) => ({ kind: 'depends_on', from, to, n: 1, ...(says && { says }) });
+  const links = [
+    on('e_fwork100', 'e_fstart00'),
+    on('e_fask0000', 'e_fwork100'),
+    on('e_fthis000', 'e_fask0000', 'This way'),
+    on('e_frec0000', 'e_fwork100'),
+    on('e_fblock00', 'e_frec0000'),
+    on('e_fblock00', 'e_fstart00'),
+    ...[1, 2, 3, 4, 5].map((k) => on('e_fgate000', `e_fpre${k}000`)),
+    on('e_fgate000', 'e_fblock00'),
+    on('e_fgate000', 'e_fthis000'),
+    on('e_fthis000', 'e_frec0000'),
+    on('e_fblock00', 'e_fwork100'),
+  ];
+  return { lens: { from: 'e_froot000', by: 'part_of', over: ['depends_on'], fold: ['system'] }, items, links, rest: {}, viewer: 'e_fperson0', controls: ['lit'], views: [] };
+}
+
+/** The flow shape's cases: three real answers (pages of the public site, 23 Oct 2026) and one with every mark. */
+export function flowCases(): DrawingCase[] {
+  const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'drawings', `flow-${name}.json`), 'utf8'));
+  const style = house('flow');
+  const answers = { onemap: fixture('onemap'), session: fixture('session'), inherits: fixture('inherits'), variety: flowVariety() };
+  const cases: DrawingCase[] = [];
+  for (const [name, answer] of Object.entries(answers)) {
+    cases.push({ name: `${name}, wide`, answer, style: { ...style, noLit: name !== 'variety', here: name === 'variety' ? 'e_fwork100' : undefined }, width: 1100 });
+    cases.push({ name: `${name}, narrow`, answer, style: { ...style, noLit: true }, width: 560 });
+    cases.push({ name: `${name}, still`, answer, style: { ...style, noLit: true, still: true }, width: 900 });
+  }
+  return cases;
+}
+
 /** A big system: 12 places of 16 parts, each calling three in the next place. */
 export function bigSystem() {
   const hero = architectureCases()[0].answer as any;

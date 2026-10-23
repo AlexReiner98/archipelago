@@ -10,6 +10,7 @@ import { tipOf } from './drawing-tip.js';
 import { build, cssFor, patch, step } from './marks.js';
 import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './lens-base.js';
 import { surfaceOf } from './surface.js';
+import { typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
 
 /**
@@ -160,7 +161,9 @@ export function drawWith(host, answer, style, keep) {
   };
   const { style: _sent, first: opening, ...shown } = answer;
   const { drawing: _code, code: _canvas, ...fields } = style;
-  const input = { answer: shown, style: plain(fields), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  // The titles of the types the picture holds, as this page knows them: a drawing has no registry of its own.
+  const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
+  const input = { answer: shown, style: plain(fields), types, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);

@@ -1,6 +1,6 @@
 # Drawings
 
-Every picture is drawn by a drawing: code a pack ships for one shape, which the owner changes on the map, run in the browser's sandbox and answering with marks the page checks. The kernel keeps only the frame every picture has (the stage that pans and zooms, the key, the bar, a published page's still frame). The architecture shape is the first; the others follow, one at a time, each proven to draw what the kernel drew.
+Every picture is drawn by a drawing: code a pack ships for one shape, which the owner changes on the map, run in the browser's sandbox and answering with marks the page checks. The kernel keeps only the frame every picture has (the stage that pans and zooms, the key, the bar, a published page's still frame). The architecture shape was the first, and the flow (a process map, `packs/core/draw/flow/`) the second, each proven in a real browser to draw what the kernel drew (`test/drawings.test.ts`, against what the kernel's code drew, kept in `test/fixtures/drawings/`); the list, grid and time shapes follow, one at a time. A picture published before its shape had a drawing is given the pack's own drawing for it when its page is served (`src/published.ts`), so it draws as it did until it is published again.
 
 ## Where a drawing comes from
 
