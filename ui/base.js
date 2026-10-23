@@ -3,7 +3,7 @@
 
 import { applyTheme } from './theme.js';
 
-export const state = { schema: undefined, pulse: undefined, dirty: false, selfDrawn: false };
+export const state = { schema: undefined, pulse: undefined, seq: undefined, dirty: false, selfDrawn: false };
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
 

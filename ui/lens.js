@@ -1,4 +1,5 @@
 import { api, h } from './base.js';
+import { drawing as redraw } from './settle.js';
 import { drawWith, drawings, warmDrawings } from './drawing.js';
 import { dress } from './lens-base.js';
 import { drawList } from './list.js';
@@ -107,7 +108,25 @@ export const keptStyle = (key) => {
  * view's rule in words. `style` is what the page or an address asks for this
  * one look, over what the person chose before.
  */
-export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${lens.story}` : (lens.from ?? 'map'), quiet = false, bare = false } = {}) {
+export function lensView(opts = {}) {
+  const asked = JSON.stringify(opts);
+  const live = onPage.get(asked);
+  if (!redraw.inPlace || !live?.isConnected) {
+    const host = drawLens(opts);
+    host.dataset.lensKey = asked;
+    onPage.set(asked, host);
+    return host;
+  }
+  // Drawn again in place with all it was asked the same: the picture on the page stays, and only asks again.
+  const mark = h('div', { 'data-keep': asked });
+  Object.assign(mark, { make: () => (onPage.delete(asked), lensView(opts)), ready: live.refresh(), light: (ids) => live.light(ids) });
+  Object.defineProperty(mark, 'answer', { get: () => live.answer });
+  return mark;
+}
+/** The pictures drawn, by all each was asked with. */
+const onPage = new Map();
+
+function drawLens({ lens = {}, style = {}, key = lens.story ? `story:${lens.story}` : (lens.from ?? 'map'), quiet = false, bare = false }) {
   const chosen = {};
   const bar = h('div', { class: 'toolbar fold-bar lens-bar', hidden: true });
   const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
@@ -123,13 +142,17 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
       // Without storage the choice lasts until the page is reloaded.
     }
   };
-  const load = async () => {
+  const load = async (refreshing = false) => {
     let answer;
     try {
       answer = await api('view', { name: 'lens', params: { ...lens, ...place.ask, have: [...drawings.keys()] } });
     } catch (err) {
-      return body.replaceChildren(h('div', { class: 'error' }, err.message));
+      return refreshing || body.replaceChildren(h('div', { class: 'error' }, err.message));
     }
+    // Asked again with the map changed somewhere: a picture whose answer is the same is left as it is (a story playing on).
+    const said = JSON.stringify(answer, (k, v) => (k === 'modules' ? undefined : v));
+    if (refreshing && said === host.said) return;
+    host.said = said;
     host.answer = answer;
     const views = answer.views ?? [];
     // From an item, the item itself is one of them; over the whole map, there is no such one.
@@ -198,6 +221,7 @@ export function lensView({ lens = {}, style = {}, key = lens.story ? `story:${le
   // The frame drawings run in is started while the answer is on its way.
   warmDrawings();
   host.ready = load();
+  host.refresh = () => load(true);
   // Light only these items (a beat's, pointed at beside the picture), or everything as the style says again: the shape draws itself anew.
   host.light = (ids) => {
     chosen.only = ids ? [...ids] : undefined;
