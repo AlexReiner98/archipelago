@@ -8,7 +8,7 @@
 
 import { LOOK as DEEP, css as deepLook, deep } from './deep.js';
 import { boxPath, curveOf, islandPath, islands, css as islandsLook, routeSpots } from './islands.js';
-import { finished, layout } from './layout.js';
+import { finished, health, layout } from './layout.js';
 import { css as base } from './look.js';
 import { m, titled } from './marks.js';
 import { play } from './play.js';
@@ -143,8 +143,14 @@ export function story({ answer, style, reduced }, tools) {
   /** The look whose key a frame shows: the one it is one of, unless it has dots of its own. */
   const keyLook = (look) => (look && !style.dots?.[look] && LOOKS[look]) || look;
   const valueOf = (n, look) => {
-    const by = dotsOf(look)?.field;
+    const by = dotsOf(look)?.field, order = dotsOf(look)?.order;
     if (!NAME.test(by ?? '')) return null;
+    // A part that holds work, coloured by status, is as far as that work: done once all of it is, under way once any
+    // of it is begun, else not begun.
+    if (by === 'status' && n.notes?.length && Array.isArray(order) && order.length > 1) {
+      const all = n.notes.map((i) => i.status);
+      return String(all.every((v) => v === order.at(-1)) ? order.at(-1) : all.some((v) => v !== order[0]) ? order[1] : order[0]);
+    }
     const v = by === 'status' ? n.item.status : n.item.fields?.[by];
     return NAME.test(String(v ?? '')) ? String(v) : 'none';
   };
@@ -153,15 +159,25 @@ export function story({ answer, style, reduced }, tools) {
     const last = dotsOf(look)?.order?.at?.(-1);
     return (n) => (last && valueOf(n, look) !== null ? valueOf(n, look) === last : n.health === 'ok');
   };
+  // Whoever a step names as the owner of a piece of work sails between the islands as a boat, not an island itself:
+  // to the island that holds the work it has under way, if it has any.
+  const crew = new Set(states.flatMap((s) => s.items.map((i) => i.fields?.owner)).filter((v) => typeof v === 'string'));
+  const underWay = (look, status) => {
+    const order = dotsOf(look)?.order;
+    return Array.isArray(order) && order.length > 2 ? order.slice(1, -1).includes(status) : health({ open: true, status }) === 'building';
+  };
   const frames = states.map((s) => {
     const room = new Map([...s.flags].map(([id, w]) => [id, flagRoom(w)]));
     const kept = [...s.ids].filter((id) => was.has(id)).length;
     if (prior && s.ids.size - kept > kept) prior = undefined;
     was = s.ids;
-    const boxes = layout({ items: s.items, links: s.links, rootId: answer.lens.from, measure, sizes: style.sizes, prior, steady: true, room });
+    const sea = family(s.look).includes('islands');
+    const boxes = layout({ items: sea ? s.items.filter((i) => !crew.has(i.id)) : s.items, links: s.links, rootId: answer.lens.from, measure, sizes: style.sizes, prior, steady: true, room });
     prior = boxes.memo;
-    const g = family(s.look).includes('islands') ? islands(boxes, { z, n: num, done: isDone(s.look) }) : boxes;
-    return { ...s, g, parts: new Map(g.all.filter((n) => !n.dummy).map((n) => [n.id, n])), boxes: new Map(g.boxes.map((b) => [b.id, b])), wires: new Map(g.chains.map((c) => [c.key, c])) };
+    const g = sea ? islands(boxes, { z, n: num, done: isDone(s.look) }) : boxes;
+    const parts = new Map(g.all.filter((n) => !n.dummy).map((n) => [n.id, n]));
+    const boats = sea ? s.items.filter((i) => crew.has(i.id)).map((i) => ({ id: i.id, title: i.title, at: s.items.find((t) => t.fields?.owner === i.id && underWay(s.look, t.status) && parts.has(t.inside))?.inside ?? null })) : [];
+    return { ...s, g, parts, boats, boxes: new Map(g.boxes.map((b) => [b.id, b])), wires: new Map(g.chains.map((c) => [c.key, c])) };
   });
   // A story with nothing in it (what it names is not shown here) says so, as the still picture does.
   if (frames.every((f) => !f.parts.size)) return { scene: { message: 'Nothing here is part of a system.' } };

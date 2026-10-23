@@ -173,3 +173,37 @@ test('in relief, the islands are still islands: the scene asks for a surface, an
   // A story with no step in relief asks for no surface.
   assert.equal(picture({ answer, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene.surface, undefined);
 });
+
+test('a boat moors off the shore facing the harbour, and keeps off the land on its way', async () => {
+  // @ts-expect-error: a plain module of the drawing, with no types of its own.
+  const { along3, berth, course } = await import('./draw/architecture/boats.js');
+  const isle = { cx: 0, cy: 0, rx: 60, ry: 30 }, toward = [0, 200];
+  const [x, y] = berth(isle, 0, 1, toward, 10);
+  assert.ok(y > 30 && Math.abs(x) < 1, `moored below the island, at ${x}, ${y}`);
+  const two = [berth(isle, 0, 2, toward, 10), berth(isle, 1, 2, toward, 10)];
+  assert.ok(Math.hypot(two[0][0] - two[1][0], two[0][1] - two[1][1]) > 20, 'two boats moor side by side');
+  // From one side of an island to the other, the course bends round it.
+  const p = course([-120, 0], [120, 0], [isle]);
+  for (let k = 1; k < 24; k++) {
+    const [px, py] = along3(p, k / 24);
+    assert.ok((px / 60) ** 2 + (py / 30) ** 2 >= 1, `on land at ${px}, ${py}`);
+  }
+});
+
+test('whoever a step names as the owner of work is a boat, never an island of its own', () => {
+  const AGENT = 'e_agentzzz';
+  const steps = [
+    { add: [...plan, AGENT], fields: status(Object.fromEntries(plan.map((id) => [id, 'todo']))) },
+    { look: 'islands', fields: { [WRITE]: { status: 'doing', owner: AGENT } } },
+    { fields: { [WRITE]: { status: 'done' } } },
+  ];
+  const sailing = { ...answer, items: [...answer.items, item(AGENT, 'Your agent', { type: 'agent', kind: 'actor', status: 'active', open: true, inside: ROOT })], steps };
+  const sent: any[] = [];
+  picture({ answer: sailing, style: house, reduced: true }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+  // Never drawn as an island or a box of its own, in the islands look.
+  const states = statesOf(sailing);
+  assert.equal(states[1].look, 'islands');
+  const layoutOf = (s: any) => layout({ items: s.items.filter((i: any) => i.id !== AGENT), links: s.links, rootId: ROOT, measure, sizes: house.sizes, steady: true });
+  assert.ok(layoutOf(states[1]).nodes.has(WRITE));
+  assert.ok(!sent.some((p) => p.key === `p:${AGENT}` && p.set?.opacity === 1), 'the agent is not a part');
+});

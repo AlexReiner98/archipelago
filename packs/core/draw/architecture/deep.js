@@ -5,16 +5,18 @@
 // straight above, where it is a map of the flat picture, then the eye tilts down while the land rises out of the sea,
 // and follows the work: closer, lower and round to the side of the islands under way, back to the whole map at the end.
 // Routes lie on the water, in the accent while a step lights them, with what they carry beside them; each island's
-// name stands over its peak. Where the page gives no surface (a still picture drawn on the server, no WebGL), the
+// name stands over its peak, with how much of its work is done. The sea runs on past the picture into a haze, and
+// whoever owns work under way sails to it as a boat (boats.js). Where the page gives no surface (a still picture drawn on the server, no WebGL), the
 // flat islands stay. Every height, angle and time is the style's (arch_deep_*), every colour its theme's (relief_*).
 
+import { fleet } from './boats.js';
 import { hashOf } from './islands.js';
 
 /** The look drawn here. */
 export const LOOK = 'islands_3d';
 
 export const css = `
-.lf-surface { opacity: 0; transition: opacity 0.6s ease; }
+.lf-surface { opacity: 0; transition: opacity 0.6s ease; border-radius: var(--radius-4); }
 .lf-surface.sp-on { opacity: 1; }
 svg.sp-deep { visibility: hidden; }
 `;
@@ -70,11 +72,14 @@ export function deep({ style, tools, z, num, shape }) {
     const { page, lens } = surface.colours;
     const colour = (...names) => new THREE.Color(names.map((n) => page[n] ?? lens[n]).find(Boolean) || 'gray');
     const renderer = new THREE.WebGLRenderer({ canvas: surface.canvas, antialias: true, alpha: true });
-    renderer.setClearColor(0x000000, 0);
+    // The sea runs on past the picture's edges into a haze of deep water.
+    const haze = colour('relief_deep', 'accent');
+    renderer.setClearColor(haze, 1);
     let size = surface.size;
     const fitRenderer = () => (renderer.setPixelRatio(size.dpr), renderer.setSize(size.width, size.height, false));
     fitRenderer();
     const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(haze, 1, 2);
     const camera = new THREE.PerspectiveCamera(num('arch_deep_fov'), size.width / Math.max(1, size.height), 1, 1e5);
     // White light from the sky and the sun, and the water's colour from below.
     scene.add(new THREE.HemisphereLight(new THREE.Color(1, 1, 1), colour('relief_deep', 'accent_soft'), 1.2));
@@ -112,10 +117,13 @@ export function deep({ style, tools, z, num, shape }) {
     const swap = (sprite, made) => (sprite.material.map.dispose(), (sprite.material.map = made.material.map), sprite.scale.copy(made.scale));
     const hex = (c) => `#${c.getHexString()}`;
     const dotColour = (n, f) => colour(dotsOf(f.look)?.colours?.[valueOf(n, f.look)], 'done');
-    const nameOf = (title, n, f) => words(title, z('text'), { fg: page.text || lens.text, bg: page.panel || lens.land, edge: lens.line, dot: hex(dotColour(n, f)) });
+    /** An island's name, and how much of its work is done: "Website  2/4". */
+    const labelOf = (title, n) => (n.notes?.length ? `${title}  ${n.notes.filter((i) => i.status === (order0().at(-1) ?? 'done')).length}/${n.notes.length}` : title);
+    const nameOf = (title, n, f) => words(labelOf(title, n), z('text'), { fg: page.text || lens.text, bg: page.panel || lens.land, edge: lens.line, dot: hex(dotColour(n, f)) });
 
     // How far up each island is coloured: the share of the work in it that is done; with none in it, its own status.
     const order = (f) => dotsOf(f.look)?.order ?? [];
+    const order0 = () => dotsOf(LOOK)?.order ?? [];
     const doneOf = (n, f) => {
       const last = order(f).at(-1), inside = n.notes ?? [];
       const finished = (item) => (last ? item.status === last : ['done', 'up'].includes(item.status));
@@ -140,7 +148,7 @@ export function deep({ style, tools, z, num, shape }) {
       uHigh: { value: colour('relief_high', 'warn') },
       uTop: { value: colour('relief_top', 'panel') },
     };
-    let tile = null, peakMost = 0;
+    let tile = null, peakMost = 0, boats = null;
     const islands = new Map(), routes = new Map();
     const ground = (f) => {
       const [x0, y0, w, h] = view(f.g).split(' ').map(Number);
@@ -155,6 +163,7 @@ export function deep({ style, tools, z, num, shape }) {
         peakMost = Math.max(peakMost, peak);
         return { id, k, n, cx: n.x0 + shift, cy: n.y0, rx: r.rx, ry: r.ry, peak, phase: [0, 1, 2].map((m) => hashOf(`${id}:${m}`) * Math.PI * 2) };
       });
+      const seaAt = (x, y) => -floor * (0.8 + 0.4 * noise(x / 160, y / 160));
       // The height of the ground at x, y (the flat picture's), and the island it is nearest.
       const heightAt = (x, y) => {
         let best = -Infinity, owner = -1;
@@ -166,8 +175,7 @@ export function deep({ style, tools, z, num, shape }) {
           if (v > best) ((best = v), (owner = i.k));
         }
         // Under the sea too, the ground is its nearest island's, so its colour does not change at the shore.
-        const sea = -floor * (0.8 + 0.4 * noise(x / 160, y / 160));
-        return [Math.max(best, sea), owner];
+        return [Math.max(best, seaAt(x, y)), owner];
       };
       const nx = 320, ny = Math.max(2, Math.round((nx * h) / w));
       const geo = new THREE.PlaneGeometry(w, h, nx, ny).rotateX(-Math.PI / 2).translate(x0 + w / 2, 0, y0 + h / 2);
@@ -190,44 +198,31 @@ export function deep({ style, tools, z, num, shape }) {
           .replace('#include <color_fragment>', `#include <color_fragment>\n${GROUND}`);
       };
       const land = new THREE.Mesh(geo, paint);
-      // The tile's sides: the ground cut through down to its base, and the water over it where the ground is under it.
-      const base = -floor * 1.7;
-      const edges = [
-        [...Array(nx + 1).keys()].map((i) => i),
-        [...Array(nx + 1).keys()].map((i) => ny * (nx + 1) + i),
-        [...Array(ny + 1).keys()].map((j) => j * (nx + 1)),
-        [...Array(ny + 1).keys()].map((j) => j * (nx + 1) + nx),
-      ];
-      const side = (top, bottom, material) => {
-        const g = new THREE.BufferGeometry(), at = [], index = [];
-        edges.forEach((edge) => {
-          const start = at.length / 3;
-          for (const v of edge) at.push(pos.getX(v), top(pos.getY(v)), pos.getZ(v), pos.getX(v), bottom(pos.getY(v)), pos.getZ(v));
-          for (let i = 0; i < edge.length - 1; i++) {
-            const a = start + 2 * i;
-            index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-          }
-        });
-        g.setAttribute('position', new THREE.Float32BufferAttribute(at, 3));
-        g.setIndex(index);
-        g.computeVertexNormals();
-        return new THREE.Mesh(g, material);
-      };
-      const rock = side((y) => y, () => base, new THREE.MeshStandardMaterial({ color: colour('relief_rock', 'edge'), roughness: 1, side: THREE.DoubleSide }));
-      const waterPaint = { color: colour('relief_water', 'accent'), transparent: true, opacity: 0.38, roughness: 0.15, depthWrite: false, side: THREE.DoubleSide };
-      const waterSide = side(() => 0, (y) => Math.min(0, y), new THREE.MeshStandardMaterial(waterPaint));
-      const water = new THREE.Mesh(new THREE.PlaneGeometry(w, h).rotateX(-Math.PI / 2).translate(x0 + w / 2, 0, y0 + h / 2), new THREE.MeshStandardMaterial(waterPaint));
+      // Beyond the picture, the sea floor (and the islands' slopes under it) runs on under one sheet of water: a ground six times the picture's size, its
+      // cells lined up with the picture's edges and the picture's own ground cut out of it, so the two meet edge to edge.
+      const [W, H] = [w * 6, h * 6], beyond = new THREE.PlaneGeometry(W, H, 96, 96).rotateX(-Math.PI / 2).translate(x0 + w / 2, 0, y0 + h / 2);
+      const far = beyond.attributes.position, cells = beyond.index.array, outside = [];
+      for (let v = 0; v < far.count; v++) far.setY(v, heightAt(far.getX(v), far.getZ(v))[0]);
+      for (let i = 0; i < cells.length; i += 3) {
+        const [cx, cz] = [0, 2].map((axis) => [0, 1, 2].reduce((t, k) => t + far.getComponent(cells[i + k], axis), 0) / 3);
+        if (!(cx > x0 && cx < x0 + w && cz > y0 && cz < y0 + h)) outside.push(cells[i], cells[i + 1], cells[i + 2]);
+      }
+      beyond.setIndex(outside);
+      beyond.setAttribute('owner', new THREE.BufferAttribute(new Float32Array(far.count), 1));
+      beyond.computeVertexNormals();
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(W, H).rotateX(-Math.PI / 2).translate(x0 + w / 2, 0, y0 + h / 2), new THREE.MeshStandardMaterial({ color: colour('relief_water', 'accent'), transparent: true, opacity: 0.38, roughness: 0.15, depthWrite: false }));
       water.renderOrder = 1;
-      waterSide.renderOrder = 1;
       const relief = new THREE.Group();
-      relief.add(land, rock);
-      scene.add(relief, water, waterSide);
+      relief.add(land, new THREE.Mesh(beyond, paint));
+      scene.add(relief, water);
       for (const i of list) {
         const name = nameOf(partAt(i.n, f).title, i.n, f);
         scene.add(name);
-        islands.set(i.id, { ...i, name, title: partAt(i.n, f).title, value: valueOf(i.n, f.look) });
+        islands.set(i.id, { ...i, name, title: partAt(i.n, f).title, value: valueOf(i.n, f.look), text: labelOf(partAt(i.n, f).title, i.n) });
       }
-      return { relief, base };
+      // The agents' boats, and the harbour they lie in when they have nothing under way: below the islands, mid-sea.
+      boats = fleet({ THREE, scene, words: (text, px, { dot }) => words(text, px, { fg: page.text || lens.text, bg: page.panel || lens.land, edge: lens.line, dot }), hue: (k) => new THREE.Color(style.hues?.[k % (style.hues?.length || 1)] || lens.you), z, tween, isles: islands, harbour: [x0 + w / 2, y0 + h - z('deep_berth') * 2] });
+      return { relief, base: -floor };
     };
 
     const route = (key, c) => {
@@ -263,7 +258,9 @@ export function deep({ style, tools, z, num, shape }) {
       camera.position.set(c.cx + flat * Math.sin(c.az), c.far * Math.sin(el), c.cz + flat * Math.cos(c.az));
       camera.up.set(-Math.sin(c.el) * Math.sin(c.az), Math.cos(c.el), -Math.sin(c.el) * Math.cos(c.az));
       camera.near = c.far / 20;
-      camera.far = c.far * 4;
+      camera.far = c.far * 8;
+      scene.fog.near = c.far * 1.3;
+      scene.fog.far = c.far * 3.2;
       camera.lookAt(c.cx, 0, c.cz);
       camera.updateProjectionMatrix();
       camera.updateMatrixWorld();
@@ -291,8 +288,9 @@ export function deep({ style, tools, z, num, shape }) {
       const cx = at.reduce((t, i) => t + i.cx, 0) / at.length, cz = at.reduce((t, i) => t + i.cy, 0) / at.length;
       const side = Math.max(-1, Math.min(1, (cx - (x + w / 2)) / (w / 2)));
       const c = fit(points, cx, cz, deg(num('arch_deep_close_angle')), deg(num('arch_deep_swing')) * side, num('arch_deep_close_room'));
-      // Never so close that one island fills the picture: the map stays around it.
-      return { ...c, far: Math.max(c.far, whole().far * num('arch_deep_closest')) };
+      // Never so close that one island fills the picture (the map stays around it), nor further back than the whole map.
+      const all = whole().far;
+      return { ...c, far: Math.min(all, Math.max(c.far, all * num('arch_deep_closest'))) };
     };
     // The eye glides to where it is to go, and a new goal on the way bends its path: steps that come quickly blend
     // into one move.
@@ -357,12 +355,16 @@ export function deep({ style, tools, z, num, shape }) {
         for (const [id, n] of f.parts) {
           const it = islands.get(id);
           if (!it) continue;
-          if (valueOf(n, f.look) !== it.value) ((it.value = valueOf(n, f.look)), swap(it.name, nameOf(it.title, n, f)));
+          if (valueOf(n, f.look) !== it.value || labelOf(it.title, n) !== it.text) ((it.value = valueOf(n, f.look)), (it.text = labelOf(it.title, n)), swap(it.name, nameOf(it.title, n, f)));
           const from = uniforms.uDone.value[it.k], to = doneOf(n, f);
-          if (to !== from || (to < 1 && order(f).indexOf(valueOf(n, f.look)) > 0)) busy.push(id);
+          if (to !== from) busy.push(id);
           tween(enter ? 0 : dur, (k) => (uniforms.uDone.value[it.k] = from + (to - from) * k));
         }
-        // Where the eye goes: to the work under way, and back to the whole map once all of it is done.
+        // The boats sail to the work they have under way.
+        boats.sail(f.boats ?? [], enter && !dur ? 0 : num('arch_deep_sail'));
+        // Where the eye goes: to the islands whose work moves on, else to those the boats are at, and back to the whole
+        // map once all of it is done.
+        if (!busy.length) busy.push(...new Set((f.boats ?? []).map((b) => b.at).filter((id) => islands.has(id))));
         const finished = [...f.parts].every(([, n]) => doneOf(n, f) >= 1);
         const there = () => (!enter && busy.length && !finished ? close(busy) : { ...whole(), whole: true });
         if (enter && dur) {

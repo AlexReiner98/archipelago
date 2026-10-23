@@ -87,6 +87,10 @@ export function islands(g, { z, n: num, done }) {
     return d;
   };
   for (const n of parts) deep(n.id);
+  // Parts no wire touches (projects apart from each other) each take a step of their own along the arc, in their order.
+  const touched = new Set(g.chains.flatMap((c) => [c.a, c.b]));
+  let next = Math.max(-1, ...[...depth].filter(([id]) => touched.has(id)).map(([, d]) => d)) + 1;
+  for (const n of [...parts].sort((a, b) => (a.item.place ?? 0) - (b.item.place ?? 0))) if (!touched.has(n.id)) depth.set(n.id, next++);
   const last = Math.max(0, ...depth.values());
   const cols = Array.from({ length: last + 1 }, (_, d) => parts.filter((n) => depth.get(n.id) === d));
   // Each step of the order a place along an arc (`arc` half turns, squashed to `squash` as high as wide), from the left
