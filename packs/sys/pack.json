@@ -9,7 +9,7 @@
   "types": [
     {
       "id": "sys.source",
-      "tier": "system",
+      "extends": "system",
       "title": "Source",
       "description": "The original input a fact came from: a file, an email, a commit, a conversation.",
       "statuses": {
@@ -60,7 +60,7 @@
     },
     {
       "id": "sys.run",
-      "tier": "system",
+      "extends": "system",
       "title": "Run",
       "description": "One agent session or one execution of an automation.",
       "statuses": {
@@ -146,7 +146,7 @@
     },
     {
       "id": "sys.notification",
-      "tier": "system",
+      "extends": "system",
       "title": "Notification",
       "description": "A message for the human, from an agent, an automation or the system.",
       "statuses": {
@@ -176,7 +176,7 @@
     },
     {
       "id": "sys.automation",
-      "tier": "system",
+      "extends": "system",
       "title": "Automation",
       "description": "A trigger that fires an action. Only fires while its status is enabled.",
       "statuses": {

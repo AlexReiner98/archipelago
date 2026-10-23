@@ -9,7 +9,7 @@ export interface PackFile {
   id: string;
   title?: string;
   requires?: string[];
-  types?: Array<{ id: string; title?: string; extends?: string; kind?: boolean; tier?: string; capabilities?: Record<string, unknown>; statuses?: { open?: string[]; closed?: string[] } }>;
+  types?: Array<{ id: string; title?: string; extends?: string; kind?: boolean; capabilities?: Record<string, unknown>; statuses?: { open?: string[]; closed?: string[] } }>;
   relations?: Array<{ id: string; title?: string; extends?: string; root?: boolean; from?: string[]; to?: string[] }>;
   extend?: Record<string, { fields?: Record<string, unknown> }>;
   actions?: unknown[];
@@ -64,12 +64,12 @@ function forest(nodes: Node[], roots: string[], colour: (pack: string) => { fill
   return { vertices, edges, height: row * ROW };
 }
 
-function typeNodes(packs: PackFile[]): { nodes: Node[]; kinds: string[]; system: string[] } {
+function typeNodes(packs: PackFile[]): { nodes: Node[]; kinds: string[] } {
   const added = new Map<string, string[]>();
   for (const p of packs) for (const [t, e] of Object.entries(p.extend ?? {})) {
     (added.get(t) ?? added.set(t, []).get(t)!).push(`${p.id} (${Object.keys(e.fields ?? {}).join(', ')})`);
   }
-  const nodes: Node[] = [], kinds: string[] = [], system: string[] = [];
+  const nodes: Node[] = [], kinds: string[] = [];
   for (const p of packs) for (const t of p.types ?? []) {
     const caps = Object.keys(t.capabilities ?? {});
     const statuses = [...(t.statuses?.open ?? []), '|', ...(t.statuses?.closed ?? [])].join(' ');
@@ -79,11 +79,10 @@ function typeNodes(packs: PackFile[]): { nodes: Node[]; kinds: string[]; system:
     const tooltip = [`${t.id}, from the ${p.id} pack.`, t.statuses ? `Statuses: ${statuses}.` : '', caps.length ? `Capabilities: ${caps.join(', ')}.` : '', added.has(t.id) ? `Fields added by ${added.get(t.id)!.join('; ')}.` : ''].filter(Boolean).join(' ');
     nodes.push({ id: t.id, pack: p.id, parent: t.extends, label: lines.join('<br>'), tooltip, root: t.kind });
     if (t.kind) kinds.push(t.id);
-    else if (!t.extends) system.push(t.id);
   }
   const known = new Set(nodes.map((n) => n.id));
   for (const n of nodes) if (n.parent && !known.has(n.parent)) throw new Error(`${n.id} extends ${n.parent}, which no pack defines`);
-  return { nodes, kinds, system };
+  return { nodes, kinds };
 }
 
 function packLegend(packs: PackFile[], colour: (pack: string) => { fill: string; stroke: string }, x: number, extra: Array<[string, string]>): Vertex[] {
@@ -92,17 +91,10 @@ function packLegend(packs: PackFile[], colour: (pack: string) => { fill: string;
 
 function inheritance(packs: PackFile[]): Page {
   const colour = colours(packs);
-  const { nodes, kinds, system } = typeNodes(packs);
+  const { nodes, kinds } = typeNodes(packs);
   const tree = forest(nodes, kinds, colour, 't');
-  // The system tier extends no kind: drawn apart, below the kinds.
-  const top = tree.height + ROW;
-  const sys = system.map((id, i): Vertex => {
-    const n = nodes.find((m) => m.id === id)!, c = colour(n.pack);
-    return { id: `t-${slug(id)}`, label: n.label, tooltip: n.tooltip, x: (i % 4) * COL, y: top + 40 + Math.floor(i / 4) * ROW, w: BOX_W, h: BOX_H, style: style({ rounded: 1, html: 1, whiteSpace: 'wrap', fontSize: 11, fillColor: c.fill, strokeColor: c.stroke, dashed: 1 }) };
-  });
-  const sysHead: Vertex[] = system.length ? [{ id: 'system-tier', label: '<b>System tier</b>: the map describing itself, extending no kind', x: 0, y: top, w: 4 * COL - 60, h: 28, style: style({ strokeColor: 'none', fillColor: 'none', html: 1, align: 'left', fontSize: 12 }) }] : [];
   const width = Math.max(...tree.vertices.map((v) => v.x + v.w), 4 * COL);
-  const vertices = [...tree.vertices, ...sysHead, ...sys, ...packLegend(packs, colour, width + 60, [['#666666', 'open arrow: extends (dark box: one of the seven kinds)'], ['#777777', 'italic: the capabilities a type declares']])];
+  const vertices = [...tree.vertices, ...packLegend(packs, colour, width + 60, [['#666666', 'open arrow: extends (dark box: one of the kinds)'], ['#777777', 'italic: the capabilities a type declares']])];
   return { id: 'types-inheritance', name: 'Types: inheritance', vertices, edges: tree.edges };
 }
 

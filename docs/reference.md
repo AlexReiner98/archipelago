@@ -284,9 +284,10 @@ seen working, what bites when working here, what to do next and why.
 
 Types live in files under `packs/`, one folder per pack:
 
-- `core`: the seven kinds, the types the root relations name (person,
-  company, agent, goal, area, event, resource), the system's own (lens,
-  style, screen) and the root relations.
+- `core`: the seven kinds of the work and the system kind, the common
+  types of them (person, company, agent, goal, area, event, resource), the
+  system's own (lens, style, screen) and the root relations, which name
+  kinds at their ends.
 - `work`, on in every workspace: project, task, decision, issue, meeting,
   idea, note, file, document and procedure, as `work.task` and so on.
 - `inquiry`: hypothesis, experiment and result, with tests, supports,

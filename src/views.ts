@@ -94,7 +94,7 @@ async function graph(l: Archipelago, input: { focus?: string; depth?: number; re
   if (!(preset in GRAPH_PRESETS)) throw new Error(`relations must be one of: ${Object.keys(GRAPH_PRESETS).join(', ')}`);
   const only = GRAPH_PRESETS[preset] && l.registry.relationFamily(...GRAPH_PRESETS[preset]);
   const { rows: entities } = await l.db.query<Entity>(`select id, type, title, status, is_open, props, created_at from entity where archived_at is null`);
-  const system = (type: string) => type.startsWith('sys.') && !l.registry.isA(type, 'resource');
+  const system = (type: string) => l.registry.type(type)?.system ?? false;
   const eligible = new Map(
     entities.filter((e) => e.id === input.focus || ((input.include_closed || e.is_open) && (input.include_system || !system(e.type)))).map((e) => [e.id, e]),
   );
