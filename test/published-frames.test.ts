@@ -164,7 +164,7 @@ test('in a browser, the workspace style’s page_css is how a published page loo
   }
 });
 
-test('in a browser, a part hovered says what it is in a tip beside it, not in a line over the picture', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a part hovered says what it is in a tip its drawing makes, beside it, not in a line over the picture', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
   const { d, a } = await published(call);
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: a, body: 'Where everything comes in: the MCP server, the CLI and the web.' }] });
@@ -172,22 +172,24 @@ test('in a browser, a part hovered says what it is in a tip beside it, not in a 
   const page = await open(`${base}/p/default/${d}`);
   try {
     const got = await page.evaluate(`(async () => {
+      const until = async (test) => { for (let n = 0; n < 400 && !test(); n++) await new Promise((r) => setTimeout(r, 25)); return test(); };
       let part;
-      for (let n = 0; n < 400 && !(part = document.querySelector('[data-lens] svg a[href="#/e/${a}"][opacity="1"]')); n++) await new Promise((r) => setTimeout(r, 25));
-      part.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      const tip = document.querySelector('.lens-tip');
-      const shown = { hidden: tip.hidden, text: tip.textContent, title: part.querySelector('title') === null, said: document.querySelector('.lens-said') === null };
-      part.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
-      const left = { after: tip.hidden, back: part.querySelector('title') !== null };
+      await until(() => (part = document.querySelector('[data-lens] svg a[href="#/e/${a}"][opacity="1"]')));
+      const tip = () => document.querySelector('[data-lens] .drawing-tip');
+      part.dispatchEvent(new MouseEvent('mouseenter'));
+      await until(() => tip() && !tip().hidden);
+      const shown = { text: tip().textContent, styled: getComputedStyle(tip().firstChild).borderTopStyle, title: part.querySelector('title') === null, said: document.querySelector('.lens-said') === null };
+      part.dispatchEvent(new MouseEvent('mouseleave'));
+      await until(() => tip().hidden);
+      const left = { after: tip().hidden, back: part.querySelector('title') !== null };
       // A place says what it is from its name only: its box, around its parts, says nothing.
-      const box = document.querySelector('[data-lens] svg rect.ar-place-box[opacity="1"]');
-      box.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      const boxSays = !tip.hidden;
-      const name = box && document.querySelector('[data-lens] svg a.ar-place[opacity="1"] text');
-      name.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      return { ...shown, ...left, boxSays, nameSays: !tip.hidden };
+      document.querySelector('[data-lens] svg rect.ar-place-box[opacity="1"]').dispatchEvent(new MouseEvent('mouseenter'));
+      await new Promise((r) => setTimeout(r, 300));
+      const boxSays = !tip().hidden;
+      document.querySelector('[data-lens] svg a.ar-place[opacity="1"]').dispatchEvent(new MouseEvent('mouseenter'));
+      return { ...shown, ...left, boxSays, nameSays: await until(() => !tip().hidden) };
     })()`);
-    assert.deepEqual(got, { hidden: false, text: 'DoorsWhere everything comes in: the MCP server, the CLI and the web.', title: true, said: true, after: true, back: true, boxSays: false, nameSays: true });
+    assert.deepEqual(got, { text: 'DoorsWhere everything comes in: the MCP server, the CLI and the web.', styled: 'solid', title: true, said: true, after: true, back: true, boxSays: false, nameSays: true });
   } finally {
     page.close();
   }

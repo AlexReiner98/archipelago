@@ -5,6 +5,7 @@
 // each drawing's code is sent once and kept by its hash.
 
 import { h } from './base.js';
+import { tipOf } from './drawing-tip.js';
 import { build, cssFor, patch, step } from './marks.js';
 import { litSwitch, numberOf, sizeOf } from './lens-base.js';
 import { panZoom } from './pan-zoom.js';
@@ -107,6 +108,13 @@ export function drawWith(host, answer, style, keep) {
   host.endDrawing = end;
   const tell = (key, name) => !ended && port.postMessage({ type: 'event', event: { key, name } });
   const run = (now) => step(moving, now) && requestAnimationFrame(run);
+  // What a drawing patches: its marks, and its tip (drawing-tip.js), whose marks are checked as every mark is.
+  const tip = tipOf(host);
+  const apply = (list) => {
+    const all = Array.isArray(list) ? list : [];
+    for (const p of all.filter((p) => p && 'tip' in p)) p.tip ? tip.show(keys.get(String(p.tip.key)), build(p.tip.mark, keys, tell)) : tip.hide();
+    patch(all.filter((p) => !(p && 'tip' in p)), keys, tell, moving);
+  };
   port.onmessage = (ev) => {
     const said = ev.data ?? {};
     // A picture taken off the page is ended: its worker forgets it.
@@ -118,7 +126,7 @@ export function drawWith(host, answer, style, keep) {
         const got = performance.now();
         mounted = true;
         mount(said.scene ?? {});
-        for (const list of early.splice(0)) patch(list, keys, tell, moving);
+        for (const list of early.splice(0)) apply(list);
         if (moving.size) requestAnimationFrame(run);
         scenes.delete(seen);
         scenes.set(seen, said.scene ?? {});
@@ -126,7 +134,7 @@ export function drawWith(host, answer, style, keep) {
         performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got) } });
       }
       else if (said.type === 'patch' && !mounted) early.push(said.list);
-      else if (said.type === 'patch') (patch(said.list, keys, tell, moving), moving.size && requestAnimationFrame(run));
+      else if (said.type === 'patch') (apply(said.list), moving.size && requestAnimationFrame(run));
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
       else if (said.type === 'error') failed(said.message);

@@ -196,5 +196,7 @@ export function play({ answer, style, reduced, tools, shape }) {
       return [];
     },
     end: stop,
+    /** The step on screen: -1 before the first. */
+    step: () => cur,
   };
 }

@@ -14,13 +14,6 @@
 .doc-lens button { font: inherit; font-size: var(--text-3); padding: var(--space-3) var(--space-6); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--edge); border-radius: var(--radius-2); cursor: pointer; }
 .doc-lens button.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 .doc-lens .pill { font-size: var(--text-1); padding: var(--space-1) var(--space-5); border-radius: var(--radius-4); white-space: nowrap; background: var(--accent-soft); color: var(--accent); }
-/* What a part is, in a tip beside it (ui/doc-lens.js): its name, then its first line, as many lines as it takes. */
-.doc-lens { position: relative; }
-.doc-lens .lens-tip { position: absolute; z-index: 1; max-width: var(--tip-most); padding: var(--space-5) var(--space-7); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--edge); border-radius: var(--radius-3); font-size: var(--reader-small); line-height: 1.4; pointer-events: none; transform: translate(-50%, calc(-100% - var(--space-4))); }
-.doc-lens .lens-tip.below { transform: translate(-50%, var(--space-4)); }
-.doc-lens .lens-tip strong { display: block; margin-bottom: var(--space-2); }
-.doc-lens .lens-tip span { color: var(--muted); }
-.doc-lens .lens-tip[hidden] { display: none; }
 /* A picture in time colours each thing by its kind, as the app's pages do (ui/style.css). */
 .doc-lens .group-actor .dot { fill: var(--g-actor); } .doc-lens .group-aim .dot { fill: var(--g-aim); } .doc-lens .group-work .dot { fill: var(--g-work); }
 .doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }

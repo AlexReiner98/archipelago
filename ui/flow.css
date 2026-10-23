@@ -46,6 +46,10 @@
 .lf-stage.still > svg { width: auto; max-width: 100%; height: auto; margin: 0 auto; }
 .lf-legend.still { position: static; flex-direction: row; flex-wrap: wrap; column-gap: var(--ln-legend-pad-x); padding: 0 0 var(--ln-legend-pad-y); background: none; border: none; }
 /* A picture a drawing's code draws (ui/drawing.js): what it draws stays inside it, however its stylesheet places it. */
-[data-drawing] { contain: paint; }
+[data-drawing] { contain: paint; position: relative; }
+/* Where a drawing's tip goes (ui/drawing-tip.js): beside its mark, out of the pointer's way. How it looks is the drawing's. */
+.drawing-tip { position: absolute; z-index: 1; pointer-events: none; transform: translate(-50%, calc(-100% - var(--space-4))); }
+.drawing-tip.below { transform: translate(-50%, var(--space-4)); }
+.drawing-tip[hidden] { display: none; }
 /* The frame drawings run in: drawn, with no size, so the browser does not slow it as a frame that is not drawn. */
 .drawing-sandbox { position: fixed; left: 0; top: 0; width: 0; height: 0; border: 0; pointer-events: none; }
