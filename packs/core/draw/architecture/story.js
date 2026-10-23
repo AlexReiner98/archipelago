@@ -71,6 +71,24 @@ export function squareMorph(from, to) {
   while (B.length < A.length) B.push([...B.at(-1)], [...B.at(-1)]);
   return [A, B];
 }
+/**
+ * Where a place's name sits along its top edge: from `from`, moved right past every wire that crosses the band it is
+ * in (`wires`, as lists of points), while it still fits before `end`; at `from` when it fits nowhere clear.
+ */
+export function nameLeft(from, width, end, top, bottom, wires, clear) {
+  const blocked = [];
+  for (const pts of wires)
+    for (let k = 1; k < pts.length; k++) {
+      const [[x1, y1], [x2, y2]] = [pts[k - 1], pts[k]];
+      if (Math.max(y1, y2) >= top && Math.min(y1, y2) <= bottom) blocked.push([Math.min(x1, x2) - clear, Math.max(x1, x2) + clear]);
+    }
+  let at = from;
+  for (let moved = true; moved; ) {
+    moved = false;
+    for (const [l, r] of blocked) if (at < r && at + width > l) ((at = r), (moved = true));
+  }
+  return at + width <= end ? at : from;
+}
 const pathOf = (pts) => `M${pts.map((p) => p.map((v) => Math.round(v * 100) / 100).join(' ')).join('L')}`;
 
 /** The story: its first scene, and what plays it. */
@@ -126,10 +144,13 @@ export function story({ answer, style, reduced }, tools) {
       flag: f.flags.get(n.id) ?? '',
     };
   };
+  // A place's name is on its top edge, where no wire of the step comes in across it.
   const placeAt = (b, f) => {
-    const x = b.x + shift, inset = z('place_name_inset'), mid = b.y + inset + z('place_name_height') / 2;
+    const x = b.x + shift, inset = z('place_name_inset'), high = z('place_name_height'), mid = b.y + inset + high / 2;
     const text = fit(b.item.title, b.w - z('place_name_room'), z('place_text'));
-    return { box: { x, y: b.y, width: b.w, height: b.h }, n: { x: x + inset, y: b.y + inset, width: measure(text, z('place_text')) + z('place_name_room') - inset }, d: { cx: x + z('place_dot_x'), cy: mid }, t: { x: x + z('place_text_x'), y: mid }, text, title: b.item.title, flag: f.flags.get(b.id) ?? '' };
+    const width = measure(text, z('place_text')) + z('place_name_room') - inset;
+    const dx = nameLeft(x + inset, width, x + b.w - inset, b.y, b.y + inset + high, [...f.wires.values()].map(wireAt), inset) - (x + inset);
+    return { box: { x, y: b.y, width: b.w, height: b.h }, n: { x: x + inset + dx, y: b.y + inset, width }, d: { cx: x + z('place_dot_x') + dx, cy: mid }, t: { x: x + z('place_text_x') + dx, y: mid }, text, title: b.item.title, flag: f.flags.get(b.id) ?? '' };
   };
   const wireAt = (c) => c.points.map(([px, py]) => [px + shift, py]);
   for (const f of frames) for (const n of f.parts.values()) ((n.x0 = f.g.x.get(n.id)), (n.y0 = f.g.y.get(n.id)));
