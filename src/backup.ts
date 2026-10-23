@@ -15,6 +15,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 import { isServer, openDb, type Db } from './db.ts';
 import { addLocalType, addWorkspace } from './control.ts';
 import type { Registry } from './packs.ts';
+import { restoreRows } from './pelago.ts';
 import { databaseFor } from './pg.ts';
 import type { Workspaces } from './workspaces.ts';
 
@@ -124,17 +125,7 @@ export async function merge(db: Db, backup: Dump, options: { workspace: string; 
       );
       const count = (what: string) => plan.filter((p) => p.what === what).length;
       const some = (what: string) => plan.filter((p) => p.what === what).slice(0, 20).map((p) => p.title);
-      const { rows: cols } = await tx.query<{ set: string }>(`select string_agg(format('%I = excluded.%I', column_name, column_name), ', ') as set from information_schema.columns where table_schema = 'public' and table_name = 'entity' and column_name <> 'id'`);
-      // One statement: rows that point at each other (an entity's owner) are checked together.
-      await tx.query(`insert into entity select * from jsonb_populate_recordset(null::entity, $1::jsonb) on conflict (id) do update set ${cols[0].set} where excluded.updated_at > entity.updated_at`, [entities]);
-
-      const { rows: rels } = await tx.query<{ added: boolean }>(
-        `insert into relation select i.* from jsonb_populate_recordset(null::relation, $1::jsonb) i
-         where exists (select 1 from entity where id = i.from_id) and exists (select 1 from entity where id = i.to_id)
-         on conflict (id) do update set valid_to = excluded.valid_to where relation.valid_to is null and excluded.valid_to is not null
-         returning (xmax = 0) as added`,
-        [JSON.stringify(here(relations.filter((r) => !held(r))))],
-      );
+      const rels = await restoreRows(tx, entities, JSON.stringify(here(relations.filter((r) => !held(r)))));
       const { rows: props } = await tx.query<{ added: boolean }>(
         `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)
          on conflict (id) do update set status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at, note = excluded.note

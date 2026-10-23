@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { Archipelago } from '../src/pelago.ts';
 import { callTool } from '../src/tools.ts';
+import { importAudit } from '../src/audit.ts';
 import { human, agent, fresh, make } from './map.ts';
 
 test('flavours inherit fields and statuses, and are found through the parent', async () => {
@@ -177,9 +178,9 @@ test('a connection\'s tool-call log is imported once into the activity log', asy
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), 'not json', line('2026-10-01T10:00:05.000Z', 'run_command')].join('\n'));
   const made = await make(l, [{ op: 'create', ref: 'c', type: 'sys.connection', title: 'Apex', props: { audit_log: log } }]);
 
-  assert.deepEqual(await l.importAudit(agent, { connection: made.c }), { imported: 2, skipped: 1, path: log });
+  assert.deepEqual(await importAudit(l, agent, { connection: made.c }), { imported: 2, skipped: 1, path: log });
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), line('2026-10-01T10:00:09.000Z', 'form_snapshot')].join('\n'));
-  assert.equal((await l.importAudit(agent, { connection: made.c })).imported, 1, 'only entries after the cursor');
+  assert.equal((await importAudit(l, agent, { connection: made.c })).imported, 1, 'only entries after the cursor');
 
   const external = (await l.events({ origin: 'external' })) as any[];
   assert.deepEqual(external.map((e) => e.action), ['form_snapshot', 'run_command', 'nodegraph_add_node']);

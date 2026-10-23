@@ -40,7 +40,7 @@ export async function notifyWorkspace(l: Archipelago, actor: Actor, input: { wor
   // Delivered by the system into the other map, shared with everyone there.
   const sender = `${l.workspace}/${actor.name}`;
   const delivered = await notify(target, { kind: 'agent', name: `workspace:${sender}` }, { title: input.title, body: input.body, level: input.level });
-  await target.db.query(`update entity set visibility = 'shared', private_to = null where id = $1`, [delivered.notification]);
+  await target.operational(delivered.notification, { reach: { visibility: 'shared', private_to: null } });
   await l.log(l.db, { actor: actorId(actor), action: 'workspace.notify', reason: input.title, detail: { to: input.workspace, level: input.level ?? 'info' } });
   return { delivered_to: input.workspace };
 }
