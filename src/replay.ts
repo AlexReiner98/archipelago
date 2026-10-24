@@ -256,6 +256,14 @@ export async function swapIn(tx: Q, kept: string[]): Promise<Record<string, numb
 }
 
 /**
+ * What the log does not hold yet, laid back on items a rebuild made elsewhere (a move, src/move.ts): the operational
+ * fields kept on them (KEPT_FIELDS in src/operational.ts), as they were.
+ */
+export async function keepFields(tx: Q, kept: { id: string; kept: Record<string, unknown> }[]): Promise<void> {
+  for (const r of kept) await tx.query(`update entity set props = props || $2::jsonb where id = $1`, [r.id, JSON.stringify(r.kept)]);
+}
+
+/**
  * Take the fact stream's lock and say the time its next entry will have, as append will (the transaction's time,
  * never before the last entry's). The write path projects with it before it appends, so it holds the lock from the
  * start: nothing can be appended in between.

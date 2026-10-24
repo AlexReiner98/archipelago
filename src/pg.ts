@@ -65,11 +65,12 @@ export async function openPg(url: string, prepare: (db: Database) => Promise<unk
 const named = (url: string, database: string) => Object.assign(new URL(url), { pathname: `/${database}` }).toString();
 
 /**
- * A new, empty database for one test, copied from a template made once per schema (the name carries its hash).
+ * A new, empty database for one test, copied from a template made once per schema and role (the name carries their hash).
  * Closing it drops it.
  */
 export async function scratchPg(url: string, schema: string, prepare: (db: Database) => Promise<unknown>): Promise<Database> {
-  const template = `pelago_t_${createHash('sha256').update(schema).digest('hex').slice(0, 12)}`;
+  // The tables belong to whoever made the template, so a template is made per login role as well as per schema.
+  const template = `pelago_t_${createHash('sha256').update(`${schema} ${decodeURIComponent(new URL(url).username)}`).digest('hex').slice(0, 12)}`;
   const admin = new pg.Client({ connectionString: url });
   await admin.connect();
   const name = `pelago_s_${randomBytes(6).toString('hex')}`;
@@ -105,6 +106,23 @@ export async function databaseFor(url: string, workspace: string, make = true): 
     if (!(await admin.query(`select 1 from pg_database where datname = $1`, [name])).rowCount) await admin.query(`create database "${name}"`);
   });
   return named(url, name);
+}
+
+/** The database an address names, made when it is not there yet: a move's target. Says whether it was made. */
+export async function makeDatabase(url: string): Promise<boolean> {
+  const name = decodeURIComponent(new URL(url).pathname.slice(1));
+  const server = named(url, 'postgres');
+  return asAdmin(server, async (admin) => {
+    if ((await admin.query(`select 1 from pg_database where datname = $1`, [name])).rowCount) return false;
+    await admin.query(`create database "${name.replaceAll('"', '""')}"`);
+    return true;
+  });
+}
+
+/** Drop the database an address names: a move's target that was made for it and not filled. */
+export async function dropDatabase(url: string): Promise<void> {
+  const name = decodeURIComponent(new URL(url).pathname.slice(1));
+  await asAdmin(named(url, 'postgres'), (admin) => admin.query(`drop database if exists "${name.replaceAll('"', '""')}" with (force)`));
 }
 
 /** Drop a workspace's own database: one whose making failed. */

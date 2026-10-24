@@ -1,7 +1,7 @@
 // The human surface. A thin client over the running server's local API, so it
 // uses exactly the tools agents use, plus the two only a human may call.
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { hashSecret, newSecret, OPERATOR_RESET_FILE } from './auth.ts';
 import { loadConfig } from './config.ts';
@@ -21,6 +21,10 @@ const USAGE = `pelago <command>
   call <tool> [json | @file]   call any tool directly
   operator-reset               replace a lost operator secret (run it on the
                                server's own machine, with the server running)
+  move <from> <to>             carry a map between a data folder and a database
+                               on a Postgres server (postgres://…), either way,
+                               by replaying its log; checked on both sides. Stop
+                               the server first; the target must be empty
 
 Start the server first:  npm start`;
 
@@ -186,6 +190,41 @@ async function main(): Promise<void> {
 The old one no longer works.`);
       } finally {
         rmSync(join(dir, OPERATOR_RESET_FILE), { force: true });
+      }
+      return;
+    }
+
+    case 'move': {
+      const [from, to] = args;
+      if (!from || !to) throw new Error('Usage: pelago move <data folder | postgres://…> <new data folder | postgres://…>');
+      const [{ isServer, openDb }, { dropDatabase, makeDatabase }, { move }, { Registry }, { localTypes }, { configureSecrets }] = await Promise.all([
+        import('./db.ts'), import('./pg.ts'), import('./move.ts'), import('./packs.ts'), import('./control.ts'), import('./secrets.ts'),
+      ]);
+      const { packsDir, packs, dataDir } = loadConfig();
+      // What is sealed is opened with the key the server has (PELAGO_SECRETS_KEY, else the one kept beside its data),
+      // and stays sealed with it: a server on the target needs that same key. None is made here.
+      configureSecrets(join(dataDir, '..', 'workspaces'), false);
+      // Opening a folder makes one: a mistyped source would be an empty map, and a target already in use is refused.
+      if (!isServer(from) && !existsSync(join(from, 'PG_VERSION'))) throw new Error(`There is no map in ${from}.`);
+      if (!isServer(to) && existsSync(to) && readdirSync(to).length) throw new Error(`${to} is not empty: give a new folder.`);
+      const made = isServer(to) ? await makeDatabase(to) : !existsSync(to);
+      const source = await openDb(from);
+      let target: Awaited<ReturnType<typeof openDb>> | undefined;
+      try {
+        target = await openDb(to);
+        const report = await move(source, target, new Registry(packsDir, packs, await localTypes(source)));
+        console.log(`Moved: ${report.entries.facts} change sets and ${report.entries.pending} held changes, the same chain on both sides (head ${report.head.facts.slice(0, 12)}…).`);
+        console.log(`Projected again: ${Object.entries(report.projected).map(([t, n]) => `${n} ${t}`).join(', ')}, as the source has them.`);
+        console.log(`Carried beside the log: ${Object.entries(report.rows).filter(([, n]) => n).map(([t, n]) => `${n} ${t}`).join(', ') || 'nothing'}.`);
+      } catch (err) {
+        // What was made for the move goes again, so the same command can be run once the cause is put right.
+        await target?.close();
+        target = undefined;
+        if (made) await (isServer(to) ? dropDatabase(to) : Promise.resolve(rmSync(to, { recursive: true, force: true })));
+        throw err;
+      } finally {
+        await source.close();
+        await target?.close();
       }
       return;
     }
