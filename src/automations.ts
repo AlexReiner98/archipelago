@@ -99,6 +99,7 @@ export class Automations {
     const cursor = await this.l.setting<number>(CURSOR);
     const latest = await lastSeq(this.l.db);
     await this.l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [CURSOR, JSON.stringify(latest)]);
+    if (latest !== cursor) await this.l.record('automations', 'agent:pelago', [['+', 'automations', 'cursor', latest]]);
     // First run: start from now instead of replaying the whole history.
     if (cursor === undefined) return [];
     const rows: LoggedEvent[] = [];

@@ -56,6 +56,7 @@ export const BACKUP_TOOLS: Record<string, Tool> = {
       const [vault, transport] = [randomBytes(24).toString('base64url'), randomBytes(32)];
       await keep(whole.db, linkKey(vault), { name: name.replace('.json.gz', '.vault.json.gz') }, LINK_MINUTES * 60_000, gzipSync(JSON.stringify(rewrap(await dumpVault(whole.db), undefined, transport))));
       await l.log(l.db, { actor: actorId(actor), action: 'workspace.backup_download', reason: `Backup of the whole workspace downloaded (${Math.round(file.length / 1024)} KB)` });
+      await l.record('access', actorId(actor), [['+', actorId(actor), 'backup_download', { bytes: file.length, taken: taken.taken }]]);
       return { path: `/backup-file/${l.workspace}/${key}`, vault_path: `/backup-file/${l.workspace}/${vault}`, vault_key: transport.toString('base64url'), name, bytes: file.length, taken: taken.taken, rows: Object.values(taken.tables).reduce((n, rows) => n + rows.length, 0), expires_in_minutes: LINK_MINUTES };
     },
   },

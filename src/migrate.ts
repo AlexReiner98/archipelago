@@ -19,6 +19,7 @@ import { LOG } from './log.ts';
 import { ACTIVITY } from './eventlog.ts';
 import { VAULT } from './vault.ts';
 import { FORGET } from './forget.ts';
+import { OPLOG, OPLOG_SERVER } from './oplog.ts';
 
 interface Migration {
   version: number;
@@ -52,6 +53,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 18, name: 'the log: change sets appended, hash-chained', sql: LOG },
   { version: 19, name: 'the activity log read from the log', sql: ACTIVITY },
   { version: 20, name: 'per-item keys in a vault, and forgetting', sql: VAULT + FORGET },
+  { version: 21, name: 'the compacted streams, in segments', sql: OPLOG, server: OPLOG_SERVER },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

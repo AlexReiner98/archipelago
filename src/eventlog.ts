@@ -44,6 +44,8 @@ type FactRow = { pos: number; id: string; n: number; op: '+' | '-'; field: strin
 type Group = { seq: number; pos: number; id: string };
 
 const READ_MOST = 500;
+/** Entries that seal or compact a day of the compacted streams (src/streams.ts): no item or link moved. */
+const SEALS = ['segment.seal', 'segment.compact'];
 
 /**
  * The item or link groups of the fact stream the query asks for: (entry, id), each numbered by its first fact. The
@@ -52,7 +54,7 @@ const READ_MOST = 500;
  */
 async function groups(db: Q, input: EventQuery, limit: number): Promise<Group[]> {
   const where = [`e.stream = 'facts'`, `coalesce(e.head->>'action', '') <> all($1::text[])`];
-  const params: unknown[] = [MOVED];
+  const params: unknown[] = [[...MOVED, ...SEALS]];
   const add = (sql: string, value: unknown) => where.push(sql.replaceAll('?', `$${params.push(value)}`));
   if (input.since) add(`e.at >= ?::timestamptz`, input.since);
   if (input.actor) add(`e.head->'actor'->>'id' = ?`, input.actor);

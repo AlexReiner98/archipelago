@@ -95,6 +95,7 @@ async function takeOnce(l: Archipelago, pack: PackFile, once: string): Promise<b
        where (setting.value->>'done')::boolean is not true and (setting.value->>'at')::timestamptz < now() - make_interval(mins => $2::int) returning key`,
     [onceKey(pack, once), ONCE_MINUTES],
   );
+  if (rows.length) await l.record('automations', `agent:${pack.id}`, [['+', 'run_once', `${pack.id}:${once}`, { done: false }]]);
   return rows.length > 0;
 }
 
@@ -211,6 +212,7 @@ async function run(l: Archipelago, pack: PackFile, r: RunAsk, by: StartedBy | un
   const cost = price ? (used.input * price.input + used.output * price.output + used.cache_read * price.input * 0.1 + used.cache_write * price.input * 1.25) / 1e6 : undefined;
   const summary = [failed, said].filter(Boolean).join('\n\n');
   if (r.once) await l.db.query(`update setting set value = value || '{"done": true}'::jsonb where key = $1`, [onceKey(pack, r.once)]);
+  if (r.once) await l.record('automations', `agent:${pack.id}`, [['+', 'run_once', `${pack.id}:${r.once}`, { done: true }]]);
   const recorded = await recordRun(l, actor, { repo: r.within[0], title: r.title, ok: !failed, tokens, cost_usd: cost, turns, link: r.link, summary, surface: 'server', started_by: by });
   if (r.then) await ended(mine, actor, pack, r, { ok: !failed, summary, run: recorded.run, tokens, turns });
   return { ok: !failed, tokens };

@@ -5,7 +5,8 @@
 // database, stored only as a hash.
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { newId, type Q } from './db.ts';
+import { newId, type Db, type Q } from './db.ts';
+import { record } from './streams.ts';
 import type { Actor, May } from './pelago.ts';
 
 export interface Identity {
@@ -84,9 +85,9 @@ export async function createToken(db: Q, workspace: string, input: { kind: 'huma
  * token copied off a machine shows up as a place its owner does not know.
  * The first place a token is used is not news.
  */
-export async function verifyToken(db: Q, token: string, from?: string): Promise<Identity | undefined> {
-  const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; within: string[] | null; may: May; seen: string[] | null }>(
-    `select id, hash, kind, name, entity_id, admin, within, coalesce(may, 'change') as may, seen from token where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
+export async function verifyToken(db: Db, token: string, from?: string, ws = 'default'): Promise<Identity | undefined> {
+  const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; within: string[] | null; may: May; seen: string[] | null; last_used: Date | null }>(
+    `select id, hash, kind, name, entity_id, admin, within, coalesce(may, 'change') as may, seen, last_used from token where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
     [hash(token)],
   );
   const row = rows[0];
@@ -96,6 +97,8 @@ export async function verifyToken(db: Q, token: string, from?: string): Promise<
   const fresh = place !== undefined && !seen.includes(place);
   // The last twenty places are kept: enough to know a machine by, and a list that cannot grow without end.
   await db.query(`update token set last_used = now(), seen = $2::jsonb where id = $1`, [row.id, JSON.stringify(fresh ? [...seen, place].slice(-20) : seen)]);
+  // Its use is in the access stream at most once an hour: how recently, not every request.
+  if (!row.last_used || Date.now() - new Date(row.last_used).getTime() >= 3600_000) await db.transaction((tx) => record(tx, ws, 'access', row.id, [['+', row.id, 'last_used', new Date().toISOString()]]));
   return {
     actor: { kind: row.kind, name: row.name, person: row.entity_id ?? undefined, admin: row.admin, token: row.id, ...(row.within?.length && { within: row.within }), ...(row.may !== 'change' && { may: row.may }) },
     ...(fresh && seen.length > 0 && { newPlace: place }),
