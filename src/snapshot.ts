@@ -14,7 +14,7 @@ import { openTables, sealTables } from './backup-seal.ts';
 import type { VaultDump } from './vault.ts';
 import type { Rows } from './replay.ts';
 
-/** Step 22: where snapshots are kept, and the schema a rebuild projects into beside the live tables. Neither is a member's. */
+/** Step 23: where snapshots are kept, and the schema a rebuild projects into beside the live tables. Neither is a member's. */
 export const SNAPSHOT = `
 create table if not exists log_snapshot (
   id                 text primary key,

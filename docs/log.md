@@ -793,7 +793,7 @@ never sees the log ahead of them.
 ### As built (`src/snapshot.ts`, `src/rebuild.ts`, `src/backup-log.ts`)
 
 - **Where kept.** `log_snapshot`, one row per snapshot in the workspace's
-  database (step 22), its rows gzipped JSON sealed per item as a backup's
+  database (step 23), its rows gzipped JSON sealed per item as a backup's
   rows are (`entity.title`, …), never readable by a member. Its id is
   `s_<facts>_<pending>_<code>`; taken again at the same position, it is
   replaced. The newest three of the running code are kept.
