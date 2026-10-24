@@ -238,7 +238,8 @@ test('the operator can create a workspace from a backup file: the map, its types
   const vault = gzipSync(JSON.stringify(await dumpVault(main.pelago.db))).toString('base64');
   assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup })).error, /backup of the key vault/, 'a sealed backup comes with its vault');
   const made = (await call('/operator/workspaces', operator, { id: 'moved', name: 'Alex, moved', backup, vault })).result;
-  assert.deepEqual([made.restored.entities, made.restored.events, made.restored.from.id], [taken.tables.entity.length, taken.tables.event.length, 'default']);
+  const logged = new Set(taken.tables.log_entry.map((e) => e.id)); // what a change set did is read from the restored log
+  assert.deepEqual([made.restored.entities, made.restored.events, made.restored.from.id], [taken.tables.entity.length, taken.tables.event.filter((e) => !logged.has(e.changeset)).length, 'default']);
   const who = await call('/whoami', made.owner_token, undefined, 'GET');
   assert.deepEqual([who.workspace.id, who.workspace.name, who.actor.admin, who.actor.person], ['moved', 'Alex, moved', true, me], 'the new token is the owner\'s own');
   assert.equal((await call('/api/workspace_info', made.owner_token)).result.owner.title, 'Alex');
