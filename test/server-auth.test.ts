@@ -219,7 +219,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
     return r.result;
   };
   const refused = async (token: string, ops: unknown[]) => (await call('/api/change', token, { reason: 'x', ops })).error as string;
-  await api(alex, 'init', { name: 'Alex' });
+  const owner = (await api(alex, 'init', { name: 'Alex' })).me;
   const sam = await member(alex, { email: 'sam@example.com', name: 'Sam' });
 
   const made = (await api(alex, 'change', { reason: 'x', ops: [
@@ -261,9 +261,9 @@ test('nothing can depend on a private item from outside it, and a held resource 
   const alexRun = await api(alex, 'session_start', { title: 'Alex wants the lane', task: made.live });
   assert.equal(alexRun.status, 'waiting');
   assert.match(alexRun.blocked[0].why, /"Live lane" is held by "someone's private session"/);
-  const other = (await api(alex, 'view', { name: 'attention', params: { reasons: ['ready', 'blocked'] } })).items.find((t: any) => t.title === 'Other live work');
+  const other = (await api(alex, 'view', { name: 'attention', params: { person: 'me', reasons: ['ready', 'blocked'] } })).items.find((t: any) => t.title === 'Other live work');
   assert.deepEqual(other.reasons.map((r: any) => [r.why, r.held_by]), [['blocked', ["someone's private session"]]], 'not ready: the lane is held, by a session Alex may not see');
-  assert.deepEqual((await api(sam, 'view', { name: 'attention', params: { reasons: ['blocked'] } })).items.find((t: any) => t.title === 'Other live work').reasons[0].held_by, ['Sam debugging']);
+  assert.deepEqual((await api(sam, 'view', { name: 'attention', params: { person: owner, reasons: ['blocked'] } })).items.find((t: any) => t.title === 'Other live work').reasons[0].held_by, ['Sam debugging']);
 });
 
 test('a workspace receives notifications only from workspaces its admin accepts', async () => {

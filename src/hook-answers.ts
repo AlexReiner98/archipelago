@@ -7,6 +7,7 @@ import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
+import { summed } from './summary.ts';
 import { keep, kept } from './transient.ts';
 
 export interface HookBody {
@@ -70,7 +71,10 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     const began = (await kept(whole, restartKey)) ? undefined : await sessionBegan(pelago, body.session_id);
     await keep(whole, restartKey, true, HEARD_MS);
     if (began && began.getTime() < Date.parse(running.started)) told.push(restarted(running));
-    if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${describeChanges(changes)}`);
+    // How many of each, and the newest few: the rest is one query away.
+    const { newest, counts, more } = summed(changes, (c) => c.action);
+    const tally = counts ? `${newest.length + more!} changes (${Object.entries(counts).map(([action, n]) => `${n} ${action}`).join(', ')}); the newest ${newest.length}, the rest with query events:\n` : '';
+    if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${describeChanges(newest)}`);
     return told.length ? { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } } : {};
   }
   if (event === 'session-start') {

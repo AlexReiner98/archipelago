@@ -27,7 +27,7 @@ test('what needs the person a lens is answered for is lit by attention: what wai
     { op: 'link', type: 'waits_on', from: 'waits', to: 'ann' },
   ]);
   await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(made.ann)]);
-  const answer = (await ask(l, 'lens', {})) as any;
+  const answer = (await ask(l, 'lens', { from: made.p })) as any;
   const item = (title: string) => answer.items.find((i: any) => i.title === title);
   assert.equal(answer.viewer, made.ann);
   assert.deepEqual(['Waits', 'Due', 'Calm'].map((t) => item(t).state.needs_you), [true, true, false], 'due work owned by no one is the owner’s, though it waits on nobody');
@@ -65,10 +65,12 @@ test('a lens answers with one shape of data: what is inside what, the same count
   const name = (answer: any, id: string) => answer.items.find((i: any) => i.id === id)?.title;
   const links = (answer: any) => answer.links.map((k: any) => `${name(answer, k.from)} ${k.kind} ${name(answer, k.to)} x${k.n}`).sort();
 
-  // The whole map, as it opens: what is finished and what the organising link does not touch are counted, not sent.
-  const whole = await run();
+  // The whole map, of the kinds it names: what is finished is not read; what the organising link does not touch is counted, not sent.
+  const every = ['work.project', 'software.feature', 'work.task', 'person'];
+  const whole = await run({ kinds: every });
   assert.deepEqual(titles(whole), ['A', 'B', 'C', 'Early', 'Late', 'P', 'Q', 'X']);
-  assert.deepEqual([whole.rest.closed, whole.rest.unlinked], [1, 2], 'E is finished; D and Sam are part of nothing');
+  assert.deepEqual([whole.rest.closed, whole.rest.unlinked], [0, 2], 'E is finished, and not read; D and Sam are part of nothing');
+  assert.deepEqual(titles(await run()), ['P', 'Q'], 'naming no kinds, the whole map opens on its top: its projects');
   assert.deepEqual([whole.lens.by, whole.lens.over, whole.lens.fold], ['part_of', ['depends_on', 'waits_on'], ['closed', 'system', 'unlinked']], 'the lens as it was read comes back');
   assert.deepEqual(Object.keys(item(whole, 'P')), Object.keys(item(whole, 'A')), 'a thing with parts carries the same keys as one without');
   assert.deepEqual(Object.keys(item(whole, 'P').within), Object.keys(item(whole, 'A').within));
@@ -80,7 +82,7 @@ test('a lens answers with one shape of data: what is inside what, the same count
   assert.deepEqual(links(whole), ['A depends_on C x1', 'X depends_on A x1'], 'a link to what was not sent is not sent');
 
   // One step down: what was cut is still counted, and its links are moved up to what stands for it.
-  const near = await run({ far: 1 });
+  const near = await run({ kinds: every, far: 1 });
   assert.deepEqual(titles(near), ['C', 'Early', 'Late', 'P', 'Q', 'X']);
   assert.equal(near.rest.far, 2);
   assert.deepEqual([item(near, 'Early').within.items, item(near, 'Early').within.not_sent, item(near, 'Early').within.blocked], [2, 2, 2]);
@@ -100,7 +102,7 @@ test('a lens answers with one shape of data: what is inside what, the same count
   const staged = await run({ from: made.p, lanes: 'stage', fold: [] });
   assert.deepEqual(['Early', 'Late', 'E'].map((t) => item(staged, t).lane), ['under_way', 'to_come', 'done']);
   const tasks = await run({ kinds: ['work.task'], fold: ['closed', 'system'] });
-  assert.deepEqual([titles(tasks), tasks.rest.kinds], [['A', 'B', 'C', 'D', 'X'], 7], 'the two projects, two features, Sam and the two notes are not tasks');
+  assert.deepEqual([titles(tasks), tasks.rest.kinds], [['A', 'B', 'C', 'D', 'X'], 0], 'only the tasks are read: the projects, features, Sam and the notes are not');
   const tasksOfP = await run({ from: made.p, kinds: ['work.task'], over: [] });
   assert.deepEqual([titles(tasksOfP), item(tasksOfP, 'A').inside, item(tasksOfP, 'P').within.items], [['A', 'B', 'C', 'P'], made.p, 3], 'of some kinds only, a thing sits in the nearest thing kept above it: the feature between is not drawn, and its tasks are not lost');
 
@@ -122,7 +124,7 @@ test('a lens answers with one shape of data: what is inside what, the same count
     { op: 'link', type: 'about', from: 'ps', to: made.p },
   ]);
   const opened = await run();
-  assert.deepEqual([opened.lens.far, titles(opened), opened.style.shape, opened.style.open, opened.style.colors], [1, ['C', 'Early', 'Late', 'P', 'Q', 'X'], 'list', 1, { sea: '#f0f4f5' }], 'the workspace’s own, and they are not items of the picture');
+  assert.deepEqual([opened.lens.far, titles(opened), opened.style.shape, opened.style.open, opened.style.colors], [1, ['P', 'Q'], 'list', 1, { sea: '#f0f4f5' }], 'the workspace’s own, and they are not items of the picture');
   // A named set (sizes, colours) is merged name by name: a style that sets one size keeps the house style's others.
   assert.equal(typeof opened.style.sizes.flow_layer_gap, 'number');
   assert.deepEqual(opened.kept, { lens: [{ id: drawn.wl, title: 'As it opens' }], style: [house, { id: drawn.ws, title: 'House style' }] });
@@ -174,10 +176,11 @@ test('a lens answers with one shape of data: what is inside what, the same count
   await make(l, [{ op: 'archive', id: onlyShortcut.s }]);
 
   // A hub is an item that holds enough to need views of its own: how much is enough is its project's to say.
-  assert.deepEqual([hubP.hub, ((await ask(l, 'hubs', {})) as any).hubs], [{ is: false }, []], 'six things are not twelve');
+  assert.deepEqual([hubP.hub, ((await ask(l, 'hubs', { within: made.p })) as any).hubs], [{ is: false }, []], 'six things are not twelve');
   await make(l, [{ op: 'update', id: made.p, props: { hub_at: 2 } }]);
-  const found = ((await ask(l, 'hubs', {})) as any).hubs.map((h: any) => [h.title, h.inside, h.at, h.views]);
-  assert.deepEqual(found, [['P', 5, 2, 3], ['Early', 2, 2, 0]], 'while a project is shaped, most of what is in it is a hub; Q is another project and keeps the usual size');
+  const found = ((await ask(l, 'hubs', { within: made.p })) as any).hubs.map((h: any) => [h.title, h.inside, h.at, h.views]);
+  assert.deepEqual(found, [['P', 5, 2, 3], ['Early', 2, 2, 0]], 'while a project is shaped, most of what is in it is a hub');
+  await assert.rejects(ask(l, 'hubs', {}), /within an item or a place/, 'across the whole map, hubs are not read');
   assert.deepEqual((await run({ from: made.early })).hub, { is: true, inside: 2, at: 2 });
 
   // Code in a style runs in the browser of whoever looks: an agent that writes it proposes it, whatever else agents may do unreviewed.

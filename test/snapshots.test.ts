@@ -57,16 +57,19 @@ test('a rebuild from a snapshot is the rebuild from the start, made beside the l
   await during;
   assert.equal(fromSnapshot.from, first.snapshots[0], 'it starts at the snapshot');
   assert.ok(fromSnapshot.chunks > 2 && fromSnapshot.entries < 20, 'and projects only what came after, a chunk at a time');
-  assert.deepEqual(fromSnapshot.swapped, { entity: 0, relation: 0, proposal: 0 }, 'the live tables were right: nothing to write');
+  assert.deepEqual(fromSnapshot.swapped, { entity: 0, relation: 0, proposal: 0, part_closure: 0, mention: 0 }, 'the live tables were right: nothing to write');
   const viaSnapshot = await rows(l);
   assert.ok(viaSnapshot.items.some((i: any) => i.title === 'Written during the rebuild'), 'what was written while it ran is in');
 
   // Damage the live tables, then rebuild from the start: the same rows, the damage swapped away.
   await l.db.query(`update entity set title = 'Wrong', props = props || '{"tokens_used": 7}' where id = $1`, [made.t]);
   await l.db.query(`delete from relation where type = 'depends_on'`);
+  // The closure and mentions too: a pair the links do not make, and one they do taken away (src/closure.ts).
+  await l.db.query(`insert into part_closure (ancestor, descendant) values ($1, $2)`, [made.t, made.p]);
+  await l.db.query(`delete from part_closure where ancestor = $1 and descendant = $2`, [made.p, made.t]);
   const fromStart = await rebuildProjections(l.db, l.registry, l.workspace, { fromStart: true, chunk: 5 });
   assert.equal(fromStart.from, 'start');
-  assert.deepEqual(fromStart.swapped, { entity: 1, relation: 1, proposal: 0 });
+  assert.deepEqual(fromStart.swapped, { entity: 1, relation: 1, proposal: 0, part_closure: 2, mention: 0 });
   assert.deepEqual(await rows(l), viaSnapshot, 'from the snapshot and from the start: row for row');
   assert.equal((await l.entity(made.t))!.props.tokens_used, 7, 'what is kept on an item that is not a fact stays');
   const { live, replay } = await replayed(l);
@@ -120,6 +123,11 @@ test('a past position reads as the map stood then: the nearest snapshot and the 
     const links = past.rows.relation.filter((r) => r.from_id === made.t && r.valid_to === null).length;
     assert.deepEqual({ pos: then.pos, title: t.title, status: t.status, links }, then, `as it stood at ${then.pos}`);
   }
+  // Read back from the start to before the unlink, the link is made again in the read's own tables: the live closure is untouched.
+  await l.db.query(`delete from log_snapshot`);
+  assert.equal((await asOf(l.db, l.registry, l.workspace, seen[1].pos)).rows.relation.filter((r) => r.valid_to === null).length, 1);
+  const { rows: inside } = await l.db.query(`select 1 from part_closure where ancestor = $1 and descendant = $2`, [made.p, made.t]);
+  assert.equal(inside.length, 0, 'an as-of read writes nothing live');
   assert.equal((await asOf(l.db, l.registry, l.workspace, seen.at(-1)!.pos)).rows.proposal.length, 1, 'the held change made by then is in the queue');
   assert.equal((await asOf(l.db, l.registry, l.workspace, seen[0].pos)).rows.proposal.length, 0);
 
@@ -149,7 +157,7 @@ test('a backup is a snapshot and the log: restored into an empty map, it verifie
     assert.deepEqual(await rows(there), await rows(l), 'the map as it was');
     const { live, replay } = await replayed(there);
     assert.deepEqual(replay, live, 'and its log replays to it');
-    assert.deepEqual((await rebuildProjections(there.db, there.registry, there.workspace, { fromStart: true })).swapped, { entity: 0, relation: 0, proposal: 0 });
+    assert.deepEqual((await rebuildProjections(there.db, there.registry, there.workspace, { fromStart: true })).swapped, { entity: 0, relation: 0, proposal: 0, part_closure: 0, mention: 0 });
     return there;
   };
   await into(taken);

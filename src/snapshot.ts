@@ -102,7 +102,8 @@ export async function takeSnapshot(q: Q, ws: string, positions: Positions, rows:
  */
 export async function liveSnapshot(q: Q, ws: string): Promise<Record<string, unknown>> {
   const { rows: [at] } = await q.query<Positions>(
-    `select coalesce((select max(pos) from log_entry where stream = 'facts'), 0)::int as facts, coalesce((select max(pos) from log_entry where stream = 'pending'), 0)::int as pending`,
+    `select coalesce((select pos from log_entry where stream = 'facts' order by at desc, pos desc limit 1), 0)::int as facts,
+            coalesce((select pos from log_entry where stream = 'pending' order by at desc, pos desc limit 1), 0)::int as pending`,
   );
   const rows = {} as Rows;
   for (const t of ['entity', 'relation', 'proposal'] as const) rows[t] = (await q.query<{ row: Record<string, unknown> }>(`select to_jsonb(t) as row from public.${t} t order by id`)).rows.map((r) => r.row);

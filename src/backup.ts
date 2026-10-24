@@ -23,6 +23,8 @@ import { isServer, openDb, type Db, type Q } from './db.ts';
 import { addLocalType, addWorkspace } from './control.ts';
 import type { Registry } from './packs.ts';
 import { restoreRows } from './pelago.ts';
+import { regatherAll } from './closure.ts';
+import { mentionedAll } from './mentions.ts';
 import { databaseFor } from './pg.ts';
 import { analyzeAll, analyzeDue } from './stats.ts';
 import { FACT_ACTIONS, factEvents } from './eventlog.ts';
@@ -115,11 +117,12 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     // What a change set in the file's log did is read from that log again: its events are not rows.
     const logged = new Set((backup.tables.log_entry ?? []).map((e) => e.id as string));
     backup.tables.event = (backup.tables.event ?? []).filter((ev) => !(logged.has(ev.changeset as string) && FACT_ACTIONS.includes(ev.action as string)));
-    // The log goes into the months it was written in, in order: each entry follows the one before (src/partitions.ts).
+    // The log goes into the years it was written in, in order: each entry follows the one before (src/partitions.ts),
+    // the compacted streams' too, whose rows a forget has rewritten out of their order on disk.
     const logAt = new Map((backup.tables.log_entry ?? []).map((e) => [`${e.stream} ${e.pos}`, e.at]));
     for (const f of backup.tables.log_fact ?? []) f.at ??= logAt.get(`${f.stream} ${f.pos}`);
-    for (const table of ['log_entry', 'log_fact'] as const) backup.tables[table]?.sort((a, b) => String(a.stream).localeCompare(String(b.stream)) || Number(a.pos) - Number(b.pos) || Number(a.n ?? 0) - Number(b.n ?? 0));
-    const first = Math.min(...[...logAt.values()].map((at) => new Date(at as string).getTime()));
+    for (const table of ['log_entry', 'log_fact', 'log_op'] as const) backup.tables[table]?.sort((a, b) => String(a.stream).localeCompare(String(b.stream)) || Number(a.pos) - Number(b.pos) || Number(a.n ?? 0) - Number(b.n ?? 0));
+    const first = [...logAt.values(), ...(backup.tables.log_op ?? []).map((o) => o.at)].reduce((min: number, at) => Math.min(min, new Date(at as string).getTime()), Infinity);
     if (Number.isFinite(first)) await makePartitions(tx, new Date(first));
     for (const table of TABLES) {
       const rows = backup.tables[table] ?? [];
@@ -128,6 +131,9 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
       counts[table] = rows.length;
     }
     await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), 1))`);
+    // What is inside what is a projection of the links just written: made again whole.
+    await regatherAll(tx, ['part_of']);
+    await mentionedAll(tx);
     // The types it defined for itself go in its database, where the server looks for them.
     for (const def of (given.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
     if (as !== undefined && as !== given.workspace?.id) {
@@ -190,6 +196,8 @@ export async function merge(db: Db, given: Dump, options: { workspace: string; s
       const count = (what: string) => plan.filter((p) => p.what === what).length;
       const some = (what: string) => plan.filter((p) => p.what === what).slice(0, 20).map((p) => p.title);
       const rels = await restoreRows(tx, entities, JSON.stringify(here(relations.filter((r) => !held(r)))));
+      await regatherAll(tx, ['part_of']);
+      await mentionedAll(tx);
       const { rows: props } = await tx.query<{ added: boolean }>(
         `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)
          on conflict (id) do update set status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at, note = excluded.note

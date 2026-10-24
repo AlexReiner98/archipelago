@@ -22,6 +22,9 @@ import { FORGET } from './forget.ts';
 import { OPLOG, OPLOG_GUARDED, OPLOG_SERVER } from './oplog.ts';
 import { PARTITION } from './partitions.ts';
 import { SNAPSHOT } from './snapshot.ts';
+import { CLOSURE } from './closure.ts';
+import { MENTIONS } from './mentions.ts';
+import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
 
 interface Migration {
   version: number;
@@ -59,6 +62,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 22, name: 'the log cut by year', sql: PARTITION },
   { version: 23, name: 'snapshots of the projections, and room to rebuild them', sql: SNAPSHOT },
   { version: 24, name: 'the compacted streams sealed, guarded by row, and reached by a forget', sql: OPLOG_GUARDED },
+  { version: 25, name: 'what is inside what, what names what, the indexes reads are bounded by, and visibility asked row by row', sql: CLOSURE + MENTIONS + READ_INDEXES + ROW_POLICIES + ACTIVE_HOLDS_BY_KEY },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

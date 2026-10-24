@@ -7,7 +7,9 @@
 import { setImmediate } from 'node:timers/promises';
 import type { Db, Q } from './db.ts';
 import { headOf, stored, type Entry } from './log.ts';
-import { inOrder, type Kinds, loadRows, projectEntry, projectedRows, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
+import { inOrder, type Kinds, loadRows, projectEntry, projectedRows, PROJECTED, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
+import { projectsApart, regatherAll } from './closure.ts';
+import { mentionedAll } from './mentions.ts';
 import { openAll } from './seal.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { newestValid, prune, takeSnapshot, type Positions, type Snapshot } from './snapshot.ts';
@@ -47,8 +49,9 @@ async function next(q: Q, at: Positions, limit: number): Promise<Entry[]> {
   return openAll(q, [...facts, ...pending].sort(inOrder).slice(0, limit));
 }
 
-/** Project entries into the shadow, in one transaction that names it first. */
+/** Project entries into the shadow (or temporary tables), in one transaction that names it first. */
 async function project(tx: Q, reg: Kinds, entries: Entry[], at: Positions): Promise<void> {
+  projectsApart(tx);
   for (const e of entries) {
     await projectEntry(tx, reg, e);
     at[e.stream as keyof Positions] = e.pos;
@@ -76,6 +79,9 @@ export async function catchUp(db: Db, reg: Kinds, ws: string, swap: boolean, o: 
       await shadowTables(tx);
       await inShadow(tx);
       if (start) await loadRows(tx, start.rows);
+      // A snapshot keeps items, links and the queue: what is inside what and what names what are made from them.
+      await regatherAll(tx, reg.relationFamily('part_of'));
+      await mentionedAll(tx);
     });
     const report: RebuildReport = { from: start?.snapshot.id ?? 'start', to: at, entries: 0, chunks: 0, snapshots: [], ms: 0, snapshot_ms: 0 };
     let since = at.facts;
@@ -123,7 +129,7 @@ export async function catchUp(db: Db, reg: Kinds, ws: string, swap: boolean, o: 
 }
 
 async function dropShadow(tx: Q) {
-  for (const t of ['proposal', 'relation', 'entity']) await tx.query(`drop table if exists ${SHADOW}.${t}`);
+  for (const t of PROJECTED) await tx.query(`drop table if exists ${SHADOW}.${t}`);
 }
 
 /** Make every projection again from the log, beside the live ones, and swap it in when caught up. */
@@ -140,7 +146,7 @@ export const snapshotNow = (db: Db, reg: Kinds, ws: string, o?: RebuildOptions) 
 export async function asOf(db: Db, reg: Kinds, ws: string, pos: number, reader: Q = db): Promise<{ at: Positions; rows: Rows }> {
   const start = await newestValid(db, ws, pos);
   const out = await db.transaction(async (tx) => {
-    for (const t of ['proposal', 'relation', 'entity']) await tx.query(`create temp table ${t} (like public.${t} including defaults including indexes) on commit drop`);
+    for (const t of PROJECTED) await tx.query(`create temp table ${t} (like public.${t} including defaults including indexes) on commit drop`);
     if (start) await loadRows(tx, start.rows);
     const at: Positions = start ? { ...start.snapshot.positions } : { facts: 0, pending: 0 };
     // The moment of fact entry `pos`: the held changes made by then are in, those after it are not.

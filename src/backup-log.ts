@@ -6,7 +6,8 @@
 
 import type { Q } from './db.ts';
 import type { Entry, Fact } from './log.ts';
-import { inOrder, kindsOf, loadRows, projectEntry, projectedRows, type Rows } from './replay.ts';
+import { inOrder, kindsOf, loadRows, projectEntry, projectedRows, PROJECTED, type Rows } from './replay.ts';
+import { projectsApart } from './closure.ts';
 import { openAll } from './seal.ts';
 import { openTables } from './backup-seal.ts';
 import { check, fromBackup, sealedRows } from './snapshot.ts';
@@ -55,7 +56,9 @@ export async function projectBackup(tx: Q, tables: Record<string, Row[]>, snapsh
       start = { rows: { entity: opened.entity ?? [], relation: opened.relation ?? [], proposal: opened.proposal ?? [] }, at: s.positions, id: s.id, left_out };
     }
   }
-  for (const t of ['proposal', 'relation', 'entity']) await tx.query(`create temp table ${t} (like public.${t} including defaults including indexes)`);
+  // Every projection in tables of its own: the closure and mentions too, or the projector would write the live ones.
+  for (const t of PROJECTED) await tx.query(`create temp table ${t} (like public.${t} including defaults including indexes)`);
+  projectsApart(tx);
   try {
     if (start) await loadRows(tx, start.rows);
     const after = all.filter((e) => !start || e.pos > start.at[e.stream as 'facts' | 'pending']);
@@ -74,6 +77,6 @@ export async function projectBackup(tx: Q, tables: Record<string, Row[]>, snapsh
       },
     };
   } finally {
-    for (const t of ['proposal', 'relation', 'entity']) await tx.query(`drop table if exists pg_temp.${t}`);
+    for (const t of PROJECTED) await tx.query(`drop table if exists pg_temp.${t}`);
   }
 }

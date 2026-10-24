@@ -70,11 +70,13 @@ export async function asCompactor<T>(tx: Q, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Every link a compacted stream ever made with the item at either end (a claim's hold). */
+/** Every link a compacted stream ever made with the item at either end (a claim's hold), by the index of entries that say a link (step 24). */
 export async function opLinksOf(tx: Q, item: string): Promise<string[]> {
   return asCompactor(tx, async () => {
     const { rows } = await tx.query<{ id: string }>(
-      `select distinct f->>1 as id from log_op, jsonb_array_elements(facts) f where f->>0 = '+' and f->>2 = 'link' and (f->3->>1 = $1 or f->3->>2 = $1)`,
+      `select distinct f->>1 as id from log_op, jsonb_array_elements(facts) f
+        where facts @> '[["link"]]' and facts @> jsonb_build_array(jsonb_build_array('link', jsonb_build_array($1::text))) -- index log_op_links
+          and f->>0 = '+' and f->>2 = 'link' and (f->3->>1 = $1 or f->3->>2 = $1)`,
       [item],
     );
     return rows.map((r) => r.id);

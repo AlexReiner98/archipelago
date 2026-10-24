@@ -92,16 +92,20 @@ async function* inOrder(q: Q): AsyncGenerator<Entry> {
   }
 }
 
-/** A table's rows hashed in id order, read the same way on both sides: what a comparison of the projections compares. */
+/** The projections with no id of their own, by the columns that are their key (src/closure.ts, src/mentions.ts). */
+const KEYS: Record<string, string[]> = { part_closure: ['ancestor', 'descendant'], mention: ['to_id', 'from_id'] };
+
+/** A table's rows hashed in key order, read the same way on both sides: what a comparison of the projections compares. */
 async function digest(q: Q, table: string): Promise<{ rows: number; hash: string; ids: string[] }> {
   const hash = createHash('sha256');
   let rows = 0;
   const ids: string[] = [];
-  for await (const page of rowsOf(q, table, 'id')) {
+  const key = KEYS[table] ?? ['id'];
+  for await (const page of rowsOf(q, table, key.join(', '))) {
     for (const row of page) {
       hash.update(jcs(row));
       hash.update('\n');
-      ids.push(createHash('sha256').update(jcs(row)).digest('hex').slice(0, 16) + ' ' + String(row.id));
+      ids.push(createHash('sha256').update(jcs(row)).digest('hex').slice(0, 16) + ' ' + key.map((k) => String(row[k])).join('/'));
     }
     rows += page.length;
   }
@@ -154,7 +158,7 @@ export async function move(from: Db, to: Db, registry: Registry): Promise<MoveRe
     const vault = carried.filter((t) => t.startsWith('vault_'));
     for (const t of vault) rows[t] = await carry(from, tx, t);
     // The years the log was written in, back to its oldest entry (src/partitions.ts).
-    const { rows: oldest } = await from.query<{ at: Date | null }>(`select least((select min(at) from log_entry), (select min(at) from log_op)) as at`);
+    const { rows: oldest } = await from.query<{ at: Date | null }>(`select least((select at from log_entry order by at limit 1), (select at from log_op order by at limit 1)) as at`);
     if (oldest[0].at) await makePartitions(tx, oldest[0].at);
 
     // The log, entry by entry as stored, each projected as it lands.
@@ -196,7 +200,7 @@ export async function move(from: Db, to: Db, registry: Registry): Promise<MoveRe
       left = failed;
     }
     // Numbers drawn from a sequence go on after the highest carried.
-    await tx.query(`select setval('event_seq_seq', greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), 1))`);
+    await tx.query(`select setval('event_seq_seq', greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), 1)) -- index log_fact_seq`);
     if (there.has('local_type')) await tx.query(`select setval(pg_get_serial_sequence('local_type', 'n'), greatest((select coalesce(max(n), 0) from local_type), 1))`);
 
     // Checked before it is committed: a target that does not agree is left as it was.

@@ -96,7 +96,7 @@ export interface View {
 
 export const VIEWS: Record<string, View> = {
   changed_since: {
-    description: 'What changed since a moment in time: how many events of each kind, and the newest of them. Long notes are cut to their start, and a change set says its reason once. Params: since (ISO date-time, required), limit (events listed, default 50), full (true for everything whole).',
+    description: 'What changed since a moment in time: how many events of each kind, and the newest of them. Long notes are cut to their start, and a change set says its reason once. Params: since (ISO date-time, required), limit (events listed, default 50; an agent is given the newest five unless it asks), full (true for everything whole).',
     run: changedSince,
   },
   spent: {

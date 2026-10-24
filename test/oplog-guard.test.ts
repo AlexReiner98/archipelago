@@ -107,6 +107,7 @@ test('a backup carries the compacted streams sealed, and a restore with the vaul
   assert.ok(!JSON.stringify(file.tables.log_op).includes('Quill'), 'sealed in the file as in the log');
 
   const there = new Archipelago(await openDb(), l.registry);
+  file.tables.log_op.reverse(); // as a forget leaves rows on disk, out of their order: a restore puts them back in it
   await restore(there.db, { ...file, vault: await dumpVault(l.db) });
   assert.deepEqual((await verifySegments(there.db)).problems, []);
   assert.equal((await readOps(there.db, 'sessions'))[0].reason, 'Quill asked for it', 'opened with the vault that came with it');

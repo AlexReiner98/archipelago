@@ -549,7 +549,7 @@ export class Archipelago {
   private async ensureSource(q: Q, spec: SourceSpec, said: (facts: Fact[]) => Promise<void>, mint: (key: string, prefix: string) => string): Promise<string | null> {
     const type = this.registry.type('sys.source');
     if (!type) return null;
-    const found = await q.query<{ id: string }>(`select id from entity where type = 'sys.source' and props->>'uri' = $1 and archived_at is null`, [spec.uri]);
+    const found = await q.query<{ id: string }>(`select id from entity where type = 'sys.source' and props->>'uri' = $1 and archived_at is null -- index entity_source_uri`, [spec.uri]);
     if (found.rows.length) return found.rows[0].id;
     const id = mint(`source ${spec.uri}`, 'e');
     const props: Props = { uri: spec.uri };
@@ -579,7 +579,7 @@ export class Archipelago {
   async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity'): Promise<number> {
     return this.db.transaction(async (tx) => {
       const { rows } = await tx.query<{ id: string; from_id?: string; to_id?: string }>(
-        what === 'entity' ? `select id from entity where type = $1` : `select id, from_id, to_id from relation where type = $1`,
+        what === 'entity' ? `select id from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1`,
         [from],
       );
       const keys = what === 'entity' ? ['kinds', 'on'] : ['over'];
@@ -725,7 +725,7 @@ export class Archipelago {
   /** Create (or find) the person this workspace belongs to and make them the default for views. */
   async init(actor: Actor, input: { name: string; email?: string }) {
     if (actor.kind !== 'human') throw new Error('Only a human can set the workspace owner.');
-    const found = await this.db.query<{ id: string }>(`select id from entity where type = 'person' and lower(title) = lower($1) and archived_at is null`, [input.name]);
+    const found = await this.db.query<{ id: string }>(`select id from entity where type = 'person' and lower(title) = lower($1) and archived_at is null -- index entity_type_title`, [input.name]);
     let id = found.rows[0]?.id;
     if (!id) id = (await this.apply(actorId(actor), { ops: [{ op: 'create', ref: 'me', type: 'person', title: input.name, props: input.email ? { email: input.email } : {} }], reason: 'Workspace owner' })).created.me;
     // Its first owner begins a workspace: what its agents change takes effect as they make it, until the owner says otherwise (owner, 21 Oct 2026).
@@ -807,9 +807,8 @@ export class Archipelago {
    */
   async mentionedIn(id: string) {
     const { rows } = await this.db.query<{ id: string; type: string; title: string; status: string }>(
-      `select id, type, title, status from entity
-       where id <> $1 and archived_at is null and type not like 'sys.%' and position($1 in body || ' ' || props::text) > 0
-       order by type = any($2::text[]) desc, updated_at desc limit 30`,
+      `select e.id, e.type, e.title, e.status from mention m join entity e on e.id = m.from_id
+       where m.to_id = $1 and e.archived_at is null and e.type not like 'sys.%' order by e.type = any($2::text[]) desc, e.updated_at desc limit 30`,
       [id, this.registry.drawnWith('document')],
     );
     return rows;
@@ -822,13 +821,13 @@ export class Archipelago {
   /** A stamp that moves whenever the map or the review queue does, as this viewer sees them. */
   async pulse() {
     const { rows } = await this.db.query<{ stamp: string }>(
-      `select concat_ws('.', greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact)), (select count(*) from proposal), (select count(*) from proposal where status = 'pending')) as stamp`,
+      `select concat_ws('.', greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact)), (select count(*) from proposal where status = 'pending')) as stamp -- index log_fact_seq, proposal_status`,
     );
     return rows[0];
   }
 
   async proposals(input: { status?: string } = {}) {
-    const { rows } = await this.db.query<Proposal>(`select * from proposal where status = $1 order by ts`, [input.status ?? 'pending']);
+    const { rows } = await this.db.query<Proposal>(`select * from proposal where status = $1 order by ts -- index proposal_status`, [input.status ?? 'pending']);
     return rows;
   }
 }

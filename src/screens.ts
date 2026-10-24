@@ -77,7 +77,8 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[],
 /** The schema as the registry describes it, with its screens as the asker's map keeps them. */
 export async function withScreens<T extends { screens: (ScreenDef & { pack: string })[] }>(l: Archipelago, described: T): Promise<Omit<T, 'screens'> & { screens: Screen[] }> {
   const { rows } = await l.db.query<Kept>(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by created_at, id`, [l.registry.family('screen')]);
-  const held = await l.db.query<{ type: string }>(`select distinct type from entity where archived_at is null`);
+  // Which types hold anything: one look each, by the index on type, not a read of every item.
+  const held = await l.db.query<{ type: string }>(`select t as type from unnest($1::text[]) t where exists (select 1 from entity where type = t and archived_at is null)`, [[...l.registry.types.keys()]]);
   const used = new Set(held.rows.flatMap((r) => (l.registry.types.get(r.type)?.lineage ?? []).map((t) => l.registry.types.get(t)!.pack)));
   return { ...described, screens: overlay(described.screens, rows, used) };
 }

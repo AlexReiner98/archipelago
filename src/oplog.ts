@@ -39,7 +39,8 @@ alter table transient set unlogged;
  * Step 24: the streams keep the fact stream's guarantees. A member reads an entry only when they may see every item
  * and link it names, and finds the next position through a function that sees them all. The compaction role reads
  * everything, and besides dropping entries may do the one thing a forget asks of it: put a sealed value, or a sealed
- * reason, as its digest (src/forget.ts), computed here so that nothing else can take its place.
+ * reason, as its digest (src/forget.ts), computed here so that nothing else can take its place. The entries that
+ * say a link are indexed, so a forget finds a claim's links without reading every entry.
  */
 export const OPLOG_GUARDED = `
 create or replace function pelago_op_digested(was jsonb, now jsonb) returns boolean language sql immutable as $fn$
@@ -75,4 +76,5 @@ drop policy if exists member_log_op_add on log_op;
 create policy member_log_op_add on log_op for insert to pelago_member with check (true);
 drop policy if exists compactor_log_op on log_op;
 create policy compactor_log_op on log_op for all to pelago_compactor using (true) with check (true);
+create index if not exists log_op_links on log_op using gin (facts jsonb_path_ops) where facts @> '[["link"]]';
 `;

@@ -105,7 +105,7 @@ export interface Segment {
 /** The segments that stand: each one asserted in the fact stream and not since replaced. */
 export async function segments(q: Q, stream?: OpStream): Promise<Segment[]> {
   const { rows } = await q.query<{ id: string; op: string; value: Omit<Segment, 'id'> }>(
-    `select distinct on (id) id, op, value from log_fact where stream = 'facts' and field = 'segment' order by id, pos desc, n desc`,
+    `select distinct on (id) id, op, value from log_fact where stream = 'facts' and field = 'segment' order by id, pos desc, n desc -- index log_fact_kept`,
   );
   return rows.filter((r) => r.op === '+' && (!stream || r.value.stream === stream)).map((r) => ({ id: r.id, ...r.value })).sort((a, b) => a.stream.localeCompare(b.stream) || a.from - b.from);
 }

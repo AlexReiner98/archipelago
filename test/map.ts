@@ -73,6 +73,8 @@ export async function replayed(l: Archipelago) {
     items: (await m.db.query(`select ${ITEM} from entity order by id`, [KEPT_FIELDS])).rows,
     links: (await m.db.query(`select ${LINK} from relation order by id`)).rows,
     queue: (await m.db.query(`select ${QUEUE} from proposal order by id`)).rows,
+    closure: (await m.db.query(`select ancestor, descendant from part_closure order by ancestor, descendant`)).rows,
+    mentions: (await m.db.query(`select from_id, to_id from mention order by from_id, to_id`)).rows,
   });
   return { live: await read(l), replay: await read(copy) };
 }

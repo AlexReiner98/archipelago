@@ -208,7 +208,7 @@
       "id": "software.handoff",
       "shape": "data",
       "limit_ms": 30000,
-      "description": "Where a repository's work stands, for the session picking it up: the last push, the handoff note (the part an agent wrote: what the map cannot know), what has happened since that note was written (pushes, what was settled, what was opened, the sessions that ended and what each said), and the open work, ready and blocked. Read this first. Params: repo (required): its id, GitHub name or title; since (an ISO date-time to count from, instead of when the note was written).",
+      "description": "Where a repository's work stands, for the session picking it up: the last push, the handoff note (the part an agent wrote: what the map cannot know), what has happened since that note was written (pushes, what was settled, what was opened, the sessions that ended and what each said: how many of each, and the newest five), and the open work, ready and blocked. Read this first. Params: repo (required): its id, GitHub name or title; since (an ISO date-time to count from, instead of when the note was written).",
       "input": {
         "type": "object",
         "properties": { "repo": { "type": "string", "description": "The repository: its id, its GitHub name \"owner/name\", or its title." }, "since": { "type": "string", "description": "An ISO date-time to count from, instead of when the note was written." }, "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." } },
