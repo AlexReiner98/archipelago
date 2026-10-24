@@ -10,6 +10,7 @@ import { jcs } from './jcs.ts';
 import { append, type Fact } from './log.ts';
 import { newId, type Db, type Q } from './db.ts';
 import { kept, ruleFor, type OpEntry, type Retention } from './retention.ts';
+import { makePartitions, partitionMade } from './partitions.ts';
 
 export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | `pack:${string}`;
 export type OpFact = ['+', string, string, unknown] | ['-', string, string];
@@ -41,11 +42,12 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
     groups.set(rule, [...(groups.get(rule) ?? []), f]);
   }
   await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.oplog'), hashtext($1))`, [stream]);
-  const { rows } = await tx.query<{ now: Date; pos: number | null; at: Date | null }>(
-    `select date_trunc('milliseconds', now()) as now, l.pos::int as pos, l.at
-     from (select 1) one left join lateral (select pos, at from log_op where stream = $1 order by pos desc limit 1) l on true`,
+  const { rows } = await tx.query<{ now: Date; pos: number | null; at: Date | null; made: boolean }>(
+    `select date_trunc('milliseconds', now()) as now, l.pos::int as pos, l.at, ${partitionMade('log_op')} as made
+     from (select 1) one left join lateral (select pos, at from log_op where stream = $1 order by at desc, pos desc limit 1) l on true`,
     [stream],
   );
+  if (!rows[0].made) await makePartitions(tx);
   let pos = rows[0].pos ?? 0;
   // Never before the last entry: a day's entries are one run of positions, so a segment is a range of them.
   const at = new Date(Math.max(new Date(rows[0].now).getTime(), rows[0].at ? new Date(rows[0].at).getTime() : 0)).toISOString();
@@ -63,11 +65,15 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
 type Row = { stream: OpStream; pos: number; at: Date; head: Omit<Light, 'stream' | 'pos' | 'at' | 'facts'>; facts: OpFact[] };
 const toLight = (r: Row): Light => ({ ...r.head, stream: r.stream, pos: r.pos, at: new Date(r.at).toISOString(), facts: r.facts });
 
-/** A compacted stream's entries, in order: all of them, or those in a range of positions. */
-export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number } = {}): Promise<Light[]> {
+/**
+ * A compacted stream's entries, in order: all of them, or those in a range of positions. A segment's range names its
+ * days too, so only the partition that holds them is read (src/partitions.ts).
+ */
+export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number; days?: [string, string] } = {}): Promise<Light[]> {
   const { rows } = await q.query<Row>(
-    `select stream, pos::int as pos, at, head, facts from log_op where stream = $1 and pos >= $2 and ($3::bigint is null or pos <= $3) order by pos`,
-    [stream, range.from ?? 1, range.to ?? null],
+    `select stream, pos::int as pos, at, head, facts from log_op where stream = $1 and pos >= $2 and ($3::bigint is null or pos <= $3)
+       and ($4::date is null or (at >= $4::date at time zone 'UTC' and at < ($5::date + 1) at time zone 'UTC')) order by at, pos`,
+    [stream, range.from ?? 1, range.to ?? null, range.days?.[0] ?? null, range.days?.[1] ?? null],
   );
   return rows.map(toLight);
 }
@@ -157,12 +163,13 @@ export async function compact(db: Db, ws: string, rules: Retention[], now = new 
       const ended = await closedOn(tx, [...new Set(all.flatMap((e) => e.facts.map((f) => f[1])))]);
       const keep = kept(all as OpEntry[], rules, now, (id) => ended.get(id));
       const inside = (s: Segment) => all.filter((e) => e.pos >= s.from && e.pos <= s.to);
-      // Runs of neighbouring segments that each lose an entry become one segment.
+      // Runs of neighbouring segments that each lose an entry become one segment, within a year: a segment lives in
+      // the partition that holds its days (src/partitions.ts).
       const runs: Segment[][] = [];
       for (const s of standing) {
         if (!inside(s).some((e) => !keep.has(e.pos))) continue;
         const last = runs.at(-1)?.at(-1);
-        if (last && standing.indexOf(last) === standing.indexOf(s) - 1) runs.at(-1)!.push(s);
+        if (last && standing.indexOf(last) === standing.indexOf(s) - 1 && last.days[1].slice(0, 4) === s.days[0].slice(0, 4)) runs.at(-1)!.push(s);
         else runs.push([s]);
       }
       const gone: number[] = [];

@@ -183,6 +183,6 @@ export async function rebuild(tx: Q, reg: Registry, all: Entry[]): Promise<void>
  */
 export async function stamp(tx: Q): Promise<string> {
   await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.log'), hashtext('facts'))`);
-  const { rows } = await tx.query<{ now: Date; at: Date | null }>(`select date_trunc('milliseconds', now()) as now, (select at from log_entry where stream = 'facts' order by pos desc limit 1) as at`);
+  const { rows } = await tx.query<{ now: Date; at: Date | null }>(`select date_trunc('milliseconds', now()) as now, (select at from log_entry where stream = 'facts' order by at desc, pos desc limit 1) as at`);
   return new Date(Math.max(new Date(rows[0].now).getTime(), rows[0].at ? new Date(rows[0].at).getTime() : 0)).toISOString();
 }

@@ -26,6 +26,7 @@ import { FACT_ACTIONS, factEvents } from './eventlog.ts';
 import { openTables, sealTables, sealedDump } from './backup-seal.ts';
 import { dumpVault, restoreVault, VAULT_BACKUP_DAYS, type VaultDump } from './vault.ts';
 import type { Workspaces } from './workspaces.ts';
+import { makePartitions } from './partitions.ts';
 
 /** Every table, parents before the rows that point at them. */
 const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'log_entry', 'log_fact'] as const;
@@ -92,6 +93,12 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     // What a change set in the file's log did is read from that log again: its events are not rows.
     const logged = new Set((backup.tables.log_entry ?? []).map((e) => e.id as string));
     backup.tables.event = (backup.tables.event ?? []).filter((ev) => !(logged.has(ev.changeset as string) && FACT_ACTIONS.includes(ev.action as string)));
+    // The log goes into the months it was written in, in order: each entry follows the one before (src/partitions.ts).
+    const logAt = new Map((backup.tables.log_entry ?? []).map((e) => [`${e.stream} ${e.pos}`, e.at]));
+    for (const f of backup.tables.log_fact ?? []) f.at ??= logAt.get(`${f.stream} ${f.pos}`);
+    for (const table of ['log_entry', 'log_fact'] as const) backup.tables[table]?.sort((a, b) => String(a.stream).localeCompare(String(b.stream)) || Number(a.pos) - Number(b.pos) || Number(a.n ?? 0) - Number(b.n ?? 0));
+    const first = Math.min(...[...logAt.values()].map((at) => new Date(at as string).getTime()));
+    if (Number.isFinite(first)) await makePartitions(tx, new Date(first));
     for (const table of TABLES) {
       const rows = backup.tables[table] ?? [];
       // One statement per table: rows that point at each other (an entity's owner) are checked together.

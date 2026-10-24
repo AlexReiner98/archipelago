@@ -438,8 +438,8 @@ and never cares which stream a fact came from beyond its retention.
 
 ### Segments and their hashes
 
-A compacted stream is cut into **segments**, one per day per stream (the time
-partitions of `e_m6a2uw2f`). When a day closes, its segment is sealed: its
+A compacted stream is cut into **segments**, one per day per stream, each
+inside the year's partition of `log_op` (below). When a day closes, its segment is sealed: its
 hash is SHA-256 of `"pelago-segment\n"` and the canonical entries in order,
 and a system entry in the fact stream records it:
 
@@ -553,6 +553,35 @@ codes, OAuth state) go in an **unlogged** Postgres table, `transient (key,
 value, expires_at)`, its entries expiring and swept, never backed up and
 never part of the log (`e_a7fjzcwv`). It is the one store outside the log
 besides the key vault, named so in `src/operational.ts`.
+
+### Partitions by time
+
+`log_entry`, `log_fact` and `log_op` are each range-partitioned on `at`, one
+partition a year (UTC), in the workspace's own database (`e_m6a2uw2f`,
+`src/partitions.ts`). A fact carries its entry's `at`, so it lives with its
+entry; a segment's days never cross a year, so a segment and a compacted one
+live in one partition, and reading one reads only it.
+
+- **The keys name the time.** Postgres needs the partition key in every unique
+  index: the keys are `(stream, at, pos)` and `(stream, pos, n, at)`. What the
+  old key promised a trigger promises: an entry must be its stream's next
+  position, name the last entry's hash and be no earlier than it, under the
+  append lock. The chain is held by the database across partitions.
+- **Append-only in every partition.** The row triggers on each table reach every
+  partition, a new one too; each partition is given its own truncate trigger
+  when it is made.
+- **Made ahead.** Partitions are made through two months from now when a
+  database opens and daily, and by an append whose own is missing. There is no
+  default partition: a row outside them all is refused.
+- **Pruned reads.** BRIN indexes on `at` serve a stretch of time inside a
+  partition. The history index is `(id, field, at, pos, n)`: an as-of read is
+  bounded by its entry's `at` and walks the partitions newest first, stopping
+  at the first that answers.
+- **Why a year, not a month.** In PGlite a read that time cannot prune is
+  planned against every partition, and planning costs more than running:
+  three years of months took an as-of read from 0.7 to 11 ms, a year each
+  keeps it near 1.5 ms (the numbers are on the task). `pelago_log_unit()`
+  names the length.
 
 ### Where this stands (24 Oct 2026)
 
@@ -726,7 +755,7 @@ The vault is `src/vault.ts`, sealing `src/seal.ts`, the forget `src/forget.ts`
 | projection | reads from a fact |
 | --- | --- |
 | current state (`entity`, `relation` as tables) | every fact: the newest value of each (id, field), plaintext; `created_at`, `updated_at`, `archived_at`, `valid_from`, `valid_to` from entry times |
-| history index | nothing beyond the log itself: `log_fact` indexed on `(id, field, pos)` and on `(id, pos)` is the index by item and by field; an as-of value is one index lookup |
+| history index | nothing beyond the log itself: `log_fact` indexed on `(id, field, at, pos, n)` is the index by item and by field; an as-of value is one index lookup in the newest partition that has one |
 | change sets by id, undo | `log_entry.id`, `undoes`, indexed |
 | search index | `title`, `body`, and fields declared searchable, after unsealing, as the append happens; a forget deletes its rows |
 | part_of closure | `link` facts whose type is in the `part_of` family: add or drop ancestor pairs |
@@ -921,8 +950,8 @@ Estimates for the benchmark to confirm, in Postgres, with indexes:
 | `log_entry` header row: ids, actor, authority, rule, two 32-byte hashes, reason of ~120 characters sealed (+28 bytes nonce and tag), tuple overhead | ~420 |
 | one `log_fact` row with a short clear value (a status) | ~80 |
 | one `log_fact` row with a sealed title of ~50 characters | ~130 |
-| index entries per fact: primary key `(pos, n)`, `(id, field, pos)`, `(id, pos)` | ~90 |
-| index entries per header: primary key, `id`, `at` (BRIN, nearly free) | ~60 |
+| index entries per fact: primary key `(stream, pos, n, at)`, `(id, field, at, pos, n)`, `at` (BRIN) | ~100 |
+| index entries per header: primary key `(stream, at, pos)`, `(stream, pos)`, `id`, `at` (BRIN, nearly free) | ~80 |
 
 A one-field update: ~650 bytes. Example 1 (a task with a note of ~60
 characters, two links, a new source; 15 facts): ~3.5 KB. A typical change set
