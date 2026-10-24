@@ -26,7 +26,7 @@ export function project(entries: Iterable<Entry>, isOpen: (type: string, status:
       if (field === 'link' || links.has(id)) {
         let link = links.get(id);
         if (field === 'link') {
-          if (op === '-') link!.valid_to = at;
+          if (op === '-') { if (link) link.valid_to = at; }
           else {
             const [type, from, to] = value as [string, string, string];
             if (!link) links.set(id, (link = { id, props: {}, confidence: 1, source_id: null, valid_from: at }));
@@ -46,7 +46,16 @@ export function project(entries: Iterable<Entry>, isOpen: (type: string, status:
       const head = COLUMN.get(field);
       if (head) item[head.column] = op === '+' ? value : head.unsaid;
       else if (field === 'archived') item.archived_at = op === '+' ? at : null;
-      else if (field === 'checked' || field === 'merged_into' || field === 'forgotten') {
+      else if (field === 'forgotten' && op === '+') {
+        // Forgotten: its row and its links leave, and what named it as owner or source names nothing (src/pelago.ts).
+        items.delete(id);
+        for (const [l, link] of links) if (link.from_id === id || link.to_id === id) links.delete(l);
+        for (const other of [...items.values(), ...links.values()]) {
+          if (other.owner === id) other.owner = null;
+          if (other.source_id === id) other.source_id = null;
+        }
+        continue;
+      } else if (field === 'checked' || field === 'merged_into' || field === 'forgotten') {
         // About the item, not a column of today's row: they move its time only.
       } else if (op === '+') item.props[field] = value;
       else delete item.props[field];
@@ -54,8 +63,8 @@ export function project(entries: Iterable<Entry>, isOpen: (type: string, status:
       touched.add(id);
     }
     for (const id of touched) {
-      const item = items.get(id)!;
-      item.is_open = isOpen(item.type, item.status);
+      const item = items.get(id);
+      if (item) item.is_open = isOpen(item.type, item.status);
     }
   }
   return { items: [...items.values()], links: [...links.values()] };

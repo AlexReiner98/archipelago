@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
+import { dumpVault } from '../src/vault.ts';
 import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
@@ -59,7 +60,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
 
   // The kept definitions travel in a backup, and a fresh map restoring it keeps them dormant.
   const copy = await openDb();
-  await restore(copy, await dump(db, { id: 'default', name: 'Default' }));
+  await restore(copy, { ...(await dump(db, { id: 'default', name: 'Default' })), vault: await dumpVault(db) });
   const there = new Archipelago(copy, new Registry(dir, ['core', 'sys', 'software']));
   await syncTypes(there);
   assert.equal(there.registry.type('time.entry')?.dormant, true);

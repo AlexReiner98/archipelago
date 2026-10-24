@@ -12,7 +12,7 @@ import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { search, type SearchInput } from './search.ts';
 import { append, headOf, type Decision, type Fact } from './log.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
-import { privateDependencies } from './private-deps.ts'; import { decideProposal, rejection } from './proposals.ts';
+import { privateDependencies } from './private-deps.ts'; import { decideProposal, supersede } from './proposals.ts'; import { asOwner, forgetIn, type ForgetOp } from './forget.ts';
 
 export interface Actor {
   kind: 'human' | 'agent';
@@ -95,7 +95,7 @@ export interface DefineTypeOp {
   op: 'define_type';
   type: TypeDef;
 }
-export type Op = CreateOp | UpdateOp | LinkOp | UnlinkOp | ArchiveOp | RestoreOp | MergeOp | DefineTypeOp;
+export type Op = CreateOp | UpdateOp | LinkOp | UnlinkOp | ArchiveOp | RestoreOp | MergeOp | DefineTypeOp | ForgetOp; export type { ForgetOp };
 
 export interface SourceSpec {
   uri: string;
@@ -379,8 +379,9 @@ export class Archipelago {
           if (!rows.length) errors.push(`${where}: no active relation "${op.relation}"`);
           break;
         }
-        case 'archive':
+        case 'archive': case 'forget':
           await existing(op.id, where);
+          if (op.op === 'forget' && (ops.length > 1 || op.reasons?.some((c) => !/^[cp]_\w+$/.test(c)))) errors.push(`${where}: a forget is a change of its own, and its reasons name change sets (c_…) or held changes (p_…)`);
           break;
         case 'restore': {
           const target = await existing(op.id, where);
@@ -577,6 +578,10 @@ export class Archipelago {
             await log('entity.merge', op.keep, { title: keep.title, absorbed: { id: drop.id, title: drop.title, props: drop.props } });
             break;
           }
+          case 'forget': // for good: its key, its words in the log and beside it, then its rows, whoever could see them
+            facts.push(['+', op.id, 'forgotten', true]); await forgetIn(tx, op); await asOwner(tx, FORGET_ROWS, [op.id]);
+            await log('entity.forget', op.id, {});
+            break;
           case 'define_type':
             facts.push(['+', op.type.id, 'type_def', op.type]);
             break; // registered after the transaction
@@ -594,33 +599,8 @@ export class Archipelago {
       await this.registry.defineLocal(op.type);
       await this.log(this.db, { actor, action: 'type.define', changeset, reason: input.reason, detail: { type: op.type, ...extra } });
     }
-    await this.supersede(changeset);
+    await supersede(this, changeset);
     return { status: 'applied' as const, changeset, created, warnings };
-  }
-
-  /**
-   * A held change that asks only for what is now so (each thing it would
-   * settle already has that status) has been overtaken: it leaves the queue
-   * as superseded, and the log says by which change. Nobody decided it, so
-   * it is neither applied nor declined.
-   */
-  private async supersede(changeset: string): Promise<void> {
-    const { rows } = await this.db.query<Proposal>(`select * from proposal where status = 'pending'`);
-    for (const p of rows) {
-      let moot = p.ops.length > 0;
-      for (const op of p.ops) {
-        if (op.op !== 'update' || !op.status || Object.keys(op).some((key) => !['op', 'id', 'status', 'props'].includes(key))) moot = false;
-        else moot = (await this.entity(op.id))?.status === op.status;
-        if (!moot) break;
-      }
-      if (!moot) continue;
-      const done = await this.db.transaction(async (tx) => {
-        const marked = await tx.query(`update proposal set status = 'superseded', decided_by = 'agent:pelago', decided_at = now(), note = $2 where id = $1 and status = 'pending' returning id`, [p.id, `Already so since ${changeset}`]);
-        if (marked.rows.length) await rejection(tx, this.workspace, p.id, { outcome: 'superseded', actor: 'system', by: changeset, reason: p.reason });
-        return marked.rows.length > 0;
-      });
-      if (done) await this.log(this.db, { actor: 'agent:pelago', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
-    }
   }
 
   private async ensureSource(q: Q, actor: string, spec: SourceSpec, changeset: string, facts: Fact[], mint: (key: string, prefix: string) => string): Promise<string | null> {
@@ -913,6 +893,10 @@ export class Archipelago {
     return rows;
   }
 }
+
+/** A forgotten item's rows leave today's tables, its links with them, and what named it as owner or source names nothing. */
+const FORGET_ROWS = [`update entity set owner = null where owner = $1`, `update entity set source_id = null where source_id = $1`, `update relation set source_id = null where source_id = $1`,
+  `delete from relation where from_id = $1 or to_id = $1`, `delete from entity where id = $1`];
 
 /**
  * The restore path (src/operational.ts): a backup's items and links merged into the map as they were, never applied

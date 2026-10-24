@@ -93,3 +93,27 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
   });
   return { ...result, proposal: proposal.id, status };
 }
+
+/**
+ * A held change that asks only for what is now so (each thing it would settle already has that status) has been
+ * overtaken: it leaves the queue as superseded, and the log says by which change. Nobody decided it, so it is neither
+ * applied nor declined.
+ */
+export async function supersede(l: Archipelago, changeset: string): Promise<void> {
+  const { rows } = await l.db.query<Proposal>(`select * from proposal where status = 'pending'`);
+  for (const p of rows) {
+    let moot = p.ops.length > 0;
+    for (const op of p.ops) {
+      if (op.op !== 'update' || !op.status || Object.keys(op).some((key) => !['op', 'id', 'status', 'props'].includes(key))) moot = false;
+      else moot = (await l.entity(op.id))?.status === op.status;
+      if (!moot) break;
+    }
+    if (!moot) continue;
+    const done = await l.db.transaction(async (tx) => {
+      const marked = await tx.query(`update proposal set status = 'superseded', decided_by = 'agent:pelago', decided_at = now(), note = $2 where id = $1 and status = 'pending' returning id`, [p.id, `Already so since ${changeset}`]);
+      if (marked.rows.length) await rejection(tx, l.workspace, p.id, { outcome: 'superseded', actor: 'system', by: changeset, reason: p.reason });
+      return marked.rows.length > 0;
+    });
+    if (done) await l.log(l.db, { actor: 'agent:pelago', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
+  }
+}
