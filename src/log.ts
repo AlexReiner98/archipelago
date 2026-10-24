@@ -1,8 +1,8 @@
 // The log (docs/log.md): each workspace's stored state as streams of entries, every entry carrying the hash of the one
 // before it. The fact stream (`facts`) holds each applied change set; the `pending` stream each held one. An entry is
 // one row of log_entry (its header) and a row of log_fact per fact, and neither table takes an update or a delete.
-// Today's tables (entity, relation, proposal) are still written beside the log, in the same transaction, and stand as
-// its projections until the projections task reads them from here (src/replay.ts is the first of them).
+// The tables pages read (entity, relation, proposal) are its projections, made from its entries in the append's
+// transaction by src/replay.ts.
 
 import { GENESIS, entryHash } from './jcs.ts';
 import type { Q } from './db.ts';
@@ -15,7 +15,7 @@ export type Fact = ['+', string, string, unknown] | ['+', string, string, unknow
 /** What decided a change set (section 3). */
 export type Decision =
   | { outcome: 'apply'; spared: { rule: string; pack: string }[] }
-  | { outcome: 'approved' | 'rejected' | 'superseded'; held_by: { rule: string; pack: string } | null; proposal: string; proposal_hash: string; by: string; revised?: boolean; except?: string[] };
+  | { outcome: 'approved' | 'rejected' | 'superseded'; held_by: { rule: string; pack: string } | null; proposal: string; proposal_hash: string; by: string; revised?: boolean; except?: string[]; note?: string };
 
 export interface Entry {
   v: 1;

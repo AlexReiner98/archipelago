@@ -4,39 +4,10 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { agent, fresh, human, make } from './map.ts';
+import { agent, all, fresh, human, make, replayed } from './map.ts';
 import { canonical, entryHash, jcs } from '../src/jcs.ts';
-import { entries, entry, verify, type Entry } from '../src/log.ts';
-import { project } from '../src/replay.ts';
-import { KEPT_FIELDS } from '../src/operational.ts';
+import { entry, verify } from '../src/log.ts';
 import { undo } from '../src/undo.ts';
-import type { Archipelago } from '../src/pelago.ts';
-
-async function all(l: Archipelago, stream: 'facts' | 'pending' = 'facts') {
-  const out: Entry[] = [];
-  for (let page = await entries(l.db, stream, 1); page.length; page = await entries(l.db, stream, out.at(-1)!.pos + 1)) out.push(...page);
-  return out;
-}
-
-const ITEM = `id, type, title, body, status, is_open, owner, visibility, confidence, jsonb_strip_nulls(props) - $1::text[] as props, source_id,
-  date_trunc('milliseconds', created_at) as created_at, date_trunc('milliseconds', updated_at) as updated_at, date_trunc('milliseconds', archived_at) as archived_at, private_to, kind`;
-const LINK = `id, type, from_id, to_id, props, confidence, source_id, date_trunc('milliseconds', valid_from) as valid_from, date_trunc('milliseconds', valid_to) as valid_to`;
-
-/** The live rows and the rows the fact stream replays into, as the same query reads them. */
-async function replayed(l: Archipelago) {
-  const { items, links } = project(await all(l), (type, status) => l.registry.isOpen(type, status));
-  await l.db.query(`create temp table if not exists replay_entity (like entity including defaults)`);
-  await l.db.query(`create temp table if not exists replay_relation (like relation including defaults)`);
-  await l.db.query(`delete from replay_entity`);
-  await l.db.query(`delete from replay_relation`);
-  await l.db.query(`insert into replay_entity select * from jsonb_populate_recordset(null::replay_entity, $1::jsonb)`, [JSON.stringify(items.map((i) => ({ ...i, workspace: 'default' })))]);
-  await l.db.query(`insert into replay_relation select * from jsonb_populate_recordset(null::replay_relation, $1::jsonb)`, [JSON.stringify(links.map((r) => ({ ...r, workspace: 'default' })))]);
-  const read = async (sql: string, params: unknown[] = []) => (await l.db.query(sql, params)).rows;
-  return {
-    live: { items: await read(`select ${ITEM} from entity order by id`, [KEPT_FIELDS]), links: await read(`select ${LINK} from relation order by id`) },
-    replay: { items: await read(`select ${ITEM} from replay_entity order by id`, [KEPT_FIELDS]), links: await read(`select ${LINK} from replay_relation order by id`) },
-  };
-}
 
 test('the canonical form is RFC 8785, and a sealed value is hashed by its digest', () => {
   assert.equal(jcs({ b: [1, 'x', null, true], a: { d: 1e21, c: 0.1 }, é: ' "' }), '{"a":{"c":0.1,"d":1e+21},"b":[1,"x",null,true],"é":" \\""}');
@@ -59,7 +30,7 @@ test('every change set is appended as facts, chained, in the transaction that wr
   assert.deepEqual(first.actor, { id: 'human:test' });
   assert.equal(first.hash, entryHash(first));
   const t = first.facts.filter((f) => f[1] === made.t);
-  assert.deepEqual(t.map((f) => f.slice(2)), [['type', 'work.task'], ['kind', 'work'], ['title', 'Chain it'], ['body', `Part of ${made.p}.`], ['status', 'todo'], ['visibility', 'private'], ['priority', 'high']]);
+  assert.deepEqual(t.map((f) => f.slice(2)), [['type', 'work.task'], ['title', 'Chain it'], ['body', `Part of ${made.p}.`], ['status', 'todo'], ['visibility', 'private'], ['priority', 'high']]);
   assert.deepEqual(first.facts.find((f) => f[2] === 'link')!.slice(3), [['part_of', made.t, made.p]]);
 
   await make(l, [{ op: 'update', id: made.t, status: 'doing', props: { priority: null } }]);
@@ -195,6 +166,7 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   assert.ok(live.items.length > 10 && live.links.length > 5);
   assert.deepEqual(replay.items, live.items, 'every item, row for row');
   assert.deepEqual(replay.links, live.links, 'every link, row for row');
+  assert.deepEqual(replay.queue, live.queue, 'every held change, and what became of it');
 
   // What is pending is a projection too: the records no entry has decided.
   const decided = new Set((await all(l)).map((e) => (e.rule as { proposal?: string } | null)?.proposal).filter(Boolean));

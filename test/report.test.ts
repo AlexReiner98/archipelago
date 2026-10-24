@@ -11,6 +11,7 @@ import { Registry } from '../src/packs.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { callTool } from '../src/tools.ts';
+import { readEvents } from '../src/eventlog.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner' };
 const kuma: Actor = { kind: 'agent', name: 'Uptime Kuma' };
@@ -71,7 +72,7 @@ test('a monitor’s report takes a component down and back up, logged with what 
   const down = (await callTool(l, kuma, 'report', beat(0, { name: 'litellm', type: 'http', url: 'http://litellm:4000/health/liveliness' }, 'connect ECONNREFUSED 172.18.0.4:4000'))) as { changed: { to: string }[] };
   assert.deepEqual(down.changed.map((c) => c.to), ['down']);
   assert.equal(await status('llm'), 'down');
-  const { rows } = await l.db.query<{ reason: string; actor: string }>(`select reason, actor from event where target_id = $1 and action = 'entity.update' order by seq desc limit 1`, [made.llm]);
+  const rows = await readEvents(l.db, { target: made.llm, action: 'entity.update', limit: 1 });
   assert.match(rows[0].reason, /Uptime Kuma: litellm does not answer \(connect ECONNREFUSED/);
   assert.equal(rows[0].actor, 'agent:Uptime Kuma');
 

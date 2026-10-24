@@ -15,6 +15,7 @@ import { decideAct, setPackSecret, type Outcome } from '../src/outside.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
+import { readEvents } from '../src/eventlog.ts';
 import { undo } from '../src/undo.ts';
 
 const human: Actor = { kind: 'human', name: 'test' };
@@ -95,7 +96,7 @@ test('a webhook is taken only with its signature, and a schedule runs as the pac
   const ok = await fetch(`${url}/demo.delivered`, { method: 'POST', body, headers: { 'x-signature-256': sign('h00k') } });
   assert.equal(ok.status, 200);
   assert.ok((await titles(l)).includes('Delivered: flour'));
-  const { rows } = await l.db.query<{ actor: string }>(`select actor from event where action = 'entity.create' order by seq desc limit 1`);
+  const rows = await readEvents(l.db, { action: 'entity.create', limit: 1 });
   assert.match(rows[0].actor, /pack:demo/);
   const { rows: arrived } = await l.db.query<{ actor: string; reason: string; detail: { pack?: string } }>(`select actor, reason, detail from event where action = 'demo.arrived'`);
   assert.deepEqual(arrived.map((e) => [e.actor, e.reason, e.detail.pack]), [['agent:pack:demo', 'flour arrived', 'demo']], 'an event of a kind it declares, recorded as the pack');

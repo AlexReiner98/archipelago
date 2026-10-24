@@ -6,6 +6,7 @@ import { pictureOf } from '../src/lens.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
 import { sessionStart } from '../src/sessions.ts';
 import { askView } from '../src/askview.ts';
+import { lastSeq } from '../src/eventlog.ts';
 import { human, agent, fresh, attend, make } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
@@ -367,8 +368,7 @@ test('a backup holds every row, and restores into an empty database that then ca
   assert.equal((await copy.proposals()).length, 1, 'what was waiting for review still is');
   const before = Math.max(...taken.tables.event.map((e) => e.seq as number));
   await make(copy, [{ op: 'create', type: 'work.note', title: 'After the restore' }]);
-  const { rows } = await copy.db.query<{ seq: number }>(`select max(seq)::int as seq from event`);
-  assert.ok(rows[0].seq > before, 'new events are numbered after the restored ones');
+  assert.ok((await lastSeq(copy.db)) > before, 'new events are numbered after the restored ones');
   await assert.rejects(restore(copy.db, taken), /not empty/);
 });
 

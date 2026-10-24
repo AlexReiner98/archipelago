@@ -10,7 +10,7 @@ import { MEMBER_TOOLS } from './members.ts'; import { WORKSPACE_TOOLS } from './
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
 import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts'; import { ASK_TOOLS } from './token-ask.ts';
-import { merge, notImported, parseBackup } from './backup.ts';
+import { merge, parseBackup } from './backup.ts'; import { lastSeq, readEvents } from './eventlog.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import { CONNECTION_TOOLS } from './connection-tools.ts';
 import { MODEL_TOOLS } from './model-tools.ts';
@@ -156,18 +156,13 @@ export interface HumanChange {
 }
 
 export async function latestSeq(l: Archipelago): Promise<number> {
-  const { rows } = await l.db.query<{ seq: number }>(`select coalesce(max(seq), 0)::int as seq from event`);
-  return rows[0].seq;
+  return lastSeq(l.db);
 }
 
 /** What humans have done since an event, oldest first: their edits, decisions, approvals and rejections. Reading a notification is not news. */
 export async function humanChanges(l: Archipelago, after: number): Promise<HumanChange[]> {
-  const { rows } = await l.db.query<{ seq: number; ts: string; actor: string; action: string; target_id: string | null; type: string | null; title: string | null; reason: string | null; detail: Record<string, unknown> | null }>(
-    `select e.seq::int as seq, e.ts, e.actor, e.action, e.target_id, t.type, t.title, e.reason, e.detail
-     from event e left join entity t on t.id = e.target_id
-     where e.seq > $1 and e.actor like 'human:%' and t.type is distinct from 'sys.notification' and ${notImported('e')} order by e.seq limit 50`,
-    [after],
-  );
+  const read = await readEvents(l.db, { after, actorLike: 'human:%', news: true, oldest: true, limit: 50 });
+  const rows = read.filter((r) => r.target_type !== 'sys.notification').map((r) => ({ ...r, ts: r.ts as string, type: r.target_type, title: r.target_title }));
   return rows.map((r) => ({
     seq: r.seq,
     ts: r.ts,
