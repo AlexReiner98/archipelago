@@ -34,3 +34,45 @@ do $$ begin
 end $$;
 alter table transient set unlogged;
 `;
+
+/**
+ * Step 24: the streams keep the fact stream's guarantees. A member reads an entry only when they may see every item
+ * and link it names, and finds the next position through a function that sees them all. The compaction role reads
+ * everything, and besides dropping entries may do the one thing a forget asks of it: put a sealed value, or a sealed
+ * reason, as its digest (src/forget.ts), computed here so that nothing else can take its place.
+ */
+export const OPLOG_GUARDED = `
+create or replace function pelago_op_digested(was jsonb, now jsonb) returns boolean language sql immutable as $fn$
+  select jsonb_array_length(was) = jsonb_array_length(now) and coalesce(bool_and(coalesce(n.f = o.f
+    or (jsonb_array_length(o.f) > 3 and (n.f - 3) = (o.f - 3) and n.f->3 = pelago_digest(o.f->3)), false)), true)
+  from jsonb_array_elements(was) with ordinality o(f, i) join jsonb_array_elements(now) with ordinality n(f, i) using (i)
+$fn$;
+create or replace function pelago_log_op_compacted() returns trigger language plpgsql as $fn$
+begin
+  if current_user = 'pelago_compactor' then
+    if tg_op = 'DELETE' then return old; end if;
+    if (new.stream, new.pos, new.at) = (old.stream, old.pos, old.at) and pelago_op_digested(old.facts, new.facts)
+       and (new.head - 'reason') = (old.head - 'reason')
+       and (new.head->'reason' is not distinct from old.head->'reason' or new.head->'reason' = pelago_digest(old.head->'reason')) then return new; end if;
+  end if;
+  raise exception 'The log is append-only: % on % is refused but to compaction', tg_op, tg_table_name;
+end $fn$;
+grant update on log_op to pelago_compactor;
+create or replace function pelago_op_seen(facts jsonb) returns boolean language sql stable as $fn$
+  select not exists (select 1 from jsonb_array_elements(facts) f
+    where (left(f->>1, 2) = 'e_' and not exists (select 1 from entity where id = f->>1))
+       or (left(f->>1, 2) = 'r_' and not exists (select 1 from relation where id = f->>1)))
+$fn$;
+create or replace function pelago_log_op_last(s text) returns table (pos bigint, at timestamptz) language sql stable security definer set search_path = public as $fn$
+  select pos, at from log_op where stream = s order by at desc, pos desc limit 1
+$fn$;
+revoke execute on function pelago_log_op_last(text) from public;
+grant execute on function pelago_log_op_last(text) to pelago_member;
+alter table log_op enable row level security;
+drop policy if exists member_log_op on log_op;
+create policy member_log_op on log_op for select to pelago_member using (pelago_op_seen(facts));
+drop policy if exists member_log_op_add on log_op;
+create policy member_log_op_add on log_op for insert to pelago_member with check (true);
+drop policy if exists compactor_log_op on log_op;
+create policy compactor_log_op on log_op for all to pelago_compactor using (true) with check (true);
+`;

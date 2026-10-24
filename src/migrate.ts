@@ -19,7 +19,7 @@ import { LOG } from './log.ts';
 import { ACTIVITY } from './eventlog.ts';
 import { VAULT } from './vault.ts';
 import { FORGET } from './forget.ts';
-import { OPLOG, OPLOG_SERVER } from './oplog.ts';
+import { OPLOG, OPLOG_GUARDED, OPLOG_SERVER } from './oplog.ts';
 import { PARTITION } from './partitions.ts';
 import { SNAPSHOT } from './snapshot.ts';
 
@@ -58,6 +58,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 21, name: 'the compacted streams, in segments', sql: OPLOG, server: OPLOG_SERVER },
   { version: 22, name: 'the log cut by year', sql: PARTITION },
   { version: 23, name: 'snapshots of the projections, and room to rebuild them', sql: SNAPSHOT },
+  { version: 24, name: 'the compacted streams sealed, guarded by row, and reached by a forget', sql: OPLOG_GUARDED },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

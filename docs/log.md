@@ -469,8 +469,21 @@ and the server does both once a day for every workspace (`src/duties.ts`).
 The compacted streams are kept in their own table, `log_op (stream, pos, at,
 head, facts)`: the light header in `head`, the facts inline. Its trigger
 refuses an update, a delete and a truncate to everyone but one role,
-`pelago_compactor`, and that role may only delete; compaction takes it for
-the end of its transaction. The fact stream's tables let no one through.
+`pelago_compactor`; compaction takes it for the end of its transaction. That
+role may delete, and may change a row in one way only: a sealed value, or a
+sealed reason, put as its digest, which is what a forget asks of it. The fact
+stream's tables let no one through.
+
+The streams keep the fact stream's guarantees (`src/opseal.ts`, step 24): a
+fact's value about an item or a link is sealed with that item's key, as in
+section 5, and `CLEAR` stays clear; an entry's reason is sealed with the key
+of the first item it names, or with its stream's own (`op:<stream>`) when it
+names none. A segment hashes each sealed value as its digest, so it verifies
+with no key and still does after a forget. Row security lets a member read an
+entry only when they may see every item and link it names; the next position
+comes from a function that sees them all. A forget puts every value its keys
+sealed, and every reason, as its digest, through the compaction role, and
+backups carry `log_op` as stored, beside the vault.
 
 ### The retention rule format
 

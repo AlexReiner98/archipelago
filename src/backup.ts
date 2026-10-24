@@ -34,7 +34,7 @@ import type { Workspaces } from './workspaces.ts';
 import { makePartitions } from './partitions.ts';
 
 /** Every table, parents before the rows that point at them. */
-const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'log_entry', 'log_fact'] as const;
+const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'log_entry', 'log_fact', 'log_op'] as const;
 /** What the log makes, and a backup since format 3 does not carry but makes again. */
 const PROJECTIONS: readonly string[] = ['entity', 'relation', 'proposal'];
 
