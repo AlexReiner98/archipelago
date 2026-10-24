@@ -1101,3 +1101,37 @@ decision under `e_j8df78ar`, stated as settled in the sections above:
     last use is operational (`e_x9wxnqz4`).
 13. A type a pack moves is a system change set asserting the new type on
     every item (`e_w66xm7kt`).
+
+## 12. One log, two databases
+
+A map runs on PGlite (a folder, one process) or on a Postgres server (many
+processes, one database per workspace). The schema and the log are the same
+on both, and moving a map from one to the other is a replay of its log.
+Where a map should move is the owner's question `e_fcusktmz`.
+
+### The move
+
+`node src/cli.ts move <from> <to>`, each a data folder or a `postgres://`
+address of one database, with no server on either (src/move.ts):
+
+1. **Verify** the source: both chains and every sealed segment.
+2. **Replay**: the key vault is carried first, then every entry of both
+   streams as it is stored (sealed, the same position, time and hash), in the
+   order a rebuild projects them (section 7), each projected as it lands.
+   What the log does not hold yet comes as rows: the operational fields kept
+   on items (`KEPT_FIELDS`) and every store beside the log, the operational
+   streams (`log_op`) among them. `transient` and `schema_version` never move.
+3. **Compare**, before the target's transaction commits: its chains verify to
+   the same heads, its projections hash to the source's row for row, and every
+   carried store has as many rows. Otherwise nothing of it stays.
+
+The target must be empty. Sealed words stay sealed, so a server on the target
+needs the sealing key the source's had (`PELAGO_SECRETS_KEY`, or the
+`secrets.key` beside a folder's data); a move refuses when the source's words
+do not open with the key it is given.
+
+### The hosted product
+
+Every hosted workspace is its own database on the server (`databaseFor` in
+src/pg.ts), so a workspace is the unit that is sharded: placed on another
+server by moving that one database, with nothing joined across workspaces.
