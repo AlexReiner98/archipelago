@@ -51,9 +51,9 @@ export interface Key {
 
 const aad = (...parts: (string | number)[]) => Buffer.from(parts.join('\0'), 'utf8');
 
-function wrap(ws: string, id: string, version: number, key: Buffer): Buffer {
+function wrap(ws: string, id: string, version: number, key: Buffer, kek = sealingKey()): Buffer {
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', sealingKey(), iv);
+  const cipher = createCipheriv('aes-256-gcm', kek, iv);
   cipher.setAAD(aad(ws, id, version));
   const body = Buffer.concat([cipher.update(key), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), body]);
@@ -63,12 +63,12 @@ function wrap(ws: string, id: string, version: number, key: Buffer): Buffer {
 // item and version, so a key found here is the one the vault row holds; a row deleted is never looked up again.
 const unwrapped = new Map<string, Buffer>();
 
-function unwrap(ws: string, id: string, version: number, wrapped: Buffer): Buffer | undefined {
+function unwrap(ws: string, id: string, version: number, wrapped: Buffer, kek?: Buffer): Buffer | undefined {
   const known = wrapped.toString('base64');
   const hit = unwrapped.get(known);
   if (hit) return hit;
   try {
-    const decipher = createDecipheriv('aes-256-gcm', sealingKey(false), wrapped.subarray(0, 12));
+    const decipher = createDecipheriv('aes-256-gcm', kek ?? sealingKey(false), wrapped.subarray(0, 12));
     decipher.setAAD(aad(ws, id, version));
     decipher.setAuthTag(wrapped.subarray(12, 28));
     const key = Buffer.concat([decipher.update(wrapped.subarray(28)), decipher.final()]);
@@ -174,6 +174,20 @@ export async function dumpVault(q: Q): Promise<VaultDump> {
   const read = (table: string, name: string) =>
     q.query<any>(`select ws, ${name}, version, encode(wrapped, 'base64') as wrapped, created_at from ${table} order by ${name}, version`).then((r) => r.rows);
   return { format: 1, vault: true, taken: new Date().toISOString(), keys: await read('vault_key', 'id'), secrets: await read('vault_secret', 'name') };
+}
+
+/**
+ * A vault backup's keys wrapped again: from this server's sealing key to `to`, or from `from` to this server's. A
+ * download carries its keys under a key of its own, given only in its answer (e_98ddd7ha), and the server that takes
+ * it in wraps them under its own. A key that does not open is left out.
+ */
+export function rewrap(dump: VaultDump, from?: Buffer, to?: Buffer): VaultDump {
+  const again = <T extends { ws: string; version: number; wrapped: string }>(rows: T[], id: (r: T) => string) =>
+    rows.flatMap((r) => {
+      const key = unwrap(r.ws, id(r), r.version, Buffer.from(r.wrapped, 'base64'), from);
+      return key ? [{ ...r, wrapped: wrap(r.ws, id(r), r.version, key, to).toString('base64') }] : [];
+    });
+  return { ...dump, keys: again(dump.keys, (r) => r.id), secrets: again(dump.secrets, (r) => `secret:${r.name}`) };
 }
 
 /** Put a vault backup back, beside the keys already there. */

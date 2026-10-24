@@ -650,6 +650,11 @@ The vault is `src/vault.ts`, sealing `src/seal.ts`, the forget `src/forget.ts`
   backup given beside the file, on a server with the same sealing key; a
   row with no key stays out. Vault backups are written to
   `backups/<ws>/vault/`, deleted after 30 days, and never sent off the server.
+- A download (`backup_download`, and so `npm run pull`) carries the vault
+  beside the file, its keys wrapped under a one-time key that only the
+  download's answer holds; the server that takes it in wraps them under its
+  own. A copy saved off the server is out of a forget's reach, as any copy
+  is (an open question for the owner, `e_98ddd7ha`).
 - Values are opened for their reader in `entries`, `entry` and `factAt`;
   `stored` and `verify` read the log as it is kept.
 

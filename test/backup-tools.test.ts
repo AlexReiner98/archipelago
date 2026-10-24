@@ -4,9 +4,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { dump, parseBackup, restore, restoreTo } from '../src/backup.ts';
+import { dump, parseBackup, parseVault, restore, restoreTo } from '../src/backup.ts';
 import { openTables } from '../src/backup-seal.ts';
-import { dumpVault } from '../src/vault.ts';
+import { dumpVault, rewrap } from '../src/vault.ts';
 import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
 import { databaseFor, dropDatabaseFor } from '../src/pg.ts';
@@ -31,6 +31,7 @@ async function map() {
 }
 
 type Made = { path: string; rows: number };
+const takeFile = (found: { file: Buffer } | undefined) => found!.file;
 /** The file a link gives, from the whole workspace's database, as the server's route takes it. */
 const fetched = (l: Archipelago, made: Made) => takeBackup(l.db, made.path.split('/').at(-1)!);
 
@@ -41,6 +42,12 @@ test('the owner downloads the whole map by a link that works once', async () => 
   assert.match(made.path, new RegExp(`^/backup-file/${l.workspace}/`), 'the link names its workspace, so any server can give it');
   const file = (await fetched(l, made))!;
   assert.ok((await openTables(l.db, parseBackup(file.file).tables)).tables.entity.some((e) => e.title === 'Kept in the file'));
+  // Its keys come by a link of their own, wrapped under a key only the answer holds: opened with it, the copy reads anywhere.
+  const sent = parseVault(takeFile(await takeBackup(l.db, (made as Made & { vault_path: string }).vault_path.split('/').at(-1)!)));
+  const there = await openDb();
+  await assert.rejects(restore(there, { ...parseBackup(file.file), vault: sent }), /give the backup of the key vault/, 'not without its key');
+  await restore(there, { ...parseBackup(file.file), vault: rewrap(sent, Buffer.from((made as Made & { vault_key: string }).vault_key, 'base64url')) });
+  assert.equal((await there.query<{ title: string }>(`select title from entity`)).rows[0].title, 'Kept in the file');
   assert.equal(await fetched(l, made), undefined, 'good once');
   await assert.rejects(callTool(l, member, 'backup_download', {}), /Only a workspace admin/);
 });
