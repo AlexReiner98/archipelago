@@ -17,6 +17,7 @@ import { addLocalType, addWorkspace } from './control.ts';
 import type { Registry } from './packs.ts';
 import { restoreRows } from './pelago.ts';
 import { databaseFor } from './pg.ts';
+import { analyzeAll, analyzeDue } from './stats.ts';
 import type { Workspaces } from './workspaces.ts';
 
 /** Every table, parents before the rows that point at them. */
@@ -71,6 +72,8 @@ export async function restore(db: Db, backup: Dump, as?: string): Promise<Record
       await tx.query(`update token set revoked_at = now() where revoked_at is null`);
     }
   });
+  // Nearly every row is new: without statistics the planner would take the map for empty (src/stats.ts).
+  await analyzeAll(db);
   return counts;
 }
 
@@ -168,6 +171,7 @@ export async function merge(db: Db, backup: Dump, options: { workspace: string; 
   } catch (err) {
     if (!(err instanceof Preview)) throw err;
   }
+  if (options.apply) await analyzeDue(db);
   return report;
 }
 

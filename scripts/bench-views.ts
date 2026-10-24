@@ -5,8 +5,9 @@
 // size of the answer. What is read is picked from the map (the largest hub, the repository, the busiest item, an
 // open task) unless named: HUB, REPO, BUSY, TASK. The change is undone after each run, untimed.
 // Only ever against a scratch map: the dev server's pulled copy, or a throwaway one with its own data folder.
-// A PGlite folder that was never analysed (a pulled copy, a seeded one) plans the scope query badly: on 20,000 items
-// the handoff took over 30 s before `analyze` and 0.7 s after. Measure it both ways when that is the question.
+// A database without table statistics plans the scope query badly: on 20,000 items the handoff took over 20 s
+// without them and 0.7 s with. The server collects them as it opens, after a restore and after enough writes
+// (src/stats.ts); a server that has just started also takes a backup, so let that finish before timing.
 
 const args = process.argv.slice(2);
 const seed = args.includes('--seed') ? Number(args[args.indexOf('--seed') + 1]) : 0;
