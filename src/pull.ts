@@ -13,7 +13,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { parseBackup, restore } from './backup.ts';
+import { gzipSync } from 'node:zlib';
+import { parseBackup, parseVault, restore } from './backup.ts';
+import { rewrap } from './vault.ts';
 import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
 
@@ -71,8 +73,8 @@ async function pull() {
   if (['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname)) return fail(`PELAGO_URL is this machine (${url}): there is nothing to pull.`);
   const { dataDir, port } = loadConfig();
 
-  const asked = await fetch(`${url}/agent/backup_download`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}' });
-  const answer = (await asked.json().catch(() => ({}))) as { result?: { path: string; name: string; taken: string }; error?: string };
+  const asked = await fetch(`${url}/agent/query`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'backup_download' }) });
+  const answer = (await asked.json().catch(() => ({}))) as { result?: { path: string; vault_path?: string; vault_key?: string; name: string; taken: string }; error?: string };
   if (!answer.result) return fail(`${url} gave no backup: ${answer.error ?? `HTTP ${asked.status}`}`);
   const got = await fetch(url + answer.result.path);
   if (!got.ok) return fail(`The backup link gave HTTP ${got.status}: ask again.`);
@@ -82,6 +84,13 @@ async function pull() {
   writeFileSync(saved, file);
 
   const backup = parseBackup(file);
+  // A sealed backup's keys, under the key the answer gave, wrapped again under this machine's own and kept beside it.
+  if (answer.result.vault_path && answer.result.vault_key) {
+    const keys = await fetch(url + answer.result.vault_path);
+    if (!keys.ok) return fail(`The link to its keys gave HTTP ${keys.status}: ask again.`);
+    backup.vault = rewrap(parseVault(Buffer.from(await keys.arrayBuffer())), Buffer.from(answer.result.vault_key, 'base64url'));
+    writeFileSync(saved.replace('.json.gz', '.vault.json.gz'), gzipSync(JSON.stringify(backup.vault)));
+  }
   let paused = 0;
   for (const row of backup.tables.entity ?? []) if (row.type === 'sys.automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
   const target = pulledDir(dataDir);
@@ -94,7 +103,7 @@ async function pull() {
   const health = () => fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json() as Promise<{ started: string }>, () => undefined);
   const before = await health();
   if (!before) return console.log(`In place in ${dataDir}; what was there is kept as ${takePulled(dataDir) ?? 'nothing'}.`);
-  const restart = await fetch(`http://127.0.0.1:${port}/agent/restart`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).then((r) => r.ok, () => false);
+  const restart = await fetch(`http://127.0.0.1:${port}/agent/revise`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'restart' }) }).then((r) => r.ok, () => false);
   if (!restart) return console.log(`The local server is not in dev mode: stop it, and the copy waiting in ${target} goes in place when it next starts under npm run dev.`);
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 500));

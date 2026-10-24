@@ -8,6 +8,7 @@ import type { Q } from './db.ts';
 import { Sandbox, type Answerer } from './packhost.ts';
 import { runAct, type ActPlaces } from './server-acts.ts';
 import { connectAct, connectionOf, type Connection } from './server-connect.ts';
+import { parts } from './manifest.ts';
 import { loadServerPacks, type ServerPack } from './server-packs.ts';
 import { hostBase, hostRequest, type HostRequest } from './server-requests.ts';
 
@@ -40,7 +41,7 @@ export class ServerPacks {
 
   /** The pack and its route that answer at an address it had before it was a pack. */
   aliased(path: string): string | undefined {
-    for (const { file } of this.packs) if (file.aliases?.[path]) return `/x/${file.id}/${file.aliases[path]}`;
+    for (const { file } of this.packs) if (file.reach.server.aliases?.[path]) return `/x/${file.id}/${file.reach.server.aliases[path]}`;
     return undefined;
   }
 
@@ -59,7 +60,7 @@ export class ServerPacks {
   /** A read a workspace pack makes through a host this pack lends, as that workspace's connection to it. */
   async lent(id: string, host: string, workspace: string, path: string): Promise<{ status: number; body: unknown }> {
     const pack = this.find(id);
-    if (!pack?.file.hosts?.some((h) => h.id === host && h.lend)) throw new Error(`The server pack "${id}" lends no host "${host}".`);
+    if (!pack?.file.reach.hosts?.some((h) => h.id === host && h.lend)) throw new Error(`The server pack "${id}" lends no host "${host}".`);
     const c = await connectionOf(await this.control(), id, workspace);
     if (!c) throw new Error(`This workspace has not connected ${pack.file.title}.`);
     return this.request(id, { host, path, as: c.id });
@@ -80,9 +81,9 @@ export class ServerPacks {
     if (this.agreed && Date.now() - this.agreed.at < AGREEMENTS_MS) return this.agreed.documents;
     const documents = Promise.all(
       this.packs
-        .filter((p) => p.file.agreements)
+        .filter((p) => p.file.reach.server.agreements)
         .map((p) =>
-          this.call(p.file.id, 'entry', p.file.agreements!, {}).then(agreementsFrom, (err) => {
+          this.call(p.file.id, 'entry', p.file.reach.server.agreements!, {}).then(agreementsFrom, (err) => {
             console.error(`server pack ${p.file.id}: its agreements did not answer: ${(err as Error).message}`);
             return [];
           }),
@@ -101,7 +102,7 @@ export class ServerPacks {
     const answer: Answerer = async (q) => {
       if (typeof q.act === 'string') {
         const input = (q.input ?? {}) as Record<string, unknown>;
-        if (!(pack.file.acts ?? []).includes(q.act as never)) throw new Error(`The pack "${id}" did not declare the act "${q.act}".`);
+        if (!(pack.file.reach.server.acts ?? []).includes(q.act as never)) throw new Error(`The pack "${id}" did not declare the act "${q.act}".`);
         if (CONNECT_ACTS.includes(q.act)) return connectAct(this.at, await this.control(), pack.file, q.act, input);
         return runAct(this.at, pack.file, q.act, input, () => this.agreements());
       }
@@ -115,7 +116,7 @@ export class ServerPacks {
       }
       throw new Error('A server pack asks only for its acts, its hosts and its store: it reads no map.');
     };
-    const done = await box.call(answer, { call, name, input, actor: { name: `pack:${id}`, kind: 'agent' }, now: new Date().toISOString(), zone: 'UTC', origin: this.origin, hosts: Object.fromEntries((pack.file.hosts ?? []).map((h) => [h.id, hostBase(id, h)])), present: [] }, Math.min(ms, MOST_MS));
+    const done = await box.call(answer, { call, name, input, actor: { name: `pack:${id}`, kind: 'agent' }, now: new Date().toISOString(), zone: 'UTC', origin: this.origin, hosts: Object.fromEntries((pack.file.reach.hosts ?? []).map((h) => [h.id, hostBase(id, h)])), present: [] }, Math.min(ms, MOST_MS));
     return done.answer ?? null;
   }
 
@@ -123,10 +124,10 @@ export class ServerPacks {
   runSchedules(): () => void {
     const timers: NodeJS.Timeout[] = [];
     for (const { file } of this.packs)
-      for (const s of file.schedules ?? []) {
+      for (const s of parts(file).schedules) {
         const run = () => void this.call(file.id, 'schedule', s.id, {}).catch((err) => console.error(`server pack ${file.id} schedule ${s.id}: ${(err as Error).message}`));
         run();
-        timers.push(setInterval(run, s.every_minutes * 60_000).unref());
+        timers.push(setInterval(run, (s.every_minutes ?? 60) * 60_000).unref());
       }
     return () => timers.forEach(clearInterval);
   }

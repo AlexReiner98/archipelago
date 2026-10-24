@@ -3,6 +3,7 @@
 // verbs are declared by the core pack the same way. Checked when the pack loads.
 
 import { REASONS } from './attention.ts';
+import { parts } from './manifest.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
 
 export interface VerbDef {
@@ -195,27 +196,37 @@ export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: 
 export const PAGES = ['time'];
 
 /** Every screen the packs declare, in the order the packs load. */
-export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.screens ?? []).map((s) => ({ ...s, pack: pack.id })));
+export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => parts(pack).screens.map((s) => ({ ...s, pack: pack.id })));
 /** Every style preset the packs ship, in the order the packs load. */
 export const stylesOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.styles ?? []).map((s) => ({ ...s, pack: pack.id })));
 
 /**
- * The kernel's own tools that are one of the six verbs in all but name. change, the generic op, stays beneath them
- * all, as do the tools that only read.
+ * The kernel's own actions, each under one of the six verbs: an agent calls one as the verb's tool with its name
+ * (src/surface.ts). change, the generic op, stays beneath them all, as do the tools that only read.
  */
 export const KERNEL_VERBS: Record<string, string> = {
-  confirmed: 'settle',
-  decide: 'settle',
-  rechecked: 'report',
-  session_end: 'report',
-  session_update: 'report',
-  tell: 'report',
-  run_report: 'report',
-  notify: 'ask',
-  publish_ask: 'ask',
+  session_start: 'capture',
+  picture_put: 'capture',
+  backup: 'capture',
+  import_audit: 'capture',
   claim: 'assign',
   launch: 'assign',
+  session_update: 'report',
+  session_end: 'report',
+  tell: 'report',
+  run_report: 'report',
+  rechecked: 'report',
+  show: 'report',
+  check_connections: 'report',
+  health: 'report',
+  notify: 'ask',
+  publish_ask: 'ask',
+  confirmed: 'settle',
+  decide: 'settle',
   release: 'revise',
+  publish: 'revise',
+  publish_all: 'revise',
+  restart: 'revise',
   undo: 'revise',
 };
 
@@ -229,7 +240,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   const problems: string[] = [];
   const own = (id: string) => pack.id === 'core' || id.startsWith(pack.id + '.');
   const seen = new Set<string>();
-  for (const [what, list] of [['action', pack.actions ?? []], ['view', pack.views ?? []]] as const) {
+  for (const [what, list] of [['action', parts(pack).actions], ['view', parts(pack).views]] as const) {
     for (const def of list) {
       const at = `${what} "${def.id}"`;
       if (!own(def.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
@@ -247,11 +258,11 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
         const action = def as ActionDef;
         if (!verbs.includes(action.verb)) problems.push(`${at} specialises "${action.verb}", which is not a verb: one of ${verbs.join(', ')}`);
         for (const t of action.on ?? []) if (!types.has(t)) problems.push(`${at} acts on unknown type "${t}"`);
-        for (const act of action.acts ?? []) if (!(pack.hosts ?? []).some((h) => h.id === act.host)) problems.push(`${at}: act "${act.id}" goes to undeclared host "${act.host}"`);
+        for (const act of action.acts ?? []) if (!parts(pack).hosts.some((h) => h.id === act.host)) problems.push(`${at}: act "${act.id}" goes to undeclared host "${act.host}"`);
       } else if (!['rows', 'data'].includes((def as ViewDef).shape)) problems.push(`${at}: \`shape\` is rows or data`);
     }
   }
-  for (const screen of pack.screens ?? []) {
+  for (const screen of parts(pack).screens) {
     const at = `screen "${screen.id}"`;
     if (!own(screen.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
     if (!screen.title || !(screen.on?.length || screen.nav || screen.at) || !screen.pieces?.length) problems.push(`${at} needs a title, the kinds or types it is on or a place offered in the nav, and its pieces`);
@@ -261,9 +272,9 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       const needs: readonly string[] | undefined = PIECES[piece.piece];
       if (!needs) problems.push(`${at}: "${piece.piece}" is not a piece: one of ${Object.keys(PIECES).join(', ')}`);
       for (const key of needs ?? []) if (!piece[key as keyof PieceDef]) problems.push(`${at}: a ${piece.piece} piece names its ${key}`);
-      if (piece.tree && !(pack.trees ?? []).some((tree) => tree.id === piece.tree)) problems.push(`${at}: the pack declares no tree "${piece.tree}"`);
-      if (piece.view && !(pack.views ?? []).some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
-      if (piece.action && !(pack.actions ?? []).some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
+      if (piece.tree && !parts(pack).trees.some((tree) => tree.id === piece.tree)) problems.push(`${at}: the pack declares no tree "${piece.tree}"`);
+      if (piece.view && !parts(pack).views.some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
+      if (piece.action && !parts(pack).actions.some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
       if (piece.page && !PAGES.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}`);
       for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
       if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a view's style has no code: code runs only from a style kept on the map`);
@@ -284,17 +295,17 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     if (typeof d.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);
     for (const [name, file] of Object.entries(d.modules ?? {})) if (!/^[a-z][a-z0-9_-]*.js$/.test(name) || typeof file !== 'string' || file.includes('..')) problems.push(`${at}: "${name}" is not a module's name (a-z, ending .js) with a file in the pack`);
   }
-  for (const host of pack.hosts ?? []) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);
-  for (const hook of pack.webhooks ?? []) {
+  for (const host of parts(pack).hosts) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);
+  for (const hook of parts(pack).webhooks) {
     if (!handler || !hook.secret) problems.push(`webhook "${hook.id}" needs the handler and the name of its secret`);
     for (const name of hook.headers ?? []) if (!/^[a-z0-9-]+$/.test(name) || /^(authorization|cookie)$/.test(name)) problems.push(`webhook "${hook.id}": "${name}" is not a header it may be given`);
   }
   // What it records in the log, beside its changes: the kernel's own kinds of event are the kernel's.
-  for (const action of pack.events ?? []) if (!/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(action) || /^(entity|relation|proposal|changeset|picture|session|pack)\./.test(action)) problems.push(`event "${action}" is not one a pack may record`);
-  for (const s of pack.schedules ?? []) if (!handler || !((s.every_minutes ?? 0) >= 1 || (s.at_start && s.every_minutes === undefined)) || !((s.limit_ms ?? 1) > 0 && (s.limit_ms ?? 1) <= 30_000)) problems.push(`schedule "${s.id}" needs the handler, every_minutes of 1 or more or at_start, and limit_ms of 30000 at most`);
+  for (const action of parts(pack).events) if (!/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(action) || /^(entity|relation|proposal|changeset|picture|session|pack)\./.test(action)) problems.push(`event "${action}" is not one a pack may record`);
+  for (const s of parts(pack).schedules) if (!handler || !((s.every_minutes ?? 0) >= 1 || (s.at_start && s.every_minutes === undefined)) || !((s.limit_ms ?? 1) > 0 && (s.limit_ms ?? 1) <= 30_000)) problems.push(`schedule "${s.id}" needs the handler, every_minutes of 1 or more or at_start, and limit_ms of 30000 at most`);
   // What it is told of, what it reads through, and the map's tools a run it asks for may offer its model.
-  for (const h of pack.hears ?? []) if (!handler || !/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(h.event) || !((h.limit_ms ?? 1) > 0 && (h.limit_ms ?? 1) <= 30_000)) problems.push(`hears "${h.event}" needs the handler, an event's name and limit_ms of 30000 at most`);
-  for (const v of pack.via ?? []) if (!/^[a-z][a-z0-9_]*$/.test(v.pack ?? '') || !/^[a-z][a-z0-9_]*$/.test(v.host ?? '')) problems.push('via names a server pack and one of its hosts');
-  for (const name of pack.runs ?? []) if (!handler || !/^[a-z][a-z0-9_]*$/.test(name)) problems.push(`runs: "${name}" is not the name of a tool, or the pack has no handler`);
+  for (const h of parts(pack).hears) if (!handler || !/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(h.event) || !((h.limit_ms ?? 1) > 0 && (h.limit_ms ?? 1) <= 30_000)) problems.push(`hears "${h.event}" needs the handler, an event's name and limit_ms of 30000 at most`);
+  for (const v of parts(pack).via) if (!/^[a-z][a-z0-9_]*$/.test(v.pack ?? '') || !/^[a-z][a-z0-9_]*$/.test(v.host ?? '')) problems.push('via names a server pack and one of its hosts');
+  for (const name of parts(pack).runs ?? []) if (!handler || !/^[a-z][a-z0-9_]*$/.test(name)) problems.push(`runs: "${name}" is not the name of a tool, or the pack has no handler`);
   return problems;
 }

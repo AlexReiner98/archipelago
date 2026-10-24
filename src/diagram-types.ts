@@ -4,18 +4,19 @@
 
 import { html, legend, style, type Edge, type Page, type Vertex } from './diagram-xml.ts';
 
-/** What a pack file says, as far as the diagrams read it. */
+/** What a pack's manifest says, as far as the diagrams read it (src/manifest.ts). */
 export interface PackFile {
   id: string;
   title?: string;
   requires?: string[];
-  types?: Array<{ id: string; title?: string; extends?: string; kind?: boolean; capabilities?: Record<string, unknown>; statuses?: { open?: string[]; closed?: string[] } }>;
-  relations?: Array<{ id: string; title?: string; extends?: string; root?: boolean; from?: string[]; to?: string[] }>;
-  extend?: Record<string, { fields?: Record<string, unknown> }>;
+  /** Its own types, and the fields it adds to another pack's (an entry with of). */
+  types?: Array<{ id?: string; of?: string; fields?: Record<string, unknown>; title?: string; extends?: string; kind?: boolean; capabilities?: Record<string, unknown>; statuses?: { open?: string[]; closed?: string[] } }>;
+  links?: Array<{ id: string; title?: string; extends?: string; root?: boolean; from?: string[]; to?: string[] }>;
   actions?: unknown[];
-  views?: unknown[];
-  screens?: unknown[];
+  views?: Array<{ form?: string }>;
 }
+
+const own = (p: PackFile) => (p.types ?? []).filter((t): t is typeof t & { id: string } => t.id !== undefined);
 
 /** A colour for each pack, the same on every page: the kernel's packs in grey, the rest in turn. */
 const KERNEL = ['core', 'sys'];
@@ -66,11 +67,11 @@ function forest(nodes: Node[], roots: string[], colour: (pack: string) => { fill
 
 function typeNodes(packs: PackFile[]): { nodes: Node[]; kinds: string[] } {
   const added = new Map<string, string[]>();
-  for (const p of packs) for (const [t, e] of Object.entries(p.extend ?? {})) {
+  for (const p of packs) for (const [t, e] of (p.types ?? []).flatMap((t) => (t.of ? [[t.of, t] as const] : []))) {
     (added.get(t) ?? added.set(t, []).get(t)!).push(`${p.id} (${Object.keys(e.fields ?? {}).join(', ')})`);
   }
   const nodes: Node[] = [], kinds: string[] = [];
-  for (const p of packs) for (const t of p.types ?? []) {
+  for (const p of packs) for (const t of own(p)) {
     const caps = Object.keys(t.capabilities ?? {});
     const statuses = [...(t.statuses?.open ?? []), '|', ...(t.statuses?.closed ?? [])].join(' ');
     const lines = [`<b>${html(t.title ?? t.id)}</b> <font color="${t.kind ? '#cccccc' : '#777777'}">${html(t.id)}</font>`];
@@ -101,7 +102,7 @@ function inheritance(packs: PackFile[]): Page {
 function relationTree(packs: PackFile[]): Page {
   const colour = colours(packs);
   const nodes: Node[] = [], roots: string[] = [];
-  for (const p of packs) for (const r of p.relations ?? []) {
+  for (const p of packs) for (const r of p.links ?? []) {
     const ends = `${(r.from ?? ['*']).join(', ')} → ${(r.to ?? ['*']).join(', ')}`;
     nodes.push({ id: r.id, pack: p.id, parent: r.extends, root: r.root, label: `<b>${html(r.title ?? r.id)}</b> <font color="${r.root ? '#cccccc' : '#777777'}">${html(r.id)}</font><br><font style="font-size:10px">${html(ends)}</font>`, tooltip: `${r.id}, from the ${p.id} pack: ${ends}.` });
     if (r.root || !r.extends) roots.push(r.id);
@@ -121,7 +122,7 @@ function packMap(packs: PackFile[]): Page {
   const count = (n: number | undefined, word: string) => (n ? `${n} ${word}${n === 1 ? '' : 's'}` : '');
   const box = (p: PackFile, x: number, y: number) => {
     const c = colour(p.id);
-    const says = [count(p.types?.length, 'type'), count(p.relations?.length, 'relation'), count(p.actions?.length, 'action'), count(p.views?.length, 'view'), count(p.screens?.length, 'screen')].filter(Boolean).join(' · ');
+    const says = [count(own(p).length, 'type'), count(p.links?.length, 'relation'), count(p.actions?.length, 'action'), count(p.views?.filter((v) => !v.form).length, 'view'), count(p.views?.filter((v) => v.form === 'screen').length, 'screen')].filter(Boolean).join(' · ');
     vertices.push({ id: `p-${slug(p.id)}`, label: `<b>${html(p.title ?? p.id)}</b><br><font style="font-size:10px">${html(says)}</font>`, x, y, w: 200, h: 50, style: style({ rounded: 1, html: 1, whiteSpace: 'wrap', fontSize: 12, fillColor: c.fill, strokeColor: c.stroke }) });
   };
   others.forEach((p, i) => box(p, i * 230, 0));

@@ -6,6 +6,7 @@
 // asked for it, with its changes waiting for the owner. What each run used is recorded as a run where it was held.
 
 import { z } from 'zod';
+import { parts } from './manifest.ts';
 import { connection, NO_MODEL } from './model-account.ts';
 import { ModelError, type Tool, type ToolResultBlock, type ToolUseBlock, type Turn } from './model.ts';
 import { holdWorkspace, setRunner, type RunAsk, type RunStart } from './pack-reach.ts';
@@ -41,7 +42,7 @@ function checked(pack: PackFile, r: RunAsk): RunAsk {
     return { name: t.name, description: t.description.slice(0, 2000), input_schema: t.input_schema };
   });
   const map = r.map_tools ?? [];
-  for (const name of map) if (!(pack.runs ?? []).includes(name) || !TOOLS[name]) throw new Error(`The ${pack.id} pack may not offer a run the map's tool "${name}": it is not one of the tools it declares in runs.`);
+  for (const name of map) if (!(parts(pack).runs ?? []).includes(name) || !TOOLS[name]) throw new Error(`The ${pack.id} pack may not offer a run the map's tool "${name}": it is not one of the tools it declares in runs.`);
   if (tools.length + map.length > 24 || new Set([...tools.map((t) => t.name), ...map]).size !== tools.length + map.length) throw new Error("A run's tools have names of their own, 24 at most.");
   if (!Array.isArray(r.within) || !r.within.length || r.within.some((id) => typeof id !== 'string')) throw new Error('A run is held to some items of the map (within).');
   if (r.once !== undefined) text(r.once, 200, 'once as a short key');
@@ -50,7 +51,7 @@ function checked(pack: PackFile, r: RunAsk): RunAsk {
 
 /** Start each run a call asked for: refused when it is not well made or there is no model, else on its way. */
 async function startRuns(l: Archipelago, asker: Actor, pack: PackFile, call: string, runs: RunAsk[]): Promise<RunStart[]> {
-  if (!pack.runs) return runs.map((r) => ({ started: false, title: String(r.title), reason: `The ${pack.id} pack does not declare that it runs a model.` }));
+  if (!parts(pack).runs) return runs.map((r) => ({ started: false, title: String(r.title), reason: `The ${pack.id} pack does not declare that it runs a model.` }));
   const out: RunStart[] = [];
   for (const given of runs) {
     let r: RunAsk;
@@ -95,6 +96,7 @@ async function takeOnce(l: Archipelago, pack: PackFile, once: string): Promise<b
        where (setting.value->>'done')::boolean is not true and (setting.value->>'at')::timestamptz < now() - make_interval(mins => $2::int) returning key`,
     [onceKey(pack, once), ONCE_MINUTES],
   );
+  if (rows.length) await l.record('automations', `agent:${pack.id}`, [['+', 'run_once', `${pack.id}:${once}`, { done: false }]]);
   return rows.length > 0;
 }
 
@@ -115,7 +117,7 @@ async function answerTool(l: Archipelago, actor: Actor, pack: PackFile, r: RunAs
   if (!r.tools?.some((t) => t.name === name)) throw new Error(`No tool "${name}". The tools are: ${definitions(r).map((t) => t.name).join(', ')}.`);
   const done: Done = await hostFor(l.registry).call(l, actor, pack.id, 'tool', 'tool', { name, input, context: r.context }, TOOL_MS, async (q, reads) => {
     if (typeof q.tool !== 'string') return reads(q);
-    if (!READS.includes(q.tool) || !(pack.runs ?? []).includes(q.tool)) throw new Error(`A tool of a run may call only the map's reads its pack declares, not "${q.tool}".`);
+    if (!READS.includes(q.tool) || !(parts(pack).runs ?? []).includes(q.tool)) throw new Error(`A tool of a run may call only the map's reads its pack declares, not "${q.tool}".`);
     return callTool(l, actor, q.tool, q.input ?? {});
   });
   const changes = [...(done.ops?.length ? [{ ops: done.ops, reason: done.reason ?? name }] : []), ...(done.changes ?? [])];
@@ -211,6 +213,7 @@ async function run(l: Archipelago, pack: PackFile, r: RunAsk, by: StartedBy | un
   const cost = price ? (used.input * price.input + used.output * price.output + used.cache_read * price.input * 0.1 + used.cache_write * price.input * 1.25) / 1e6 : undefined;
   const summary = [failed, said].filter(Boolean).join('\n\n');
   if (r.once) await l.db.query(`update setting set value = value || '{"done": true}'::jsonb where key = $1`, [onceKey(pack, r.once)]);
+  if (r.once) await l.record('automations', `agent:${pack.id}`, [['+', 'run_once', `${pack.id}:${r.once}`, { done: true }]]);
   const recorded = await recordRun(l, actor, { repo: r.within[0], title: r.title, ok: !failed, tokens, cost_usd: cost, turns, link: r.link, summary, surface: 'server', started_by: by });
   if (r.then) await ended(mine, actor, pack, r, { ok: !failed, summary, run: recorded.run, tokens, turns });
   return { ok: !failed, tokens };
@@ -221,7 +224,7 @@ async function ended(l: Archipelago, actor: Actor, pack: PackFile, r: RunAsk, ou
   try {
     const done = await hostFor(l.registry).call(l, actor, pack.id, 'answer', r.then!, { ...outcome, context: r.context }, TOOL_MS);
     for (const c of done.calls ?? []) {
-      if (!(pack.runs ?? []).includes(c.tool)) throw new Error(`"${c.tool}" is not one of the tools the ${pack.id} pack declares in runs.`);
+      if (!(parts(pack).runs ?? []).includes(c.tool)) throw new Error(`"${c.tool}" is not one of the tools the ${pack.id} pack declares in runs.`);
       await callTool(l, actor, c.tool, c.input ?? {});
     }
   } catch (err) {

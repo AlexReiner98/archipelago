@@ -38,8 +38,14 @@ Approving, launching and tokens stay with you. Dev mode refuses to start with
 | CLI | You | `npm run pelago -- <command>` (run with no command for the list) |
 
 All three call the tools in [src/tools.ts](../src/tools.ts). The web UI and CLI
-have human authority; the MCP endpoint does not, and two tools (`decide`,
-`init`) are not offered to agents at all.
+have human authority and call each tool by its name; the MCP endpoint does not,
+and offers agents nine tools ([src/surface.ts](../src/surface.ts)): `query`
+reads (a view, a lens, or a read such as `get`, `search`, `schema`, `events`),
+`change` writes, `undo` takes a change set back, and every other action is
+called under one of the six verbs the core pack declares (`capture`, `assign`,
+`report`, `ask`, `settle`, `revise`) by its name, with its inputs as `params`:
+`report` with action `tell`. A pack's actions join its verb. The human's own
+tools (`decide`, `init`, tokens, members) are not offered to agents at all.
 
 The web UI has five places, and one page for each thing.
 
@@ -166,8 +172,8 @@ on, and is given any exclusive resource that work needs, or told who holds it.
 When the session ends, everything it held is released. These writes take effect
 at once; they are the session's own state, not facts about the world.
 
-- **From an agent:** the `session_start`, `session_update` and `session_end`
-  tools. An agent that finishes a session in a repository is first shown that
+- **From an agent:** `capture` with action `session_start`, and `report` with
+  action `session_update` or `session_end`. An agent that finishes a session in a repository is first shown that
   repository's open work nobody has changed since the session began, and has
   to change each item, say it is still true, or say it cannot tell from where
   it is (the item is then left as it was, and the run says it was not
@@ -203,8 +209,11 @@ at once; they are the session's own state, not facts about the world.
   open `/connect/setup.mjs` on the server. With no terminal to ask at and no
   `--yes` (an agent running it), it brings up to date only what Archipelago
   wrote there before and refuses a first setup.
-- **From a script:** `POST /agent/<tool>` takes the same tools as plain JSON
-  with agent authority.
+- **From a script:** `POST /agent/<tool>` takes the same nine tools as plain
+  JSON with agent authority. A tool's name from before the surface was made
+  small still answers there for one release, with `moved_to` beside `result`
+  naming the call that replaces it. `POST /agent/report` with no action is what
+  a running system measured (action `health`), as Uptime Kuma posts it.
 
 - **Launched from the map:** an item page's **Launch session** button (or
   the human-only `launch` tool) starts a headless Claude Code session in the
@@ -457,7 +466,7 @@ one in the map whose `remote` is its GitHub address. From then on:
   closes that item the way an agent would: held for you to confirm unless
   policy lets it through. Decisions and hypotheses are left alone; a commit
   cannot say what was decided. An agent session that names its task in
-  `session_start` or `session_update` is told to end the commit that finishes
+  action `session_start` or `session_update` is told to end the commit that finishes
   it with that line, and says its branch, so the push reader knows what the
   branch was for.
 

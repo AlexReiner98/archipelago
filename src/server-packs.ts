@@ -1,5 +1,5 @@
 // Server packs: what a server does that no one workspace's map can (sell a workspace, take a payment's webhook), by
-// the pack contract. A server pack is a folder with a pack.json marked tier "server" and a handler.js, kept in the
+// the pack contract. A server pack is a pack whose manifest asks for server reach (reach.server), with a handler.js, kept in the
 // kernel's own packs folder (beside the workspace packs, for one that ships with it) or in one of the folders the
 // server's configuration names (PELAGO_SERVER_PACKS, separated as PATH is): so a private one is a folder on the
 // machine the server runs on, never a file of this repository. Being there enables it; no workspace owner can. Its
@@ -14,6 +14,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { env } from './env.ts';
+import { isServerPack, parts, readManifest, type Manifest, type ReachDef } from './manifest.ts';
 
 /** The acts a server pack may ask the kernel for, each only if it declares it. */
 export const SERVER_ACTS = [
@@ -44,12 +45,8 @@ export interface ServerHost {
   lend?: boolean;
 }
 
-export interface ServerPackFile {
-  id: string;
-  version: string;
-  title: string;
-  description?: string;
-  tier: 'server';
+/** Server reach, as a manifest asks for it (reach.server): a pack that asks for it is a server pack. */
+export interface ServerReach {
   /** The server acts it may ask for. */
   acts?: ServerAct[];
   /**
@@ -64,25 +61,11 @@ export interface ServerPackFile {
    */
   pages?: { id: string; file: string; form_action?: string }[];
   /**
-   * POST /x/<pack>/hook/<id>, checked before the handler sees it: the HMAC-SHA256 of the raw body with the secret named.
-   * One that names headers is handed { payload, headers } with those of the delivery's headers, not the body alone.
-   */
-  webhooks?: { id: string; secret: string; header?: string; format?: 'prefixed' | 'hex'; headers?: string[]; limit_ms?: number }[];
-  /** Outside services it may call while it runs (ctx.request), each with how the kernel proves who it is. */
-  hosts?: ServerHost[];
-  /**
-   * The secrets its hosts and webhooks are given, held by the kernel: set at run time from a host's answer (sealed in
-   * the control plane), or from the environment (PELAGO_SECRET_<PACK>_<NAME>, or the name given as env).
-   */
-  secrets?: { name: string; env?: string }[];
-  /**
    * What a workspace's admin may connect it to (src/server-connect.ts): entries the kernel calls, never public. status
    * says whether it is ready to be connected; start answers where to send the admin, given a one-time word (state).
    * With setup, the default workspace's admin readies it once for the server, through start too.
    */
   connect?: { status: string; start: string; setup?: boolean };
-  /** Entries the server's leader runs every so many minutes, and once when it takes the lead. */
-  schedules?: { id: string; every_minutes: number }[];
   /** Addresses it answered at before it was a pack, each to one of its own routes ("hook/<id>", an entry or a page). */
   aliases?: Record<string, string>;
   /**
@@ -93,44 +76,54 @@ export interface ServerPackFile {
   agreements?: string;
 }
 
+/**
+ * A server pack's file: a manifest that asks for server reach. Its webhooks are checked before the handler sees them
+ * (POST /x/<pack>/hook/<id>, the HMAC-SHA256 of the raw body with the secret named); its hosts are called with how the
+ * kernel proves who it is; its secrets are held by the kernel, set at run time from a host's answer (sealed in the
+ * control plane) or from the environment (PELAGO_SECRET_<PACK>_<NAME>, or the name given as env); its schedules are
+ * handlers the server's leader runs every so many minutes, and once when it takes the lead.
+ */
+export type ServerPackFile = Manifest & { reach: ReachDef & { server: ServerReach } };
+
 export interface ServerPack {
   file: ServerPackFile;
   folder: string;
 }
 
 /** Why a pack.json is not a server pack it may be, as sentences; none when it is. */
-export function checkServerPack(p: Partial<ServerPackFile>, folder: string): string[] {
+export function checkServerPack(p: Partial<Manifest>, folder: string): string[] {
   const problems: string[] = [];
   if (!p.id || !ID.test(p.id)) problems.push('its id is lowercase letters, digits and underscores, starting with a letter');
-  if (p.tier !== 'server') problems.push('it is not marked tier "server"');
+  if (!isServerPack(p)) problems.push('it asks for no server reach (reach.server)');
   if (!p.version || !p.title) problems.push('it needs a version and a title');
-  for (const act of p.acts ?? []) if (!(SERVER_ACTS as readonly string[]).includes(act)) problems.push(`"${act}" is not a server act: one of ${SERVER_ACTS.join(', ')}`);
-  const names = [...(p.entries ?? []), ...(p.pages ?? [])].map((e) => e.id);
+  const { server = {}, hosts, secrets: declared, webhooks, schedules } = parts(p as Manifest);
+  for (const act of server.acts ?? []) if (!(SERVER_ACTS as readonly string[]).includes(act)) problems.push(`"${act}" is not a server act: one of ${SERVER_ACTS.join(', ')}`);
+  const names = [...(server.entries ?? []), ...(server.pages ?? [])].map((e) => e.id);
   for (const name of names) if (!NAME.test(name) || name === 'hook' || name === 'public') problems.push(`"${name}" cannot name an entry or a page`);
   if (new Set(names).size !== names.length) problems.push('an entry and a page share a name');
-  for (const page of p.pages ?? []) if (!FILE.test(page.file) || !existsSync(join(folder, 'public', page.file))) problems.push(`page "${page.id}" names no file in its public/ folder`);
-  for (const page of p.pages ?? []) if (page.form_action && !p.hosts?.some((h) => h.id === page.form_action)) problems.push(`page "${page.id}" sends a form to no host of its own`);
-  const secrets = (p.secrets ?? []).map((s) => s.name);
+  for (const page of server.pages ?? []) if (!FILE.test(page.file) || !existsSync(join(folder, 'public', page.file))) problems.push(`page "${page.id}" names no file in its public/ folder`);
+  for (const page of server.pages ?? []) if (page.form_action && !hosts.some((h) => h.id === page.form_action)) problems.push(`page "${page.id}" sends a form to no host of its own`);
+  const secrets = declared.map((s) => s.name);
   for (const s of secrets) if (!NAME.test(s)) problems.push(`"${s}" cannot name a secret`);
-  for (const host of p.hosts ?? []) {
+  for (const host of hosts) {
     if (!NAME.test(host.id) || !/^https?:\/\/\S+$/.test(host.base ?? '')) problems.push(`host "${host.id}" needs an id and an http(s) base`);
     for (const name of [host.secret, host.sign?.key, host.sign?.issuer]) if (name !== undefined && !secrets.includes(name)) problems.push(`host "${host.id}" names the secret "${name}", which it does not declare`);
     if (host.exchange && (!host.sign || !host.exchange.path?.includes('{as}') || !host.exchange.token || !host.exchange.expires)) problems.push(`host "${host.id}": an exchange trades a signed token, at a path with {as}, for a token and when it expires`);
   }
-  for (const hook of p.webhooks ?? []) {
+  for (const hook of webhooks) {
     if (!NAME.test(hook.id) || !NAME.test(hook.secret ?? '')) problems.push(`webhook "${hook.id}" needs an id and the name of its secret`);
     if (hook.format && !['prefixed', 'hex'].includes(hook.format)) problems.push(`webhook "${hook.id}": its format is prefixed (sha256=<hex>) or hex`);
-    if (p.secrets && !secrets.includes(hook.secret)) problems.push(`webhook "${hook.id}" names the secret "${hook.secret}", which it does not declare`);
+    if (p.reach?.secrets && !secrets.includes(hook.secret)) problems.push(`webhook "${hook.id}" names the secret "${hook.secret}", which it does not declare`);
   }
-  if (p.connect && (!p.connect.status || !p.connect.start)) problems.push('what it connects to needs a status and a start entry');
-  for (const s of p.schedules ?? []) if (!NAME.test(s.id ?? '') || !(s.every_minutes >= 1)) problems.push(`schedule "${s.id}" needs an id and every_minutes`);
-  for (const [path, to] of Object.entries(p.aliases ?? {})) {
+  if (server.connect && (!server.connect.status || !server.connect.start)) problems.push('what it connects to needs a status and a start entry');
+  for (const s of schedules) if (!NAME.test(s.id ?? '') || !((s.every_minutes ?? 0) >= 1)) problems.push(`schedule "${s.id}" needs an id and every_minutes`);
+  for (const [path, to] of Object.entries(server.aliases ?? {})) {
     const hook = /^hook\/([a-z][a-z0-9_]*)$/.exec(to);
     if (!/^\/[a-z0-9][a-z0-9/_-]*$/.test(path) || KERNEL_PATHS.test(path)) problems.push(`"${path}" cannot be an address of its own`);
-    if (hook ? !p.webhooks?.some((w) => w.id === hook[1]) : !names.includes(to)) problems.push(`"${path}" leads to no route of its own: "${to}"`);
+    if (hook ? !webhooks.some((w) => w.id === hook[1]) : !names.includes(to)) problems.push(`"${path}" leads to no route of its own: "${to}"`);
   }
-  if (p.agreements !== undefined && !p.entries?.some((e) => e.id === p.agreements)) problems.push(`its agreements name no entry of its own: "${p.agreements}"`);
-  if ((p.entries?.length || p.webhooks?.length || p.connect || p.schedules?.length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
+  if (server.agreements !== undefined && !server.entries?.some((e) => e.id === server.agreements)) problems.push(`its agreements name no entry of its own: "${server.agreements}"`);
+  if ((server.entries?.length || webhooks.length || server.connect || schedules.length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
   return problems;
 }
 
@@ -140,10 +133,11 @@ export const OWN_PACKS = resolve(import.meta.dirname, '..', 'packs');
 /** The folders server packs are kept in: the kernel's own, and those the configuration names. */
 export const serverPackDirs = (given = env('SERVER_PACKS')): string[] => [OWN_PACKS, ...(given ?? '').split(delimiter).map((d) => d.trim()).filter(Boolean).map((d) => resolve(d))];
 
-/** Whether a pack file is marked a server pack: only those are read from a folder that holds workspace packs too. */
+/** Whether a pack file asks for server reach: only those are read from a folder that holds workspace packs too. */
 function markedServer(at: string): boolean {
   try {
-    return (JSON.parse(readFileSync(at, 'utf8')) as { tier?: string }).tier === 'server';
+    const raw = JSON.parse(readFileSync(at, 'utf8')) as { tier?: string; reach?: { server?: unknown } };
+    return raw.tier === 'server' || raw.reach?.server !== undefined;
   } catch {
     return true;
   }
@@ -162,16 +156,18 @@ export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[];
       const folder = join(dir, name);
       const at = join(folder, 'pack.json');
       if (!existsSync(at) || (dir === OWN_PACKS && !markedServer(at))) continue;
-      let file: Partial<ServerPackFile>;
+      let file: Partial<Manifest>;
       try {
-        file = JSON.parse(readFileSync(at, 'utf8'));
+        const read = readManifest(readFileSync(at, 'utf8'), at);
+        file = read.manifest;
+        for (const w of read.warnings) console.warn(w);
       } catch (err) {
-        refused.push({ folder, why: [`its pack.json is not JSON: ${(err as Error).message}`] });
+        refused.push({ folder, why: [err instanceof SyntaxError ? `its pack.json is not JSON: ${err.message}` : (err as Error).message] });
         continue;
       }
       const why = checkServerPack(file, folder);
       if (!why.length && packs.some((p) => p.file.id === file.id)) why.push(`another server pack is "${file.id}" already`);
-      for (const path of Object.keys(file.aliases ?? {})) if (packs.some((p) => p.file.aliases?.[path])) why.push(`another server pack answers at "${path}" already`);
+      for (const path of Object.keys(file.reach?.server?.aliases ?? {})) if (packs.some((p) => p.file.reach.server.aliases?.[path])) why.push(`another server pack answers at "${path}" already`);
       if (why.length) refused.push({ folder, why });
       else packs.push({ file: file as ServerPackFile, folder });
     }
@@ -180,7 +176,7 @@ export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[];
 }
 
 /** A secret from the server's environment: PELAGO_SECRET_<PACK>_<NAME>, or the name the pack declares for it. */
-export function envSecret(pack: Pick<ServerPackFile, 'id' | 'secrets'>, name: string): string | undefined {
-  const declared = pack.secrets?.find((s) => s.name === name)?.env;
+export function envSecret(pack: Pick<Manifest, 'id' | 'reach'>, name: string): string | undefined {
+  const declared = pack.reach?.secrets?.find((s) => s.name === name)?.env;
   return env(`SECRET_${pack.id}_${name}`.toUpperCase()) ?? (declared ? env(declared) : undefined);
 }

@@ -11,10 +11,18 @@ that is belongs to whoever is working; `CLAUDE.local.md` (not tracked) says
 where, and how that server is run.
 
 - **If your pelago tools are connected to a map that tracks this
-  repository,** start with `view`, name `handoff`, and the repository. One
+  repository,** start with `query`, name `handoff`, and the repository. One
   answer holds the last push, the handoff note, what has happened since, and
-  the open work. Say what you take on with `session_update`, keep the map
-  true as you go, and bring the handoff note up to date before you finish.
+  the open work. Say what you take on with `report` action `session_update`,
+  keep the map true as you go, and bring the handoff note up to date before
+  you finish.
+- **The pelago tools are nine.** `query` reads (a view, a lens, or a read
+  such as `get`, `search`, `schema`, `events`), `change` writes, `undo` takes
+  a change set back, and every other action is called under its verb
+  (`capture`, `assign`, `report`, `ask`, `settle`, `revise`) by name, with its
+  inputs as `params`: `report` with action `tell`. `query` with name
+  `actions` says what each action takes. The table of what every old tool
+  became is on the task "A small surface for agents".
 - **The local server on port 3100 (`npm run dev`) is where the code is
   tried.** Its map is a scratch copy: do not record the state of the work
   there. Make sure it is running before you change code. `npm run pull`
@@ -49,17 +57,17 @@ where, and how that server is run.
   of each change.
 - **Restart the local server yourself in dev mode.** After changing anything
   under `src/` or `packs/`, run `npm test` and `npm run typecheck`, then
-  restart it and wait for `GET /health`: with the `restart` tool if your
+  restart it and wait for `GET /health`: with `revise` action `restart` if your
   pelago tools are the local server's, otherwise
-  `curl -X POST http://127.0.0.1:3100/agent/restart -H "content-type: application/json" -d "{}"`. `/health` says which commit the
+  `curl -X POST http://127.0.0.1:3100/agent/revise -H "content-type: application/json" -d "{\"action\":\"restart\"}"`. `/health` says which commit the
   server was started from and when (`commit`, `started`): any server runs
   new code when its `commit` is the one you mean (`git rev-parse HEAD`), not
   merely when it answers. If it does not come back, the
   reason is in `runs/dev-server.log`; fix the code and it starts again on the
-  next file change. Without dev mode (no `restart` tool), ask the owner.
+  next file change. Without dev mode (no restart action), ask the owner.
 - **Test where the owner can watch.** Try things on the local server (port
   3100), and keep the owner's screen with you when they have it open there:
-  `show` before each step worth seeing (a change you make already moves it). Say in the reason that it is a test, and undo what you
+  `report` action `show` before each step worth seeing (a change you make already moves it). Say in the reason that it is a test, and undo what you
   made when you are done (`undo` with the change set). Drive a browser only
   when you need to click, and then a visible one on that same server. To see
   how a held change looks there, send it with `hold: true` (core's rule
@@ -70,16 +78,16 @@ where, and how that server is run.
   change is applied. Do not write an id you have not been given.
 - **After the server restarts on new code, your tool list is old.** The
   client keeps the tools as they were when it connected; the prompt hook says
-  when the server has restarted under the session. A tool or input the server has and your list
-  lacks can be called as plain JSON (`POST /agent/<tool>` with the agent
+  when the server has restarted under the session. An action or input the server has and your
+  list lacks can be called as plain JSON (`POST /agent/<tool>` with the agent
   token from the environment, never printed), or the owner can reconnect.
 - **Say who is waited on with a link, not a sentence.** Work that cannot
   move until a person answers or acts gets a `waits_on` link to that person
   (what for goes in the link's `props.for`), and the link is removed once
   they have. Other work is `depends_on`, a resource is `needs`.
 - **Listen for the owner.** What they do in the web UI (a decision made, an
-  edit, an approval) is addressed to you as much as a chat message is. The
-  `watch` tool answers the moment they change something: call it once for
+  edit, an approval) is addressed to you as much as a chat message is. `query`
+  with name `watch` answers the moment they change something: call it once for
   `latest`, then run it in the background with `after` and `wait_seconds`, act
   on what it returns, and start it again. The prompt hook also tells you, with
   the owner's next message, what they did since you last heard.
@@ -89,8 +97,8 @@ where, and how that server is run.
   `PELAGO_PORT=3199 PELAGO_DATA=<temp folder>/data node src/server.ts`
   (add `PELAGO_AUTH=tokens` to test identity). Delete it afterwards. Never
   point a second server at `data/`; the lock refuses it.
-- **Before changing the database schema, take a backup** with the `backup`
-  tool (the server also writes one every 6 hours, to `backups/default/`), then
+- **Before changing the database schema, take a backup** with `capture` action `backup`
+  (the server also writes one every 6 hours, to `backups/default/`), then
   confirm the item and event counts are unchanged after the restart. Never copy `data/` while the
   server runs and call it a backup.
 - **One write path.** Every change to items and links goes through
@@ -100,7 +108,8 @@ where, and how that server is run.
 - **Visibility is enforced by the database** (row level security in
   `src/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
-- **Types live in pack files** under `packs/`. Fields the system maintains are
+- **Types live in pack files** under `packs/`, each a manifest of fifteen keys
+  (`docs/packs.md`, read by `src/manifest.ts`). Fields the system maintains are
   marked `"system": true`.
 - **An item is a small head and its fields** (`src/head.ts`). The head is id,
   kind, type, title, body, visibility and its times; everything else is a
@@ -110,7 +119,7 @@ where, and how that server is run.
   indexes, row-level security and the foreign keys). Read an item's kind from
   its row (`kind`). A value over 4000 characters needs a field declared
   `"large": true`, which only a system-kind type may have. What a pack adds to the page of an item of a kind
-  or type is a screen there too (`screens`: pieces the kernel draws, listed in
+  or type is a screen there too (a view of `form: "screen"`: pieces the kernel draws, listed in
   `src/declared.ts`); the item page (`ui/item.js`) names no pack's type.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
@@ -143,7 +152,7 @@ goal, 8 Oct 2026: minimal, no walls of text, text never stacking vertically,
 spatial where it can be):
 
 - **One thing, one page.** An item has a single page, and every way to it
-  (Home, a search, a link, an agent's `show`) leads to that same page, so a
+  (Home, a search, a link, an agent's show) leads to that same page, so a
   person always lands somewhere they recognise. A list or dashboard points at
   the page; it never draws its own version of the item. What one kind of item
   needs beyond the common page (a project's roadmap) is a part of that page,

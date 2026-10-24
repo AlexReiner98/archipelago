@@ -1,11 +1,12 @@
 // The log (docs/log.md): each workspace's stored state as streams of entries, every entry carrying the hash of the one
 // before it. The fact stream (`facts`) holds each applied change set; the `pending` stream each held one. An entry is
 // one row of log_entry (its header) and a row of log_fact per fact, and neither table takes an update or a delete.
-// Today's tables (entity, relation, proposal) are still written beside the log, in the same transaction, and stand as
-// its projections until the projections task reads them from here (src/replay.ts is the first of them).
+// The tables pages read (entity, relation, proposal) are its projections, made from its entries in the append's
+// transaction by src/replay.ts.
 
 import { GENESIS, entryHash } from './jcs.ts';
 import type { Q } from './db.ts';
+import { openEntries, openValue, sealEntry } from './seal.ts';
 
 export type Stream = 'facts' | 'pending';
 
@@ -15,7 +16,7 @@ export type Fact = ['+', string, string, unknown] | ['+', string, string, unknow
 /** What decided a change set (section 3). */
 export type Decision =
   | { outcome: 'apply'; spared: { rule: string; pack: string }[] }
-  | { outcome: 'approved' | 'rejected' | 'superseded'; held_by: { rule: string; pack: string } | null; proposal: string; proposal_hash: string; by: string; revised?: boolean; except?: string[] };
+  | { outcome: 'approved' | 'rejected' | 'superseded'; held_by: { rule: string; pack: string } | null; proposal: string; proposal_hash: string; by: string; revised?: boolean; except?: string[]; note?: string };
 
 export interface Entry {
   v: 1;
@@ -87,9 +88,14 @@ export async function headOf(q: Q, stream: Stream = 'facts'): Promise<{ pos: num
 
 /**
  * Append one entry under the stream's lock: the next position, a time never before the last entry's, the hash of the
- * one before. Run it in the transaction that writes what it records, so the two stand or fall together.
+ * one before. Run it in the transaction that writes what it records, so the two stand or fall together. The entry
+ * it answers is in clear, with the stored entry's position, time and hash.
  */
 export async function append(tx: Q, ws: string, stream: Stream, head: { id: string; actor: Entry['actor']; reason: string; [field: string]: unknown }, facts: Fact[]): Promise<Entry> {
+  // Every value that is someone's words goes in sealed with its key (src/seal.ts), and `keys` names them.
+  const plain = facts;
+  const sealed = await sealEntry(tx, ws, stream, head, facts);
+  facts = sealed.facts;
   await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.log'), hashtext($1))`, [stream]);
   const { rows } = await tx.query<{ now: Date; pos: number | null; hash: string | null; at: Date | null }>(
     `select date_trunc('milliseconds', now()) as now, l.pos::int as pos, encode(l.hash, 'hex') as hash, l.at
@@ -99,7 +105,7 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
   const last = rows[0];
   // The transaction's own time, which today's tables are written with, clamped so time order and position order agree.
   const at = new Date(Math.max(new Date(last.now).getTime(), last.at ? new Date(last.at).getTime() : 0)).toISOString();
-  const { id, actor, reason, ...rest } = head;
+  const { id, actor, reason, ...rest } = sealed.head as unknown as typeof head;
   const entry = { v: 1, ws, stream, pos: (last.pos ?? 0) + 1, id, at, actor, reason, ...rest, facts, prev: last.hash ?? GENESIS } as unknown as Entry;
   entry.hash = entryHash(entry);
   const { stream: _s, pos, at: _a, facts: _f, prev, hash, ...stored } = entry;
@@ -114,7 +120,8 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
       [stream, pos, JSON.stringify(facts)],
     );
   }
-  return entry;
+  // Handed back in clear, as the caller said it: what it projects into today's tables.
+  return { ...entry, ...head, keys: sealed.head.keys, facts: plain } as unknown as Entry;
 }
 
 const FACTS = `coalesce((select jsonb_agg(case when f.op = '-' then jsonb_build_array(f.op, f.id, f.field)
@@ -125,16 +132,19 @@ type Row = { stream: Stream; pos: number; id: string; at: Date; head: Record<str
 const toEntry = (r: Row) => ({ ...r.head, stream: r.stream, pos: r.pos, id: r.id, at: new Date(r.at).toISOString(), facts: r.facts, prev: r.prev, hash: r.hash }) as Entry;
 const SELECT = `select e.stream, e.pos::int as pos, e.id, e.at, e.head, encode(e.prev, 'hex') as prev, encode(e.hash, 'hex') as hash, ${FACTS} as facts from log_entry e`;
 
-/** Entries of a stream from a position on, in order, as they were appended. */
-export async function entries(q: Q, stream: Stream = 'facts', from = 1, limit = 500): Promise<Entry[]> {
+/** Entries of a stream from a position on, in order, as they are stored: sealed values sealed. */
+export async function stored(q: Q, stream: Stream = 'facts', from = 1, limit = 500): Promise<Entry[]> {
   const { rows } = await q.query<Row>(`${SELECT} where e.stream = $1 and e.pos >= $2 order by e.pos limit $3`, [stream, from, limit]);
   return rows.map(toEntry);
 }
 
+/** Entries of a stream from a position on, in order, opened for whoever reads them. */
+export const entries = async (q: Q, stream: Stream = 'facts', from = 1, limit = 500) => openEntries(q, await stored(q, stream, from, limit));
+
 /** One entry by its id (a change set's c_…, a proposal's p_…). */
 export async function entry(q: Q, id: string): Promise<Entry | undefined> {
   const { rows } = await q.query<Row>(`${SELECT} where e.id = $1`, [id]);
-  return rows[0] && toEntry(rows[0]);
+  return rows[0] && (await openEntries(q, [toEntry(rows[0])]))[0];
 }
 
 /** Walk a stream from its first entry: every position follows the last, every entry names the hash before it, every hash is its own. */
@@ -142,7 +152,7 @@ export async function verify(q: Q, stream: Stream = 'facts'): Promise<{ stream: 
   const problems: string[] = [];
   let pos = 0;
   let prev = GENESIS;
-  for (let batch = await entries(q, stream, 1); batch.length; batch = await entries(q, stream, pos + 1)) {
+  for (let batch = await stored(q, stream, 1); batch.length; batch = await stored(q, stream, pos + 1)) {
     for (const e of batch) {
       if (e.pos !== pos + 1) problems.push(`${stream} ${pos + 1}: missing, the next is ${e.pos}`);
       if (e.prev !== prev) problems.push(`${stream} ${e.pos} (${e.id}): names ${e.prev.slice(0, 12)}… as the entry before, which is ${prev.slice(0, 12)}…`);
@@ -163,5 +173,5 @@ export async function factAt(q: Q, id: string, field: string, pos?: number): Pro
     `select pos::int as pos, op, value from log_fact where stream = 'facts' and id = $1 and field = $2 and ($3::bigint is null or pos <= $3) order by pos desc, n desc limit 1`,
     [id, field, pos ?? null],
   );
-  return rows[0];
+  return rows[0] && { ...rows[0], value: await openValue(q, id, field, rows[0].value) };
 }

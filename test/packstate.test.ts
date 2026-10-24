@@ -74,7 +74,8 @@ test("a pack turned off and on again on a running server: a connected agent's to
   });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
   closers.push(() => client.close());
-  const names = async () => (await client.listTools()).tools.map((t) => t.name);
+  // A pack's action is offered under its verb: the capture tool's description names time.log while the pack is on.
+  const names = async () => [...((await client.listTools()).tools.find((t) => t.name === 'capture')?.description ?? '').matchAll(/\b([a-z]+)\.([a-z_]+) \(/g)].map((m) => `${m[1]}_${m[2]}`);
   const told = () => new Promise<void>((resolve, reject) => ((heard = resolve), setTimeout(() => reject(new Error('not told')), 5000)));
   assert.ok((await names()).includes('time_log'));
 
