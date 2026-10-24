@@ -17,10 +17,7 @@
       "statuses": { "open": ["planned", "active", "paused"], "closed": ["done", "dropped"] },
       "fields": {
         "due": { "type": "date" },
-        "hub_at": {
-          "type": "number",
-          "description": "How many open things an item in this project holds before it is a hub: an item with views of its own, owed them when it has none. 12 when not set. While a project is being shaped, set 1: nearly everything in it is then a hub."
-        },
+        "hub_at": { "type": "number", "description": "How many open things an item in this project holds before it is a hub: an item with views of its own, owed them when it has none. 12 when not set. While a project is being shaped, set 1: nearly everything in it is then a hub." },
         "recheck_days": { "type": "number", "description": "How often, in days, an agent re-checks this project's oldest open items against its repository. Weekly when not set; 0 turns it off." },
         "rechecked_at": { "type": "datetime", "description": "When an agent last re-checked this project's oldest items.", "system": true }
       }
@@ -68,14 +65,17 @@
       "fields": {
         "kind": { "type": "enum", "values": ["problem", "risk"] },
         "severity": { "type": "enum", "values": ["low", "medium", "high", "critical"] },
-        "tokens_estimated": {
-          "type": "number",
-          "description": "How many tokens an agent expects fixing this to take: input and output, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected."
-        },
+        "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects fixing this to take: input and output, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
         "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
       }
     },
-    { "id": "work.meeting", "moved_from": ["meeting"], "extends": "event", "title": "Meeting", "description": "An event with participants (use the involves relation)." },
+    {
+      "id": "work.meeting",
+      "moved_from": ["meeting"],
+      "extends": "event",
+      "title": "Meeting",
+      "description": "An event with participants (use the involves relation)."
+    },
     {
       "id": "work.procedure",
       "moved_from": ["procedure"],
@@ -83,7 +83,10 @@
       "title": "Procedure",
       "description": "How something is done: a checklist, playbook or rule. One a machine can run is a function.",
       "statuses": { "open": ["draft", "current"], "closed": ["retired"] },
-      "fields": { "executable": { "type": "boolean", "default": false }, "entrypoint": { "type": "string", "description": "For executable procedures: the command, skill or script." } }
+      "fields": {
+        "executable": { "type": "boolean", "default": false },
+        "entrypoint": { "type": "string", "description": "For executable procedures: the command, skill or script." }
+      }
     },
     {
       "id": "work.file",
@@ -128,19 +131,75 @@
       }
     }
   ],
-  "relations": [
-    { "id": "work.owed_to", "moved_from": ["owed_to"], "extends": "involves", "title": "is owed to", "inverse": "is owed", "from": ["work.task"], "to": ["person", "company"], "description": "Makes a task a commitment to someone." },
-    { "id": "work.requested_by", "moved_from": ["requested_by"], "extends": "involves", "title": "was requested by", "inverse": "requested", "from": ["*"], "to": ["person", "company", "agent"], "description": "Who asked for it." },
-    { "id": "work.addresses", "moved_from": ["addresses"], "extends": "about", "title": "addresses", "inverse": "is addressed by", "from": ["*"], "to": ["work.issue"], "description": "Work meant to fix or reduce the issue." },
-    { "id": "work.based_on", "moved_from": ["based_on"], "extends": "relates_to", "title": "is based on", "inverse": "informs", "from": ["*"], "to": ["*"], "description": "A decision or plan rests on this result or source." },
-    { "id": "work.governed_by", "moved_from": ["governed_by"], "extends": "relates_to", "title": "is governed by", "inverse": "governs", "from": ["*"], "to": ["work.procedure", "work.decision"], "description": "The rule or procedure that applies." }
+  "links": [
+    {
+      "id": "work.owed_to",
+      "moved_from": ["owed_to"],
+      "extends": "involves",
+      "title": "is owed to",
+      "inverse": "is owed",
+      "from": ["work.task"],
+      "to": ["person", "company"],
+      "description": "Makes a task a commitment to someone."
+    },
+    {
+      "id": "work.requested_by",
+      "moved_from": ["requested_by"],
+      "extends": "involves",
+      "title": "was requested by",
+      "inverse": "requested",
+      "from": ["*"],
+      "to": ["person", "company", "agent"],
+      "description": "Who asked for it."
+    },
+    {
+      "id": "work.addresses",
+      "moved_from": ["addresses"],
+      "extends": "about",
+      "title": "addresses",
+      "inverse": "is addressed by",
+      "from": ["*"],
+      "to": ["work.issue"],
+      "description": "Work meant to fix or reduce the issue."
+    },
+    {
+      "id": "work.based_on",
+      "moved_from": ["based_on"],
+      "extends": "relates_to",
+      "title": "is based on",
+      "inverse": "informs",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "A decision or plan rests on this result or source."
+    },
+    {
+      "id": "work.governed_by",
+      "moved_from": ["governed_by"],
+      "extends": "relates_to",
+      "title": "is governed by",
+      "inverse": "governs",
+      "from": ["*"],
+      "to": ["work.procedure", "work.decision"],
+      "description": "The rule or procedure that applies."
+    }
+  ],
+  "views": [
+    { "form": "screen", "id": "work.figure", "title": "Figure", "on": ["work.note", "work.file"], "pieces": [{ "piece": "figure" }] },
+    { "form": "screen", "id": "work.reading", "title": "Reading", "on": ["work.document"], "pieces": [{ "piece": "document" }] },
+    {
+      "form": "screen",
+      "id": "work.tokens",
+      "title": "Tokens for this",
+      "on": ["work.project"],
+      "pieces": [{ "piece": "token_ask" }, { "piece": "token" }]
+    }
   ],
   "styles": [
-    { "id": "work.reading", "title": "Reading a document", "on": ["work.document"], "props": { "page": { "picture": false, "notes": "whole" } } }
-  ],
-  "screens": [
-    { "id": "work.figure", "title": "Figure", "on": ["work.note", "work.file"], "pieces": [{ "piece": "figure" }] },
-    { "id": "work.reading", "title": "Reading", "on": ["work.document"], "pieces": [{ "piece": "document" }] },
-    { "id": "work.tokens", "title": "Tokens for this", "on": ["work.project"], "pieces": [{ "piece": "token_ask" }, { "piece": "token" }] }
+    {
+      "id": "work.reading",
+      "title": "Reading a document",
+      "on": ["work.document"],
+      "props": { "page": { "picture": false, "notes": "whole" } }
+    }
   ]
 }

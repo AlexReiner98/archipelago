@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { dump, restoreTo } from '../src/backup.ts';
+import { dumpVault } from '../src/vault.ts';
 import { openDb, type Q } from '../src/db.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { analyzeDue } from '../src/stats.ts';
@@ -33,7 +34,7 @@ test('a newly opened database has statistics for entity and relation', async () 
 test('a restored map has statistics for its rows, before anything reads it', async () => {
   const l = await filled();
   const target = join(folder(), 'db');
-  await restoreTo(JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))), target);
+  await restoreTo({ ...JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))), vault: await dumpVault(l.db) }, target);
   const db = await openDb(target);
   assert.ok((await analysed(db, 'entity')) > 80);
   assert.ok((await analysed(db, 'relation')) >= 80);
@@ -44,7 +45,7 @@ test('a restored map has statistics for its rows, before anything reads it', asy
 test('enough writes since the last time make a table due again, and analysing it settles that', async () => {
   const l = await filled();
   const due = await analyzeDue(l.db);
-  for (const table of ['entity', 'relation', 'event']) assert.ok(due.includes(table), `${table} is due after 160 rows`);
+  for (const table of ['entity', 'relation', 'log_fact']) assert.ok(due.includes(table), `${table} is due after 160 rows`);
   assert.ok((await analysed(l.db, 'relation')) >= 80);
   assert.deepEqual(await analyzeDue(l.db), [], 'nothing is due straight after');
   await l.db.close();

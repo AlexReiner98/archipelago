@@ -8,6 +8,8 @@
 
 import type { Q } from './db.ts';
 import type { Registry } from './packs.ts';
+import { checkRetention, type Keep } from './retention.ts';
+import { fieldInReach, inReach } from './reach.ts';
 
 type OneOrMany = string | string[];
 
@@ -58,6 +60,10 @@ export interface RuleDef {
     said?: boolean;
     /** Whether a rule holds this op: false for what is checked only of an op that takes effect at once. */
     held?: boolean;
+    /** Whether a pack's action or handler makes the change. */
+    pack?: boolean;
+    /** "outside": it writes a type, a link type or a field outside the reach of the pack that makes it (src/manifest.ts). */
+    reach?: 'outside';
   };
   then?: 'hold' | 'refuse' | { require: string[] };
   /** Fields whose values together may belong to one item of the type only. */
@@ -72,6 +78,10 @@ export interface RuleDef {
   server?: boolean;
   /** Whether a report's reading, a measurement, is under it. Left out: a refusal is, a hold is not. */
   readings?: boolean;
+  /** A retention rule: the compacted stream its facts go to (docs/log.md, section 4), with keep in place of then. */
+  stream?: string;
+  /** What compaction leaves of them (src/retention.ts). */
+  keep?: Keep;
 }
 
 export type Rule = RuleDef & { pack: string };
@@ -112,6 +122,8 @@ export interface Who {
   asked?: boolean;
   /** The change says on whose authority it is made. */
   said?: boolean;
+  /** The pack whose action or handler makes the change. */
+  pack?: string;
 }
 
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
@@ -127,6 +139,10 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
   const known = (t: string) => reg.types.has(t);
   for (const [i, rule] of rules.entries()) {
     const at = `rule ${rule.id ?? i + 1}`;
+    if (rule.stream !== undefined || rule.keep !== undefined) {
+      problems.push(...checkRetention(rule, at));
+      continue;
+    }
     if (rule.unique) {
       if (!rule.type || !known(rule.type)) problems.push(`${at}: unique needs a type it holds within`);
       else for (const f of rule.unique) if (!reg.types.get(rule.type)!.fields[f]) problems.push(`${at}: ${rule.type} has no field "${f}"`);
@@ -136,6 +152,7 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
     if (then !== 'hold' && then !== 'refuse' && !(then && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse or { require: [fields] }`);
     for (const t of [...(list(rule.when?.type) ?? []), ...(list(rule.when?.kind) ?? [])]) if (!known(t)) problems.push(`${at}: no type "${t}"`);
     if (rule.when?.compare !== undefined && !COMPARE.test(rule.when.compare)) problems.push(`${at}: compare reads like "total > 500"`);
+    if (rule.when?.reach !== undefined && rule.when.reach !== 'outside') problems.push(`${at}: reach is "outside", for what a pack writes outside its reach`);
     if (rule.lifted !== undefined && !LIFTS.includes(rule.lifted)) problems.push(`${at}: lifted is one of ${LIFTS.join(', ')}`);
     if (rule.server && !rule.lifted) problems.push(`${at}: server says what lifts it where the workspace has not set lifted, so it needs lifted`);
   }
@@ -160,6 +177,8 @@ function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Ta
   if (when.may !== undefined && who.may !== when.may) return false;
   if (when.said !== undefined && Boolean(who.said) !== when.said) return false;
   if (when.held !== undefined && held !== when.held) return false;
+  if (when.pack !== undefined && Boolean(who.pack) !== when.pack) return false;
+  if (when.reach === 'outside' && !(who.pack && outsideReach(reg, who.pack, w, targets))) return false;
   if (when.dormant !== undefined) {
     const asleep = [w.op === 'create' || w.op === 'link' ? w.type : undefined, ...targets.map((t) => t.type)].some((t) => t && (reg.types.get(t)?.dormant || reg.relations.get(t)?.dormant));
     if (asleep !== when.dormant) return false;
@@ -188,6 +207,19 @@ function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Ta
   return true;
 }
 
+/**
+ * What an op writes outside a pack's reach, if anything: a type or link type it neither declares nor requires (nor
+ * uses while that pack is active), or a field another pack outside its reach added to a type. Undefined when inside.
+ */
+export function outsideReach(reg: Registry, pack: string, w: Written, targets: Target[]): string | undefined {
+  const types = w.op === 'create' || w.op === 'link' ? (w.type ? [w.type] : []) : targets.map((t) => t.type);
+  for (const t of types) {
+    if (!inReach(reg, pack, t)) return t;
+    for (const field of Object.keys(w.props ?? {})) if (!fieldInReach(reg, pack, t, field)) return `${t} (its field ${field})`;
+  }
+  return undefined;
+}
+
 /** Whether a rule is lifted for this op: by its setting, or where the workspace has not set it, by the server's policy. */
 export type Lifted = (rule: RuleDef, op: string) => boolean;
 
@@ -197,12 +229,13 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const spared: Ruled[] = [];
   const refused: string[] = [];
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
-  const said = (rule: Rule, fallback: string) => (rule.say ?? fallback).replaceAll('{title}', title);
+  const said = (rule: Rule, fallback: string) =>
+    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || w.type || targets[0]?.type || '');
   const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`) });
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
   for (const rule of order) {
-    if (rule.unique || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
+    if (rule.unique || rule.stream || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
     if (rule.lifted && lifted(rule, w.op)) {
       spared.push(ruled(rule));
       continue;

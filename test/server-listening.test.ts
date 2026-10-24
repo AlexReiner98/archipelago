@@ -131,7 +131,7 @@ test('a project with nothing of Archipelago\'s in it is connected by one command
   assert.equal(settings.hooks.Stop[0].hooks[0].command, 'node .claude/pelago-hook.mjs stop', 'the end of a turn is heard too');
   assert.ok(file('.claude/pelago-hook.mjs').includes(`process.env.PELAGO_URL || process.env.LATTICE_URL || "${base}"`), 'the hook falls back on the server that handed it out');
   assert.match(file('.claude/skills/pelago-bump/SKILL.md'), /^---\nname: pelago-bump/);
-  assert.match(file('.claude/pelago.md'), /view` with name `handoff`/);
+  assert.match(file('.claude/pelago.md'), /query` with name `handoff`/);
   assert.match(file('CLAUDE.md'), /^# Their project\n\nTheir own rules\.\n\n## Archipelago\n[\s\S]*@\.claude\/pelago\.md\n$/);
   // Run again, it changes nothing.
   const before = [file('CLAUDE.md'), file('.claude/settings.json')];

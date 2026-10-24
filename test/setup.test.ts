@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { dumpVault } from '../src/vault.ts';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
@@ -73,7 +74,7 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
   const renewed = await setup();
   assert.equal(renewed.code, 0, renewed.out);
   assert.match(renewed.out, /not done {3}\.mcp\.json {2}\(it needs a yes\)[\s\S]*written {4}\.claude\/pelago\.md[\s\S]*Some of it was left/);
-  assert.match(file('.claude/pelago.md'), /view` with name `handoff`/);
+  assert.match(file('.claude/pelago.md'), /query` with name `handoff`/);
   assert.equal(file('.mcp.json'), theirs['.mcp.json']);
   assert.equal((await setup(['--yes'])).code, 0);
   assert.ok(JSON.parse(file('.mcp.json')).mcpServers.pelago);
@@ -234,8 +235,11 @@ test('the operator can create a workspace from a backup file: the map, its types
   assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.map((w: any) => w.id), ['default'], 'a failed one leaves no workspace behind');
   assert.equal(existsSync(join(workspaces.config.rootDir, 'moved')), false);
 
-  const made = (await call('/operator/workspaces', operator, { id: 'moved', name: 'Alex, moved', backup })).result;
-  assert.deepEqual([made.restored.entities, made.restored.events, made.restored.from.id], [taken.tables.entity.length, taken.tables.event.length, 'default']);
+  const vault = gzipSync(JSON.stringify(await dumpVault(main.pelago.db))).toString('base64');
+  assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup })).error, /backup of the key vault/, 'a sealed backup comes with its vault');
+  const made = (await call('/operator/workspaces', operator, { id: 'moved', name: 'Alex, moved', backup, vault })).result;
+  const logged = new Set(taken.tables.log_entry.map((e) => e.id)); // what a change set did is read from the restored log
+  assert.deepEqual([made.restored.entities, made.restored.events, made.restored.from.id], [taken.tables.entity.length, taken.tables.event.filter((e) => !logged.has(e.changeset)).length, 'default']);
   const who = await call('/whoami', made.owner_token, undefined, 'GET');
   assert.deepEqual([who.workspace.id, who.workspace.name, who.actor.admin, who.actor.person], ['moved', 'Alex, moved', true, me], 'the new token is the owner\'s own');
   assert.equal((await call('/api/workspace_info', made.owner_token)).result.owner.title, 'Alex');
@@ -282,6 +286,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   const laptop = await workspaces.get('laptop');
   const taken = await dump(laptop.pelago.db, { id: 'laptop', name: 'Laptop' }, laptop.pelago.registry.localPack());
   const backup = gzipSync(JSON.stringify(taken)).toString('base64');
+  const vault = gzipSync(JSON.stringify(await dumpVault(laptop.pelago.db))).toString('base64');
 
   const main = await workspaces.get('default');
   const admin = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
@@ -293,18 +298,18 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   assert.match((await call('/api/import_backup', admin, { backup: 'bm90IGEgYmFja3Vw' })).error, /not an Archipelago backup/);
 
   const { latest } = (await call('/agent/watch', robot)).result;
-  const preview = (await call('/api/import_backup', admin, { backup })).result;
+  const preview = (await call('/api/import_backup', admin, { backup, vault })).result;
   assert.deepEqual([preview.applied, preview.entities.added, preview.types_added], [false, 2, ['local.site_visit']]);
   const titles = async () => ((await call('/api/search', admin)).result as any[]).map((e) => e.title).sort();
   assert.ok(!(await titles()).includes('Order the stone'), 'looking changes nothing');
-  const done = (await call('/api/import_backup', admin, { backup, apply: true })).result;
+  const done = (await call('/api/import_backup', admin, { backup, vault, apply: true })).result;
   assert.deepEqual([done.applied, done.entities.added], [true, 2]);
   assert.deepEqual((await titles()).filter((t) => ['Already here', 'Order the stone', 'Visit the quarry'].includes(t)), ['Already here', 'Order the stone', 'Visit the quarry']);
   assert.equal(((await call('/api/search', admin, { type: 'local.site_visit' })).result as any[]).length, 1, 'with the type it needed');
 
   const heard = (await call('/agent/watch', robot, { after: latest })).result.changes as any[];
   assert.deepEqual(heard.map((c) => c.action), ['workspace.import'], "what the laptop's owner did there long ago is not news here");
-  assert.equal((await call('/api/import_backup', admin, { backup, apply: true })).result.events.added, 0);
+  assert.equal((await call('/api/import_backup', admin, { backup, vault, apply: true })).result.events.added, 0);
 });
 
 test('an import can make the owner in the file and the owner here one person, and they keep their token and what is theirs', async () => {
@@ -314,20 +319,21 @@ test('an import can make the owner in the file and the owner here one person, an
   const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'From the laptop', owner: theirs }] });
   const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).pelago.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');
+  const vault = gzipSync(JSON.stringify(await dumpVault((await workspaces.get('laptop')).pelago.db))).toString('base64');
 
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const mine = (await call('/api/init', alex, { name: 'Alex R' })).result.me as string;
   await call('/api/change', alex, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Mine alone' }] });
 
-  const preview = (await call('/api/import_backup', alex, { backup })).result;
+  const preview = (await call('/api/import_backup', alex, { backup, vault })).result;
   assert.deepEqual(preview.owners, { here: { id: mine, title: 'Alex R' }, file: { id: theirs, title: 'Alex Reiner' }, made_one: false });
-  const apart = (await call('/api/import_backup', alex, { backup, apply: true })).result;
+  const apart = (await call('/api/import_backup', alex, { backup, vault, apply: true })).result;
   assert.equal(apart.owners.made_one, false, 'not unless asked');
   assert.equal((await call('/whoami', alex, undefined, 'GET')).actor.person, mine);
 
   // Asked afterwards, with a file that has nothing else new in it.
-  const done = (await call('/api/import_backup', alex, { backup, apply: true, same_owner: true })).result;
+  const done = (await call('/api/import_backup', alex, { backup, vault, apply: true, same_owner: true })).result;
   assert.deepEqual([done.owners.made_one, done.entities.added], [true, 0]);
   assert.equal((await call('/whoami', alex, undefined, 'GET')).actor.person, theirs, 'the token is now the person from the file');
   assert.equal((await call('/api/workspace_info', alex)).result.owner.id, theirs, 'who owns the workspace');
@@ -335,6 +341,6 @@ test('an import can make the owner in the file and the owner here one person, an
   assert.deepEqual(tasks, ['From the laptop', 'Mine alone'], 'and still sees what was private to them');
   const people = ((await call('/api/search', alex, { type: 'person' })).result as any[]).map((e) => e.title);
   assert.deepEqual(people, ['Alex Reiner'], 'one person, not two');
-  assert.equal((await call('/api/import_backup', alex, { backup })).result.owners, undefined, 'and later imports line up');
+  assert.equal((await call('/api/import_backup', alex, { backup, vault })).result.owners, undefined, 'and later imports line up');
 });
 

@@ -80,21 +80,21 @@ test('a client connected over MCP goes on through a deploy with the session it h
   const client = new Client({ name: 'test', version: '1' });
   await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)));
   closers.push(() => client.close());
-  assert.ok((await client.listTools()).tools.some((t) => t.name === 'search'));
+  assert.ok((await client.listTools()).tools.some((t) => t.name === 'query'));
 
   // The deploy: the old server stops, a new one starts in its place.
   await stop(before);
   // Long enough for the client to see its open connections closed, as it would while a deploy takes its minute.
   await new Promise((r) => setTimeout(r, 200));
   await map.start(port);
-  const found = await client.callTool({ name: 'search', arguments: { q: 'anything' } });
+  const found = await client.callTool({ name: 'query', arguments: { name: 'search', params: { q: 'anything' } } });
   assert.ok(!found.isError, 'the call is answered, without a new session');
 
   // A client of a server that held sessions in memory carries an id the new one never gave: it is answered all the same.
   const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-session-id': 'given-by-the-old-server', 'mcp-protocol-version': '2025-06-18' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'search', arguments: { q: 'anything' } } }),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'query', arguments: { name: 'search', params: { q: 'anything' } } } }),
   });
   assert.equal(res.status, 200);
   assert.match(await res.text(), /"result"/);

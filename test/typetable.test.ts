@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
+import { dumpVault } from '../src/vault.ts';
 import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
@@ -59,7 +60,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
 
   // The kept definitions travel in a backup, and a fresh map restoring it keeps them dormant.
   const copy = await openDb();
-  await restore(copy, await dump(db, { id: 'default', name: 'Default' }));
+  await restore(copy, { ...(await dump(db, { id: 'default', name: 'Default' })), vault: await dumpVault(db) });
   const there = new Archipelago(copy, new Registry(dir, ['core', 'sys', 'software']));
   await syncTypes(there);
   assert.equal(there.registry.type('time.entry')?.dormant, true);
@@ -111,7 +112,7 @@ test('a relation a pack took over takes its links with it, and the work at risk 
   const core = JSON.parse(readFileSync(join(before, 'core', 'pack.json'), 'utf8'));
   const bare = (id: string) => id.replace('inquiry.', '');
   for (const { moved_from: _, ...t } of inquiry.types) core.types.push({ ...t, id: bare(t.id) });
-  for (const { moved_from: _, ...r } of inquiry.relations) core.relations.push({ ...r, id: bare(r.id), from: r.from.map(bare), to: r.to.map(bare) });
+  for (const { moved_from: _, ...r } of inquiry.links) core.links.push({ ...r, id: bare(r.id), from: r.from.map(bare), to: r.to.map(bare) });
   writeFileSync(join(before, 'core', 'pack.json'), JSON.stringify(core));
   rmSync(join(before, 'inquiry'), { recursive: true });
   const db = await openDb();

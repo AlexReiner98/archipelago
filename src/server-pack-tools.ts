@@ -12,7 +12,7 @@ export const SERVER_PACK_TOOLS: Record<string, Tool> = {
       if (l.workspace !== 'default' || !actor.admin) throw new Error('Only an admin of the default workspace sees the server packs.');
       const { packs, refused } = loadServerPacks();
       return {
-        packs: packs.map(({ file }) => ({ id: file.id, title: file.title, version: file.version, acts: file.acts ?? [], pages: (file.pages ?? []).map((p) => p.id), entries: (file.entries ?? []).map((e) => e.id), webhooks: (file.webhooks ?? []).map((w) => w.id) })),
+        packs: packs.map(({ file }) => ({ id: file.id, title: file.title, version: file.version, acts: file.reach.server.acts ?? [], pages: (file.reach.server.pages ?? []).map((p) => p.id), entries: (file.reach.server.entries ?? []).map((e) => e.id), webhooks: (file.reach.webhooks ?? []).map((w) => w.id) })),
         refused,
       };
     },

@@ -30,7 +30,7 @@ const TIMEOUT_MS = 20_000;
 const secretKey = (pack: string, name: string) => `pack_secret:${pack}:${name}`;
 
 /** A secret of a server pack: set at run time and sealed in the control plane, else from the environment. */
-export async function serverSecret(control: Q, pack: Pick<ServerPackFile, 'id' | 'secrets'>, name: string): Promise<string | undefined> {
+export async function serverSecret(control: Q, pack: Pick<ServerPackFile, 'id' | 'reach'>, name: string): Promise<string | undefined> {
   const kept = unseal(await controlValue<string>(control, secretKey(pack.id, name)));
   return kept ?? envSecret(pack, name);
 }
@@ -47,7 +47,7 @@ const forget = (pack: string) => {
 };
 
 async function keepSecret(control: Q, pack: ServerPackFile, name: string, value: string): Promise<void> {
-  if (!pack.secrets?.some((s) => s.name === name)) throw new Error(`The ${pack.id} pack declares no secret "${name}"`);
+  if (!pack.reach?.secrets?.some((s) => s.name === name)) throw new Error(`The ${pack.id} pack declares no secret "${name}"`);
   await setControlValue(control, secretKey(pack.id, name), seal(value));
   forget(pack.id);
 }
@@ -96,7 +96,7 @@ async function tradedFor(control: Q, pack: ServerPackFile, host: ServerHost, as:
 
 /** Make one request for a server pack to a host it declares, with the credential the host says, and give back the answer. */
 export async function hostRequest(control: Q, pack: ServerPackFile, r: HostRequest): Promise<{ status: number; body: unknown; kept?: string[] }> {
-  const host = pack.hosts?.find((h) => h.id === r.host);
+  const host = pack.reach?.hosts?.find((h) => h.id === r.host);
   if (!host) throw new Error(`The ${pack.id} pack declares no host "${r.host}"`);
   let authorization: string | undefined;
   if (!r.anonymous) {

@@ -34,14 +34,14 @@ prevented it cheaply, it counts.
 ## How to record one
 
 1. **Find the home.** Bumps live as issues under the Archipelago project's feature
-   for friction. `search` with type `software.feature` and q `friction`. On the
+   for friction. `query` with name `search`, params type `software.feature` and q `friction`. On the
    owner's hosted map its id is in `references/home.md`. If there is none in
    this workspace, create the issue as part of the Archipelago project instead.
 
-2. **Look for it first.** `search` with type `issue`, open only, and two or
+2. **Look for it first.** `query` `search` with type `issue`, open only, and two or
    three words of what happened. The same bump is usually already there.
 
-3. **If it is there, add to it.** `get` it, then `update` its body with one
+3. **If it is there, add to it.** `query` `get` it, then `change` it with an `update` op that appends one
    more dated line under "Seen": what you were doing and what happened. A bump
    seen five times matters more than one seen once, and the lines are how
    anyone can tell. If it was marked resolved and you have just hit it again,

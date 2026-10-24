@@ -22,8 +22,8 @@ test('server packs are loaded from the folders the configuration names; one that
   assert.equal(refused.length, 1);
   assert.match(refused[0].why.join(), /"database.drop" is not a server act/);
   assert.deepEqual(loadServerPacks([join(FIXTURES, 'nowhere')]).refused[0].why, ['there is no such folder']);
-  assert.match(checkServerPack({ id: 'x', version: '1', title: 'X', tier: 'server', pages: [{ id: 'hook', file: 'a.html' }] }, FIXTURES).join(), /"hook" cannot name/);
-  assert.match(checkServerPack({ id: 'x', version: '1', title: 'X' } as never, FIXTURES).join(), /not marked tier "server"/);
+  assert.match(checkServerPack({ id: 'x', version: '1', title: 'X', reach: { server: { pages: [{ id: 'hook', file: 'a.html' }] } } }, FIXTURES).join(), /"hook" cannot name/);
+  assert.match(checkServerPack({ id: 'x', version: '1', title: 'X' } as never, FIXTURES).join(), /asks for no server reach/);
 });
 
 test('a server pack sells a workspace: its page, its entries, a signed webhook, and the buyer signed in by a one-time link', async () => {

@@ -46,7 +46,7 @@ async function itsOwn(at: ActPlaces, pack: string, workspace: unknown) {
 
 /** Do one act for a pack, if it declared it, and log it on the default map. Answers what the act gives back. */
 export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown> = {}, agreements: () => Promise<Agreement[]> = async () => []): Promise<unknown> {
-  if (!(pack.acts ?? []).includes(act as ServerAct)) throw new Error(`The pack "${pack.id}" did not declare the act "${act}".`);
+  if (!(pack.reach.server.acts ?? []).includes(act as ServerAct)) throw new Error(`The pack "${pack.id}" did not declare the act "${act}".`);
   const owner = (await at.get('default')).pelago;
   const log = (reason: string, detail: Record<string, unknown>) => owner.log(owner.db, { actor: `pack:${pack.id}`, action: `server.${act}`, reason, detail });
   switch (act as ServerAct) {

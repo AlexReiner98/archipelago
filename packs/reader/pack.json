@@ -3,15 +3,7 @@
   "version": "0.1.0",
   "title": "Push reader",
   "description": "An agent on the server reads each push to a repository connected through the GitHub App against its open work, and re-checks a repository's oldest open items against its code: on the workspace's model account, held to the one repository, what it changes waiting for the owner unless they asked for it.",
-  "contract": 1,
   "requires": ["core", "software", "github"],
-  "via": [{ "pack": "github_app", "host": "api" }],
-  "hears": [{ "event": "repo.push", "limit_ms": 30000 }],
-  "runs": ["view", "search", "get", "events", "schema", "proposals", "change", "notify", "rechecked"],
-  "schedules": [
-    { "id": "catch_up", "every_minutes": 15, "at_start": true, "limit_ms": 30000 },
-    { "id": "recheck", "every_minutes": 60, "at_start": true, "limit_ms": 30000 }
-  ],
   "actions": [
     {
       "id": "reader.recheck",
@@ -22,11 +14,16 @@
       "item": "repo",
       "admin": true,
       "limit_ms": 30000,
-      "input": {
-        "type": "object",
-        "properties": { "repo": { "type": "string", "description": "A repository's id." } },
-        "required": ["repo"]
-      }
+      "input": { "type": "object", "properties": { "repo": { "type": "string", "description": "A repository's id." } }, "required": ["repo"] }
     }
-  ]
+  ],
+  "handlers": [
+    { "schedule": "catch_up", "every_minutes": 15, "at_start": true, "limit_ms": 30000 },
+    { "schedule": "recheck", "every_minutes": 60, "at_start": true, "limit_ms": 30000 },
+    { "event": "repo.push", "limit_ms": 30000 }
+  ],
+  "reach": {
+    "via": [{ "pack": "github_app", "host": "api" }],
+    "runs": ["view", "search", "get", "events", "schema", "proposals", "change", "notify", "rechecked"]
+  }
 }

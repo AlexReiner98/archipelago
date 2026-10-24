@@ -40,6 +40,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       for (const [key, value] of Object.entries(input)) {
         await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
         await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${key} set to ${JSON.stringify(value)}` });
+        await l.record('settings', actorId(actor), [['+', 'setting', key, value]]);
       }
       return settings(l);
     },
