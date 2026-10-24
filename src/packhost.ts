@@ -5,6 +5,7 @@
 // with ops, which the kernel applies as one change set naming the action, under the workspace's policy.
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { parts } from './manifest.ts';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -180,9 +181,9 @@ export class PackHost {
     await check?.(done);
     const file = l.registry.packs.find((p) => p.id === pack)!;
     // Refused whole, before anything is written: an event of a kind its pack does not declare.
-    for (const e of done.log ?? []) if (!(file.events ?? []).includes(e.action)) throw new Error(`The ${pack} pack declares no event "${e.action}"`);
-    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name }) : undefined;
-    const action = call === 'action' ? file.actions?.find((a) => a.id === name) : undefined;
+    for (const e of done.log ?? []) if (!parts(file).events.includes(e.action)) throw new Error(`The ${pack} pack declares no event "${e.action}"`);
+    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack }) : undefined;
+    const action = call === 'action' ? parts(file).actions.find((a) => a.id === name) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
     const made = (changed as { created?: Record<string, string> } | undefined)?.created ?? {};
     const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));
@@ -200,7 +201,7 @@ export class PackHost {
    */
   private tell(l: Archipelago, from: string, e: NonNullable<Done['log']>[number]): void {
     for (const pack of l.registry.packs) {
-      const hears = pack.id !== from && pack.hears?.find((h) => h.event === e.action);
+      const hears = pack.id !== from && parts(pack).hears.find((h) => h.event === e.action);
       if (!hears) continue;
       const release = holdWorkspace(l.workspace);
       void this.act(l, { kind: 'agent', name: `pack:${pack.id}` }, pack.id, e.action, { event: { ...e, pack: from } }, hears.limit_ms, 'event')
@@ -226,7 +227,7 @@ async function further(l: Archipelago, actor: Actor, file: PackFile, name: strin
   for (const n of done.notify ?? []) await notify(l, actor, n);
   const results = [];
   for (const c of done.changes ?? []) {
-    const result = await l.change(actor, { ops: c.ops, reason: c.reason?.trim() || name, action: name, ...(c.authority && { authority: c.authority }), ...(c.source && { source: c.source }) });
+    const result = await l.change(actor, { ops: c.ops, reason: c.reason?.trim() || name, action: name, pack: file.id, ...(c.authority && { authority: c.authority }), ...(c.source && { source: c.source }) });
     results.push({ status: result.status, ...('changeset' in result && { changeset: result.changeset }), ...('proposal' in result && { proposal: result.proposal }) });
   }
   return results;

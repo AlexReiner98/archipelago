@@ -100,7 +100,8 @@ where, and how that server is run.
 - **Visibility is enforced by the database** (row level security in
   `src/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
-- **Types live in pack files** under `packs/`. Fields the system maintains are
+- **Types live in pack files** under `packs/`, each a manifest of fifteen keys
+  (`docs/packs.md`, read by `src/manifest.ts`). Fields the system maintains are
   marked `"system": true`.
 - **An item is a small head and its fields** (`src/head.ts`). The head is id,
   kind, type, title, body, visibility and its times; everything else is a
@@ -110,7 +111,7 @@ where, and how that server is run.
   indexes, row-level security and the foreign keys). Read an item's kind from
   its row (`kind`). A value over 4000 characters needs a field declared
   `"large": true`, which only a system-kind type may have. What a pack adds to the page of an item of a kind
-  or type is a screen there too (`screens`: pieces the kernel draws, listed in
+  or type is a screen there too (a view of `form: "screen"`: pieces the kernel draws, listed in
   `src/declared.ts`); the item page (`ui/item.js`) names no pack's type.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,

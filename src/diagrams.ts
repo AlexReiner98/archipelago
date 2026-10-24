@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { join, relative } from 'node:path';
 import { moduleDiagram, type SourceFile } from './diagram-modules.ts';
 import { typeDiagram, type PackFile } from './diagram-types.ts';
+import { readManifest } from './manifest.ts';
 import { mxfile, type Page } from './diagram-xml.ts';
 
 /** Every diagram's pages, by the file they are written to, from the sources and pack files given. */
@@ -21,7 +22,7 @@ export function diagrams(files: SourceFile[], packs: PackFile[], link?: (path: s
 /** What is read to draw them: this checkout's sources and pack files. */
 export function readCheckout(root = ROOT): { files: SourceFile[]; packs: PackFile[] } {
   const files = ['src', 'ui', 'packs'].flatMap((d) => walk(join(root, d))).map((f) => ({ path: relative(root, f).split('\\').join('/'), text: readFileSync(f, 'utf8') }));
-  const packs = readdirSync(join(root, 'packs')).filter((p) => existsSync(join(root, 'packs', p, 'pack.json'))).map((p) => JSON.parse(readFileSync(join(root, 'packs', p, 'pack.json'), 'utf8')) as PackFile);
+  const packs = readdirSync(join(root, 'packs')).filter((p) => existsSync(join(root, 'packs', p, 'pack.json'))).map((p) => readManifest(readFileSync(join(root, 'packs', p, 'pack.json'), 'utf8'), `packs/${p}/pack.json`).manifest as PackFile);
   return { files, packs };
 }
 

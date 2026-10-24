@@ -1,1 +1,1 @@
-{ "id": "broken", "version": "0.1.0", "title": "Broken", "tier": "server", "acts": ["database.drop"] }
+{ "id": "broken", "version": "0.1.0", "title": "Broken", "reach": { "server": { "acts": ["database.drop"] } } }

@@ -89,7 +89,7 @@ test('screens are declared in pack files, checked when the pack loads, and liste
 
   const dir = packs();
   const bad = (screens: unknown[]) => {
-    writeFileSync(join(dir, 'demo', 'pack.json'), JSON.stringify({ id: 'demo', version: '1', title: 'D', requires: ['core'], screens }));
+    writeFileSync(join(dir, 'demo', 'pack.json'), JSON.stringify({ id: 'demo', version: '1', title: 'D', requires: ['core'], views: screens.map((v) => ({ form: 'screen', ...(v as object) })) }));
     return () => new Registry(dir);
   };
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['nothing'], pieces: [{ piece: 'gate' }] }]), /is on unknown type "nothing"/);

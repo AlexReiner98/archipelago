@@ -4,12 +4,14 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
-import { checkDeclared, KERNEL_VERBS, screensOf, stylesOf, toolName, type ActionDef, type HearDef, type HostDef, type ScheduleDef, type ViaDef, type ScreenDef, type StyleDef, type DrawingDef, type TreeDef, type VerbDef, type ViewDef, type WebhookDef } from './declared.ts';
+import { checkDeclared, KERNEL_VERBS, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { checkFieldDecls, headOf, SYSTEM, type ColumnField } from './head.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
+import { isServerPack, parts, readManifest, withoutAbsent, type Manifest } from './manifest.ts';
+import { createHash } from 'node:crypto';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
 
@@ -69,29 +71,8 @@ export interface RelationDef {
   description: string; moved_from?: string[]; // Relations whose links are this one's now, moved once no pack defines them.
 }
 
-export interface PackFile {
-  id: string;
-  version: string;
-  title: string;
-  description?: string;
-  requires?: string[];
-  types?: TypeDef[];
-  relations?: RelationDef[];
-  trees?: TreeDef[];
-  /** What tightens writes to the map: holds, refusals, required fields, unique values. */
-  rules?: RuleDef[];
-  /** The kernel's six verbs, declared by the core pack. */
-  verbs?: VerbDef[];
-  /** What agents and people can do and read through it, run by its handler. */
-  actions?: ActionDef[];
-  views?: ViewDef[];
-  /** What it shows on the page of every item of a kind or type: one column of pieces the kernel draws; and how it looks. */
-  screens?: ScreenDef[]; styles?: StyleDef[]; drawings?: DrawingDef[];
-  /** What comes from and goes to the world outside: hosts it may reach, webhooks it receives, what it runs by itself, the kinds of event it records beside its changes (a push heard) and those it is told of, the hosts of server packs it reads through, and the map's tools its runs may offer a model. */
-  hosts?: HostDef[]; webhooks?: WebhookDef[]; schedules?: ScheduleDef[]; events?: string[]; hears?: HearDef[]; via?: ViaDef[]; runs?: string[];
-  /** Extra fields a pack adds to types owned by another pack. */
-  extend?: Record<string, { fields: Record<string, FieldDef> }>;
-}
+/** A pack file as the registry reads it: the manifest (src/manifest.ts). */
+export type PackFile = Manifest;
 
 export interface ResolvedType {
   id: string;
@@ -141,6 +122,12 @@ export class Registry {
   /** Every pack found, active, waiting or off, with why. */
   states = new Map<string, PackState>();
   found: PackFile[] = [];
+  /** Each pack's manifest as it was read: the SHA-256 of its pack.json, which its fact on the log names. */
+  hashes = new Map<string, string>();
+  /** The fields a pack adds to another pack's type, by type and field: the pack that added each (src/reach.ts). */
+  added = new Map<string, Map<string, string>>();
+  /** Warnings said once: a pack file using the keys of the shape before the manifest. */
+  private warned = new Set<string>();
   /** Packs the owner turned off in this workspace. */
   private turnedOff: string[] = [];
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
@@ -159,34 +146,42 @@ export class Registry {
     const folders = readdirSync(this.dir)
       .filter((name) => name !== LOCAL_PACK)
       .map((name) => [name, join(this.dir, name, 'pack.json')]);
+    const hashes = new Map<string, string>();
+    const warnings: string[] = [];
     for (const [name, file] of folders) {
       if (!existsSync(file)) continue;
-      const pack = JSON.parse(readFileSync(file, 'utf8')) as PackFile;
+      const text = readFileSync(file, 'utf8');
+      const { manifest: pack, warnings: said } = readManifest(text, `packs/${name}/pack.json`);
       // A server pack kept beside the workspace packs is the server's (src/server-packs.ts), never a workspace's.
-      if ((pack as { tier?: string }).tier === 'server') continue;
+      if (isServerPack(pack)) continue;
       if (pack.id !== name) throw new Error(`Pack folder "${name}" contains pack id "${pack.id}"`);
       found.set(pack.id, pack);
+      hashes.set(pack.id, createHash('sha256').update(text).digest('hex'));
+      warnings.push(...said);
     }
+    for (const w of warnings) if (!this.warned.has(w)) (this.warned.add(w), console.warn(w));
     if (!found.has('core')) throw new Error(`No core pack in ${this.dir}`);
     if (this.local.length) found.set(LOCAL_PACK, this.localPack()!);
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
-    const { ordered, states } = orderPacks(found, off, LOCAL_PACK);
+    const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
+    // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses).
+    const ordered = loaded.map((pack) => withoutAbsent(pack, (id) => states.get(id)?.state === 'active'));
 
     const raw = new Map<string, TypeDef & { pack: string }>();
     const relations = new Map<string, ResolvedRelation>();
     const declared = new Map<string, RelationDef>();
     const owned = (pack: PackFile, id: string) => pack.id === 'core' || id.startsWith(pack.id + '.');
     for (const pack of ordered) {
-      for (const type of pack.types ?? []) {
+      for (const type of parts(pack).types) {
         if (!owned(pack, type.id)) throw new Error(`Type "${type.id}" in pack "${pack.id}" must be named "${pack.id}.<name>"`);
         if (raw.has(type.id)) throw new Error(`Type "${type.id}" is defined twice`);
         if (type.kind && pack.id !== 'core') throw new Error(`Type "${type.id}": only the core pack declares kinds`);
         raw.set(type.id, { ...type, pack: pack.id });
       }
-      for (const rel of pack.relations ?? []) {
+      for (const rel of parts(pack).relations) {
         if (!owned(pack, rel.id)) throw new Error(`Relation "${rel.id}" in pack "${pack.id}" must be named "${pack.id}.<name>"`);
         if (relations.has(rel.id)) throw new Error(`Relation "${rel.id}" is defined twice`);
         if (rel.root && pack.id !== 'core') throw new Error(`Relation "${rel.id}": only the core pack declares root relations`);
@@ -195,10 +190,12 @@ export class Registry {
       }
     }
     const extra = new Map<string, Record<string, FieldDef>>();
+    const added = new Map<string, Map<string, string>>();
     for (const pack of ordered) {
-      for (const [typeId, ext] of Object.entries(pack.extend ?? {})) {
+      for (const [typeId, ext] of Object.entries(parts(pack).adds)) {
         if (!raw.has(typeId)) throw new Error(`Pack "${pack.id}" extends unknown type "${typeId}"`);
         extra.set(typeId, { ...extra.get(typeId), ...ext.fields });
+        for (const field of Object.keys(ext.fields)) (added.get(typeId) ?? added.set(typeId, new Map()).get(typeId)!).set(field, pack.id);
       }
     }
 
@@ -278,7 +275,7 @@ export class Registry {
 
     const trees = new Map<string, TreeDef & { pack: string }>();
     for (const pack of ordered) {
-      for (const tree of pack.trees ?? []) {
+      for (const tree of parts(pack).trees) {
         if (!owned(pack, tree.id)) throw new Error(`Tree "${tree.id}" in pack "${pack.id}" must be named "${pack.id}.<name>"`);
         for (const kind of [...tree.roots, ...tree.branches, ...tree.work]) {
           if (!types.has(kind)) throw new Error(`Tree "${tree.id}" refers to unknown type "${kind}"`);
@@ -287,19 +284,21 @@ export class Registry {
       }
     }
 
-    const verbs = ordered.flatMap((pack) => pack.verbs ?? []);
+    const verbs = ordered.flatMap((pack) => parts(pack).verbs);
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
       const declared = checkDeclared(pack, types, verbs.map((v) => v.id), pack.id !== LOCAL_PACK && existsSync(join(this.dir, pack.id, 'handler.js')));
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
-      for (const def of pack.actions ?? []) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
+      for (const def of parts(pack).actions) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.
-      for (const def of pack.views ?? []) if (!def.lens) tools.set(toolName(def.id), { pack: pack.id, call: 'view', def });
+      for (const def of parts(pack).views) if (!def.lens) tools.set(toolName(def.id), { pack: pack.id, call: 'view', def });
       const problems = checkRules(pack.rules ?? [], { types });
       if (problems.length) throw new Error(`Pack "${pack.id}": ${problems.join('; ')}`);
     }
 
     this.packs = ordered;
+    this.added = added;
+    this.hashes = hashes;
     this.states = states;
     this.found = [...found.values()];
     this.rules = ordered.flatMap((pack) => (pack.rules ?? []).map((rule) => ({ ...rule, pack: pack.id })));

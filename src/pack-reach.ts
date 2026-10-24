@@ -3,6 +3,7 @@
 // (its runs), made by the kernel. And the hold that keeps a workspace open while what a pack started still runs.
 
 import type { PackFile } from './packs.ts';
+import { parts } from './manifest.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 
 /** How the server reaches its server packs for a workspace: the connection the workspace made, and a read through it. */
@@ -65,7 +66,7 @@ export const NOT_BEYOND = Symbol('not beyond');
 
 /** Answer what a pack asks beyond its map while its call runs: a connection it reads through, and a read through it. */
 export async function answerBeyond(l: Archipelago, pack: PackFile, q: Record<string, unknown>): Promise<unknown> {
-  const declared = (id: unknown, host?: unknown) => (pack.via ?? []).some((v) => v.pack === id && (host === undefined || v.host === host));
+  const declared = (id: unknown, host?: unknown) => parts(pack).via.some((v) => v.pack === id && (host === undefined || v.host === host));
   if (typeof q.connection === 'string') {
     if (!declared(q.connection)) throw new Error(`The ${pack.id} pack declares no way through "${q.connection}".`);
     return reach ? reach.connection(l.workspace, q.connection) : null;
