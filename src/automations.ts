@@ -100,6 +100,7 @@ export class Automations {
     const { rows: top } = await this.l.db.query<{ max: number | null }>(`select max(seq)::int as max from event`);
     const latest = top[0].max ?? 0;
     await this.l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [CURSOR, JSON.stringify(latest)]);
+    if (latest !== cursor) await this.l.record('automations', 'agent:pelago', [['+', 'automations', 'cursor', latest]]);
     // First run: start from now instead of replaying the whole history.
     if (cursor === undefined) return [];
     const { rows } = await this.l.db.query<LoggedEvent>(
