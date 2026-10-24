@@ -210,6 +210,20 @@
       }
     },
     {
+      "id": "software.gate",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "An event as a gate (a release, a launch): what it waits for (everything it depends_on), grouped by stream (the feature or project each is part of) with progress and what the owner owes; what it goes ahead without (what it defers); what is not yet sorted (open tasks, issues and decisions under what it ships, on neither side); and how we know (the proof questions of what it ships and of what holds it, answered or not on the release’s build: its version). Params: event (an item id; without it, the open events that have a gate).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "event": { "type": "string", "description": "The event: an item id. Without it, the open events that have a gate." },
+          "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "id": "software.repo_work",
       "shape": "data",
       "limit_ms": 30000,
@@ -296,6 +310,7 @@
   ],
   "screens": [
     { "id": "software.releases", "title": "Releases", "at": "home", "pieces": [{ "piece": "picture", "lens": { "kinds": ["software.release"], "fold": ["closed", "system"] }, "style": { "shape": "list" } }] },
+    { "id": "software.gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
     { "id": "software.roadmap", "title": "Roadmap", "on": ["work.project"], "pieces": [{ "piece": "tree", "tree": "software.roadmap" }] },
     { "id": "software.proof", "title": "How we know", "on": ["work.project", "software.feature", "software.proof"], "pieces": [{ "piece": "proof" }] },
     { "id": "software.usage", "title": "Tokens used here", "on": ["software.repo"], "pieces": [{ "piece": "usage" }] },

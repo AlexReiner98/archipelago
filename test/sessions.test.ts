@@ -3,7 +3,11 @@ import { test } from 'node:test';
 import { hookSessionEnd, hookSessionStart, sessionEnd, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
+import { askView } from '../src/askview.ts';
 import { human, agent, fresh, attend, make, laneSetup } from './map.ts';
+
+/** A view asked by its name, as the view tool asks it. */
+const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 test('a session registers, takes the lane its task needs, and gives it back when it ends', async () => {
   const l = await fresh();
@@ -58,7 +62,7 @@ test('a project’s open questions are what needs the owner in it, and its next 
   const asked = await attend(l, { reasons: ['unsettled'], within: made.p });
   assert.deepEqual(asked.items.map((q: any) => [q.title, q.reasons[0].by, q.top.title]), [['Which licence?', 'word', 'Shadows']]);
   assert.deepEqual((await attend(l, { reasons: ['unsettled'], within: made.quiet })).items, []);
-  const gate = (await VIEWS.gate.run(l, { event: made.r })) as any;
+  const gate = (await ask(l, 'gate', { event: made.r })) as any;
   const items = gate.streams.flatMap((s: any) => s.items);
   assert.deepEqual([items.filter((i: any) => i.done).length, items.length, items.filter((i: any) => i.blocked).map((i: any) => i.title)], [1, 2, ['Write the installer']]);
 });
@@ -83,7 +87,7 @@ test('a session tells the story of its work, beat by beat, and can take a beat b
   const told = (await VIEWS.story.run(l, { run })) as any;
   assert.deepEqual(told.beats.map((b: any) => [b.n, b.replaced_by ?? null]), [[1, null], [2, 3], [3, null]]);
   // The picture of it is a lens started from the story, the same answer every style draws.
-  const drawn = (await VIEWS.lens.run(l, { story: 's-story' })) as any;
+  const drawn = (await ask(l, 'lens', { story: 's-story' })) as any;
   assert.deepEqual(drawn.items.map((i: any) => i.title), ['Labels clip', 'Fix the halo'], 'what only a beat taken back was about drops out; the rest in the order told');
   assert.deepEqual(drawn.items.map((i: any) => i.told), [[1], [1]]);
   assert.deepEqual(drawn.links.map((k: any) => [k.kind, k.says ?? null]), [['said', 'is why']], 'the map’s own link between the two is said by the session’s words');
@@ -97,9 +101,9 @@ test('a session tells the story of its work, beat by beat, and can take a beat b
   const found = await tell(l, agent, { run, said: `The halo waits on ${made.b} only; fix that and ${made.a} can go.`, about: [made.a, made.b], finding: true });
   await tell(l, agent, { run, said: 'A later note on the side.', about: [made.c] });
   assert.equal(((await VIEWS.story.run(l, { run })) as any).finding, found.beat, 'a later beat is history under the finding');
-  const alone = (await VIEWS.lens.run(l, { story: run, beat: found.beat })) as any;
+  const alone = (await ask(l, 'lens', { story: run, beat: found.beat })) as any;
   assert.deepEqual(alone.items.map((i: any) => i.title).sort(), ['Fix the halo', 'Labels clip']);
-  await assert.rejects(VIEWS.lens.run(l, { story: run, beat: 2 }), /No beat 2 stands/);
+  await assert.rejects(ask(l, 'lens', { story: run, beat: 2 }), /No beat 2 stands/);
 
   await assert.rejects(tell(l, agent, { run, said: 'x'.repeat(281) }), /280 characters/);
   await assert.rejects(tell(l, agent, { run, said: 'About nothing real', about: ['e_nothere1'] }), /No item "e_nothere1"/);
@@ -125,14 +129,14 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
   const holder = await sessionStart(l, agent, { title: 'Other session' });
   await l.claim(agent, { resource: made.lane, holder: holder.run, reason: 'busy' });
 
-  const brief = (await VIEWS.brief.run(l, { task: made.live })) as any;
+  const brief = (await ask(l, 'brief', { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Apex');
   assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
   assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['work.governed_by', 'One live lane.']]);
   for (const part of ['# Capture probe', 'Part of: Apex', 'held by Other session', 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
-  const gated = (await VIEWS.brief.run(l, { task: made.gated })) as any;
+  const gated = (await ask(l, 'brief', { task: made.gated })) as any;
   assert.deepEqual(gated.root_blockers.map((b: any) => b.title), ['Which target?']);
 });
 

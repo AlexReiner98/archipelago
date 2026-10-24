@@ -25,9 +25,8 @@ import { undo } from './undo.ts'; import { importAudit } from './audit.ts';
 import { withScreens } from './screens.ts'; import { withStyles } from './styles.ts'; import { schemaBrief, schemaOf } from './schema-brief.ts';
 import { getPicture, putPicture } from './pictures.ts';
 import { pictureOf, readLens, shownIn } from './lens.ts';
-import { askView, viewList } from './askview.ts';
+import { askView, viewList, viewsSaid } from './askview.ts';
 import { toConfirm } from './confirm.ts';
-import { VIEWS } from './views.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
 import { type Focus, listening, point as setFocus, presence, tellStamp, took } from './presence.ts'; import { touched } from './touched.ts';
 
@@ -333,11 +332,7 @@ export const TOOLS: Record<string, Tool> = {
     },
   },
   view: {
-    description:
-      'Answer one of the standing questions. Call with no name to list them. An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ' +
-      Object.entries(VIEWS)
-        .map(([name, v]) => `${name}: ${v.description}`)
-        .join(' ') + ' The packs here add their own (the repository views handoff, repo_work, recheck and agent_usage are the software pack\u2019s): call with no name for all of them.',
+    description: viewsSaid(),
     input: {
       name: z.string().optional(),
       params: props.optional(),
@@ -880,7 +875,11 @@ export const TOOLS: Record<string, Tool> = {
 };
 
 /** Every tool offered in a workspace: the kernel's, then those its packs declare (a kernel tool's name wins). */
-export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(TOOLS), ...packTools(reg).filter(([t]) => !TOOLS[t])];
+/** The view tool as a registry offers it: described with the lenses its core pack declares, then the kernel's own views. */
+const viewTools = new WeakMap<Registry, Tool>();
+const viewTool = (reg: Registry): Tool => viewTools.get(reg) ?? (viewTools.set(reg, { ...TOOLS.view, description: viewsSaid(reg) }), viewTools.get(reg)!);
+
+export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(TOOLS).map(([name, tool]): [string, Tool] => [name, name === 'view' ? viewTool(reg) : tool]), ...packTools(reg).filter(([t]) => !TOOLS[t])];
 
 /** Validate input and run a tool. */
 export async function callTool(l: Archipelago, actor: Actor, given: string, input: unknown): Promise<unknown> {

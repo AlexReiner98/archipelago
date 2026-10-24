@@ -7,6 +7,7 @@ import { livesIn, livesInFor, SCOPE } from './places.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { blockGraph } from './blocking.ts';
 import { askPackView, VIEWS } from './views.ts';
+import { lensRead } from './lens-scan.ts';
 
 /** The most items one read gives back. */
 const READ_LIMIT = 500;
@@ -29,6 +30,10 @@ export type Read = {
   open?: boolean;
   /** With scope: only what is part of it, not what is about it or lives in it. */
   parts?: boolean;
+  /** Everything part of any of these items, and the items themselves, in one read. */
+  parts_of?: string[];
+  /** What a lens from an item reads (src/lens-scan.ts), in one read: the items around it and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
+  lens?: { from: string; over?: string[]; above?: boolean };
   /** Which of these items have a picture kept for them. */
   pictures?: string[];
   /** Events of a kind, about one item, since a moment, newest first. */
@@ -37,8 +42,10 @@ export type Read = {
   blocked?: string[];
   view?: string;
   params?: Record<string, unknown>;
-  /** What a type is: its statuses, and whether a person settles it (a question), so a handler need not know it. */
+  /** What a type is: its statuses, whether a person settles it (a question) and how, and whether it is estimated, so a handler need not know it. */
   type_info?: string;
+  /** Who the answer is for: the person asking, else the workspace's owner. */
+  me?: boolean;
   /** Whether a change with this op is waiting for a person already. */
   proposed?: Record<string, unknown>;
   /** Only these of each item's props, and no note. */
@@ -96,6 +103,24 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     );
     return rows.map(typed);
   }
+  if (q.parts_of !== undefined) {
+    if (!Array.isArray(q.parts_of) || q.parts_of.some((id) => typeof id !== 'string')) throw new Error('parts_of is a list of item ids');
+    const { rows } = await l.db.query<Entity>(
+      `with recursive scope(id) as (select unnest($1::text[]) union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null)
+       select ${cols('e')} from entity e join scope s on s.id = e.id where e.archived_at is null order by e.updated_at desc`,
+      [q.parts_of],
+    );
+    return rows.map(typed);
+  }
+  if (q.lens !== undefined) {
+    const read = await lensRead(l, { from: String(q.lens.from) }, { over: q.lens.over ?? 'all', fold: [] }, { above: Boolean(q.lens.above), made: true });
+    // What a link is: its kind and those it extends, as an item says what it is.
+    const lineage = (type: string): string[] => [type, ...(l.registry.relations.get(type)?.extends ? lineage(l.registry.relations.get(type)!.extends!) : [])];
+    return {
+      items: read.entities.map(({ body: _body, ...e }) => typed({ ...e, ...(!open && { owner: null }) })),
+      links: read.relations.map((r) => ({ ...(open && { id: r.id }), type: r.type, from: r.from_id, to: r.to_id, is: lineage(r.type) })),
+    };
+  }
   if (q.events) {
     const { action, target, since, limit } = q.events;
     const { rows } = await l.db.query(
@@ -111,23 +136,25 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
   if (q.blocked) {
     const graph = await blockGraph(l);
     const roots = [...new Set(q.blocked.flatMap((id) => graph.roots(id)))];
-    const { rows } = roots.length ? await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[])`, [roots]) : { rows: [] };
-    const titles = new Map(rows.map((r) => [r.id, r.title]));
-    return Object.fromEntries(q.blocked.map((id) => [id, { blocked: graph.isBlocked(id), waits_on_someone: graph.waitsOnSomeone(id), roots: graph.roots(id).map((r) => ({ id: r, title: titles.get(r) })) }]));
+    const { rows } = roots.length ? await l.db.query<{ id: string; type: string; title: string; status: string }>(`select id, type, title, status from entity where id = any($1::text[])`, [roots]) : { rows: [] };
+    const found = new Map(rows.map((r) => [r.id, r]));
+    const root = (r: string) => ({ id: r, title: found.get(r)?.title, type: found.get(r)?.type, status: found.get(r)?.status });
+    return Object.fromEntries(q.blocked.map((id) => [id, { blocked: graph.isBlocked(id), waits_on_someone: graph.waitsOnSomeone(id), roots: graph.roots(id).map(root) }]));
   }
   if (q.view !== undefined) {
-    // A pack's view by its short name too (repo_work), answered by its pack.
+    // A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work).
     const view = VIEWS[q.view];
     return view ? view.run(l, q.params ?? {}) : askPackView(l, q.view, q.params ?? {});
   }
   if (q.type_info !== undefined) {
     const t = l.registry.type(q.type_info);
     // lives_in: the link that puts an item in a place of this type.
-    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id), lives_in: livesInFor(l, t.id) } : null;
+    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id), settled_by: t.capabilities.settles?.by ?? null, estimated: Boolean(t.fields.tokens_estimated), lives_in: livesInFor(l, t.id) } : null;
   }
+  if (q.me) return l.viewer || (await l.setting<string>('me')) || null;
   if (q.proposed !== undefined) {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, events, pictures, blocked, view, type_info, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, lens, events, pictures, blocked, view, type_info, me, proposed.');
 }

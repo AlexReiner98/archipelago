@@ -27,7 +27,7 @@ function ctxOver(items: Item[], links: Link[], pictures: string[] = []) {
     read: async (q: Record<string, any>) => {
       if (q.get) return byId.get(q.get) ?? null;
       if (q.items) return [...byId.values()].filter((e) => e.is.includes(q.items.type));
-      if (q.scope && q.parts) return partsUnder(q.scope).map((id) => byId.get(id));
+      if (q.parts_of) return [...new Set(q.parts_of.flatMap(partsUnder))].map((id) => byId.get(id as string));
       if (q.related) {
         const back = q.direction === 'in';
         return links.filter(([t, from, to]) => fits(t, q.relation) && (back ? to : from) === q.related).map(([, from, to]) => byId.get(back ? from : to));

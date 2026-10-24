@@ -265,6 +265,20 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 There are more (`hubs`, `proof`, `changelog`, `recheck`, `agent_usage`,
 `notifications`, `graph`).
 
+Every view of the work is a lens. A pack declares its views in its pack file
+(`views`): one with `lens` is a lens preset, answered by the one lens query
+(`src/lens-presets.ts`) and read back into the form that view has always
+had; any other is answered by the pack's own code. The core pack's are
+presets: `lens`, `attention`, `brief`, `graph`, `tree` and `hubs`. `gate` is
+the software pack's, and reads around its event through the same lens query
+(the pack read `lens`). A lens of the whole map reads the whole map; a lens
+that starts from an item reads only what is around it (`src/lens-scan.ts`),
+so what it costs follows what it answers. What the kernel still answers
+itself reads what keeps the map running, not the work (`sessions`,
+`notifications`, `spent`, `story`, `changed_since`, `style`, `saved_views`),
+and `src/operational.ts` names each; `npm test` refuses any other. Every view
+is asked by its short name, wherever it lives.
+
 Blockers are never stored. They are derived each time from `depends_on`,
 `waits_on` and `needs` links, so they cannot go stale. `depends_on` is
 other work that has to be closed first; `waits_on` is a person, company or

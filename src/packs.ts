@@ -293,7 +293,8 @@ export class Registry {
       const declared = checkDeclared(pack, types, verbs.map((v) => v.id), pack.id !== LOCAL_PACK && existsSync(join(this.dir, pack.id, 'handler.js')));
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
       for (const def of pack.actions ?? []) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
-      for (const def of pack.views ?? []) tools.set(toolName(def.id), { pack: pack.id, call: 'view', def });
+      // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.
+      for (const def of pack.views ?? []) if (!def.lens) tools.set(toolName(def.id), { pack: pack.id, call: 'view', def });
       const problems = checkRules(pack.rules ?? [], { types });
       if (problems.length) throw new Error(`Pack "${pack.id}": ${problems.join('; ')}`);
     }

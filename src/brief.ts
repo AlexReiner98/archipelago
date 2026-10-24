@@ -1,8 +1,10 @@
 // The brief: everything a session needs to start on one task, as data and as text to paste. What it is part of,
-// its repository, what blocks it, what it needs and who holds that, and what it rests on beyond structure.
+// its repository, what blocks it, what it needs and who holds that, and what it rests on beyond structure. Answered
+// from what the brief's lens read around the task (src/lens-presets.ts): the task, what holds it, and what they link to.
 
 import { commitRule } from './commit-rule.ts';
 import { blockGraph } from './blocking.ts';
+import type { Row } from './lens-scan.ts';
 import { whereOf } from './places.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 
@@ -15,66 +17,69 @@ interface Brief {
   due: string | null;
 }
 
-async function briefs(l: Archipelago, ids: Iterable<string>): Promise<Map<string, Brief>> {
-  const list = [...new Set(ids)];
-  if (!list.length) return new Map();
-  const { rows } = await l.db.query<Brief>(
-    `select id, type, title, status, owner, props->>'due' as due from entity where id = any($1::text[])`,
-    [list],
-  );
-  return new Map(rows.map((r) => [r.id, r]));
+/** What the brief's lens read: the items around the task, the task's note, and the links among them. */
+export interface BriefRead {
+  entities: Row[];
+  relations: { type: string; from_id: string; to_id: string }[];
 }
 
-/** Everything a session needs to start on a task, as data and as text to paste. */
-export async function brief(l: Archipelago, input: { task?: string }) {
-  if (!input.task) throw new Error('brief needs "task": the id of the entity to work on');
-  const task = await l.entity(input.task);
-  if (!task) throw new Error(`No item "${input.task}"`);
+/** How far up what holds a task the brief reads: what it is part of, outwards. */
+export const BRIEF_UP = 6;
 
-  // The task, then what it is part of, outwards.
-  const chain: Entity[] = [task];
-  for (let at = task.id, depth = 0; depth < 6; depth++) {
-    const { rows } = await l.db.query<Entity>(
-      `select e.* from relation r join entity e on e.id = r.to_id where r.type = 'part_of' and r.from_id = $1 and r.valid_to is null limit 1`,
-      [at],
-    );
-    if (!rows[0] || chain.some((c) => c.id === rows[0].id)) break;
-    chain.push(rows[0]);
-    at = rows[0].id;
+const due = (e: Row) => (e.props.due == null ? null : String(e.props.due));
+
+/** Everything a session needs to start on a task, as data and as text to paste, from what its lens read. */
+export async function brief(l: Archipelago, input: { task?: string }, read: BriefRead) {
+  if (!input.task) throw new Error('brief needs "task": the id of the entity to work on');
+  const byId = new Map(read.entities.map((e) => [e.id, e]));
+  const task = byId.get(input.task);
+  if (!task) throw new Error(`No item "${input.task}"`);
+  const out = (types: string[], from: string[]) => read.relations.filter((r) => types.includes(r.type) && from.includes(r.from_id) && byId.has(r.to_id));
+  // What items link to by a kind of link, flavours included, each once and in the order of their ids.
+  const related = (root: string, from: string[]) => [...new Set(out(l.registry.relationFamily(root), from).map((r) => r.to_id))].sort().map((id) => byId.get(id)!);
+
+  // The task, then what it is part of, outwards: of two, the one that is itself part of something.
+  const chain: Row[] = [task];
+  for (let at = task.id; chain.length <= BRIEF_UP; ) {
+    const ups = out(['part_of'], [at]).map((r) => byId.get(r.to_id)!).filter((e) => !chain.includes(e));
+    const next = ups.find((e) => out(['part_of'], [e.id]).length) ?? ups[0];
+    if (!next) break;
+    chain.push(next);
+    at = next.id;
   }
   const ids = chain.map((c) => c.id);
-  const related = async (type: string, from: string[]) =>
-    (
-      await l.db.query<Entity>(
-        `select distinct e.* from relation r join entity e on e.id = r.to_id where r.type = any($1::text[]) and r.from_id = any($2::text[]) and r.valid_to is null and e.archived_at is null`,
-        [l.registry.relationFamily(type), from],
-      )
-    ).rows;
 
   // Its repository: a place it or what holds it lives in that is known by an address or a folder.
-  const [repo] = (await related('lives_in', ids)).filter((p) => whereOf(l, p));
-  const needs = await related('needs', [task.id]);
+  const [repo] = related('lives_in', ids).filter((p) => whereOf(l, p as unknown as Entity));
+  const needs = related('needs', [task.id]);
   // What the task rests on beyond structure (a rule that governs it, an issue it addresses, a question it assumes), by
   // the kind of link. From what holds it or what it needs, only questions and records: the rules and the decisions.
-  const { rows: tied } = await l.db.query<Entity & { rel: string; near: boolean }>(
-    `select distinct on (r.type, e.id) r.type as rel, r.from_id = $1 as near, e.* from relation r join entity e on e.id = r.to_id
-     where r.from_id = any($2::text[]) and r.valid_to is null and e.archived_at is null and r.type = any($3::text[]) order by r.type, e.id, near desc`,
-    [task.id, [...ids, ...needs.map((n) => n.id)], l.registry.relationFamily('relates_to', 'about', 'bears_on').filter((t) => t !== 'produced')],
-  );
-  const ties = tied.filter((t) => t.near || ['question', 'record'].some((k) => l.registry.isA(t.type, k)));
-  const graph = await blockGraph(l);
+  const kinds = l.registry.relationFamily('relates_to', 'about', 'bears_on').filter((t) => t !== 'produced');
+  const tiedBy = new Map<string, { rel: string; near: boolean; e: Row }>();
+  for (const r of out(kinds, [...ids, ...needs.map((n) => n.id)])) {
+    const key = `${r.type} ${r.to_id}`;
+    const near = r.from_id === task.id;
+    if (!tiedBy.has(key) || near) tiedBy.set(key, { rel: r.type, near, e: byId.get(r.to_id)! });
+  }
+  const ties = [...tiedBy.values()].sort((a, b) => a.rel.localeCompare(b.rel) || a.e.id.localeCompare(b.e.id)).filter((t) => t.near || ['question', 'record'].some((k) => l.registry.isA(t.e.type, k)));
+  // A tie with no outcome says what it is in its note: read for those alone.
+  const bare = ties.filter((t) => !t.e.props.outcome).map((t) => t.e.id);
+  const notes = new Map(bare.length ? (await l.db.query<{ id: string; body: string }>(`select id, body from entity where id = any($1::text[])`, [bare])).rows.map((r) => [r.id, r.body]) : []);
+  const graph = await blockGraph(l, [task.id]);
   const roots = graph.roots(task.id);
-  const names = await briefs(l, [...(graph.direct.get(task.id) ?? []).map((e) => e.y), ...roots]);
+  const asBrief = (e: Row): Brief => ({ id: e.id, type: e.type, title: e.title, status: e.status, owner: e.owner, due: due(e) });
+  const names = new Map([...(graph.direct.get(task.id) ?? []).map((e) => e.y), ...roots].flatMap((id) => (byId.has(id) ? [[id, asBrief(byId.get(id)!)] as const] : [])));
+  const unread = roots.filter((id) => !names.has(id));
+  if (unread.length) for (const r of (await l.db.query<Brief>(`select id, type, title, status, owner, props->>'due' as due from entity where id = any($1::text[])`, [unread])).rows) names.set(r.id, r);
   const blockedBy = (graph.direct.get(task.id) ?? []).map((e) => ({ why: e.why, entity: names.get(e.y) }));
-  const { rows: held } = await l.db.query<{ to_id: string; title: string }>(
-    `select h.to_id, h.holder_title as title from ${ACTIVE_HOLDS} h where h.to_id = any($1::text[])`,
-    [needs.map((n) => n.id)],
-  );
+  const { rows: held } = needs.length
+    ? await l.db.query<{ to_id: string; title: string }>(`select h.to_id, h.holder_title as title from ${ACTIVE_HOLDS} h where h.to_id = any($1::text[])`, [needs.map((n) => n.id)])
+    : { rows: [] };
 
   const lines = [`# ${task.title}`, `${l.registry.type(task.type)?.title ?? task.type}, ${task.status}. Archipelago id: ${task.id}`];
   if (task.body) lines.push('', task.body);
   if (chain.length > 1) lines.push('', `Part of: ${chain.slice(1).map((c) => c.title).join(' > ')}`);
-  const at = repo && whereOf(l, repo);
+  const at = repo && whereOf(l, repo as unknown as Entity);
   if (repo) lines.push(`Repository: ${repo.title} (${at?.folder ?? at?.address ?? 'no path recorded'})`);
   if (roots.length) {
     lines.push('', '## Blocked', 'This cannot finish until:');
@@ -90,11 +95,11 @@ export async function brief(l: Archipelago, input: { task?: string }) {
   for (const rel of new Set(ties.map((t) => t.rel))) {
     const title = l.registry.relations.get(rel)?.title ?? rel;
     lines.push('', `## ${title[0].toUpperCase()}${title.slice(1)}`);
-    for (const r of ties.filter((t) => t.rel === rel)) lines.push(`- ${r.title} (${r.status})${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && r.body ? `: ${r.body}` : ''}`);
+    for (const { e: r } of ties.filter((t) => t.rel === rel)) lines.push(`- ${r.title} (${r.status})${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && notes.get(r.id) ? `: ${notes.get(r.id)}` : ''}`);
   }
   lines.push('', '## Reporting', `Register with pelago (session_start, task ${task.id}, with your git branch), note anything worth knowing with session_update, and call session_end with a summary when done. ${commitRule(task.id)}`);
 
-  const slim = (e: Entity) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
+  const slim = (e: Row) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
   return {
     task: slim(task),
     part_of: chain.slice(1).map(slim),
@@ -102,7 +107,7 @@ export async function brief(l: Archipelago, input: { task?: string }) {
     blocked_by: blockedBy,
     root_blockers: roots.map((id) => names.get(id)),
     needs: needs.map((n) => ({ ...slim(n), exclusive: l.registry.capacity(n) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
-    ties: ties.map((t) => ({ relation: t.rel, ...slim(t) })),
+    ties: ties.map(({ rel, e }) => ({ relation: rel, ...slim(e) })),
     text: lines.join('\n'),
   };
 }

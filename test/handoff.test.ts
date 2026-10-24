@@ -9,8 +9,11 @@ import { Archipelago } from '../src/pelago.ts';
 import { configureSecrets, isSealed, seal, unseal } from '../src/secrets.ts';
 import { hookSessionEnd, hookSessionStart, recordUsage, sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
-import { VIEWS } from '../src/views.ts';
+import { askView } from '../src/askview.ts';
 import { human, agent, fresh, make, laneSetup } from './map.ts';
+
+/** A view asked by its name, as the view tool asks it. */
+const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 test('a handoff is read off the map: the note an agent wrote, and what has happened since it was written', async () => {
   const l = await fresh();
@@ -286,26 +289,26 @@ test('tokens: an estimate is asked for, what a session uses goes to its work, an
   assert.deepEqual([(await props(run)).tokens_used, (await props(made.a)).tokens_used, (await props(made.b)).tokens_used], [50_000, 20_000, 20_000]);
   assert.deepEqual((await l.entity(made.b))!.updated_at, before, 'measuring does not make the work look newly confirmed');
 
-  const nodes = new Map(((await VIEWS.graph.run(l, { focus: made.p, depth: 1, relations: 'all', include_closed: true })) as any).nodes.map((n: any) => [n.title, n]));
+  const nodes = new Map(((await ask(l, 'graph', { focus: made.p, depth: 1, relations: 'all', include_closed: true })) as any).nodes.map((n: any) => [n.title, n]));
   const of = (title: string) => nodes.get(title) as any;
   assert.deepEqual(of('Proj').tokens, { estimated: 80_000, used: 40_000, partial: true }, 'a project is what is part of it, in sight or not');
   assert.deepEqual([of('Feature').tokens, of('Feature').estimated], [{ estimated: 80_000, used: 40_000, partial: true }, true], 'a feature is the sum of its tasks, and says when some of them have no estimate');
   assert.deepEqual([of('A note').work, of('A note').tokens], [undefined, undefined], 'what is not work has no tokens');
   // A task linked to its feature and to the project as well is counted once, and a note that is part of a feature is not work.
   await make(l, [{ op: 'link', type: 'part_of', from: made.a, to: made.p }, { op: 'link', type: 'part_of', from: made.n, to: made.f }]);
-  const once = ((await VIEWS.graph.run(l, { focus: made.p, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
+  const once = ((await ask(l, 'graph', { focus: made.p, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
   assert.deepEqual(once.find((n: any) => n.id === made.p).tokens, { estimated: 80_000, used: 40_000, partial: true });
   // What is finished counts as used: by its estimate when no session was measured on it, and its feature and project with it.
   const { c } = await make(l, [{ op: 'create', ref: 'c', type: 'work.task', title: 'Task C', status: 'done', props: { tokens_estimated: 30_000 } }, { op: 'link', type: 'part_of', from: 'c', to: made.f }]);
-  const again = ((await VIEWS.graph.run(l, { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
+  const again = ((await ask(l, 'graph', { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
   assert.deepEqual(again.find((n: any) => n.id === c).tokens, { estimated: 30_000, used: 30_000, assumed: true });
   assert.deepEqual(again.find((n: any) => n.id === made.f).tokens, { estimated: 110_000, used: 70_000, assumed: true, partial: true });
   // Its own estimate stands only while none of its tasks has one.
   const { g } = await make(l, [{ op: 'create', ref: 'g', type: 'software.feature', title: 'Bare', props: { tokens_estimated: 50_000 } }, { op: 'create', ref: 'x', type: 'work.task', title: 'Unsized' }, { op: 'link', type: 'part_of', from: 'x', to: 'g' }]);
-  assert.deepEqual(((await VIEWS.graph.run(l, { focus: g, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === g).tokens, { estimated: 50_000, used: 0 });
+  assert.deepEqual(((await ask(l, 'graph', { focus: g, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === g).tokens, { estimated: 50_000, used: 0 });
   await make(l, [{ op: 'archive', id: c }]);
   await make(l, [{ op: 'update', id: made.b, props: { tokens_estimated: 70_000 } }]);
-  assert.equal(((await VIEWS.graph.run(l, { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === made.f).tokens.estimated, 150_000);
+  assert.equal(((await ask(l, 'graph', { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === made.f).tokens.estimated, 150_000);
 });
 
 test('a run in GitHub Actions reports what it used, once, and the repository adds it up by where agents ran', async () => {

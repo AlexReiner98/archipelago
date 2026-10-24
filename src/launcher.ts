@@ -11,7 +11,7 @@ import { createInterface } from 'node:readline';
 import { createToken, revokeToken } from './auth.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
-import { VIEWS } from './views.ts';
+import { askView } from './askview.ts';
 
 /**
  * Who started a run, when it was not the owner: another person, an automation, or a delivery from outside (a push).
@@ -61,7 +61,7 @@ export async function launch(l: Archipelago, actor: Actor, input: { task: string
   const started = by ?? (owner && actor.person && actor.person !== owner ? { kind: 'person' as const, id: actor.person, name: actor.name } : undefined);
   if (!config) throw new Error('Launching is off on this server. It starts Claude Code in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
   const mode = input.mode ?? 'plan';
-  const brief = (await VIEWS.brief.run(l, { task: input.task })) as {
+  const brief = (await askView(l, actor, 'brief', { task: input.task })) as {
     task: { id: string; title: string };
     repo?: { title: string; path?: string };
     text: string;

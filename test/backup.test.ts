@@ -10,9 +10,12 @@ import { openDb } from '../src/db.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { sessionEnd, sessionStart } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
-import { VIEWS } from '../src/views.ts';
+import { askView } from '../src/askview.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import { human, agent, fresh, make } from './map.ts';
+
+/** A view asked by its name, as the view tool asks it. */
+const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 test('a backup merges into a map that has moved on: nothing is lost, the later edit wins, and twice is the same as once', async () => {
   const a = await fresh();
@@ -203,7 +206,7 @@ test('an event is a gate: what holds it by stream, what can follow, and what is 
     streams: { id: string | null; title: string | null; yours: number; progress: { done: number; total: number }; items: { id: string; yours: boolean; done: boolean; relation?: string }[] }[];
     can_follow: { id: string; relation: string }[];
   };
-  const gate = (await VIEWS.gate.run(l, { event: made.release })) as Gate;
+  const gate = (await ask(l, 'gate', { event: made.release })) as Gate;
   assert.deepEqual(gate.counts, { holding: 4, open: 3, yours: 3, to_sort: 2, can_follow: 1 });
   assert.equal(gate.clear, false);
   // Not sorted: open work under what ships that is on neither side. What is held, deferred or outside what ships is not asked about.
@@ -224,13 +227,13 @@ test('an event is a gate: what holds it by stream, what can follow, and what is 
     { op: 'link', type: 'depends_on', from: made.release, to: made.guide },
     { op: 'link', type: 'defers', from: made.release, to: made.extras },
   ]);
-  const sorted = (await VIEWS.gate.run(l, { event: made.release })) as Gate;
+  const sorted = (await ask(l, 'gate', { event: made.release })) as Gate;
   assert.equal(sorted.counts.to_sort, 0);
   assert.equal(sorted.streams.find((s) => s.id === made.docs)!.items[0].id, made.guide);
 
-  await assert.rejects(VIEWS.gate.run(l, { event: made.app }), /needs an event/);
+  await assert.rejects(ask(l, 'gate', { event: made.app }), /needs an event/);
   await assert.rejects(l.change(human, { ops: [{ op: 'link', type: 'defers', from: made.app, to: made.hover }], reason: 'test' }), /must start from occurrence/);
-  const listed = (await VIEWS.gate.run(l, {})) as { events: { id: string }[] };
+  const listed = (await ask(l, 'gate', {})) as { events: { id: string }[] };
   assert.deepEqual(listed.events.map((e) => e.id), [made.release]);
 });
 

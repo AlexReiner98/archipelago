@@ -5,7 +5,7 @@
 // under way (a session on it), what is ready to take up, and what an agent settled that the owner has not confirmed.
 
 import { pastBounds } from './bounds.ts';
-import { blockGraph, heldResources } from './blocking.ts';
+import { blockGraph, heldResources, type BlockGraph } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
 import type { Archipelago } from './pelago.ts';
 import { SYSTEM } from './head.ts';
@@ -45,14 +45,29 @@ export interface Input {
   limit?: number;
 }
 
-/** What needs a person now, by the reasons only they act on: it waits on them, it is theirs to confirm, it is due, or it is theirs to settle. */
-export async function needsOf(l: Archipelago, person: string | null): Promise<Set<string>> {
+/**
+ * What a lens read, handed to attention as its state stage (src/lens-scan.ts): the items, with their fields, and the
+ * links among them. Attention then reads no items or links of its own: what it answers is the state of what was read.
+ */
+export interface Read {
+  entities: { id: string; type: string; kind: string | null; title: string; status: string; owner: string | null; is_open: boolean; props: Record<string, unknown>; updated_at: Date }[];
+  /** Those that say what waits on what as the map keeps them, the rest by id. */
+  relations: { type: string; from_id: string; to_id: string; for: string | null }[];
+  /** Whether it is the whole map: else, what blocks what is read for what it holds only. */
+  whole: boolean;
+  /** What blocks what, when the lens has read it already. */
+  graph?: BlockGraph;
+}
+
+/** What needs a person now, by the reasons only they act on: it waits on them, it is theirs to confirm, it is due, or it is theirs to settle. Of what a lens read, when it is given. */
+export async function needsOf(l: Archipelago, person: string | null, read?: Read): Promise<Set<string>> {
   if (!person) return new Set();
-  const { items } = await attention(l, { person, reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 100_000 });
+  const { items } = await attention(l, { person, reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 100_000 }, read);
   return new Set(items.map((i) => i.id));
 }
 
-export async function attention(l: Archipelago, input: Input) {
+/** What deserves attention, and why: the state of what a lens read, or of the whole map. */
+export async function attention(l: Archipelago, input: Input, read?: Read) {
   const wanted = new Set<Reason>(input.reasons?.length ? input.reasons : REASONS);
   for (const r of wanted) if (!REASONS.includes(r)) throw new Error(`"${r}" is not a reason: one of ${REASONS.join(', ')}`);
   const owner = (await l.setting<string>('me')) || null;
@@ -61,7 +76,9 @@ export async function attention(l: Archipelago, input: Input) {
   const scope = input.within ? await scopeOf(l, input.within) : null;
   const staleDays = input.stale_days ?? STALE_DAYS;
 
-  const { rows } = await l.db.query<Row>(`select id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at from entity where archived_at is null and is_open`);
+  const rows: Row[] = read
+    ? read.entities.filter((e) => e.is_open).map(({ id, type, kind, title, status, owner, is_open, props, updated_at }) => ({ id, type, kind, title, status, owner, is_open, due: typeof props.due === 'string' ? props.due : props.due == null ? null : String(props.due), updated_at }))
+    : (await l.db.query<Row>(`select id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at from entity where archived_at is null and is_open`)).rows;
   const reg = l.registry;
   // Only what is work or a question to someone: not people, places, records of the past, or the system's own.
   const live = new Map(rows.filter((e) => e.kind !== SYSTEM && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
@@ -77,15 +94,15 @@ export async function attention(l: Archipelago, input: Input) {
   const titles = async (ids: string[]) => new Map((await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[])`, [ids])).rows.map((r) => [r.id, r.title]));
 
   // Waiting on someone to answer or act.
-  const { rows: waits } = await l.db.query<{ from_id: string; to_id: string; for: string | null }>(
-    `select from_id, to_id, props->>'for' as for from relation where type = any($1::text[]) and valid_to is null`,
-    [reg.relationFamily('waits_on')],
-  );
+  const waitsOn = reg.relationFamily('waits_on');
+  const waits = read
+    ? read.relations.filter((r) => waitsOn.includes(r.type))
+    : (await l.db.query<{ from_id: string; to_id: string; for: string | null }>(`select from_id, to_id, props->>'for' as for from relation where type = any($1::text[]) and valid_to is null`, [waitsOn])).rows;
   const who = await titles([...new Set(waits.map((w) => w.to_id))]);
   for (const w of waits) if (me === null || w.to_id === me) add(live.get(w.from_id), 'waits_on', { who: who.get(w.to_id) ?? w.to_id, ...(w.for && { for: w.for }) });
 
   // Blocked, and what holds others up: the roots every chain of blocking ends at.
-  const graph = await blockGraph(l);
+  const graph = read?.graph ?? (await blockGraph(l, read && !read.whole ? [...live.keys()] : undefined));
   const blockedIds = [...graph.direct.keys()].filter((id) => live.has(id));
   const rootsOf = new Map(blockedIds.map((id) => [id, graph.roots(id)]));
   const rootTitles = await titles([...new Set([...rootsOf.values()].flat())]);
@@ -140,7 +157,7 @@ export async function attention(l: Archipelago, input: Input) {
   }
 
   // What each sits in at the top: the outermost thing it is part of, for a page that groups by it.
-  const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null order by id`);
+  const parts = read ? read.relations.filter((r) => r.type === 'part_of') : (await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null order by id`)).rows;
   const up = new Map<string, string>();
   for (const p of parts) if (!up.has(p.from_id) && p.from_id !== p.to_id) up.set(p.from_id, p.to_id);
   const topOf = (id: string) => {
