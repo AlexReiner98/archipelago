@@ -3,13 +3,15 @@
 // log_op, beside the fact stream's tables, cut into one segment per day per stream. A day closed is sealed by a system
 // entry in the fact stream carrying the segment's hash, so the chain commits to every operational day; compaction
 // drops whole entries a retention rule (src/retention.ts) no longer keeps and records the compacted segment the same
-// way. Deleting from log_op is refused by its trigger to everyone but the compaction role.
+// way. Deleting from log_op is refused by its trigger to everyone but the compaction role. What is someone's words is
+// sealed with its item's key (src/opseal.ts), and a member reads only the entries about what they may see.
 
 import { createHash } from 'node:crypto';
 import { jcs } from './jcs.ts';
 import { append, type Fact } from './log.ts';
 import { newId, type Db, type Q } from './db.ts';
 import { kept, ruleFor, type OpEntry, type Retention } from './retention.ts';
+import { hashed, openOps, sealOp } from './opseal.ts';
 
 export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | `pack:${string}`;
 export type OpFact = ['+', string, string, unknown] | ['-', string, string];
@@ -43,7 +45,7 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
   await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.oplog'), hashtext($1))`, [stream]);
   const { rows } = await tx.query<{ now: Date; pos: number | null; at: Date | null }>(
     `select date_trunc('milliseconds', now()) as now, l.pos::int as pos, l.at
-     from (select 1) one left join lateral (select pos, at from log_op where stream = $1 order by pos desc limit 1) l on true`,
+     from (select 1) one left join lateral pelago_log_op_last($1) l on true`,
     [stream],
   );
   let pos = rows[0].pos ?? 0;
@@ -52,9 +54,8 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
   const out: Light[] = [];
   for (const [rule, of] of groups) {
     const e: Light = { v: 1, ws, stream, pos: ++pos, at, actor: { id: actor }, rule, facts: of, ...(opts.reason && { reason: opts.reason }) };
-    await tx.query(`insert into log_op (stream, pos, at, head, facts) values ($1, $2, $3, $4::jsonb, $5::jsonb)`, [
-      stream, e.pos, at, JSON.stringify({ v: 1, ws, actor: e.actor, rule, ...(opts.reason && { reason: opts.reason }) }), JSON.stringify(of),
-    ]);
+    const stored = await sealOp(tx, ws, stream, { v: 1, ws, actor: e.actor, rule, ...(opts.reason && { reason: opts.reason }) }, of);
+    await tx.query(`insert into log_op (stream, pos, at, head, facts) values ($1, $2, $3, $4::jsonb, $5::jsonb)`, [stream, e.pos, at, JSON.stringify(stored.head), JSON.stringify(stored.facts)]);
     out.push(e);
   }
   return out;
@@ -63,7 +64,7 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
 type Row = { stream: OpStream; pos: number; at: Date; head: Omit<Light, 'stream' | 'pos' | 'at' | 'facts'>; facts: OpFact[] };
 const toLight = (r: Row): Light => ({ ...r.head, stream: r.stream, pos: r.pos, at: new Date(r.at).toISOString(), facts: r.facts });
 
-/** A compacted stream's entries, in order: all of them, or those in a range of positions. */
+/** A compacted stream's entries as stored, sealed, in order: all of them, or those in a range of positions. */
 export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number } = {}): Promise<Light[]> {
   const { rows } = await q.query<Row>(
     `select stream, pos::int as pos, at, head, facts from log_op where stream = $1 and pos >= $2 and ($3::bigint is null or pos <= $3) order by pos`,
@@ -72,10 +73,13 @@ export async function opEntries(q: Q, stream: OpStream, range: { from?: number; 
   return rows.map(toLight);
 }
 
-/** SHA-256 of "pelago-segment\n" and each entry's canonical form, one per line, in order. */
+/** The entries as their reader reads them: opened with the keys the vault holds (src/opseal.ts). */
+export const readOps = async (q: Q, stream: OpStream, range: { from?: number; to?: number } = {}) => openOps(q, await opEntries(q, stream, range));
+
+/** SHA-256 of "pelago-segment\n" and each entry's canonical form, its sealed values as their digests, one per line. */
 export function segmentHash(entries: Light[]): string {
   const h = createHash('sha256').update('pelago-segment\n');
-  for (const e of entries) h.update(`${jcs(e)}\n`);
+  for (const e of entries) h.update(`${jcs(hashed(e))}\n`);
   return h.digest('hex');
 }
 

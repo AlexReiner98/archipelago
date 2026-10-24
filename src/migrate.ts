@@ -19,7 +19,7 @@ import { LOG } from './log.ts';
 import { ACTIVITY } from './eventlog.ts';
 import { VAULT } from './vault.ts';
 import { FORGET } from './forget.ts';
-import { OPLOG, OPLOG_SERVER } from './oplog.ts';
+import { OPLOG, OPLOG_GUARDED, OPLOG_SERVER } from './oplog.ts';
 import { SNAPSHOT } from './snapshot.ts';
 
 interface Migration {
@@ -56,6 +56,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 20, name: 'per-item keys in a vault, and forgetting', sql: VAULT + FORGET },
   { version: 21, name: 'the compacted streams, in segments', sql: OPLOG, server: OPLOG_SERVER },
   { version: 23, name: 'snapshots of the projections, and room to rebuild them', sql: SNAPSHOT },
+  { version: 26, name: 'the compacted streams sealed, guarded by row, and reached by a forget', sql: OPLOG_GUARDED },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
