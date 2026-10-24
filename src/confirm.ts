@@ -40,6 +40,6 @@ export async function toConfirm(l: Archipelago, input: { limit?: number } = {}) 
       on: own(q) ? 'the agent\u2019s own judgment' : 'the owner\u2019s word, as the agent reports it',
       basis: short(q.authority?.basis),
     })),
-    how: 'Show the owner, in your reply, a line for each question settled on an agent\u2019s own judgment, and ask them to confirm or correct; of those recorded on their own word, say how many there are and list them only if asked. When they have answered, call confirmed with upto and what they said; change or reopen whatever they correct, on their authority.',
+    how: 'Show the owner, in your reply, a line for each question settled on an agent\u2019s own judgment, and ask them to confirm or correct; of those recorded on their own word, say how many there are and list them only if asked. When they have answered, call settle with action confirmed, its upto and what they said; change or reopen whatever they correct, on their authority.',
   };
 }

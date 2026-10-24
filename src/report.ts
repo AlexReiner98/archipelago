@@ -112,7 +112,7 @@ const REPORT_INPUT = {
 };
 
 export const REPORT_TOOLS: Record<string, Tool> = {
-  report: {
+  health: {
     description:
       'A running system reports what it measured, and the parts of the map that stand for it follow, at once: the token may be one that can only report. ' +
       'Uptime Kuma’s webhook notification posts its body here as it is (POST /agent/report, the token in an Authorization: Bearer header): the item whose watched address (a component’s url) is the monitor’s address, else whose title is its name, goes down when the check fails and up when it answers again; one still being built (planned, wiring) or stopped on purpose (standby) is left alone. ' +
@@ -129,5 +129,6 @@ export const REPORT_TOOLS: Record<string, Tool> = {
   },
 };
 
-/** Names a tool had before it was folded into another: Kuma's webhook still posts to health_report until it is moved. */
-export const FORMER_NAMES: Record<string, string> = { health_report: 'report' };
+/** Names a tool had before it was folded into another: Kuma's webhook still posts to health_report until it is moved. The report verb with no action
+ * is health too (src/surface.ts), so POST /agent/report goes on answering as it did. */
+export const FORMER_NAMES: Record<string, string> = { health_report: 'health' };

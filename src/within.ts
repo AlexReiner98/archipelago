@@ -25,7 +25,7 @@ export async function refuser(l: Archipelago, within: string[]) {
 /** Whether this actor may write these ops: refused with the reason when it may not. */
 export async function mayWrite(l: Archipelago, actor: Actor, ops: Op[], measured: boolean): Promise<void> {
   if (actor.kind === 'human') return;
-  if (actor.may === 'report' && !measured) throw new Error('This token may only report: send what was measured with the report tool. It cannot change the map.');
+  if (actor.may === 'report' && !measured) throw new Error('This token may only report: send what was measured with report (action health, or as Uptime Kuma posts it). It cannot change the map.');
   if (actor.within?.length) await opsWithin(l, actor.within, ops);
 }
 

@@ -3,7 +3,8 @@
 // deploy, or from one server to another, with the session it has (an id it was given before is not looked at). Every
 // request is checked on its own: its token says whose it is.
 //
-// A client that opens the GET stream is told there when its workspace's tools change (a pack turned off or on), so
+// The tools are the small surface (src/surface.ts); a verb's description lists the actions a workspace's packs add,
+// so a client that opens the GET stream is told there when its workspace's tools change (a pack turned off or on), so
 // it asks again rather than holding the list it was given when it connected. The stream is this process's: after a
 // restart the client opens it again, on whichever server answers.
 
@@ -13,7 +14,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { onToolsChanged } from './packstate.ts';
 import type { Actor, Archipelago } from './pelago.ts';
-import { callTool, devMode, toolsFor, type Tool } from './tools.ts';
+import { callTool, surfaceFor, type Tool } from './tools.ts';
 
 const actorField = {
   actor: z.string().optional().describe('Who you are, e.g. "claude-code:my-project". Recorded against everything you do.'),
@@ -44,7 +45,8 @@ export interface Caller {
   actor: (label?: string) => Actor;
 }
 
-const offered = (registry: Archipelago['registry']) => toolsFor(registry).filter(([, tool]) => !tool.humanOnly && !(tool.devOnly && !devMode()));
+/** What an agent is offered: query, change, undo and the six verbs (src/surface.ts), whatever packs are on. */
+const offered = (registry: Archipelago['registry']) => surfaceFor(registry);
 
 /** A tool's inputs as MCP is given them, made once per tool rather than for every request. */
 const schemas = new WeakMap<Tool, Record<string, z.ZodType>>();

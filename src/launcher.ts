@@ -34,7 +34,7 @@ const MODE_NOTE: Record<LaunchMode, string> = {
 
 // The pelago tools a launched session may call unprompted. `change` is safe
 // here because agent changes are held as proposals.
-const ALLOWED_TOOLS = ['session_update', 'schema', 'search', 'get', 'view', 'events', 'change', 'claim', 'release', 'notify'].map((t) => `mcp__pelago__${t}`).join(',');
+const ALLOWED_TOOLS = ['query', 'change', 'report', 'assign', 'revise', 'ask'].map((t) => `mcp__pelago__${t}`).join(',');
 
 interface LauncherConfig {
   /** The pelago MCP endpoint to give the session. */
@@ -94,7 +94,7 @@ export async function launch(l: Archipelago, actor: Actor, input: { task: string
     '',
     '## How you are running',
     MODE_NOTE[mode],
-    `Your Archipelago run id is ${run}; it is already registered and will be closed for you. Use the pelago session_update tool (run ${run}) for anything the owner should know along the way.`,
+    `Your Archipelago run id is ${run}; it is already registered and will be closed for you. Use the pelago report tool, action session_update (run ${run}), for anything the owner should know along the way.`,
     input.instructions ? `\n## Instructions from the owner\n${input.instructions}` : '',
   ].join('\n');
 

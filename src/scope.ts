@@ -30,7 +30,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
   switch (tool) {
     // What a change writes is checked where every change is (within.ts), and so is what a pack's action writes.
     case 'change':
-    case 'report':
+    case 'health':
       return;
     case 'undo': {
       const { rows } = await l.db.query<{ target_id: string | null }>(`select distinct target_id from event where changeset = $1`, [input.changeset]);
@@ -75,4 +75,4 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
 }
 
 /** Kernel tools a limited token may call that change nothing in the map: reading it, listening for the owner, pointing their screen. A pack's views are reads too. */
-const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show', 'document'];
+const READS = ['schema', 'search', 'get', 'view', 'events', 'proposals', 'picture', 'watch', 'show', 'document', 'query'];

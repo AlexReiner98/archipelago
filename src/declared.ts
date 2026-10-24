@@ -200,22 +200,32 @@ export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.sc
 export const stylesOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.styles ?? []).map((s) => ({ ...s, pack: pack.id })));
 
 /**
- * The kernel's own tools that are one of the six verbs in all but name. change, the generic op, stays beneath them
- * all, as do the tools that only read.
+ * The kernel's own actions, each under one of the six verbs: an agent calls one as the verb's tool with its name
+ * (src/surface.ts). change, the generic op, stays beneath them all, as do the tools that only read.
  */
 export const KERNEL_VERBS: Record<string, string> = {
-  confirmed: 'settle',
-  decide: 'settle',
-  rechecked: 'report',
-  session_end: 'report',
-  session_update: 'report',
-  tell: 'report',
-  run_report: 'report',
-  notify: 'ask',
-  publish_ask: 'ask',
+  session_start: 'capture',
+  picture_put: 'capture',
+  backup: 'capture',
+  import_audit: 'capture',
   claim: 'assign',
   launch: 'assign',
+  session_update: 'report',
+  session_end: 'report',
+  tell: 'report',
+  run_report: 'report',
+  rechecked: 'report',
+  show: 'report',
+  check_connections: 'report',
+  health: 'report',
+  notify: 'ask',
+  publish_ask: 'ask',
+  confirmed: 'settle',
+  decide: 'settle',
   release: 'revise',
+  publish: 'revise',
+  publish_all: 'revise',
+  restart: 'revise',
   undo: 'revise',
 };
 
