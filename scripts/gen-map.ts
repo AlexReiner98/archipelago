@@ -14,6 +14,8 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { openDb } from '../src/db.ts';
+import { regatherAll } from '../src/closure.ts';
+import { mentionedAll } from '../src/mentions.ts';
 
 const args = process.argv.slice(2);
 const opt = (name: string, dflt: string) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : dflt);
@@ -394,6 +396,10 @@ for (today = 0; today < DAYS; today++) {
 for (const c of components) buffers.entity.push([c.id, c.type, kindOf(c.type), c.title, '', c.status, true, null, 'shared', null, '{}', null, iso(START), iso(c.at), null]);
 await flush(true);
 await db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [json(person[0].id)]);
+// What the projector keeps beside the rows (src/closure.ts, src/mentions.ts), made whole from them as a restore does.
+process.stderr.write('projecting what is inside what, and what names what\n');
+await regatherAll(db, ['part_of']);
+await mentionedAll(db);
 process.stderr.write('analysing\n');
 await db.query('analyze');
 const counts = (await db.query<Record<string, number>>(`select (select count(*) from entity)::int as items, (select count(*) from relation)::int as links, (select count(*) from event)::int as events, (select count(*) from proposal)::int as proposals`)).rows[0];
