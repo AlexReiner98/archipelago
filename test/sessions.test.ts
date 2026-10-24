@@ -129,14 +129,14 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
   const holder = await sessionStart(l, agent, { title: 'Other session' });
   await l.claim(agent, { resource: made.lane, holder: holder.run, reason: 'busy' });
 
-  const brief = (await VIEWS.brief.run(l, { task: made.live })) as any;
+  const brief = (await ask(l, 'brief', { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Apex');
   assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
   assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['work.governed_by', 'One live lane.']]);
   for (const part of ['# Capture probe', 'Part of: Apex', 'held by Other session', 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
-  const gated = (await VIEWS.brief.run(l, { task: made.gated })) as any;
+  const gated = (await ask(l, 'brief', { task: made.gated })) as any;
   assert.deepEqual(gated.root_blockers.map((b: any) => b.title), ['Which target?']);
 });
 

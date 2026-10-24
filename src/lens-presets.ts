@@ -4,8 +4,10 @@
 // to read). A preset's fields are data; what is here only reads its params onto the lens and its answer back out.
 
 import { attention, type Input } from './attention.ts';
+import { brief, BRIEF_UP } from './brief.ts';
+import { lensRead } from './lens-scan.ts';
 import type { LENS_ANSWERS, ViewDef } from './declared.ts';
-import { HUB_AT, keptOf } from './lens-kept.ts';
+import { HUB_AT, hubs } from './lens-kept.ts';
 import { lens } from './lens.ts';
 import type { Archipelago } from './pelago.ts';
 
@@ -36,29 +38,38 @@ async function graph(l: Archipelago, def: ViewDef, params: Record<string, unknow
   const fold = [...(params.include_closed ? [] : ['closed']), ...(params.include_system ? [] : ['system'])];
   const over = family(l, chosen(def, 'relations', preset).over);
   const near = Math.min(Math.max(Number(params.depth ?? 2) || 2, 1), 4);
-  const answer = await lens(l, { ...(focus && { from: focus }) }, { ...def.lens, over, fold, ...(focus && { near }) });
-  const by = answer.lens.by;
-  const along = (kind: string) => answer.lens.over === 'all' || answer.lens.over.includes(kind);
-  // What is inside what is said by `inside`, not as a link: here it is an edge like any other.
-  const edges = [
-    ...answer.items.filter((i) => i.inside !== null && along(by)).map((i) => ({ type: by, from: i.id, to: i.inside! })),
-    ...answer.links.map((k) => ({ type: k.kind, from: k.from, to: k.to })),
-  ].map((e) => ({ id: `${e.type} ${e.from} ${e.to}`, ...e }));
-  // Without a focus, a thing nothing connects to adds nothing to a graph.
-  const tied = new Set(edges.flatMap((e) => [e.from, e.to]));
-  const all = answer.items.filter((i) => focus || tied.has(i.id));
-  const nodes = all.slice(0, GRAPH_LIMIT);
+  const answer = await lens(l, { ...(focus && { from: focus }) }, { ...def.lens, over, fold, ...(focus && { near }) }, false);
+  const sent = new Map(answer.items.map((i) => [i.id, i]));
+  // The links among them as the map keeps them, in the order it keeps them, which decides what a graph too big to
+  // send keeps: walked out from the focus a step at a time, or, without one, as the links come.
+  const types = answer.lens.over === 'all' ? null : answer.lens.over;
+  const ids = [...sent.keys()];
+  const { rows: links } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(
+    `select id, type, from_id, to_id from relation where valid_to is null and from_id = any($1::text[]) and to_id = any($1::text[])${types ? ' and type = any($2::text[])' : ''} order by ctid`,
+    types ? [ids, types] : [ids],
+  );
+  let order: string[];
+  if (focus) {
+    const keep = new Set([focus]);
+    for (let d = 0, frontier = [focus]; d < near && frontier.length; d++) {
+      const next: string[] = [];
+      for (const r of links) for (const [x, y] of [[r.from_id, r.to_id], [r.to_id, r.from_id]]) if (frontier.includes(x) && !keep.has(y)) (keep.add(y), next.push(y));
+      frontier = next;
+    }
+    order = [...keep];
+  } else order = [...new Set(links.flatMap((r) => [r.from_id, r.to_id]))];
+  const nodes = order.slice(0, GRAPH_LIMIT).map((id) => sent.get(id)!);
   const kept = new Set(nodes.map((n) => n.id));
   const tokens = await rolledTokens(l, nodes.map((n) => n.id));
   return {
     preset,
     focus,
-    truncated: all.length > GRAPH_LIMIT ? { shown: GRAPH_LIMIT, of: all.length } : undefined,
+    truncated: order.length > GRAPH_LIMIT ? { shown: GRAPH_LIMIT, of: order.length } : undefined,
     nodes: nodes.map((i) => {
       const t = tokens.of(i.id);
       return { id: i.id, type: i.type, root: i.root, kind: i.kind, title: i.title, status: i.status, open: i.open, created: t?.created, blocked: i.state.blocked, ...(t?.work && { work: true, tokens: t.tokens, estimated: t.estimated, order: t.order }) };
     }),
-    edges: edges.filter((e) => kept.has(e.from) && kept.has(e.to)),
+    edges: links.filter((r) => kept.has(r.from_id) && kept.has(r.to_id)).map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id })),
   };
 }
 
@@ -70,13 +81,19 @@ async function graph(l: Archipelago, def: ViewDef, params: Record<string, unknow
 async function rolledTokens(l: Archipelago, nodes: string[]) {
   // Only work is counted: what can be estimated, and what such things are part of. And the nodes, for when each was made.
   const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'work');
-  const workTypes = [...l.registry.types.keys()].filter(work);
+  // Everything that is part of the nodes, a level at a time: all a roll-up of them reads.
+  const parts: { from_id: string; to_id: string }[] = [];
+  const seen = new Set(nodes);
+  for (let level = nodes; level.length; ) {
+    const { rows: found } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null and to_id = any($1::text[])`, [level]);
+    parts.push(...found);
+    level = [...new Set(found.map((r) => r.from_id))].filter((id) => !seen.has(id) && seen.add(id));
+  }
   const { rows } = await l.db.query<{ id: string; type: string; status: string; is_open: boolean; created_at: Date; estimated: unknown; used: unknown; place: unknown }>(
-    `select id, type, status, is_open, created_at, props->'tokens_estimated' as estimated, props->'tokens_used' as used, props->'order' as place from entity where archived_at is null and (type = any($1::text[]) or id = any($2::text[]))`,
-    [workTypes, nodes],
+    `select id, type, status, is_open, created_at, props->'tokens_estimated' as estimated, props->'tokens_used' as used, props->'order' as place from entity where archived_at is null and id = any($1::text[])`,
+    [[...seen]],
   );
   const all = new Map(rows.map((e) => [e.id, e]));
-  const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null`);
   const partsOf = new Map<string, string[]>();
   for (const p of parts) if (all.has(p.from_id)) partsOf.set(p.to_id, [...(partsOf.get(p.to_id) ?? []), p.from_id]);
   type Tokens = { estimated: number; used: number; assumed?: boolean; partial?: boolean };
@@ -125,10 +142,9 @@ async function tree(l: Archipelago, def: ViewDef, params: Record<string, unknown
   const isA = (type: string, kinds: string[]) => kinds.some((kind) => l.registry.isA(type, kind));
   const about = { id: t.id, title: t.title };
   const root = params.root === undefined ? undefined : String(params.root);
-  const answer = await lens(l, { ...(root && { from: root }) }, { ...def.lens, kinds: root ? [...t.roots, ...t.branches, ...t.work] : [...t.roots, ...t.branches], order: t.order });
+  const answer = await lens(l, { ...(root && { from: root }) }, { ...def.lens, kinds: root ? [...t.roots, ...t.branches, ...t.work] : [...t.roots, ...t.branches], order: t.order }, false);
   const kids = new Map<string, Item[]>();
   for (const i of answer.items) if (i.inside !== null) kids.set(i.inside, [...(kids.get(i.inside) ?? []), i]);
-  for (const list of kids.values()) list.sort((a, b) => a.place - b.place);
   if (!root) {
     const roots = answer.items.filter((i) => isA(i.type, t.roots)).map((i) => ({ id: i.id, type: i.type, title: i.title, status: i.status, branches: (kids.get(i.id) ?? []).filter((k) => isA(k.type, t.branches)).length }));
     return { tree: about, roots: roots.sort((a, b) => b.branches - a.branches || a.title.localeCompare(b.title)) };
@@ -137,7 +153,13 @@ async function tree(l: Archipelago, def: ViewDef, params: Record<string, unknown
     `select r.to_id as target, s.id, s.title from relation r join entity s on s.id = r.from_id
      where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null`,
   );
-  const props = new Map((await l.db.query<{ id: string; place: unknown }>(`select id, props->$2 as place from entity where id = any($1::text[])`, [answer.items.map((i) => i.id), t.order])).rows.map((r) => [r.id, r.place]));
+  const props = new Map((await l.db.query<{ id: string; place: unknown; created_at: Date }>(`select id, props->$2 as place, created_at from entity where id = any($1::text[])`, [answer.items.map((i) => i.id), t.order])).rows.map((r) => [r.id, r]));
+  // What is under each thing comes as the map keeps its links; branches in their order, then the oldest first.
+  const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null and to_id = any($1::text[]) order by ctid`, [answer.items.map((i) => i.id)]);
+  const kept = new Map(parts.map((r, i) => [`${r.from_id} ${r.to_id}`, i]));
+  for (const [up, list] of kids) list.sort((a, b) => (kept.get(`${a.id} ${up}`) ?? Infinity) - (kept.get(`${b.id} ${up}`) ?? Infinity));
+  const placeOf = (id: string) => (typeof props.get(id)?.place === 'number' ? (props.get(id)!.place as number) : Infinity);
+  const age = (id: string) => +new Date(props.get(id)?.created_at ?? 0);
   const item = (i: Item) => {
     const on = sessions.filter((s) => s.target === i.id).map(({ id, title }) => ({ id, title }));
     return { id: i.id, type: i.type, title: i.title, status: i.status, open: i.open, blocked: i.state.blocked, sessions: on, active: on.length > 0 || t.active.includes(i.status) };
@@ -158,11 +180,11 @@ async function tree(l: Archipelago, def: ViewDef, params: Record<string, unknown
     placed.add(i.id);
     if (self.active && i !== top) now.push({ ...self, path });
     const here = i === top ? [] : [...path, i.title];
-    const branches = (kids.get(i.id) ?? []).filter((k) => isA(k.type, t.branches)).map((k) => build(k, here));
+    const branches = (kids.get(i.id) ?? []).filter((k) => isA(k.type, t.branches)).sort((a, b) => placeOf(a.id) - placeOf(b.id) || age(a.id) - age(b.id)).map((k) => build(k, here));
     const work = (kids.get(i.id) ?? []).filter((k) => !isA(k.type, t.branches) && isA(k.type, t.work)).map((k) => (placed.add(k.id), item(k)));
     now.push(...work.filter((w) => w.active).map((w) => ({ ...w, path: here })));
     const progress = branches.reduce((sum, b) => ({ done: sum.done + b.progress.done, total: sum.total + b.progress.total }), { done: work.filter((w) => !w.open).length, total: work.length });
-    const order = props.get(i.id);
+    const order = props.get(i.id)?.place;
     return { ...self, active: self.active || work.some((w) => w.active) || branches.some((b) => b.active), order: typeof order === 'number' ? order : null, progress, branches, work };
   };
   const built = build(top, []);
@@ -180,45 +202,35 @@ async function tree(l: Archipelago, def: ViewDef, params: Record<string, unknown
     unplaced: built.work,
     /** What waits on what, within this tree: "from" cannot finish until "to" has. */
     // The links themselves: a lens moves a link whose end it did not send up to what holds it, which here would say what does not wait.
-    depends: (await l.db.query<{ from: string; to: string }>(`select from_id as "from", to_id as "to" from relation where type = 'depends_on' and valid_to is null`)).rows.filter((d) => placed.has(d.from) && placed.has(d.to)),
+    depends: (await l.db.query<{ from: string; to: string }>(`select from_id as "from", to_id as "to" from relation where type = 'depends_on' and valid_to is null and from_id = any($1::text[]) and to_id = any($1::text[]) order by ctid`, [[...placed]])).rows,
   };
 }
 
-/**
- * The hubs: open items that hold enough to need views of their own, read from the lens of the whole map. How much is
- * enough is the nearest project's hub_at, or HUB_AT. Nothing says an item is a hub that could go stale.
- */
-async function hubs(l: Archipelago, def: ViewDef) {
-  const answer = await lens(l, {}, def.lens);
-  const { rows } = await l.db.query<{ id: string; at: number }>(`select id, (props->>'hub_at')::float8 as at from entity where archived_at is null and jsonb_typeof(props->'hub_at') = 'number'`);
-  const set = new Map(rows.map((r) => [r.id, r.at]));
-  const up = new Map(answer.items.map((i) => [i.id, i.inside]));
-  const at = (id: string): number => {
-    for (let cur: string | null | undefined = id, steps = 0; cur && steps < 64; cur = up.get(cur), steps++) if (set.has(cur)) return set.get(cur)!;
-    return HUB_AT;
-  };
-  const views = new Map<string, number>();
-  for (const kept of await keptOf(l, 'lens', undefined)) for (const id of kept.about) views.set(id, (views.get(id) ?? 0) + 1);
-  const found = answer.items
-    .map((i) => ({ id: i.id, type: i.type, title: i.title, inside: i.within.items, at: at(i.id), views: views.get(i.id) ?? 0 }))
-    .filter((h) => h.inside > 0 && h.inside >= h.at)
-    .sort((a, b) => b.inside - a.inside || a.title.localeCompare(b.title));
-  return { at: HUB_AT, hubs: found };
-}
+/** The hubs, by the core pack's lens of them (src/lens-kept.ts), with the size at which an item counts as one where its project does not say. */
+const hubsOf: Reading = async (l) => ({ at: HUB_AT, hubs: await hubs(l) });
 
 /**
- * What deserves attention: the lens's state, asked alone. Every lens item's needs_you is read from these same
- * reasons (src/attention.ts); asked for itself, the state of open work is answered without drawing a picture of
- * the map around it, which would double what it costs.
+ * What deserves attention: the state stage of its lens (open work and questions, the links that say what waits on
+ * what), answered without drawing the picture. Every lens item's needs_you is read from the same reasons.
  */
-const attend: Reading = (l, _def, params) => attention(l, params as Input);
+/** The one field of an item attention reads: when it is due. */
+const DUE = ['due'];
+const attend: Reading = async (l, def, params) => attention(l, params as Input, await lensRead(l, {}, { ...def.lens, over: family(l, def.lens?.over) }, {}, DUE, ['status', 'owner', 'updated_at']));
+
+/** Everything a session needs to start on a task: what the lens from the task reads, with what holds the task and what it needs. */
+const briefOf: Reading = async (l, def, params) => {
+  if (!params.task) throw new Error('brief needs "task": the id of the entity to work on');
+  const read = await lensRead(l, { from: String(params.task) }, { ...def.lens, over: family(l, def.lens?.over) }, { up: BRIEF_UP, through: l.registry.relationFamily('needs'), narrow: true });
+  return brief(l, { task: String(params.task) }, read);
+};
 
 const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
   lens: (l, def, params) => lens(l, { ...def.lens, ...params }),
   graph,
   tree,
-  hubs,
+  hubs: hubsOf,
   attention: attend,
+  brief: briefOf,
 };
 
 /** Answer a lens preset a pack declares: its lens under the params, read as the preset says. */

@@ -8,10 +8,10 @@ import { isA } from './repo.js';
 const slim = (e) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
 const at = (e) => Date.parse(e.updated_at);
 
-/** Everything part of these items, and the items themselves, each as read. */
+/** Everything part of these items, and the items themselves, each as read: in one read. */
 async function under(ctx, ids) {
   const scope = new Map(ids.map((id) => [id, undefined]));
-  for (const id of ids) for (const e of await ctx.read({ scope: id, parts: true, fields: [] })) scope.set(e.id, e);
+  for (const e of await ctx.read({ parts_of: ids, fields: [] })) scope.set(e.id, e);
   return scope;
 }
 

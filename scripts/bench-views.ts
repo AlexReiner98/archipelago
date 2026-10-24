@@ -1,6 +1,7 @@
 // How long the heavy reads and a typical write take, end to end, against a running server's /agent tools:
 //   node scripts/bench-views.ts [http://127.0.0.1:3100] [runs]
 //   node scripts/bench-views.ts <base> --seed 20000      fill an empty throwaway server with a large map first
+// Every view the pages and agents lean on is timed: attention, lens, handoff, brief, hubs, graph, tree and gate.
 // Each call is warmed up, then timed RUNS times (20); the median and the 95th percentile are given in ms, with the
 // size of the answer. What is read is picked from the map (the largest hub, the repository, the busiest item, an
 // open task) unless named: HUB, REPO, BUSY, TASK. The change is undone after each run, untimed.
@@ -120,7 +121,10 @@ if (!BUSY) {
     if (n > most) [most, BUSY] = [n, id];
   }
 }
-console.log(`${base}: hub ${HUB} (${hubs[0]?.inside} inside), repo ${REPO ?? 'none'}, busy ${BUSY}, task ${TASK}; ${RUNS} runs after 3 warm-ups`);
+// The roadmap's project (the largest hub, unless named) and the event with the most behind it: what the gate is drawn for.
+const ROOT = process.env.ROOT ?? HUB;
+const EVENT = process.env.EVENT ?? (await call('view', { name: 'gate' }).then((r) => (r.result.events as { id: string; holding?: number }[]).sort((a, b) => (b.holding ?? 0) - (a.holding ?? 0))[0]?.id, () => undefined));
+console.log(`${base}: hub ${HUB} (${hubs[0]?.inside} inside), repo ${REPO ?? 'none'}, busy ${BUSY}, task ${TASK}, root ${ROOT}, event ${EVENT ?? 'none'}; ${RUNS} runs after 3 warm-ups`);
 console.log(`${'call'.padEnd(34)} ${'median'.padStart(7)} ${'p95'.padStart(7)} ${'KB'.padStart(7)}`);
 
 const rows = [
@@ -130,6 +134,12 @@ const rows = [
   await time(`view lens (from hub)`, view('lens', { from: HUB })),
   ...(REPO ? [await time('view handoff (repo)', view('handoff', { repo: REPO }))] : []),
   await time('view brief (task)', view('brief', { task: TASK })),
+  await time('view hubs', view('hubs')),
+  await time('view graph (whole map)', view('graph')),
+  // As the roadmap asks it: around its project, two steps, every link, finished work too.
+  await time('view graph (roadmap)', view('graph', { focus: ROOT, depth: 2, relations: 'all', include_closed: true })),
+  await time('view tree (roadmap)', view('tree', { root: ROOT })),
+  ...(EVENT ? [await time('view gate (event)', view('gate', { event: EVENT }))] : []),
   await time('get (busiest item)', () => call('get', { id: BUSY })),
   await time('search "model export"', () => call('search', { q: 'model export', limit: 20 })),
 ];

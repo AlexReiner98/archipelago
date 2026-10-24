@@ -55,8 +55,6 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',
   style: 'How a page looks: the styles the packs ship and the map keeps, merged; the system tier, not the work.',
   saved_views: 'The views kept on the map, each named by the style that draws it: the system tier, not the work.',
-  brief:
-    'What a session is handed when it starts on a task (the launcher reads it, and its text says how to report). A read around one task: a lens preset {from: task, far: 0} once a lens can start from an item without reading the whole map.',
 };
 
 /** Restoring a backup writes the map's rows as they were, in src/pelago.ts (restoreRows): never re-applied as changes. */

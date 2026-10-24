@@ -57,7 +57,8 @@ export function streamsOf(l: Archipelago, hub: string, by: string, relations: Li
 }
 
 /** Today as a date in a zone. */
-const dayIn = (at: number, zone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+const days = new Map<string, Intl.DateTimeFormat>();
+const dayIn = (at: number, zone: string) => (days.get(zone) ?? days.set(zone, new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' })).get(zone)!).format(at);
 
 /** The week that holds today, Monday to Sunday, as dates in the workspace's zone. */
 export function thisWeek(zone: string, now = Date.now()): TimeAxis {

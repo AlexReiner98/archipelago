@@ -1,6 +1,8 @@
 // What the map keeps for looking at it: lenses and styles, with what each is about; the hubs that need views of
 // their own; and where a lens or a style is seen at work.
 
+import { SYSTEM } from './head.ts';
+import { lensRead } from './lens-scan.ts';
 import type { Archipelago } from './pelago.ts';
 
 export interface Kept {
@@ -28,12 +30,15 @@ export const HUB_AT = 12;
  * The hubs: open items that hold enough to need views of their own. How much
  * is enough is the nearest project's hub_at, or HUB_AT: a project still being
  * shaped sets it low, so that most of what is in it is treated as a hub.
- * Read off the map each time; nothing says an item is a hub that could go stale.
+ * Read off the map each time, by the core pack's lens of them (core.hubs: what is
+ * open and not the system's, and what is part of what); nothing says an item is a
+ * hub that could go stale.
  */
 export async function hubs(l: Archipelago) {
-  const { rows: entities } = await l.db.query<{ id: string; type: string; title: string; props: Record<string, unknown> }>(`select id, type, title, ${l.props} from entity where archived_at is null and is_open`);
-  const byId = new Map(entities.filter((e) => !e.type.startsWith('sys.') && !l.registry.isA(e.type, 'lens') && !l.registry.isA(e.type, 'style')).map((e) => [e.id, e]));
-  const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null order by id`);
+  const lens = l.registry.packs.find((p) => p.id === 'core')?.views?.find((v) => v.id === 'core.hubs')?.lens ?? {};
+  const read = await lensRead(l, {}, lens, {}, ['hub_at'], []);
+  const byId = new Map(read.entities.filter((e) => e.is_open && e.kind !== SYSTEM).map((e) => [e.id, e]));
+  const parts = read.relations.filter((r) => r.type === 'part_of');
   const up = new Map<string, string>();
   const kids = new Map<string, string[]>();
   for (const p of parts) {

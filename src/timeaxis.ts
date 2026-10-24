@@ -47,9 +47,13 @@ export function readAxis(input: unknown): TimeAxis {
   return { from: t.from!, to: t.to!, ...(t.by && { by: t.by }) };
 }
 
+/** One clock for each zone: making one is slow, and every item placed in time asks it. */
+const clocks = new Map<string, Intl.DateTimeFormat>();
+const clock = (zone: string) => clocks.get(zone) ?? clocks.set(zone, new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })).get(zone)!;
+
 /** Milliseconds from UTC at an instant in a time zone: -4 h in Toronto in summer. */
 function offset(zone: string, at: number): number {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(at).map((p) => [p.type, p.value]));
+  const parts = Object.fromEntries(clock(zone).formatToParts(at).map((p) => [p.type, p.value]));
   return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second) - Math.floor(at / 1000) * 1000;
 }
 

@@ -97,7 +97,7 @@ export interface ViewDef {
 }
 
 /** How a lens preset's answer may be read, each kept to the form its view had (src/lens-presets.ts). */
-export const LENS_ANSWERS = ['lens', 'graph', 'tree', 'hubs', 'attention'] as const;
+export const LENS_ANSWERS = ['lens', 'graph', 'tree', 'hubs', 'attention', 'brief'] as const;
 
 /**
  * A tree a pack declares over "is part of": a roadmap, for one. The `tree`

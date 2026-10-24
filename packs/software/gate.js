@@ -16,18 +16,30 @@ const slim = (e) => ({ id: e.id, type: e.type, title: e.title, status: e.status 
 const done = (e) => !e.is_open || e.status === 'built';
 
 export async function gate(input, ctx) {
-  const linked = (id, relation) => ctx.read({ related: id, relation, fields: [] });
   if (!input.event) {
+    const relatedTo = (id, relation) => ctx.read({ related: id, relation, fields: [] });
     const events = [];
     for (const e of (await ctx.read({ items: { type: 'event' }, fields: ['at'] })).filter((x) => x.is_open)) {
-      const [held, deferred, shipped] = await Promise.all([linked(e.id, 'depends_on'), linked(e.id, 'defers'), linked(e.id, 'ships')]);
+      const [held, deferred, shipped] = await Promise.all([relatedTo(e.id, 'depends_on'), relatedTo(e.id, 'defers'), relatedTo(e.id, 'ships')]);
       if (held.length || deferred.length || shipped.length) events.push({ ...slim(e), at: e.props.at ?? null, holding: held.length });
     }
     return { events };
   }
-  const event = await ctx.read({ get: input.event });
+  // Everything around the event in one read: what it waits for, goes ahead without and ships, all that is inside
+  // those, and what holds them, with the links among it all.
+  const { items: around, links } = await ctx.read({ lens: { from: input.event, over: ['depends_on', 'defers', 'ships'], above: true } });
+  const byId = new Map(around.map((e) => [e.id, e]));
+  const event = byId.get(input.event);
   if (!event) throw new Error(`No item "${input.event}"`);
   if (!isA(event, 'event')) throw new Error(`gate needs an event (a release, a launch, a deadline); "${event.title}" is a ${event.type}`);
+  // What an item links to by one kind of link (ships with its flavours), each with the link that says so.
+  const linked = (id, relation) => links.filter((k) => k.from === id && (relation === 'ships' ? k.is.includes('ships') : k.type === relation) && byId.has(k.to)).map((k) => ({ ...byId.get(k.to), link: k.id }));
+  const kids = new Map();
+  const parents = new Map();
+  for (const k of links.filter((x) => x.type === 'part_of' && byId.has(x.from) && byId.has(x.to))) {
+    kids.set(k.to, [...(kids.get(k.to) ?? []), k.from]);
+    parents.set(k.from, [...(parents.get(k.from) ?? []), k.to]);
+  }
 
   // What is sorted and counted behind a gate: things that get done or settled: work that can be estimated, and questions that settle.
   const types = new Map();
@@ -37,39 +49,36 @@ export async function gate(input, ctx) {
     return Boolean((t?.estimated && isA(e, 'work')) || t?.settles);
   };
   // Everything part of an item, at any depth, by its id; the item itself left out.
-  const underOf = new Map();
-  const under = async (id) => {
-    if (!underOf.has(id)) underOf.set(id, new Map((await ctx.read({ scope: id, parts: true, fields: [] })).filter((e) => e.id !== id).map((e) => [e.id, e])));
-    return underOf.get(id);
+  const under = (id) => {
+    const seen = new Map();
+    for (const stack = [id]; stack.length; ) for (const kid of kids.get(stack.pop()) ?? []) if (!seen.has(kid) && kid !== id) (seen.set(kid, byId.get(kid)), stack.push(kid));
+    return seen;
   };
   // The nearest feature or project an item is part of.
-  const upOf = new Map();
-  const up = async (id) => (upOf.has(id) ? upOf.get(id) : (upOf.set(id, await linked(id, 'part_of')), upOf.get(id)));
-  const nearest = async (id) => {
+  const nearest = (id) => {
     const seen = new Set([id]);
-    let level = [id];
-    while (level.length) {
-      const above = [];
-      for (const x of level) for (const e of await up(x)) if (!seen.has(e.id)) (seen.add(e.id), above.push(e));
-      const found = above.find(container);
+    for (let level = [id]; level.length; ) {
+      const above = level.flatMap((x) => parents.get(x) ?? []).filter((x) => !seen.has(x));
+      const found = above.map((x) => byId.get(x)).find(container);
       if (found) return found;
-      level = above.map((e) => e.id);
+      for (const x of above) seen.add(x);
+      level = above;
     }
     return undefined;
   };
 
   const me = await ctx.read({ me: true });
   const items = new Map();
-  const itemOf = async (id) => (items.has(id) ? items.get(id) : (items.set(id, await ctx.read({ get: id, fields: [] })), items.get(id)));
+  const itemOf = async (id) => byId.get(id) ?? (items.has(id) ? items.get(id) : (items.set(id, await ctx.read({ get: id, fields: [] })), items.get(id)));
   // The owner's to answer, act on or decide: they are it, or it is theirs to settle by their word and still open.
   const mine = async (id) => {
     if (id === me) return true;
     const e = await itemOf(id);
     return Boolean(e && e.owner === me && e.is_open && (await typeOf(e.type))?.settled_by === 'word');
   };
-  const held = await linked(event.id, 'depends_on');
-  const deferred = await linked(event.id, 'defers');
-  const shipped = await linked(event.id, 'ships');
+  const held = linked(event.id, 'depends_on');
+  const deferred = linked(event.id, 'defers');
+  const shipped = linked(event.id, 'ships');
 
   // The streams: a feature or project that holds the event brings its work with it.
   const streams = new Map();
@@ -77,7 +86,7 @@ export async function gate(input, ctx) {
   const entries = [];
   for (const head of held.filter(container)) {
     const work = [];
-    for (const e of (await under(head.id)).values()) if (!container(e) && !placed.has(e.id) && (await counted(e))) work.push(e);
+    for (const e of under(head.id).values()) if (!container(e) && !placed.has(e.id) && (await counted(e))) work.push(e);
     for (const w of work) placed.add(w.id);
     placed.add(head.id);
     const list = work.length ? work.map((w) => ({ e: w })) : [{ e: head }];
@@ -87,7 +96,7 @@ export async function gate(input, ctx) {
   for (const e of held) {
     if (placed.has(e.id)) continue;
     placed.add(e.id);
-    const head = await nearest(e.id);
+    const head = nearest(e.id);
     const stream = streams.get(head?.id ?? '') ?? { head, list: [] };
     const entry = { e, relation: e.link };
     stream.list.push(entry);
@@ -113,13 +122,13 @@ export async function gate(input, ctx) {
   };
 
   const left = new Set(deferred.map((e) => e.id));
-  for (const e of deferred) for (const id of (await under(e.id)).keys()) left.add(id);
+  for (const e of deferred) for (const id of under(e.id).keys()) left.add(id);
   const scope = new Map(shipped.map((e) => [e.id, e]));
-  for (const e of shipped) for (const [id, x] of await under(e.id)) scope.set(id, x);
+  for (const e of shipped) for (const [id, x] of under(e.id)) scope.set(id, x);
   const toSort = [];
   for (const e of scope.values()) {
     if (e.id === event.id || !e.is_open || container(e) || placed.has(e.id) || left.has(e.id) || !(await counted(e))) continue;
-    const s = await nearest(e.id);
+    const s = nearest(e.id);
     toSort.push({ ...slim(e), stream: s ? { id: s.id, title: s.title } : null });
   }
 
@@ -128,7 +137,7 @@ export async function gate(input, ctx) {
   const asked = new Set();
   for (const e of [...shipped, ...held.filter(container)]) {
     asked.add(e.id);
-    for (const id of (await under(e.id)).keys()) asked.add(id);
+    for (const id of under(e.id).keys()) asked.add(id);
   }
   const version = typeof event.props.version === 'string' && event.props.version.trim() ? event.props.version.trim() : undefined;
   const proven = asked.size ? await proof({ build: version, within: [...asked] }, ctx).catch(() => undefined) : undefined;

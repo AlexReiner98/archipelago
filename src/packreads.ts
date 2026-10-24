@@ -7,6 +7,7 @@ import { livesIn, livesInFor, SCOPE } from './places.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { blockGraph } from './blocking.ts';
 import { askPackView, VIEWS } from './views.ts';
+import { lensRead } from './lens-scan.ts';
 
 /** The most items one read gives back. */
 const READ_LIMIT = 500;
@@ -29,6 +30,10 @@ export type Read = {
   open?: boolean;
   /** With scope: only what is part of it, not what is about it or lives in it. */
   parts?: boolean;
+  /** Everything part of any of these items, and the items themselves, in one read. */
+  parts_of?: string[];
+  /** What a lens from an item reads (src/lens-scan.ts), in one read: the items around it and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
+  lens?: { from: string; over?: string[]; above?: boolean };
   /** Which of these items have a picture kept for them. */
   pictures?: string[];
   /** Events of a kind, about one item, since a moment, newest first. */
@@ -98,6 +103,24 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     );
     return rows.map(typed);
   }
+  if (q.parts_of !== undefined) {
+    if (!Array.isArray(q.parts_of) || q.parts_of.some((id) => typeof id !== 'string')) throw new Error('parts_of is a list of item ids');
+    const { rows } = await l.db.query<Entity>(
+      `with recursive scope(id) as (select unnest($1::text[]) union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null)
+       select ${cols('e')} from entity e join scope s on s.id = e.id where e.archived_at is null order by e.updated_at desc`,
+      [q.parts_of],
+    );
+    return rows.map(typed);
+  }
+  if (q.lens !== undefined) {
+    const read = await lensRead(l, { from: String(q.lens.from) }, { over: q.lens.over ?? 'all', fold: [] }, { above: Boolean(q.lens.above), made: true });
+    // What a link is: its kind and those it extends, as an item says what it is.
+    const lineage = (type: string): string[] => [type, ...(l.registry.relations.get(type)?.extends ? lineage(l.registry.relations.get(type)!.extends!) : [])];
+    return {
+      items: read.entities.map(({ body: _body, ...e }) => typed({ ...e, ...(!open && { owner: null }) })),
+      links: read.relations.map((r) => ({ ...(open && { id: r.id }), type: r.type, from: r.from_id, to: r.to_id, is: lineage(r.type) })),
+    };
+  }
   if (q.events) {
     const { action, target, since, limit } = q.events;
     const { rows } = await l.db.query(
@@ -133,5 +156,5 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, events, pictures, blocked, view, type_info, me, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, lens, events, pictures, blocked, view, type_info, me, proposed.');
 }

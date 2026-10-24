@@ -5,7 +5,6 @@
 import { type Entity, type Archipelago } from './pelago.ts';
 import { spent } from './spent.ts';
 import { livesIn } from './places.ts';
-import { brief } from './brief.ts';
 import { savedViews } from './saved-views.ts'; import { pageStyle } from './styles.ts';
 
 /**
@@ -104,10 +103,6 @@ export const VIEWS: Record<string, View> = {
   sessions: {
     description: 'Agent sessions and automation runs: what each open one is working on and holding, whether it has gone quiet, and the last ten that ended.',
     run: sessions,
-  },
-  brief: {
-    description: 'Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required).',
-    run: brief,
   },
   saved_views: {
     description: 'Every view kept on the map (a lens, named by the style that draws it), with what it is a view of: pinned first, then the newest. Params: limit (100).',

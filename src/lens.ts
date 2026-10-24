@@ -13,7 +13,8 @@ import { hubs, keptOf, type Kept } from './lens-kept.ts';
 import { styleFor, drawn as withDrawing } from './styles.ts'; import { SYSTEM } from './head.ts';
 import { readSteps, stepIds } from './lens-steps.ts';
 import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
-import { LENS_DEFAULT, LENS_KEPT, readLens, type Lens } from './lens-read.ts';
+import { LENS_DEFAULT, LENS_KEPT, readLens, WAITS, type Lens } from './lens-read.ts';
+import { aroundOf, scanAll, scanAround, type Row } from './lens-scan.ts';
 
 // Kept where they were first imported from.
 export { hubs, HUB_AT, pictureOf } from './lens-kept.ts';
@@ -23,21 +24,9 @@ export { LENS_DEFAULT, readLens, type Lens } from './lens-read.ts';
 const CONTROLS = ['lit', 'far', 'closed', 'time'];
 /** The most items one answer sends: the deepest are cut first, and `rest` says how many. */
 export const LENS_LIMIT = 2000;
-/** The kinds of link that say one thing cannot move until another has. */
-const WAITS = ['depends_on', 'waits_on', 'needs'];
 /** Statuses that mean someone is on it now. */
 const UNDER_WAY = ['doing', 'building', 'investigating'];
 
-interface Row {
-  id: string;
-  type: string; kind: string | null;
-  title: string;
-  status: string;
-  is_open: boolean;
-  owner: string | null;
-  props: Record<string, unknown>;
-  created_at: Date; updated_at: Date;
-}
 
 interface Counts {
   items: number;
@@ -94,8 +83,9 @@ async function storyOf(l: Archipelago, key: string): Promise<{ id: string; title
  * What a lens answers with: the lens as read, the items, the links between them, and what was left out. Asked with a
  * preset (a view a pack declares as a lens: src/lens-presets.ts), the preset is the view: no lens or style kept on the
  * map goes in, and what only a page needs (its style, the views to choose from, what needs the person looking) is left out.
+ * A preset that reads no `rest` asks for it uncounted.
  */
-export async function lens(l: Archipelago, input: Record<string, unknown>, preset?: Record<string, unknown>) {
+export async function lens(l: Archipelago, input: Record<string, unknown>, preset?: Record<string, unknown>, counted = true) {
   // A story is drawn under no view of its own: the workspace's views are pictures of the map, not of what a session said.
   const told = input.story === undefined ? undefined : await storyOf(l, String(input.story));
   // One beat of it, where one is asked for: a finding is drawn alone.
@@ -117,21 +107,11 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
   const views = told ? [] : [...own, ...shared];
   // A preset is known before anything is read: what it folds away, and the links it does not send, are not read at all.
   const early = preset && readLens(l, input, readLens(l, preset));
-  const [foldClosed, foldSystem] = [Boolean(early?.fold.includes('closed')), Boolean(early?.fold.includes('system'))];
-  const { rows: entities } = await l.db.query<Row>(
-    `select id, type, kind, title, status, is_open, owner, ${l.props}, created_at, updated_at from entity where archived_at is null${early ? ` and (id = $1 or ((not $2 or is_open) and (not $3 or kind is distinct from 'system')))` : ''}`,
-    early ? [early.from ?? null, foldClosed, foldSystem] : [],
-  );
-  // What was not read is counted, as it would have been left out.
-  const unread = early ? (await l.db.query<{ closed: number; system: number }>(
-    `select count(*) filter (where $2 and not is_open and not ($3 and kind is not distinct from 'system'))::int as closed, count(*) filter (where $3 and kind is not distinct from 'system')::int as system from entity where archived_at is null and id is distinct from $1`,
-    [early.from ?? null, foldClosed, foldSystem],
-  )).rows[0] : { closed: 0, system: 0 };
+  // A lens from an item reads what is around it, for any view of it that may be chosen; one of the whole map reads it all.
+  // A view of it that goes near reads only what it walks to: kept on the map, among others to choose from, it is read whole.
+  const scoped = hub !== undefined && !told && (Boolean(early) || ![input, ...own.map((one) => one.props)].some((x) => typeof x.near === 'number'));
+  const { entities, relations, unread } = scoped ? await scanAround(l, aroundOf(l, hub, input, early, [...own, ...lenses.filter((one) => one.id === input.lens)])) : await scanAll(l, early ? { from: early.from, fold: early.fold, types: early.over === 'all' ? null : [early.by, ...early.over], count: counted } : undefined);
   const all = new Map(entities.map((e) => [e.id, e]));
-  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; says: string | null; state: string | null }>(
-    `select id, type, from_id, to_id, props ->> 'says' as says, props ->> 'state' as state from relation where valid_to is null${early && early.over !== 'all' ? ' and type = any($1::text[])' : ''} order by id`,
-    early && early.over !== 'all' ? [[early.by, ...early.over]] : [],
-  );
   // What the item waits on, step by step through what that waits on, finished or not: the view of what holds it,
   // offered beside the others while some of it is still open, and the one an item opens on when it has none of its own.
   const waitsOn = new Map<string, string[]>();
@@ -295,9 +275,10 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
   }
 
   // The state of each thing, and the same counted over everything inside it, sent or not.
+  // What blocks what is read across the map: a chain of waiting may leave what was read, and it is cheap.
   const blocked = await blockGraph(l);
   // What needs the person it is answered for: what waits on them, theirs to confirm, due, or unsettled and theirs.
-  const viewer = l.viewer || (await l.setting<string>('me')) || null, yours = preset ? new Set<string>() : await needsOf(l, viewer);
+  const viewer = l.viewer || (await l.setting<string>('me')) || null, yours = preset ? new Set<string>() : await needsOf(l, viewer, { entities, relations, whole: !scoped, graph: blocked });
   const { rows: at } = await l.db.query<{ target: string }>(
     `select r.to_id as target from relation r join entity s on s.id = r.from_id
      where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null`,

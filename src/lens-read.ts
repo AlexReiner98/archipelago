@@ -33,6 +33,9 @@ export interface Lens {
   time?: TimeAxis;
 }
 
+/** The kinds of link that say one thing cannot move until another has. */
+export const WAITS = ['depends_on', 'waits_on', 'needs'];
+
 export const LENS_DEFAULT: Lens = { by: 'part_of', over: ['depends_on', 'waits_on'], order: 'order', measure: 'work', fold: ['closed', 'system', 'unlinked'] };
 /** The fields a lens kept on the map may name: all but where it starts, which is what it is about. */
 export const LENS_KEPT = { kinds: 1, by: 1, over: 1, far: 1, near: 1, lanes: 1, order: 1, measure: 1, fold: 1, time: 1 };
