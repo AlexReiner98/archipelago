@@ -36,9 +36,9 @@ export interface MoveReport {
   segments: number;
 }
 
-/** The tables a database holds, as the schema made them. */
+/** The tables a database holds, as the schema made them: a partitioned one by its parent, which reads all of it. */
 async function tables(q: Q): Promise<string[]> {
-  const { rows } = await q.query<{ name: string }>(`select c.relname as name from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r', 'p') order by 1`);
+  const { rows } = await q.query<{ name: string }>(`select c.relname as name from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relispartition order by 1`);
   return rows.map((r) => r.name);
 }
 
