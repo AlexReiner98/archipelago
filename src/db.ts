@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { migrate, schemaKey } from './migrate.ts';
 import { openPg, scratchPg } from './pg.ts';
+import { keepStatistics } from './stats.ts';
 
 /** Anything that can run a query: the database or a transaction on it. */
 export interface Q {
@@ -30,10 +31,10 @@ export const isServer = (where: string) => /^postgres(ql)?:\/\//.test(where);
 /** Open the database at a folder or on a server (a postgres:// address), or in memory when neither is given. */
 export async function openDb(where?: string): Promise<Database> {
   if (!where) return inMemory();
-  if (isServer(where)) return openPg(where, (db) => prepared(db, true));
+  if (isServer(where)) return keepStatistics(await openPg(where, (db) => prepared(db, true)), true);
   mkdirSync(where, { recursive: true });
   const image = process.env.PELAGO_TEST_IMAGE && !existsSync(join(where, 'PG_VERSION')) ? await (blank ??= blankImage()) : undefined;
-  return prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm } }));
+  return keepStatistics(await prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm } })), false);
 }
 
 // The steps of the schema this database lacks (src/migrate.ts). pg_trgm, which search uses for near-misses and typos,
@@ -58,7 +59,7 @@ let blank: Promise<File | Blob> | undefined;
 
 async function inMemory() {
   const server = process.env.PELAGO_TEST_DATABASE_URL;
-  const db: Database = server ? await scratchPg(server, schemaKey(true), (db) => prepared(db, true)) : await PGlite.create({ loadDataDir: await (blank ??= blankImage()), extensions: { pg_trgm } });
+  const db: Database = await keepStatistics(server ? await scratchPg(server, schemaKey(true), (db) => prepared(db, true)) : await PGlite.create({ loadDataDir: await (blank ??= blankImage()), extensions: { pg_trgm } }), Boolean(server));
   openInMemory.add(db);
   const close = db.close.bind(db);
   db.close = async () => {
@@ -78,6 +79,7 @@ async function makeImage() {
   const db = await prepared(new PGlite({ extensions: { pg_trgm }, initDbStartParams: ['--wal-segsize=1'] }));
   await db.query(`update pg_database set datistemplate = false where datname in ('template0', 'template1')`);
   for (const name of ['template0', 'template1']) await db.query(`drop database ${name}`);
+  await db.query('analyze'); // empty, but analysed: a database made from it is not taken for one never analysed
   await db.query('checkpoint');
   const image = await db.dumpDataDir('none');
   await db.close();
