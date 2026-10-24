@@ -228,10 +228,11 @@ test('the operator can create a workspace from a backup file: the map, its types
   await call('/api/change', old, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }] });
 
   const taken = await dump(main.pelago.db, { id: 'default', name: 'Default' }, main.pelago.registry.localPack());
+  const items = (await main.pelago.db.query<{ n: number }>(`select count(*)::int as n from entity`)).rows[0].n;
   const backup = gzipSync(JSON.stringify(taken)).toString('base64');
   assert.equal((await call('/operator/workspaces', old, { id: 'moved', backup })).status, 401, 'only the operator');
   assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: 'bm90IGEgYmFja3Vw' })).error, /not an Archipelago backup/);
-  assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: gzipSync(JSON.stringify({ ...taken, tables: { ...taken.tables, relation: [{ id: 'r_x', type: 'part_of', from_id: 'e_nobody', to_id: 'e_nowhere' }] } })).toString('base64') })).error, /./, 'a backup that does not go in');
+  assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup: gzipSync(JSON.stringify({ ...taken, tables: { ...taken.tables, log_fact: [...taken.tables.log_fact, { stream: 'facts', pos: 999999, n: 0, op: '+', id: 'e_x', field: 'type', value: 'x' }] } })).toString('base64') })).error, /./, 'a backup that does not go in');
   assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.map((w: any) => w.id), ['default'], 'a failed one leaves no workspace behind');
   assert.equal(existsSync(join(workspaces.config.rootDir, 'moved')), false);
 
@@ -239,7 +240,7 @@ test('the operator can create a workspace from a backup file: the map, its types
   assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup })).error, /backup of the key vault/, 'a sealed backup comes with its vault');
   const made = (await call('/operator/workspaces', operator, { id: 'moved', name: 'Alex, moved', backup, vault })).result;
   const logged = new Set(taken.tables.log_entry.map((e) => e.id)); // what a change set did is read from the restored log
-  assert.deepEqual([made.restored.entities, made.restored.events, made.restored.from.id], [taken.tables.entity.length, taken.tables.event.filter((e) => !logged.has(e.changeset)).length, 'default']);
+  assert.deepEqual([made.restored.entities, made.restored.events, made.restored.from.id], [items, taken.tables.event.filter((e) => !logged.has(e.changeset)).length, 'default']);
   const who = await call('/whoami', made.owner_token, undefined, 'GET');
   assert.deepEqual([who.workspace.id, who.workspace.name, who.actor.admin, who.actor.person], ['moved', 'Alex, moved', true, me], 'the new token is the owner\'s own');
   assert.equal((await call('/api/workspace_info', made.owner_token)).result.owner.title, 'Alex');

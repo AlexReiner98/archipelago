@@ -146,7 +146,7 @@ test('a backup taken before a forget cannot bring the item back', async () => {
   const made = await setup(l);
   const vaultThen = await dumpVault(l.db);
   const before = JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' })));
-  assert.equal(before.format, 2);
+  assert.equal(before.format, 3);
   assert.ok(!JSON.stringify(before).includes('Quill') && !JSON.stringify(vaultThen).includes('Quill'), 'the file holds no words, and its keys are wrapped');
   await make(l, [{ op: 'forget', id: made.sam, reasons: [made.said] }]);
 

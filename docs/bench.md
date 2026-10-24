@@ -68,3 +68,11 @@ It runs against whatever schema the checkout has, so the same command run in two
 ## When the log lands
 
 The bench reads and writes only through `/agent` tools, so it runs against the log as it is. The generator is the one part that knows the tables: it writes rows of `entity`, `relation`, `event` and `proposal` in `flush`. When the log is the truth, that becomes appending the same change sets in the log's format and letting the projections be rebuilt from it, which is itself worth timing.
+
+## Rebuilds and snapshots
+
+```bash
+npm run bench:rebuild -- --events 300000
+```
+
+`scripts/bench-rebuild.ts` generates a map with `gen-map.ts`, writes the log for its rows (one change set per item and per link, through `append`), then times a walk of the whole log into a snapshot, a rebuild from the start swapped in, a rebuild from that snapshot after `--more` change sets, an as-of read halfway and after the snapshot, and a backup (format 3: snapshot and log) dumped and restored. It works in a temporary folder it deletes. The numbers are on the snapshots task on the map.

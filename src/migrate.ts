@@ -21,6 +21,7 @@ import { VAULT } from './vault.ts';
 import { FORGET } from './forget.ts';
 import { OPLOG, OPLOG_SERVER } from './oplog.ts';
 import { PARTITION } from './partitions.ts';
+import { SNAPSHOT } from './snapshot.ts';
 
 interface Migration {
   version: number;
@@ -55,7 +56,8 @@ export const MIGRATIONS: Migration[] = [
   { version: 19, name: 'the activity log read from the log', sql: ACTIVITY },
   { version: 20, name: 'per-item keys in a vault, and forgetting', sql: VAULT + FORGET },
   { version: 21, name: 'the compacted streams, in segments', sql: OPLOG, server: OPLOG_SERVER },
-  { version: 22, name: 'the log cut by month', sql: PARTITION },
+  { version: 22, name: 'the log cut by year', sql: PARTITION },
+  { version: 23, name: 'snapshots of the projections, and room to rebuild them', sql: SNAPSHOT },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

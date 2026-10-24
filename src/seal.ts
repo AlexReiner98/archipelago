@@ -8,7 +8,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import type { Q } from './db.ts';
 import type { Entry, Fact } from './log.ts';
-import { keysFor, keysOf, type Key } from './vault.ts';
+import { keysFor, keysIn, keysOf, type Key, type VaultDump } from './vault.ts';
 
 export type Sealed = { $k: number; $n: string; $c: string };
 export type Digest = { $h: string };
@@ -127,6 +127,28 @@ export async function openSaid<T extends { id: string; field: string; value: unk
   if (!ids.length) return said;
   const ring = await keysOf(q, ids);
   return said.map((r) => (isSealed(r.value) ? { ...r, value: opened(open(ring.get(r.id), r.field, r.value), r.value) } : r));
+}
+
+/**
+ * Entries opened with every key the vault still holds, for no reader: what a rebuild projects from. The server's own
+ * read, never a page's; a value whose key is gone stays its digest.
+ */
+export async function openAll(q: Q, entries: Entry[], vault?: VaultDump): Promise<Entry[]> {
+  const ids = new Set<string>();
+  for (const e of entries) {
+    for (const f of e.facts) if (f[0] === '+' && isSealed(f[3])) ids.add(f[1]);
+    for (const k of (e.keys as string[] | undefined) ?? []) ids.add(k);
+  }
+  if (!ids.size) return entries;
+  const ring = new Map([...(vault ? keysIn(vault, ids) : []), ...(await keysOf(q, [...ids]))]);
+  const read = (id: string, field: string, v: unknown) => (isSealed(v) ? opened(open(ring.get(id), field, v), v) : v);
+  return entries.map((e) => {
+    const out: Entry = { ...e, facts: e.facts.map((f): Fact => (f[0] === '+' && isSealed(f[3]) ? ([...f.slice(0, 3), read(f[1], f[2], f[3]), ...f.slice(4)] as Fact) : f)) };
+    for (const [field, key] of HEAD[e.stream] ?? []) if (field in e) out[field] = read(key(e.id), field, e[field]);
+    const authority = e.authority as { basis?: unknown } | null | undefined;
+    if (authority?.basis !== undefined) out.authority = { ...authority, basis: read(BASIS(e.id), 'basis', authority.basis) };
+    return out;
+  });
 }
 
 const opened = (plain: unknown, v: Sealed) => (plain === undefined ? digestOf(v) : plain);
