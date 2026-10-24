@@ -5,6 +5,7 @@
 // entry to be told the answer (then), which answers ops in turn.
 
 import { newSecret } from './auth.ts';
+import { parts } from './manifest.ts';
 import { newId } from './db.ts';
 import type { ActionDef, HostDef } from './declared.ts';
 import { notify } from './notify.ts';
@@ -94,7 +95,7 @@ async function answer(host: PackHost, l: Archipelago, actor: Actor, pack: PackFi
 export async function handleRequests(host: PackHost, l: Archipelago, actor: Actor, pack: PackFile, action: ActionDef | undefined, requests: OutsideRequest[], changeset: string | undefined, depth = 0): Promise<Outcome[]> {
   const out: Outcome[] = [];
   for (const r of requests) {
-    const target = pack.hosts?.find((h) => h.id === r.host);
+    const target = parts(pack).hosts.find((h) => h.id === r.host);
     if (!target) {
       out.push({ host: r.host, status: 'refused', why: `the ${pack.id} pack declares no host "${r.host}"` });
       continue;
@@ -129,7 +130,7 @@ export async function handleRequests(host: PackHost, l: Archipelago, actor: Acto
 
 /** Make an act now, log it as done (never undone), and tell the handler. */
 async function makeAct(host: PackHost, l: Archipelago, actor: Actor, pack: PackFile, id: string, r: OutsideRequest, depth: number): Promise<Outcome[]> {
-  const target = pack.hosts!.find((h) => h.id === r.host)!;
+  const target = parts(pack).hosts.find((h) => h.id === r.host)!;
   try {
     const made = await make(l, pack.id, target, r);
     await l.db.query(`update act set status = 'done', result = $2::jsonb, decided_at = now() where id = $1`, [id, JSON.stringify({ http: made.http })]);

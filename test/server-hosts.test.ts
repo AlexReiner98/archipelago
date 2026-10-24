@@ -34,9 +34,11 @@ const pack: ServerPackFile = {
   id: 'signer',
   version: '1',
   title: 'Signer',
-  tier: 'server',
-  hosts: [{ id: 'api', base: `${base}/`, sign: { key: 'key', issuer: 'iss', minutes: 5 }, exchange: { path: '/trade/{as}', token: 'token', expires: 'until' } }],
-  secrets: [{ name: 'key', env: 'SIGNER_KEY' }, { name: 'iss' }, { name: 'hook' }],
+  reach: {
+    server: {},
+    hosts: [{ id: 'api', base: `${base}/`, sign: { key: 'key', issuer: 'iss', minutes: 5 }, exchange: { path: '/trade/{as}', token: 'token', expires: 'until' } }],
+    secrets: [{ name: 'key', env: 'SIGNER_KEY' }, { name: 'iss' }, { name: 'hook' }],
+  },
 };
 
 test('a host that signs: the kernel signs with the key it holds, trades for an account\'s token once, and keeps what a host hands over', async () => {
@@ -68,18 +70,19 @@ test('a host that signs: the kernel signs with the key it holds, trades for an a
 });
 
 test('what a server pack may declare, and the acts on a workspace only once it connected the pack', async () => {
-  const ok = { id: 'x', version: '1', title: 'X', tier: 'server' as const };
-  assert.match(checkServerPack({ ...ok, hosts: [{ id: 'api', base: 'https://a.test', secret: 'token' }] }, OWN_PACKS).join(), /names the secret "token", which it does not declare/);
-  assert.match(checkServerPack({ ...ok, secrets: [{ name: 'k' }], hosts: [{ id: 'api', base: 'https://a.test', exchange: { path: '/t', token: 't', expires: 'e' } }] }, OWN_PACKS).join(), /an exchange trades a signed token/);
-  assert.match(checkServerPack({ ...ok, aliases: { '/api/change': 'hook/x' } }, OWN_PACKS).join(), /cannot be an address of its own[\s\S]*leads to no route/);
-  assert.match(checkServerPack({ ...ok, pages: [{ id: 'p', file: 'new.html', form_action: 'web' }] }, OWN_PACKS).join(), /sends a form to no host/);
+  const ok = { id: 'x', version: '1', title: 'X' };
+  const with_ = (reach: Record<string, unknown>, server: Record<string, unknown> = {}) => ({ ...ok, reach: { ...reach, server } }) as never;
+  assert.match(checkServerPack(with_({ hosts: [{ id: 'api', base: 'https://a.test', secret: 'token' }] }), OWN_PACKS).join(), /names the secret "token", which it does not declare/);
+  assert.match(checkServerPack(with_({ secrets: [{ name: 'k' }], hosts: [{ id: 'api', base: 'https://a.test', exchange: { path: '/t', token: 't', expires: 'e' } }] }), OWN_PACKS).join(), /an exchange trades a signed token/);
+  assert.match(checkServerPack(with_({}, { aliases: { '/api/change': 'hook/x' } }), OWN_PACKS).join(), /cannot be an address of its own[\s\S]*leads to no route/);
+  assert.match(checkServerPack(with_({}, { pages: [{ id: 'p', file: 'new.html', form_action: 'web' }] }), OWN_PACKS).join(), /sends a form to no host/);
   // The kernel's own packs folder holds workspace packs too: only those marked for the server are read as server packs.
   const own = loadServerPacks([OWN_PACKS]);
   assert.deepEqual([own.packs.map((p) => p.file.id), own.refused], [['github_app'], []]);
 
   const control = await openDb();
   const at = { has: async () => true, get: async () => { throw new Error('reached a workspace'); }, hold: () => () => {} } as never;
-  const acting = { ...ok, acts: ['workspace.add', 'workspace.deliver', 'connection.make'] } as ServerPackFile;
+  const acting = with_({}, { acts: ['workspace.add', 'workspace.deliver', 'connection.make'] }) as ServerPackFile;
   await assert.rejects(connectAct(at, control, acting, 'workspace.add', { connection: '42', type: 'software.repo', unique: 'remote', items: [] }), /No workspace here has connected "42"/);
   await assert.rejects(connectAct(at, control, acting, 'workspace.deliver', { connection: '42', event: 'repo.push' }), /No workspace here has connected "42"/);
   await assert.rejects(connectAct(at, control, acting, 'connection.make', { id: '42', state: 'default.guessed' }), /not started from Archipelago/);

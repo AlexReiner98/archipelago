@@ -23,7 +23,7 @@ test('a value is kept until it runs out, and taken once', async () => {
 test('a connection begun on one server is finished on another, once', async () => {
   // Every server reads the one control plane: what was begun on one is known on the next, and taken once.
   const db = await openDb();
-  const pack = { id: 'acme_app', version: '1', title: 'Acme App', tier: 'server' as const, acts: [] };
+  const pack = { id: 'acme_app', version: '1', title: 'Acme App', reach: { server: { acts: [] } } };
   const at = { has: async () => true, get: async () => { throw new Error('no workspace is reached'); }, hold: () => () => {} } as never;
   const state = await begin(db, pack.id, 'setup', 'acme');
   assert.match(state, /^acme\./, 'the state names its workspace');

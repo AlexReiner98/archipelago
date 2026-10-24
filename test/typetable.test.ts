@@ -111,7 +111,7 @@ test('a relation a pack took over takes its links with it, and the work at risk 
   const core = JSON.parse(readFileSync(join(before, 'core', 'pack.json'), 'utf8'));
   const bare = (id: string) => id.replace('inquiry.', '');
   for (const { moved_from: _, ...t } of inquiry.types) core.types.push({ ...t, id: bare(t.id) });
-  for (const { moved_from: _, ...r } of inquiry.relations) core.relations.push({ ...r, id: bare(r.id), from: r.from.map(bare), to: r.to.map(bare) });
+  for (const { moved_from: _, ...r } of inquiry.links) core.links.push({ ...r, id: bare(r.id), from: r.from.map(bare), to: r.to.map(bare) });
   writeFileSync(join(before, 'core', 'pack.json'), JSON.stringify(core));
   rmSync(join(before, 'inquiry'), { recursive: true });
   const db = await openDb();

@@ -126,7 +126,7 @@ test('with no model, what needs one says so plainly', async () => {
   await withEnv(noServerModel, async () => {
     const l = await fresh();
     // A pack's run is not started.
-    const pack = { id: 'demo', version: '0', title: 'Demo', runs: [] };
+    const pack = { id: 'demo', version: '0', title: 'Demo', reach: { runs: [] } };
     const runs = await startRuns(l, { kind: 'agent', name: 'pack:demo' }, pack, 'webhook', [{ title: 'Read the push', system: 'Read it.', task: 'A push.', within: ['e_00000000'] }]);
     assert.deepEqual(runs, [{ started: false, title: 'Read the push', reason: NO_MODEL }]);
     assert.match(NO_MODEL, /^No model account is connected to this workspace[\s\S]*Workspace page/);

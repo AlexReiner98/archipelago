@@ -54,7 +54,7 @@ test('every relation extends one of the thirteen roots', () => {
 });
 
 test('a pack cannot leave a type without a kind, declare a kind, or stretch a root', () => {
-  const pack = (types: PackFile['types'], relations: PackFile['relations'] = []): PackFile => ({ id: 'x', version: '1', title: 'X', requires: ['core'], types, relations });
+  const pack = (types: PackFile['types'], links: PackFile['links'] = []): PackFile => ({ id: 'x', version: '1', title: 'X', requires: ['core'], types, links });
   const statuses = { open: ['open'], closed: ['done'] };
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.thing', title: 'T', description: '', statuses }]))), /must extend one of the kinds: actor, aim/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.kind', title: 'K', description: '', kind: true, statuses }]))), /only the core pack declares kinds/);
@@ -70,7 +70,7 @@ test('a pack cannot leave a type without a kind, declare a kind, or stretch a ro
 test("a pack's relation extending depends_on blocks as depends_on does", async () => {
   const reg = new Registry(packsWith({
     id: 'x', version: '1', title: 'X', requires: ['core'],
-    relations: [{ id: 'x.after', extends: 'depends_on', title: 'comes after', inverse: 'comes before', from: ['*'], to: ['*'], description: '' }],
+    links: [{ id: 'x.after', extends: 'depends_on', title: 'comes after', inverse: 'comes before', from: ['*'], to: ['*'], description: '' }],
   }));
   const l = new Archipelago(await openDb(), reg);
   const made = await l.change(human, {

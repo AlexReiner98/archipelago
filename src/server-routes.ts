@@ -61,13 +61,13 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
   const { file, folder } = pack;
 
   if (req.method === 'GET') {
-    const page = !more && file.pages?.find((p) => p.id === name);
+    const page = !more && file.reach.server.pages?.find((p) => p.id === name);
     if (page) {
-      const host = page.form_action ? file.hosts?.find((h) => h.id === page.form_action) : undefined;
+      const host = page.form_action ? file.reach.hosts?.find((h) => h.id === page.form_action) : undefined;
       // The site it hands the person to may send them straight back here: a form's redirects are held to the policy too.
       return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': pagePolicy(host && `'self' ${new URL(hostBase(file.id, host)).origin}`) }).end(await readFile(join(folder, 'public', page.file)));
     }
-    const back = !more && file.entries?.find((e) => e.id === name && e.method === 'GET');
+    const back = !more && file.reach.server.entries?.find((e) => e.id === name && e.method === 'GET');
     if (back) return comeBack(res, () => packs.call(file.id, 'entry', back.id, Object.fromEntries(new URL(req.url ?? '/', 'http://x').searchParams), back.limit_ms));
     if (name === 'public' && ASSET.test(more)) {
       const bytes = await readFile(join(folder, 'public', more)).catch(() => null);
@@ -78,7 +78,7 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
   if (req.method !== 'POST') return json(405, { error: 'GET a page, POST an entry or a webhook.' });
 
   if (name === 'hook') {
-    const hook = file.webhooks?.find((w) => w.id === more);
+    const hook = file.reach.webhooks?.find((w) => w.id === more);
     if (!hook) return json(404, { error: 'Not found' });
     const raw = await at.raw();
     const secret = await serverSecret(await packs.control(), file, hook.secret);
@@ -106,7 +106,7 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
       return json(500, { error: (err as Error).message });
     }
   }
-  const entry = !more && file.entries?.find((e) => e.id === name && e.method !== 'GET');
+  const entry = !more && file.reach.server.entries?.find((e) => e.id === name && e.method !== 'GET');
   if (!entry) return json(404, { error: 'Not found' });
   try {
     return json(200, { result: await packs.call(file.id, 'entry', entry.id, (await at.body()) ?? {}, entry.limit_ms) });

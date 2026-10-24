@@ -128,7 +128,7 @@ export interface ChangeInput {
   /** From an agent: have this change wait for a human even where agents' changes are applied as made. */
   hold?: boolean;
   /** The pack action that made it, named on every event it logs ("time.log made this"). */
-  action?: string;
+  action?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string;
   /** The change set this one reverses: undo's own. */
   undoes?: string;
 }
@@ -253,7 +253,7 @@ export class Archipelago {
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);
     // Whether it applies, waits or is refused is the rules' to say (src/rules.ts), and the answer names the rule.
-    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed) };
+    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), pack: input.pack };
     const verdict = await decide(this.db, this.registry, who, input.ops, this.policy);
     if (verdict.outcome === 'refuse') throw new Error(`Change rejected:\n${verdict.refused.map((r) => `- ${r}`).join('\n')}`);
     // A question an agent settled, where the owner lets it, is put to them by the next session they talk to.
@@ -585,7 +585,7 @@ export class Archipelago {
       if (opts.dry) throw DRY;
       const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
       const by = { id: actor, ...(opts.token && { token: opts.token }) };
-      await append(tx, this.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [] }, facts);
+      await append(tx, this.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [], ...(input.pack && { pack: { id: input.pack, manifest: this.registry.hashes.get(input.pack) ?? null, action: input.action ?? null } }) }, facts);
     }).catch((err) => { if (err !== DRY) throw err; });
     if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
