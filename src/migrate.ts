@@ -14,6 +14,7 @@ import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
+import { SEARCH_INDEX } from './search.ts';
 
 interface Migration {
   version: number;
@@ -43,6 +44,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 14, name: 'an agent reads whether it may change the code drawings run', sql: AGENT_CODE_READ },
   { version: 15, name: 'an item keeps its kind in its row', sql: ITEM_KIND },
   { version: 16, name: 'a held change keeps the rule that held it', sql: HELD_BY },
+  { version: 17, name: 'titles and notes indexed for search', sql: SEARCH_INDEX },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
