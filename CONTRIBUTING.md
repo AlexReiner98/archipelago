@@ -30,9 +30,15 @@ read it before you send it.
 
 These are refused in review, so they are said here first.
 
-- **One write path.** Every change to entities and relations goes through
-  `Archipelago.change`. Sessions, claims and notifications are the only writes
-  that skip it.
+- **The log is the truth.** Every change to items and links goes through
+  `Archipelago.change` and is appended to the workspace's log; the tables
+  pages read are projections of it, written only by the projector
+  (`src/replay.ts`). What skips approval (sessions, claims, notifications,
+  settings) goes to the operational streams, each store named in
+  `src/operational.ts`.
+- **No read of the whole map.** Every query of items, links or the log is
+  bounded by an id, a subtree, a person, a cursor or a limit, or goes by an
+  index the schema makes.
 - **The database enforces who sees what** (row level security in
   `src/db.ts`). No visibility filters in application code. If something must
   cross the privacy line, it is a narrow `security definer` function.

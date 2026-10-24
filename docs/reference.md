@@ -74,7 +74,7 @@ stands: pick an option or type the outcome, and say why. The whole log of
 changes is at `#/activity`.
 
 The roadmap is the `tree` view, which agents can call too. The tree is
-declared in the software pack (`trees` in
+declared in the software pack (a view of `form: "tree"` in
 [packs/software/pack.json](../packs/software/pack.json)): which types are roots,
 branches and work, which field orders them, and which statuses mean "now". A
 pack can declare another tree the same way, with no code.
@@ -116,7 +116,7 @@ The UI is plain files in `ui/` with no build step.
 
 Every change to the map goes through one tool, `change`: a list of ops
 (`create`, `update`, `link`, `unlink`, `archive`, `restore`, `merge`,
-`define_type`) with a
+`define_type`, `forget`) with a
 reason and a source.
 
 1. The whole change is validated against the schema and the current map.
@@ -148,8 +148,9 @@ npm run pelago -- reject <id> "why"
    A held change that asks only for what a later change has already made
    so (the task it would close is closed) leaves the queue as superseded,
    and the log says by which change.
-4. Every applied op is written to the event log with who proposed it, who
-   approved it, why, and the source, and on whose authority it was made:
+4. Every applied change is appended to the workspace's log as one entry
+   (below), with who proposed it, who approved it, why, the source, the rule
+   that decided it, and on whose authority it was made:
    the human's own (their change, or a held one they applied), a human's
    word as an agent reports it (the agent must say what was said and where,
    and the log keeps that it is the agent's report), or the agent's own
@@ -161,6 +162,44 @@ the `undo` tool. The opposite is applied as a new change, so the log keeps
 both: created items are archived, edits put back, links removed or
 restored, archived items restored. An edit that has been changed again
 since is left alone and reported. A merge cannot be undone automatically.
+
+**Forget.** `forget` takes an item out of the map for good: its key is
+destroyed, so its title, note and fields, and the fields of every link
+touching it, are gone from the log, the tables, the search index and any
+backup that needs that key; what stays is that something of its type
+existed. Change set reasons that mention it are offered, and go with it only
+if chosen. An agent's forget waits for the owner, whatever the workspace
+lets agents do, and no forget can be undone.
+
+## The log
+
+Each workspace keeps one log, and everything else is read from it
+([docs/log.md](log.md) is the full account). It is appended to and never
+rewritten:
+
+- **The fact stream** holds every applied change set as one entry: a header
+  and its facts, each one value of one field of one item or link asserted or
+  retracted. Each entry carries the hash of the one before, so the chain
+  shows any change to what was written. Held changes are entries of the
+  pending stream until they are decided.
+- **The operational streams** (sessions, claims, notifications,
+  automations, settings, access, observations, and a pack's own) hold what
+  skips approval. Each day of each is sealed by an entry in the fact stream,
+  and compacted by the retention rules its packs declare (`keep` in
+  `packs/core/pack.json`); the fact stream is kept forever.
+- **Sealed words.** Every title, note, field value and reason is sealed
+  with its item's own key, kept in the workspace's key vault, so a forget
+  destroys one key and the chain still verifies. A member reads an entry of
+  the log only when they may see what it is about.
+- **Projections.** The tables pages read (items, links, the review queue,
+  the part_of closure, mentions, the search index) are written from the
+  log's facts in the same transaction as the append. A snapshot of them is
+  kept daily; a rebuild starts from the newest one and swaps in what
+  differs, and any position can be read as it was (`src/snapshot.ts`).
+- **Partitions.** The log's tables are partitioned by year, made ahead as
+  time goes on, and every partition refuses an update or a delete.
+- **Activity and history** (an item's history, `changed_since`, `watch`,
+  undo) are read from the log, not from a table of their own.
 
 `claim` and `release` (taking an exclusive resource, such as the one live session
 of a desktop program) take effect at once for agents too.
@@ -327,6 +366,15 @@ Types live in files under `packs/`, one folder per pack:
 - `funding`: funding programs, tied to the work they could pay for.
 - `local`: created when you approve a `define_type` proposal.
 
+Each pack is described by its `pack.json`, a manifest of fifteen keys
+([docs/packs.md](packs.md)): what it declares, which packs it requires or
+uses, and what it may reach beyond the map. Adding or taking out a pack is a
+fact in the workspace's log, and everything it registers (its types, tools,
+screens, rules and handlers) follows from the packs present, so taking one
+out unwinds it while its items stay. A change a pack's action or handler
+makes names the pack, and core's rule `pack_reach` refuses one that writes
+outside what the pack declares, requires or uses.
+
 A type can extend another. A `software.bug` is a flavour of `work.issue`: it
 inherits the parent's fields and statuses, and anything that searches or views
 issues sees bugs too. Types outside `core` are named `<pack>.<name>`. When a
@@ -372,7 +420,16 @@ it.
   `npm run migrate` as the deploy step, before the new server starts, so no
   server that is answering requests changes the schema under another. A
   server also applies the steps a database lacks as it opens it, so a
-  database on the disk needs no deploy step.
+  database on the disk needs no deploy step. Log in as a role that is not a
+  superuser, with CREATEDB and CREATEROLE: a superuser can turn off the
+  triggers that keep the log append-only. Every server on the database must
+  have the same `PELAGO_SECRETS_KEY`.
+- `node src/cli.ts move <from> <to>` carries a map between a data folder and
+  a Postgres database, either way, or between two Postgres servers, with no
+  server running on either. It verifies the source's log, replays it into the
+  empty target with the same positions and hashes, and keeps the result only
+  if the target's chains and tables match the source's row for row. The
+  target needs the sealing key the source was sealed with.
 - Each workspace is its own database and costs about 200 MB of memory while
   open, on top of about 350 MB for the server. A workspace nobody has used for
   30 minutes (`PELAGO_IDLE_MINUTES`; 0 for never) is closed and opens again
@@ -509,6 +566,11 @@ What the server knows and must not give up is of two kinds.
 - **What it only has to recognise is kept as a hash:** every token, and the
   operator secret. Each is shown once, when it is made, and cannot be read
   back out of the server or a backup.
+- **What the map says is sealed per item** (`src/seal.ts`): each item, link
+  with fields and change set has its own key, kept in the workspace's key
+  vault (`src/vault.ts`) wrapped with the sealing key below. A forget deletes
+  the key; vault backups are kept apart from the data and for 30 days only,
+  so a forgotten item cannot be read back after that.
 - **What it has to use is sealed** (AES-256-GCM, `src/secrets.ts`): a
   workspace's model account, the secret a GitHub webhook signs with, and the
   GitHub App's key and signing secret. The sealing key is
@@ -572,8 +634,13 @@ any other, and are held for review where the workspace holds agents' changes.
 
 ## Backups
 
-Every 6 hours the server writes each workspace out as one file of plain rows,
-`backups/<workspace>/<time>.json.gz`, and keeps the newest 28 (a week). It goes
+Every 6 hours the server writes each workspace out as one file,
+`backups/<workspace>/<time>.json.gz`, and keeps the newest 28 (a week). The
+file holds the log as it is stored, a snapshot of the projections at its
+head, and the tables beside the log; restored, the tables are that snapshot
+with the rest of the log projected on. Its words are sealed, so it is read
+with the workspace's key vault, which is backed up beside it in
+`backups/<workspace>/vault/`, kept 30 days and never sent off the server. It goes
 by the newest file, so restarting neither skips a backup nor piles them up.
 `"backup": false` in `pelago.config.json` turns it off, `"backup": { "dir",
 "everyHours", "keep" }` changes it, and `PELAGO_BACKUP_DIR` moves it.
@@ -585,8 +652,13 @@ a backup: taken while the server runs, it may not open again.
 To restore, with the server stopped, into a folder that does not exist yet:
 
 ```bash
-node src/backup.ts restore backups/default/<file>.json.gz data-restored
+node src/backup.ts restore backups/default/<file>.json.gz data-restored backups/default/vault/<file>
 ```
+
+The last argument is the vault backup taken with it; the target may also be
+a `postgres://` address. A row whose key is gone (forgotten since) stays
+out. A download of a backup (`npm run pull`) carries the vault beside it,
+its keys wrapped under a one-time key.
 
 Then put that folder in place of `data/`.
 
@@ -600,7 +672,10 @@ either direction:
   edits to different fields of the same item do not combine: the later one
   wins.
 - A link ended on either side is ended; a proposal decided on either side
-  is decided; the file's history is added to the activity log.
+  is decided; the file's history is added to the activity log as events. Two
+  logs are never joined: the map keeps its own chain.
+- A file from another server is read with the vault backup taken with it
+  (`vault` on `import_backup`), on a server with the same sealing key.
 - Tokens and settings are not touched. Sessions still open where the file
   came from, and what they hold, are left out.
 - A map from elsewhere has its own person for its owner. When that differs
