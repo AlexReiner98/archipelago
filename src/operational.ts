@@ -1,25 +1,28 @@
 // What is stored that is not a fact anyone states (Rule 4 of the model). Every fact about the map changes through
 // Archipelago.change; everything else lives in a store named here, with the one rule it keeps. test/structure.test.ts
 // reads these lists: a table that is neither the map nor named here fails it, and so does a write to the map's
-// tables outside src/pelago.ts.
+// tables outside src/pelago.ts and the projector it runs (src/replay.ts).
 
 /**
  * The map itself: items, links and the log. Written only in src/pelago.ts. log_entry and log_fact are the log the
- * owner decided is the source of truth (docs/log.md), appended to and never changed; entity, relation and event are
- * written beside it until they are projections of it.
+ * owner decided is the source of truth (docs/log.md), appended to and never changed; entity and relation are its
+ * projections, written from its facts by src/replay.ts in the append's transaction (and, until the operational
+ * streams hold them, by the operational writes). event holds only what is not a fact: what a change set did is read
+ * from the log. log_op holds the compacted streams (src/streams.ts): what is below appended there at once, sealed by
+ * day in the fact stream and kept by the retention rules of the packs.
  */
-export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact'];
+export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact', 'log_op'];
 
 /**
  * State kept on the map's own items that skips approval. It takes effect at once and is never held, through the
  * operational writes in src/pelago.ts (operational, claim, release, and apply for what is made at once).
  */
 export const ON_THE_MAP: Record<string, string> = {
-  sessions: "A run's heartbeat (last_seen, active, busy), its tokens_used (shared onto the work it is on) and its story: kept at once by operational, out of the item's history; its start and end are logged changes.",
-  claims: 'A holds link from holder to resource: made by claim and ended by release, at once, each logged.',
-  notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational.',
-  automations: "An automation's last_run, last_fired and last_result: kept by operational, the firing itself logged.",
-  rechecks: "A project's rechecked_at: kept by operational, the re-check itself logged.",
+  sessions: "A run's tokens_used (shared onto the work it is on), story and stale flag: kept at once by operational and appended to the sessions stream; its start, end and task are facts; its heartbeat (last_seen, active, busy) is in no stream.",
+  claims: 'A holds link from holder to resource: made by claim and ended by release, at once, appended to the claims stream.',
+  notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
+  automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
+  rechecks: "A project's rechecked_at: kept by operational, appended to the automations stream.",
   kinds: "An item's kind column, read from its type: filled by fillKinds when a workspace opens, and by the database for a row written without it; never a fact anyone states.",
 };
 
@@ -30,20 +33,22 @@ export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'tokens_used', 'story
 export const STORES: Record<string, string> = {
   token: "Who may act: stored as a hash; made, moved and revoked by a human, an admin or the server's setup, never by a change.",
   share: 'A link that lets someone with no login, or another workspace, read one document: made and revoked by a human only.',
-  setting: "The workspace's settings and sealed secrets: set by the human or by the server, never by an agent's change.",
+  setting: "The workspace's settings and sealed secrets: set by the human or by the server, never by an agent's change; each set appended to the settings stream (a secret by its name only).",
   member: 'Who belongs to the workspace, by email: written by an admin or a server pack, read only by the whole database.',
-  proposal: 'A change held for a human: written by change when it holds, decided by decide; what it would do is ops, applied through apply.',
+  proposal: 'The review queue, a projection of the log: a held change’s record in the pending stream makes its row, the entry that decides it in the fact stream says what became of it (src/replay.ts).',
   published: 'A document as it was published, frozen: written only when a human publishes.',
-  picture: 'The picture a test drew, kept for a public result: one per result, replaced when the test runs again.',
+  picture: 'The picture a test drew, kept for a public result: one per result, replaced when the test runs again; its hash appended to the observations stream.',
   act: 'A request a pack made outside the map: one that cannot be taken back waits for a person; once made it is logged, never undone.',
   type_def: "Every type and relation the packs declare, dormant ones included: written when a workspace opens, never by a change.",
   local_type: "A workspace's own types, kept beside the workspaces so the server can read them: written when one is defined.",
-  transient: 'Short-lived keys and values with an expiry: gone when they lapse, never part of a backup.',
+  transient: 'Short-lived keys and values with an expiry: gone when they lapse, never part of a backup or the log; unlogged on a Postgres server.',
   pack_store: 'Keys and values a server pack keeps, each pack its own: written through the pack host only.',
   control_workspace: 'The workspaces this server holds: written when one is made.',
   control_value: "The server's own keys and values, across workspaces.",
   github_installation: 'Which GitHub installation belongs to which workspace: written by the GitHub sign-up.',
   schema_version: 'Which schema steps have run: written by migrate only.',
+  vault_key: "Each item's, link's and change set's key, wrapped with the server's sealing key: made in the append that first seals with it, deleted only by a forget, backed up apart and kept 30 days.",
+  vault_secret: 'Secrets kept by name, wrapped like a key: set and removed by the owner or the server, never in the log or its backups.',
 };
 
 /**

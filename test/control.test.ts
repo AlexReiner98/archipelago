@@ -44,7 +44,7 @@ test('what the files beside the data held is taken into the database, and kept t
   await setControlValue(control, 'github_app', { id: 7, slug: 'pelago-x', name: 'X', pem: seal('PEM'), webhook_secret: seal('whsec') });
   await control.query(`insert into github_installation (id, workspace, account) values ('42', 'acme', 'Acme')`);
   await control.exec(ADOPT_APP);
-  const app = { id: 'github_app', secrets: [{ name: 'key' }, { name: 'hook' }, { name: 'app_id' }] };
+  const app = { id: 'github_app', reach: { secrets: [{ name: 'key' }, { name: 'hook' }, { name: 'app_id' }], server: {} } };
   assert.deepEqual(await connectionById(control, 'github_app', '42'), { id: '42', workspace: 'acme', account: 'Acme' });
   assert.deepEqual([await serverSecret(control, app, 'key'), await serverSecret(control, app, 'hook'), await serverSecret(control, app, 'app_id')], ['PEM', 'whsec', '7']);
   assert.deepEqual(await storeGet(control, 'github_app', 'app'), { id: 7, slug: 'pelago-x', name: 'X' });

@@ -22,7 +22,7 @@ test('a database made while this was called Lattice is opened under the new name
   `);
   await made.close();
   const db = await openDb(dir);
-  assert.deepEqual((await db.query<{ rolname: string }>(`select rolname from pg_roles where rolname like 'lattice%' or rolname like 'pelago%' order by 1`)).rows.map((r) => r.rolname), ['pelago_member', 'pelago_public']);
+  assert.deepEqual((await db.query<{ rolname: string }>(`select rolname from pg_roles where rolname like 'lattice%' or rolname like 'pelago%' order by 1`)).rows.map((r) => r.rolname), ['pelago_compactor', 'pelago_member', 'pelago_public']);
   assert.deepEqual((await db.query<{ proname: string }>(`select proname from pg_proc where proname like 'lattice%'`)).rows, []);
   assert.deepEqual((await db.query<{ origin: string }>(`select origin from event order by seq`)).rows.map((r) => r.origin), ['pelago', 'github']);
   // And a member still sees through the role that took the old one's place.

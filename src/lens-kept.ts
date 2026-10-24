@@ -2,6 +2,7 @@
 // their own; and where a lens or a style is seen at work.
 
 import { SYSTEM } from './head.ts';
+import { parts as declaredBy } from './manifest.ts';
 import { lensRead } from './lens-scan.ts';
 import type { Archipelago } from './pelago.ts';
 
@@ -35,7 +36,7 @@ export const HUB_AT = 12;
  * hub that could go stale.
  */
 export async function hubs(l: Archipelago) {
-  const lens = l.registry.packs.find((p) => p.id === 'core')?.views?.find((v) => v.id === 'core.hubs')?.lens ?? {};
+  const lens = declaredBy(l.registry.packs.find((p) => p.id === 'core')!).views.find((v) => v.id === 'core.hubs')?.lens ?? {};
   const read = await lensRead(l, {}, lens, {}, ['hub_at'], []);
   const byId = new Map(read.entities.filter((e) => e.is_open && e.kind !== SYSTEM).map((e) => [e.id, e]));
   const parts = read.relations.filter((r) => r.type === 'part_of');

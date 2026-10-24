@@ -97,7 +97,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     lines.push('', `## ${title[0].toUpperCase()}${title.slice(1)}`);
     for (const { e: r } of ties.filter((t) => t.rel === rel)) lines.push(`- ${r.title} (${r.status})${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && notes.get(r.id) ? `: ${notes.get(r.id)}` : ''}`);
   }
-  lines.push('', '## Reporting', `Register with pelago (session_start, task ${task.id}, with your git branch), note anything worth knowing with session_update, and call session_end with a summary when done. ${commitRule(task.id)}`);
+  lines.push('', '## Reporting', `Register with pelago (capture, action session_start, task ${task.id}, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. ${commitRule(task.id)}`);
 
   const slim = (e: Row) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
   return {

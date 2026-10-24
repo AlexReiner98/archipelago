@@ -35,12 +35,57 @@
       }
     }
   ],
-  "relations": [
-    { "id": "inquiry.tests", "moved_from": ["tests"], "extends": "bears_on", "title": "tests", "inverse": "is tested by", "from": ["work.task"], "to": ["inquiry.hypothesis"], "description": "The work that will settle the hypothesis." },
-    { "id": "inquiry.supports", "moved_from": ["supports"], "extends": "bears_on", "title": "supports", "inverse": "is supported by", "from": ["inquiry.result"], "to": ["inquiry.hypothesis"], "description": "Evidence for." },
-    { "id": "inquiry.refutes", "moved_from": ["refutes"], "extends": "bears_on", "title": "refutes", "inverse": "is refuted by", "from": ["inquiry.result"], "to": ["inquiry.hypothesis"], "description": "Evidence against." },
-    { "id": "inquiry.assumes", "moved_from": ["assumes"], "extends": "relates_to", "title": "assumes", "inverse": "is assumed by", "from": ["*"], "to": ["inquiry.hypothesis"], "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted." },
-    { "id": "inquiry.explains", "moved_from": ["explains"], "extends": "about", "title": "would explain", "inverse": "may be explained by", "from": ["inquiry.hypothesis"], "to": ["work.issue"], "description": "A suspected cause." }
+  "links": [
+    {
+      "id": "inquiry.tests",
+      "moved_from": ["tests"],
+      "extends": "bears_on",
+      "title": "tests",
+      "inverse": "is tested by",
+      "from": ["work.task"],
+      "to": ["inquiry.hypothesis"],
+      "description": "The work that will settle the hypothesis."
+    },
+    {
+      "id": "inquiry.supports",
+      "moved_from": ["supports"],
+      "extends": "bears_on",
+      "title": "supports",
+      "inverse": "is supported by",
+      "from": ["inquiry.result"],
+      "to": ["inquiry.hypothesis"],
+      "description": "Evidence for."
+    },
+    {
+      "id": "inquiry.refutes",
+      "moved_from": ["refutes"],
+      "extends": "bears_on",
+      "title": "refutes",
+      "inverse": "is refuted by",
+      "from": ["inquiry.result"],
+      "to": ["inquiry.hypothesis"],
+      "description": "Evidence against."
+    },
+    {
+      "id": "inquiry.assumes",
+      "moved_from": ["assumes"],
+      "extends": "relates_to",
+      "title": "assumes",
+      "inverse": "is assumed by",
+      "from": ["*"],
+      "to": ["inquiry.hypothesis"],
+      "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted."
+    },
+    {
+      "id": "inquiry.explains",
+      "moved_from": ["explains"],
+      "extends": "about",
+      "title": "would explain",
+      "inverse": "may be explained by",
+      "from": ["inquiry.hypothesis"],
+      "to": ["work.issue"],
+      "description": "A suspected cause."
+    }
   ],
   "views": [
     {
@@ -48,9 +93,13 @@
       "shape": "rows",
       "description": "Open work that rests on a refuted hypothesis (it assumes one), each with the hypothesis it rests on: what was planned on a belief the evidence has since gone against.",
       "input": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "form": "screen",
+      "id": "inquiry.undermined",
+      "title": "Resting on what was refuted",
+      "at": "home",
+      "pieces": [{ "piece": "view", "view": "inquiry.undermined" }]
     }
-  ],
-  "screens": [
-    { "id": "inquiry.undermined", "title": "Resting on what was refuted", "at": "home", "pieces": [{ "piece": "view", "view": "inquiry.undermined" }] }
   ]
 }

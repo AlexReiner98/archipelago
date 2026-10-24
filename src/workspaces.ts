@@ -16,7 +16,7 @@ import { databaseFor, dropDatabaseFor } from './pg.ts';
 import { dueForDeletion, setEnded } from './ended.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
-import { followPacks, packsOff } from './packstate.ts';
+import { followPacks, packsOff, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
 
@@ -217,6 +217,7 @@ export class Workspaces {
       // The packs the owner turned off here stay off; what they made is dormant.
       pelago.registry.turnOff(await packsOff(pelago));
       await syncTypes(pelago);
+      await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };
       if (this.leading) this.clocks(ws, true);
       return ws;
