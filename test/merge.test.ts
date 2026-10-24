@@ -10,7 +10,7 @@ const pair = (l: Archipelago) =>
     { op: 'create', ref: 'keep', type: 'work.issue', title: 'A page reloads on every change', body: 'The original.' },
     { op: 'create', ref: 'drop', type: 'work.issue', title: 'Every screen redraws', body: 'The copy.' },
   ]);
-const events = async (l: Archipelago) => Number((await l.db.query<{ n: number }>(`select count(*)::int as n from event`)).rows[0].n);
+const events = async (l: Archipelago) => Number((await l.db.query<{ n: number }>(`select (select count(*) from event) + (select count(*) from log_entry) as n`)).rows[0].n);
 const hold = async (l: Archipelago, keep: string, drop: string) => {
   const held = await l.change(agent, { ops: [{ op: 'merge', keep, drop }], reason: 'Merge the copy into its original' });
   assert.equal(held.status, 'proposed');

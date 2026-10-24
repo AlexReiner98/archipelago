@@ -57,8 +57,8 @@ const count = (files: string[], pattern: RegExp) =>
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
-  'src/tools.ts': 908,
-  'src/pelago.ts': 934,
+  'src/tools.ts': 903,
+  'src/pelago.ts': 870,
   'ui/style.css': 732,
 };
 
@@ -76,12 +76,13 @@ test('the kernel names no pack', () => {
   assert.deepEqual(ratchet(named, NAMES_PACKS), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
 
-// 3. Writes to items and relations go through the write path (src/pelago.ts): change for facts, and the
-// operational writes and the restore path src/operational.ts names. Every other store is named there too.
+// 3. Writes to items and relations go through the write path (src/pelago.ts): change for facts, projected by the
+// projector it runs (src/replay.ts), and the operational writes and the restore path src/operational.ts names.
+// Every other store is named there too.
 const WRITES_ELSEWHERE: Record<string, number> = {};
 
 test('items and relations are written in one place', () => {
-  const others = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/pelago.ts');
+  const others = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/pelago.ts' && f !== 'src/replay.ts');
   const writes = count(others, /\b(?:insert\s+into|update|delete\s+from)\s+(?:entity|relation)\b/gi);
   assert.deepEqual(ratchet(writes, WRITES_ELSEWHERE), [], 'Send the change through Archipelago.change.');
 });
@@ -99,8 +100,9 @@ test('every store is named, with its rule', () => {
 // the server's policy only as the rules it lifts or adds.
 test('every approval is decided by a rule', () => {
   const src = walk('src').filter((f) => f.endsWith('.ts'));
-  const held = count(src, /insert\s+into\s+proposal\s*\(/gi);
+  const held = count(src, /append\(tx, this\.workspace, 'pending'/g);
   assert.deepEqual(held, { 'src/pelago.ts': 1 }, 'A change waits only where Archipelago.change holds it on the verdict of decide.');
+  assert.deepEqual(count(src, /insert\s+into\s+proposal\s*\(/gi), { 'src/replay.ts': 1 }, 'The queue is projected from the pending stream, nowhere else.');
   assert.match(read('src/pelago.ts'), /verdict\.outcome === 'hold'/, 'Archipelago.change holds a change on the verdict of decide.');
   const lifts = count(src.filter((f) => f !== 'src/rules.ts' && f !== 'src/schema.ts'), /['"`](?:agent_changes|agent_code|agent_publish|agent_backups)['"`]/g);
   assert.deepEqual(lifts, {}, 'A setting lifts a rule a pack declared liftable: read it through src/rules.ts (decide, mayDo, liftsOn).');

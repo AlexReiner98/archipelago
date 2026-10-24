@@ -6,6 +6,7 @@
 import type { Actor, Archipelago, Op, Proposal } from './pelago.ts';
 import { append, entry, factAt, type Decision } from './log.ts';
 import { ITEM_COLUMNS } from './facts.ts';
+import { projectDecision, stamp } from './replay.ts';
 import { dropExcepted } from './ops.ts';
 import { overtaken } from './merge.ts';
 import { newId, type Q } from './db.ts';
@@ -39,12 +40,18 @@ export async function overtakenFields(l: Archipelago, base: number, ops: Op[]): 
   return problems;
 }
 
-/** An entry with no facts, for a held change that was declined, or made moot by a change that did what it asked. */
-export async function rejection(tx: Q, ws: string, proposal: string, d: { outcome: 'rejected' | 'superseded'; actor: string; by: string; reason: string }) {
+/**
+ * An entry with no facts, for a held change that was declined, or made moot by a change that did what it asked; the
+ * queue's row says so from it. Only while it is pending: false when something else decided it first.
+ */
+export async function rejection(tx: Q, ws: string, proposal: string, d: { outcome: 'rejected' | 'superseded'; actor: string; by: string; reason: string }): Promise<boolean> {
+  await stamp(tx); // the fact stream's lock: one decision at a time
+  if ((await tx.query(`select 1 from proposal where id = $1 and status = 'pending'`, [proposal])).rows.length === 0) return false;
   const record = await entry(tx, proposal);
   const held = record?.held_by as { rule: string; pack: string } | null | undefined;
   const rule: Decision = { outcome: d.outcome, held_by: held ? { rule: held.rule, pack: held.pack } : null, proposal, proposal_hash: record?.hash ?? '', by: d.by };
-  return append(tx, ws, 'facts', { id: newId('c'), actor: { id: d.actor }, authority: null, rule, reason: d.reason, source: null, action: null, undoes: null, keys: [] }, []);
+  await projectDecision(tx, await append(tx, ws, 'facts', { id: newId('c'), actor: { id: d.actor }, authority: null, rule, reason: d.reason, source: null, action: null, undoes: null, keys: [] }, []));
+  return true;
 }
 
 /** Approve or reject a held change. `ops`, when given, is the reviewer's corrected version, planned on the map as it is. */
@@ -74,16 +81,13 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
         except: input.except, approvedBy: me, revised, authority: { of: 'human', who: me },
         // The ids it would have made when it was held: with nothing moved since, the facts it appends are the ones it showed.
         ids: revised ? undefined : (record?.ids as Record<string, string> | undefined),
-        rule: { outcome: 'approved', held_by: held ? { rule: held.rule, pack: held.pack } : null, proposal: proposal.id, proposal_hash: record?.hash ?? '', by: me, revised, except: input.except ?? [] },
+        rule: { outcome: 'approved', held_by: held ? { rule: held.rule, pack: held.pack } : null, proposal: proposal.id, proposal_hash: record?.hash ?? '', by: me, revised, except: input.except ?? [], ...(input.note && { note: input.note }) },
       },
     ).catch((err: Error) => { throw err.message.startsWith('Change rejected') ? overtaken(proposal.id, err) : err; });
-    if (input.ops) await l.db.query(`update proposal set ops = $2::jsonb where id = $1`, [proposal.id, JSON.stringify(input.ops)]);
   }
+  // The queue's row is the projection of what was appended: approved by the change set, declined by its own entry.
   const status = input.approve ? 'approved' : 'rejected';
-  await l.db.transaction(async (tx) => {
-    const marked = await tx.query(`update proposal set status = $2, decided_by = $3, decided_at = now(), note = $4 where id = $1 and status = 'pending' returning id`, [proposal.id, status, me, input.note ?? null]);
-    if (!input.approve && marked.rows.length) await rejection(tx, l.workspace, proposal.id, { outcome: 'rejected', actor: me, by: me, reason: input.note ?? '' });
-  });
+  if (!input.approve) await l.db.transaction((tx) => rejection(tx, l.workspace, proposal.id, { outcome: 'rejected', actor: me, by: me, reason: input.note ?? '' }));
   await l.log(l.db, {
     actor: me,
     action: `proposal.${input.approve ? 'approve' : 'reject'}`,

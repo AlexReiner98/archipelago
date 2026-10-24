@@ -5,7 +5,7 @@
 // logged with its result.
 
 import { AUTOMATION_TOOLS, checkAutomation } from './automation-rules.ts';
-import { notImported } from './backup.ts';
+import { lastSeq, readEvents } from './eventlog.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
@@ -97,19 +97,17 @@ export class Automations {
   /** Events since the last pass. Nothing an automation did can trigger another, so they cannot loop. */
   private async newEvents(): Promise<LoggedEvent[]> {
     const cursor = await this.l.setting<number>(CURSOR);
-    const { rows: top } = await this.l.db.query<{ max: number | null }>(`select max(seq)::int as max from event`);
-    const latest = top[0].max ?? 0;
+    const latest = await lastSeq(this.l.db);
     await this.l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [CURSOR, JSON.stringify(latest)]);
     // First run: start from now instead of replaying the whole history.
     if (cursor === undefined) return [];
-    const { rows } = await this.l.db.query<LoggedEvent>(
-      `select ev.seq::int as seq, ev.actor, ev.action, ev.target_id, e.title as target_title, ev.reason
-       from event ev left join entity e on e.id = ev.target_id
-       where ev.seq > $1 and ev.seq <= $2 and ev.origin = 'pelago' and ev.actor not like '%:automation:%' and ev.action <> 'automation.fire' and ${notImported('ev')}
-       order by ev.seq`,
-      [cursor, latest],
-    );
-    return rows;
+    const rows: LoggedEvent[] = [];
+    for (let after = cursor; ; ) {
+      const page = (await readEvents(this.l.db, { after, origin: 'pelago', news: true, oldest: true, limit: 500 })).filter((ev) => ev.seq <= latest);
+      rows.push(...page.filter((ev) => !ev.actor.includes(':automation:') && ev.action !== 'automation.fire'));
+      if (page.length < 500) return rows;
+      after = page.at(-1)!.seq;
+    }
   }
 
   private async fire(auto: Entity, now: Date, ev?: LoggedEvent) {

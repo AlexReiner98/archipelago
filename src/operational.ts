@@ -1,12 +1,14 @@
 // What is stored that is not a fact anyone states (Rule 4 of the model). Every fact about the map changes through
 // Archipelago.change; everything else lives in a store named here, with the one rule it keeps. test/structure.test.ts
 // reads these lists: a table that is neither the map nor named here fails it, and so does a write to the map's
-// tables outside src/pelago.ts.
+// tables outside src/pelago.ts and the projector it runs (src/replay.ts).
 
 /**
  * The map itself: items, links and the log. Written only in src/pelago.ts. log_entry and log_fact are the log the
- * owner decided is the source of truth (docs/log.md), appended to and never changed; entity, relation and event are
- * written beside it until they are projections of it.
+ * owner decided is the source of truth (docs/log.md), appended to and never changed; entity and relation are its
+ * projections, written from its facts by src/replay.ts in the append's transaction (and, until the operational
+ * streams hold them, by the operational writes). event holds only what is not a fact: what a change set did is read
+ * from the log.
  */
 export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact'];
 
@@ -32,7 +34,7 @@ export const STORES: Record<string, string> = {
   share: 'A link that lets someone with no login, or another workspace, read one document: made and revoked by a human only.',
   setting: "The workspace's settings and sealed secrets: set by the human or by the server, never by an agent's change.",
   member: 'Who belongs to the workspace, by email: written by an admin or a server pack, read only by the whole database.',
-  proposal: 'A change held for a human: written by change when it holds, decided by decide; what it would do is ops, applied through apply.',
+  proposal: 'The review queue, a projection of the log: a held change’s record in the pending stream makes its row, the entry that decides it in the fact stream says what became of it (src/replay.ts).',
   published: 'A document as it was published, frozen: written only when a human publishes.',
   picture: 'The picture a test drew, kept for a public result: one per result, replaced when the test runs again.',
   act: 'A request a pack made outside the map: one that cannot be taken back waits for a person; once made it is logged, never undone.',

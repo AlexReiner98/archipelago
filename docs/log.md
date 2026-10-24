@@ -682,6 +682,30 @@ Each projection declares the fields and streams it reads, and its version.
 Projections are written in the append's transaction (commitment 2): a page
 never sees the log ahead of them.
 
+### As built
+
+- **The projector** is `src/replay.ts`. The write path plans each op into
+  facts and projects them at once, under the fact stream's lock, so the next
+  op reads what it did; the entry is appended at the end of the same
+  transaction. `rebuild` projects a log into empty tables the same way, and
+  `test/projections.test.ts` compares the two row for row.
+- **An item's kind is not a fact.** It is read from its type, as `is_open`
+  is from its status, so a field a pack calls `kind` is the pack's own. A
+  link is known by its id (`r_…`), so an item may have a field called `link`.
+- **The activity log** reads change sets from the log (`src/eventlog.ts`):
+  one event per item or link an entry touched, the before-values and the
+  title then from the history index. Facts are numbered from the event
+  table's sequence (`log_fact.seq`, not hashed), so one cursor runs over
+  both. `event` keeps only what is not yet a fact. A backup carries the
+  change sets as the events they read as, until it carries the log itself.
+- **The review queue** (`proposal`) is projected: a pending record makes its
+  row, the entry that decides it says what became of it.
+- **The search index** is the indexes on `entity` (`src/search.ts`), kept
+  current by the projector's writes. The part_of closure, blocking roots and
+  the counts are not kept: at 2,000 items every view that reads them answers
+  in under 70 ms (the task records the measurements). They wait for the
+  10-million-event benchmark (section 9) to show a need.
+
 ### What a snapshot records
 
 ```json
