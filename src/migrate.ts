@@ -57,7 +57,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 19, name: 'the activity log read from the log', sql: ACTIVITY },
   { version: 20, name: 'per-item keys in a vault, and forgetting', sql: VAULT + FORGET },
   { version: 21, name: 'the compacted streams, in segments', sql: OPLOG, server: OPLOG_SERVER },
-  { version: 22, name: 'what is inside what, what names what, and the indexes reads are bounded by', sql: CLOSURE + MENTIONS + READ_INDEXES },
+  { version: 25, name: 'what is inside what, what names what, and the indexes reads are bounded by', sql: CLOSURE + MENTIONS + READ_INDEXES },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
