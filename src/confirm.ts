@@ -13,11 +13,12 @@ export async function toConfirm(l: Archipelago, input: { limit?: number } = {}) 
   const { rows: marks } = await l.db.query<{ upto: number | null }>(`select max((detail->>'upto')::int) as upto from event where action in ('changes.seen', 'questions.confirmed')`);
   const since = marks[0]?.upto ?? 0;
   const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; outcome: string | null; seq: number; ts: Date; actor: string; authority: { of?: string; basis?: string } | null }>(
-    `select distinct on (e.id) e.id, e.type, e.title, e.status, e.props->>'outcome' as outcome, ev.seq::int as seq, ev.ts, ev.actor, ev.detail->'authority' as authority
-     from event ev join entity e on e.id = ev.target_id
-     where ev.seq > $1 and ev.action = 'entity.update' and ev.actor not like 'human:%' and coalesce(ev.detail->'authority'->>'who', '') not like 'human:%'
-       and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and ev.detail->'changes'->'status'->>'to' = e.status
-     order by e.id, ev.seq desc`,
+    // Read from the log: each status an agent set, on its own say or a human's word it reported, that the item still has.
+    `select distinct on (e.id) e.id, e.type, e.title, e.status, e.props->>'outcome' as outcome, f.seq::int as seq, le.at as ts, le.head->'actor'->>'id' as actor, le.head->'authority' as authority
+     from log_fact f join log_entry le on le.stream = f.stream and le.pos = f.pos join entity e on e.id = f.id
+     where f.stream = 'facts' and f.seq > $1 and f.field = 'status' and f.op = '+' and le.head->'actor'->>'id' not like 'human:%' and coalesce(le.head->'authority'->>'who', '') not like 'human:%'
+       and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and f.value = to_jsonb(e.status)
+     order by e.id, f.seq desc`,
     [since, l.registry.having('settles')],
   );
   // What an agent settled on its own judgment is what the owner has not seen; what it settled on their word they

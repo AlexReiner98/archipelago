@@ -17,7 +17,7 @@ test('a session keeps its branch, and taking a task tells it how a commit closes
   // Moving to another branch is kept, even said alone; a heartbeat that says nothing new changes nothing.
   await sessionUpdate(l, agent, { run: started.run, branch: 'claude/tests-2' });
   assert.equal(await branchOf(), 'claude/tests-2');
-  const count = async () => (await l.db.query<{ n: number }>(`select count(*)::int as n from event`)).rows[0].n;
+  const count = async () => Number((await l.db.query<{ n: number }>(`select (select count(*) from event) + (select count(*) from log_entry) as n`)).rows[0].n);
   const events = await count();
   await sessionUpdate(l, agent, { run: started.run, branch: 'claude/tests-2' });
   assert.equal(await count(), events, 'the same branch again is a heartbeat');

@@ -1,16 +1,18 @@
-// What a row of today's tables says as facts (docs/log.md, section 2): an item's head fields and declared fields, one
-// fact each, and a link's ends as one value. The write path reads back the rows it wrote and states them so; the
-// projection (src/replay.ts) turns the facts back into the same rows.
+// What a row says as facts (docs/log.md, section 2): an item's head fields and declared fields, one fact each, and a
+// link's ends as one value. The write path plans each op as the row it would leave and states it so; the projector
+// (src/replay.ts) turns the facts into that row.
 
 import type { Fact } from './log.ts';
 import { KEPT_FIELDS } from './operational.ts';
 
 type Row = Record<string, any>;
 
-/** An item's columns and the field each is in the log. Kernel defaults are not asserted: the value a field has unsaid. */
+/**
+ * An item's columns and the field each is in the log. Kernel defaults are not asserted: the value a field has unsaid.
+ * Its kind is not one: it is read from its type, as whether it is open is, and a field named kind is a pack's own.
+ */
 export const ITEM_COLUMNS: [column: string, field: string, unsaid: unknown][] = [
   ['type', 'type', undefined],
-  ['kind', 'kind', null],
   ['title', 'title', undefined],
   ['body', 'body', ''],
   ['status', 'status', undefined],

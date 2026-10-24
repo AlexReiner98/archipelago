@@ -18,6 +18,7 @@ import type { Registry } from './packs.ts';
 import { restoreRows } from './pelago.ts';
 import { databaseFor } from './pg.ts';
 import { analyzeAll, analyzeDue } from './stats.ts';
+import { factEvents } from './eventlog.ts';
 import type { Workspaces } from './workspaces.ts';
 
 /** Every table, parents before the rows that point at them. */
@@ -38,6 +39,9 @@ export async function dump(db: Db, workspace: { id: string; name: string }, loca
   await db.transaction(async (tx) => {
     await tx.query(`set transaction isolation level repeatable read`);
     for (const table of TABLES) tables[table] = (await tx.query<{ row: Record<string, unknown> }>(`select to_jsonb(t) as row from ${table} t`)).rows.map((r) => r.row);
+    // What change sets did is read from the log, which a backup does not carry yet: it goes as the events it reads as.
+    const done = await factEvents(tx, {}, Number.MAX_SAFE_INTEGER);
+    tables.event.push(...done.map(({ target_title: _t, target_type: _y, ...ev }) => ({ ...ev, workspace: workspace.id, private_to: null })));
   });
   // A secret stored before secrets were sealed has not been read since, and so is still as it was typed: it does not leave like that.
   for (const row of tables.setting ?? []) if (SECRET_SETTINGS.includes(row.key as string) && typeof row.value === 'string' && !isSealed(row.value)) row.value = seal(row.value);
@@ -64,7 +68,7 @@ export async function restore(db: Db, backup: Dump, as?: string): Promise<Record
       if (rows.length) await tx.query(`insert into ${table} select * from jsonb_populate_recordset(null::${table}, $1::jsonb)`, [JSON.stringify(rows)]);
       counts[table] = rows.length;
     }
-    await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), 1))`);
+    await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), 1))`);
     // The types it defined for itself go in its database, where the server looks for them.
     for (const def of (backup.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
     if (as !== undefined && as !== backup.workspace?.id) {
@@ -95,9 +99,7 @@ export interface MergeReport {
 
 class Preview extends Error {}
 
-/** True of an event that was written here, false of one that arrived in a merged backup: those are history, not news. */
-export const notImported = (ev: string) =>
-  `not exists (select 1 from event imp where imp.action = 'workspace.import' and ${ev}.seq between (imp.detail->>'first_seq')::bigint and (imp.detail->>'last_seq')::bigint)`;
+export { notImported } from './eventlog.ts';
 
 /**
  * Merge a dump into a database that already holds a map, matching rows by id.

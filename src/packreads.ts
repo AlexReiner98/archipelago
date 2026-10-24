@@ -6,6 +6,7 @@
 import { livesIn, livesInFor, SCOPE } from './places.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { blockGraph } from './blocking.ts';
+import { readEvents } from './eventlog.ts';
 import { askPackView, VIEWS } from './views.ts';
 import { lensRead } from './lens-scan.ts';
 
@@ -123,11 +124,8 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
   }
   if (q.events) {
     const { action, target, since, limit } = q.events;
-    const { rows } = await l.db.query(
-      `select seq, ts, actor, action, target_id, reason, detail from event where action = $1 and ($2::text is null or target_id = $2) and ($3::timestamptz is null or ts > $3::timestamptz) order by seq desc limit $4`,
-      [action, target ?? null, since ?? null, Math.min(limit ?? 50, READ_LIMIT)],
-    );
-    return rows;
+    const rows = await readEvents(l.db, { action, target, since, limit: Math.min(limit ?? 50, READ_LIMIT) });
+    return rows.filter((r) => !since || new Date(r.ts) > new Date(since)).map(({ seq, ts, actor, action, target_id, reason, detail }) => ({ seq, ts, actor, action, target_id, reason, detail }));
   }
   if (q.pictures) {
     const { rows } = await l.db.query<{ entity_id: string }>(`select entity_id from picture where entity_id = any($1::text[])`, [q.pictures]);

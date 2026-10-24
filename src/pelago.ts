@@ -11,7 +11,7 @@ import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { search, type SearchInput } from './search.ts';
-import { append, headOf, type Decision, type Fact } from './log.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
+import { append, headOf, type Decision, type Fact } from './log.ts'; import { projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
 import { privateDependencies } from './private-deps.ts'; import { decideProposal, rejection } from './proposals.ts';
 
 export interface Actor {
@@ -274,13 +274,10 @@ export class Archipelago {
       // What it would do on the map as it is now, with the ids it would make: approved with nothing moved, it appends these facts.
       const { facts = [], ids = {} } = await this.apply(me, input, { authority, dry: true });
       const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say };
-      await this.db.transaction(async (tx) => {
-        await tx.query(
-          `insert into proposal (id, actor, reason, source, ops, warnings, private_to, held_by) values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8::jsonb)`,
-          [id, actorId(actor), input.reason, JSON.stringify(input.source ?? null), JSON.stringify(input.ops), JSON.stringify(warnings), this.viewer || null, JSON.stringify(verdict.by ?? null)],
-        );
-        await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, base, ops: input.ops, warnings, ids }, facts);
-      });
+      // The queue is a projection of the pending stream: the record makes its row (src/replay.ts).
+      await this.db.transaction(async (tx) =>
+        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),
+      );
       await this.log(this.db, { actor: actorId(actor), action: 'proposal.create', reason: input.reason, detail: { proposal: id, ops: input.ops.length, held_by: verdict.by?.rule } });
       return {
         status: 'proposed' as const,
@@ -406,8 +403,9 @@ export class Archipelago {
 
   /**
    * Apply a change without consulting policy. For human changes, approved proposals, and the system's own bookkeeping
-   * (sessions). Appended to the fact stream as one change set, in the transaction that writes today's tables. dry: the
-   * facts it would append and the ids it would make, with nothing written; ids: those ids, to make the same ones again.
+   * (sessions). Each op is planned into facts and projected at once (src/replay.ts), so the next reads what it did; the
+   * facts are appended to the fact stream as one change set in the same transaction. dry: the facts it would append and
+   * the ids it would make, with nothing written; ids: those ids, to make the same ones again.
    */
   async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string> } = {}) {
     const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(this.workspace);
@@ -416,7 +414,6 @@ export class Archipelago {
     const { warnings } = await this.plan(ops);
     const changeset = newId('c');
     const created: Record<string, string> = {};
-    const extra = { ...(opts.approvedBy && { approved_by: opts.approvedBy, ...(opts.revised && { revised_by: opts.approvedBy }) }), ...(opts.authority && { authority: opts.authority }), ...(input.action && { action: input.action }) };
     const reg = this.registry;
     // Each id it makes is named by what makes it, so that a held change approved with nothing moved makes the same ones.
     const ids: Record<string, string> = {};
@@ -426,8 +423,11 @@ export class Archipelago {
     const DRY = Symbol('dry');
 
     await this.db.transaction(async (tx) => {
+      // Facts first: each op is planned on the map as the ops before it left it, and its facts projected at once.
+      const when = await stamp(tx);
+      const said = async (some: Fact[]) => { facts.push(...some); await projectFacts(tx, reg, when, some); };
       const fallback = await this.defaultVisibility(tx);
-      const source = (spec: SourceSpec) => this.ensureSource(tx, actor, spec, changeset, facts, mint);
+      const source = (spec: SourceSpec) => this.ensureSource(tx, spec, said, mint);
       const defaultSource = input.source ? await source(input.source) : null;
       const sourceOf = async (op: { source?: SourceSpec }) => (op.source ? source(op.source) : defaultSource);
       const resolve = (key: string) => created[key] ?? key;
@@ -436,166 +436,110 @@ export class Archipelago {
       for (const [i, op] of ops.entries()) if (op.op === 'create') created[op.ref ?? `#${i + 1}`] = mint(`#${at.get(op)}`, 'e');
       const refs = new Set(ops.flatMap((op) => (op.op === 'create' && op.ref ? [op.ref] : [])));
       const named = <T extends string | undefined>(text: T): T => (text === undefined ? text : (text.replace(/\{([^{}\s]+)\}/g, (whole, ref: string) => (refs.has(ref) ? created[ref] : whole)) as T));
-      const log = (action: string, target: string, detail: Props) =>
-        this.log(tx, { actor, action, target, changeset, reason: input.reason, detail: { ...detail, ...extra } });
 
       for (const [i, op] of ops.entries()) {
         switch (op.op) {
           case 'create': {
             const type = reg.type(op.type)!;
             const id = created[op.ref ?? `#${i + 1}`];
-            const status = op.status ?? type.statuses.open[0];
-            const { rows } = await tx.query<Entity>(
-              `insert into entity (id, type, title, body, status, is_open, owner, visibility, confidence, props, source_id, private_to, kind)
-               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13) returning *`,
-              [
-                id,
-                op.type,
-                named(op.title.trim()),
-                named(op.body) ?? '',
-                status,
-                reg.isOpen(op.type, status),
-                op.owner ? resolve(op.owner) : null,
-                op.visibility ?? fallback,
-                op.confidence ?? 1,
-                JSON.stringify({ ...reg.defaults(op.type), ...op.props }),
-                type.columns && !type.columns.source ? null : await sourceOf(op),
-                this.privateTo(op.visibility ?? fallback), type.kind ?? null,
-              ],
-            );
-            facts.push(...itemFacts(rows[0]));
-            await log('entity.create', id, { type: op.type, title: named(op.title.trim()), status });
+            const visibility = op.visibility ?? fallback;
+            await said(itemFacts({
+              id, type: op.type, title: named(op.title.trim()), body: named(op.body) ?? '', status: op.status ?? type.statuses.open[0],
+              visibility, private_to: this.privateTo(visibility), owner: op.owner ? resolve(op.owner) : null, confidence: op.confidence ?? 1,
+              source_id: type.columns && !type.columns.source ? null : await sourceOf(op), props: { ...reg.defaults(op.type), ...op.props },
+            }));
+            await this.kept(tx, id, op.props);
             break;
           }
           case 'update': {
             const before = (await this.entity(op.id, tx))!;
             const props = { ...before.props };
-            const changes: Record<string, { from: unknown; to: unknown }> = {};
             for (const [key, value] of Object.entries(op.props ?? {})) {
-              changes[`props.${key}`] = { from: props[key] ?? null, to: value };
               if (value === null) delete props[key];
               else props[key] = value;
             }
-            const next = {
+            const visibility = op.visibility ?? before.visibility;
+            await said(changedFacts(before, {
+              ...before, props, visibility,
               title: named(op.title)?.trim() ?? before.title,
               body: bodyAfter(before.body, { ...op, body: named(op.body), append: named(op.append), replace: op.replace && { find: op.replace.find, with: named(op.replace.with) } }),
               status: op.status ?? before.status,
               owner: op.owner === undefined ? before.owner : op.owner,
-              visibility: op.visibility ?? before.visibility,
               confidence: op.confidence ?? before.confidence,
-            };
-            for (const key of Object.keys(next) as (keyof typeof next)[]) {
-              if (next[key] !== before[key]) changes[key] = { from: before[key], to: next[key] };
-            }
-            const { rows } = await tx.query<Entity>(
-              `update entity set title = $2, body = $3, status = $4, is_open = $5, owner = $6, visibility = $7,
-                 confidence = $8, props = $9::jsonb, updated_at = now(),
-                 private_to = case when $10::boolean then $11 else private_to end where id = $1 returning *`,
-              [
-                op.id, next.title, next.body, next.status, reg.isOpen(before.type, next.status), next.owner, next.visibility, next.confidence, JSON.stringify(props),
-                // Only an explicit change of visibility moves who it is private to.
-                op.visibility !== undefined && op.visibility !== before.visibility,
-                this.privateTo(next.visibility),
-              ],
-            );
-            facts.push(...changedFacts(before, rows[0]));
-            await log('entity.update', op.id, { title: next.title, changes });
+              // Only an explicit change of visibility moves who it is private to.
+              private_to: op.visibility !== undefined && op.visibility !== before.visibility ? this.privateTo(visibility) : before.private_to,
+            }));
+            await this.kept(tx, op.id, op.props);
             break;
           }
           case 'link': {
             const from = resolve(op.from);
             const to = resolve(op.to);
-            const same = await tx.query<{ id: string }>(
-              `select id from relation where type = $1 and from_id = $2 and to_id = $3 and valid_to is null`,
-              [op.type, from, to],
-            );
+            const same = await tx.query(`select 1 from relation where type = $1 and from_id = $2 and to_id = $3 and valid_to is null`, [op.type, from, to]);
             if (same.rows.length) break; // already linked
-            const id = mint(`#${at.get(op)}`, 'r');
-            const { rows } = await tx.query<Props>(
-              `insert into relation (id, type, from_id, to_id, props, confidence, source_id) values ($1, $2, $3, $4, $5::jsonb, $6, $7) returning *`,
-              [id, op.type, from, to, JSON.stringify(op.props ?? {}), op.confidence ?? 1, await sourceOf(op)],
-            );
-            facts.push(...linkFacts(rows[0]));
-            await log('relation.link', from, { relation: id, type: op.type, to });
+            await said(linkFacts({ id: mint(`#${at.get(op)}`, 'r'), type: op.type, from_id: from, to_id: to, props: op.props ?? {}, confidence: op.confidence ?? 1, source_id: await sourceOf(op) }));
             break;
           }
-          case 'unlink': {
-            const { rows } = await tx.query<{ type: string; from_id: string; to_id: string }>(
-              `update relation set valid_to = now() where id = $1 returning type, from_id, to_id`,
-              [op.relation],
-            );
-            facts.push(['-', op.relation, 'link']);
-            await log('relation.unlink', rows[0].from_id, { relation: op.relation, type: rows[0].type, to: rows[0].to_id });
+          case 'unlink':
+            await said([['-', op.relation, 'link']]);
             break;
-          }
-          case 'archive': {
-            const { rows } = await tx.query<{ title: string }>(`update entity set archived_at = now(), updated_at = now() where id = $1 returning title`, [op.id]);
-            facts.push(['+', op.id, 'archived', true]);
-            await log('entity.archive', op.id, { title: rows[0].title });
+          case 'archive':
+            await said([['+', op.id, 'archived', true]]);
             break;
-          }
-          case 'restore': {
-            const { rows } = await tx.query<{ title: string }>(`update entity set archived_at = null, updated_at = now() where id = $1 returning title`, [op.id]);
-            facts.push(['-', op.id, 'archived']);
-            await log('entity.restore', op.id, { title: rows[0].title });
+          case 'restore':
+            await said([['-', op.id, 'archived']]);
             break;
-          }
           case 'merge': {
             const keep = (await this.entity(op.keep, tx))!;
-            const drop = (await this.entity(op.drop, tx))!; // archived first, and only once: a merge that races another is refused
-            if (!(await tx.query(`update entity set archived_at = now(), updated_at = now() where id = $1 and archived_at is null returning id`, [op.drop])).rows.length) throw new Error(`Change rejected:\n- "${drop.title}" is already merged or archived`);
-            facts.push(['+', drop.id, 'archived', true], ['+', drop.id, 'merged_into', keep.id]);
+            const drop = (await this.entity(op.drop, tx))!; // archived first, and only once: the log's lock puts a merge that races another after it, refused
+            if (drop.archived_at) throw new Error(`Change rejected:\n- "${drop.title}" is already merged or archived`);
+            await said([['+', drop.id, 'archived', true], ['+', drop.id, 'merged_into', keep.id]]);
             // Each live link of the dropped item moves to the kept one, unless it would join the item to itself or repeat
-            // one the kept item has: where both said the same thing (each was part of the same project), the older stays.
+            // one the kept item has: where both said the same thing (each was part of the same project), the older stays,
+            // and of two made together, the kept item's.
             const { rows: links } = await tx.query<{ id: string; type: string; from_id: string; to_id: string }>(
-              `select id, type, from_id, to_id from relation where valid_to is null and (from_id = any($1::text[]) or to_id = any($1::text[])) order by valid_from, id`,
-              [[keep.id, drop.id]],
+              `select id, type, from_id, to_id from relation where valid_to is null and (from_id = any($1::text[]) or to_id = any($1::text[])) order by valid_from, $2 in (from_id, to_id), id`,
+              [[keep.id, drop.id], drop.id],
             );
-            const said = new Set<string>();
+            const seen = new Set<string>();
+            const moves: Fact[] = [];
             for (const r of links) {
               const [from, to] = [r.from_id, r.to_id].map((end) => (end === drop.id ? keep.id : end));
               const what = `${r.type} ${from} ${to}`;
-              if (from === to || said.has(what)) {
-                await tx.query(`update relation set valid_to = now() where id = $1`, [r.id]);
-                facts.push(['-', r.id, 'link']);
-                continue;
-              }
-              said.add(what);
-              if (from === r.from_id && to === r.to_id) continue;
-              await tx.query(`update relation set from_id = $2, to_id = $3 where id = $1`, [r.id, from, to]);
-              facts.push(['+', r.id, 'link', [r.type, from, to]]);
+              if (from === to || seen.has(what)) moves.push(['-', r.id, 'link']);
+              else if (seen.add(what) && (from !== r.from_id || to !== r.to_id)) moves.push(['+', r.id, 'link', [r.type, from, to]]);
             }
-            const { rows: owned } = await tx.query<{ id: string }>(`update entity set owner = $1, updated_at = now() where owner = $2 returning id`, [op.keep, op.drop]);
-            facts.push(...owned.map((o): Fact => ['+', o.id, 'owner', op.keep]));
-            const body = [keep.body, drop.body].filter(Boolean).join('\n\n');
-            const { rows: kept } = await tx.query<Entity>(`update entity set props = $2::jsonb, body = $3, updated_at = now() where id = $1 returning *`, [
-              op.keep,
-              JSON.stringify({ ...drop.props, ...keep.props }),
-              body,
-            ]);
-            facts.push(...changedFacts({ ...keep, owner: kept[0].owner }, kept[0]));
-            await log('entity.merge', op.keep, { title: keep.title, absorbed: { id: drop.id, title: drop.title, props: drop.props } });
+            const { rows: owned } = await tx.query<{ id: string }>(`select id from entity where owner = $1`, [op.drop]);
+            await said([...moves, ...owned.map((o): Fact => ['+', o.id, 'owner', op.keep])]);
+            const now = (await this.entity(op.keep, tx))!;
+            await said(changedFacts(now, { ...now, props: { ...drop.props, ...keep.props }, body: [keep.body, drop.body].filter(Boolean).join('\n\n') }));
             break;
           }
           case 'define_type':
-            facts.push(['+', op.type.id, 'type_def', op.type]);
+            await said([['+', op.type.id, 'type_def', op.type]]);
             break; // registered after the transaction
         }
       }
       if (opts.dry) throw DRY;
       const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
       const by = { id: actor, ...(opts.token && { token: opts.token }) };
-      await append(tx, this.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [] }, facts);
+      const done = await append(tx, this.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [] }, facts);
+      if (done.at !== when) throw new Error(`The log's time moved under its lock (${when}, then ${done.at})`);
+      await projectDecision(tx, done);
     }).catch((err) => { if (err !== DRY) throw err; });
     if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
-    for (const op of ops) {
-      if (op.op !== 'define_type') continue;
-      await this.registry.defineLocal(op.type);
-      await this.log(this.db, { actor, action: 'type.define', changeset, reason: input.reason, detail: { type: op.type, ...extra } });
-    }
+    for (const op of ops) if (op.op === 'define_type') await this.registry.defineLocal(op.type);
     await this.supersede(changeset);
     return { status: 'applied' as const, changeset, created, warnings };
+  }
+
+  /** What an op sets of an item's operational state (src/operational.ts) is not a fact: it is written beside them, never logged. */
+  private async kept(tx: Q, id: string, props: Props = {}) {
+    const ours = Object.entries(props).filter(([k]) => KEPT_FIELDS.includes(k));
+    if (!ours.length) return;
+    const set = Object.fromEntries(ours.filter(([, v]) => v !== null && v !== undefined));
+    await tx.query(`update entity set props = (props || $2::jsonb) - $3::text[] where id = $1`, [id, JSON.stringify(set), ours.filter(([k]) => !(k in set)).map(([k]) => k)]);
   }
 
   /**
@@ -614,17 +558,14 @@ export class Archipelago {
         if (!moot) break;
       }
       if (!moot) continue;
-      const done = await this.db.transaction(async (tx) => {
-        const marked = await tx.query(`update proposal set status = 'superseded', decided_by = 'agent:pelago', decided_at = now(), note = $2 where id = $1 and status = 'pending' returning id`, [p.id, `Already so since ${changeset}`]);
-        if (marked.rows.length) await rejection(tx, this.workspace, p.id, { outcome: 'superseded', actor: 'system', by: changeset, reason: p.reason });
-        return marked.rows.length > 0;
-      });
+      const done = await this.db.transaction((tx) => rejection(tx, this.workspace, p.id, { outcome: 'superseded', actor: 'system', by: changeset, reason: p.reason }));
       if (done) await this.log(this.db, { actor: 'agent:pelago', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
     }
   }
 
-  private async ensureSource(q: Q, actor: string, spec: SourceSpec, changeset: string, facts: Fact[], mint: (key: string, prefix: string) => string): Promise<string | null> {
-    if (!this.registry.type('sys.source')) return null;
+  private async ensureSource(q: Q, spec: SourceSpec, said: (facts: Fact[]) => Promise<void>, mint: (key: string, prefix: string) => string): Promise<string | null> {
+    const type = this.registry.type('sys.source');
+    if (!type) return null;
     const found = await q.query<{ id: string }>(`select id from entity where type = 'sys.source' and props->>'uri' = $1 and archived_at is null`, [spec.uri]);
     if (found.rows.length) return found.rows[0].id;
     const id = mint(`source ${spec.uri}`, 'e');
@@ -632,25 +573,20 @@ export class Archipelago {
     if (spec.kind) props.kind = spec.kind;
     const problems = this.registry.check('sys.source', undefined, props);
     if (problems.length) throw new Error(`Change rejected:\n- source: ${problems.join('\n- source: ')}`);
-    const { rows } = await q.query<Entity>(
-      `insert into entity (id, type, title, body, status, is_open, props, visibility, private_to) values ($1, 'sys.source', $2, $3, 'recorded', true, $4::jsonb, $5, $6) returning *`,
-      [id, spec.title ?? spec.uri, spec.excerpt ?? '', JSON.stringify(props), await this.defaultVisibility(q), this.privateTo(await this.defaultVisibility(q))],
-    );
-    facts.push(...itemFacts(rows[0])); // the source's own facts, before the facts that name it
-    await this.log(q, { actor, action: 'entity.create', target: id, changeset, reason: 'Source of this change', detail: { type: 'sys.source', title: spec.title ?? spec.uri } });
+    const visibility = await this.defaultVisibility(q);
+    // The source's own facts, before the facts that name it.
+    await said(itemFacts({ id, type: type.id, title: spec.title ?? spec.uri, body: spec.excerpt ?? '', status: 'recorded', visibility, private_to: this.privateTo(visibility), props }));
     return id;
   }
 
   /** A change set the system appends when a pack moves a type or a kind: the new type or kind, and nothing else of the items moves. */
-  private moved = (tx: Q, action: string, reason: string, facts: Fact[]) =>
-    append(tx, this.workspace, 'facts', { id: newId('c'), actor: { id: 'system' }, authority: null, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts);
+  private async moved(tx: Q, action: string, reason: string, facts: Fact[]) {
+    await projectFacts(tx, this.registry, await stamp(tx), facts, true);
+    await append(tx, this.workspace, 'facts', { id: newId('c'), actor: { id: 'system' }, authority: null, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts);
+  }
 
   /** Each item's kind in its row, from the type table, where the row lacks it or has another (src/head.ts): when a workspace opens. */
-  fillKinds = () => this.db.transaction(async (tx) => {
-    const { rows } = await tx.query<{ id: string; kind: string | null }>(`update entity e set kind = t.def->>'kind' from type_def t where t.id = e.type and e.kind is distinct from t.def->>'kind' returning e.id, e.kind`);
-    if (rows.length) await this.moved(tx, 'kind.moved', 'A pack moved a type to another kind', rows.map((r): Fact => (r.kind === null ? ['-', r.id, 'kind'] : ['+', r.id, 'kind', r.kind])));
-    return rows.length;
-  });
+  fillKinds = async () => (await this.db.query(`update entity e set kind = t.def->>'kind' from type_def t where t.id = e.type and e.kind is distinct from t.def->>'kind' returning e.id`)).rows.length;
 
   /**
    * Move every item of a type (or link of a relation) no pack defines any more to the one that took it over
@@ -659,21 +595,21 @@ export class Archipelago {
    */
   async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity'): Promise<number> {
     return this.db.transaction(async (tx) => {
-      const { rows } = await tx.query<{ id: string; kind?: string | null; from_id?: string; to_id?: string }>(
-        what === 'entity' ? `update entity set type = $2 where type = $1 returning id, kind` : `update relation set type = $2 where type = $1 returning id, from_id, to_id`,
-        [from, to],
+      const { rows } = await tx.query<{ id: string; from_id?: string; to_id?: string }>(
+        what === 'entity' ? `select id from entity where type = $1` : `select id, from_id, to_id from relation where type = $1`,
+        [from],
       );
       const keys = what === 'entity' ? ['kinds', 'on'] : ['over'];
       const names = `jsonb_typeof(e.props -> k) = 'array' and (e.props -> k ? $1 or e.props -> k ? ('-' || $1))`;
       const swap = `case when x = to_jsonb($1::text) then to_jsonb($2::text) when x = to_jsonb('-' || $1) then to_jsonb('-' || $2) else x end`;
       const { rows: named } = await tx.query<{ id: string; props: Props }>(
-        `update entity e set props = e.props || (select jsonb_object_agg(k, (select jsonb_agg(${swap} order by i) from jsonb_array_elements(e.props -> k) with ordinality a(x, i))) from unnest($3::text[]) k where ${names})
-         where e.type = any($4::text[]) and exists (select 1 from unnest($3::text[]) k where ${names}) returning e.id, e.props`,
+        `select e.id, (select jsonb_object_agg(k, (select jsonb_agg(${swap} order by i) from jsonb_array_elements(e.props -> k) with ordinality a(x, i))) from unnest($3::text[]) k where ${names}) as props
+         from entity e where e.type = any($4::text[]) and exists (select 1 from unnest($3::text[]) k where ${names})`,
         [from, to, keys, [...this.registry.family('lens'), ...this.registry.family('screen')]],
       );
       const settings = named.length ? { settings: named.map((r) => r.id) } : {};
       const reason = `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`;
-      const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to], r.kind ? ['+', r.id, 'kind', r.kind] : ['-', r.id, 'kind']] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));
+      const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to]] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));
       for (const r of named) for (const k of keys) if (Array.isArray(r.props[k])) facts.push(['+', r.id, k, r.props[k]]);
       if (facts.length) await this.moved(tx, 'type.moved', reason, facts);
       if (rows.length || named.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason, detail: { from, to, items: rows.map((r) => r.id), ...settings } });
@@ -835,7 +771,7 @@ export class Archipelago {
     const [out, inc, events, source] = await Promise.all([
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.valid_to is null`, [id]),
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.from_id where r.to_id = $1 and r.valid_to is null`, [id]),
-      this.db.query(`select seq, ts, actor, action, changeset, reason, detail from event where target_id = $1 order by seq desc limit 8`, [id]),
+      readEvents(this.db, { target: id, limit: 8 }),
       entity.source_id ? this.entity(entity.source_id) : undefined,
     ]);
     return {
@@ -845,7 +781,7 @@ export class Archipelago {
       mentioned_in: await this.mentionedIn(id),
       outgoing: out.rows,
       incoming: inc.rows,
-      recent_events: events.rows,
+      recent_events: events.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })),
     };
   }
 
@@ -903,7 +839,7 @@ export class Archipelago {
   /** A stamp that moves whenever the map or the review queue does, as this viewer sees them. */
   async pulse() {
     const { rows } = await this.db.query<{ stamp: string }>(
-      `select concat_ws('.', (select coalesce(max(seq), 0) from event), (select count(*) from proposal), (select count(*) from proposal where status = 'pending')) as stamp`,
+      `select concat_ws('.', greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact)), (select count(*) from proposal), (select count(*) from proposal where status = 'pending')) as stamp`,
     );
     return rows[0];
   }
