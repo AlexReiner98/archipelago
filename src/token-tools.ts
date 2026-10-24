@@ -17,7 +17,7 @@ export const TOKEN_TOOLS: Record<string, Tool> = {
     description:
       'Make a token. Anyone can make an agent token that acts for themselves: it sees what they see and proposes to them. Only an admin can make a token for someone else or for a human. The secret is shown once. ' +
       'An agent’s token can be scoped. within: the items it writes within (each with all that is part of it, lives in it or is about it); it still reads the map as its person does. ' +
-      'may: report (it can only send what a system measured, with the report tool), propose (every change it sends waits for a person) or change (the default: as any agent, under the workspace’s setting). Give it an expiry (expires_days) unless there is a reason not to.',
+      'may: report (it can only send what a system measured, with report, action health), propose (every change it sends waits for a person) or change (the default: as any agent, under the workspace’s setting). Give it an expiry (expires_days) unless there is a reason not to.',
     humanOnly: true,
     input: {
       kind: z.enum(['human', 'agent']),

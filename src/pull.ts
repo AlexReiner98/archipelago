@@ -73,7 +73,7 @@ async function pull() {
   if (['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname)) return fail(`PELAGO_URL is this machine (${url}): there is nothing to pull.`);
   const { dataDir, port } = loadConfig();
 
-  const asked = await fetch(`${url}/agent/backup_download`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}' });
+  const asked = await fetch(`${url}/agent/query`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'backup_download' }) });
   const answer = (await asked.json().catch(() => ({}))) as { result?: { path: string; vault_path?: string; vault_key?: string; name: string; taken: string }; error?: string };
   if (!answer.result) return fail(`${url} gave no backup: ${answer.error ?? `HTTP ${asked.status}`}`);
   const got = await fetch(url + answer.result.path);
@@ -103,7 +103,7 @@ async function pull() {
   const health = () => fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json() as Promise<{ started: string }>, () => undefined);
   const before = await health();
   if (!before) return console.log(`In place in ${dataDir}; what was there is kept as ${takePulled(dataDir) ?? 'nothing'}.`);
-  const restart = await fetch(`http://127.0.0.1:${port}/agent/restart`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).then((r) => r.ok, () => false);
+  const restart = await fetch(`http://127.0.0.1:${port}/agent/revise`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'restart' }) }).then((r) => r.ok, () => false);
   if (!restart) return console.log(`The local server is not in dev mode: stop it, and the copy waiting in ${target} goes in place when it next starts under npm run dev.`);
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 500));

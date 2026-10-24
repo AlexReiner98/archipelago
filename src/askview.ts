@@ -52,7 +52,7 @@ export async function askView(l: Archipelago, actor: Actor, name: string, params
   const view = VIEWS[name];
   if (view) return view.run(l, params);
   const found = packView(l, name);
-  if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask view attention with params ${REPLACED[name]}.`);
+  if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask query attention with params ${REPLACED[name]}.`);
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(l)).join(', ')}`);
   if (found.def.lens) return answerPreset(l, found.def, params);
   return (await hostFor(l.registry).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;

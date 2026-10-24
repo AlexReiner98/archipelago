@@ -74,7 +74,7 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
   const renewed = await setup();
   assert.equal(renewed.code, 0, renewed.out);
   assert.match(renewed.out, /not done {3}\.mcp\.json {2}\(it needs a yes\)[\s\S]*written {4}\.claude\/pelago\.md[\s\S]*Some of it was left/);
-  assert.match(file('.claude/pelago.md'), /view` with name `handoff`/);
+  assert.match(file('.claude/pelago.md'), /query` with name `handoff`/);
   assert.equal(file('.mcp.json'), theirs['.mcp.json']);
   assert.equal((await setup(['--yes'])).code, 0);
   assert.ok(JSON.parse(file('.mcp.json')).mcpServers.pelago);
