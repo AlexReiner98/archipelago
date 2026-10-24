@@ -5,7 +5,7 @@ import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns
 import { AGENT_CHANGES, agentChanges, decide, DEFAULT_AGENT_POLICY, type Policy, type Ruled } from './rules.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
-import { bodyAfter, dropExcepted } from './ops.ts';
+import { bodyAfter, dropExcepted } from './ops.ts'; import { mergeRefusals, once, overtaken } from './merge.ts';
 import { readEvents, type EventQuery } from './eventlog.ts';
 import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
@@ -283,8 +283,9 @@ export class Archipelago {
     return answered.length ? { ...applied, answered } : applied;
   }
 
-  /** `ops`, when given, replaces the proposed ops: the reviewer's corrected version. */
-  async decide(actor: Actor, input: { proposal: string; approve: boolean; except?: string[]; note?: string; ops?: Op[] }) {
+  /** `ops`, when given, replaces the proposed ops: the reviewer's corrected version. One at a time: a second click while one applies is refused, not applied again. */
+  decide(actor: Actor, input: Parameters<Archipelago['decideNow']>[1]) { return once(input.proposal, () => this.decideNow(actor, input)); }
+  private async decideNow(actor: Actor, input: { proposal: string; approve: boolean; except?: string[]; note?: string; ops?: Op[] }) {
     if (actor.kind !== 'human') throw new Error('Only a human can approve or reject proposals.');
     const { rows } = await this.db.query<Proposal>(`select * from proposal where id = $1`, [input.proposal]);
     const proposal = rows[0];
@@ -298,11 +299,11 @@ export class Archipelago {
         { ops: input.ops ?? proposal.ops, reason: proposal.reason, source: proposal.source ?? undefined },
         // Held and then applied by a human: it rests on that human, whatever the agent thought it rested on.
         { except: input.except, approvedBy: actorId(actor), revised: Boolean(input.ops), authority: { of: 'human', who: actorId(actor) } },
-      );
+      ).catch((err: Error) => { throw err.message.startsWith('Change rejected') ? overtaken(proposal.id, err) : err; });
       if (input.ops) await this.db.query(`update proposal set ops = $2::jsonb where id = $1`, [proposal.id, JSON.stringify(input.ops)]);
     }
     const status = input.approve ? 'approved' : 'rejected';
-    await this.db.query(`update proposal set status = $2, decided_by = $3, decided_at = now(), note = $4 where id = $1`, [
+    await this.db.query(`update proposal set status = $2, decided_by = $3, decided_at = now(), note = $4 where id = $1 and status = 'pending'`, [
       proposal.id,
       status,
       actorId(actor),
@@ -321,10 +322,9 @@ export class Archipelago {
   /** Validate ops against the schema and the current map. Throws listing every problem. */
   async plan(ops: Op[]): Promise<{ warnings: string[] }> {
     if (!ops.length) throw new Error('A change needs at least one op.');
-    const errors: string[] = [];
-    const warnings: string[] = [];
+    const errors: string[] = [], warnings: string[] = [];
     const refs = new Map<string, string>(); // ref -> type
-    const seen = new Set<string>();
+    const seen = new Set<string>(), dropped = new Set<string>(); // dropped: what this change has merged away so far
     const reg = this.registry;
 
     const typeOf = async (key: string, where: string): Promise<string | undefined> => {
@@ -411,7 +411,7 @@ export class Archipelago {
         case 'merge': {
           const keep = await existing(op.keep, where);
           const drop = await existing(op.drop, where);
-          if (op.keep === op.drop) errors.push(`${where}: keep and drop are the same entity`);
+          errors.push(...(await mergeRefusals(this.db, where, keep, drop, dropped)));
           if (keep && drop && keep.type !== drop.type) warnings.push(`${where}: merging a ${drop.type} into a ${keep.type}`);
           break;
         }
@@ -617,7 +617,8 @@ export class Archipelago {
           }
           case 'merge': {
             const keep = (await this.entity(op.keep, tx))!;
-            const drop = (await this.entity(op.drop, tx))!;
+            const drop = (await this.entity(op.drop, tx))!; // archived first, and only once: a merge that races another is refused
+            if (!(await tx.query(`update entity set archived_at = now(), updated_at = now() where id = $1 and archived_at is null returning id`, [op.drop])).rows.length) throw new Error(`Change rejected:\n- "${drop.title}" is already merged or archived`);
             await tx.query(`update relation set from_id = $1 where from_id = $2`, [op.keep, op.drop]);
             await tx.query(`update relation set to_id = $1 where to_id = $2`, [op.keep, op.drop]);
             await tx.query(`update relation set valid_to = now() where from_id = to_id and valid_to is null`);
@@ -635,7 +636,6 @@ export class Archipelago {
               JSON.stringify({ ...drop.props, ...keep.props }),
               body,
             ]);
-            await tx.query(`update entity set archived_at = now(), updated_at = now() where id = $1`, [op.drop]);
             await log('entity.merge', op.keep, { title: keep.title, absorbed: { id: drop.id, title: drop.title, props: drop.props } });
             break;
           }

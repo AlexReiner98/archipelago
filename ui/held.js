@@ -30,14 +30,21 @@ export async function heldPiece(host, title) {
     const decide = async (yes) => {
       const note = yes ? undefined : await ask({ title: 'Decline this change?', message: p.reason, input: { placeholder: 'Why not? (optional, kept in the log for whoever made it)' }, action: 'Decline', danger: true });
       if (!yes && note === null) return;
+      // One decision at a time: a long apply must not be sent again by a second click.
+      for (const b of buttons) b.disabled = true;
       try {
         await api('decide', { proposal: p.id, approve: yes, note: note || undefined });
         if (yes && p.ops.some((o) => o.op === 'define_type')) await loadSchema();
       } catch (err) {
+        for (const b of buttons) b.disabled = false;
         return tell('That was not done', err.message);
       }
       again();
     };
+    const buttons = [
+      h('button', { class: 'primary', style: 'flex: none', onclick: () => decide(true) }, 'Apply'),
+      h('button', { class: 'danger', style: 'flex: none', onclick: () => decide(false) }, 'Decline'),
+    ];
     const look = () => {
       whole.hidden = !whole.hidden;
       if (!whole.hidden && !whole.childElementCount) whole.append(proposalCard(p, names, again));
@@ -52,8 +59,7 @@ export async function heldPiece(host, title) {
         h('span', { class: 'muted small', style: 'flex: none' }, who(p.actor)),
         h('span', { class: 'muted small nowrap', style: 'flex: none' }, `${n} change${n === 1 ? '' : 's'}`),
         h('button', { style: 'flex: none', title: 'See each part of it, and leave out or correct any before applying', onclick: look }, 'Look'),
-        h('button', { class: 'primary', style: 'flex: none', onclick: () => decide(true) }, 'Apply'),
-        h('button', { class: 'danger', style: 'flex: none', onclick: () => decide(false) }, 'Decline'),
+        ...buttons,
       ),
       whole,
     ];
