@@ -6,6 +6,7 @@
 
 import { GENESIS, entryHash } from './jcs.ts';
 import type { Q } from './db.ts';
+import { makePartitions, partitionMade } from './partitions.ts';
 import { openEntries, openValue, sealEntry } from './seal.ts';
 
 export type Stream = 'facts' | 'pending';
@@ -37,7 +38,8 @@ export interface Entry {
 /**
  * Step 18. Append-only twice over: the member role is granted no update or delete, and a trigger refuses both (and
  * truncate) from anyone, the owner included. Compaction (section 4) will be the one role the trigger lets through.
- * The history index is log_fact by (id, field, pos): the value a field held at any position is one lookup.
+ * The history index is log_fact by (id, field, pos): the value a field held at any position is one lookup. Step 22
+ * (src/partitions.ts) makes these tables again, cut by time.
  */
 export const LOG = `
 create table if not exists log_entry (
@@ -51,7 +53,10 @@ create table if not exists log_entry (
   hash   bytea not null,
   primary key (stream, pos)
 );
-create unique index if not exists log_entry_id on log_entry(id);
+-- Taken again over a log step 22 has cut by time (a step can be): a unique index there must name the time.
+do $$ begin
+  if (select relkind from pg_class where oid = 'log_entry'::regclass) = 'r' then create unique index if not exists log_entry_id on log_entry(id); end if;
+end $$;
 create index if not exists log_entry_undoes on log_entry(undoes) where undoes is not null;
 create table if not exists log_fact (
   stream text not null,
@@ -82,7 +87,7 @@ grant select, insert on log_entry, log_fact to pelago_member;
 
 /** The stream's last position and hash: 0 and the genesis hash while it is empty. */
 export async function headOf(q: Q, stream: Stream = 'facts'): Promise<{ pos: number; hash: string }> {
-  const { rows } = await q.query<{ pos: number; hash: string }>(`select pos::int as pos, encode(hash, 'hex') as hash from log_entry where stream = $1 order by pos desc limit 1`, [stream]);
+  const { rows } = await q.query<{ pos: number; hash: string }>(`select pos::int as pos, encode(hash, 'hex') as hash from log_entry where stream = $1 order by at desc, pos desc limit 1`, [stream]);
   return rows[0] ?? { pos: 0, hash: GENESIS };
 }
 
@@ -97,12 +102,14 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
   const sealed = await sealEntry(tx, ws, stream, head, facts);
   facts = sealed.facts;
   await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.log'), hashtext($1))`, [stream]);
-  const { rows } = await tx.query<{ now: Date; pos: number | null; hash: string | null; at: Date | null }>(
-    `select date_trunc('milliseconds', now()) as now, l.pos::int as pos, encode(l.hash, 'hex') as hash, l.at
-     from (select 1) one left join lateral (select pos, hash, at from log_entry where stream = $1 order by pos desc limit 1) l on true`,
+  const { rows } = await tx.query<{ now: Date; pos: number | null; hash: string | null; at: Date | null; made: boolean }>(
+    `select date_trunc('milliseconds', now()) as now, l.pos::int as pos, encode(l.hash, 'hex') as hash, l.at, ${partitionMade('log_entry')} as made
+     from (select 1) one left join lateral (select pos, hash, at from log_entry where stream = $1 order by at desc, pos desc limit 1) l on true`,
     [stream],
   );
   const last = rows[0];
+  // The log is cut by time (src/partitions.ts): made ahead of need, and here when a year came before its partition.
+  if (!last.made) await makePartitions(tx);
   // The transaction's own time, which today's tables are written with, clamped so time order and position order agree.
   const at = new Date(Math.max(new Date(last.now).getTime(), last.at ? new Date(last.at).getTime() : 0)).toISOString();
   const { id, actor, reason, ...rest } = sealed.head as unknown as typeof head;
@@ -114,10 +121,10 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
   ]);
   if (facts.length) {
     await tx.query(
-      `insert into log_fact (stream, pos, n, op, id, field, value, meta)
-       select $1, $2, f.n - 1, f.x->>0, f.x->>1, f.x->>2, case when jsonb_array_length(f.x) > 3 then f.x->3 end, f.x->4
-       from jsonb_array_elements($3::jsonb) with ordinality f(x, n)`,
-      [stream, pos, JSON.stringify(facts)],
+      `insert into log_fact (stream, pos, at, n, op, id, field, value, meta)
+       select $1, $2, $3, f.n - 1, f.x->>0, f.x->>1, f.x->>2, case when jsonb_array_length(f.x) > 3 then f.x->3 end, f.x->4
+       from jsonb_array_elements($4::jsonb) with ordinality f(x, n)`,
+      [stream, pos, at, JSON.stringify(facts)],
     );
   }
   // Handed back in clear, as the caller said it: what it projects into today's tables.
@@ -126,7 +133,7 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
 
 const FACTS = `coalesce((select jsonb_agg(case when f.op = '-' then jsonb_build_array(f.op, f.id, f.field)
   when f.meta is null then jsonb_build_array(f.op, f.id, f.field, f.value) else jsonb_build_array(f.op, f.id, f.field, f.value, f.meta) end order by f.n)
-  from log_fact f where f.stream = e.stream and f.pos = e.pos), '[]'::jsonb)`;
+  from log_fact f where f.stream = e.stream and f.at = e.at and f.pos = e.pos), '[]'::jsonb)`;
 
 type Row = { stream: Stream; pos: number; id: string; at: Date; head: Record<string, unknown>; prev: string; hash: string; facts: Fact[] };
 const toEntry = (r: Row) => ({ ...r.head, stream: r.stream, pos: r.pos, id: r.id, at: new Date(r.at).toISOString(), facts: r.facts, prev: r.prev, hash: r.hash }) as Entry;
@@ -170,7 +177,11 @@ export async function verify(q: Q, stream: Stream = 'facts'): Promise<{ stream: 
  */
 export async function factAt(q: Q, id: string, field: string, pos?: number): Promise<{ pos: number; op: '+' | '-'; value: unknown } | undefined> {
   const { rows } = await q.query<{ pos: number; op: '+' | '-'; value: unknown }>(
-    `select pos::int as pos, op, value from log_fact where stream = 'facts' and id = $1 and field = $2 and ($3::bigint is null or pos <= $3) order by pos desc, n desc limit 1`,
+    // Bounded by the entry's time as well as its position, so the partitions after it are not read, and ordered by
+    // time first, so those before it are read newest first and the first that answers ends the read.
+    `select pos::int as pos, op, value from log_fact where stream = 'facts' and id = $1 and field = $2
+       and ($3::bigint is null or (pos <= $3 and at <= (select at from log_entry where stream = 'facts' and pos = $3)))
+     order by at desc, pos desc, n desc limit 1`,
     [id, field, pos ?? null],
   );
   return rows[0] && { ...rows[0], value: await openValue(q, id, field, rows[0].value) };

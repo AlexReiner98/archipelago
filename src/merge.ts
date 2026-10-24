@@ -17,7 +17,7 @@ export async function mergeRefusals(db: Q, where: string, keep: Side | undefined
   const problems: string[] = [];
   if (drop.archived_at) {
     const { rows } = await db.query<{ changeset: string | null }>(
-      `select e.id as changeset from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos
+      `select e.id as changeset from log_fact f join log_entry e on e.stream = f.stream and e.at = f.at and e.pos = f.pos
        where f.stream = 'facts' and f.id = $2 and f.field = 'merged_into' and f.value = to_jsonb($1::text) order by f.pos desc limit 1`,
       [keep.id, drop.id],
     );

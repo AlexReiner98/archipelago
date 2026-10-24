@@ -8,14 +8,16 @@ import type { Leader } from './leader.ts';
 import type { ServerPacks } from './server-host.ts';
 import type { Workspaces } from './workspaces.ts';
 import { compact, seal } from './streams.ts';
+import { makePartitions } from './partitions.ts';
 
-/** Seal each workspace's compacted streams up to today and compact what their rules no longer keep (docs/log.md, section 4). */
+/** Make each workspace's log's partitions ahead, seal its compacted streams up to today and compact what their rules no longer keep (docs/log.md, section 4). */
 export async function keepStreams(workspaces: Workspaces, now = new Date()) {
   for (const { id } of await workspaces.list()) {
     const wasOpen = workspaces.isOpen(id);
     const release = workspaces.hold(id);
     try {
       const { pelago } = await workspaces.get(id);
+      await makePartitions(pelago.db); // the log's partitions, two months ahead (src/partitions.ts)
       const sealed = await seal(pelago.db, pelago.workspace, now);
       const { dropped } = await compact(pelago.db, pelago.workspace, pelago.registry.rules, now);
       if (sealed.length || dropped) console.log(`${id}: ${sealed.length} days sealed, ${dropped} entries compacted away`);

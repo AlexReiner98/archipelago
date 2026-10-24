@@ -74,7 +74,7 @@ export async function runSpans(l: Archipelago, runs: Run[], from: number, to: nu
   const { rows: places } = await l.db.query<{ run: string; place: string }>(`select from_id as run, to_id as place from relation where from_id = any($1::text[]) and type = any($2::text[]) and valid_to is null`, [ids, livesIn(l)]);
   // What else says when a session recorded before its stretches were kept was at work: what it did to its own record.
   const { rows: signs } = await l.db.query<{ run: string; ts: Date }>(`select target_id as run, ts from event where target_id = any($1::text[])
-     union all select f.id, e.at from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos where f.stream = 'facts' and f.id = any($1::text[])`, [ids]);
+     union all select f.id, e.at from log_fact f join log_entry e on e.stream = f.stream and e.at = f.at and e.pos = f.pos where f.stream = 'facts' and f.id = any($1::text[])`, [ids]);
   const iso = (t: number) => new Date(t).toISOString();
   for (const run of runs) {
     const spans = out.get(run.id)!;

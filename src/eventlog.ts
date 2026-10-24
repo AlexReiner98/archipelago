@@ -73,7 +73,7 @@ async function groups(db: Q, input: EventQuery, limit: number): Promise<Group[]>
   if (input.after !== undefined) having.push(`min(f.seq) > $${params.push(input.after)}`);
   const order = input.oldest ? 'asc' : 'desc';
   const { rows } = await db.query<Group>(
-    `with picked as (select e.pos from log_entry e where ${where.join(' and ')} order by e.pos ${order} limit $${params.push(limit)})
+    `with picked as (select e.pos from log_entry e where ${where.join(' and ')} order by e.at ${order}, e.pos ${order} limit $${params.push(limit)})
      select min(f.seq)::int8 as seq, f.pos::int as pos, f.id from log_fact f
      where f.stream = 'facts' and f.pos in (select pos from picked)${ids} group by f.pos, f.id having ${having.join(' and ')}
      order by seq ${order} limit $${params.length}`,
@@ -87,12 +87,12 @@ async function expand(db: Q, found: Group[]): Promise<Omit<LoggedEvent, 'target_
   if (!found.length) return [];
   const { rows: facts } = await db.query<FactRow>(
     `select f.pos::int as pos, f.id, f.n, f.op, f.field, f.value, f.seq::int8 as seq,
-       (select jsonb_build_array(p.op, p.value) from log_fact p where p.stream = 'facts' and p.id = f.id and p.field = f.field and p.pos < f.pos order by p.pos desc, p.n desc limit 1) as was
+       (select jsonb_build_array(p.op, p.value) from log_fact p where p.stream = 'facts' and p.id = f.id and p.field = f.field and p.at <= f.at and p.pos < f.pos order by p.at desc, p.pos desc, p.n desc limit 1) as was
      from log_fact f where f.stream = 'facts' and (f.pos, f.id) in (select * from unnest($1::bigint[], $2::text[])) order by f.pos, f.n`,
     [found.map((g) => g.pos), found.map((g) => g.id)],
   );
   const { rows: heads } = await db.query<{ pos: number; id: string; at: Date; head: Record<string, any>; merged: string[] }>(
-    `select e.pos::int as pos, e.id, e.at, e.head, coalesce((select jsonb_agg(m.id) from log_fact m where m.stream = e.stream and m.pos = e.pos and m.field = 'merged_into'), '[]') as merged
+    `select e.pos::int as pos, e.id, e.at, e.head, coalesce((select jsonb_agg(m.id) from log_fact m where m.stream = e.stream and m.at = e.at and m.pos = e.pos and m.field = 'merged_into'), '[]') as merged
      from log_entry e where e.stream = 'facts' and e.pos = any($1::bigint[])`,
     [[...new Set(found.map((g) => g.pos))]],
   );
