@@ -280,9 +280,18 @@ Every view of the work is a lens. A pack declares its views in its pack file
 had; any other is answered by the pack's own code. The core pack's are
 presets: `lens`, `attention`, `brief`, `graph`, `tree` and `hubs`. `gate` is
 the software pack's, and reads around its event through the same lens query
-(the pack read `lens`). A lens of the whole map reads the whole map; a lens
-that starts from an item reads only what is around it (`src/lens-scan.ts`),
-so what it costs follows what it answers. What the kernel still answers
+(the pack read `lens`). No view reads the whole map: a lens that starts
+from an item reads only what is around it (`src/lens-scan.ts`), so what it
+costs follows what it answers; a lens of the whole map reads the kinds it
+names (`kinds`), by the index on type, and opens on the map's top, its
+projects, when it names none. `attention` reads what is a person's
+(`person`) or inside an item (`within`); for everyone, only `to_confirm`,
+from the log. `hubs` read within an item (`within`). A `graph` with no
+focus is drawn from the newest links of each kind. What is inside what, all
+the way down, is the part_of closure, a projection the log keeps
+(`src/closure.ts`); `npm test` refuses a query of the items, links or log
+with nothing to bound it. An agent is told what changed as counts and the
+newest five (`changed_since`, `watch`, the prompt hook), not the list. What the kernel still answers
 itself reads what keeps the map running, not the work (`sessions`,
 `notifications`, `spent`, `story`, `changed_since`, `style`, `saved_views`),
 and `src/operational.ts` names each; `npm test` refuses any other. Every view
