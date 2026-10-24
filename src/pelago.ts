@@ -11,6 +11,8 @@ import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { search, type SearchInput } from './search.ts';
+import { append, headOf, type Decision, type Fact } from './log.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
+import { privateDependencies } from './private-deps.ts'; import { decideProposal, rejection } from './proposals.ts';
 
 export interface Actor {
   kind: 'human' | 'agent';
@@ -127,6 +129,8 @@ export interface ChangeInput {
   hold?: boolean;
   /** The pack action that made it, named on every event it logs ("time.log made this"). */
   action?: string;
+  /** The change set this one reverses: undo's own. */
+  undoes?: string;
 }
 
 export interface Entity {
@@ -166,8 +170,7 @@ export interface Proposal {
 
 export const actorId = (actor: Actor) => `${actor.kind}:${actor.name}`;
 
-/** Relations that make one thing wait on another. */
-export const BLOCKING_RELATIONS = ['depends_on', 'needs'];
+export { BLOCKING_RELATIONS } from './private-deps.ts';
 
 /** Active holds on resources, including ones whose holder the caller may not see. */
 export const ACTIVE_HOLDS = `pelago_active_holds(current_user = 'pelago_member', current_setting('pelago.viewer', true))`;
@@ -265,12 +268,19 @@ export class Archipelago {
       }
     }
 
+    const by = { id: me, ...(actor.token && { token: actor.token }) };
     if (verdict.outcome === 'hold') {
       const id = newId('p');
-      await this.db.query(
-        `insert into proposal (id, actor, reason, source, ops, warnings, private_to, held_by) values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8::jsonb)`,
-        [id, actorId(actor), input.reason, JSON.stringify(input.source ?? null), JSON.stringify(input.ops), JSON.stringify(warnings), this.viewer || null, JSON.stringify(verdict.by ?? null)],
-      );
+      // What it would do on the map as it is now, with the ids it would make: approved with nothing moved, it appends these facts.
+      const { facts = [], ids = {} } = await this.apply(me, input, { authority, dry: true });
+      const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say };
+      await this.db.transaction(async (tx) => {
+        await tx.query(
+          `insert into proposal (id, actor, reason, source, ops, warnings, private_to, held_by) values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8::jsonb)`,
+          [id, actorId(actor), input.reason, JSON.stringify(input.source ?? null), JSON.stringify(input.ops), JSON.stringify(warnings), this.viewer || null, JSON.stringify(verdict.by ?? null)],
+        );
+        await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, base, ops: input.ops, warnings, ids }, facts);
+      });
       await this.log(this.db, { actor: actorId(actor), action: 'proposal.create', reason: input.reason, detail: { proposal: id, ops: input.ops.length, held_by: verdict.by?.rule } });
       return {
         status: 'proposed' as const,
@@ -280,45 +290,13 @@ export class Archipelago {
         note: 'Nothing has changed yet. A human must approve this proposal before it appears in the map.',
       };
     }
-    const applied = await this.apply(me, input, { authority });
+    const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];
+    const applied = await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared } });
     return answered.length ? { ...applied, answered } : applied;
   }
 
   /** `ops`, when given, replaces the proposed ops: the reviewer's corrected version. One at a time: a second click while one applies is refused, not applied again. */
-  decide(actor: Actor, input: Parameters<Archipelago['decideNow']>[1]) { return once(input.proposal, () => this.decideNow(actor, input)); }
-  private async decideNow(actor: Actor, input: { proposal: string; approve: boolean; except?: string[]; note?: string; ops?: Op[] }) {
-    if (actor.kind !== 'human') throw new Error('Only a human can approve or reject proposals.');
-    const { rows } = await this.db.query<Proposal>(`select * from proposal where id = $1`, [input.proposal]);
-    const proposal = rows[0];
-    if (!proposal) throw new Error(`No proposal "${input.proposal}"`);
-    if (proposal.status !== 'pending') throw new Error(`Proposal ${proposal.id} is already ${proposal.status}`);
-
-    let result: Awaited<ReturnType<Archipelago['apply']>> | undefined;
-    if (input.approve) {
-      result = await this.apply(
-        proposal.actor,
-        { ops: input.ops ?? proposal.ops, reason: proposal.reason, source: proposal.source ?? undefined },
-        // Held and then applied by a human: it rests on that human, whatever the agent thought it rested on.
-        { except: input.except, approvedBy: actorId(actor), revised: Boolean(input.ops), authority: { of: 'human', who: actorId(actor) } },
-      ).catch((err: Error) => { throw err.message.startsWith('Change rejected') ? overtaken(proposal.id, err) : err; });
-      if (input.ops) await this.db.query(`update proposal set ops = $2::jsonb where id = $1`, [proposal.id, JSON.stringify(input.ops)]);
-    }
-    const status = input.approve ? 'approved' : 'rejected';
-    await this.db.query(`update proposal set status = $2, decided_by = $3, decided_at = now(), note = $4 where id = $1 and status = 'pending'`, [
-      proposal.id,
-      status,
-      actorId(actor),
-      input.note ?? null,
-    ]);
-    await this.log(this.db, {
-      actor: actorId(actor),
-      action: `proposal.${input.approve ? 'approve' : 'reject'}`,
-      changeset: result?.changeset,
-      reason: input.note ?? '',
-      detail: { proposal: proposal.id, proposed_by: proposal.actor, except: input.except ?? [], revised: Boolean(input.ops) },
-    });
-    return { ...result, proposal: proposal.id, status };
-  }
+  decide(actor: Actor, input: Parameters<typeof decideProposal>[2]) { return once(input.proposal, () => decideProposal(this, actor, input)); }
 
   /** Validate ops against the schema and the current map. Throws listing every problem. */
   async plan(ops: Op[]): Promise<{ warnings: string[] }> {
@@ -421,84 +399,17 @@ export class Archipelago {
           break;
       }
     }
-    if (!errors.length) errors.push(...(await this.checkPrivateDependencies(ops)));
+    if (!errors.length) errors.push(...(await privateDependencies(this, ops)));
     if (errors.length) throw new Error(`Change rejected:\n- ${errors.join('\n- ')}`);
     return { warnings };
   }
 
   /**
-   * The rule that keeps blockers honest between people: nothing may depend on
-   * an item that is private unless it is private to the same person. Otherwise
-   * a colleague would see work as ready that is waiting on something hidden
-   * from them. Checked for new dependencies and for changes of visibility.
+   * Apply a change without consulting policy. For human changes, approved proposals, and the system's own bookkeeping
+   * (sessions). Appended to the fact stream as one change set, in the transaction that writes today's tables. dry: the
+   * facts it would append and the ids it would make, with nothing written; ids: those ids, to make the same ones again.
    */
-  private async checkPrivateDependencies(ops: Op[]): Promise<string[]> {
-    if (!this.viewer) return []; // nothing is private without a person to be private to
-    const problems: string[] = [];
-    const fallback = await this.defaultVisibility();
-    const after = new Map<string, boolean>(); // ref or id -> private once this change applies
-    const names = new Map<string, string>();
-    for (const op of ops) {
-      if (op.op === 'create' && op.ref) {
-        after.set(op.ref, (op.visibility ?? fallback) === 'private');
-        names.set(op.ref, op.title);
-      }
-      if (op.op === 'update' && op.visibility) after.set(op.id, op.visibility === 'private');
-    }
-    const lookup = async (key: string) => {
-      const found = after.has(key) && names.has(key) ? undefined : await this.entity(key);
-      if (found) names.set(key, found.title);
-      return { private: after.get(key) ?? Boolean(found?.private_to), was: Boolean(found?.private_to) };
-    };
-    const name = (key: string) => `"${names.get(key) ?? key}"`;
-
-    for (const [i, op] of ops.entries()) {
-      const where = `op ${i + 1} (${op.op})`;
-      if (op.op === 'link' && BLOCKING_RELATIONS.includes(this.registry.relations.get(op.type)?.root ?? op.type)) {
-        const [from, to] = [await lookup(op.from), await lookup(op.to)];
-        if (to.private && !from.private) problems.push(`${where}: ${name(op.from)} is shared, so it cannot depend on ${name(op.to)}, which is private. Share ${name(op.to)}, or make ${name(op.from)} private too.`);
-      }
-      if (op.op === 'merge') {
-        // A merge moves relations from one to the other, so the two must be equally visible.
-        const [keep, drop] = [await lookup(op.keep), await lookup(op.drop)];
-        if (keep.private !== drop.private) problems.push(`${where}: ${name(op.keep)} and ${name(op.drop)} must have the same visibility to be merged. Share or un-share one of them first.`);
-      }
-      if (op.op !== 'update' || !op.visibility) continue;
-      const self = await lookup(op.id);
-      if (self.private && !self.was) {
-        // Going private: nothing outside my own private items may be waiting on it.
-        const { rows: seen } = await this.db.query<{ id: string; title: string }>(
-          `select s.id, s.title from relation r join entity s on s.id = r.from_id
-           where r.to_id = $1 and r.valid_to is null and r.type = any($2::text[]) and s.archived_at is null and s.private_to is null`,
-          [op.id, this.registry.relationFamily(...BLOCKING_RELATIONS)],
-        );
-        const { rows: all } = await this.db.query<{ n: number }>(`select pelago_external_dependents($1, $2) as n`, [op.id, this.viewer]);
-        const staying = seen.filter((s) => after.get(s.id) !== true);
-        const hidden = all[0].n - seen.length;
-        if (staying.length || hidden > 0) {
-          const what = [...staying.map((s) => `"${s.title}"`), ...(hidden > 0 ? [`${hidden} item${hidden === 1 ? '' : 's'} private to someone else`] : [])].join(', ');
-          problems.push(`${where}: ${name(op.id)} cannot be made private while other work depends on it: ${what}.`);
-        }
-      }
-      if (!self.private && self.was) {
-        // Going shared: what it waits on must be visible too.
-        const { rows: targets } = await this.db.query<{ id: string; title: string }>(
-          `select t.id, t.title from relation r join entity t on t.id = r.to_id
-           where r.from_id = $1 and r.valid_to is null and r.type = any($2::text[]) and t.archived_at is null and t.private_to is not null`,
-          [op.id, this.registry.relationFamily(...BLOCKING_RELATIONS)],
-        );
-        const stillPrivate = targets.filter((t) => after.get(t.id) !== false);
-        if (stillPrivate.length) problems.push(`${where}: ${name(op.id)} cannot be shared while it depends on private items: ${stillPrivate.map((t) => `"${t.title}"`).join(', ')}. Share those in the same change.`);
-      }
-    }
-    return problems;
-  }
-
-  /**
-   * Apply a change without consulting policy. For human changes, approved
-   * proposals, and the system's own bookkeeping (sessions).
-   */
-  async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority } = {}) {
+  async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string> } = {}) {
     const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(this.workspace);
     if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
     // Validate again: the map may have changed since this was proposed.
@@ -507,15 +418,22 @@ export class Archipelago {
     const created: Record<string, string> = {};
     const extra = { ...(opts.approvedBy && { approved_by: opts.approvedBy, ...(opts.revised && { revised_by: opts.approvedBy }) }), ...(opts.authority && { authority: opts.authority }), ...(input.action && { action: input.action }) };
     const reg = this.registry;
+    // Each id it makes is named by what makes it, so that a held change approved with nothing moved makes the same ones.
+    const ids: Record<string, string> = {};
+    const mint = (key: string, prefix: string) => (ids[key] = opts.ids?.[key] ?? newId(prefix));
+    const at = new Map(input.ops.map((op, i) => [op, i + 1]));
+    const facts: Fact[] = [];
+    const DRY = Symbol('dry');
 
     await this.db.transaction(async (tx) => {
       const fallback = await this.defaultVisibility(tx);
-      const defaultSource = input.source ? await this.ensureSource(tx, actor, input.source, changeset) : null;
-      const sourceOf = async (op: { source?: SourceSpec }) => (op.source ? this.ensureSource(tx, actor, op.source, changeset) : defaultSource);
+      const source = (spec: SourceSpec) => this.ensureSource(tx, actor, spec, changeset, facts, mint);
+      const defaultSource = input.source ? await source(input.source) : null;
+      const sourceOf = async (op: { source?: SourceSpec }) => (op.source ? source(op.source) : defaultSource);
       const resolve = (key: string) => created[key] ?? key;
       // What this change makes has its id from the start, so a title or note in the same change can name it:
       // {ref} becomes the id of the item made under that ref. Braces around anything else are left alone.
-      for (const [i, op] of ops.entries()) if (op.op === 'create') created[op.ref ?? `#${i + 1}`] = newId('e');
+      for (const [i, op] of ops.entries()) if (op.op === 'create') created[op.ref ?? `#${i + 1}`] = mint(`#${at.get(op)}`, 'e');
       const refs = new Set(ops.flatMap((op) => (op.op === 'create' && op.ref ? [op.ref] : [])));
       const named = <T extends string | undefined>(text: T): T => (text === undefined ? text : (text.replace(/\{([^{}\s]+)\}/g, (whole, ref: string) => (refs.has(ref) ? created[ref] : whole)) as T));
       const log = (action: string, target: string, detail: Props) =>
@@ -527,9 +445,9 @@ export class Archipelago {
             const type = reg.type(op.type)!;
             const id = created[op.ref ?? `#${i + 1}`];
             const status = op.status ?? type.statuses.open[0];
-            await tx.query(
+            const { rows } = await tx.query<Entity>(
               `insert into entity (id, type, title, body, status, is_open, owner, visibility, confidence, props, source_id, private_to, kind)
-               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13)`,
+               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13) returning *`,
               [
                 id,
                 op.type,
@@ -545,6 +463,7 @@ export class Archipelago {
                 this.privateTo(op.visibility ?? fallback), type.kind ?? null,
               ],
             );
+            facts.push(...itemFacts(rows[0]));
             await log('entity.create', id, { type: op.type, title: named(op.title.trim()), status });
             break;
           }
@@ -568,10 +487,10 @@ export class Archipelago {
             for (const key of Object.keys(next) as (keyof typeof next)[]) {
               if (next[key] !== before[key]) changes[key] = { from: before[key], to: next[key] };
             }
-            await tx.query(
+            const { rows } = await tx.query<Entity>(
               `update entity set title = $2, body = $3, status = $4, is_open = $5, owner = $6, visibility = $7,
                  confidence = $8, props = $9::jsonb, updated_at = now(),
-                 private_to = case when $10::boolean then $11 else private_to end where id = $1`,
+                 private_to = case when $10::boolean then $11 else private_to end where id = $1 returning *`,
               [
                 op.id, next.title, next.body, next.status, reg.isOpen(before.type, next.status), next.owner, next.visibility, next.confidence, JSON.stringify(props),
                 // Only an explicit change of visibility moves who it is private to.
@@ -579,6 +498,7 @@ export class Archipelago {
                 this.privateTo(next.visibility),
               ],
             );
+            facts.push(...changedFacts(before, rows[0]));
             await log('entity.update', op.id, { title: next.title, changes });
             break;
           }
@@ -590,11 +510,12 @@ export class Archipelago {
               [op.type, from, to],
             );
             if (same.rows.length) break; // already linked
-            const id = newId('r');
-            await tx.query(
-              `insert into relation (id, type, from_id, to_id, props, confidence, source_id) values ($1, $2, $3, $4, $5::jsonb, $6, $7)`,
+            const id = mint(`#${at.get(op)}`, 'r');
+            const { rows } = await tx.query<Props>(
+              `insert into relation (id, type, from_id, to_id, props, confidence, source_id) values ($1, $2, $3, $4, $5::jsonb, $6, $7) returning *`,
               [id, op.type, from, to, JSON.stringify(op.props ?? {}), op.confidence ?? 1, await sourceOf(op)],
             );
+            facts.push(...linkFacts(rows[0]));
             await log('relation.link', from, { relation: id, type: op.type, to });
             break;
           }
@@ -603,16 +524,19 @@ export class Archipelago {
               `update relation set valid_to = now() where id = $1 returning type, from_id, to_id`,
               [op.relation],
             );
+            facts.push(['-', op.relation, 'link']);
             await log('relation.unlink', rows[0].from_id, { relation: op.relation, type: rows[0].type, to: rows[0].to_id });
             break;
           }
           case 'archive': {
             const { rows } = await tx.query<{ title: string }>(`update entity set archived_at = now(), updated_at = now() where id = $1 returning title`, [op.id]);
+            facts.push(['+', op.id, 'archived', true]);
             await log('entity.archive', op.id, { title: rows[0].title });
             break;
           }
           case 'restore': {
             const { rows } = await tx.query<{ title: string }>(`update entity set archived_at = null, updated_at = now() where id = $1 returning title`, [op.id]);
+            facts.push(['-', op.id, 'archived']);
             await log('entity.restore', op.id, { title: rows[0].title });
             break;
           }
@@ -620,31 +544,50 @@ export class Archipelago {
             const keep = (await this.entity(op.keep, tx))!;
             const drop = (await this.entity(op.drop, tx))!; // archived first, and only once: a merge that races another is refused
             if (!(await tx.query(`update entity set archived_at = now(), updated_at = now() where id = $1 and archived_at is null returning id`, [op.drop])).rows.length) throw new Error(`Change rejected:\n- "${drop.title}" is already merged or archived`);
-            await tx.query(`update relation set from_id = $1 where from_id = $2`, [op.keep, op.drop]);
-            await tx.query(`update relation set to_id = $1 where to_id = $2`, [op.keep, op.drop]);
-            await tx.query(`update relation set valid_to = now() where from_id = to_id and valid_to is null`);
-            // Where both said the same thing (each was part of the same project), the kept one now says it twice: the older stays.
-            await tx.query(
-              `update relation set valid_to = now() where valid_to is null and (from_id = $1 or to_id = $1) and id not in (
-                 select distinct on (type, from_id, to_id) id from relation where valid_to is null and (from_id = $1 or to_id = $1)
-                 order by type, from_id, to_id, valid_from, id)`,
-              [op.keep],
+            facts.push(['+', drop.id, 'archived', true], ['+', drop.id, 'merged_into', keep.id]);
+            // Each live link of the dropped item moves to the kept one, unless it would join the item to itself or repeat
+            // one the kept item has: where both said the same thing (each was part of the same project), the older stays.
+            const { rows: links } = await tx.query<{ id: string; type: string; from_id: string; to_id: string }>(
+              `select id, type, from_id, to_id from relation where valid_to is null and (from_id = any($1::text[]) or to_id = any($1::text[])) order by valid_from, id`,
+              [[keep.id, drop.id]],
             );
-            await tx.query(`update entity set owner = $1 where owner = $2`, [op.keep, op.drop]);
+            const said = new Set<string>();
+            for (const r of links) {
+              const [from, to] = [r.from_id, r.to_id].map((end) => (end === drop.id ? keep.id : end));
+              const what = `${r.type} ${from} ${to}`;
+              if (from === to || said.has(what)) {
+                await tx.query(`update relation set valid_to = now() where id = $1`, [r.id]);
+                facts.push(['-', r.id, 'link']);
+                continue;
+              }
+              said.add(what);
+              if (from === r.from_id && to === r.to_id) continue;
+              await tx.query(`update relation set from_id = $2, to_id = $3 where id = $1`, [r.id, from, to]);
+              facts.push(['+', r.id, 'link', [r.type, from, to]]);
+            }
+            const { rows: owned } = await tx.query<{ id: string }>(`update entity set owner = $1, updated_at = now() where owner = $2 returning id`, [op.keep, op.drop]);
+            facts.push(...owned.map((o): Fact => ['+', o.id, 'owner', op.keep]));
             const body = [keep.body, drop.body].filter(Boolean).join('\n\n');
-            await tx.query(`update entity set props = $2::jsonb, body = $3, updated_at = now() where id = $1`, [
+            const { rows: kept } = await tx.query<Entity>(`update entity set props = $2::jsonb, body = $3, updated_at = now() where id = $1 returning *`, [
               op.keep,
               JSON.stringify({ ...drop.props, ...keep.props }),
               body,
             ]);
+            facts.push(...changedFacts({ ...keep, owner: kept[0].owner }, kept[0]));
             await log('entity.merge', op.keep, { title: keep.title, absorbed: { id: drop.id, title: drop.title, props: drop.props } });
             break;
           }
           case 'define_type':
-            break; // handled after the transaction
+            facts.push(['+', op.type.id, 'type_def', op.type]);
+            break; // registered after the transaction
         }
       }
-    });
+      if (opts.dry) throw DRY;
+      const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
+      const by = { id: actor, ...(opts.token && { token: opts.token }) };
+      await append(tx, this.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [] }, facts);
+    }).catch((err) => { if (err !== DRY) throw err; });
+    if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
     for (const op of ops) {
       if (op.op !== 'define_type') continue;
@@ -671,47 +614,69 @@ export class Archipelago {
         if (!moot) break;
       }
       if (!moot) continue;
-      const done = await this.db.query(`update proposal set status = 'superseded', decided_by = 'agent:pelago', decided_at = now(), note = $2 where id = $1 and status = 'pending' returning id`, [p.id, `Already so since ${changeset}`]);
-      if (done.rows.length) await this.log(this.db, { actor: 'agent:pelago', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
+      const done = await this.db.transaction(async (tx) => {
+        const marked = await tx.query(`update proposal set status = 'superseded', decided_by = 'agent:pelago', decided_at = now(), note = $2 where id = $1 and status = 'pending' returning id`, [p.id, `Already so since ${changeset}`]);
+        if (marked.rows.length) await rejection(tx, this.workspace, p.id, { outcome: 'superseded', actor: 'system', by: changeset, reason: p.reason });
+        return marked.rows.length > 0;
+      });
+      if (done) await this.log(this.db, { actor: 'agent:pelago', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
     }
   }
 
-  private async ensureSource(q: Q, actor: string, spec: SourceSpec, changeset: string): Promise<string | null> {
+  private async ensureSource(q: Q, actor: string, spec: SourceSpec, changeset: string, facts: Fact[], mint: (key: string, prefix: string) => string): Promise<string | null> {
     if (!this.registry.type('sys.source')) return null;
     const found = await q.query<{ id: string }>(`select id from entity where type = 'sys.source' and props->>'uri' = $1 and archived_at is null`, [spec.uri]);
     if (found.rows.length) return found.rows[0].id;
-    const id = newId('e');
+    const id = mint(`source ${spec.uri}`, 'e');
     const props: Props = { uri: spec.uri };
     if (spec.kind) props.kind = spec.kind;
     const problems = this.registry.check('sys.source', undefined, props);
     if (problems.length) throw new Error(`Change rejected:\n- source: ${problems.join('\n- source: ')}`);
-    await q.query(
-      `insert into entity (id, type, title, body, status, is_open, props, visibility, private_to) values ($1, 'sys.source', $2, $3, 'recorded', true, $4::jsonb, $5, $6)`,
+    const { rows } = await q.query<Entity>(
+      `insert into entity (id, type, title, body, status, is_open, props, visibility, private_to) values ($1, 'sys.source', $2, $3, 'recorded', true, $4::jsonb, $5, $6) returning *`,
       [id, spec.title ?? spec.uri, spec.excerpt ?? '', JSON.stringify(props), await this.defaultVisibility(q), this.privateTo(await this.defaultVisibility(q))],
     );
+    facts.push(...itemFacts(rows[0])); // the source's own facts, before the facts that name it
     await this.log(q, { actor, action: 'entity.create', target: id, changeset, reason: 'Source of this change', detail: { type: 'sys.source', title: spec.title ?? spec.uri } });
     return id;
   }
+
+  /** A change set the system appends when a pack moves a type or a kind: the new type or kind, and nothing else of the items moves. */
+  private moved = (tx: Q, action: string, reason: string, facts: Fact[]) =>
+    append(tx, this.workspace, 'facts', { id: newId('c'), actor: { id: 'system' }, authority: null, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts);
+
+  /** Each item's kind in its row, from the type table, where the row lacks it or has another (src/head.ts): when a workspace opens. */
+  fillKinds = () => this.db.transaction(async (tx) => {
+    const { rows } = await tx.query<{ id: string; kind: string | null }>(`update entity e set kind = t.def->>'kind' from type_def t where t.id = e.type and e.kind is distinct from t.def->>'kind' returning e.id, e.kind`);
+    if (rows.length) await this.moved(tx, 'kind.moved', 'A pack moved a type to another kind', rows.map((r): Fact => (r.kind === null ? ['-', r.id, 'kind'] : ['+', r.id, 'kind', r.kind])));
+    return rows.length;
+  });
 
   /**
    * Move every item of a type (or link of a relation) no pack defines any more to the one that took it over
    * (moved_from): a one-time migration as a pack takes it out of another, logged as one event. All else stays. The
    * lenses and screens that name the old one in their settings (kinds and on, or over) name the new one.
    */
-  /** Each item's kind in its row, from the type table, where the row lacks it or has another (src/head.ts): when a workspace opens. */
-  fillKinds = async () => (await this.db.query(`update entity e set kind = t.def->>'kind' from type_def t where t.id = e.type and e.kind is distinct from t.def->>'kind' returning e.id`)).rows.length;
   async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity'): Promise<number> {
     return this.db.transaction(async (tx) => {
-      const { rows } = await tx.query<{ id: string }>(`update ${what === 'entity' ? 'entity' : 'relation'} set type = $2 where type = $1 returning id`, [from, to]);
+      const { rows } = await tx.query<{ id: string; kind?: string | null; from_id?: string; to_id?: string }>(
+        what === 'entity' ? `update entity set type = $2 where type = $1 returning id, kind` : `update relation set type = $2 where type = $1 returning id, from_id, to_id`,
+        [from, to],
+      );
+      const keys = what === 'entity' ? ['kinds', 'on'] : ['over'];
       const names = `jsonb_typeof(e.props -> k) = 'array' and (e.props -> k ? $1 or e.props -> k ? ('-' || $1))`;
       const swap = `case when x = to_jsonb($1::text) then to_jsonb($2::text) when x = to_jsonb('-' || $1) then to_jsonb('-' || $2) else x end`;
-      const { rows: named } = await tx.query<{ id: string }>(
+      const { rows: named } = await tx.query<{ id: string; props: Props }>(
         `update entity e set props = e.props || (select jsonb_object_agg(k, (select jsonb_agg(${swap} order by i) from jsonb_array_elements(e.props -> k) with ordinality a(x, i))) from unnest($3::text[]) k where ${names})
-         where e.type = any($4::text[]) and exists (select 1 from unnest($3::text[]) k where ${names}) returning e.id`,
-        [from, to, what === 'entity' ? ['kinds', 'on'] : ['over'], [...this.registry.family('lens'), ...this.registry.family('screen')]],
+         where e.type = any($4::text[]) and exists (select 1 from unnest($3::text[]) k where ${names}) returning e.id, e.props`,
+        [from, to, keys, [...this.registry.family('lens'), ...this.registry.family('screen')]],
       );
       const settings = named.length ? { settings: named.map((r) => r.id) } : {};
-      if (rows.length || named.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason: `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`, detail: { from, to, items: rows.map((r) => r.id), ...settings } });
+      const reason = `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`;
+      const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to], r.kind ? ['+', r.id, 'kind', r.kind] : ['-', r.id, 'kind']] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));
+      for (const r of named) for (const k of keys) if (Array.isArray(r.props[k])) facts.push(['+', r.id, k, r.props[k]]);
+      if (facts.length) await this.moved(tx, 'type.moved', reason, facts);
+      if (rows.length || named.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason, detail: { from, to, items: rows.map((r) => r.id), ...settings } });
       return rows.length;
     });
   }

@@ -3,8 +3,12 @@
 // reads these lists: a table that is neither the map nor named here fails it, and so does a write to the map's
 // tables outside src/pelago.ts.
 
-/** The map itself: items, links and the log. Written only in src/pelago.ts. */
-export const MAP_TABLES = ['entity', 'relation', 'event'];
+/**
+ * The map itself: items, links and the log. Written only in src/pelago.ts. log_entry and log_fact are the log the
+ * owner decided is the source of truth (docs/log.md), appended to and never changed; entity, relation and event are
+ * written beside it until they are projections of it.
+ */
+export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact'];
 
 /**
  * State kept on the map's own items that skips approval. It takes effect at once and is never held, through the
