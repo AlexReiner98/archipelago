@@ -58,7 +58,7 @@ const count = (files: string[], pattern: RegExp) =>
 const LONG_FILES: Record<string, number> = {
   'src/views.ts': 503,
   'src/tools.ts': 909,
-  'src/pelago.ts': 1003,
+  'src/pelago.ts': 969,
   'ui/style.css': 732,
 };
 

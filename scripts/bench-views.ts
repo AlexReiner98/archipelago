@@ -132,6 +132,9 @@ const rows = [
   await time('view brief (task)', view('brief', { task: TASK })),
   await time('get (busiest item)', () => call('get', { id: BUSY })),
   await time('search "model export"', () => call('search', { q: 'model export', limit: 20 })),
+  await time('search "review"', () => call('search', { q: 'review', limit: 20 })),
+  // Nothing found as typed: titles with a word close to it are taken instead.
+  await time('search "rendr" (a slip)', () => call('search', { q: 'rendr', limit: 20 })),
 ];
 // A typical change: a task made inside the hub, linked to the one being briefed, and a note added to that one.
 let changeset = '';
