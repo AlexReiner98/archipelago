@@ -33,3 +33,16 @@ create policy member_event on event for all to pelago_member
          and (target_id is null or exists (select 1 from entity e where e.id = target_id)))
   with check (true);
 `;
+
+// Who holds what: the holder's title looked up for each hold, by the key. Joined instead, a planner that takes the
+// open holds for many (the ended ones count in its statistics) reads every item to join them.
+export const ACTIVE_HOLDS_BY_KEY = `
+create or replace function pelago_active_holds(is_member boolean, viewer text)
+returns table (id text, from_id text, to_id text, props jsonb, valid_from timestamptz, holder_title text)
+language sql stable security definer set search_path = public as $fn$
+  select h.id, h.from_id, h.to_id, h.props, h.valid_from,
+         (select case when not is_member or s.private_to is null or s.private_to = viewer then s.title else 'someone''s private session' end from entity s where s.id = h.from_id)
+  from relation h
+  where h.type = 'holds' and h.valid_to is null
+$fn$;
+`;

@@ -22,7 +22,7 @@ import { FORGET } from './forget.ts';
 import { OPLOG, OPLOG_SERVER } from './oplog.ts';
 import { CLOSURE } from './closure.ts';
 import { MENTIONS } from './mentions.ts';
-import { READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
+import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
 
 interface Migration {
   version: number;
@@ -57,7 +57,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 19, name: 'the activity log read from the log', sql: ACTIVITY },
   { version: 20, name: 'per-item keys in a vault, and forgetting', sql: VAULT + FORGET },
   { version: 21, name: 'the compacted streams, in segments', sql: OPLOG, server: OPLOG_SERVER },
-  { version: 25, name: 'what is inside what, what names what, the indexes reads are bounded by, and visibility asked row by row', sql: CLOSURE + MENTIONS + READ_INDEXES + ROW_POLICIES },
+  { version: 25, name: 'what is inside what, what names what, the indexes reads are bounded by, and visibility asked row by row', sql: CLOSURE + MENTIONS + READ_INDEXES + ROW_POLICIES + ACTIVE_HOLDS_BY_KEY },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

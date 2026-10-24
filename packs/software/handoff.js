@@ -29,8 +29,8 @@ export async function handoff(input, ctx) {
   const note = newest ? await ctx.read({ get: newest.id }) : null;
   const since = input.since ? new Date(input.since) : note ? new Date(note.updated_at) : new Date(Date.parse(ctx.now) - HANDOFF_DAYS * 86_400_000);
   const after = (t) => Date.parse(t) > since.getTime();
-  // Everything that goes stale and is the repository's, open or not, newest first.
-  const stale = (await ctx.read({ scope: repo.id, types: GOES_STALE, fields: [] })).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || a.id.localeCompare(b.id));
+  // What goes stale and is the repository's, open or not, changed since then, newest first.
+  const stale = (await ctx.read({ scope: repo.id, types: GOES_STALE, fields: [], since: since.toISOString() })).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || a.id.localeCompare(b.id));
   const ran = (await ctx.read({ related: repo.id, relation: 'lives_in', direction: 'in', types: ['sys.run'], newest: 'updated', fields: [] })).filter((r) => !r.is_open && after(r.updated_at)).slice(0, 10);
   const ended = [];
   for (const r of ran) ended.push({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said((await ctx.read({ get: r.id }))?.body) });

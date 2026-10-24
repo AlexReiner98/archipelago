@@ -31,6 +31,8 @@ export type Read = {
   open?: boolean;
   /** With scope: only what is part of it, not what is about it or lives in it. */
   parts?: boolean;
+  /** With scope: only what changed after this moment (an ISO date-time). */
+  since?: string;
   /** Everything part of any of these items, and the items themselves, in one read. */
   parts_of?: string[];
   /** What a lens from an item reads (src/lens-scan.ts), in one read: the items around it and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
@@ -98,9 +100,9 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const under = q.parts ? `with recursive scope(id) as (select $1::text union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null and $2::text[] is not null)` : SCOPE;
     const { rows } = await l.db.query<Entity>(
       `${under} select ${cols('e')} from entity e join scope s on s.id = e.id
-       where e.archived_at is null and ($3::text[] is null or e.type = any($3::text[])) and ($4::boolean is null or e.is_open = $4)
+       where e.archived_at is null and ($3::text[] is null or e.type = any($3::text[])) and ($4::boolean is null or e.is_open = $4) and ($5::timestamptz is null or e.updated_at > $5::timestamptz)
        order by e.updated_at desc`,
-      [q.scope, livesIn(l), family(q.types), q.open ?? null],
+      [q.scope, livesIn(l), family(q.types), q.open ?? null, q.since ?? null],
     );
     return rows.map(typed);
   }
