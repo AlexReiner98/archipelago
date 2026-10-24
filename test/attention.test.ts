@@ -84,9 +84,11 @@ test('attention finds every reason, for the right person, within a scope, and th
 
   const site = await ask({ person: 'me', within: made.site });
   assert.ok(why(site, made.copy).includes('due') && !site.items.some((i) => i.id === made.seeds), 'within a project, only its own');
-  const due = await ask({ reasons: ['due'] });
-  assert.deepEqual(due.items.map((i) => i.title).sort(), ['Order the seeds', 'Write the copy'], 'everyone’s, by one reason');
-  assert.deepEqual(Object.keys(due.counts), ['due']);
+  // Everyone's across the map is not weighed: it would read every open item. What the log answers is.
+  await assert.rejects(ask({ reasons: ['due'] }), /for a person \(person\) or within an item/);
+  const due = await ask({ person: 'me', reasons: ['due'] });
+  assert.deepEqual([due.items.map((i) => i.title).sort(), Object.keys(due.counts)], [['Order the seeds', 'Write the copy'], ['due']], 'by one reason: both are the owner’s, owned by nobody');
+  assert.deepEqual((await ask({ reasons: ['to_confirm'] })).items.map((i) => i.id), [made.cms], 'what to confirm is read from the log, for everyone');
   await assert.rejects(ask({ reasons: ['urgent'] }), /"urgent" is not a reason/);
 
   // The views attention replaced are gone, each saying what to ask now.

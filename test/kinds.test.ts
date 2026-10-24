@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { callTool } from '../src/tools.ts';
 import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
@@ -82,7 +83,8 @@ test("a pack's relation extending depends_on blocks as depends_on does", async (
     ],
   });
   const { a, b } = (made as { created: Record<string, string> }).created;
-  const answer = (await ask(l, 'attention', { reasons: ['blocked'] })) as { items: { id: string; reasons: { why: string; by: string[] }[] }[] };
+  await callTool(l, { kind: 'human', name: 'test' }, 'init', { name: 'Owner' });
+  const answer = (await ask(l, 'attention', { person: 'me', reasons: ['blocked'] })) as { items: { id: string; reasons: { why: string; by: string[] }[] }[] };
   const framed = answer.items.find((x) => x.id === b);
   assert.ok(framed, 'the later task is blocked');
   assert.deepEqual(framed.reasons.map((x) => [x.why, x.by]), [['blocked', [(await l.entity(a))!.title]]]);
@@ -129,8 +131,8 @@ test("the roots name kinds at their ends, so a pack's own actor can be waited on
       { op: 'link', type: 'needs', from: 't', to: 'crane' },
     ],
   });
-  const { t } = (made as { created: Record<string, string> }).created;
-  const answer = (await ask(l, 'attention', { reasons: ['waits_on'] })) as { items: { id: string; reasons: { why: string }[] }[] };
+  const { t, crew } = (made as { created: Record<string, string> }).created;
+  const answer = (await ask(l, 'attention', { person: crew, reasons: ['waits_on'] })) as { items: { id: string; reasons: { why: string }[] }[] };
   assert.ok(answer.items.find((x) => x.id === t)?.reasons.some((x) => x.why === 'waits_on'), 'the task waits on the crew');
 });
 
@@ -145,10 +147,13 @@ test('views of the work leave the system kind out by default', async () => {
       { op: 'create', ref: 'v', type: 'lens', title: 'Everything' },
     ],
   });
-  const { t, v } = (made as { created: Record<string, string> }).created;
-  const answer = (await ask(l, 'lens', { fold: [] })) as { items: { id: string }[] };
+  const { p, t, v } = (made as { created: Record<string, string> }).created;
+  // Of the whole map, a lens says the kinds it is of.
+  const kinds = ['work.task', 'lens'];
+  const answer = (await ask(l, 'lens', { kinds, fold: [] })) as { items: { id: string }[] };
   assert.ok(answer.items.some((x) => x.id === v), 'asked to, a view shows the system kind');
-  const folded = (await ask(l, 'lens', {})) as { items: { id: string }[]; rest: { system: number } };
+  const folded = (await ask(l, 'lens', { kinds })) as { items: { id: string }[] };
   assert.ok(folded.items.some((x) => x.id === t) && !folded.items.some((x) => x.id === v));
-  assert.ok(folded.rest.system >= 1);
+  const within = (await ask(l, 'lens', { from: p, kinds })) as { items: { id: string }[]; rest: { system: number } };
+  assert.ok(!within.items.some((x) => x.id === v));
 });

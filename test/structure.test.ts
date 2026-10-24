@@ -57,7 +57,7 @@ const count = (files: string[], pattern: RegExp) =>
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
-  'src/pelago.ts': 853,
+  'src/pelago.ts': 852,
   'ui/style.css': 732,
 };
 
@@ -305,4 +305,34 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
   assert.deepEqual(unmapped, [], 'Write it in the manifest shape (docs/packs.md): a key the manifest does not have is refused.');
   const lands = (to: string) => to.startsWith('nothing') || [...MANIFEST_KEYS, 'reach.server'].some((k) => to === k || to.startsWith(`${k} `) || to.startsWith(`${k}.`)) || REACH_KEYS.some((k) => to.startsWith(`reach.${k}`));
   assert.deepEqual(Object.entries(LEGACY).filter(([, to]) => !lands(to)).map(([k]) => k), [], 'Every old key says the manifest key it is read as, or that it goes.');
+});
+
+// 15. No read of the whole map ("Refuse unscoped reads", 24 Oct 2026). At millions of items a query of the items,
+// links, log or queue with nothing to bound it reads them all: each is bounded by an id or a set of them, a subtree
+// (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
+// (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
+const WHOLE_READS: Record<string, number> = {
+  'src/backup.ts': 2,
+  'src/forget.ts': 2,
+  'src/log.ts': 2,
+  'src/mentions.ts': 1,
+  'src/pelago.ts': 1,
+  'src/search.ts': 1,
+  'src/server.ts': 1,
+  'src/streams.ts': 1,
+};
+
+/** The tables that grow with the map. */
+const GROWS = /\b(?:from|join)\s+(?:entity|relation|event|log_entry|log_fact|log_op|proposal)\b(?!\s*\()/i;
+/** What bounds a read. */
+const BOUND = /=\s*any\s*\(|unnest\s*\(|\b(?:id|from_id|to_id|target_id|ancestor|descendant|owner|changeset|undoes)\s*=\s*(?:\$|[a-z_]+\b(?!\s*\())|\bid\s+in\s*\(\s*select|\blimit\s+(?:\$|\d|\$\{)|\b(?:seq|pos|ts|at)\s*>=?\s*\$|--\s*index\s+[a-z_]+/i;
+
+test('no read of the whole map', () => {
+  const indexes = new Set(walk('src').flatMap((f) => [...read(f).matchAll(/create (?:unique )?index if not exists (\w+)/g)].map((m) => m[1])));
+  const queries = (text: string) => [...text.matchAll(/`(?:[^`\\]|\\.)*`/gs)].map((m) => m[0]).filter((q) => /\bselect\b/i.test(q) && GROWS.test(q));
+  const files = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/read-indexes.ts');
+  const named = files.flatMap((f) => queries(read(f)).flatMap((q) => [...q.matchAll(/--\s*index\s+([a-z_, ]+)/g)].flatMap((m) => m[1].split(',').map((n) => n.trim()).filter(Boolean)))).filter((name) => !indexes.has(name));
+  assert.deepEqual(named, [], 'A read names an index the schema makes.');
+  const counted = Object.fromEntries(files.map((f) => [f, queries(read(f)).filter((q) => !BOUND.test(q)).length]).filter(([, n]) => (n as number) > 0));
+  assert.deepEqual(ratchet(counted, WHOLE_READS), [], 'Bound the read: by an id, a subtree (part_closure), a person, a time or a limit; or name the index it goes by (-- index <name>).');
 });

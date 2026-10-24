@@ -29,7 +29,7 @@ const SEALED: Record<string, { columns: string[]; key: (r: Row) => string | null
 export async function sealTables(q: Q, ws: string, tables: Record<string, Row[]>): Promise<void> {
   await sealBasis(q, ws, tables.event ?? []);
   // No key is made again for what was forgotten: what is left of it says nothing (an event's reason, its detail emptied).
-  const forgotten = new Set((await q.query<{ id: string }>(`select id from log_fact where field = 'forgotten' and op = '+'`)).rows.map((r) => r.id));
+  const forgotten = new Set((await q.query<{ id: string }>(`select id from log_fact where field = 'forgotten' and op = '+' -- index log_fact_kept`)).rows.map((r) => r.id));
   const ids = new Set<string>();
   for (const [table, parts] of Object.entries(SEALED)) for (const r of tables[table] ?? []) for (const p of parts) { const id = p.key(r); if (id && !forgotten.has(id)) ids.add(id); }
   const ring = await keysFor(q, ws, [...ids]);

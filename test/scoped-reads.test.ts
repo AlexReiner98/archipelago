@@ -1,0 +1,59 @@
+// No request reads the whole map: a lens of the whole map reads the kinds it names (its top when it names none), a
+// graph with no focus the newest links, attention what is a person's or inside an item, and an agent is told what
+// changed as counts and the newest few. The structure test keeps the queries bounded; this keeps the answers.
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { callTool } from '../src/tools.ts';
+import { agent, fresh, human, make } from './map.ts';
+
+const view = (l: Awaited<ReturnType<typeof fresh>>, who: typeof human, name: string, params: Record<string, unknown> = {}) => callTool(l, who, 'view', { name, params }) as Promise<any>;
+
+test('a lens of the whole map opens on its top, and reads only the kinds it names', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'work.project', title: 'House' },
+    { op: 'create', ref: 'f', type: 'software.feature', title: 'Roof' },
+    { op: 'create', ref: 't', type: 'work.task', title: 'Tiles' },
+    { op: 'create', ref: 'q', type: 'work.project', title: 'Garden' },
+    { op: 'link', type: 'part_of', from: 'f', to: 'p' },
+    { op: 'link', type: 'part_of', from: 't', to: 'f' },
+    { op: 'link', type: 'part_of', from: 'q', to: 't' },
+  ]);
+  const top = await view(l, human, 'lens');
+  assert.deepEqual(top.items.map((i: any) => i.title).sort(), ['Garden', 'House'], 'naming no kinds, the projects');
+  assert.equal(top.items.find((i: any) => i.title === 'Garden').inside, made.p, 'held through what was not read, by the part_of closure');
+  const tasks = await view(l, human, 'lens', { kinds: ['work.task'] });
+  assert.deepEqual(tasks.items.map((i: any) => i.title), ['Tiles']);
+  // Only kinds to leave out read everything else: that is the top, less them.
+  assert.deepEqual((await view(l, human, 'lens', { kinds: ['-work.task'] })).items.map((i: any) => i.title).sort(), ['Garden', 'House']);
+});
+
+test('a graph with no focus is drawn from the newest links of each kind', async () => {
+  const l = await fresh();
+  await make(l, [
+    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'c', type: 'work.task', title: 'C' },
+    { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
+  ]);
+  const graph = await view(l, human, 'graph');
+  assert.deepEqual(graph.nodes.map((n: any) => n.title).sort(), ['A', 'B'], 'what no link of the kind joins is not read');
+  assert.deepEqual([graph.nodes.find((n: any) => n.title === 'A').blocked, graph.edges.length], [true, 1]);
+});
+
+test('an agent is told what changed as counts and the newest few, not the list', async () => {
+  const l = await fresh();
+  const since = new Date(Date.now() - 1000).toISOString();
+  await make(l, Array.from({ length: 8 }, (_, i) => ({ op: 'create' as const, type: 'work.task', title: `Task ${i}` })));
+  const forHuman = await view(l, human, 'changed_since', { since });
+  const forAgent = await view(l, agent, 'changed_since', { since });
+  assert.equal(forHuman.events.length, 8);
+  assert.deepEqual([forAgent.events.length, forAgent.counts['entity.create'], /newest 5 of 8/.test(forAgent.more)], [5, 8, true]);
+  assert.equal((await view(l, agent, 'changed_since', { since, limit: 8 })).events.length, 8, 'more when it asks');
+
+  const { latest } = (await callTool(l, agent, 'watch', {})) as { latest: number };
+  await make(l, Array.from({ length: 7 }, (_, i) => ({ op: 'create' as const, type: 'work.task', title: `More ${i}` })));
+  const heard = (await callTool(l, agent, 'watch', { after: latest })) as { changes: unknown[]; counts: Record<string, number>; more: number; latest: number };
+  assert.deepEqual([heard.changes.length, heard.counts['entity.create'], heard.more, heard.latest > latest], [5, 7, 2, true]);
+});

@@ -53,8 +53,6 @@ export interface Read {
   entities: { id: string; type: string; kind: string | null; title: string; status: string; owner: string | null; is_open: boolean; props: Record<string, unknown>; updated_at: Date }[];
   /** Those that say what waits on what as the map keeps them, the rest by id. */
   relations: { type: string; from_id: string; to_id: string; for: string | null }[];
-  /** Whether it is the whole map: else, what blocks what is read for what it holds only. */
-  whole: boolean;
   /** What blocks what, when the lens has read it already. */
   graph?: BlockGraph;
 }
@@ -78,7 +76,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
 
   const rows: Row[] = read
     ? read.entities.filter((e) => e.is_open).map(({ id, type, kind, title, status, owner, is_open, props, updated_at }) => ({ id, type, kind, title, status, owner, is_open, due: typeof props.due === 'string' ? props.due : props.due == null ? null : String(props.due), updated_at }))
-    : (await l.db.query<Row>(`select id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at from entity where archived_at is null and is_open`)).rows;
+    : await rowsFor(l, me, me !== null && me === owner, scope, wanted);
   const reg = l.registry;
   // Only what is work or a question to someone: not people, places, records of the past, or the system's own.
   const live = new Map(rows.filter((e) => e.kind !== SYSTEM && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
@@ -97,12 +95,12 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const waitsOn = reg.relationFamily('waits_on');
   const waits = read
     ? read.relations.filter((r) => waitsOn.includes(r.type))
-    : (await l.db.query<{ from_id: string; to_id: string; for: string | null }>(`select from_id, to_id, props->>'for' as for from relation where type = any($1::text[]) and valid_to is null`, [waitsOn])).rows;
+    : (await l.db.query<{ from_id: string; to_id: string; for: string | null }>(`select from_id, to_id, props->>'for' as for from relation where type = any($1::text[]) and valid_to is null and from_id = any($2::text[])`, [waitsOn, rows.map((r) => r.id)])).rows;
   const who = await titles([...new Set(waits.map((w) => w.to_id))]);
   for (const w of waits) if (me === null || w.to_id === me) add(live.get(w.from_id), 'waits_on', { who: who.get(w.to_id) ?? w.to_id, ...(w.for && { for: w.for }) });
 
   // Blocked, and what holds others up: the roots every chain of blocking ends at.
-  const graph = read?.graph ?? (await blockGraph(l, read && !read.whole ? [...live.keys()] : undefined));
+  const graph = read?.graph ?? (await blockGraph(l, [...live.keys()]));
   const blockedIds = [...graph.direct.keys()].filter((id) => live.has(id));
   const rootsOf = new Map(blockedIds.map((id) => [id, graph.roots(id)]));
   const rootTitles = await titles([...new Set([...rootsOf.values()].flat())]);
@@ -119,7 +117,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   }
 
   // Due, or past a limit, by the bound its type declares.
-  const { due, under } = await pastBounds(l, input.days ?? 7);
+  const { due, under } = await pastBounds(l, input.days ?? 7, [...live.keys()]);
   for (const d of due) if (live.get(d.id) && theirs(live.get(d.id)!)) add(live.get(d.id), 'due', { on: d.due, overdue: d.overdue });
   for (const u of under) if (live.get(u.id) && theirs(live.get(u.id)!)) add(live.get(u.id), 'due', { value: u.value, limit: u.limit });
 
@@ -134,7 +132,8 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   // Under way: a session at work on it.
   const { rows: at } = await l.db.query<{ target: string; n: number }>(
     `select r.to_id as target, count(*)::int as n from relation r join entity s on s.id = r.from_id
-     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null group by r.to_id`,
+     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null and r.to_id = any($1::text[]) group by r.to_id`,
+    [[...live.keys()]],
   );
   for (const a of at) if (live.get(a.target) && theirs(live.get(a.target)!)) add(live.get(a.target), 'under_way', { sessions: a.n });
 
@@ -156,17 +155,6 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
     if (!scope || scope.has(q.id)) add(e ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
   }
 
-  // What each sits in at the top: the outermost thing it is part of, for a page that groups by it.
-  const parts = read ? read.relations.filter((r) => r.type === 'part_of') : (await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null order by id`)).rows;
-  const up = new Map<string, string>();
-  for (const p of parts) if (!up.has(p.from_id) && p.from_id !== p.to_id) up.set(p.from_id, p.to_id);
-  const topOf = (id: string) => {
-    let at = id;
-    for (let steps = 0, next = up.get(at); next !== undefined && steps < 64; steps++, next = up.get(at)) at = next;
-    return at === id ? null : at;
-  };
-  const tops = await titles([...new Set([...found.keys()].map(topOf).filter((t): t is string => t !== null))]);
-
   const rank = (reasons: Record<string, unknown>[]) => Math.min(...reasons.map((r) => REASONS.indexOf(r.why as Reason)));
   // What to confirm keeps the order the owner should see it in: what agents settled on their own judgment first.
   const asked = new Map((confirm?.questions ?? []).map((q, i) => [q.id, i]));
@@ -174,21 +162,61 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const newer = (a: { row: Row }, b: { row: Row }) => +new Date(b.row.updated_at) - +new Date(a.row.updated_at);
   const items = [...found.values()]
     .sort((a, b) => (input.order === 'latest' && newer(a, b)) || rank(a.reasons) - rank(b.reasons) || place(a.row.id) - place(b.row.id) || String(a.row.due ?? '9').localeCompare(String(b.row.due ?? '9')) || +new Date(b.row.updated_at) - +new Date(a.row.updated_at))
-    .map(({ row, reasons }) => {
-      const top = topOf(row.id);
-      return { id: row.id, type: row.type, kind: row.kind ?? null, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons, top: top ? { id: top, title: tops.get(top) ?? top } : null };
-    });
+    .map(({ row, reasons }) => ({ id: row.id, type: row.type, kind: row.kind ?? null, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons }));
   const counts = Object.fromEntries([...wanted].map((r) => [r, items.filter((i) => i.reasons.some((x) => x.why === r)).length]));
   const limit = input.limit ?? 100;
+  // What each sits in at the top, for those sent: the outermost thing it is part of, for a page that groups by it.
+  const tops = await topsOf(l, items.slice(0, limit).map((i) => i.id));
   return {
     person: me,
     within: input.within ?? null,
     counts,
-    items: items.slice(0, limit),
+    items: items.slice(0, limit).map((i) => ({ ...i, top: tops.get(i.id) ?? null })),
     ...(items.length > limit && { more: `The first ${limit} of ${items.length}: ask with a higher limit, fewer reasons, or a scope (within).` }),
     // What the confirmed tool needs to say the owner has answered for these.
     ...(confirm && { to_confirm: { count: confirm.count, on_agents_judgment: confirm.on_agents_judgment, on_owners_word: confirm.on_owners_word, upto: confirm.upto, how: confirm.how } }),
   };
+}
+
+/** Reasons read from the log or an index alone, which attention may give for everyone across the map. */
+const EVERYONE = ['to_confirm'];
+
+/**
+ * The open items attention weighs, read by what it is asked for and no wider: what is inside an item or a place
+ * (within); else what is a person's (owned by them, or by nobody when they are the workspace's owner) and what waits
+ * on them. For everyone across the map, only reasons the log answers: weighing every open item would read them all.
+ */
+async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<Reason>): Promise<Row[]> {
+  const cols = `id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at`;
+  if (scope) return (await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and is_open and archived_at is null`, [[...scope]])).rows;
+  if (me !== null) {
+    const { rows } = await l.db.query<Row>(
+      `select ${cols} from entity where is_open and archived_at is null and (owner = $1 or ($2 and owner is null))
+       union select ${cols} from entity where is_open and archived_at is null and id in (select from_id from relation where to_id = $1 and type = any($3::text[]) and valid_to is null)`,
+      [me, isOwner, l.registry.relationFamily('waits_on')],
+    );
+    if (!wanted.has('holding_up')) return rows;
+    // What theirs holds up: whatever waits on it, step by step back along the links that block.
+    const { rows: held } = await l.db.query<Row>(
+      `with recursive back(id) as (select unnest($1::text[]) union select r.from_id from relation r join back b on r.to_id = b.id where r.valid_to is null and r.type = any($2::text[]))
+       select ${cols} from entity where id in (select id from back) and not (id = any($1::text[])) and is_open and archived_at is null`,
+      [rows.map((r) => r.id), l.registry.relationFamily('depends_on', 'waits_on', 'needs')],
+    );
+    return [...rows, ...held];
+  }
+  if ([...wanted].some((r) => !EVERYONE.includes(r))) throw new Error(`attention reads for a person (person) or within an item or a place (within); for everyone across the map, only ${EVERYONE.join(', ')}: weighing every open item would read the whole map.`);
+  return [];
+}
+
+/** The outermost thing each item is part of, from the part_of closure: the ancestor that is part of nothing. */
+async function topsOf(l: Archipelago, ids: string[]): Promise<Map<string, { id: string; title: string }>> {
+  const { rows } = await l.db.query<{ id: string; top: string; title: string }>(
+    `select distinct on (c.descendant) c.descendant as id, c.ancestor as top, e.title from part_closure c join entity e on e.id = c.ancestor
+     where c.descendant = any($1::text[]) and not exists (select 1 from part_closure up where up.descendant = c.ancestor)
+     order by c.descendant, c.ancestor`,
+    [ids],
+  );
+  return new Map(rows.map((r) => [r.id, { id: r.top, title: r.title }]));
 }
 
 /** What each view attention replaced asks it now. */
@@ -196,9 +224,9 @@ export const REPLACED: Record<string, string> = {
   needs_me: '{ person: "me", reasons: ["waits_on", "to_confirm", "due", "unsettled", "ready"] }',
   blocked_on_me: '{ person: "me", reasons: ["holding_up"] }',
   waiting_on: '{ person: "me", reasons: ["blocked"] }',
-  at_risk: '{ reasons: ["due"], days: 7 }',
-  blockers: '{ reasons: ["blocked"] }',
-  available_now: '{ reasons: ["ready"] }',
+  at_risk: '{ reasons: ["due"], days: 7, within: <a project> }',
+  blockers: '{ reasons: ["blocked"], within: <a project> }',
+  available_now: '{ reasons: ["ready"], person: "me" }',
   oldest: '{ reasons: ["stale"], within: <an item or a repository> }',
   questions: '{ reasons: ["unsettled"], within: <a project> }',
   to_confirm: '{ person: "me", reasons: ["to_confirm"] }',

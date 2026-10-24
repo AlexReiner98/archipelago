@@ -2,6 +2,7 @@
 // for an item, and listening for what the owner does. Agents reach each of them through query.
 
 import { z } from 'zod';
+import { NEWEST, summed } from './summary.ts';
 import { lastSeq, readEvents } from './eventlog.ts';
 import { listening } from './presence.ts';
 import { askView, viewList, viewsSaid } from './askview.ts';
@@ -172,9 +173,13 @@ export const READ_TOOLS: Record<string, Tool> = {
       if (!input.name) return viewList(l);
       const answer = await askView(l, actor, input.name, input.params ?? {});
       if (actor.kind !== 'agent' || input.params?.full) return answer;
-      // A view that answers with events (changed_since) is history, and is cut for an agent as history is.
+      // A view that answers with events (changed_since) is history, and is cut for an agent as history is: its counts,
+      // and the newest few unless it asked for more.
       const events = (answer as { events?: unknown } | null)?.events;
-      return forAgent(input.name, Array.isArray(events) ? { ...(answer as object), events: shortHistory(events) } : answer);
+      if (!Array.isArray(events)) return forAgent(input.name, answer);
+      const counted = Object.values((answer as { counts?: Record<string, number> }).counts ?? {}).reduce((sum, n) => sum + n, 0);
+      const few = input.params?.limit === undefined && events.length > NEWEST;
+      return forAgent(input.name, { ...(answer as object), events: shortHistory(few ? events.slice(0, NEWEST) : events), ...(few && { more: `The newest ${NEWEST} of ${counted}; counts has each kind. Ask with a limit, or query events, for more.` }) });
     },
   },
   events: {
@@ -209,7 +214,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       after: z.number().int().nonnegative().optional().describe('The `latest` from the previous call.'),
       wait_seconds: z.number().int().min(0).max(600).optional().describe('How long to wait for something to happen. Default 0: answer at once.'),
     },
-    run: async (l, _actor, input) => {
+    run: async (l, actor, input) => {
       if (input.after === undefined) return { latest: await latestSeq(l), changes: [] };
       const until = Date.now() + (input.wait_seconds ?? 0) * 1000;
       // Counted on every server, so the web UI can say whether anyone will hear a decision the moment it is made.
@@ -218,7 +223,9 @@ export const READ_TOOLS: Record<string, Tool> = {
       try {
         for (;;) {
           const changes = await humanChanges(l, input.after);
-          if (changes.length || Date.now() >= until) return { latest: changes.at(-1)?.seq ?? input.after, changes };
+          // An agent is told how many of each, and the newest few.
+          const { newest, counts, more } = actor.kind === 'agent' ? summed(changes, (c) => c.action) : { newest: changes };
+          if (changes.length || Date.now() >= until) return { latest: changes.at(-1)?.seq ?? input.after, changes: newest, ...(counts && { counts, more }) };
           await new Promise((r) => setTimeout(r, 1000));
         }
       } finally {

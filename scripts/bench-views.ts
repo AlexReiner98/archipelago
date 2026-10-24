@@ -110,8 +110,6 @@ async function time(label: string, run: () => Promise<{ bytes: number }>, after?
 if (seed) await fill(seed);
 
 const view = (name: string, params: Record<string, unknown> = {}) => () => call('view', { name, params });
-const hubs = (await call('view', { name: 'hubs' })).result.hubs as { id: string; inside: number }[];
-const HUB = process.env.HUB ?? hubs[0]?.id;
 const relations = async (id: string) => ((r) => r.incoming.length + r.outgoing.length)((await call('get', { id })).result);
 let REPO = process.env.REPO;
 if (!REPO) {
@@ -122,9 +120,14 @@ if (!REPO) {
     if (n > most) [most, REPO] = [n, id];
   }
 }
+// The hubs within the repository (since 24 Oct a server reads hubs within an item only; an older one reads them all).
+const hubs = (await call('view', { name: 'hubs', params: { ...(REPO && { within: REPO }) } })).result.hubs as { id: string; inside: number }[];
+const HUB = process.env.HUB ?? hubs[0]?.id;
 const TASK = process.env.TASK ?? (await call('search', { type: 'work.task', open: true, limit: 1 })).result[0]?.id;
 // A map with no owner set (a throwaway one) has no "me": one person's attention stands in.
 const PERSON = process.env.PERSON ?? (await call('view', { name: 'attention', params: { person: 'me', limit: 1 } }).then(() => 'me', async () => (await call('search', { type: 'person', limit: 1 })).result[0]?.id));
+// The kinds Home lists as your projects: the types at the altitude of a project.
+const PROJECTS = ((await call('schema')).result.types as { id: string; altitude?: string }[]).filter((t) => t.altitude === 'project').map((t) => t.id);
 let BUSY = process.env.BUSY;
 if (!BUSY) {
   let most = -1;
@@ -141,12 +144,14 @@ console.log(`${'call'.padEnd(34)} ${'median'.padStart(7)} ${'p95'.padStart(7)} $
 
 const rows = [
   await time('view attention (everyone)', view('attention')),
+  ...(REPO ? [await time('view attention (within repo)', view('attention', { within: REPO }))] : []),
   await time(`view attention (person ${PERSON === 'me' ? 'me' : 'one'})`, view('attention', { person: PERSON })),
   await time('view lens (whole map)', view('lens')),
   await time(`view lens (from hub)`, view('lens', { from: HUB })),
   ...(REPO ? [await time('view handoff (repo)', view('handoff', { repo: REPO }))] : []),
   await time('view brief (task)', view('brief', { task: TASK })),
   await time('view hubs', view('hubs')),
+  ...(REPO ? [await time('view hubs (within repo)', view('hubs', { within: REPO }))] : []),
   await time('view graph (whole map)', view('graph')),
   // As the roadmap asks it: around its project, two steps, every link, finished work too.
   await time('view graph (roadmap)', view('graph', { focus: ROOT, depth: 2, relations: 'all', include_closed: true })),
@@ -157,6 +162,19 @@ const rows = [
   await time('search "review"', () => call('search', { q: 'review', limit: 20 })),
   // Nothing found as typed: titles with a word close to it are taken instead.
   await time('search "rendr" (a slip)', () => call('search', { q: 'rendr', limit: 20 })),
+  // What Home asks, one after another, as the page does: the schema, what is held, your move, your projects, saved views.
+  await time('Home (its reads)', async () => {
+    const parts = await Promise.all([
+      call('schema'),
+      call('proposals'),
+      call('search', { limit: 200, include_archived: true }),
+      call('view', { name: 'attention', params: { person: PERSON, reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 5 } }),
+      call('view', { name: 'lens', params: { kinds: PROJECTS, fold: ['closed', 'system'] } }),
+      call('view', { name: 'saved_views', params: { limit: 6 } }),
+    ]);
+    return { bytes: parts.reduce((n, p) => n + p.bytes, 0) };
+  }),
+  await time('changed_since (a day)', view('changed_since', { since: new Date(Date.now() - 86_400_000).toISOString() })),
 ];
 // A typical change: a task made inside the hub, linked to the one being briefed, and a note added to that one.
 let changeset = '';

@@ -8,6 +8,8 @@ import type { Entry, Fact } from './log.ts';
 import type { Registry } from './packs.ts';
 import type { Q } from './db.ts';
 import { ITEM_COLUMNS } from './facts.ts';
+import { joined, regather } from './closure.ts';
+import { mentioned } from './mentions.ts';
 
 type Props = Record<string, unknown>;
 
@@ -22,7 +24,13 @@ const COLUMN = new Map(ITEM_COLUMNS.map(([column, field, unsaid]) => [field, { c
 const ABOUT = ['checked', 'merged_into', 'forgotten'];
 /** A forgotten item's rows leave today's tables, its links with them, and what named it as owner or source names nothing. */
 export const FORGET_ROWS = [`update entity set owner = null where owner = $1`, `update entity set source_id = null where source_id = $1`, `update relation set source_id = null where source_id = $1`,
-  `delete from relation where from_id = $1 or to_id = $1`, `delete from entity where id = $1`];
+  `delete from relation where from_id = $1 or to_id = $1`, `delete from entity where id = $1`,
+  // What was inside it keeps only the ancestors its links still reach (src/closure.ts), and it leaves the closure.
+  `with recursive below(id) as (select descendant from part_closure where ancestor = $1),
+   up(d, a) as (select r.from_id, r.to_id from relation r join below b on b.id = r.from_id where r.valid_to is null and r.type = 'part_of'
+     union select up.d, r.to_id from up join relation r on r.from_id = up.a where r.valid_to is null and r.type = 'part_of')
+   delete from part_closure c using below b where c.descendant = b.id and not exists (select 1 from up where up.d = c.descendant and up.a = c.ancestor)`,
+  `delete from part_closure where ancestor = $1 or descendant = $1`, `delete from mention where from_id = $1 or to_id = $1`];
 const LINK_COLUMNS: Record<string, [column: string, unsaid: unknown]> = { confidence: ['confidence', 1], source: ['source_id', null] };
 
 /** A declared field said or cleared: what is set, and what is taken away. */
@@ -79,6 +87,7 @@ async function item(tx: Q, reg: Registry, at: string, moved: boolean, id: string
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $14, $15)`,
       [id, row.type, row.kind, row.title, row.body, row.status, row.visibility, row.private_to, row.owner, row.confidence, row.source_id, isOpen, JSON.stringify(props), at, archived ? at : null],
     );
+    await mentioned(tx, id);
     return;
   }
   const params: unknown[] = [id, at, isOpen, JSON.stringify(props), [...unset], moved];
@@ -88,11 +97,14 @@ async function item(tx: Q, reg: Registry, at: string, moved: boolean, id: string
     `update entity set ${[...cols, ''].join(', ')}is_open = $3, props = (props || $4::jsonb) - $5::text[], updated_at = case when $6 then updated_at else $2 end where id = $1`,
     params,
   );
+  // What it names is read again when its note or fields were written.
+  if (set.body !== undefined || Object.keys(props).length || unset.size) await mentioned(tx, id);
 }
 
 /** One run of facts on a link: made with its ends, moved, ended, or one of its fields set. */
-async function link(tx: Q, at: string, id: string, run: Fact[]) {
-  const { rows } = await tx.query<{ id: string }>(`select id from relation where id = $1`, [id]);
+async function link(tx: Q, reg: Registry, at: string, id: string, run: Fact[]) {
+  const { rows } = await tx.query<{ id: string; type: string; from_id: string }>(`select id, type, from_id from relation where id = $1`, [id]);
+  const was = rows[0];
   let made = !rows.length ? undefined : false;
   const set: Props = {};
   const props: Props = {};
@@ -111,17 +123,23 @@ async function link(tx: Q, at: string, id: string, run: Fact[]) {
     else fold(props, unset, f);
   }
   if (made === undefined) return; // nothing said of it is a link
+  const parts = reg.relationFamily('part_of');
   if (made) {
     const row: Props = { confidence: 1, source_id: null, valid_to: null, ...set };
     await tx.query(
       `insert into relation (id, type, from_id, to_id, props, confidence, source_id, valid_from, valid_to) values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)`,
       [id, row.type, row.from_id, row.to_id, JSON.stringify(props), row.confidence, row.source_id, at, row.valid_to],
     );
+    // What is inside what, all the way down, follows a part_of link the moment it is made.
+    if (parts.includes(row.type as string) && row.valid_to === null) await joined(tx, row.from_id as string, row.to_id as string);
     return;
   }
   const params: unknown[] = [id, JSON.stringify(props), [...unset]];
   const cols = Object.entries(set).map(([column, value]) => `${column} = $${params.push(value)}`);
   await tx.query(`update relation set ${[...cols, ''].join(', ')}props = (props || $2::jsonb) - $3::text[] where id = $1`, params);
+  // A part_of link ended, moved or retyped: what was below it, and what is below it now, find their ancestors again.
+  const changed = set.valid_to !== undefined || set.type !== undefined || set.from_id !== undefined || set.to_id !== undefined;
+  if (changed && (parts.includes(was.type) || parts.includes(set.type as string))) await regather(tx, [...new Set([was.from_id, (set.from_id as string | undefined) ?? was.from_id])], parts);
 }
 
 /**
@@ -132,7 +150,7 @@ export async function projectFacts(tx: Q, reg: Registry, at: string, facts: Fact
   for (const run of runs(facts)) {
     const id = run[0][1];
     // A link's id says it is one: an item may have a field called link of its own.
-    if (isLink(id)) await link(tx, at, id, run);
+    if (isLink(id)) await link(tx, reg, at, id, run);
     else await item(tx, reg, at, moved, id, run);
   }
 }
@@ -160,7 +178,7 @@ export async function projectEntry(tx: Q, reg: Registry, e: Entry): Promise<void
 }
 
 /** The tables the log projects into, and the order a rebuild empties and fills them in. */
-export const PROJECTED = ['proposal', 'relation', 'entity'];
+export const PROJECTED = ['proposal', 'mention', 'part_closure', 'relation', 'entity'];
 
 /**
  * Every projection made again from the log: the tables emptied, then each entry of both streams projected in the

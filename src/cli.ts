@@ -105,10 +105,10 @@ async function main(): Promise<void> {
       const [pending, connections, now] = await Promise.all([
         call<ProposalRow[]>('proposals'),
         call<{ title: string; status: string; url: string }[]>('check_connections'),
-        call<{ counts: { ready: number; blocked: number } }>('view', { name: 'attention', params: { reasons: ['ready', 'blocked'], limit: 1 } }),
+        call<{ counts: { ready: number; blocked: number } }>('view', { name: 'attention', params: { person: 'me', reasons: ['ready', 'blocked'], limit: 1 } }),
       ]);
       console.log(`Proposals awaiting review: ${pending.length}`);
-      console.log(`Work ready to take up: ${now.counts.ready}   blocked: ${now.counts.blocked}`);
+      console.log(`Your work ready to take up: ${now.counts.ready}   blocked: ${now.counts.blocked}`);
       for (const c of connections) console.log(`Connection ${c.title}: ${c.status}  (${c.url})`);
       return;
     }

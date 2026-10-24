@@ -62,10 +62,12 @@ async function groups(db: Q, input: EventQuery, limit: number): Promise<Group[]>
   if (input.before) add(`e.pos <= coalesce((select f.pos from log_fact f where f.stream = 'facts' and f.seq < ? order by f.seq desc limit 1), 0)`, input.before);
   if (input.after !== undefined) add(`e.pos >= coalesce((select f.pos from log_fact f where f.stream = 'facts' and f.seq > ? order by f.seq limit 1), 1e18)`, input.after);
   // About an item: what was said of it, of the links from it, and of what was merged into it.
-  const about = `(select ?::text union all select l.id from log_fact l where l.field = 'link' and l.value->>1 = ? and left(l.id, 2) = 'r_' union all select m.id from log_fact m where m.field = 'merged_into' and m.value = to_jsonb(?::text))`;
+  const about = `(select ?::text union all select l.id from log_fact l where l.field = 'link' and l.value->>1 = ? and left(l.id, 2) = 'r_' union all select m.id from log_fact m where m.field = 'merged_into' and m.value = to_jsonb(?::text) -- index log_fact_link_from, log_fact_merged_into
+)`;
   let ids = '';
   if (input.target) {
-    add(`e.pos in (select t.pos from log_fact t where t.stream = 'facts' and t.id in ${about})`, input.target);
+    add(`e.pos in (select t.pos from log_fact t where t.stream = 'facts' and t.id in ${about} -- index log_fact_history
+)`, input.target);
     ids = ` and f.id in ${about.replaceAll('?', `$${params.length}`)}`;
   }
   const having = [`true`];
@@ -199,7 +201,8 @@ export async function factEvents(db: Q, input: EventQuery, limit: number): Promi
 
 /** True of an event that was written here, false of one that arrived in a merged backup: those are history, not news. */
 export const notImported = (ev: string) =>
-  `not exists (select 1 from event imp where imp.action = 'workspace.import' and ${ev}.seq between (imp.detail->>'first_seq')::bigint and (imp.detail->>'last_seq')::bigint)`;
+  `not exists (select 1 from event imp where imp.action = 'workspace.import' and ${ev}.seq between (imp.detail->>'first_seq')::bigint and (imp.detail->>'last_seq')::bigint) -- index event_imports
+`;
 
 /** Events that are not facts, from the event table, under the same filters. */
 async function rowEvents(db: Q, input: EventQuery, limit: number): Promise<LoggedEvent[]> {
@@ -234,7 +237,7 @@ export async function readEvents(db: Q, input: EventQuery): Promise<LoggedEvent[
 
 /** The newest number either kind of event has: a cursor's start. */
 export async function lastSeq(db: Q): Promise<number> {
-  const { rows } = await db.query<{ seq: string }>(`select greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact)) as seq`);
+  const { rows } = await db.query<{ seq: string }>(`select greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact)) as seq -- index log_fact_seq`);
   return Number(rows[0].seq);
 }
 

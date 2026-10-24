@@ -17,6 +17,8 @@ const HUBS_HOW =
 
 /** What a session said when it ended is the last thing it was heard to say: the line that opens with the time. */
 const said = (body) => (String(body ?? '').split('\n').findLast((line) => /^\[\d{4}-/.test(line)) ?? '').replace(/^\[[^\]]*\]\s*/, '').slice(0, 400);
+/** How many of the newest of each kind of change are given whole: the rest are counted. */
+const NEWEST = 5;
 const slim = ({ id, type, title, status }) => ({ id, type, title, status });
 
 export async function handoff(input, ctx) {
@@ -36,8 +38,11 @@ export async function handoff(input, ctx) {
   const asked = await ctx.read({ view: 'attention', params: { reasons: ['to_confirm'], limit: 15 } });
   const unconfirmed = asked.to_confirm ? { ...asked.to_confirm, questions: asked.items.map((i) => ({ id: i.id, title: i.title, ...Object.fromEntries(Object.entries(i.reasons[0]).filter(([k]) => k !== 'why')) })) } : { count: 0 };
   const inRepo = new Set([repo.id, ...(await ctx.read({ scope: repo.id, fields: [] })).map((e) => e.id)]);
-  const unshaped = (await ctx.read({ view: 'hubs' })).hubs.filter((h) => h.views === 0 && inRepo.has(h.id));
+  const unshaped = (await ctx.read({ view: 'hubs', params: { within: repo.id } })).hubs.filter((h) => h.views === 0 && inRepo.has(h.id));
   const length = note?.body.length ?? 0;
+  const pushed = await pushes(ctx, repo.id, since.toISOString(), 20);
+  const settled = stale.filter((e) => !e.is_open && after(e.updated_at));
+  const opened = stale.filter((e) => e.is_open && after(e.created_at));
   return {
     repo: work.repo,
     last_push: work.last_push,
@@ -45,11 +50,13 @@ export async function handoff(input, ctx) {
     // The owner is met in chat: what agents settled and they have not answered for comes with where things stand.
     ...(unconfirmed.count > 0 && { for_owner: unconfirmed }),
     since: since.toISOString(),
+    // How many of each, and the newest few of each: what changed, not every item it touched.
     since_then: {
-      pushes: (await pushes(ctx, repo.id, since.toISOString(), 20)).map((p) => ({ at: p.ts, branch: p.detail?.branch, head: p.detail?.after?.slice(0, 7), subject: p.reason })),
-      settled: stale.filter((e) => !e.is_open && after(e.updated_at)).slice(0, 40).map(slim),
-      opened: stale.filter((e) => e.is_open && after(e.created_at)).slice(0, 40).map(slim),
-      sessions: ended,
+      counts: { pushes: pushed.length, settled: settled.length, opened: opened.length, sessions: ended.length },
+      pushes: pushed.slice(0, NEWEST).map((p) => ({ at: p.ts, branch: p.detail?.branch, head: p.detail?.after?.slice(0, 7), subject: p.reason })),
+      settled: settled.slice(0, NEWEST).map(slim),
+      opened: opened.slice(0, NEWEST).map(slim),
+      sessions: ended.slice(0, NEWEST),
     },
     open: { ready: work.ready.map(slim), blocked: work.blocked.map((b) => ({ ...slim(b), waiting_on: b.waiting_on })) },
     // Work that is owed though nobody wrote it down: an item here that has grown into a hub and has no view of its own.

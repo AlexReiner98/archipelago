@@ -35,7 +35,7 @@ export async function lastPushes(l: Archipelago): Promise<Map<string, { at: stri
     // A tag, or a branch that was deleted, is heard but is not a push of work to a branch.
     `select distinct on (target_id) target_id, ts, reason, detail from event
      where action = 'repo.push' and target_id is not null and coalesce(detail->>'branch', '') <> '' and detail->>'deleted' is null
-     order by target_id, seq desc`,
+     order by target_id, seq desc -- index event_pushes`,
   );
   return new Map(rows.map((r) => [r.target_id, { at: r.ts, branch: r.detail?.branch ?? '', head: r.detail?.after?.slice(0, 7), subject: r.reason }]));
 }

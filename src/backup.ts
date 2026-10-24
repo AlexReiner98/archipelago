@@ -20,6 +20,8 @@ import { isServer, openDb, type Db, type Q } from './db.ts';
 import { addLocalType, addWorkspace } from './control.ts';
 import type { Registry } from './packs.ts';
 import { restoreRows } from './pelago.ts';
+import { regatherAll } from './closure.ts';
+import { mentionedAll } from './mentions.ts';
 import { databaseFor } from './pg.ts';
 import { analyzeAll, analyzeDue } from './stats.ts';
 import { FACT_ACTIONS, factEvents } from './eventlog.ts';
@@ -99,6 +101,9 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
       counts[table] = rows.length;
     }
     await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), 1))`);
+    // What is inside what is a projection of the links just written: made again whole.
+    await regatherAll(tx, ['part_of']);
+    await mentionedAll(tx);
     // The types it defined for itself go in its database, where the server looks for them.
     for (const def of (given.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
     if (as !== undefined && as !== given.workspace?.id) {
@@ -161,6 +166,8 @@ export async function merge(db: Db, given: Dump, options: { workspace: string; s
       const count = (what: string) => plan.filter((p) => p.what === what).length;
       const some = (what: string) => plan.filter((p) => p.what === what).slice(0, 20).map((p) => p.title);
       const rels = await restoreRows(tx, entities, JSON.stringify(here(relations.filter((r) => !held(r)))));
+      await regatherAll(tx, ['part_of']);
+      await mentionedAll(tx);
       const { rows: props } = await tx.query<{ added: boolean }>(
         `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)
          on conflict (id) do update set status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at, note = excluded.note

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { heldResources } from '../src/blocking.ts';
-import { agent, fresh, attend, make } from './map.ts';
+import { callTool } from '../src/tools.ts';
+import { agent, fresh, attend, human, make } from './map.ts';
+
+/** Attention is read for a person: the workspace's owner, whose is what nobody owns. */
+const owned = async (l: Awaited<ReturnType<typeof fresh>>) => callTool(l, human, 'init', { name: 'Owner' });
 
 test('blockers are derived, and roots are what has to move first', async () => {
   const l = await fresh();
@@ -16,7 +20,7 @@ test('blockers are derived, and roots are what has to move first', async () => {
     { op: 'link', type: 'depends_on', from: 'sign', to: 'cert' },
   ]);
 
-  const ship = (await attend(l, { reasons: ['blocked'] })).items.find((i: any) => i.id === made.ship);
+  const ship = (await attend(l, { person: made.me, reasons: ['blocked'] })).items.find((i: any) => i.id === made.ship);
   assert.deepEqual(ship.reasons[0].by, ['Which certificate?'], 'what has to move first, at the root of the chain');
 
   assert.deepEqual((await attend(l, { person: made.me, reasons: ['ready'] })).items.map((t: any) => t.title), ['Write notes']);
@@ -38,7 +42,8 @@ test('a dependency cycle does not hang the views', async () => {
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
     { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
   ]);
-  assert.equal((await attend(l, { reasons: ['blocked'] })).items.length, 2);
+  await owned(l);
+  assert.equal((await attend(l, { person: 'me', reasons: ['blocked'] })).items.length, 2);
 });
 
 test('an exclusive resource has one holder, and blocks other work that needs it', async () => {
@@ -53,14 +58,15 @@ test('an exclusive resource has one holder, and blocks other work that needs it'
     { op: 'link', type: 'needs', from: 'live1', to: 'lane' },
     { op: 'link', type: 'needs', from: 'live2', to: 'lane' },
   ]);
-  assert.equal((await attend(l, { reasons: ['ready'] })).items.length, 3);
+  await owned(l);
+  assert.equal((await attend(l, { person: 'me', reasons: ['ready'] })).items.length, 3);
 
   // Agents claim directly: no proposal.
   const claimed = await l.claim(agent, { resource: made.lane, holder: made.run1, for: made.live1, reason: 'Running the probe' });
   assert.equal(claimed.status, 'claimed');
   await assert.rejects(l.claim(agent, { resource: made.lane, holder: made.run2, reason: 'Me too' }), /held by "Session one"/);
 
-  const during = await attend(l, { reasons: ['ready', 'blocked'] });
+  const during = await attend(l, { person: 'me', reasons: ['ready', 'blocked'] });
   assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'ready').map((t: any) => t.title).sort(), ['Capture parity probe', 'Write unit tests']);
   assert.deepEqual(during.items.filter((t: any) => t.reasons[0].why === 'blocked').map((t: any) => [t.title, t.reasons[0].by]), [['Debug conduit', ['Live CAD lane']]]);
   assert.equal((await heldResources(l))[0].held_by_title, 'Session one');
@@ -76,6 +82,7 @@ test('overdue work is due, and what is far off is not', async () => {
     { op: 'create', type: 'work.task', title: 'Far off', props: { due: '2999-01-01' } },
   ]);
   // Work resting on a refuted hypothesis is the inquiry pack's to show, not the kernel's.
-  const due = await attend(l, { reasons: ['due'] });
+  await owned(l);
+  const due = await attend(l, { person: 'me', reasons: ['due'] });
   assert.deepEqual(due.items.map((t: any) => [t.title, t.reasons[0].overdue]), [['File return', true]]);
 });

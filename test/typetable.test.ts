@@ -47,13 +47,14 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   assert.equal(program.kind, 'place');
 
   // Still at risk, by its kept bound.
-  const due = (await ask(l, 'attention', { reasons: ['due'] })) as { items: { id: string }[] };
+  await callTool(l, { kind: 'human', name: 'test' }, 'init', { name: 'Owner' });
+  const due = (await ask(l, 'attention', { person: 'me', reasons: ['due'] })) as { items: { id: string }[] };
   assert.ok(due.items.some((r) => r.id === grant), 'its deadline still counts');
   // A person edits it within its kept definition, and closes it, which frees what waited on it.
   assert.equal((await l.change(human, { reason: 'test', ops: [{ op: 'update', id: grant, title: 'Seed grant 2027', props: { deadline: soon } }] })).status, 'applied');
   assert.equal((await l.change(agent, { reason: 'test', ops: [{ op: 'update', id: hours, props: { hours: 4 } }] })).status, 'proposed', "an agent's edit waits");
   assert.equal((await l.change(human, { reason: 'test', ops: [{ op: 'update', id: grant, status: 'funded' }] })).status, 'applied');
-  const blocked = (await ask(l, 'attention', { reasons: ['blocked'] })) as { items: { id: string }[] };
+  const blocked = (await ask(l, 'attention', { person: 'me', reasons: ['blocked'] })) as { items: { id: string }[] };
   assert.ok(!blocked.items.some((b) => b.id === task), 'closing it unblocked the task');
   // The pack's tools are gone, not answering wrong.
   await assert.rejects(callTool(l, human, 'time_timesheet', {}), /No tool "time_timesheet"/);

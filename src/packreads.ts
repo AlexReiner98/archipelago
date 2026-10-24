@@ -132,7 +132,7 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     return rows.map((r) => r.entity_id);
   }
   if (q.blocked) {
-    const graph = await blockGraph(l);
+    const graph = await blockGraph(l, q.blocked);
     const roots = [...new Set(q.blocked.flatMap((id) => graph.roots(id)))];
     const { rows } = roots.length ? await l.db.query<{ id: string; type: string; title: string; status: string }>(`select id, type, title, status from entity where id = any($1::text[])`, [roots]) : { rows: [] };
     const found = new Map(rows.map((r) => [r.id, r]));
