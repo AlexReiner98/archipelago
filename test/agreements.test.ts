@@ -19,7 +19,7 @@ test('a version agreed to is kept with every one before it; a new version is owe
   assert.deepEqual(await recordAgreement(control, 'rosa@acme.example', [{ id: 'terms', version: '1' }], v2, 'test'), v2, 'the old version does not answer for the new');
   assert.deepEqual(await recordAgreement(control, 'rosa@acme.example', [{ id: 'terms', version: '2' }], v2, 'test'), []);
   assert.deepEqual(owed(v1, {}), v1);
-  assert.match(checkServerPack({ id: 'x', version: '1', title: 'X', tier: 'server', agreements: 'nowhere' }, FIXTURES).join(), /agreements name no entry/);
+  assert.match(checkServerPack({ id: 'x', version: '1', title: 'X', reach: { server: { agreements: 'nowhere' } } }, FIXTURES).join(), /agreements name no entry/);
 });
 
 test('a sign-in waits until the documents in force are agreed to, without spending its link or code', async () => {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { dumpVault } from '../src/vault.ts';
 import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
@@ -6,6 +7,7 @@ import { pictureOf } from '../src/lens.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
 import { sessionStart } from '../src/sessions.ts';
 import { askView } from '../src/askview.ts';
+import { lastSeq } from '../src/eventlog.ts';
 import { human, agent, fresh, attend, make } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
@@ -358,17 +360,19 @@ test('a backup holds every row, and restores into an empty database that then ca
 
   const taken = await dump(l.db, { id: 'default', name: 'Default' }, { id: 'local', types: [] });
   const copy = new Archipelago(await openDb(), l.registry);
-  const counts = await restore(copy.db, JSON.parse(JSON.stringify(taken)));
+  const counts = await restore(copy.db, { ...JSON.parse(JSON.stringify(taken)), vault: await dumpVault(l.db) });
   assert.deepEqual([counts.entity, counts.relation, counts.proposal], [3, 1, 1]);
-  assert.equal(counts.event, taken.tables.event.length);
+  // What the change sets did is read from the restored log again, not restored as events.
+  const logged = new Set(taken.tables.log_entry.map((e) => e.id));
+  assert.equal(counts.event, taken.tables.event.filter((e) => !logged.has(e.changeset)).length);
+  assert.equal(counts.log_entry, taken.tables.log_entry.length);
 
   const task = (await copy.get(made.t)) as any;
   assert.deepEqual([task.entity.title, task.entity.props.due, task.outgoing[0].title], ['Task', '2026-11-01', 'Proj']);
   assert.equal((await copy.proposals()).length, 1, 'what was waiting for review still is');
   const before = Math.max(...taken.tables.event.map((e) => e.seq as number));
   await make(copy, [{ op: 'create', type: 'work.note', title: 'After the restore' }]);
-  const { rows } = await copy.db.query<{ seq: number }>(`select max(seq)::int as seq from event`);
-  assert.ok(rows[0].seq > before, 'new events are numbered after the restored ones');
+  assert.ok((await lastSeq(copy.db)) > before, 'new events are numbered after the restored ones');
   await assert.rejects(restore(copy.db, taken), /not empty/);
 });
 

@@ -1,0 +1,24 @@
+{
+  "id": "reacher",
+  "version": "0.1.0",
+  "title": "Reacher",
+  "description": "A pack for testing reach: it requires core only, and has one action that writes its own type and one that writes a task.",
+  "requires": ["core"],
+  "types": [{ "id": "reacher.note", "title": "Note", "description": "A note it keeps.", "extends": "record" }],
+  "actions": [
+    {
+      "id": "reacher.keep",
+      "title": "Keep a note",
+      "description": "Keep a note of its own type.",
+      "verb": "capture",
+      "input": { "type": "object", "properties": { "title": { "type": "string" } }, "required": ["title"] }
+    },
+    {
+      "id": "reacher.rename",
+      "title": "Rename an item",
+      "description": "Rename any item: a task is outside what it declares or requires.",
+      "verb": "revise",
+      "input": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" } }, "required": ["id", "title"] }
+    }
+  ]
+}

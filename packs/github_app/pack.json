@@ -3,32 +3,43 @@
   "version": "0.1.0",
   "title": "GitHub App",
   "description": "One GitHub App for the whole server, so connecting a repository is choosing it on GitHub and nothing else: the server's owner creates it once, a workspace's admin chooses repositories, each is put in that map, and every push is handed to its GitHub pack.",
-  "tier": "server",
-  "acts": ["begun.get", "begun.take", "connection.make", "connection.get", "connection.drop", "workspace.add", "workspace.deliver"],
-  "hosts": [
-    {
-      "id": "api",
-      "base": "https://api.github.com",
-      "headers": { "accept": "application/vnd.github+json", "x-github-api-version": "2022-11-28" },
-      "sign": { "key": "key", "issuer": "app_id", "minutes": 9 },
-      "exchange": { "path": "/app/installations/{as}/access_tokens", "token": "token", "expires": "expires_at" },
-      "lend": true
-    },
-    { "id": "web", "base": "https://github.com" }
-  ],
-  "secrets": [
-    { "name": "key", "env": "GITHUB_APP_KEY" },
-    { "name": "hook", "env": "GITHUB_APP_SECRET" },
-    { "name": "app_id", "env": "GITHUB_APP_ID" }
-  ],
-  "connect": { "status": "status", "start": "start", "setup": true },
-  "entries": [
-    { "id": "manifest", "description": "What GitHub is handed to create the app, for the page that hands it over." },
-    { "id": "created", "method": "GET", "limit_ms": 30000 },
-    { "id": "installed", "method": "GET", "limit_ms": 30000 }
-  ],
-  "pages": [{ "id": "new", "file": "new.html", "form_action": "web" }],
-  "webhooks": [{ "id": "events", "secret": "hook", "header": "x-hub-signature-256", "headers": ["x-github-event", "x-github-delivery"], "limit_ms": 30000 }],
-  "schedules": [{ "id": "refresh", "every_minutes": 60 }],
-  "aliases": { "/github/app/hook": "hook/events", "/github/app/installed": "installed", "/github/app/created": "created" }
+  "handlers": [{ "schedule": "refresh", "every_minutes": 60 }],
+  "reach": {
+    "hosts": [
+      {
+        "id": "api",
+        "base": "https://api.github.com",
+        "headers": { "accept": "application/vnd.github+json", "x-github-api-version": "2022-11-28" },
+        "sign": { "key": "key", "issuer": "app_id", "minutes": 9 },
+        "exchange": { "path": "/app/installations/{as}/access_tokens", "token": "token", "expires": "expires_at" },
+        "lend": true
+      },
+      { "id": "web", "base": "https://github.com" }
+    ],
+    "secrets": [
+      { "name": "key", "env": "GITHUB_APP_KEY" },
+      { "name": "hook", "env": "GITHUB_APP_SECRET" },
+      { "name": "app_id", "env": "GITHUB_APP_ID" }
+    ],
+    "webhooks": [
+      {
+        "id": "events",
+        "secret": "hook",
+        "header": "x-hub-signature-256",
+        "headers": ["x-github-event", "x-github-delivery"],
+        "limit_ms": 30000
+      }
+    ],
+    "server": {
+      "acts": ["begun.get", "begun.take", "connection.make", "connection.get", "connection.drop", "workspace.add", "workspace.deliver"],
+      "entries": [
+        { "id": "manifest", "description": "What GitHub is handed to create the app, for the page that hands it over." },
+        { "id": "created", "method": "GET", "limit_ms": 30000 },
+        { "id": "installed", "method": "GET", "limit_ms": 30000 }
+      ],
+      "pages": [{ "id": "new", "file": "new.html", "form_action": "web" }],
+      "connect": { "status": "status", "start": "start", "setup": true },
+      "aliases": { "/github/app/hook": "hook/events", "/github/app/installed": "installed", "/github/app/created": "created" }
+    }
+  }
 }
