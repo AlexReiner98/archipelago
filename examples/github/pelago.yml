@@ -109,13 +109,13 @@ jobs:
           so send only what the commits show.
 
           1. Read what changed: `git log` and `git diff --stat` over that range, and the diffs that matter.
-          2. Read what the map believes: the pelago `view` tool with name "repo_work" and the repository as
-             params.repo; `search` for anything else these commits touch; `get` an item before you change it.
-             Call `schema` once: every type has its own statuses, and you must use the ones the item's type has
+          2. Read what the map believes: the pelago `query` tool with name "repo_work" and the repository as
+             params.repo; query `search` for anything else these commits touch; query `get` an item before you
+             change it. Query `schema` once: every type has its own statuses, and you must use the ones the item's type has
              (a task is done, a feature is built and later shipped, an issue is resolved).
           3. Archipelago itself has already read this push: where a commit on the default branch says "fixes",
              "closes" or "resolves" with an item's id (e_ and eight characters), that item has been closed, or
-             a change closing it is held (`proposals` lists what is held). Do not send those again. If `get`
+             a change closing it is held (query `proposals` lists what is held). Do not send those again. If `get`
              shows an item already in the state you would give it, leave it.
           4. For each open item these commits settle or change, send one `change` of its own. Give it:
              - a reason that says what the commit did;
@@ -142,7 +142,7 @@ jobs:
           claude --print "$(cat "$RUNNER_TEMP/prompt.txt")" \
             --mcp-config "$RUNNER_TEMP/pelago-mcp.json" --strict-mcp-config \
             --setting-sources user \
-            --allowedTools "mcp__pelago__view,mcp__pelago__search,mcp__pelago__get,mcp__pelago__events,mcp__pelago__schema,mcp__pelago__proposals,mcp__pelago__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
+            --allowedTools "mcp__pelago__query,mcp__pelago__change,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
             --max-budget-usd 2 --output-format json > "$RUNNER_TEMP/claude.json" || status=$?
           # What it said goes in this run's log; what it used is in the same answer, for the step below.
           node -e '
@@ -183,7 +183,7 @@ jobs:
               link: GITHUB_SERVER_URL + "/" + GITHUB_REPOSITORY + "/actions/runs/" + GITHUB_RUN_ID,
               summary: String(out.result || "").slice(0, 2000),
             };
-            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/run_report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + PELAGO_AGENT_TOKEN }, body: JSON.stringify(report) })
+            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + PELAGO_AGENT_TOKEN }, body: JSON.stringify({ action: "run_report", params: report }) })
               .then(async (res) => console.log(res.ok ? "Told Archipelago: " + report.tokens + " tokens." : "::warning::Archipelago did not take the report: " + res.status + " " + (await res.text()).slice(0, 200)))
               .catch((err) => console.log("::warning::Could not tell Archipelago what the run used: " + err.message));
           '
@@ -209,7 +209,7 @@ jobs:
           node -e '
             const { PELAGO_URL, PELAGO_AGENT_TOKEN, REPO, NOW, RUNNER_TEMP, GITHUB_OUTPUT } = process.env;
             const fs = require("fs");
-            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/view", {
+            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/query", {
               method: "POST",
               headers: { "content-type": "application/json", authorization: "Bearer " + PELAGO_AGENT_TOKEN },
               body: JSON.stringify({ name: "recheck", params: { repo: REPO, now: NOW === "true" }, actor: "claude-code:pelago-recheck" }),
@@ -272,7 +272,7 @@ jobs:
           Depending on the workspace, what you send is held for the owner or takes effect at once.
 
           For each item you take:
-          1. `get` it, and read what it says and what it is part of. Call `schema` once: every type has its
+          1. Query `get` it, and read what it says and what it is part of. Query `schema` once: every type has its
              own statuses, and you must use the ones the item's type has.
           2. Look for the truth of it here: the code, the tests, `git log`. Look properly before you conclude.
           3. Then exactly one of:
@@ -289,10 +289,10 @@ jobs:
           4. Do not guess, and do not confirm what you have not checked: a wrong "still true" is worse than none.
 
           When you have been through them all:
-          - If there were items the repository could not tell you about, send one `notify` listing the ten
+          - If there were items the repository could not tell you about, send one `ask` with action `notify` listing the ten
             oldest of them by title and id, asking the owner to open each and say whether it is still true. One
             notification, not one per item.
-          - Call `rechecked` with this repository ("owner/name") and a summary of what you found. Always, even
+          - Call `report` with action `rechecked`, params this repository as repo ("owner/name") and a summary of what you found. Always, even
             if you changed nothing: it is what starts the wait until the next re-check.
 
           Finish with two or three lines saying what you sent.
@@ -303,7 +303,7 @@ jobs:
           claude --print "$(cat "$RUNNER_TEMP/prompt.txt")" \
             --mcp-config "$RUNNER_TEMP/pelago-mcp.json" --strict-mcp-config \
             --setting-sources user \
-            --allowedTools "mcp__pelago__view,mcp__pelago__search,mcp__pelago__get,mcp__pelago__events,mcp__pelago__schema,mcp__pelago__proposals,mcp__pelago__change,mcp__pelago__notify,mcp__pelago__rechecked,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
+            --allowedTools "mcp__pelago__query,mcp__pelago__change,mcp__pelago__ask,mcp__pelago__report,Read,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)" \
             --max-budget-usd 2 --output-format json > "$RUNNER_TEMP/claude.json" || status=$?
           # What it said goes in this run's log; what it used is in the same answer, for the step below.
           node -e '
@@ -344,7 +344,7 @@ jobs:
               link: GITHUB_SERVER_URL + "/" + GITHUB_REPOSITORY + "/actions/runs/" + GITHUB_RUN_ID,
               summary: String(out.result || "").slice(0, 2000),
             };
-            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/run_report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + PELAGO_AGENT_TOKEN }, body: JSON.stringify(report) })
+            fetch(PELAGO_URL.replace(/\/$/, "") + "/agent/report", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + PELAGO_AGENT_TOKEN }, body: JSON.stringify({ action: "run_report", params: report }) })
               .then(async (res) => console.log(res.ok ? "Told Archipelago: " + report.tokens + " tokens." : "::warning::Archipelago did not take the report: " + res.status + " " + (await res.text()).slice(0, 200)))
               .catch((err) => console.log("::warning::Could not tell Archipelago what the run used: " + err.message));
           '

@@ -143,7 +143,7 @@ test('a note is added to, or one passage of it replaced, without sending it agai
   const long = 'A long note. '.repeat(100);
   await make(l, [{ op: 'update', id: t, body: long }]);
   const to = (answer: any) => (answer.recent_events ?? answer)[0].detail.changes.body.to as string;
-  for (const who of [agent, human]) assert.match(to(await callTool(l, who, 'get', { id: t, history: true, full: true })), /^A long note\. .{180,200}… \(1300 characters; the events tool, with full: true, has all of it\)$/, who.kind);
+  for (const who of [agent, human]) assert.match(to(await callTool(l, who, 'get', { id: t, history: true, full: true })), /^A long note\. .{180,200}… \(1300 characters; query events, with full: true, has all of it\)$/, who.kind);
   for (let i = 0; i < 10; i++) await make(l, [{ op: 'update', id: t, props: { priority: i % 2 ? 'high' : 'low' } }]);
   assert.equal(((await callTool(l, human, 'get', { id: t })) as any).recent_events.length, 8, 'only the last few');
   const bodyIn = async (who: typeof agent, full?: boolean) => ((await callTool(l, who, 'events', { target: t, limit: 20, full })) as any[]).find((e) => e.detail?.changes?.body).detail.changes.body.to as string;

@@ -1,8 +1,9 @@
 // One local process owns the databases and serves every surface:
 //   POST /mcp          MCP (streamable HTTP) for agents
 //   POST /api/<tool>   the same tools for the human CLI and web UI
-//   POST /agent/<tool> the same tools as plain JSON, for hooks and scripts
-//                      that cannot speak MCP
+//   POST /agent/<tool> what MCP offers as plain JSON, for hooks and scripts
+//                      that cannot speak MCP; an old tool name still answers
+//                      for one release, with moved_to naming its new call
 //   POST /hooks/session-start, /hooks/session-end, /hooks/prompt
 //                      Claude Code HTTP hooks: a session registers itself and
 //                      is handed what the map knows about its repository
@@ -50,7 +51,7 @@ import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
-import { callTool, configureBackup, configureRestart, devMode } from './tools.ts';
+import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, uiFile, uiPage } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
@@ -277,7 +278,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           if (surface === 'api') return send(res, 200, { result: await callTool(pelago, actor(), name, body) });
           // Scripts say which one they are in the body, as MCP callers do in their arguments.
           const { actor: label, ...input } = body;
-          return send(res, 200, { result: await callTool(pelago, actor((label as string) || 'script'), name, input) });
+          // An old name answers for one release, saying the call that replaces it (src/surface.ts).
+          const moved_to = replacementOf(pelago.registry, name);
+          return send(res, 200, { result: await callTool(pelago, actor((label as string) || 'script'), name, input), ...(moved_to && { moved_to }) });
         } catch (err) {
           if (err instanceof Refused) throw err;
           return send(res, 400, { error: (err as Error).message });

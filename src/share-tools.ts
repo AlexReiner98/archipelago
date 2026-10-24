@@ -48,7 +48,7 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => endShare(l, actor, input.id),
   },
   publish: {
-    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with publish_ask.',
+    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with the ask verb, action publish_ask.',
     input: { id: z.string().describe('The document.'), authority },
     run: async (l, actor, input) => publish(l, actor, input.id, input.authority),
   },
@@ -80,7 +80,7 @@ export const SHARE_TOOLS: Record<string, Tool> = {
   },
   share_figure: {
     description: 'The figure of one section of a document another workspace shares with this one, as base64 with its content type, or null.',
-    input: { via: z.string().describe('The shared document here.'), id: z.string().describe('The section, as the document tool names it.') },
+    input: { via: z.string().describe('The shared document here.'), id: z.string().describe('The section, as query document names it.') },
     run: async (l, _actor, input) => sharedFigure(l, input),
   },
 };
