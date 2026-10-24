@@ -151,7 +151,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     res.once('close', workspaces.hold(id));
     const ws = await workspaces.get(id);
     // Where the request came from is a help in noticing a token used somewhere new, not a control.
-    const identity = await verifyToken(ws.pelago.db, token, address || undefined);
+    const identity = await verifyToken(ws.pelago.db, token, address || undefined, ws.pelago.workspace);
     if (!identity) throw deny();
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {

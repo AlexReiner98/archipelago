@@ -51,5 +51,6 @@ export async function importAudit(l: Archipelago, actor: Actor, input: { connect
     ]);
   });
   if (imported) await l.log(l.db, { actor: actorId(actor), action: 'audit.import', target: conn.id, detail: { imported, path } });
+  if (imported) await l.record('observations', actorId(actor), [['+', conn.id, 'imported', { imported, path }]]), await l.record('automations', actorId(actor), [['+', conn.id, 'audit_cursor', latest]]);
   return { imported, skipped, path };
 }

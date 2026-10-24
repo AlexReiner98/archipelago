@@ -8,6 +8,7 @@
 
 import type { Q } from './db.ts';
 import type { Registry } from './packs.ts';
+import { checkRetention, type Keep } from './retention.ts';
 
 type OneOrMany = string | string[];
 
@@ -72,6 +73,10 @@ export interface RuleDef {
   server?: boolean;
   /** Whether a report's reading, a measurement, is under it. Left out: a refusal is, a hold is not. */
   readings?: boolean;
+  /** A retention rule: the compacted stream its facts go to (docs/log.md, section 4), with keep in place of then. */
+  stream?: string;
+  /** What compaction leaves of them (src/retention.ts). */
+  keep?: Keep;
 }
 
 export type Rule = RuleDef & { pack: string };
@@ -127,6 +132,10 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
   const known = (t: string) => reg.types.has(t);
   for (const [i, rule] of rules.entries()) {
     const at = `rule ${rule.id ?? i + 1}`;
+    if (rule.stream !== undefined || rule.keep !== undefined) {
+      problems.push(...checkRetention(rule, at));
+      continue;
+    }
     if (rule.unique) {
       if (!rule.type || !known(rule.type)) problems.push(`${at}: unique needs a type it holds within`);
       else for (const f of rule.unique) if (!reg.types.get(rule.type)!.fields[f]) problems.push(`${at}: ${rule.type} has no field "${f}"`);
@@ -202,7 +211,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
   for (const rule of order) {
-    if (rule.unique || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
+    if (rule.unique || rule.stream || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
     if (rule.lifted && lifted(rule, w.op)) {
       spared.push(ruled(rule));
       continue;

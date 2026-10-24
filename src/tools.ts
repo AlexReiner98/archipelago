@@ -812,7 +812,7 @@ export const TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: { upto: z.number().int().nonnegative().describe('The seq of the newest event looked at.') },
     run: async (l, actor, input) => {
-      await l.log(l.db, { actor: actorId(actor), action: 'changes.seen', reason: 'Looked at what agents changed', detail: { upto: input.upto } });
+      await l.log(l.db, { actor: actorId(actor), action: 'changes.seen', reason: 'Looked at what agents changed', detail: { upto: input.upto } }), await l.record('settings', actorId(actor), [['+', actorId(actor), 'changes.seen', input.upto]]);
       return { seen_upto: input.upto };
     },
   },
@@ -826,7 +826,7 @@ export const TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       const asked = await toConfirm(l, { limit: 500 });
       const answered = asked.questions.filter((q) => q.seq <= input.upto).map((q) => q.id);
-      await l.log(l.db, { actor: actorId(actor), action: 'questions.confirmed', reason: input.basis, detail: { upto: input.upto, questions: answered.length, authority: actor.kind === 'human' ? { of: 'human', who: actorId(actor) } : { of: 'human', basis: input.basis, stated_by: actorId(actor) } } });
+      await l.log(l.db, { actor: actorId(actor), action: 'questions.confirmed', reason: input.basis, detail: { upto: input.upto, questions: answered.length, authority: actor.kind === 'human' ? { of: 'human', who: actorId(actor) } : { of: 'human', basis: input.basis, stated_by: actorId(actor) } } }), await l.record('settings', actorId(actor), [['+', actorId(actor), 'questions.confirmed', input.upto]], input.basis);
       // The notices that said each one was settled have been answered with them.
       const { rows } = await l.db.query<{ id: string }>(
         `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null

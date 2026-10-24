@@ -333,6 +333,15 @@
     { "id": "propose_only", "when": { "actor": "agent", "may": "propose" }, "then": "hold", "say": "This agent's token may only propose." },
     { "id": "agent_changes", "when": { "actor": "agent", "op": ["create", "update", "link", "unlink", "archive", "restore", "merge", "define_type"] }, "then": "hold", "lifted": "agent_changes", "server": true, "say": "An agent's change waits for a person until the owner lets agents' changes apply." },
     { "id": "agent_publish", "when": { "actor": "agent", "op": "publish" }, "then": "refuse", "lifted": "agent_publish", "say": "Publishing is the owner’s here: they allow agents on the Workspace page, under Publishing. Ask them with publish_ask." },
-    { "id": "agent_backups", "when": { "actor": "agent", "op": "backup_download" }, "then": "refuse", "lifted": "agent_backups", "say": "Agents may not download this workspace’s backups: the owner allows it on the Workspace page, under Backups." }
+    { "id": "agent_backups", "when": { "actor": "agent", "op": "backup_download" }, "then": "refuse", "lifted": "agent_backups", "say": "Agents may not download this workspace’s backups: the owner allows it on the Workspace page, under Backups." },
+    { "id": "sessions", "when": { "fields": ["story", "tokens_used", "cost_usd", "stale_flagged"] }, "stream": "sessions", "keep": { "latest": true, "history": "P14D", "closed": "P180D" }, "say": "A run's story and spend now, two weeks of how they got there, kept half a year after the run ends." },
+    { "id": "claims", "stream": "claims", "keep": { "latest": true, "history": "P30D", "closed": "P90D" }, "say": "Who holds what now, a month of who held it, a claim kept three months after its release." },
+    { "id": "notifications", "stream": "notifications", "keep": { "latest": true, "closed": "P30D", "open": "P90D" }, "say": "Who may read a notification, kept a month after it is read and three months unread." },
+    { "id": "automations", "stream": "automations", "keep": { "latest": true, "history": "P7D" }, "say": "When an automation last ran and what came of it, a week of it before." },
+    { "id": "settings", "stream": "settings", "keep": { "latest": true, "history": "P365D" }, "say": "The workspace's settings now, and a year of how they were." },
+    { "id": "access", "stream": "access", "keep": { "latest": true, "history": "P365D" }, "say": "When a token was last used and backups downloaded, a year of it." },
+    { "id": "pictures", "when": { "fields": ["picture"] }, "stream": "observations", "keep": { "latest": true }, "say": "A test's picture as it last ran." },
+    { "id": "observations", "stream": "observations", "keep": { "latest": true, "thin": [["P1D", "PT1H"], ["P30D", "P1D"]] }, "say": "The latest reading, one an hour after a day, one a day after a month." },
+    { "id": "pack", "stream": "pack:*", "keep": { "latest": true }, "say": "What a pack keeps, as it last kept it." }
   ]
 }

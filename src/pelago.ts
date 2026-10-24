@@ -9,7 +9,7 @@ import { bodyAfter, dropExcepted } from './ops.ts'; import { mergeRefusals, once
 import { readEvents, type EventQuery } from './eventlog.ts';
 import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
-import { KEPT_FIELDS } from './operational.ts';
+import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
 import { search, type SearchInput } from './search.ts';
 import { append, headOf, type Decision, type Fact } from './log.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
 import { privateDependencies } from './private-deps.ts'; import { decideProposal, rejection } from './proposals.ts';
@@ -705,12 +705,18 @@ export class Archipelago {
   async operational(id: string, set: { props?: Props; unset?: string[]; add?: Record<string, number>; reach?: { private_to: string | null; visibility?: 'shared' } }, event?: { actor: string; action: string; reason?: string; detail?: Props }) {
     const named = [...Object.keys(set.props ?? {}), ...(set.unset ?? []), ...Object.keys(set.add ?? {})].filter((k) => !KEPT_FIELDS.includes(k));
     if (named.length) throw new Error(`${named.join(', ')} is a fact about the item: change it through change`);
-    await this.db.query(
+    const { rows } = await this.db.query<{ props: Props; visibility: string; private_to: string | null }>(
       `update entity set props = ((props || $2::jsonb) - $3::text[]) || coalesce((select jsonb_object_agg(k, coalesce((props->>k)::numeric, 0) + v::numeric) from jsonb_each_text($4::jsonb) a(k, v)), '{}'),
-         visibility = coalesce($5, visibility), private_to = case when $6 then $7 else private_to end where id = $1`,
+         visibility = coalesce($5, visibility), private_to = case when $6 then $7 else private_to end where id = $1 returning props, visibility, private_to`,
       [id, JSON.stringify(set.props ?? {}), set.unset ?? [], JSON.stringify(set.add ?? {}), set.reach?.visibility ?? null, Boolean(set.reach), set.reach?.private_to ?? null],
     );
+    for (const [stream, facts] of rows[0] ? operationalFacts(id, set, rows[0]) : []) await this.record(stream, event?.actor ?? 'system', facts, event?.reason);
     if (event) await this.log(this.db, { ...event, target: id });
+  }
+
+  /** Append to a compacted stream at once (src/streams.ts), kept by the retention rules the packs declare. */
+  record(stream: OpStream, actor: string, facts: OpFact[], reason?: string, tx?: Q) {
+    return tx ? record(tx, this.workspace, stream, actor, facts, { rules: this.registry.rules, reason }) : this.db.transaction((t) => record(t, this.workspace, stream, actor, facts, { rules: this.registry.rules, reason }));
   }
 
   async claim(actor: Actor, input: { resource: string; holder: string; for?: string; reason: string }) {
@@ -734,42 +740,34 @@ export class Archipelago {
         throw new Error(`"${resource.title}" is held by "${h.title}" (${h.from_id}) since ${h.valid_from.toISOString()}. It must be released first.`);
       }
       const id = newId('r');
-      await tx.query(`insert into relation (id, type, from_id, to_id, props) values ($1, 'holds', $2, $3, $4::jsonb)`, [
-        id,
-        holder.id,
-        resource.id,
-        JSON.stringify(input.for ? { for: input.for } : {}),
-      ]);
+      await tx.query(`insert into relation (id, type, from_id, to_id, props) values ($1, 'holds', $2, $3, $4::jsonb)`, [id, holder.id, resource.id, JSON.stringify(input.for ? { for: input.for } : {})]);
+      await this.record('claims', actorId(actor), linkFacts({ id, type: 'holds', from_id: holder.id, to_id: resource.id, props: input.for ? { for: input.for } : {}, confidence: 1 }) as OpFact[], input.reason, tx);
       await this.log(tx, { actor: actorId(actor), action: 'resource.claim', target: resource.id, reason: input.reason, detail: { resource: resource.title, holder: holder.id, holder_title: holder.title, for: input.for } });
       return { status: 'claimed' as const, relation: id };
     });
   }
 
   async release(actor: Actor, input: { resource: string; holder?: string; reason: string }) {
-    const { rows } = await this.db.query<{ from_id: string }>(
-      `update relation set valid_to = now() where type = 'holds' and to_id = $1 and valid_to is null
-         and ($2::text is null or from_id = $2) returning from_id`,
+    const { rows } = await this.db.query<{ id: string; from_id: string }>(
+      `update relation set valid_to = now() where type = 'holds' and to_id = $1 and valid_to is null and ($2::text is null or from_id = $2) returning id, from_id`,
       [input.resource, input.holder ?? null],
     );
+    await this.record('claims', actorId(actor), rows.map((r): OpFact => ['-', r.id, 'link']), input.reason);
     for (const row of rows) await this.log(this.db, { actor: actorId(actor), action: 'resource.release', target: input.resource, reason: input.reason, detail: { holder: row.from_id } });
     return { released: rows.length };
   }
 
   /** Ping every connection's URL and record whether it is reachable. */
   async checkConnections(actor: Actor) {
-    const { rows } = await this.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and is_open`, [
-      this.registry.family('sys.connection'),
-    ]);
+    const { rows } = await this.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and is_open`, [this.registry.family('sys.connection')]);
     const out = [];
     for (const conn of rows) {
       const url = conn.props.url as string | undefined;
       if (!url) continue;
       // Any HTTP answer, even an error status, means something is listening.
-      const reachable = await fetch(url, { signal: AbortSignal.timeout(2000) }).then(
-        () => true,
-        () => false,
-      );
+      const reachable = await fetch(url, { signal: AbortSignal.timeout(2000) }).then(() => true, () => false);
       const status = reachable ? 'available' : 'unavailable';
+      await this.record('observations', actorId(actor), [['+', conn.id, 'status', status]]);
       if (status !== conn.status) {
         await this.db.query(`update entity set status = $2, updated_at = now() where id = $1`, [conn.id, status]);
         await this.log(this.db, { actor: actorId(actor), action: 'connection.check', target: conn.id, reason: 'Reachability changed', detail: { title: conn.title, from: conn.status, to: status } });
@@ -802,6 +800,7 @@ export class Archipelago {
   async setSecret(key: string, value: string | undefined): Promise<void> {
     if (!value) await this.db.query(`delete from setting where key = $1`, [key]);
     else await this.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(seal(value))]);
+    await this.record('settings', 'system', [value ? ['+', 'secret', key, true] : ['-', 'secret', key]]); // the name only: the value is the vault's
   }
 
   /** Create (or find) the person this workspace belongs to and make them the default for views. */
@@ -813,6 +812,7 @@ export class Archipelago {
     // Its first owner begins a workspace: what its agents change takes effect as they make it, until the owner says otherwise (owner, 21 Oct 2026).
     if ((await this.setting('me')) === undefined) await this.db.query(`insert into setting (key, value) values ($1, '"apply"'::jsonb) on conflict (key) do nothing`, [AGENT_CHANGES]);
     await this.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(id)]);
+    await this.record('settings', actorId(actor), [['+', 'setting', 'me', id], ['+', 'setting', AGENT_CHANGES, await this.setting(AGENT_CHANGES)]]);
     return { me: id };
   }
 

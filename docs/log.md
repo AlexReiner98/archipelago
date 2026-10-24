@@ -444,15 +444,33 @@ hash is SHA-256 of `"pelago-segment\n"` and the canonical entries in order,
 and a system entry in the fact stream records it:
 
 ```json
-{ "rule": { "outcome": "apply", "spared": [] }, "actor": { "id": "system" }, "reason": "Day sealed",
-  "facts": [["+", "seg_sessions_20261024", "segment", { "stream": "sessions", "from": 5101, "to": 9877, "hash": "ab03…" }]] }
+{ "rule": { "outcome": "apply", "spared": [] }, "actor": { "id": "system" }, "reason": "Day sealed", "action": "segment.seal",
+  "facts": [["+", "seg_sessions_20261024", "segment", { "stream": "sessions", "days": ["2026-10-24", "2026-10-24"], "from": 5101, "to": 9877, "entries": 4777, "hash": "ab03…" }]] }
 ```
 
 So the chain commits to every operational day. **Compaction** later drops
 entries a retention rule no longer keeps: it writes a compacted segment in
 place of one or more sealed ones and records it the same way, naming the
 segments it replaces and the rule it followed. An operational entry is never
-rewritten; it is dropped whole, by rule, and the drop is in the chain.
+rewritten; it is dropped whole, by rule, and the drop is in the chain:
+
+```json
+{ "reason": "Compacted by rule", "action": "segment.compact",
+  "facts": [["-", "seg_automations_20261004", "segment"], ["-", "seg_automations_20261014", "segment"],
+            ["+", "seg_automations_20261004_20261014_x7k2", "segment", { "stream": "automations", "days": ["2026-10-04", "2026-10-14"],
+              "from": 1, "to": 2, "entries": 0, "hash": "…", "replaces": ["seg_automations_20261004", "seg_automations_20261014"], "rules": ["automations"] }]] }
+```
+
+The segments that stand are those asserted and not since retracted;
+`verifySegments` (`src/streams.ts`) hashes each one's entries again. Only
+sealed days are compacted, neighbouring segments that lost entries become one,
+and the server does both once a day for every workspace (`src/duties.ts`).
+
+The compacted streams are kept in their own table, `log_op (stream, pos, at,
+head, facts)`: the light header in `head`, the facts inline. Its trigger
+refuses an update, a delete and a truncate to everyone but one role,
+`pelago_compactor`, and that role may only delete; compaction takes it for
+the end of its transaction. The fact stream's tables let no one through.
 
 ### The retention rule format
 
@@ -469,10 +487,11 @@ with a `stream` and a `keep` in place of `then`:
 }
 ```
 
-- `when` selects facts by what they are written to, with today's
-  conditions (type, kind, op, fields), and `fields` matters here: a run's
-  `story` and `tokens_used` go to the `sessions` stream while its start,
-  end and the task it is on stay facts.
+- `when` selects facts by their field (`fields`): a run's `story` and
+  `tokens_used` go to the `sessions` stream while its start, end and the task
+  it is on stay facts. Of a stream's rules, the one naming a fact's field
+  keeps it, else the one naming none; an entry's header names that rule, and
+  facts kept by different rules are appended as entries of their own.
 - `stream` names the stream; a rule with no `stream` leaves its facts in the
   fact stream.
 - `keep` says what compaction leaves:
@@ -483,7 +502,10 @@ with a `stream` and a `keep` in place of `then`:
     they are older than `after` (`[["P1D", "PT1H"], ["P30D", "P1D"]]`).
   - `closed: <duration>`: how long a record is kept at all after it ends
     (a run ended, a notification read, a token revoked, a claim released);
-    then every fact of it is dropped.
+    then every fact of it is dropped. A link retracted in the stream ends
+    there; an item ends when its projection is closed or archived.
+  - `open: <duration>`: how long a record that has not ended is kept after
+    its last fact (a notification never read).
   - `forever: true`: never compacted.
 - A workspace setting may lengthen a `keep` its pack declares liftable; it
   never shortens one below what a pack declares as needed (the spent view's
@@ -499,7 +521,7 @@ kept forever as facts instead: a run's start, end and the task it is on
 | --- | --- | --- |
 | `sessions` | a run's story, tokens_used, cost, stale_flagged (its start, end and task are facts) | `latest`, `history: P14D`, `closed: P180D` |
 | `claims` | `holds` links: claim and release | `latest`, `history: P30D`, `closed: P90D` |
-| `notifications` | notification items and who may read them; outbox deliveries | `latest`, `closed: P30D` after read, `P90D` unread |
+| `notifications` | notification items and who may read them; outbox deliveries | `latest`, `closed: P30D` after read, `open: P90D` unread |
 | `automations` | an automation's last_run, last_fired, last_result; the event cursor; `run_once` marks; `rechecked_at` | `latest`, `history: P7D` |
 | `settings` | the workspace's settings, `me`, each person's `changes.seen` and `questions.confirmed` (not packs: adding and removing one is a fact, section 8; not secrets: they are in the vault) | `latest`, `history: P365D` |
 | `access` | a token's last use (at most hourly), backup downloads (the grants themselves are facts) | `latest`, `history: P365D` |
@@ -531,6 +553,19 @@ codes, OAuth state) go in an **unlogged** Postgres table, `transient (key,
 value, expires_at)`, its entries expiring and swept, never backed up and
 never part of the log (`e_a7fjzcwv`). It is the one store outside the log
 besides the key vault, named so in `src/operational.ts`.
+
+### Where this stands (24 Oct 2026)
+
+Each write the table of section 10 sends to a compacted stream appends there
+as it is made, beside today's tables, which are still written and read until
+the projections read the streams: `operational`, `claim`, `release` and
+`checkConnections` in `src/pelago.ts`, settings and secrets by name, the
+event and audit cursors, `run_once` marks, a token's use (hourly), backup
+downloads, audit imports and a picture's hash. Not yet: the notification item
+itself (still facts through `apply`), a run's heartbeat (still on the run's
+row, in no stream), `pack_store` (the server's own log, `e_8g9feum7`), and
+`log_blob` (a picture's bytes stay in `picture`). `transient` is unlogged on a
+Postgres server.
 
 ---
 
