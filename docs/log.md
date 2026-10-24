@@ -702,9 +702,11 @@ never sees the log ahead of them.
   row, the entry that decides it says what became of it.
 - **The search index** is the indexes on `entity` (`src/search.ts`), kept
   current by the projector's writes. The part_of closure, blocking roots and
-  the counts are not kept: at 2,000 items every view that reads them answers
-  in under 70 ms (the task records the measurements). They wait for the
-  10-million-event benchmark (section 9) to show a need.
+  the counts are not kept: measured on 20,000 items, the block graph of the
+  whole map takes 36 ms, the open and blocked counts 48 ms and a hub's
+  part_of closure 1 ms, while attention takes 345 ms, nearly all of it the
+  lens read that none of them would save (the task records the numbers).
+  They wait for the 10-million-event benchmark (section 9) to show a need.
 
 ### What a snapshot records
 

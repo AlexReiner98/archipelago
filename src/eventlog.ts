@@ -225,12 +225,13 @@ export async function lastSeq(db: Q): Promise<number> {
 
 /**
  * Step 19. Each fact numbered from the event table's sequence, so the activity log is in one order across both;
- * found by that number, by what a link starts from, and its entries by their time. The number is not hashed: it is
+ * found by that number, by what a link starts from and what an item was merged into, and its entries by their time. The number is not hashed: it is
  * where the row sits in this database, not part of what was said.
  */
 export const ACTIVITY = `
 alter table log_fact add column if not exists seq bigint default nextval('event_seq_seq');
 create index if not exists log_fact_seq on log_fact(seq);
 create index if not exists log_fact_link_from on log_fact((value->>1)) where field = 'link';
+create index if not exists log_fact_merged_into on log_fact(value) where field = 'merged_into';
 create index if not exists log_entry_at on log_entry(at);
 `;
