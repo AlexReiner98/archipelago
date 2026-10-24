@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make } from './map.ts';
 import { canonical, entryHash, jcs } from '../src/jcs.ts';
-import { entries, entry, verify, type Entry } from '../src/log.ts';
+import { entries, entry, stored, verify, type Entry } from '../src/log.ts';
 import { project } from '../src/replay.ts';
 import { KEPT_FIELDS } from '../src/operational.ts';
 import { undo } from '../src/undo.ts';
@@ -57,7 +57,7 @@ test('every change set is appended as facts, chained, in the transaction that wr
   assert.deepEqual([first.v, first.ws, first.stream, first.pos, first.prev], [1, 'default', 'facts', 1, '0'.repeat(64)]);
   assert.deepEqual(first.rule, { outcome: 'apply', spared: [] });
   assert.deepEqual(first.actor, { id: 'human:test' });
-  assert.equal(first.hash, entryHash(first));
+  assert.equal(first.hash, entryHash((await stored(l.db))[0]), 'the hash of the entry as stored, its words sealed');
   const t = first.facts.filter((f) => f[1] === made.t);
   assert.deepEqual(t.map((f) => f.slice(2)), [['type', 'work.task'], ['kind', 'work'], ['title', 'Chain it'], ['body', `Part of ${made.p}.`], ['status', 'todo'], ['visibility', 'private'], ['priority', 'high']]);
   assert.deepEqual(first.facts.find((f) => f[2] === 'link')!.slice(3), [['part_of', made.t, made.p]]);

@@ -67,6 +67,7 @@ export async function opsWithin(l: Archipelago, within: string[], ops: Op[]): Pr
       if (rows[0]) await mustBeIn(rows[0].from_id, 'change what it is linked to');
     }
     if (op.op === 'define_type') refuse('It cannot define a type: that changes the whole map.');
+    if (op.op === 'forget') refuse('It cannot forget: that reaches the log, the backups and every read.');
   }
 }
 

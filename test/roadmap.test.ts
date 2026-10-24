@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { dumpVault } from '../src/vault.ts';
 import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
@@ -358,7 +359,7 @@ test('a backup holds every row, and restores into an empty database that then ca
 
   const taken = await dump(l.db, { id: 'default', name: 'Default' }, { id: 'local', types: [] });
   const copy = new Archipelago(await openDb(), l.registry);
-  const counts = await restore(copy.db, JSON.parse(JSON.stringify(taken)));
+  const counts = await restore(copy.db, { ...JSON.parse(JSON.stringify(taken)), vault: await dumpVault(l.db) });
   assert.deepEqual([counts.entity, counts.relation, counts.proposal], [3, 1, 1]);
   assert.equal(counts.event, taken.tables.event.length);
 

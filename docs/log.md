@@ -635,6 +635,24 @@ forgotten with an item without the person choosing it.
   `keys`, so a page read decrypts nothing (projections are plaintext) and a
   replay unwraps each key once.
 
+### As built
+
+The vault is `src/vault.ts`, sealing `src/seal.ts`, the forget `src/forget.ts`
+(step 20). Where the build had to choose:
+
+- A held change's `ops`, `warnings` and `source` are sealed with a key of
+  their own, `<p_…>/ops`, beside the one for its reason: forgetting an item
+  it touches takes what it asked and leaves why, which goes only if chosen.
+  The proposal leaves the queue as superseded.
+- Backups are format 2 (`src/backup-seal.ts`): the rows of today's tables
+  sealed as the log is, keyed the same way, with the log's tables in the
+  file. A restore opens them with the vault as it is then, or with a vault
+  backup given beside the file, on a server with the same sealing key; a
+  row with no key stays out. Vault backups are written to
+  `backups/<ws>/vault/`, deleted after 30 days, and never sent off the server.
+- Values are opened for their reader in `entries`, `entry` and `factAt`;
+  `stored` and `verify` read the log as it is kept.
+
 ---
 
 ## 6. Versioning

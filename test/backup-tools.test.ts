@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { dump, parseBackup, restore, restoreTo } from '../src/backup.ts';
+import { openTables } from '../src/backup-seal.ts';
+import { dumpVault } from '../src/vault.ts';
 import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
 import { databaseFor, dropDatabaseFor } from '../src/pg.ts';
@@ -38,7 +40,7 @@ test('the owner downloads the whole map by a link that works once', async () => 
   const made = (await callTool(l, owner, 'backup_download', {})) as Made;
   assert.match(made.path, new RegExp(`^/backup-file/${l.workspace}/`), 'the link names its workspace, so any server can give it');
   const file = (await fetched(l, made))!;
-  assert.ok(parseBackup(file.file).tables.entity.some((e) => e.title === 'Kept in the file'));
+  assert.ok((await openTables(l.db, parseBackup(file.file).tables)).tables.entity.some((e) => e.title === 'Kept in the file'));
   assert.equal(await fetched(l, made), undefined, 'good once');
   await assert.rejects(callTool(l, member, 'backup_download', {}), /Only a workspace admin/);
 });
@@ -68,14 +70,14 @@ test('a link given to a document is in the backup, and works again where the bac
   await createShare(l, owner, doc);
   const file = (await fetched(l, (await callTool(l, owner, 'backup_download', {})) as Made))!;
   const there = await openDb();
-  assert.equal((await restore(there, parseBackup(file.file))).share, 1);
+  assert.equal((await restore(there, { ...parseBackup(file.file), vault: await dumpVault(l.db) })).share, 1);
   assert.deepEqual((await there.query<{ entity_id: string }>(`select entity_id from share`)).rows, [{ entity_id: doc }]);
 });
 
 test('a backup is restored from the command line into a new folder, and never over one', async () => {
   const l = await map();
   await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Carried over' }] });
-  const taken = await dump(l.db, { id: 'default', name: 'Default' });
+  const taken = { ...(await dump(l.db, { id: 'default', name: 'Default' })), vault: await dumpVault(l.db) };
   const dir = mkdtempSync(join(tmpdir(), 'pelago-restore-'));
   try {
     const done = await restoreTo(taken, join(dir, 'data'));
@@ -93,7 +95,7 @@ test('a backup is restored into a Postgres server where the server looks for its
   const base = `r${Date.now().toString(36)}`;
   const url = await databaseFor(server!, base); // stands for the server's own database: an empty one
   try {
-    const home = await dump(l.db, { id: 'default', name: 'Default' });
+    const home = { ...(await dump(l.db, { id: 'default', name: 'Default' })), vault: await dumpVault(l.db) };
     const done = await restoreTo(home, url);
     assert.match(done.where, new RegExp(`database \\w+_${base} on `), 'the default workspace goes in the database named');
     assert.doesNotMatch(done.where, /:[^@/]+@/, 'the password is not said');

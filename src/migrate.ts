@@ -16,6 +16,8 @@ import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
 import { SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
+import { VAULT } from './vault.ts';
+import { FORGET } from './forget.ts';
 
 interface Migration {
   version: number;
@@ -47,6 +49,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 16, name: 'a held change keeps the rule that held it', sql: HELD_BY },
   { version: 17, name: 'titles and notes indexed for search', sql: SEARCH_INDEX },
   { version: 18, name: 'the log: change sets appended, hash-chained', sql: LOG },
+  { version: 20, name: 'per-item keys in a vault, and forgetting', sql: VAULT + FORGET },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
