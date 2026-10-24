@@ -16,6 +16,7 @@ export async function undo(l: Archipelago, actor: Actor, input: { changeset: str
   if (!done || done.stream !== 'facts' || !done.facts.length) throw new Error(`No change set "${input.changeset}"`);
   const { rows: already } = await l.db.query(`select 1 from log_entry where undoes = $1 and stream = 'facts'`, [input.changeset]);
   if (already.length) throw new Error(`Change set ${input.changeset} has already been undone`);
+  if (done.facts.some((f) => f[2] === 'forgotten')) throw new Error(`Change set ${input.changeset} forgot something: its key is gone, and it cannot be undone`);
 
   const ops: Op[] = [];
   const skipped: string[] = [];

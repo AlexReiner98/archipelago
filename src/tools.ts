@@ -10,7 +10,7 @@ import { MEMBER_TOOLS } from './members.ts'; import { WORKSPACE_TOOLS } from './
 import { PACK_STATE_TOOLS } from './packstate.ts';
 import { SHARE_TOOLS } from './share-tools.ts';
 import { BACKUP_TOOLS } from './backup-tools.ts'; import { FORMER_NAMES, REPORT_TOOLS } from './report.ts'; import { TOKEN_TOOLS } from './token-tools.ts'; import { ASK_TOOLS } from './token-ask.ts';
-import { merge, parseBackup } from './backup.ts'; import { lastSeq, readEvents } from './eventlog.ts';
+import { merge, parseBackup, parseVault, readable } from './backup.ts'; import { lastSeq, readEvents } from './eventlog.ts';
 import { githubStatus, newGithubSecret } from './github.ts';
 import { CONNECTION_TOOLS } from './connection-tools.ts';
 import { MODEL_TOOLS } from './model-tools.ts';
@@ -93,7 +93,7 @@ const op = z.discriminatedUnion('op', [
     source: opSource,
   }),
   z.object({ op: z.literal('unlink'), relation: z.string().describe('The link\'s id, from the get tool.') }),
-  z.object({ op: z.literal('archive'), id: z.string() }),
+  z.object({ op: z.literal('archive'), id: z.string() }), z.object({ op: z.literal('forget'), id: z.string().describe('For good: its words leave the log, the backups and every read. The owner’s.'), reasons: z.array(z.string()).optional().describe('Change sets (c_…) whose reason and basis go with it.') }),
   z.object({ op: z.literal('restore'), id: z.string().describe('An archived item to bring back.') }),
   z.object({ op: z.literal('merge'), keep: z.string(), drop: z.string().describe('Its links move to keep, then it is archived.') }),
   z.object({
@@ -390,6 +390,7 @@ export const TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: {
       backup: z.string().min(1).describe('The backup file (.json.gz) in base64.'),
+      vault: z.string().optional().describe('The backup of the key vault taken with it (.json.gz) in base64: a sealed file is read with it.'),
       apply: z.boolean().optional().describe('Do it. Leave out to see what it would do.'),
       same_owner: z
         .boolean()
@@ -398,9 +399,8 @@ export const TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       needAdmin(actor, 'import a backup');
-      const file = parseBackup(Buffer.from(input.backup, 'base64'));
-      // Everything in the file goes in, whoever it is private to: this is the map as a whole, as a backup is.
-      const whole = await wholeMap(l);
+      const whole = await wholeMap(l); // everything in the file goes in, whoever it is private to: this is the map as a whole, as a backup is
+      const file = await readable(whole.db, { ...parseBackup(Buffer.from(input.backup, 'base64')), ...(input.vault && { vault: parseVault(Buffer.from(input.vault, 'base64')) }) });
       const defined = ((file.local_pack as { types?: TypeDef[] } | null)?.types ?? []).filter((t) => !whole.registry.types.has(t.id));
       const known = new Set([...whole.registry.types.keys(), ...defined.map((t) => t.id)]);
       const unknown = [...new Set((file.tables?.entity ?? []).map((e) => e.type as string))].filter((t) => !known.has(t));
@@ -505,7 +505,7 @@ export const TOOLS: Record<string, Tool> = {
   },
   change: {
     description:
-      'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type) with the reason. ' +
+      'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type, forget) with the reason. ' +
       'Creates can carry a ref so later ops in the same change can link to them, and a title or note in the same change can name what it makes: write {ref} and it becomes that item\u2019s id. Give the source the facts came from. ' +
       'To add to a note or change one passage of it, send append or replace on the update, not the whole body again. ' +
       'An update that changes nothing (only the id) says you checked the item and it is still true as written: it records when it was last known true. ' +

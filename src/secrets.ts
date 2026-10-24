@@ -58,6 +58,13 @@ function fromFile(create: boolean): Buffer | undefined {
   return made;
 }
 
+/** The key secrets and the key vault (src/vault.ts) are sealed with. `make` false: none is made where there is none. */
+export function sealingKey(make = true): Buffer {
+  const key = fromEnv() ?? fromFile(make);
+  if (!key) throw new Error('This server has no sealing key: what was sealed elsewhere cannot be opened here.');
+  return key;
+}
+
 /** The settings that are secrets. A backup never holds one of these unsealed, whenever it was stored. */
 export const SECRET_SETTINGS = ['model_account', 'anthropic_key', 'github_secret'];
 

@@ -32,7 +32,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { notify } from './notify.ts';
-import { backupAll, parseBackup } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
+import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { serveConnect } from './connect.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
@@ -321,9 +321,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (req.method === 'GET') return send(res, 200, { result: await workspaces.list() });
         if (req.method === 'POST') {
           // `backup` is a backup file's bytes in base64: the workspace starts as that map.
-          const { id, name, backup } = ((await readJson(req)) ?? {}) as { id?: string; name?: string; backup?: string };
+          const { id, name, backup, vault } = ((await readJson(req)) ?? {}) as { id?: string; name?: string; backup?: string; vault?: string };
           try {
-            const from = backup === undefined ? undefined : parseBackup(Buffer.from(String(backup), 'base64'));
+            // `vault`: the backup of the key vault taken with it, which a sealed backup is read with.
+            const from = backup === undefined ? undefined : { ...parseBackup(Buffer.from(String(backup), 'base64')), ...(vault && { vault: parseVault(Buffer.from(vault, 'base64')) }) };
             const ws = await workspaces.create(id ?? '', name ?? '', from);
             const owner = await ownerToken(ws, 'owner');
             if (!from) return send(res, 200, { result: owner });

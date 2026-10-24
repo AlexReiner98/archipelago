@@ -20,6 +20,9 @@ export const MOVED = ['type.moved', 'kind.moved'];
 const COLUMN = new Map(ITEM_COLUMNS.map(([column, field, unsaid]) => [field, { column, unsaid }]));
 /** What the log says of an item beside its columns: they move its time only. */
 const ABOUT = ['checked', 'merged_into', 'forgotten'];
+/** A forgotten item's rows leave today's tables, its links with them, and what named it as owner or source names nothing. */
+export const FORGET_ROWS = [`update entity set owner = null where owner = $1`, `update entity set source_id = null where source_id = $1`, `update relation set source_id = null where source_id = $1`,
+  `delete from relation where from_id = $1 or to_id = $1`, `delete from entity where id = $1`];
 const LINK_COLUMNS: Record<string, [column: string, unsaid: unknown]> = { confidence: ['confidence', 1], source: ['source_id', null] };
 
 /** A declared field said or cleared: what is set, and what is taken away. */
@@ -49,6 +52,10 @@ async function item(tx: Q, reg: Registry, at: string, moved: boolean, id: string
   const { rows } = await tx.query<{ type: string; status: string }>(`select type, status from entity where id = $1`, [id]);
   const was = rows[0];
   if (!was && !run.some((f) => f[0] === '+' && f[2] === 'type')) return; // a type's definition, or another record: not an item
+  if (run.some((f) => f[0] === '+' && f[2] === 'forgotten')) {
+    for (const sql of FORGET_ROWS) await tx.query(sql, [id]);
+    return;
+  }
   const set: Props = {};
   const props: Props = {};
   const unset = new Set<string>();

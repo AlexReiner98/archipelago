@@ -6,6 +6,7 @@
 
 import type { Q } from './db.ts';
 import { isLink, MOVED } from './replay.ts';
+import { openSaid } from './seal.ts';
 
 export type EventQuery = {
   since?: string; before?: number; after?: number; target?: string; actor?: string; origin?: string; action?: string; limit?: number;
@@ -93,6 +94,17 @@ async function expand(db: Q, found: Group[]): Promise<Omit<LoggedEvent, 'target_
      from log_entry e where e.stream = 'facts' and e.pos = any($1::bigint[])`,
     [[...new Set(found.map((g) => g.pos))]],
   );
+  // What someone said is sealed in the log (src/seal.ts): opened here, before anything reads it.
+  const values = await openSaid(db, facts.flatMap((f, i) => [
+    { id: f.id, field: f.field, value: f.value, i, was: false },
+    ...(f.was ? [{ id: f.id, field: f.field, value: f.was[1], i, was: true }] : []),
+  ]));
+  for (const v of values) if (v.was) facts[v.i].was![1] = v.value; else facts[v.i].value = v.value;
+  const words = await openSaid(db, heads.flatMap((h, i) => [
+    { id: h.id, field: 'reason', value: h.head.reason, i, basis: false },
+    ...(h.head.authority?.basis !== undefined ? [{ id: h.id, field: 'basis', value: h.head.authority.basis, i, basis: true }] : []),
+  ]));
+  for (const w of words) if (w.basis) heads[w.i].head.authority = { ...heads[w.i].head.authority, basis: w.value }; else heads[w.i].head.reason = w.value;
   const entries = new Map(heads.map((h) => [h.pos, h]));
   const said = new Map<string, FactRow[]>();
   for (const f of facts) said.set(`${f.pos} ${f.id}`, [...(said.get(`${f.pos} ${f.id}`) ?? []), f]);
@@ -105,12 +117,13 @@ async function expand(db: Q, found: Group[]): Promise<Omit<LoggedEvent, 'target_
     if (f.field === 'merged_into') ask(f.value, g.pos);
   }
   const pairs = [...wanted.values()];
-  const { rows: titled } = await db.query<{ pos: number; id: string; title: string | null }>(
-    `select w.pos::int as pos, w.id, (select p.value #>> '{}' from log_fact p where p.stream = 'facts' and p.id = w.id and p.field = 'title' and p.pos <= w.pos order by p.pos desc, p.n desc limit 1) as title
+  const { rows: titled } = await db.query<{ pos: number; id: string; title: unknown }>(
+    `select w.pos::int as pos, w.id, (select p.value from log_fact p where p.stream = 'facts' and p.id = w.id and p.field = 'title' and p.pos <= w.pos order by p.pos desc, p.n desc limit 1) as title
      from unnest($1::bigint[], $2::text[]) w(pos, id)`,
     [pairs.map((p) => p.pos), pairs.map((p) => p.id)],
   );
-  const titles = new Map(titled.map((t) => [`${t.pos} ${t.id}`, t.title]));
+  const opened = await openSaid(db, titled.map((t) => ({ ...t, field: 'title', value: t.title })));
+  const titles = new Map(opened.map((t) => [`${t.pos} ${t.id}`, typeof t.value === 'string' ? t.value : null]));
   const titleAt = (id: string, pos: number) => titles.get(`${pos} ${id}`) ?? null;
 
   const out: Omit<LoggedEvent, 'target_title' | 'target_type'>[] = [];

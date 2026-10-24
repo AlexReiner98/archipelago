@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { dump, localPackOf } from './backup.ts';
+import { dumpVault, rewrap } from './vault.ts';
 import type { Q } from './db.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
@@ -38,6 +39,7 @@ export const BACKUP_TOOLS: Record<string, Tool> = {
   backup_download: {
     description:
       'This workspace as a backup file (.json.gz), as it stands now: answers with a path on this server that gives the file once, within five minutes, with no token (GET it and save it; do not read it into the conversation). ' +
+      'Its rows are sealed: vault_path gives the keys the same way, wrapped under vault_key, which only this answer holds. ' +
       'Everything is in it, private items included, so an agent may call this only when the owner allows it on the Workspace page. To rehearse a change on it: node src/backup.ts restore <file> <new data folder>, then a throwaway server on that folder.',
     input: {},
     run: async (l, actor) => {
@@ -49,8 +51,12 @@ export const BACKUP_TOOLS: Record<string, Tool> = {
       const name = `archipelago-${l.workspace}-${taken.taken.replaceAll(':', '-')}.json.gz`;
       const file = gzipSync(JSON.stringify(taken));
       await keep(whole.db, linkKey(key), { name }, LINK_MINUTES * 60_000, file);
+      // Its rows are sealed: the keys come beside it, wrapped under a key given only here. A copy saved off the server
+      // is out of a forget's reach, as any copy is (e_98ddd7ha).
+      const [vault, transport] = [randomBytes(24).toString('base64url'), randomBytes(32)];
+      await keep(whole.db, linkKey(vault), { name: name.replace('.json.gz', '.vault.json.gz') }, LINK_MINUTES * 60_000, gzipSync(JSON.stringify(rewrap(await dumpVault(whole.db), undefined, transport))));
       await l.log(l.db, { actor: actorId(actor), action: 'workspace.backup_download', reason: `Backup of the whole workspace downloaded (${Math.round(file.length / 1024)} KB)` });
-      return { path: `/backup-file/${l.workspace}/${key}`, name, bytes: file.length, taken: taken.taken, rows: Object.values(taken.tables).reduce((n, rows) => n + rows.length, 0), expires_in_minutes: LINK_MINUTES };
+      return { path: `/backup-file/${l.workspace}/${key}`, vault_path: `/backup-file/${l.workspace}/${vault}`, vault_key: transport.toString('base64url'), name, bytes: file.length, taken: taken.taken, rows: Object.values(taken.tables).reduce((n, rows) => n + rows.length, 0), expires_in_minutes: LINK_MINUTES };
     },
   },
 };

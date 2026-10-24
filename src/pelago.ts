@@ -11,8 +11,8 @@ import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { search, type SearchInput } from './search.ts';
-import { append, headOf, type Decision, type Fact } from './log.ts'; import { projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
-import { privateDependencies } from './private-deps.ts'; import { decideProposal, rejection } from './proposals.ts';
+import { append, headOf, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
+import { privateDependencies } from './private-deps.ts'; import { decideProposal, supersede } from './proposals.ts'; import { asOwner, forgetIn, type ForgetOp } from './forget.ts';
 
 export interface Actor {
   kind: 'human' | 'agent';
@@ -95,7 +95,7 @@ export interface DefineTypeOp {
   op: 'define_type';
   type: TypeDef;
 }
-export type Op = CreateOp | UpdateOp | LinkOp | UnlinkOp | ArchiveOp | RestoreOp | MergeOp | DefineTypeOp;
+export type Op = CreateOp | UpdateOp | LinkOp | UnlinkOp | ArchiveOp | RestoreOp | MergeOp | DefineTypeOp | ForgetOp; export type { ForgetOp };
 
 export interface SourceSpec {
   uri: string;
@@ -376,8 +376,9 @@ export class Archipelago {
           if (!rows.length) errors.push(`${where}: no active relation "${op.relation}"`);
           break;
         }
-        case 'archive':
+        case 'archive': case 'forget':
           await existing(op.id, where);
+          if (op.op === 'forget' && (ops.length > 1 || op.reasons?.some((c) => !/^[cp]_\w+$/.test(c)))) errors.push(`${where}: a forget is a change of its own, and its reasons name change sets (c_…) or held changes (p_…)`);
           break;
         case 'restore': {
           const target = await existing(op.id, where);
@@ -515,6 +516,9 @@ export class Archipelago {
             await said(changedFacts(now, { ...now, props: { ...drop.props, ...keep.props }, body: [keep.body, drop.body].filter(Boolean).join('\n\n') }));
             break;
           }
+          case 'forget': // for good: its key, its words in the log and beside it, then its rows, whoever could see them
+            await forgetIn(tx, op); await said([['+', op.id, 'forgotten', true]]); await asOwner(tx, FORGET_ROWS, [op.id]);
+            break;
           case 'define_type':
             await said([['+', op.type.id, 'type_def', op.type]]);
             break; // registered after the transaction
@@ -530,7 +534,7 @@ export class Archipelago {
     if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
     for (const op of ops) if (op.op === 'define_type') await this.registry.defineLocal(op.type);
-    await this.supersede(changeset);
+    await supersede(this, changeset);
     return { status: 'applied' as const, changeset, created, warnings };
   }
 
@@ -540,27 +544,6 @@ export class Archipelago {
     if (!ours.length) return;
     const set = Object.fromEntries(ours.filter(([, v]) => v !== null && v !== undefined));
     await tx.query(`update entity set props = (props || $2::jsonb) - $3::text[] where id = $1`, [id, JSON.stringify(set), ours.filter(([k]) => !(k in set)).map(([k]) => k)]);
-  }
-
-  /**
-   * A held change that asks only for what is now so (each thing it would
-   * settle already has that status) has been overtaken: it leaves the queue
-   * as superseded, and the log says by which change. Nobody decided it, so
-   * it is neither applied nor declined.
-   */
-  private async supersede(changeset: string): Promise<void> {
-    const { rows } = await this.db.query<Proposal>(`select * from proposal where status = 'pending'`);
-    for (const p of rows) {
-      let moot = p.ops.length > 0;
-      for (const op of p.ops) {
-        if (op.op !== 'update' || !op.status || Object.keys(op).some((key) => !['op', 'id', 'status', 'props'].includes(key))) moot = false;
-        else moot = (await this.entity(op.id))?.status === op.status;
-        if (!moot) break;
-      }
-      if (!moot) continue;
-      const done = await this.db.transaction((tx) => rejection(tx, this.workspace, p.id, { outcome: 'superseded', actor: 'system', by: changeset, reason: p.reason }));
-      if (done) await this.log(this.db, { actor: 'agent:pelago', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
-    }
   }
 
   private async ensureSource(q: Q, spec: SourceSpec, said: (facts: Fact[]) => Promise<void>, mint: (key: string, prefix: string) => string): Promise<string | null> {

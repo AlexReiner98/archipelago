@@ -46,6 +46,8 @@ export const STORES: Record<string, string> = {
   control_value: "The server's own keys and values, across workspaces.",
   github_installation: 'Which GitHub installation belongs to which workspace: written by the GitHub sign-up.',
   schema_version: 'Which schema steps have run: written by migrate only.',
+  vault_key: "Each item's, link's and change set's key, wrapped with the server's sealing key: made in the append that first seals with it, deleted only by a forget, backed up apart and kept 30 days.",
+  vault_secret: 'Secrets kept by name, wrapped like a key: set and removed by the owner or the server, never in the log or its backups.',
 };
 
 /**
