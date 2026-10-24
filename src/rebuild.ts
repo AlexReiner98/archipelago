@@ -79,9 +79,12 @@ export async function catchUp(db: Db, reg: Kinds, ws: string, swap: boolean, o: 
       await shadowTables(tx);
       await inShadow(tx);
       if (start) await loadRows(tx, start.rows);
-      // A snapshot keeps items, links and the queue: what is inside what and what names what are made from them.
-      await regatherAll(tx, reg.relationFamily('part_of'));
-      await mentionedAll(tx);
+      // A snapshot keeps items, links and the queue: what is inside what and what names what are made from them, when
+      // they are to be swapped in. A snapshot alone never reads them.
+      if (swap) {
+        await regatherAll(tx, reg.relationFamily('part_of'));
+        await mentionedAll(tx);
+      }
     });
     const report: RebuildReport = { from: start?.snapshot.id ?? 'start', to: at, entries: 0, chunks: 0, snapshots: [], ms: 0, snapshot_ms: 0 };
     let since = at.facts;
