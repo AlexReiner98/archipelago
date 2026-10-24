@@ -55,7 +55,7 @@ async function sealBasis(q: Q, ws: string, events: Row[]): Promise<void> {
 }
 
 /** Whether a dump's rows are sealed (format 2) and so need the vault to be read. */
-export const sealedDump = (format: number) => format === 2;
+export const sealedDump = (format: number) => format === 2 || format === 3;
 
 /**
  * A sealed dump's rows opened with the keys a database's vault holds. A row of an item with no key (forgotten since,

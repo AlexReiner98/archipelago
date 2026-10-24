@@ -5,14 +5,13 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { backupAll, dump, merge, newestBackup, readBackup, restore } from '../src/backup.ts';
+import { backupAll, dump, merge, newestBackup, readable, readBackup, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { sessionEnd, sessionStart } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { askView } from '../src/askview.ts';
 import { Workspaces } from '../src/workspaces.ts';
-import { openTables } from '../src/backup-seal.ts';
 import { dumpVault } from '../src/vault.ts';
 import { human, agent, fresh, make } from './map.ts';
 
@@ -99,7 +98,7 @@ test('backups are written per workspace, read back, and only the newest are kept
   assert.equal(readdirSync(join(dir, 'acme', 'vault')).length, 3, 'the vault is backed up apart, and kept by age, not by count');
   const read = readBackup(join(dir, 'acme', files.sort().at(-1)!));
   assert.ok(!JSON.stringify(read).includes('Theirs'), 'what items say is sealed in the file');
-  const opened = await openTables((await workspaces.get('acme')).pelago.db, read.tables);
+  const opened = await readable((await workspaces.get('acme')).pelago.db, read);
   assert.deepEqual([read.workspace, opened.tables.entity.map((e) => e.title)], [{ id: 'acme', name: 'Acme' }, ['Theirs']]);
   assert.ok(Date.now() - newestBackup(dir)!.getTime() < 60_000, 'the newest backup\'s time is read from its name');
 

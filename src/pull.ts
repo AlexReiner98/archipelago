@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { parseBackup, parseVault, restore } from './backup.ts';
+import { parseBackup, parseVault, readable, restore } from './backup.ts';
 import { rewrap } from './vault.ts';
 import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
@@ -91,12 +91,14 @@ async function pull() {
     backup.vault = rewrap(parseVault(Buffer.from(await keys.arrayBuffer())), Buffer.from(answer.result.vault_key, 'base64url'));
     writeFileSync(saved.replace('.json.gz', '.vault.json.gz'), gzipSync(JSON.stringify(backup.vault)));
   }
-  let paused = 0;
-  for (const row of backup.tables.entity ?? []) if (row.type === 'sys.automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
   const target = pulledDir(dataDir);
   rmSync(target, { recursive: true, force: true });
   const db = await openDb(target);
-  const counts = await restore(db, backup, 'default');
+  // Its items as the file's log makes them, read before they go in, so its automations can be paused on the way.
+  const clear = await readable(db, backup);
+  let paused = 0;
+  for (const row of clear.tables.entity ?? []) if (row.type === 'sys.automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
+  const counts = await restore(db, clear, 'default');
   await db.close();
   console.log(`Pulled ${url} as of ${answer.result.taken}: ${counts.entity} items, ${counts.event} events; ${paused} automations paused. Kept as ${saved}`);
 

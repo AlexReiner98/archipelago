@@ -790,6 +790,54 @@ never sees the log ahead of them.
 - A snapshot is taken every 100,000 fact entries or daily, whichever comes
   first; it is not part of the log and can be deleted and taken again.
 
+### As built (`src/snapshot.ts`, `src/rebuild.ts`, `src/backup-log.ts`)
+
+- **Where kept.** `log_snapshot`, one row per snapshot in the workspace's
+  database (step 22), its rows gzipped JSON sealed per item as a backup's
+  rows are (`entity.title`, …), never readable by a member. Its id is
+  `s_<facts>_<pending>_<code>`; taken again at the same position, it is
+  replaced. The newest three of the running code are kept.
+- **The code's version.** `PROJECTION_VERSION` is raised by hand when what
+  the projector makes changes in meaning; beside it the snapshot keeps the
+  digest of the projector's source (`src/replay.ts`, `src/facts.ts`), so a
+  projector changed without raising it is still not built on. A snapshot
+  whose version or code is not the running one, whose anchor is not the fact
+  entry at its position, or whose rows do not hash to its hash, is passed
+  over.
+- **The hash.** SHA-256 of `"pelago-snapshot\n"`, the header canonical, a
+  newline, and the SHA-256 of the sealed rows' bytes: the rows by digest, so
+  a forget, which only destroys keys, changes nothing a snapshot hashed.
+- **Rebuild.** Into a schema of its own (`pelago_rebuild`, named first on
+  the search path: the projector is the write path's own, unchanged), from
+  the newest snapshot this code can build on, both streams merged in the
+  order the write path projects them, a chunk of entries per transaction so
+  pages are served between them. When one chunk is left, one transaction
+  takes both streams' locks, projects the rest, keeps a snapshot at the head
+  and swaps: what differs from the live tables is written, what is the same
+  is left, so the live tables keep their policies, triggers and foreign
+  keys. An item keeps its operational fields; a link the fact stream never
+  said (a claim's, in its own stream) is not removed. A snapshot is also
+  kept every 100,000 fact entries of a walk.
+- **When.** Daily, by the leader: a snapshot at the head, walked from the
+  newest one; where none fits the running code (a new projector, or none
+  yet), the projections are rebuilt from the start in the background and
+  swapped in.
+- **As of a position.** The nearest snapshot at or before it, then the
+  entries of both streams up to the moment of that fact entry, projected
+  into temporary tables that live for one transaction. The reader sees of it
+  only what their database shows them now, as the log's facts are read.
+- **Backups (format 3).** The log's rows whole, a snapshot of the live
+  projections at the head of the log (read in the backup's own transaction),
+  and the tables that are not projections; no rows of `entity`, `relation`
+  or `proposal`. The live snapshot holds what the log alone does not make:
+  rows a merge of another backup wrote, a claim's link, an item's
+  operational fields. Restored or read, the projections are that snapshot
+  with what the log says after it projected on; when it cannot be built on
+  (other code, off the chain), the log alone from its start. Keys travel
+  apart as section 5 says. A merge of a format 3 file reads the same
+  projections and merges them as rows, with the other map's history as
+  events: two hash chains are not joined (`e_z2kv3ejs`).
+
 ---
 
 ## 8. Packs in space and time

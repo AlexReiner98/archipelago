@@ -5,11 +5,22 @@
 // projects a whole stream into empty tables the same way (`rebuild`), and the two must agree row for row.
 
 import type { Entry, Fact } from './log.ts';
-import type { Registry } from './packs.ts';
 import type { Q } from './db.ts';
 import { ITEM_COLUMNS } from './facts.ts';
 
 type Props = Record<string, unknown>;
+
+/** What the projector asks of the types: whether a status is open, and a type's kind. The registry answers; so does a backup's type table. */
+export interface Kinds {
+  isOpen(type: string, status: string): boolean;
+  type(id: string): { kind?: string | null } | undefined;
+}
+
+/** The types as a backup keeps them (its type_def rows), answering what the projector asks. */
+export function kindsOf(defs: { id: string; def: { kind?: string | null; statuses?: { open?: string[] } } }[]): Kinds {
+  const by = new Map(defs.map((d) => [d.id, d.def]));
+  return { isOpen: (type, status) => by.get(type)?.statuses?.open?.includes(status) ?? true, type: (id) => by.get(id) };
+}
 
 /** Whether an id is a link's (r_…), whose `link` field is its ends; an item's id is e_…. */
 export const isLink = (id: string) => id.startsWith('r_');
@@ -48,7 +59,7 @@ function runs(facts: Fact[]): Fact[][] {
 }
 
 /** One run of facts on an item, folded into the columns and fields it sets. */
-async function item(tx: Q, reg: Registry, at: string, moved: boolean, id: string, run: Fact[]) {
+async function item(tx: Q, reg: Kinds, at: string, moved: boolean, id: string, run: Fact[]) {
   const { rows } = await tx.query<{ type: string; status: string }>(`select type, status from entity where id = $1`, [id]);
   const was = rows[0];
   if (!was && !run.some((f) => f[0] === '+' && f[2] === 'type')) return; // a type's definition, or another record: not an item
@@ -128,7 +139,7 @@ async function link(tx: Q, at: string, id: string, run: Fact[]) {
  * Facts said at a moment, projected into entity and relation in order. moved: a pack moved a type or a kind, and
  * the items' time stays. The write path calls it op by op, so each op reads what the ones before it did.
  */
-export async function projectFacts(tx: Q, reg: Registry, at: string, facts: Fact[], moved = false): Promise<void> {
+export async function projectFacts(tx: Q, reg: Kinds, at: string, facts: Fact[], moved = false): Promise<void> {
   for (const run of runs(facts)) {
     const id = run[0][1];
     // A link's id says it is one: an item may have a field called link of its own.
@@ -137,12 +148,18 @@ export async function projectFacts(tx: Q, reg: Registry, at: string, facts: Fact
   }
 }
 
+const digest = (v: unknown) => typeof v === 'object' && v !== null && '$h' in v;
+const FORGOTTEN = 'Forgotten with what it touched';
+
 /** The review queue: a held change's record makes its row, and the entry that decides it says what became of it. */
 export async function projectDecision(tx: Q, e: Entry): Promise<void> {
   if (e.stream === 'pending') {
+    // Read back from the log after a forget, what the held change said is a digest: its row is what the forget left of it.
+    const gone = digest(e.ops);
     await tx.query(
-      `insert into proposal (id, ts, actor, reason, source, ops, warnings, private_to, held_by) values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9::jsonb)`,
-      [e.id, e.at, e.actor.id, e.reason, JSON.stringify(e.source ?? null), JSON.stringify(e.ops ?? []), JSON.stringify(e.warnings ?? []), (e.private_to as string | null) ?? null, JSON.stringify(e.held_by ?? null)],
+      `insert into proposal (id, ts, actor, reason, source, ops, warnings, private_to, held_by, status, note) values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9::jsonb, $10, $11)`,
+      [e.id, e.at, e.actor.id, digest(e.reason) ? '' : e.reason, gone || e.source == null ? null : JSON.stringify(e.source), JSON.stringify(gone ? [] : (e.ops ?? [])), JSON.stringify(gone ? [] : (e.warnings ?? [])),
+        (e.private_to as string | null) ?? null, e.held_by == null ? null : JSON.stringify(e.held_by), gone ? 'superseded' : 'pending', gone ? FORGOTTEN : null],
     );
     return;
   }
@@ -154,7 +171,7 @@ export async function projectDecision(tx: Q, e: Entry): Promise<void> {
 }
 
 /** One entry of any stream, projected: its facts, then what it says of the review queue. */
-export async function projectEntry(tx: Q, reg: Registry, e: Entry): Promise<void> {
+export async function projectEntry(tx: Q, reg: Kinds, e: Entry): Promise<void> {
   if (e.stream === 'facts') await projectFacts(tx, reg, e.at, e.facts, MOVED.includes(e.action as string));
   await projectDecision(tx, e);
 }
@@ -162,18 +179,80 @@ export async function projectEntry(tx: Q, reg: Registry, e: Entry): Promise<void
 /** The tables the log projects into, and the order a rebuild empties and fills them in. */
 export const PROJECTED = ['proposal', 'relation', 'entity'];
 
+/** The order both streams are projected in: by time, a held change before what decides it in the same moment, then by position. */
+export const inOrder = (a: Entry, b: Entry) =>
+  Date.parse(a.at) - Date.parse(b.at) || (a.stream === 'pending' ? 0 : 1) - (b.stream === 'pending' ? 0 : 1) || a.pos - b.pos;
+
 /**
  * Every projection made again from the log: the tables emptied, then each entry of both streams projected in the
- * order it was appended. Run on a copy of the log (the test does) or, later, in the background with a snapshot.
+ * order it was appended. Run on a copy of the log (the test does); src/rebuild.ts does it in the background.
  */
-export async function rebuild(tx: Q, reg: Registry, all: Entry[]): Promise<void> {
+export async function rebuild(tx: Q, reg: Kinds, all: Entry[]): Promise<void> {
   for (const table of PROJECTED) await tx.query(`delete from ${table}`);
-  const order = (e: Entry) => [Date.parse(e.at), e.stream === 'pending' ? 0 : 1, e.pos];
-  const sorted = [...all].sort((a, b) => {
-    const [x, y] = [order(a), order(b)];
-    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
-  });
-  for (const e of sorted) await projectEntry(tx, reg, e);
+  for (const e of [...all].sort(inOrder)) await projectEntry(tx, reg, e);
+}
+
+/** The schema a rebuild projects into, beside the live tables, until it is swapped in (src/rebuild.ts). */
+export const SHADOW = 'pelago_rebuild';
+
+/** A projection's rows, table by table: what a snapshot keeps. */
+export type Rows = { entity: Props[]; relation: Props[]; proposal: Props[] };
+
+/** Empty copies of the projected tables in the shadow schema: their columns, defaults and indexes; no policy, trigger or foreign key. */
+export async function shadowTables(tx: Q): Promise<void> {
+  for (const t of PROJECTED) await tx.query(`drop table if exists ${SHADOW}.${t}`);
+  for (const t of PROJECTED) await tx.query(`create table ${SHADOW}.${t} (like public.${t} including defaults including indexes)`);
+}
+
+/** The rows of the projected tables the search path names first (the shadow's in a rebuild), in order of id. */
+export async function projectedRows(tx: Q): Promise<Rows> {
+  const out = {} as Rows;
+  for (const t of ['entity', 'relation', 'proposal'] as const) out[t] = (await tx.query<{ row: Record<string, unknown> }>(`select to_jsonb(t) as row from ${t} t order by id`)).rows.map((r) => r.row);
+  return out;
+}
+
+/** A snapshot's rows put back into the projected tables the search path names first, items before the links that name them. */
+export async function loadRows(tx: Q, rows: Partial<Rows>): Promise<void> {
+  for (const t of ['entity', 'relation', 'proposal'] as const) {
+    const all = rows[t] ?? [];
+    for (let i = 0; i < all.length; i += 5000) {
+      await tx.query(`insert into ${t} select * from jsonb_populate_recordset(null::${t}, $1::jsonb)`, [JSON.stringify(all.slice(i, i + 5000))]);
+    }
+  }
+}
+
+const ITEM = ['type', 'kind', 'title', 'body', 'status', 'is_open', 'owner', 'visibility', 'confidence', 'source_id', 'private_to', 'created_at', 'updated_at', 'archived_at'];
+const LINK = ['type', 'from_id', 'to_id', 'props', 'confidence', 'source_id', 'valid_from', 'valid_to'];
+const QUEUE = ['ts', 'actor', 'reason', 'source', 'ops', 'warnings', 'status', 'decided_by', 'decided_at', 'note', 'private_to', 'held_by'];
+/** What the fact stream never said (a claim's holds link, kept in its own stream) is not the rebuild's to take away. */
+const SAID = (alias: string) => `exists (select 1 from log_fact f where f.id = ${alias}.id)`;
+
+/**
+ * The shadow's rows swapped in for the live ones, in the transaction that holds both streams' locks: what differs is
+ * written, what is the same is left, so the live tables keep their policies, triggers and foreign keys, and a page
+ * never sees them half made. An item keeps the operational fields kept on it (KEPT_FIELDS, not facts). Answers how
+ * many rows of each table it wrote.
+ */
+export async function swapIn(tx: Q, kept: string[]): Promise<Record<string, number>> {
+  const n = async (sql: string, params: unknown[] = []) => (await tx.query(`${sql} returning 1`, params)).rows.length;
+  const set = (cols: string[]) => cols.map((c) => `${c} = s.${c}`).join(', ');
+  const differs = (cols: string[], a: string, b: string) => `(${cols.map((c) => `${a}.${c}`).join(', ')}) is distinct from (${cols.map((c) => `${b}.${c}`).join(', ')})`;
+  const props = `(s.props || coalesce((select jsonb_object_agg(k, v) from jsonb_each(e.props) x(k, v) where k = any($1::text[])), '{}'))`;
+  const out: Record<string, number> = {};
+  out.entity = await n(`insert into public.entity select * from ${SHADOW}.entity s where not exists (select 1 from public.entity e where e.id = s.id)`);
+  out.entity += await n(
+    `update public.entity e set ${set(ITEM)}, props = ${props} from ${SHADOW}.entity s
+     where e.id = s.id and (${differs(ITEM, 'e', 's')} or (e.props - $1::text[]) is distinct from s.props)`,
+    [kept],
+  );
+  out.relation = await n(`insert into public.relation select * from ${SHADOW}.relation s where not exists (select 1 from public.relation e where e.id = s.id)`);
+  out.relation += await n(`update public.relation e set ${set(LINK)} from ${SHADOW}.relation s where e.id = s.id and ${differs(LINK, 'e', 's')}`);
+  out.relation += await n(`delete from public.relation e where ${SAID('e')} and not exists (select 1 from ${SHADOW}.relation s where s.id = e.id)`);
+  out.entity += await n(`delete from public.entity e where ${SAID('e')} and not exists (select 1 from ${SHADOW}.entity s where s.id = e.id)`);
+  out.proposal = await n(`insert into public.proposal select * from ${SHADOW}.proposal s where not exists (select 1 from public.proposal e where e.id = s.id)`);
+  out.proposal += await n(`update public.proposal e set ${set(QUEUE)} from ${SHADOW}.proposal s where e.id = s.id and ${differs(QUEUE, 'e', 's')}`);
+  out.proposal += await n(`delete from public.proposal e where not exists (select 1 from ${SHADOW}.proposal s where s.id = e.id)`);
+  return out;
 }
 
 /**
