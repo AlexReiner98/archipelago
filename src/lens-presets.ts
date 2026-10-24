@@ -45,7 +45,7 @@ async function graph(l: Archipelago, def: ViewDef, params: Record<string, unknow
   const types = answer.lens.over === 'all' ? null : answer.lens.over;
   const ids = [...sent.keys()];
   const { rows: links } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(
-    `select id, type, from_id, to_id from relation where valid_to is null and from_id = any($1::text[]) and to_id = any($1::text[])${types ? ' and type = any($2::text[])' : ''} order by ctid`,
+    `with s(id) as (select unnest($1::text[])) select r.id, r.type, r.from_id, r.to_id from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null${types ? ' and r.type = any($2::text[])' : ''} order by r.ctid`,
     types ? [ids, types] : [ids],
   );
   let order: string[];
@@ -85,12 +85,12 @@ async function rolledTokens(l: Archipelago, nodes: string[]) {
   const parts: { from_id: string; to_id: string }[] = [];
   const seen = new Set(nodes);
   for (let level = nodes; level.length; ) {
-    const { rows: found } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null and to_id = any($1::text[])`, [level]);
+    const { rows: found } = await l.db.query<{ from_id: string; to_id: string }>(`select r.from_id, r.to_id from relation r join unnest($1::text[]) s(id) on s.id = r.to_id where r.type = 'part_of' and r.valid_to is null`, [level]);
     parts.push(...found);
     level = [...new Set(found.map((r) => r.from_id))].filter((id) => !seen.has(id) && seen.add(id));
   }
   const { rows } = await l.db.query<{ id: string; type: string; status: string; is_open: boolean; created_at: Date; estimated: unknown; used: unknown; place: unknown }>(
-    `select id, type, status, is_open, created_at, props->'tokens_estimated' as estimated, props->'tokens_used' as used, props->'order' as place from entity where archived_at is null and id = any($1::text[])`,
+    `select e.id, e.type, e.status, e.is_open, e.created_at, e.props->'tokens_estimated' as estimated, e.props->'tokens_used' as used, e.props->'order' as place from entity e join unnest($1::text[]) s(id) on s.id = e.id where e.archived_at is null`,
     [[...seen]],
   );
   const all = new Map(rows.map((e) => [e.id, e]));
@@ -153,9 +153,9 @@ async function tree(l: Archipelago, def: ViewDef, params: Record<string, unknown
     `select r.to_id as target, s.id, s.title from relation r join entity s on s.id = r.from_id
      where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null`,
   );
-  const props = new Map((await l.db.query<{ id: string; place: unknown; created_at: Date }>(`select id, props->$2 as place, created_at from entity where id = any($1::text[])`, [answer.items.map((i) => i.id), t.order])).rows.map((r) => [r.id, r]));
+  const props = new Map((await l.db.query<{ id: string; place: unknown; created_at: Date }>(`select e.id, e.props->$2 as place, e.created_at from entity e join unnest($1::text[]) s(id) on s.id = e.id`, [answer.items.map((i) => i.id), t.order])).rows.map((r) => [r.id, r]));
   // What is under each thing comes as the map keeps its links; branches in their order, then the oldest first.
-  const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null and to_id = any($1::text[]) order by ctid`, [answer.items.map((i) => i.id)]);
+  const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select r.from_id, r.to_id from relation r join unnest($1::text[]) s(id) on s.id = r.to_id where r.type = 'part_of' and r.valid_to is null order by r.ctid`, [answer.items.map((i) => i.id)]);
   const kept = new Map(parts.map((r, i) => [`${r.from_id} ${r.to_id}`, i]));
   for (const [up, list] of kids) list.sort((a, b) => (kept.get(`${a.id} ${up}`) ?? Infinity) - (kept.get(`${b.id} ${up}`) ?? Infinity));
   const placeOf = (id: string) => (typeof props.get(id)?.place === 'number' ? (props.get(id)!.place as number) : Infinity);
@@ -202,7 +202,7 @@ async function tree(l: Archipelago, def: ViewDef, params: Record<string, unknown
     unplaced: built.work,
     /** What waits on what, within this tree: "from" cannot finish until "to" has. */
     // The links themselves: a lens moves a link whose end it did not send up to what holds it, which here would say what does not wait.
-    depends: (await l.db.query<{ from: string; to: string }>(`select from_id as "from", to_id as "to" from relation where type = 'depends_on' and valid_to is null and from_id = any($1::text[]) and to_id = any($1::text[]) order by ctid`, [[...placed]])).rows,
+    depends: (await l.db.query<{ from: string; to: string }>(`with s(id) as (select unnest($1::text[])) select r.from_id as "from", r.to_id as "to" from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.type = 'depends_on' and r.valid_to is null order by r.ctid`, [[...placed]])).rows,
   };
 }
 

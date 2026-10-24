@@ -64,6 +64,8 @@ const WORKS_ON = 'sys.works_on';
 
 const COLUMNS = (props: string) => `id, type, kind, title, status, is_open, owner, ${props}, created_at, updated_at`;
 const LINKS = `id, type, from_id, to_id, props ->> 'says' as says, props ->> 'state' as state, props ->> 'for' as for`;
+/** The same, of links read among some items (as r). */
+const LINKS_AMONG = `r.id, r.type, r.from_id, r.to_id, r.props ->> 'says' as says, r.props ->> 'state' as state, r.props ->> 'for' as for`;
 /** What a stage that is no picture reads of a link: what it joins, and what a waits_on link says it waits for. */
 const BARE_LINKS = (waits: string | null) => `type, from_id, to_id${waits ? `, case when type = any(${waits}) then props ->> 'for' end as for` : ''}`;
 /** Of an item's fields, only those named, where the reader may read them all. */
@@ -112,11 +114,11 @@ export async function scanAll(l: Archipelago, known?: { from?: string; fold: str
  * walk costs what it finds, whether or not the database has gathered statistics on the map (a fresh copy has none).
  */
 async function regionOf(l: Archipelago, around: Around): Promise<string[]> {
-  const typed = (types: string[] | null) => (types ? ' and type = any($2::text[])' : '');
+  const typed = (types: string[] | null) => (types ? ' and r.type = any($2::text[])' : '');
   const step = async (ids: string[], from: 'from_id' | 'to_id', types: string[] | null, ended = false) => {
     if (!ids.length || types?.length === 0) return [];
     const to = from === 'from_id' ? 'to_id' : 'from_id';
-    const { rows } = await l.db.query<{ id: string }>(`select ${to} as id from relation where ${from} = any($1::text[])${ended ? '' : ' and valid_to is null'}${typed(types)}`, types ? [ids, types] : [ids]);
+    const { rows } = await l.db.query<{ id: string }>(`select r.${to} as id from relation r join unnest($1::text[]) s(id) on s.id = r.${from} where true${ended ? '' : ' and r.valid_to is null'}${typed(types)}`, types ? [ids, types] : [ids]);
     return rows.map((r) => r.id);
   };
   // From some items, step by step along links one way, as far as they go: all that was reached.
@@ -141,7 +143,7 @@ async function regionOf(l: Archipelago, around: Around): Promise<string[]> {
   if (around.narrow) return [...new Set([...core, ...out])];
   const tied = [...out, ...(await step(ids, 'to_id', around.over)), ...(await step([...down], 'to_id', [WORKS_ON], true))].filter((id) => !core.has(id));
   const region = new Set([...core, ...(await walk([...new Set(tied)], 'to_id', around.by)), ...(around.above ? await walk([...new Set(tied)], 'from_id', around.by) : [])]);
-  const { rows: owners } = await l.db.query<{ owner: string }>(`select distinct owner from entity where id = any($1::text[]) and owner is not null`, [[...region]]);
+  const { rows: owners } = await l.db.query<{ owner: string }>(`select distinct e.owner from entity e join unnest($1::text[]) s(id) on s.id = e.id where e.owner is not null`, [[...region]]);
   for (const o of owners) region.add(o.owner);
   return [...region];
 }
@@ -151,7 +153,8 @@ export async function scanAround(l: Archipelago, around: Around) {
   const region = await regionOf(l, around);
   // The note of where it starts, too: a brief reads it.
   const { rows: entities } = await l.db.query<Row>(`select ${COLUMNS(l.props)}, case when id = any($2::text[]) then body end as body from entity where archived_at is null and id = any($1::text[])`, [region, around.starts]);
-  const { rows: relations } = await l.db.query<Link>(`select ${LINKS} from relation where valid_to is null and from_id = any($1::text[]) and to_id = any($1::text[]) order by ${around.made ? 'valid_from, ctid' : 'id'}`, [region]);
+  // Joined to the ids, not tested against a list of them: a planner with statistics weighs every id in a list.
+  const { rows: relations } = await l.db.query<Link>(`with s(id) as (select unnest($1::text[])) select ${LINKS_AMONG} from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null order by ${around.made ? 'r.valid_from, r.ctid' : 'r.id'}`, [region]);
   return { entities, relations, unread: { closed: 0, system: 0 } };
 }
 
