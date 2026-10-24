@@ -98,8 +98,13 @@ export const SCOPE = `with recursive scope(id) as (
        select r.from_id from relation r join scope s on r.to_id = s.id where r.type in ('part_of', 'about') and r.valid_to is null
      )`;
 
-/** The ids of everything that is a place's or an item's (SCOPE). */
-export async function scopeOf(l: Archipelago, id: string): Promise<Set<string>> {
-  const { rows } = await l.db.query<{ id: string }>(`${SCOPE} select id from scope`, [id, livesIn(l)]);
+/** The ids of everything that is a place's or an item's (SCOPE); open: only what is open and not the system's, and the item; among: only which of these. */
+export async function scopeOf(l: Archipelago, id: string, open = false, among?: string[]): Promise<Set<string>> {
+  const { rows } = await l.db.query<{ id: string }>(
+    open
+      ? `${SCOPE} select s.id from scope s join entity e on e.id = s.id where s.id = $1 or (e.is_open and e.archived_at is null and (e.kind is null or e.kind <> 'system'))`
+      : `${SCOPE} select id from scope${among ? ' where id = any($3::text[])' : ''}`,
+    [id, livesIn(l), ...(among ? [among] : [])],
+  );
   return new Set(rows.map((r) => r.id));
 }

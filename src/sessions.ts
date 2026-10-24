@@ -353,7 +353,7 @@ type Item = { id: string; type: string; title: string; status: string };
 async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
   const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = any($2::text[]) and from_id = $1 and valid_to is null`, [run.id, livesIn(l)]);
   if (!repos.length) return [];
-  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id))], [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
+  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id, true))], [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
   const graph = await blockGraph(l, work.map((i) => i.id));
   const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending' -- index proposal_status`);
   const proposed = new Set(held.flatMap((p) => p.ops.flatMap((o) => ('id' in o && o.id ? [o.id] : []))));

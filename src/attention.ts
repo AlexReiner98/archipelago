@@ -71,7 +71,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const owner = (await l.setting<string>('me')) || null;
   const me = input.person === undefined ? null : input.person === 'me' ? l.viewer || owner : input.person;
   if (input.person !== undefined && !me) throw new Error('No person: give an id, or set the workspace owner (pelago init "Your Name").');
-  const scope = input.within ? await scopeOf(l, input.within) : null;
+  const scope = input.within ? await scopeOf(l, input.within, true) : null;
   const staleDays = input.stale_days ?? STALE_DAYS;
 
   const rows: Row[] = read
@@ -150,10 +150,12 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
 
   // What agents settled and the owner has not confirmed: the owner's to look at, closed though it is.
   const confirm = wanted.has('to_confirm') && (me === null || me === owner) ? await toConfirm(l, { limit: 40 }) : undefined;
+  // What was settled is closed: whether it is within is asked of the whole scope, for those few.
+  const settledWithin = confirm && input.within ? await scopeOf(l, input.within, false, confirm.questions.map((q) => q.id)) : null;
   for (const q of confirm?.questions ?? []) {
     const row = { id: q.id, type: '', kind: null, title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
     const { rows: [e] } = await l.db.query<Row>(`select id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);
-    if (!scope || scope.has(q.id)) add(e ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
+    if (!settledWithin || settledWithin.has(q.id)) add(e ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
   }
 
   const rank = (reasons: Record<string, unknown>[]) => Math.min(...reasons.map((r) => REASONS.indexOf(r.why as Reason)));
