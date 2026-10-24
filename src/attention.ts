@@ -5,7 +5,7 @@
 // under way (a session on it), what is ready to take up, and what an agent settled that the owner has not confirmed.
 
 import { pastBounds } from './bounds.ts';
-import { blockGraph, heldResources, type BlockGraph } from './blocking.ts';
+import { BlockGraph, blockGraph, heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
 import type { Archipelago } from './pelago.ts';
 import { SYSTEM } from './head.ts';
@@ -100,7 +100,8 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   for (const w of waits) if (me === null || w.to_id === me) add(live.get(w.from_id), 'waits_on', { who: who.get(w.to_id) ?? w.to_id, ...(w.for && { for: w.for }) });
 
   // Blocked, and what holds others up: the roots every chain of blocking ends at.
-  const graph = read?.graph ?? (await blockGraph(l, [...live.keys()]));
+  const blocking = ['blocked', 'holding_up', 'ready'].some((r) => wanted.has(r as Reason));
+  const graph = read?.graph ?? (blocking ? await blockGraph(l, [...live.keys()]) : new BlockGraph([]));
   const blockedIds = [...graph.direct.keys()].filter((id) => live.has(id));
   const rootsOf = new Map(blockedIds.map((id) => [id, graph.roots(id)]));
   const rootTitles = await titles([...new Set([...rootsOf.values()].flat())]);
@@ -109,7 +110,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   // Only work or a question holds others up: a person who is waited on is said so by waits_on.
   for (const [id, n] of holding) if (live.get(id) && theirs(live.get(id)!) && ['work', 'question'].includes(live.get(id)!.kind ?? '')) add(live.get(id), 'holding_up', { count: n });
   // A resource held by others says who holds it (as the asker may see them: a private session is not named).
-  const holders = await heldResources(l);
+  const holders = blockedIds.length ? await heldResources(l) : [];
   for (const id of blockedIds) {
     if (!theirs(live.get(id)!)) continue;
     const held = graph.direct.get(id)!.filter((e) => e.why === 'resource_held').flatMap((e) => holders.filter((h) => h.resource === e.y).map((h) => h.held_by_title));
@@ -188,12 +189,19 @@ const EVERYONE = ['to_confirm'];
  */
 async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<Reason>): Promise<Row[]> {
   const cols = `id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at`;
-  if (scope) return (await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and is_open and archived_at is null`, [[...scope]])).rows;
+  const notSystem = `(kind is null or kind <> '${SYSTEM}')`;
+  if (scope) return (await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and is_open and archived_at is null and ${notSystem}`, [[...scope]])).rows;
   if (me !== null) {
+    // What nobody owns is the owner's: of it, only what a reason asked for can be (work and questions; for what is
+    // due, unsettled or waits on them alone, only what has a bound or settles), never every open item.
+    const reg = l.registry;
+    const kept = [...reg.having('bound'), ...reg.having('settles')];
+    const broad = ['blocked', 'holding_up', 'stale', 'ready', 'under_way'].some((r) => wanted.has(r as Reason));
+    const unowned = broad ? `(kind in ('work', 'question') or type = any($4::text[]))` : `type = any($4::text[])`;
     const { rows } = await l.db.query<Row>(
-      `select ${cols} from entity where is_open and archived_at is null and (owner = $1 or ($2 and owner is null))
+      `select ${cols} from entity where is_open and archived_at is null and ${notSystem} and (owner = $1 or ($2 and owner is null and ${unowned}))
        union select ${cols} from entity where is_open and archived_at is null and id in (select from_id from relation where to_id = $1 and type = any($3::text[]) and valid_to is null)`,
-      [me, isOwner, l.registry.relationFamily('waits_on')],
+      [me, isOwner, reg.relationFamily('waits_on'), kept],
     );
     if (!wanted.has('holding_up')) return rows;
     // What theirs holds up: whatever waits on it, step by step back along the links that block.
