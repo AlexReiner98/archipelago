@@ -32,15 +32,15 @@ export const CONNECTION_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       const packs = serverPacks;
-      const offered = (packs?.packs ?? []).filter((p) => p.file.connect);
+      const offered = (packs?.packs ?? []).filter((p) => p.file.reach.server.connect);
       const control = packs && (await packs.control());
       const list = async () =>
         Promise.all(
           offered.map(async ({ file }) => {
             const connected = (await packs!.connectionOf(file.id, l.workspace)) ?? null;
-            const status = ((await packs!.call(file.id, 'entry', file.connect!.status, { workspace: l.workspace, connection: connected?.id ?? null }).catch((err) => ({ ready: false, why: (err as Error).message }))) ?? {}) as { ready?: boolean; name?: string; why?: string };
+            const status = ((await packs!.call(file.id, 'entry', file.reach.server.connect!.status, { workspace: l.workspace, connection: connected?.id ?? null }).catch((err) => ({ ready: false, why: (err as Error).message }))) ?? {}) as { ready?: boolean; name?: string; why?: string };
             const ready = Boolean(status.ready);
-            return { pack: file.id, title: file.title, ready, name: status.name ?? null, can_setup: !ready && Boolean(file.connect!.setup) && Boolean(actor.admin) && l.workspace === 'default', connected: connected && { id: connected.id, account: connected.account } };
+            return { pack: file.id, title: file.title, ready, name: status.name ?? null, can_setup: !ready && Boolean(file.reach.server.connect!.setup) && Boolean(actor.admin) && l.workspace === 'default', connected: connected && { id: connected.id, account: connected.account } };
           }),
         );
       if (!input.start && !input.setup && !input.end) return { packs: await list() };
@@ -53,9 +53,9 @@ export const CONNECTION_TOOLS: Record<string, Tool> = {
         return { packs: await list() };
       }
       const purpose = input.setup ? 'setup' : 'connect';
-      if (purpose === 'setup' && (!pack.connect!.setup || l.workspace !== 'default')) throw new Error(`${pack.title} is readied for the whole server from the default workspace, by its admin.`);
+      if (purpose === 'setup' && (!pack.reach.server.connect!.setup || l.workspace !== 'default')) throw new Error(`${pack.title} is readied for the whole server from the default workspace, by its admin.`);
       const state = await begin(control, pack.id, purpose, l.workspace);
-      const answer = (await packs.call(pack.id, 'entry', pack.connect!.start, { purpose, state, workspace: l.workspace })) as { url?: string } | null;
+      const answer = (await packs.call(pack.id, 'entry', pack.reach.server.connect!.start, { purpose, state, workspace: l.workspace })) as { url?: string } | null;
       if (!answer?.url) throw new Error(`${pack.title} gave nowhere to go.`);
       return { packs: await list(), url: answer.url };
     },

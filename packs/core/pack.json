@@ -115,10 +115,7 @@
       "title": "Person",
       "description": "A human being.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
-      "fields": {
-        "email": { "type": "string" },
-        "role": { "type": "string", "description": "What they do, in a few words." }
-      }
+      "fields": { "email": { "type": "string" }, "role": { "type": "string", "description": "What they do, in a few words." } }
     },
     {
       "id": "company",
@@ -142,10 +139,7 @@
       "title": "Goal",
       "description": "An outcome that projects and tasks serve.",
       "statuses": { "open": ["active", "paused"], "closed": ["achieved", "dropped"] },
-      "fields": {
-        "target_date": { "type": "date" },
-        "measure": { "type": "string", "description": "How you will know it is achieved." }
-      }
+      "fields": { "target_date": { "type": "date" }, "measure": { "type": "string", "description": "How you will know it is achieved." } }
     },
     {
       "id": "area",
@@ -161,12 +155,7 @@
       "title": "Event",
       "description": "Something that happens at a time: a deadline, a launch, an appointment.",
       "statuses": { "open": ["upcoming", "in_progress"], "closed": ["happened", "cancelled"] },
-      "fields": {
-        "at": { "type": "datetime" },
-        "ends": { "type": "datetime" },
-        "location": { "type": "string" },
-        "recurrence": { "type": "string" }
-      }
+      "fields": { "at": { "type": "datetime" }, "ends": { "type": "datetime" }, "location": { "type": "string" }, "recurrence": { "type": "string" } }
     },
     {
       "id": "resource",
@@ -176,11 +165,7 @@
       "description": "Something limited or exclusive that work needs: a machine, a licence, a budget, a live app.",
       "statuses": { "open": ["available", "unavailable"], "closed": ["retired"] },
       "fields": {
-        "exclusive": {
-          "type": "boolean",
-          "default": true,
-          "description": "If true, only one holder at a time; everything else that needs it is blocked."
-        }
+        "exclusive": { "type": "boolean", "default": true, "description": "If true, only one holder at a time; everything else that needs it is blocked." }
       }
     },
     {
@@ -234,7 +219,7 @@
         "numbers": { "type": "json", "description": "Numbers a drawing is drawn by that are not lengths, each by name: how faint what is not lit is (dim), how many make a checklist (flow_fold_at), how far a step of the wheel zooms. Read as --ln-<name> too." },
         "hues": { "type": "json", "description": "The colours things are told apart by, in order, as hex colours: a grid's values with no colour of their own in palette, and a calendar's streams." },
         "page": { "type": "json", "description": "What an item's page shows, and how: picture (true to draw what it holds and is tied to above its note), notes (folded: a note opens on its first paragraph with each section a click away; whole: read through, every section open, as a document is), ties and history (open or closed as the page opens), head (invoice: a document read whole opens on its number, dates and what is due, from the fields its type shows). A preset on a kind or type says it for every such item." },
-        "lengths": {"ago": 56, "around_graph": 520, "around_item": 260, "around_self": 220, "bar": 90, "border_1": 1, "border_2": 1.5, "border_3": 2, "border_4": 3, "box_1": 4, "box_2": 6, "box_3": 8, "box_4": 10, "box_5": 16, "box_6": 18, "box_7": 28, "box_8": 32, "box_9": 40, "box_10": 52, "cal_body_least": 420, "cal_day_least": 64, "cal_gutter": 44, "cal_head": 30, "cal_least": 520, "cal_room": 170, "card_least": 340, "card_most": 620, "chip_most": 180, "code_least": "3ch", "code_most": "16ch", "column_most": 980, "count_col": 78, "date_field": 140, "dialog": 460, "event_what": 96, "event_when": 84, "event_who": 110, "field_grow": 180, "field_least": 120, "frame_most": 820, "frame_room": 190, "graph_room": 215, "hatch": 5, "hours_field": 74, "input_least": 180, "input_wide": 220, "label_col": 150, "measure": "72ch", "measure_wide": "80ch", "menu_item_most": 420, "menu_least": 230, "nav": 180, "page_most": 1100, "progress_col": 132, "public_most": 860, "radius_1": 3, "radius_2": 6, "radius_3": 8, "radius_4": 10, "radius_pill": 999, "reader_bottom": 64, "reader_h1": "2rem", "reader_h2": "1.35rem", "reader_h3": "1.08rem", "reader_h4": "1rem", "reader_measure": "44rem", "reader_side": 20, "reader_small": "0.9rem", "reader_text": 17, "reader_tiny": "0.82rem", "reader_title": "2.2rem", "reader_top": 48, "reader_wide": 1200, "reader_window": "100vw", "reader_total": "1.1em", "rhythm_1": "0.2em", "rhythm_2": "0.4em", "rhythm_3": "0.6em", "rhythm_4": "0.8em", "rhythm_5": "1em", "rhythm_6": "1.2em", "rhythm_7": "1.4em", "rhythm_8": "1.6em", "rhythm_9": "2.2em", "rhythm_10": "3em", "row_grow": 220, "row_select": 170, "scroll_most": 620, "select_least": 180, "side_least": 260, "space_1": 1, "space_2": 2, "space_3": 4, "space_4": 6, "space_5": 8, "space_6": 10, "space_7": 12, "space_8": 14, "space_9": 16, "space_10": 18, "space_11": 24, "space_12": 30, "space_13": 40, "space_14": 60, "stage_floor": 380, "switch_most": "22ch", "text_1": 11, "text_2": 12, "text_3": 12.5, "text_4": 13, "text_5": 14, "text_6": 15, "text_7": 16, "text_8": 20, "text_9": 24, "thumb": 96, "tile": 280, "tile_proof": 170, "tile_small": 130, "tip_most": 250, "track_1": "0.02em", "track_2": "0.04em", "track_3": "0.12em", "who": 64, "wide": 720},
+        "lengths": { "ago": 56, "around_graph": 520, "around_item": 260, "around_self": 220, "bar": 90, "border_1": 1, "border_2": 1.5, "border_3": 2, "border_4": 3, "box_1": 4, "box_2": 6, "box_3": 8, "box_4": 10, "box_5": 16, "box_6": 18, "box_7": 28, "box_8": 32, "box_9": 40, "box_10": 52, "cal_body_least": 420, "cal_day_least": 64, "cal_gutter": 44, "cal_head": 30, "cal_least": 520, "cal_room": 170, "card_least": 340, "card_most": 620, "chip_most": 180, "code_least": "3ch", "code_most": "16ch", "column_most": 980, "count_col": 78, "date_field": 140, "dialog": 460, "event_what": 96, "event_when": 84, "event_who": 110, "field_grow": 180, "field_least": 120, "frame_most": 820, "frame_room": 190, "graph_room": 215, "hatch": 5, "hours_field": 74, "input_least": 180, "input_wide": 220, "label_col": 150, "measure": "72ch", "measure_wide": "80ch", "menu_item_most": 420, "menu_least": 230, "nav": 180, "page_most": 1100, "progress_col": 132, "public_most": 860, "radius_1": 3, "radius_2": 6, "radius_3": 8, "radius_4": 10, "radius_pill": 999, "reader_bottom": 64, "reader_h1": "2rem", "reader_h2": "1.35rem", "reader_h3": "1.08rem", "reader_h4": "1rem", "reader_measure": "44rem", "reader_side": 20, "reader_small": "0.9rem", "reader_text": 17, "reader_tiny": "0.82rem", "reader_title": "2.2rem", "reader_top": 48, "reader_wide": 1200, "reader_window": "100vw", "reader_total": "1.1em", "rhythm_1": "0.2em", "rhythm_2": "0.4em", "rhythm_3": "0.6em", "rhythm_4": "0.8em", "rhythm_5": "1em", "rhythm_6": "1.2em", "rhythm_7": "1.4em", "rhythm_8": "1.6em", "rhythm_9": "2.2em", "rhythm_10": "3em", "row_grow": 220, "row_select": 170, "scroll_most": 620, "select_least": 180, "side_least": 260, "space_1": 1, "space_2": 2, "space_3": 4, "space_4": 6, "space_5": 8, "space_6": 10, "space_7": 12, "space_8": 14, "space_9": 16, "space_10": 18, "space_11": 24, "space_12": 30, "space_13": 40, "space_14": 60, "stage_floor": 380, "switch_most": "22ch", "text_1": 11, "text_2": 12, "text_3": 12.5, "text_4": 13, "text_5": 14, "text_6": 15, "text_7": 16, "text_8": 20, "text_9": 24, "thumb": 96, "tile": 280, "tile_proof": 170, "tile_small": 130, "tip_most": 250, "track_1": "0.02em", "track_2": "0.04em", "track_3": "0.12em", "who": 64, "wide": 720 },
         "theme": { "type": "json", "description": "The page's colours, as light and dark, each a set of hex colours by name: bg, panel, line, text, muted, accent, ok, warn, bad, closed (each with a _soft), the kinds' g_*, edge, on_mark (words on a coloured mark), figure (behind a picture), and the reader's and the public page's (reader_*, public_*). Read as --<name>, an underscore a dash. The house style names every one." },
         "font": { "type": "string", "description": "The typeface names are written in, as CSS font-family." },
         "dots": { "type": "json", "description": "What a part's dot says, where a drawing reads it (architecture): field (the shown field it is coloured by, e.g. layer, in place of its health), colours (for each value, the name of one of the page's colours, e.g. {\"kernel\": \"g_system\"}) names (what each value is called in the key) and order (the values in the order the key gives them). Under the name of a look a story is drawn in (islands), the same again for that look: a field of status colours by the status, and the last value in order is done." },
@@ -260,17 +245,414 @@
       }
     }
   ],
-  "styles": [
-    { "id": "core.house", "title": "House style", "props": {"shape": "list", "lit": "all", "open": 1, "show": ["status", "waits", "sessions"], "text": 13, "radius": 8, "gap": 8, "column": 270, "font": "system-ui, -apple-system, 'Segoe UI', sans-serif", "hues": ["#2e7d4f", "#2f5fb3", "#a86a12", "#6f43b0", "#59636e", "#0f7c86", "#b23a48", "#7a6a1c"], "sizes": {"rule": 1, "dot": 8, "dot_ring": 1.5, "small_text": 12, "tiny_text": 11, "legend_text": 12, "pill_pad_y": 1, "pill_pad_x": 7, "here_ring": 2, "swatch": 12, "swatch_radius": 3, "stage_least": 320, "stage": "68vh", "stage_most": 760, "legend_inset": 10, "legend_gap": 3, "legend_pad_y": 7, "legend_pad_x": 10, "legend_mark_gap": 8, "list_pad_top": 6, "list_pad_bottom": 10, "list_column_gap": 12, "list_row": 30, "list_group_row": 34, "list_side": 14, "list_indent": 22, "list_name_gap": 8, "list_dot_before": 6, "list_dot_after": 4, "list_fold": 18, "list_lane_indent": 26, "list_count_gap": 4, "list_count": 18, "list_column_most": "18ch", "list_status": "11ch", "list_waits": "14ch", "list_sessions": 10, "list_narrow_at": 640, "grid_pad": 10, "grid_gap": 6, "grid_head_pad_y": 7, "grid_head_pad_x": 10, "grid_row_pad_y": 8, "grid_card_gap": 2, "grid_card_pad_left": 11, "grid_card_pad_right": 9, "grid_stripe": 4, "grid_edge_mix": "55%", "grid_tint": "13%", "grid_tint_hover": "22%", "grid_swatch_mix": "30%", "grid_detail_text": "0.92em", "grid_mark_gap": 4, "grid_mark_text": "0.85em", "grid_legend_gap": 14, "grid_legend_pad_y": 8, "grid_legend_pad_x": 12, "grid_row_head": 120, "grid_lane": 170, "flow_layer_gap": 84, "flow_node_gap": 16, "flow_margin": 24, "flow_max_text": 140, "flow_track": 8, "flow_slot": 9, "flow_lead_out": 12, "flow_lead_in": 22, "flow_list_head": 28, "flow_list_row": 20, "flow_list_pad": 6, "flow_list_text_more": 40, "flow_text": 13, "flow_stub_text": 12, "flow_row_text": 12, "flow_diamond_pad": 96, "flow_diamond_height": 60, "flow_end_pad": 30, "flow_end_height": 30, "flow_box_pad": 42, "flow_box_height": 34, "flow_sheet_height": 40, "flow_corner": 6, "flow_head_half": 4.5, "flow_head_length": 9, "flow_break_half": 3, "flow_break_reach": 8, "flow_break_track": 6, "flow_row_inset": 2, "flow_row_dot_x": 15, "flow_dot_small": 4, "flow_row_text_x": 26, "flow_row_text_after": 10, "flow_list_head_x": 12, "flow_list_rule_above": 2, "flow_stub_text_x": 15, "flow_text_x": 27, "flow_text_after": 11, "flow_dot_gap": 12, "flow_dot": 4.5, "flow_sheet_lift": 2, "flow_badge_in": 4, "flow_badge": 8, "flow_says_most": 200, "flow_says_text": 11.5, "flow_says_pad": 7, "flow_says_aside": 6, "flow_says_height": 20, "flow_legend_from": 720, "flow_legend_room": 20, "flow_stroke": 1.25, "flow_stroke_lit": 2, "flow_dot_ring": 1.5, "flow_badge_text": 10.5, "flow_dash_scenario": "5 4", "flow_dash_choice": "6 5", "time_head_text": 11, "time_hour_text": 10, "time_lane_dash": "2 3", "time_letter": 6.5, "time_least_block": 6, "time_day_start": 8, "time_day_end": 18, "time_gutter": 38, "time_hour": 34, "time_lane_named_from": 28, "time_chip": 18, "time_head_named": 36, "time_head": 22, "time_key_most": "28ch", "time_key_stripe": 10, "time_key_pad": 6, "time_key_gap": "4px 14px", "time_bar_label_most": 220, "time_bar_row": 24, "time_bar_day_every": 70, "arch_layer_gap": 48, "arch_node_gap": 18, "arch_col_gap": 36, "arch_margin": 24, "arch_max_text": 150, "arch_track": 8, "arch_slot": 10, "arch_lead_out": 12, "arch_lead_in": 20, "arch_head": 26, "arch_pad": 12, "arch_text": 13, "arch_place_text": 12, "arch_place_name_pad": 20, "arch_diamond_pad": 90, "arch_diamond_height": 56, "arch_store_pad": 44, "arch_store_height": 44, "arch_box_pad": 44, "arch_box_height": 34, "arch_says_text": 10.5, "arch_corner": 6, "arch_lid": 6, "arch_place_corner": 10, "arch_place_name_room": 34, "arch_place_name_inset": 4, "arch_place_name_height": 18, "arch_place_dot_x": 14, "arch_dot_small": 4, "arch_place_text_x": 24, "arch_says_most": 120, "arch_says_pad": 6, "arch_says_height": 16, "arch_text_x": 28, "arch_text_after": 12, "arch_dot_gap": 12, "arch_dot": 4.5, "arch_badge_in": 4, "arch_badge": 8, "arch_stroke_down": 1.75, "arch_stroke_warn": 1.5, "arch_dash_dot": "2 2", "arch_dash_place": "6 4", "arch_hit": 9, "arch_says_stroke": 0.75, "arch_story_least": 760, "arch_island_pad": 14, "arch_island_rise": 5, "arch_island_gap": 60, "arch_island_tint": "24%", "arch_deep_high": 62, "arch_deep_floor": 28, "arch_deep_route": 1.4, "arch_deep_name_lift": 14, "arch_deep_boat": 15, "arch_board_unit": 150, "arch_board_bar": 24, "arch_board_gap": 14, "arch_board_pad": 10, "arch_board_head": 34, "arch_board_card": 150, "arch_board_card_high": 26, "arch_deep_berth": 16}, "numbers": {"dim": 0.32, "zoom_step": 1.25, "flow_fold_at": 4, "time_bar_label_share": 0.3, "arch_place_fill": 0.55, "arch_planned_wire": 0.8, "arch_standby": 0.4, "arch_story_aspect": 1.6, "arch_story_gone_hold": 900, "arch_story_gone_fade": 700, "arch_story_move": 1300, "arch_story_new_for": 3200, "arch_story_draw": 900, "arch_story_read_base": 700, "arch_story_read_per_char": 26, "arch_story_beat_least": 3200, "arch_story_beat_after": 1800, "arch_story_typing": 900, "arch_story_chapter_pause": 500, "arch_story_jump": 1000, "arch_story_start": 400, "arch_story_lines_kept": 12, "arch_story_quick": 650, "arch_story_quick_move": 450, "arch_island_bow": 0.16, "arch_island_wobble": 0.12, "arch_island_arc": 1.3, "arch_island_squash": 0.75, "arch_deep_fov": 24, "arch_deep_angle": 48, "arch_deep_near": 0.94, "arch_deep_sail": 1700, "arch_deep_fly_pitch": 18, "arch_deep_fly_up": 2.2, "arch_deep_fly": 5200, "arch_deep_card_in": 1400, "arch_deep_card_after": 2200, "arch_deep_fold": 1300, "arch_deep_rise": 2600, "arch_story_deep_cover": 650, "note_title_most": 90, "note_opening_most": 320, "note_opening_cut": 240, "note_sentence_least": 80, "note_sentence_most": 300, "fact_most": 32, "field_fold_at": 140}, "page": {"picture": true, "notes": "folded", "ties": "open", "history": "closed"}, "dots": {"islands": {"field": "status", "names": {"todo": "To do", "doing": "Doing", "done": "Done"}, "order": ["todo", "doing", "done"], "colours": {"todo": "closed", "doing": "warn", "done": "ok"}}}, "lengths": {"ago": 56, "around_graph": 520, "around_item": 260, "around_self": 220, "bar": 90, "border_1": 1, "border_2": 1.5, "border_3": 2, "border_4": 3, "box_1": 4, "box_2": 6, "box_3": 8, "box_4": 10, "box_5": 16, "box_6": 18, "box_7": 28, "box_8": 32, "box_9": 40, "box_10": 52, "cal_body_least": 420, "cal_day_least": 64, "cal_gutter": 44, "cal_head": 30, "cal_least": 520, "cal_room": 170, "card_least": 340, "chip_most": 180, "column_most": 980, "count_col": 78, "date_field": 140, "dialog": 460, "event_what": 96, "event_when": 84, "event_who": 110, "field_grow": 180, "field_least": 120, "frame_most": 820, "frame_room": 190, "graph_room": 215, "hatch": 5, "hours_field": 74, "label_col": 150, "measure": "72ch", "measure_wide": "80ch", "menu_item_most": 420, "menu_least": 230, "nav": 180, "page_most": 1100, "progress_col": 132, "public_most": 860, "radius_1": 3, "radius_2": 6, "radius_3": 8, "radius_4": 10, "radius_pill": 999, "reader_bottom": 64, "reader_h1": "2rem", "reader_h2": "1.35rem", "reader_h3": "1.08rem", "reader_h4": "1rem", "reader_measure": "44rem", "reader_side": 20, "reader_small": "0.9rem", "reader_text": 17, "reader_tiny": "0.82rem", "reader_title": "2.2rem", "reader_top": 48, "reader_wide": 1200, "reader_window": "100vw", "reader_total": "1.1em", "rhythm_1": "0.2em", "rhythm_2": "0.4em", "rhythm_3": "0.6em", "rhythm_4": "0.8em", "rhythm_5": "1em", "rhythm_6": "1.2em", "rhythm_7": "1.4em", "rhythm_8": "1.6em", "rhythm_9": "2.2em", "rhythm_10": "3em", "row_grow": 220, "row_select": 170, "scroll_most": 620, "select_least": 180, "side_least": 260, "space_1": 1, "space_2": 2, "space_3": 4, "space_4": 6, "space_5": 8, "space_6": 10, "space_7": 12, "space_8": 14, "space_9": 16, "space_10": 18, "space_11": 24, "space_12": 30, "space_13": 40, "space_14": 60, "stage_floor": 380, "switch_most": "22ch", "text_1": 11, "text_2": 12, "text_3": 12.5, "text_4": 13, "text_5": 14, "text_6": 15, "text_7": 16, "text_8": 20, "text_9": 24, "tile": 280, "tile_proof": 170, "tile_small": 130, "tip_most": 250, "track_1": "0.02em", "track_2": "0.04em", "track_3": "0.12em", "who": 64, "wide": 720}, "theme": {"light": {"bg": "#f6f5f2", "panel": "#ffffff", "line": "#e3e0d9", "text": "#1f1e1b", "muted": "#6d6a62", "accent": "#2f5fd0", "accent_soft": "#e6edfb", "ok": "#2c7a4b", "ok_soft": "#e3f3e9", "warn": "#a35a00", "warn_soft": "#fbefd9", "bad": "#b3312b", "bad_soft": "#fbe6e4", "closed": "#8a877f", "closed_soft": "#eceae5", "g_actor": "#2a78d6", "g_aim": "#9a6a2f", "g_work": "#eb6834", "g_record": "#1baf7a", "g_question": "#eda100", "g_occurrence": "#e87ba4", "g_place": "#008300", "g_system": "#4a3aa7", "g_blocked": "#d03b3b", "edge": "#b9b5aa", "edge_strong": "#5f5c55", "reader_ink": "#1d1f23", "reader_muted": "#6b7079", "reader_line": "#e3e5e8", "reader_link": "#2457c5", "reader_page": "#ffffff", "reader_bad": "#b3261e", "public_bg": "#f7f6f2", "public_panel": "#ffffff", "public_text": "#1d1c1a", "public_muted": "#6b6860", "public_line": "#e2dfd7", "public_soft": "#eceae5", "public_ok": "#2c7a4b", "public_ok_soft": "#e3f3e9", "public_warn": "#8a5a00", "public_warn_soft": "#f6ead0", "public_bad": "#b3312b", "public_bad_soft": "#fbe6e4", "on_mark": "#ffffff", "figure": "#ffffff", "reader_figure": "#ffffff", "reader_paid": "#2e7d4f", "reader_void": "#b3261e", "reader_print_ink": "#000000", "reader_print_muted": "#555555", "reader_print_page": "#ffffff", "relief_shallow": "#b9dbe8", "relief_deep": "#4f86ad", "relief_water": "#5fa3cf", "relief_bare": "#e4ddcd", "relief_low": "#9cc98a", "relief_mid": "#d8cf8f", "relief_high": "#b88a5e", "relief_top": "#f4f1ea", "relief_space": "#0b1220"}, "dark": {"bg": "#161614", "panel": "#1f1f1c", "line": "#34332e", "text": "#ecebe6", "muted": "#a09d94", "accent": "#8fb0ff", "accent_soft": "#232c45", "ok": "#7fd3a0", "ok_soft": "#1c3226", "warn": "#f0b765", "warn_soft": "#3a2c14", "bad": "#f08a84", "bad_soft": "#3d1f1d", "closed": "#8f8c84", "closed_soft": "#2a2925", "g_actor": "#3987e5", "g_aim": "#b8864b", "g_work": "#d95926", "g_record": "#199e70", "g_question": "#c98500", "g_occurrence": "#d55181", "g_place": "#008300", "g_system": "#9085e9", "g_blocked": "#d03b3b", "edge": "#55534c", "edge_strong": "#b5b2a8", "reader_ink": "#e6e7ea", "reader_muted": "#9aa0a9", "reader_line": "#33363c", "reader_link": "#8cb0ff", "reader_page": "#16181b", "reader_bad": "#ff8a80", "public_bg": "#171614", "public_panel": "#1f1e1b", "public_text": "#ecebe6", "public_muted": "#9c998f", "public_line": "#33312c", "public_soft": "#2a2925", "public_ok": "#7fd3a0", "public_ok_soft": "#1c3226", "public_warn": "#e6b65c", "public_warn_soft": "#3a2e14", "public_bad": "#f08a84", "public_bad_soft": "#3d1f1d", "on_mark": "#ffffff", "figure": "#ffffff", "reader_figure": "#ffffff", "reader_paid": "#2e7d4f", "reader_void": "#b3261e", "reader_print_ink": "#000000", "reader_print_muted": "#555555", "reader_print_page": "#ffffff", "relief_shallow": "#2f5a6e", "relief_deep": "#12293d", "relief_water": "#2b6a96", "relief_bare": "#5d574c", "relief_low": "#4f7f4a", "relief_mid": "#8d8452", "relief_high": "#7a5a3e", "relief_top": "#d8d3c6", "relief_space": "#05070d"}}} }
-  ],
-  "drawings": [
-    { "id": "core.architecture", "title": "Architecture", "shape": "architecture", "modules": { "index.js": "draw/architecture/index.js", "layout.js": "draw/architecture/layout.js", "route.js": "draw/architecture/route.js", "look.js": "draw/architecture/look.js", "marks.js": "draw/architecture/marks.js", "story.js": "draw/architecture/story.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js", "says.js": "draw/architecture/says.js", "sides.js": "draw/architecture/sides.js", "islands.js": "draw/architecture/islands.js", "deep.js": "draw/architecture/deep.js", "boats.js": "draw/architecture/boats.js", "boards.js": "draw/architecture/boards.js", "moves.js": "draw/architecture/moves.js" } },
-    { "id": "core.grid", "title": "Grid", "shape": "grid", "modules": { "index.js": "draw/grid/index.js", "look.js": "draw/grid/look.js", "story.js": "draw/grid/story.js", "marks.js": "draw/architecture/marks.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js" } },
-    { "id": "core.time", "title": "Time", "shape": "time", "modules": { "index.js": "draw/time/index.js", "look.js": "draw/time/look.js", "story.js": "draw/time/story.js", "marks.js": "draw/architecture/marks.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js" } },
-    { "id": "core.flow", "title": "Flow", "shape": "flow", "modules": { "index.js": "draw/flow/index.js", "layout.js": "draw/flow/layout.js", "look.js": "draw/flow/look.js", "story.js": "draw/flow/story.js", "marks.js": "draw/architecture/marks.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js" } }
-  ],
-  "screens": [
+  "links": [
     {
+      "id": "depends_on",
+      "root": true,
+      "title": "depends on",
+      "inverse": "blocks",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "The source cannot finish until the target is closed. Drives the blockers view."
+    },
+    {
+      "id": "waits_on",
+      "root": true,
+      "title": "waits on",
+      "inverse": "is waited on by",
+      "from": ["*"],
+      "to": ["actor"],
+      "description": "The source cannot move until this actor (a person, a company, an agent) has answered or acted. Say what is awaited in the relation's props.for, as what they are to do, in a few words, said to them: \"Choose the pack's name\", not \"choosing the name\". Drives the blockers view; remove the link once they have."
+    },
+    {
+      "id": "ships",
+      "extends": "relates_to",
+      "title": "ships",
+      "inverse": "ships in",
+      "from": ["occurrence"],
+      "to": ["*"],
+      "description": "What the event brings out: open work under it that neither it waits for nor it goes ahead without is left to sort. Drives the gate view."
+    },
+    {
+      "id": "defers",
+      "root": true,
+      "title": "goes ahead without",
+      "inverse": "can follow",
+      "from": ["occurrence"],
+      "to": ["*"],
+      "description": "The event was planned with this in sight and does not wait for it: it can follow. What the event does wait for is depends_on. Drives the gate view."
+    },
+    {
+      "id": "part_of",
+      "root": true,
+      "title": "is part of",
+      "inverse": "contains",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "Hierarchy: a task in a project, a project in an area."
+    },
+    {
+      "id": "serves",
+      "root": true,
+      "title": "serves",
+      "inverse": "is served by",
+      "from": ["*"],
+      "to": ["aim"],
+      "description": "Why the work exists."
+    },
+    {
+      "id": "involves",
+      "root": true,
+      "title": "involves",
+      "inverse": "is involved in",
+      "from": ["*"],
+      "to": ["actor"],
+      "description": "Participants and stakeholders."
+    },
+    {
+      "id": "works_at",
+      "extends": "relates_to",
+      "title": "works at",
+      "inverse": "employs",
+      "from": ["person"],
+      "to": ["company"],
+      "description": "Put the job title in the relation's props.role."
+    },
+    {
+      "id": "about",
+      "root": true,
+      "title": "is about",
+      "inverse": "is described by",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "A note, file, decision or issue concerns the target."
+    },
+    {
+      "id": "needs",
+      "root": true,
+      "title": "needs",
+      "inverse": "is needed by",
+      "from": ["*"],
+      "to": ["place"],
+      "description": "The work cannot run without this place, one with a capacity (a resource). Drives the blockers view."
+    },
+    {
+      "id": "holds",
+      "root": true,
+      "title": "holds",
+      "inverse": "is held by",
+      "from": ["*"],
+      "to": ["place"],
+      "description": "Current occupancy of a place with a capacity (a resource). Created by claim, ended by release."
+    },
+    {
+      "id": "produced",
+      "extends": "relates_to",
+      "title": "produced",
+      "inverse": "was produced by",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "The work led to this result, file or decision."
+    },
+    {
+      "id": "lives_in",
+      "root": true,
+      "title": "lives in",
+      "inverse": "is home to",
+      "from": ["*"],
+      "to": ["place"],
+      "description": "Where something is: work in a repository, a visit at a site."
+    },
+    {
+      "id": "bears_on",
+      "root": true,
+      "title": "bears on",
+      "inverse": "is borne on by",
+      "from": ["*"],
+      "to": ["question"],
+      "description": "Evidence on a question: a result, a test or a finding that helps settle it."
+    },
+    {
+      "id": "supersedes",
+      "root": true,
+      "title": "supersedes",
+      "inverse": "is superseded by",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "Replaces an older version."
+    },
+    {
+      "id": "relates_to",
+      "root": true,
+      "title": "relates to",
+      "inverse": "relates to",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "A loose link. Prefer a specific relation when one fits."
+    }
+  ],
+  "rules": [
+    {
+      "id": "code_runs",
+      "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code", "modules", "page_css"] },
+      "then": "hold",
+      "lifted": "agent_code",
+      "say": "Code that runs in the browser of whoever looks is the human's to allow."
+    },
+    {
+      "id": "screens_human",
+      "when": { "actor": "agent", "type": "screen" },
+      "then": "hold",
+      "say": "What a screen shows, and where, is the human's to change."
+    },
+    {
+      "id": "styles_merge",
+      "when": { "actor": "agent", "op": "merge", "type": "style" },
+      "then": "hold",
+      "lifted": "agent_code",
+      "say": "Folding one style into another can bring its code along: the human's to allow."
+    },
+    {
+      "id": "public",
+      "when": { "actor": "agent", "op": ["create", "update"], "visibility": "public" },
+      "then": "hold",
+      "say": "What anyone can see is the human's to decide."
+    },
+    {
+      "id": "dormant",
+      "when": { "actor": "agent", "dormant": true },
+      "then": "hold",
+      "say": "Its pack is gone, and its rules with it: a person looks at what is written to it."
+    },
+    {
+      "id": "pack_reach",
+      "when": { "pack": true, "reach": "outside" },
+      "then": "refuse",
+      "say": "The {pack} pack touched \"{title}\", a {type} it neither declares nor requires."
+    },
+    {
+      "id": "settle",
+      "when": { "actor": "agent", "op": "update", "capability": "settles", "status": { "from": "open", "to": "closed" } },
+      "then": "hold",
+      "lifted": "agent_changes",
+      "readings": true,
+      "say": "Settling \"{title}\" is the owner's: the agent proposes the answer, and they confirm it."
+    },
+    {
+      "id": "settle_why",
+      "when": {
+        "actor": "agent",
+        "op": "update",
+        "capability": { "settles": { "by": "word" } },
+        "status": { "from": "open", "to": "closed" },
+        "held": false
+      },
+      "then": { "require": ["outcome", "rationale"] },
+      "say": "\"{title}\": to settle a decision, say what was chosen (props.outcome) and why (props.rationale)."
+    },
+    {
+      "id": "settle_said",
+      "when": {
+        "actor": "agent",
+        "op": "update",
+        "capability": "settles",
+        "status": { "from": "open", "to": "closed" },
+        "held": false,
+        "said": false
+      },
+      "then": "refuse",
+      "say": "\"{title}\": to settle a question, say on whose authority (authority.of: \"human\" with where they said so, or \"agent\" for your own judgment)."
+    },
+    {
+      "id": "forget",
+      "when": {
+        "actor": "agent",
+        "op": "forget"
+      },
+      "then": "hold",
+      "say": "Forgetting \"{title}\" is the owner's: it is for good, and cannot be undone."
+    },
+    {
+      "id": "asked",
+      "when": { "actor": "agent", "asked": true },
+      "then": "hold",
+      "say": "The agent asked for a look before it takes effect."
+    },
+    { "id": "propose_only", "when": { "actor": "agent", "may": "propose" }, "then": "hold", "say": "This agent's token may only propose." },
+    {
+      "id": "agent_changes",
+      "when": { "actor": "agent", "op": ["create", "update", "link", "unlink", "archive", "restore", "merge", "define_type"] },
+      "then": "hold",
+      "lifted": "agent_changes",
+      "server": true,
+      "say": "An agent's change waits for a person until the owner lets agents' changes apply."
+    },
+    {
+      "id": "agent_publish",
+      "when": { "actor": "agent", "op": "publish" },
+      "then": "refuse",
+      "lifted": "agent_publish",
+      "say": "Publishing is the owner’s here: they allow agents on the Workspace page, under Publishing. Ask them with publish_ask."
+    },
+    {
+      "id": "agent_backups",
+      "when": { "actor": "agent", "op": "backup_download" },
+      "then": "refuse",
+      "lifted": "agent_backups",
+      "say": "Agents may not download this workspace’s backups: the owner allows it on the Workspace page, under Backups."
+    },
+    {
+      "id": "sessions",
+      "when": {
+        "fields": [
+          "story",
+          "tokens_used",
+          "cost_usd",
+          "stale_flagged"
+        ]
+      },
+      "stream": "sessions",
+      "keep": {
+        "latest": true,
+        "history": "P14D",
+        "closed": "P180D"
+      },
+      "say": "A run's story and spend now, two weeks of how they got there, kept half a year after the run ends."
+    },
+    {
+      "id": "claims",
+      "stream": "claims",
+      "keep": {
+        "latest": true,
+        "history": "P30D",
+        "closed": "P90D"
+      },
+      "say": "Who holds what now, a month of who held it, a claim kept three months after its release."
+    },
+    {
+      "id": "notifications",
+      "stream": "notifications",
+      "keep": {
+        "latest": true,
+        "closed": "P30D",
+        "open": "P90D"
+      },
+      "say": "Who may read a notification, kept a month after it is read and three months unread."
+    },
+    {
+      "id": "automations",
+      "stream": "automations",
+      "keep": {
+        "latest": true,
+        "history": "P7D"
+      },
+      "say": "When an automation last ran and what came of it, a week of it before."
+    },
+    {
+      "id": "settings",
+      "stream": "settings",
+      "keep": {
+        "latest": true,
+        "history": "P365D"
+      },
+      "say": "The workspace's settings now, and a year of how they were."
+    },
+    {
+      "id": "access",
+      "stream": "access",
+      "keep": {
+        "latest": true,
+        "history": "P365D"
+      },
+      "say": "When a token was last used and backups downloaded, a year of it."
+    },
+    {
+      "id": "pictures",
+      "when": {
+        "fields": [
+          "picture"
+        ]
+      },
+      "stream": "observations",
+      "keep": {
+        "latest": true
+      },
+      "say": "A test's picture as it last ran."
+    },
+    {
+      "id": "observations",
+      "stream": "observations",
+      "keep": {
+        "latest": true,
+        "thin": [
+          [
+            "P1D",
+            "PT1H"
+          ],
+          [
+            "P30D",
+            "P1D"
+          ]
+        ]
+      },
+      "say": "The latest reading, one an hour after a day, one a day after a month."
+    },
+    {
+      "id": "pack",
+      "stream": "pack:*",
+      "keep": {
+        "latest": true
+      },
+      "say": "What a pack keeps, as it last kept it."
+    }
+  ],
+  "views": [
+    {
+      "id": "core.lens",
+      "shape": "data",
+      "lens": {},
+      "description": "What is in a view, as data of one fixed form, whatever is asked: `lens` (the lens as it was read), `items` (each with what it is `inside`, its `place` among those beside it, its `size`, its `state`: blocked, who it waits on, sessions at work; and `within`: the same counted over everything inside it, sent or not), `links` (kind, from, to, and how many each stands for: a link whose end was not sent is moved up to the nearest thing that was) and `rest` (how many items were left out of what it read, by reason: a lens from an item reads only what is around it, the whole map otherwise). The lens is the built-in one, under the view chosen (an item of type lens: about the item the view is of, or about nothing for any view), under what is asked here: a field that is named replaces it whole. How it looks is not decided here: `style` is what the map keeps for the page that draws (items of type style, combined the same way), passed on as it is, and `kept` names the lenses and styles that went in. Every lens that applies can be chosen: `views` names them in order (those about the item asked for, then \"holding\": what the item waits on, step by step, and nothing else, offered while some of it is open; then \"when\": what is in it placed in time, a week at a time, each person a lane and the sessions on it one more, offered while any of it is dated; then the workspace’s, which are about nothing; each by place); an item opens on its first own view that is not a shortcut, else on \"holding\" when it is offered, else on what is in it, `view` says which this is (the first, unless lens names another; a field it does not name is the built-in one), one whose own from is another item is a shortcut to there (`to`), `controls` says what the person may change on the page, and `hub` says whether the item holds enough to be a hub. `said` is the lens in words. Params, each optional: lens and style (the id of one kept on the map, used outright; lens \"holding\" for what holds an item, \"when\" for when what is in it happens, with time to move the week; \"in\" for what is in it), from (an item id; without it, the whole map), kinds (types to keep, or \"work\"; with a leading \"-\", to leave out), by (the kind of link that says what is inside what; part_of), over (the kinds of link sent along, or \"all\"; depends_on and waits_on), far (steps down from the start), lanes (stage, link or person: what each item is filed under, as `lane`), order (the number field that orders things beside each other; order), measure (work or tokens), fold (what to leave out, of: closed, system, unlinked; all three)."
+    },
+    {
+      "id": "core.attention",
+      "shape": "data",
+      "lens": { "fold": ["closed", "system"] },
+      "answer": "attention",
+      "description": "What deserves attention, and why: each item with its reasons, the strongest first. Reasons: waits_on (someone must answer or act), to_confirm (an agent settled it and the owner has not confirmed), holding_up (others are blocked by it), due (its bound is near or past), unsettled (a question not yet settled, and how it settles), blocked (and what has to move first), stale (nobody has changed or confirmed it for stale_days), under_way (a session is on it), ready (work nothing blocks). Each item says what it sits in at the top (top). Params: person (\"me\", or an id: only what is theirs; everyone when left out), within (an item or place: only what is its), reasons (some of the above), days (due within, 7), stale_days (14), order (latest: what changed most recently first), limit (100). With to_confirm, the answer has to_confirm.upto for the confirmed tool."
+    },
+    {
+      "id": "core.graph",
+      "shape": "data",
+      "lens": { "fold": ["closed", "system"] },
+      "answer": "graph",
+      "choices": {
+        "relations": { "blocking": { "over": ["depends_on", "waits_on", "needs", "holds"] }, "structure": { "over": ["part_of", "serves", "lives_in", "works_at"] }, "all": { "over": "all" } }
+      },
+      "description": "Nodes and edges for drawing the map. Params: `relations` (blocking, structure or all), focus (an item id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system."
+    },
+    {
+      "id": "core.tree",
+      "shape": "data",
+      "lens": { "by": "part_of", "over": [], "fold": ["system"] },
+      "answer": "tree",
+      "description": "A tree a pack declares over \"is part of\", such as software.roadmap: one root and its branches in order, the work under each, progress rolled up, and what is being worked on now. Params: root (an item id; without it, the roots to choose from), tree (needed only when packs declare more than one)."
+    },
+    {
+      "id": "core.hubs",
+      "shape": "data",
+      "lens": { "over": [], "fold": ["closed", "system"] },
+      "answer": "hubs",
+      "description": "The hubs: open items that hold enough to need views of their own, largest first, each with how much it holds (inside), the size at which an item there counts as a hub (at) and how many views it has. An item is a hub when it holds at least its project's hub_at open things (12 when the project does not say; a project still being shaped sets it to 1, so that nearly everything in it is one). A hub with no views is work owed: give it its views with lens items about it. Nothing is stored: this is read off the map each time."
+    },
+    {
+      "id": "core.brief",
+      "shape": "data",
+      "lens": { "far": 0, "over": ["needs", "lives_in", "relates_to", "about", "bears_on", "depends_on", "waits_on"], "fold": [] },
+      "answer": "brief",
+      "description": "Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required)."
+    },
+    {
+      "form": "screen",
       "id": "home",
       "title": "Home",
       "at": "home",
@@ -283,66 +665,135 @@
         { "piece": "saved_views", "title": "Saved views", "limit": 6 }
       ]
     },
-    { "id": "needs", "title": "Needs you", "on": ["work", "aim"], "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] }] },
-    { "id": "tokens", "title": "Tokens for this", "on": ["place", "aim"], "pieces": [{ "piece": "token_ask" }, { "piece": "token" }] }
+    {
+      "form": "screen",
+      "id": "needs",
+      "title": "Needs you",
+      "on": ["work", "aim"],
+      "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] }]
+    },
+    {
+      "form": "screen",
+      "id": "tokens",
+      "title": "Tokens for this",
+      "on": ["place", "aim"],
+      "pieces": [{ "piece": "token_ask" }, { "piece": "token" }]
+    }
   ],
-  "relations": [
-    { "id": "depends_on", "root": true, "title": "depends on", "inverse": "blocks", "from": ["*"], "to": ["*"], "description": "The source cannot finish until the target is closed. Drives the blockers view." },
-    { "id": "waits_on", "root": true, "title": "waits on", "inverse": "is waited on by", "from": ["*"], "to": ["actor"], "description": "The source cannot move until this actor (a person, a company, an agent) has answered or acted. Say what is awaited in the relation's props.for, as what they are to do, in a few words, said to them: \"Choose the pack's name\", not \"choosing the name\". Drives the blockers view; remove the link once they have." },
-    { "id": "ships", "extends": "relates_to", "title": "ships", "inverse": "ships in", "from": ["occurrence"], "to": ["*"], "description": "What the event brings out: open work under it that neither it waits for nor it goes ahead without is left to sort. Drives the gate view." },
-    { "id": "defers", "root": true, "title": "goes ahead without", "inverse": "can follow", "from": ["occurrence"], "to": ["*"], "description": "The event was planned with this in sight and does not wait for it: it can follow. What the event does wait for is depends_on. Drives the gate view." },
-    { "id": "part_of", "root": true, "title": "is part of", "inverse": "contains", "from": ["*"], "to": ["*"], "description": "Hierarchy: a task in a project, a project in an area." },
-    { "id": "serves", "root": true, "title": "serves", "inverse": "is served by", "from": ["*"], "to": ["aim"], "description": "Why the work exists." },
-    { "id": "involves", "root": true, "title": "involves", "inverse": "is involved in", "from": ["*"], "to": ["actor"], "description": "Participants and stakeholders." },
-    { "id": "works_at", "extends": "relates_to", "title": "works at", "inverse": "employs", "from": ["person"], "to": ["company"], "description": "Put the job title in the relation's props.role." },
-    { "id": "about", "root": true, "title": "is about", "inverse": "is described by", "from": ["*"], "to": ["*"], "description": "A note, file, decision or issue concerns the target." },
-    { "id": "needs", "root": true, "title": "needs", "inverse": "is needed by", "from": ["*"], "to": ["place"], "description": "The work cannot run without this place, one with a capacity (a resource). Drives the blockers view." },
-    { "id": "holds", "root": true, "title": "holds", "inverse": "is held by", "from": ["*"], "to": ["place"], "description": "Current occupancy of a place with a capacity (a resource). Created by claim, ended by release." },
-    { "id": "produced", "extends": "relates_to", "title": "produced", "inverse": "was produced by", "from": ["*"], "to": ["*"], "description": "The work led to this result, file or decision." },
-    { "id": "lives_in", "root": true, "title": "lives in", "inverse": "is home to", "from": ["*"], "to": ["place"], "description": "Where something is: work in a repository, a visit at a site." },
-    { "id": "bears_on", "root": true, "title": "bears on", "inverse": "is borne on by", "from": ["*"], "to": ["question"], "description": "Evidence on a question: a result, a test or a finding that helps settle it." },
-    { "id": "supersedes", "root": true, "title": "supersedes", "inverse": "is superseded by", "from": ["*"], "to": ["*"], "description": "Replaces an older version." },
-    { "id": "relates_to", "root": true, "title": "relates to", "inverse": "relates to", "from": ["*"], "to": ["*"], "description": "A loose link. Prefer a specific relation when one fits." }
+  "actions": [
+    {
+      "id": "capture",
+      "title": "Capture",
+      "description": "Put something on the map: an item and its links, or a record of what happened.",
+      "kernel": true
+    },
+    {
+      "id": "assign",
+      "title": "Assign",
+      "description": "Give work to someone, inside the map or outside it: an owner, a person waited on, a party asked to act.",
+      "kernel": true
+    },
+    {
+      "id": "report",
+      "title": "Report",
+      "description": "Say that something happened or is so: progress, a result, a payment received, a check that it is still true.",
+      "kernel": true
+    },
+    { "id": "ask", "title": "Ask", "description": "Put a question to someone and wait for the answer.", "kernel": true },
+    {
+      "id": "settle",
+      "title": "Settle",
+      "description": "Close a question by someone's word or by evidence: a decision made, a hypothesis borne out.",
+      "kernel": true
+    },
+    { "id": "revise", "title": "Revise", "description": "Change, correct or undo what is on the map.", "kernel": true }
   ],
-  "verbs": [
-    { "id": "capture", "title": "Capture", "description": "Put something on the map: an item and its links, or a record of what happened." },
-    { "id": "assign", "title": "Assign", "description": "Give work to someone, inside the map or outside it: an owner, a person waited on, a party asked to act." },
-    { "id": "report", "title": "Report", "description": "Say that something happened or is so: progress, a result, a payment received, a check that it is still true." },
-    { "id": "ask", "title": "Ask", "description": "Put a question to someone and wait for the answer." },
-    { "id": "settle", "title": "Settle", "description": "Close a question by someone's word or by evidence: a decision made, a hypothesis borne out." },
-    { "id": "revise", "title": "Revise", "description": "Change, correct or undo what is on the map." }
+  "drawings": [
+    {
+      "id": "core.architecture",
+      "title": "Architecture",
+      "shape": "architecture",
+      "modules": {
+        "index.js": "draw/architecture/index.js",
+        "layout.js": "draw/architecture/layout.js",
+        "route.js": "draw/architecture/route.js",
+        "look.js": "draw/architecture/look.js",
+        "marks.js": "draw/architecture/marks.js",
+        "story.js": "draw/architecture/story.js",
+        "play.js": "draw/architecture/play.js",
+        "story-look.js": "draw/architecture/story-look.js",
+        "says.js": "draw/architecture/says.js",
+        "sides.js": "draw/architecture/sides.js",
+        "islands.js": "draw/architecture/islands.js",
+        "deep.js": "draw/architecture/deep.js",
+        "boats.js": "draw/architecture/boats.js",
+        "boards.js": "draw/architecture/boards.js",
+        "moves.js": "draw/architecture/moves.js"
+      }
+    },
+    {
+      "id": "core.grid",
+      "title": "Grid",
+      "shape": "grid",
+      "modules": {
+        "index.js": "draw/grid/index.js",
+        "look.js": "draw/grid/look.js",
+        "story.js": "draw/grid/story.js",
+        "marks.js": "draw/architecture/marks.js",
+        "play.js": "draw/architecture/play.js",
+        "story-look.js": "draw/architecture/story-look.js"
+      }
+    },
+    {
+      "id": "core.time",
+      "title": "Time",
+      "shape": "time",
+      "modules": {
+        "index.js": "draw/time/index.js",
+        "look.js": "draw/time/look.js",
+        "story.js": "draw/time/story.js",
+        "marks.js": "draw/architecture/marks.js",
+        "play.js": "draw/architecture/play.js",
+        "story-look.js": "draw/architecture/story-look.js"
+      }
+    },
+    {
+      "id": "core.flow",
+      "title": "Flow",
+      "shape": "flow",
+      "modules": {
+        "index.js": "draw/flow/index.js",
+        "layout.js": "draw/flow/layout.js",
+        "look.js": "draw/flow/look.js",
+        "story.js": "draw/flow/story.js",
+        "marks.js": "draw/architecture/marks.js",
+        "play.js": "draw/architecture/play.js",
+        "story-look.js": "draw/architecture/story-look.js"
+      }
+    }
   ],
-  "views": [
-    { "id": "core.lens", "shape": "data", "lens": {}, "description": "What is in a view, as data of one fixed form, whatever is asked: `lens` (the lens as it was read), `items` (each with what it is `inside`, its `place` among those beside it, its `size`, its `state`: blocked, who it waits on, sessions at work; and `within`: the same counted over everything inside it, sent or not), `links` (kind, from, to, and how many each stands for: a link whose end was not sent is moved up to the nearest thing that was) and `rest` (how many items were left out of what it read, by reason: a lens from an item reads only what is around it, the whole map otherwise). The lens is the built-in one, under the view chosen (an item of type lens: about the item the view is of, or about nothing for any view), under what is asked here: a field that is named replaces it whole. How it looks is not decided here: `style` is what the map keeps for the page that draws (items of type style, combined the same way), passed on as it is, and `kept` names the lenses and styles that went in. Every lens that applies can be chosen: `views` names them in order (those about the item asked for, then \"holding\": what the item waits on, step by step, and nothing else, offered while some of it is open; then \"when\": what is in it placed in time, a week at a time, each person a lane and the sessions on it one more, offered while any of it is dated; then the workspace’s, which are about nothing; each by place); an item opens on its first own view that is not a shortcut, else on \"holding\" when it is offered, else on what is in it, `view` says which this is (the first, unless lens names another; a field it does not name is the built-in one), one whose own from is another item is a shortcut to there (`to`), `controls` says what the person may change on the page, and `hub` says whether the item holds enough to be a hub. `said` is the lens in words. Params, each optional: lens and style (the id of one kept on the map, used outright; lens \"holding\" for what holds an item, \"when\" for when what is in it happens, with time to move the week; \"in\" for what is in it), from (an item id; without it, the whole map), kinds (types to keep, or \"work\"; with a leading \"-\", to leave out), by (the kind of link that says what is inside what; part_of), over (the kinds of link sent along, or \"all\"; depends_on and waits_on), far (steps down from the start), lanes (stage, link or person: what each item is filed under, as `lane`), order (the number field that orders things beside each other; order), measure (work or tokens), fold (what to leave out, of: closed, system, unlinked; all three)." },
-    { "id": "core.attention", "shape": "data", "lens": { "fold": ["closed", "system"] }, "answer": "attention", "description": "What deserves attention, and why: each item with its reasons, the strongest first. Reasons: waits_on (someone must answer or act), to_confirm (an agent settled it and the owner has not confirmed), holding_up (others are blocked by it), due (its bound is near or past), unsettled (a question not yet settled, and how it settles), blocked (and what has to move first), stale (nobody has changed or confirmed it for stale_days), under_way (a session is on it), ready (work nothing blocks). Each item says what it sits in at the top (top). Params: person (\"me\", or an id: only what is theirs; everyone when left out), within (an item or place: only what is its), reasons (some of the above), days (due within, 7), stale_days (14), order (latest: what changed most recently first), limit (100). With to_confirm, the answer has to_confirm.upto for the confirmed tool." },
-    { "id": "core.graph", "shape": "data", "lens": { "fold": ["closed", "system"] }, "answer": "graph", "choices": { "relations": { "blocking": { "over": ["depends_on", "waits_on", "needs", "holds"] }, "structure": { "over": ["part_of", "serves", "lives_in", "works_at"] }, "all": { "over": "all" } } }, "description": "Nodes and edges for drawing the map. Params: `relations` (blocking, structure or all), focus (an item id: show only its neighbourhood), depth (1 to 4, with focus), include_closed, include_system." },
-    { "id": "core.tree", "shape": "data", "lens": { "by": "part_of", "over": [], "fold": ["system"] }, "answer": "tree", "description": "A tree a pack declares over \"is part of\", such as software.roadmap: one root and its branches in order, the work under each, progress rolled up, and what is being worked on now. Params: root (an item id; without it, the roots to choose from), tree (needed only when packs declare more than one)." },
-    { "id": "core.hubs", "shape": "data", "lens": { "over": [], "fold": ["closed", "system"] }, "answer": "hubs", "description": "The hubs: open items that hold enough to need views of their own, largest first, each with how much it holds (inside), the size at which an item there counts as a hub (at) and how many views it has. An item is a hub when it holds at least its project's hub_at open things (12 when the project does not say; a project still being shaped sets it to 1, so that nearly everything in it is one). A hub with no views is work owed: give it its views with lens items about it. Nothing is stored: this is read off the map each time." },
-    { "id": "core.brief", "shape": "data", "lens": { "far": 0, "over": ["needs", "lives_in", "relates_to", "about", "bears_on", "depends_on", "waits_on"], "fold": [] }, "answer": "brief", "description": "Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required)." }
-  ],
-  "rules": [
-    { "id": "code_runs", "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code", "modules", "page_css"] }, "then": "hold", "lifted": "agent_code", "say": "Code that runs in the browser of whoever looks is the human's to allow." },
-    { "id": "screens_human", "when": { "actor": "agent", "type": "screen" }, "then": "hold", "say": "What a screen shows, and where, is the human's to change." },
-    { "id": "styles_merge", "when": { "actor": "agent", "op": "merge", "type": "style" }, "then": "hold", "lifted": "agent_code", "say": "Folding one style into another can bring its code along: the human's to allow." },
-    { "id": "public", "when": { "actor": "agent", "op": ["create", "update"], "visibility": "public" }, "then": "hold", "say": "What anyone can see is the human's to decide." },
-    { "id": "dormant", "when": { "actor": "agent", "dormant": true }, "then": "hold", "say": "Its pack is gone, and its rules with it: a person looks at what is written to it." },
-    { "id": "settle", "when": { "actor": "agent", "op": "update", "capability": "settles", "status": { "from": "open", "to": "closed" } }, "then": "hold", "lifted": "agent_changes", "readings": true, "say": "Settling \"{title}\" is the owner's: the agent proposes the answer, and they confirm it." },
-    { "id": "settle_why", "when": { "actor": "agent", "op": "update", "capability": { "settles": { "by": "word" } }, "status": { "from": "open", "to": "closed" }, "held": false }, "then": { "require": ["outcome", "rationale"] }, "say": "\"{title}\": to settle a decision, say what was chosen (props.outcome) and why (props.rationale)." },
-    { "id": "settle_said", "when": { "actor": "agent", "op": "update", "capability": "settles", "status": { "from": "open", "to": "closed" }, "held": false, "said": false }, "then": "refuse", "say": "\"{title}\": to settle a question, say on whose authority (authority.of: \"human\" with where they said so, or \"agent\" for your own judgment)." },
-    { "id": "forget", "when": { "actor": "agent", "op": "forget" }, "then": "hold", "say": "Forgetting \"{title}\" is the owner's: it is for good, and cannot be undone." },
-    { "id": "asked", "when": { "actor": "agent", "asked": true }, "then": "hold", "say": "The agent asked for a look before it takes effect." },
-    { "id": "propose_only", "when": { "actor": "agent", "may": "propose" }, "then": "hold", "say": "This agent's token may only propose." },
-    { "id": "agent_changes", "when": { "actor": "agent", "op": ["create", "update", "link", "unlink", "archive", "restore", "merge", "define_type"] }, "then": "hold", "lifted": "agent_changes", "server": true, "say": "An agent's change waits for a person until the owner lets agents' changes apply." },
-    { "id": "agent_publish", "when": { "actor": "agent", "op": "publish" }, "then": "refuse", "lifted": "agent_publish", "say": "Publishing is the owner’s here: they allow agents on the Workspace page, under Publishing. Ask them with publish_ask." },
-    { "id": "agent_backups", "when": { "actor": "agent", "op": "backup_download" }, "then": "refuse", "lifted": "agent_backups", "say": "Agents may not download this workspace’s backups: the owner allows it on the Workspace page, under Backups." },
-    { "id": "sessions", "when": { "fields": ["story", "tokens_used", "cost_usd", "stale_flagged"] }, "stream": "sessions", "keep": { "latest": true, "history": "P14D", "closed": "P180D" }, "say": "A run's story and spend now, two weeks of how they got there, kept half a year after the run ends." },
-    { "id": "claims", "stream": "claims", "keep": { "latest": true, "history": "P30D", "closed": "P90D" }, "say": "Who holds what now, a month of who held it, a claim kept three months after its release." },
-    { "id": "notifications", "stream": "notifications", "keep": { "latest": true, "closed": "P30D", "open": "P90D" }, "say": "Who may read a notification, kept a month after it is read and three months unread." },
-    { "id": "automations", "stream": "automations", "keep": { "latest": true, "history": "P7D" }, "say": "When an automation last ran and what came of it, a week of it before." },
-    { "id": "settings", "stream": "settings", "keep": { "latest": true, "history": "P365D" }, "say": "The workspace's settings now, and a year of how they were." },
-    { "id": "access", "stream": "access", "keep": { "latest": true, "history": "P365D" }, "say": "When a token was last used and backups downloaded, a year of it." },
-    { "id": "pictures", "when": { "fields": ["picture"] }, "stream": "observations", "keep": { "latest": true }, "say": "A test's picture as it last ran." },
-    { "id": "observations", "stream": "observations", "keep": { "latest": true, "thin": [["P1D", "PT1H"], ["P30D", "P1D"]] }, "say": "The latest reading, one an hour after a day, one a day after a month." },
-    { "id": "pack", "stream": "pack:*", "keep": { "latest": true }, "say": "What a pack keeps, as it last kept it." }
+  "styles": [
+    {
+      "id": "core.house",
+      "title": "House style",
+      "props": {
+        "shape": "list",
+        "lit": "all",
+        "open": 1,
+        "show": ["status", "waits", "sessions"],
+        "text": 13,
+        "radius": 8,
+        "gap": 8,
+        "column": 270,
+        "font": "system-ui, -apple-system, 'Segoe UI', sans-serif",
+        "hues": ["#2e7d4f", "#2f5fb3", "#a86a12", "#6f43b0", "#59636e", "#0f7c86", "#b23a48", "#7a6a1c"],
+        "sizes": { "rule": 1, "dot": 8, "dot_ring": 1.5, "small_text": 12, "tiny_text": 11, "legend_text": 12, "pill_pad_y": 1, "pill_pad_x": 7, "here_ring": 2, "swatch": 12, "swatch_radius": 3, "stage_least": 320, "stage": "68vh", "stage_most": 760, "legend_inset": 10, "legend_gap": 3, "legend_pad_y": 7, "legend_pad_x": 10, "legend_mark_gap": 8, "list_pad_top": 6, "list_pad_bottom": 10, "list_column_gap": 12, "list_row": 30, "list_group_row": 34, "list_side": 14, "list_indent": 22, "list_name_gap": 8, "list_dot_before": 6, "list_dot_after": 4, "list_fold": 18, "list_lane_indent": 26, "list_count_gap": 4, "list_count": 18, "list_column_most": "18ch", "list_status": "11ch", "list_waits": "14ch", "list_sessions": 10, "list_narrow_at": 640, "grid_pad": 10, "grid_gap": 6, "grid_head_pad_y": 7, "grid_head_pad_x": 10, "grid_row_pad_y": 8, "grid_card_gap": 2, "grid_card_pad_left": 11, "grid_card_pad_right": 9, "grid_stripe": 4, "grid_edge_mix": "55%", "grid_tint": "13%", "grid_tint_hover": "22%", "grid_swatch_mix": "30%", "grid_detail_text": "0.92em", "grid_mark_gap": 4, "grid_mark_text": "0.85em", "grid_legend_gap": 14, "grid_legend_pad_y": 8, "grid_legend_pad_x": 12, "grid_row_head": 120, "grid_lane": 170, "flow_layer_gap": 84, "flow_node_gap": 16, "flow_margin": 24, "flow_max_text": 140, "flow_track": 8, "flow_slot": 9, "flow_lead_out": 12, "flow_lead_in": 22, "flow_list_head": 28, "flow_list_row": 20, "flow_list_pad": 6, "flow_list_text_more": 40, "flow_text": 13, "flow_stub_text": 12, "flow_row_text": 12, "flow_diamond_pad": 96, "flow_diamond_height": 60, "flow_end_pad": 30, "flow_end_height": 30, "flow_box_pad": 42, "flow_box_height": 34, "flow_sheet_height": 40, "flow_corner": 6, "flow_head_half": 4.5, "flow_head_length": 9, "flow_break_half": 3, "flow_break_reach": 8, "flow_break_track": 6, "flow_row_inset": 2, "flow_row_dot_x": 15, "flow_dot_small": 4, "flow_row_text_x": 26, "flow_row_text_after": 10, "flow_list_head_x": 12, "flow_list_rule_above": 2, "flow_stub_text_x": 15, "flow_text_x": 27, "flow_text_after": 11, "flow_dot_gap": 12, "flow_dot": 4.5, "flow_sheet_lift": 2, "flow_badge_in": 4, "flow_badge": 8, "flow_says_most": 200, "flow_says_text": 11.5, "flow_says_pad": 7, "flow_says_aside": 6, "flow_says_height": 20, "flow_legend_from": 720, "flow_legend_room": 20, "flow_stroke": 1.25, "flow_stroke_lit": 2, "flow_dot_ring": 1.5, "flow_badge_text": 10.5, "flow_dash_scenario": "5 4", "flow_dash_choice": "6 5", "time_head_text": 11, "time_hour_text": 10, "time_lane_dash": "2 3", "time_letter": 6.5, "time_least_block": 6, "time_day_start": 8, "time_day_end": 18, "time_gutter": 38, "time_hour": 34, "time_lane_named_from": 28, "time_chip": 18, "time_head_named": 36, "time_head": 22, "time_key_most": "28ch", "time_key_stripe": 10, "time_key_pad": 6, "time_key_gap": "4px 14px", "time_bar_label_most": 220, "time_bar_row": 24, "time_bar_day_every": 70, "arch_layer_gap": 48, "arch_node_gap": 18, "arch_col_gap": 36, "arch_margin": 24, "arch_max_text": 150, "arch_track": 8, "arch_slot": 10, "arch_lead_out": 12, "arch_lead_in": 20, "arch_head": 26, "arch_pad": 12, "arch_text": 13, "arch_place_text": 12, "arch_place_name_pad": 20, "arch_diamond_pad": 90, "arch_diamond_height": 56, "arch_store_pad": 44, "arch_store_height": 44, "arch_box_pad": 44, "arch_box_height": 34, "arch_says_text": 10.5, "arch_corner": 6, "arch_lid": 6, "arch_place_corner": 10, "arch_place_name_room": 34, "arch_place_name_inset": 4, "arch_place_name_height": 18, "arch_place_dot_x": 14, "arch_dot_small": 4, "arch_place_text_x": 24, "arch_says_most": 120, "arch_says_pad": 6, "arch_says_height": 16, "arch_text_x": 28, "arch_text_after": 12, "arch_dot_gap": 12, "arch_dot": 4.5, "arch_badge_in": 4, "arch_badge": 8, "arch_stroke_down": 1.75, "arch_stroke_warn": 1.5, "arch_dash_dot": "2 2", "arch_dash_place": "6 4", "arch_hit": 9, "arch_says_stroke": 0.75, "arch_story_least": 760, "arch_island_pad": 14, "arch_island_rise": 5, "arch_island_gap": 60, "arch_island_tint": "24%", "arch_deep_high": 62, "arch_deep_floor": 28, "arch_deep_route": 1.4, "arch_deep_name_lift": 14, "arch_deep_boat": 15, "arch_board_unit": 150, "arch_board_bar": 24, "arch_board_gap": 14, "arch_board_pad": 10, "arch_board_head": 34, "arch_board_card": 150, "arch_board_card_high": 26, "arch_deep_berth": 16 },
+        "numbers": { "dim": 0.32, "zoom_step": 1.25, "flow_fold_at": 4, "time_bar_label_share": 0.3, "arch_place_fill": 0.55, "arch_planned_wire": 0.8, "arch_standby": 0.4, "arch_story_aspect": 1.6, "arch_story_gone_hold": 900, "arch_story_gone_fade": 700, "arch_story_move": 1300, "arch_story_new_for": 3200, "arch_story_draw": 900, "arch_story_read_base": 700, "arch_story_read_per_char": 26, "arch_story_beat_least": 3200, "arch_story_beat_after": 1800, "arch_story_typing": 900, "arch_story_chapter_pause": 500, "arch_story_jump": 1000, "arch_story_start": 400, "arch_story_lines_kept": 12, "arch_story_quick": 650, "arch_story_quick_move": 450, "arch_island_bow": 0.16, "arch_island_wobble": 0.12, "arch_island_arc": 1.3, "arch_island_squash": 0.75, "arch_deep_fov": 24, "arch_deep_angle": 48, "arch_deep_near": 0.94, "arch_deep_sail": 1700, "arch_deep_fly_pitch": 18, "arch_deep_fly_up": 2.2, "arch_deep_fly": 5200, "arch_deep_card_in": 1400, "arch_deep_card_after": 2200, "arch_deep_fold": 1300, "arch_deep_rise": 2600, "arch_story_deep_cover": 650, "note_title_most": 90, "note_opening_most": 320, "note_opening_cut": 240, "note_sentence_least": 80, "note_sentence_most": 300, "fact_most": 32, "field_fold_at": 140 },
+        "page": { "picture": true, "notes": "folded", "ties": "open", "history": "closed" },
+        "dots": { "islands": { "field": "status", "names": { "todo": "To do", "doing": "Doing", "done": "Done" }, "order": ["todo", "doing", "done"], "colours": { "todo": "closed", "doing": "warn", "done": "ok" } } },
+        "lengths": { "ago": 56, "around_graph": 520, "around_item": 260, "around_self": 220, "bar": 90, "border_1": 1, "border_2": 1.5, "border_3": 2, "border_4": 3, "box_1": 4, "box_2": 6, "box_3": 8, "box_4": 10, "box_5": 16, "box_6": 18, "box_7": 28, "box_8": 32, "box_9": 40, "box_10": 52, "cal_body_least": 420, "cal_day_least": 64, "cal_gutter": 44, "cal_head": 30, "cal_least": 520, "cal_room": 170, "card_least": 340, "chip_most": 180, "column_most": 980, "count_col": 78, "date_field": 140, "dialog": 460, "event_what": 96, "event_when": 84, "event_who": 110, "field_grow": 180, "field_least": 120, "frame_most": 820, "frame_room": 190, "graph_room": 215, "hatch": 5, "hours_field": 74, "label_col": 150, "measure": "72ch", "measure_wide": "80ch", "menu_item_most": 420, "menu_least": 230, "nav": 180, "page_most": 1100, "progress_col": 132, "public_most": 860, "radius_1": 3, "radius_2": 6, "radius_3": 8, "radius_4": 10, "radius_pill": 999, "reader_bottom": 64, "reader_h1": "2rem", "reader_h2": "1.35rem", "reader_h3": "1.08rem", "reader_h4": "1rem", "reader_measure": "44rem", "reader_side": 20, "reader_small": "0.9rem", "reader_text": 17, "reader_tiny": "0.82rem", "reader_title": "2.2rem", "reader_top": 48, "reader_wide": 1200, "reader_window": "100vw", "reader_total": "1.1em", "rhythm_1": "0.2em", "rhythm_2": "0.4em", "rhythm_3": "0.6em", "rhythm_4": "0.8em", "rhythm_5": "1em", "rhythm_6": "1.2em", "rhythm_7": "1.4em", "rhythm_8": "1.6em", "rhythm_9": "2.2em", "rhythm_10": "3em", "row_grow": 220, "row_select": 170, "scroll_most": 620, "select_least": 180, "side_least": 260, "space_1": 1, "space_2": 2, "space_3": 4, "space_4": 6, "space_5": 8, "space_6": 10, "space_7": 12, "space_8": 14, "space_9": 16, "space_10": 18, "space_11": 24, "space_12": 30, "space_13": 40, "space_14": 60, "stage_floor": 380, "switch_most": "22ch", "text_1": 11, "text_2": 12, "text_3": 12.5, "text_4": 13, "text_5": 14, "text_6": 15, "text_7": 16, "text_8": 20, "text_9": 24, "tile": 280, "tile_proof": 170, "tile_small": 130, "tip_most": 250, "track_1": "0.02em", "track_2": "0.04em", "track_3": "0.12em", "who": 64, "wide": 720 },
+        "theme": { "light": { "bg": "#f6f5f2", "panel": "#ffffff", "line": "#e3e0d9", "text": "#1f1e1b", "muted": "#6d6a62", "accent": "#2f5fd0", "accent_soft": "#e6edfb", "ok": "#2c7a4b", "ok_soft": "#e3f3e9", "warn": "#a35a00", "warn_soft": "#fbefd9", "bad": "#b3312b", "bad_soft": "#fbe6e4", "closed": "#8a877f", "closed_soft": "#eceae5", "g_actor": "#2a78d6", "g_aim": "#9a6a2f", "g_work": "#eb6834", "g_record": "#1baf7a", "g_question": "#eda100", "g_occurrence": "#e87ba4", "g_place": "#008300", "g_system": "#4a3aa7", "g_blocked": "#d03b3b", "edge": "#b9b5aa", "edge_strong": "#5f5c55", "reader_ink": "#1d1f23", "reader_muted": "#6b7079", "reader_line": "#e3e5e8", "reader_link": "#2457c5", "reader_page": "#ffffff", "reader_bad": "#b3261e", "public_bg": "#f7f6f2", "public_panel": "#ffffff", "public_text": "#1d1c1a", "public_muted": "#6b6860", "public_line": "#e2dfd7", "public_soft": "#eceae5", "public_ok": "#2c7a4b", "public_ok_soft": "#e3f3e9", "public_warn": "#8a5a00", "public_warn_soft": "#f6ead0", "public_bad": "#b3312b", "public_bad_soft": "#fbe6e4", "on_mark": "#ffffff", "figure": "#ffffff", "reader_figure": "#ffffff", "reader_paid": "#2e7d4f", "reader_void": "#b3261e", "reader_print_ink": "#000000", "reader_print_muted": "#555555", "reader_print_page": "#ffffff", "relief_shallow": "#b9dbe8", "relief_deep": "#4f86ad", "relief_water": "#5fa3cf", "relief_bare": "#e4ddcd", "relief_low": "#9cc98a", "relief_mid": "#d8cf8f", "relief_high": "#b88a5e", "relief_top": "#f4f1ea", "relief_space": "#0b1220" }, "dark": { "bg": "#161614", "panel": "#1f1f1c", "line": "#34332e", "text": "#ecebe6", "muted": "#a09d94", "accent": "#8fb0ff", "accent_soft": "#232c45", "ok": "#7fd3a0", "ok_soft": "#1c3226", "warn": "#f0b765", "warn_soft": "#3a2c14", "bad": "#f08a84", "bad_soft": "#3d1f1d", "closed": "#8f8c84", "closed_soft": "#2a2925", "g_actor": "#3987e5", "g_aim": "#b8864b", "g_work": "#d95926", "g_record": "#199e70", "g_question": "#c98500", "g_occurrence": "#d55181", "g_place": "#008300", "g_system": "#9085e9", "g_blocked": "#d03b3b", "edge": "#55534c", "edge_strong": "#b5b2a8", "reader_ink": "#e6e7ea", "reader_muted": "#9aa0a9", "reader_line": "#33363c", "reader_link": "#8cb0ff", "reader_page": "#16181b", "reader_bad": "#ff8a80", "public_bg": "#171614", "public_panel": "#1f1e1b", "public_text": "#ecebe6", "public_muted": "#9c998f", "public_line": "#33312c", "public_soft": "#2a2925", "public_ok": "#7fd3a0", "public_ok_soft": "#1c3226", "public_warn": "#e6b65c", "public_warn_soft": "#3a2e14", "public_bad": "#f08a84", "public_bad_soft": "#3d1f1d", "on_mark": "#ffffff", "figure": "#ffffff", "reader_figure": "#ffffff", "reader_paid": "#2e7d4f", "reader_void": "#b3261e", "reader_print_ink": "#000000", "reader_print_muted": "#555555", "reader_print_page": "#ffffff", "relief_shallow": "#2f5a6e", "relief_deep": "#12293d", "relief_water": "#2b6a96", "relief_bare": "#5d574c", "relief_low": "#4f7f4a", "relief_mid": "#8d8452", "relief_high": "#7a5a3e", "relief_top": "#d8d3c6", "relief_space": "#05070d" } }
+      }
+    }
   ]
 }

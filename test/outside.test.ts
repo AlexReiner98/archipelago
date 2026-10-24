@@ -43,7 +43,7 @@ async function map(base: string) {
   cpSync(join(import.meta.dirname, 'packs', 'demo'), join(dir, 'demo'), { recursive: true });
   const file = join(dir, 'demo', 'pack.json');
   const pack = JSON.parse(readFileSync(file, 'utf8'));
-  pack.hosts[0].base = base;
+  pack.reach.hosts[0].base = base;
   writeFileSync(file, JSON.stringify(pack));
   const reg = new Registry(dir);
   closers.push(() => hostFor(reg).stop());
