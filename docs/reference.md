@@ -275,7 +275,9 @@ There are more (`hubs`, `proof`, `changelog`, `recheck`, `agent_usage`,
 `notifications`, `graph`).
 
 The lens is the flat lens (`flat`): a filter, a walk and a limit, answered as
-items and the links among them (`src/lens-flat.ts`). A pack declares its views
+items and the links among them (`src/lens-flat.ts`). Its filter's text is
+the `search` read's own search, ranked the same, and the find bar on the page
+sets it. A pack declares its views
 in its pack file (`views`): one with `lens` is answered by a read of the
 kernel's that its `answer` names (`src/lens-presets.ts`), in the form that view
 has always had; any other is answered by the pack's own code. The core pack's

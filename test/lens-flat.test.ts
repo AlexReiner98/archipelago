@@ -126,3 +126,24 @@ test('tags: an item is tagged with any number of tags, and the filter selects by
   const asked = (await callTool(l, agent, 'view', { name: 'flat', params: { filter: { links: ['tagged Canvas'], exclude: ['work.note'] } } })) as { items: { title: string }[] };
   assert.deepEqual(titles(asked), ['Flat lens']);
 });
+
+test('the text is the search read: ranked as it ranks, near-misses when nothing matches, and how many it found', async () => {
+  const { l } = await chain();
+  await make(l, [
+    { op: 'create', type: 'work.task', title: 'Roof', body: 'The whole of it.' },
+    { op: 'create', type: 'work.task', title: 'Walls', body: 'Before the roof goes on, and the roof drains.' },
+    { op: 'create', type: 'work.task', title: 'A roof for the shed, and its gutters' },
+  ]);
+  // The newest only mentions it in its note: what has the word in its title comes first all the same.
+  const roof = await flatLens(l, { filter: { text: 'roof' } });
+  assert.deepEqual(roof.items.map((i) => i.title), ['Roof', 'A roof for the shed, and its gutters', 'Walls']);
+  assert.equal(roof.matched, 3);
+  const found = (await callTool(l, agent, 'search', { q: 'roof' })) as { title: string }[];
+  assert.deepEqual(roof.items.map((i) => i.title), found.map((i) => i.title), 'in the order search gives');
+  assert.deepEqual((await flatLens(l, { filter: { text: 'roof' }, limit: 1 })).matched, 3, 'counted past the limit');
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: 'canvasses' } })), ['Saved canvases'], 'a slip of the keys finds the near title');
+  assert.deepEqual(((await callTool(l, agent, 'search', { q: 'canvasses' })) as { title: string }[]).map((i) => i.title), ['Saved canvases'], 'as search does');
+  const none = await flatLens(l, { filter: { text: 'zzqx' } });
+  assert.equal(none.matched, 0);
+  assert.equal(none.items.length, 0);
+});

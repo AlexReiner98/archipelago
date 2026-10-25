@@ -140,7 +140,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => input.type ? schemaOf(l.registry.describe(), input.type) : actor.kind === 'human' || input.full ? withStyles(l, await withScreens(l, l.registry.describe())) : schemaBrief(l.registry),
   },
   search: {
-    description: 'Find items by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. Always search before creating, to avoid duplicates.',
+    description: 'Find items by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. The flat lens (query flat) takes the same search as its filter’s text, so what is found can be read with what it is tied to. Always search before creating, to avoid duplicates.',
     input: {
       q: z.string().optional().describe('Matches title and body.'),
       type: z.string().optional(),

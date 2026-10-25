@@ -68,21 +68,15 @@ body[data-sheet="open"] #query { right: calc(min(var(--sheet), 50%) + var(--spac
 #whoami:empty { display: none; }
 #whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }
 
-/* Find: one bar at the canvas's foot; what it finds rises above it. */
+/* Find: one bar at the canvas's foot; what its words would find is said in one line above it. */
 #find { position: fixed; z-index: 3; left: 50%; bottom: var(--space-9); transform: translateX(-50%); width: min(var(--find-most), calc(100% - 2 * var(--space-9))); margin: 0; }
 body[data-sheet="open"] #find { left: calc((100% - min(var(--sheet), 50%)) / 2); width: min(var(--find-most), calc(100% - min(var(--sheet), 50%) - 2 * var(--space-9))); }
 #find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
 #find input[type=search] { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-4) var(--space-7); font-size: var(--text-6); outline: none; }
-#find select { flex: none; max-width: var(--select-least); border: 0; background: none; color: var(--muted); }
-#find .quiet-button.on { color: var(--accent); border-color: var(--accent); }
-#find .found { list-style: none; margin: 0 0 var(--space-4); padding: var(--space-3); max-height: var(--found-most); overflow: auto; background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); }
-#find .found[hidden] { display: none; }
-#find .found a { display: flex; gap: var(--space-5); align-items: center; min-width: 0; padding: var(--space-4) var(--space-5); border-radius: var(--radius-2); color: var(--text); text-decoration: none; white-space: nowrap; }
-#find .found a:hover, #find .found a:focus { background: var(--accent-soft); }
-#find .found .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-#find .found > li.muted, #find .found > li.error { padding: var(--space-4) var(--space-5); }
-#find .found-new { border-top: var(--border-1) solid var(--line); margin-top: var(--space-3); padding-top: var(--space-3); }
-#find .found-draw { border-bottom: var(--border-1) solid var(--line); margin-bottom: var(--space-3); padding-bottom: var(--space-3); }
+#find .find-peek { display: flex; gap: var(--space-5); align-items: center; min-width: 0; margin: 0 0 var(--space-4); padding: var(--space-4) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; }
+#find .find-peek[hidden] { display: none; }
+#find .find-peek .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#find .find-peek > .quiet-button { flex: none; }
 
 /* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
    (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */
