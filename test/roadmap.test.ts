@@ -110,9 +110,11 @@ test('a lens answers with one shape of data: what is inside what, the same count
   await assert.rejects(run({ fold: ['everything'] }), /fold must be of/);
   await assert.rejects(run({ from: 'e_nothing0' }), /No item/);
 
-  // The packs' presets first: with nothing kept on the map, a picture is drawn in the core pack's house style.
+  // The packs' presets first: with nothing kept on the map, a view is drawn in the core pack's house style, with the
+  // canvas pack's preset over it (packs/canvas), which draws it in space.
   const house = { id: 'core.house', title: 'House style', preset: 'core.house' };
-  assert.deepEqual([whole.style.shape, whole.style.lit, whole.style.open, whole.kept], ['list', 'all', 1, { lens: [], style: [house] }]);
+  const canvas = { id: 'canvas.house', title: 'Canvas', preset: 'canvas.house' };
+  assert.deepEqual([whole.style.shape, whole.style.lit, whole.style.open, whole.kept], ['space', 'all', 1, { lens: [], style: [house, canvas] }]);
   // Kept on the map: the workspace's lens and style (about nothing), then those about what the picture starts from, then what is asked.
   const drawn = await make(l, [
     { op: 'create', ref: 'wl', type: 'lens', title: 'As it opens', props: { far: 1 } },
@@ -127,16 +129,16 @@ test('a lens answers with one shape of data: what is inside what, the same count
   assert.deepEqual([opened.lens.far, titles(opened), opened.style.shape, opened.style.open, opened.style.colors], [1, ['P', 'Q'], 'list', 1, { sea: '#f0f4f5' }], 'the workspace’s own, and they are not items of the picture');
   // A named set (sizes, colours) is merged name by name: a style that sets one size keeps the house style's others.
   assert.equal(typeof opened.style.sizes.flow_layer_gap, 'number');
-  assert.deepEqual(opened.kept, { lens: [{ id: drawn.wl, title: 'As it opens' }], style: [house, { id: drawn.ws, title: 'House style' }] });
+  assert.deepEqual(opened.kept, { lens: [{ id: drawn.wl, title: 'As it opens' }], style: [house, canvas, { id: drawn.ws, title: 'House style' }] });
   const ofP = await run({ from: made.p });
   assert.deepEqual([ofP.lens.far, ofP.lens.over, ofP.style.open, ofP.style.shape], [2, ['depends_on'], 2, 'list'], 'a field the nearer one names replaces it; one it does not falls through');
-  assert.deepEqual(ofP.kept.style.map((k: any) => k.title), ['House style', 'House style', 'P opened']);
+  assert.deepEqual(ofP.kept.style.map((k: any) => k.title), ['House style', 'Canvas', 'House style', 'P opened']);
   // The owner's version of a preset: its fields over the preset's, in its place; retired, the preset is not used.
   const mine = await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Mine', props: { preset: 'core.house', lit: 'blocked' } }]);
   const versioned = await run();
   assert.deepEqual([versioned.style.lit, versioned.style.shape, versioned.kept.style[0]], ['blocked', 'list', { id: mine.v, title: 'Mine', preset: 'core.house' }]);
   await make(l, [{ op: 'update', id: mine.v, status: 'retired' }]);
-  assert.deepEqual((await run()).kept.style.map((k: any) => k.title), ['House style'], 'retired, the preset is not used');
+  assert.deepEqual((await run()).kept.style.map((k: any) => k.title), ['Canvas', 'House style'], 'retired, the preset is not used');
   await make(l, [{ op: 'update', id: mine.v, status: 'current' }, { op: 'update', id: mine.v, props: { lit: null } }]);
   // A style kept on a kind is how every such item's pictures look: over the workspace's, under the item's own.
   const onKind = await make(l, [{ op: 'create', ref: 'k', type: 'style', title: 'Projects', props: { on: ['work.project'], open: 3, radius: 4, sizes: { list_row: 40 } } }]);

@@ -1,0 +1,82 @@
+{
+  "id": "canvas",
+  "version": "0.1.0",
+  "title": "Canvas",
+  "description": "The map drawn in space: what holds others as land with what it holds on it, each thing a node in an outline its type or kind is given, every link a wire and what names another a faint thread. Its preset makes it the view every lens is drawn in unless a nearer style says otherwise; take the pack out and views are drawn as before. A template for a drawing pack: a layout, a look, a library of outlines, a style preset and tests run without a database.",
+  "requires": ["core"],
+  "types": [
+    {
+      "of": "style",
+      "fields": {
+        "outlines": { "type": "json", "description": "The outline each type or kind is drawn in on the canvas and in any drawing that reads it: a type's id, its root type or its kind, to one of box, round, pill, diamond, sheet, stack, note, folder, hexagon, octagon, slant, chevron, flag, tag, cylinder, person, circle, cloud, shield. The nearest name wins: the type, then its root, then its kind; a box when none is named." }
+      }
+    }
+  ],
+  "drawings": [
+    {
+      "id": "canvas.space",
+      "title": "Space",
+      "shape": "space",
+      "modules": { "index.js": "draw/index.js", "layout.js": "draw/layout.js", "look.js": "draw/look.js", "outlines.js": "draw/outlines.js", "marks.js": "draw/marks.js" }
+    }
+  ],
+  "styles": [
+    {
+      "id": "canvas.house",
+      "title": "Canvas",
+      "props": {
+        "shape": "space",
+        "outlines": {
+          "work": "box",
+          "question": "diamond",
+          "occurrence": "pill",
+          "record": "sheet",
+          "actor": "person",
+          "aim": "flag",
+          "place": "hexagon",
+          "system": "note",
+          "agent": "circle",
+          "work.project": "folder",
+          "work.issue": "octagon",
+          "work.document": "sheet",
+          "software.feature": "round",
+          "software.release": "chevron",
+          "software.repo": "cylinder",
+          "software.component": "hexagon"
+        },
+        "sizes": {
+          "space_text": 13,
+          "space_head_text": 12,
+          "space_count_text": 10.5,
+          "space_box": 34,
+          "space_text_x": 24,
+          "space_text_after": 12,
+          "space_max_text": 180,
+          "space_pad": 16,
+          "space_head": 34,
+          "space_gap": 16,
+          "space_layer_gap": 52,
+          "space_margin": 40,
+          "space_reach": 26,
+          "space_badge": 11,
+          "space_count": 18,
+          "space_corner": 6,
+          "space_region_corner": 14,
+          "space_dot": 4.5,
+          "space_dot_x": 13,
+          "space_arrow_length": 8,
+          "space_arrow_half": 4,
+          "space_stroke": 1.25,
+          "space_stroke_lit": 2,
+          "space_dash_mention": "2 4",
+          "space_dash_other": "6 4",
+          "space_tip_most": "36ch",
+          "space_tip_pad": "8px 10px",
+          "space_tip_gap": 4,
+          "space_tip_text": 12.5
+        },
+        "numbers": { "space_aspect": 3 }
+      }
+    }
+  ]
+}

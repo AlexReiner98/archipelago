@@ -8,7 +8,7 @@ export const READABLE = 0.62;
 /**
  * Make `svg` (`width` by `height` in its own units) move inside `frame`. `start` is a point to open on when all of
  * it cannot be read at once; `aside` is room kept on the left for what floats over the frame (a legend).
- * Answers with what a control may do: zoom by a factor, fit it all, or open again.
+ * Answers with what a control may do: zoom by a factor, fit it all, open again, or bring a point into sight.
  */
 export function panZoom(frame, svg, { width, height, start = [width / 2, 0], aside = 0 }) {
   const view = { s: 1, x: 0, y: 0 };
@@ -52,6 +52,14 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     view.x += mx / view.s - mx / s;
     view.y += my / view.s - my / s;
     view.s = s;
+    apply();
+  };
+
+  /** Bring a point of the picture to the middle of what is in sight, less `right` of the frame covered on its right. */
+  const show = (px, py, right = 0) => {
+    const [W, H] = size();
+    view.x = px - (W - right) / 2 / view.s;
+    view.y = py - H / 2 / view.s;
     apply();
   };
 
@@ -99,5 +107,5 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   let opened = Boolean(frame.clientWidth);
   if (opened) open();
   new ResizeObserver(() => (frame.clientWidth ? (opened ? apply() : ((opened = true), open())) : null)).observe(frame);
-  return { zoomBy, fit, open };
+  return { zoomBy, fit, open, show };
 }

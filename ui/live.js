@@ -128,7 +128,7 @@ export function follow(steps = []) {
   if (!busy && there && location.hash !== there) location.hash = there;
 }
 
-/** The items the page shows: what it is the page of, what it names or links to, and what its pictures hold. */
+/** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */
 export function shownIds() {
   const ids = new Set(location.hash.match(/e_[a-z0-9]{8}/g) ?? []);
   for (const a of main.querySelectorAll('a[href*="e_"]')) for (const id of a.getAttribute('href').match(/e_[a-z0-9]{8}/g) ?? []) ids.add(id);
@@ -136,6 +136,8 @@ export function shownIds() {
   for (const host of main.querySelectorAll('.lens-wrap')) for (const item of host.answer?.items ?? []) ids.add(item.id);
   return ids;
 }
+/** The canvas behind the sheet (ui/canvas.js): the view it draws. */
+const canvasView = () => document.querySelector('#canvas > .lens-wrap');
 
 /** Whether what changed (the pulse's `touched`, and whether the held changes or a story moved) bears on the page in view. */
 export function bears(touched, queueMoved) {
@@ -180,8 +182,13 @@ export async function checkPulse() {
   state.pulse = now;
   if (!moved) return;
   if (state.selfDrawn) return void (state.selfDrawn = false);
-  // Only the map's events moved, and none of them is on this page: it stays as it is.
-  if (!bears(touched, now.split('.').slice(1).join() !== was.split('.').slice(1).join())) return;
+  // Only the map's events moved, and none of them is on the sheet: it stays as it is, and the canvas asks again if
+  // they are on it (drawn again only where its answer changed).
+  if (!bears(touched, now.split('.').slice(1).join() !== was.split('.').slice(1).join())) {
+    const drawn = canvasView();
+    if (!touched || touched.ids === null || touched.made || touched.ids.some((id) => drawn?.answer?.items.some((i) => i.id === id))) drawn?.refresh?.();
+    return;
+  }
   if (state.dirty || document.querySelector('dialog[open]') || /^#\/new/.test(location.hash)) {
     stale.hidden = false;
     return;

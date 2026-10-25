@@ -49,7 +49,9 @@ function same(now: Record<string, any>, kernel: string, own: RegExp, extra: stri
     const [a, b] = [was[name], now[name]];
     assert.ok(b, `${name} is drawn`);
     assert.equal(marks(b.html), marks(a.html), `${name}: the marks`);
-    assert.deepEqual(kept(b).map((k: number) => b.boxes[k]), kept(a).map((k: number) => a.boxes[k]), `${name}: where each is`);
+    // An element with no size (a title, what is hidden) is nowhere: where the page puts the host says where it is reported.
+    const at = (r: any, k: number) => (/ 0 0$/.test(r.boxes[k]) ? 'no size' : r.boxes[k]);
+    assert.deepEqual(kept(b).map((k: number) => at(b, k)), kept(a).map((k: number) => at(a, k)), `${name}: where each is`);
     assert.deepEqual(kept(b).map((k: number) => b.looks[b.styles[k]]), kept(a).map((k: number) => a.looks[a.styles[k]]), `${name}: the looks`);
   }
 }

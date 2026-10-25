@@ -1,12 +1,11 @@
-// Saved views: the pictures kept on the map, as tiles named by what they show, each opening the picture itself. On
-// Home, a strip of the pinned and the newest (docs/ui-strategy.md).
+// Saved views: the views kept on the map, as tiles named by what they show, each opening that view on the canvas.
+// For you, a strip of the pinned and the newest (docs/ui-strategy.md).
 
-import { api, h, part } from './base.js';
-import { lensView, readLens } from './lens.js';
-import { typeTitle } from './words.js';
+import { api, h } from './base.js';
+import { lensView } from './lens.js';
 
 /** Where a picture opens: drawn from what it is of, through its lens (the style kept about the lens comes with it). */
-export const pictureHref = (p) => (p.of ? `#/graph?from=${p.of.id}&lens=${p.lens}` : `#/graph?lens=${p.lens}`);
+export const pictureHref = (p) => (p.of ? `#/v?from=${p.of.id}&lens=${p.lens}` : `#/v?lens=${p.lens}`);
 
 /** How much smaller than the picture's own page its thumbnail is drawn. */
 const SHRINK = 4;
@@ -60,39 +59,4 @@ export async function savedViewsStrip(host, title, limit = 6) {
     h('button', { class: 'quiet-button', style: 'margin-left: auto; white-space: nowrap', title: 'Every view kept on the map, or only the pinned and the newest', onclick: () => ((open = !open), show()) });
   host.replaceChildren(h('section', { class: 'card wide saved-views', style: 'margin-bottom: var(--space-8); min-width: 0' }, h('header', {}, h('h2', {}, title), fold), tiles));
   show();
-}
-
-/** What a picture is called and where it sits: the style kept about its lens names it, else the lens, else the view it opened on. */
-async function pictureHead(lens, view) {
-  const kept = typeof lens.lens === 'string' && /^e_/.test(lens.lens) ? lens.lens : undefined;
-  const [of, own] = await Promise.all([lens.from ? api('get', { id: lens.from }).catch(() => null) : null, kept ? api('get', { id: kept }).catch(() => null) : null]);
-  await view.ready;
-  const answer = view.answer;
-  const style = own?.incoming.find((r) => r.type === 'about' && r.entity_type === 'style');
-  const opened = answer?.views?.find((v) => v.id === answer.view);
-  const title = style?.title ?? own?.entity.title ?? opened?.title ?? of?.entity.title ?? 'The whole map';
-  const steps = of ? [...(of.trail ?? []), of.entity] : [];
-  return h(
-    'div',
-    { class: 'page-head' },
-    // Where it sits, from Home down to what it is a picture of, each a way there.
-    h('nav', { class: 'trail', title: 'Where this view sits' }, h('a', { class: 'trail-step', href: '#/' }, 'Home'), steps.map((t) => [h('span', { class: 'trail-sep' }, '›'), h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title)])),
-    h('h1', { style: 'margin-top: var(--space-4)' }, title),
-  );
-}
-
-/**
- * The map as a picture: the lens its address names (what follows a ?), or the whole map as it opens, drawn in the
- * style kept for it, under its name and the way back to what it is of.
- */
-export async function graph(query = '') {
-  const { lens, style } = readLens(query);
-  const view = lensView({ lens, style });
-  const head = pictureHead(lens, view);
-  // One already there stays until the new one is drawn: the map changing under it does not blank the page.
-  if (part('graph').querySelector('.lens-wrap')) await view.ready;
-  const card = h('section', { class: 'card lens-card' }, view);
-  part('graph').replaceChildren(card);
-  const drawn = await head;
-  if (card.isConnected) card.before(drawn);
 }

@@ -5,7 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'held', 'search', 'item', 'item-doc', 'item-links', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'lens', 'lens-base', 'list', 'style-code', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'theme', 'token-piece', 'token-ask', 'saved-views', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'drawing', 'drawing-tip', 'surface'];
+const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'held', 'canvas', 'find', 'item', 'item-doc', 'item-links', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'lens', 'lens-base', 'list', 'style-code', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'theme', 'token-piece', 'token-ask', 'saved-views', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'drawing', 'drawing-tip', 'surface'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -14,6 +14,7 @@ export const UI_FILES: Record<string, string> = {
   // The house style's lengths as a stylesheet, so the page is laid out before the workspace's style is read (src/styles.ts).
   '/layout.css': 'layout.css',
   '/style.css': 'style.css',
+  '/shell.css': 'shell.css',
   '/flow.css': 'flow.css',
   '/diagram.css': 'diagram.css',
   '/list.css': 'list.css',

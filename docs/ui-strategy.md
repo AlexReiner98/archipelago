@@ -1,15 +1,44 @@
-# UI strategy: altitude, your move, saved views
+# UI strategy: the canvas, the sheet, altitude, your move
 
-The map grows faster than a person can read it: agents raise two items for
-every one they close, and every screen shows all of them at once, projects
-beside tasks beside issues. This strategy keeps the map whole but the screen
-small. Three ideas, each fixing one complaint: **altitude** (one level of the
-hierarchy per screen), **your move** (Home shows only what waits on you, and
-never more than a handful), and **saved views** (the pictures worth keeping are
-named, listed and found in one place).
+The map grows faster than a person can read it. This strategy keeps the map
+whole and the screen small. Since 24 Oct 2026 the UI is **canvas first**: the
+map drawn in space is the app, and one thing is read in a **sheet** that
+opens over it from the side. The ideas from before still hold where they
+describe the map (**altitude**, **noticed** items). Where they described rows
+on a page, the canvas replaces them, as each section below says.
 
 The UI rules in `CLAUDE.md` still hold; this says what the screens are for.
 Where the two disagree, change the rule and say so in the commit.
+
+## 0. Canvas first (the owner, 24 Oct 2026)
+
+The owner's words: the canvas becomes the main view; an item gives its most
+important facts on hover, and clicking it opens it from the side to act on.
+
+- **The canvas is the whole page.** Home is the map's top with what is
+  directly in each thing. An item's address (`#/e/<id>`) is the canvas where
+  that item stands, among what is beside it, with the item lit. A view's
+  address (`#/v?...`) is that view. What the canvas draws is a lens in the
+  drawing its style names: the canvas pack's `space` unless a nearer style
+  says otherwise, a project's own view where it keeps one.
+- **Connections are drawn, never listed.** What is inside what is land within
+  land (the part_of closure). What holds what up is a wire pointing at the
+  one that waits. What names what is a faint thread (mentions). No page
+  lists links: not the trail rows, Shown in, Mentioned in, Delivers, Waiting
+  on this or This waits on.
+- **Hover says the point.** A tip gives the name, the type and status, what
+  needs you, and the first line of the note.
+- **The sheet is the item's one page.** It opens from the right on a click
+  and holds the item read as a document: its title, one line of marks, its
+  note or text, and what its pack adds for its kind or type. Rare actions go
+  in one menu. Enter redraws the canvas from the item. The sheet also holds a
+  new item, the Workspace page, a screen in the menu, and For you. On a
+  narrow screen it takes the whole width. Esc or × goes back to the canvas.
+- **Nothing else is on screen.** A thin bar on top shows where the canvas
+  stands, a mark counting what waits for you, and the menu. Find is a bar at
+  the foot of the canvas.
+- **Looks are the drawing's.** Node outlines are named per type or kind in a
+  style (`outlines`), so a view is made evocative on the map, not in code.
 
 ## The problem, as seen on 19 Oct 2026
 
@@ -25,6 +54,11 @@ Where the two disagree, change the rule and say so in the commit.
   they came from.
 
 ## 1. Altitude: one level per screen
+
+*Replaced on screen by the canvas (section 0), pending the owner's word
+(question e_eb4qrq9k). Altitude stays a fact of each type. The rows with
+pills below are no longer drawn: the canvas draws one level in full and
+deeper levels as a count on each thing.*
 
 Every type has an altitude, declared in its pack (the kernel names no pack's
 type; it reads the altitude from the registry):
@@ -56,6 +90,11 @@ Altitude is read from the type, not from how deep an item happens to sit, so
 a decision is a step wherever it is filed.
 
 ## 2. Your move: a bounded Home
+
+*Replaced by the canvas as Home (section 0), pending the owner's word
+(question e_eb4qrq9k). What waits for you is a mark in the bar opening For
+you in the sheet: what is held for your word, then your move. "Your
+projects" is the canvas itself.*
 
 Home answers one question: what can only I do next? It holds:
 

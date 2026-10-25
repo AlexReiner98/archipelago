@@ -3,9 +3,6 @@
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
 body {
-  margin: 0;
-  display: grid;
-  grid-template-columns: var(--nav) minmax(0, 1fr);
   min-height: 100vh;
   /* The theme's colours are the style's (theme, set by ui/theme.js); until it is read, the browser's own. */
   background: var(--bg, Canvas);
@@ -19,20 +16,8 @@ h2 { font-size: var(--text-5); margin: 0; }
 p { margin: 0; }
 .muted { color: var(--muted); }
 .small { font-size: var(--text-2); }
-
-#nav {
-  position: sticky; top: 0; height: 100vh;
-  padding: var(--space-9) var(--space-6);
-  border-right: var(--border-1) solid var(--line);
-  display: flex; flex-direction: column; gap: var(--space-2);
-}
-#nav .brand { font-weight: 700; font-size: var(--text-7); padding: var(--space-3) var(--space-6) var(--space-8); }
-#nav a { padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); display: flex; justify-content: space-between; align-items: center; }
-#nav a:hover { background: var(--line); text-decoration: none; }
-#nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .count { background: var(--accent); color: var(--panel); border-radius: var(--radius-4); padding: 0 var(--space-5); font-size: var(--text-2); font-weight: 600; }
 
-#main { padding: var(--space-11) var(--space-12) var(--space-14); max-width: var(--page-most); width: 100%; }
 .page-head { margin-bottom: var(--space-10); }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--card-least), 1fr)); gap: var(--space-8); align-items: start; }
@@ -59,12 +44,6 @@ details.fold > summary .n { color: var(--muted); font-size: var(--text-2); }
 .body-text.whole h4.part-title { margin: var(--space-8) 0 var(--space-3); font-size: var(--text-5); }
 .body-text.whole h4.part-title:first-child { margin-top: 0; }
 /* Where an item sits: one line under its title, each step a link up, with the views kept about it as small chips. */
-.page-head .trail { display: flex; align-items: center; gap: var(--space-4); flex-basis: 100%; width: 100%; margin-top: var(--space-3); font-size: var(--text-4); white-space: nowrap; overflow: hidden; color: var(--muted); }
-.page-head .trail-step { color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.page-head .trail-step:hover { color: var(--text); text-decoration: underline; }
-.page-head .trail-sep { color: var(--muted); }
-.page-head .trail-view, .page-head .shown-in .trail-view { flex: none; padding: var(--space-1) var(--space-5); border: var(--border-1) solid var(--accent); border-radius: var(--radius-pill); color: var(--accent); text-decoration: none; font-size: var(--text-2); }
-.page-head .trail-view:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
 /* What an item delivers: one line under its title, each deliverable a way to its own page. */
 .page-head .delivers { display: flex; flex-basis: 100%; width: 100%; align-items: center; gap: var(--space-6); margin-top: var(--space-5); white-space: nowrap; overflow: hidden; }
 .page-head .delivers .deliverable { display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; padding: var(--space-3) var(--space-6); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
@@ -368,11 +347,13 @@ details.folded[open] > summary::before { content: "\25BE  "; }
 button.quiet-button { padding: var(--space-2) var(--space-6); font-size: var(--text-2); }
 
 @media (max-width: 720px) {
-  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  #nav { align-items: center; position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: var(--border-1) solid var(--line); }
-  #nav .brand { padding: var(--space-3) var(--space-6); }
-  #main { padding: var(--space-9); }
   .ops td.kind { width: auto; }
+  /* The two surfaces on a narrow screen (ui/shell.css). */
+  #nav { top: var(--space-5); left: var(--space-5); right: var(--space-5); }
+  #trail { display: none; }
+  #main { padding: var(--space-9) var(--space-8) var(--space-14); }
+  #find { bottom: var(--space-5); }
+  #canvas .lens-view > .toolbar, #canvas .lf-legend { bottom: calc(var(--box-10) + var(--space-5)); }
 }
 
 /* Forms */
@@ -423,12 +404,6 @@ svg.graph .dim { opacity: 0.18; }
 .legend .stroke { width: var(--box-6); border-top: var(--border-2) solid var(--edge); display: inline-block; }
 .legend .stroke.blocking { border-top: var(--border-3) solid var(--edge-strong); }
 
-#listening { margin-top: auto; padding: var(--space-3) var(--space-6) 0; color: var(--ok); font-size: var(--text-3); }
-#listening::before { content: "● "; }
-#listening[hidden] { display: none; }
-#listening:not([hidden]) + #follow { margin-top: 0; }
-#follow { margin-top: auto; padding: var(--space-5) var(--space-6); display: flex; gap: var(--space-4); align-items: center; color: var(--muted); font-size: var(--text-3); cursor: pointer; }
-#follow + #whoami { margin-top: 0; }
 #follow > label { flex: 1; display: flex; gap: var(--space-4); align-items: center; cursor: pointer; white-space: nowrap; }
 #follow-what > summary { padding: var(--space-1) var(--space-5); font-size: var(--text-2); }
 #follow:has(> label input:not(:checked)) #follow-what { opacity: 0.5; }
@@ -442,10 +417,6 @@ svg.graph .dim { opacity: 0.18; }
 #followed[hidden] { display: none; }
 #followed > * { flex: none; white-space: nowrap; }
 #followed > .grow { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
-#nav .brand .workspace-name { font-weight: 600; font-size: var(--text-3); color: var(--accent); margin-top: var(--space-2); overflow-wrap: anywhere; }
-#whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }
-#whoami { margin-top: auto; padding: var(--space-6); border-top: var(--border-1) solid var(--line); display: grid; gap: var(--space-2); }
-#whoami:empty { display: none; }
 
 .secret { margin: 0 0 var(--space-8); padding: var(--space-7) var(--space-8); border: var(--border-1) solid var(--warn); background: var(--warn-soft); border-radius: var(--radius-4); display: grid; gap: var(--space-5); }
 .secret code { font: var(--text-4)/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; user-select: all; }

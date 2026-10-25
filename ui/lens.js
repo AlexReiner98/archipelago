@@ -227,6 +227,11 @@ function drawLens({ lens = {}, style = {}, key = lens.story ? `story:${lens.stor
     chosen.only = ids ? [...ids] : undefined;
     body.redraw?.();
   };
+  // Mark one item as the one whose page is open, or none: kept over a refresh, as the page asked for it.
+  host.mark = (id) => {
+    style.here = chosen.here = id;
+    body.redraw?.();
+  };
   return host;
 }
 

@@ -1,0 +1,77 @@
+/* The two surfaces (ui/app.js): the canvas across the whole page, and the sheet that opens over it from the side. A
+   thin bar floats over the canvas's top and the find bar over its foot; nothing else is on screen. Every length is
+   the house style's (--*), every colour the theme's. */
+html, body { height: 100%; }
+body { overflow: hidden; }
+
+/* The canvas: the view drawn edge to edge, its frame the whole page. */
+#canvas { position: fixed; inset: 0; background: var(--ln-sea, var(--bg)); }
+#canvas > .lens-wrap, #canvas .lens-view { height: 100%; }
+#canvas .lens-view { position: relative; }
+#canvas .lf-stage { height: 100%; }
+#canvas .lf-legend { top: auto; bottom: calc(var(--box-10) + var(--space-9)); }
+#canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
+#canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
+#canvas .lens-view > .toolbar { position: absolute; z-index: 2; right: var(--space-9); bottom: calc(var(--box-10) + var(--space-9)); margin: 0; padding: 0; border: 0; background: none; }
+#canvas .lens-view > .toolbar > .grow { display: none; }
+#canvas .lens-view > .empty, #canvas .lens-view > .error, #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
+
+/* The bar: where the canvas stands, what waits for you, and the menu. */
+#nav { position: fixed; z-index: 3; top: var(--space-7); left: var(--space-9); right: var(--space-9); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
+#nav > * { pointer-events: auto; }
+/* With the sheet open, the bar keeps to the canvas left of it. */
+body[data-sheet="open"] #nav { right: calc(min(var(--sheet), 100%) + var(--space-9)); }
+#nav > .grow { flex: 1; pointer-events: none; }
+#nav .brand { flex: none; font-weight: 700; font-size: var(--text-7); color: var(--text); text-decoration: none; padding: var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
+#nav .brand .workspace-name { display: none; }
+#trail { display: flex; align-items: center; gap: var(--space-4); min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--text-4); }
+#trail:empty { display: none; }
+#trail .trail-step { color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+#trail .trail-step:hover, #trail .trail-step.here { color: var(--text); }
+#trail .trail-sep { color: var(--muted); flex: none; }
+#marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
+#marks .count.held { background: var(--warn); }
+#listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
+#listening::before { content: "● "; }
+#listening[hidden] { display: none; }
+#more > summary { background: var(--panel); border-radius: var(--radius-pill); }
+#more > .menu-items { min-width: var(--menu-least); }
+#menu-pages { display: grid; }
+#menu-pages > a { padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; }
+#menu-pages > a:hover { background: var(--accent-soft); }
+#menu-pages > a.active { color: var(--accent); font-weight: 600; }
+#follow { padding: var(--space-5) var(--space-6); display: flex; gap: var(--space-4); align-items: center; color: var(--muted); font-size: var(--text-3); border-top: var(--border-1) solid var(--line); }
+#whoami { padding: var(--space-6); border-top: var(--border-1) solid var(--line); display: grid; gap: var(--space-2); }
+#whoami:empty { display: none; }
+#whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }
+
+/* Find: one bar at the canvas's foot; what it finds rises above it. */
+#find { position: fixed; z-index: 3; left: 50%; bottom: var(--space-9); transform: translateX(-50%); width: min(var(--find-most), calc(100% - 2 * var(--space-9))); margin: 0; }
+body[data-sheet="open"] #find { left: calc((100% - min(var(--sheet), 100%)) / 2); width: min(var(--find-most), calc(100% - min(var(--sheet), 100%) - 2 * var(--space-9))); }
+#find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
+#find input[type=search] { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-4) var(--space-7); font-size: var(--text-6); outline: none; }
+#find select { flex: none; max-width: var(--select-least); border: 0; background: none; color: var(--muted); }
+#find .quiet-button.on { color: var(--accent); border-color: var(--accent); }
+#find .found { list-style: none; margin: 0 0 var(--space-4); padding: var(--space-3); max-height: var(--found-most); overflow: auto; background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); }
+#find .found[hidden] { display: none; }
+#find .found a { display: flex; gap: var(--space-5); align-items: center; min-width: 0; padding: var(--space-4) var(--space-5); border-radius: var(--radius-2); color: var(--text); text-decoration: none; white-space: nowrap; }
+#find .found a:hover, #find .found a:focus { background: var(--accent-soft); }
+#find .found .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#find .found > li.muted, #find .found > li.error { padding: var(--space-4) var(--space-5); }
+#find .found-new { border-top: var(--border-1) solid var(--line); margin-top: var(--space-3); padding-top: var(--space-3); }
+
+/* The sheet: one thing read as a document, over the canvas's right side; the whole width on a narrow screen. */
+#sheet { position: fixed; z-index: 4; top: 0; right: 0; bottom: 0; width: min(var(--sheet), 100%); overflow: auto; background: var(--bg); border-left: var(--border-1) solid var(--line); box-shadow: 0 0 var(--space-13) rgb(0 0 0 / 0.14); transform: translateX(100%); visibility: hidden; transition: transform 0.18s ease, visibility 0s 0.18s; }
+body[data-sheet="open"] #sheet { transform: none; visibility: visible; transition: transform 0.18s ease; }
+@media (prefers-reduced-motion: reduce) { #sheet, body[data-sheet="open"] #sheet { transition: none; } }
+#sheet-close { position: sticky; z-index: 1; top: var(--space-6); float: right; margin: var(--space-6) var(--space-6) 0 0; width: var(--box-8); height: var(--box-8); padding: 0; border-radius: var(--radius-pill); font-size: var(--text-8); line-height: 1; }
+#main { padding: var(--space-11) var(--space-11) var(--space-14); }
+#sheet .page-head { margin-bottom: var(--space-8); }
+#sheet .page-head h1 { font-size: var(--text-9); line-height: 1.2; margin: 0 0 var(--space-5); padding-right: var(--box-8); }
+#sheet .sheet-marks { gap: var(--space-4); }
+#sheet .toolbar.facts { flex-wrap: wrap; margin-bottom: var(--space-9); }
+#sheet .grid { grid-template-columns: minmax(0, 1fr); }
+#sheet .card.note { background: none; border: 0; border-radius: 0; }
+#sheet .card.note > .body, #sheet .card.note > .fields { padding-left: 0; padding-right: 0; }
+#sheet a.button { display: inline-flex; align-items: center; padding: var(--space-4) var(--space-7); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); color: var(--text); text-decoration: none; background: var(--panel); }
+#sheet a.button:hover { border-color: var(--accent); }

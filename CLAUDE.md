@@ -142,18 +142,19 @@ where, and how that server is run.
 
 ## UI rules
 
-What each screen is for (one level of the hierarchy per screen, a bounded
-Home, named views kept on the map) is in `docs/ui-strategy.md`; read it before
-adding or changing a screen.
+What each surface is for (the canvas, the sheet over it, named views kept on
+the map) is in `docs/ui-strategy.md`; read it before adding or changing a
+screen. How to make a drawing pack is `packs/canvas/README.md`.
 
 The UI is for a person glancing at it, and most of what it shows was written
 by agents, who write paragraphs. Every screen keeps to these (the owner's
 goal, 8 Oct 2026: minimal, no walls of text, text never stacking vertically,
 spatial where it can be):
 
-- **One thing, one page.** An item has a single page, and every way to it
-  (Home, a search, a link, an agent's show) leads to that same page, so a
-  person always lands somewhere they recognise. A list or dashboard points at
+- **One thing, one page.** An item has a single page, the sheet that opens
+  over the canvas where it stands, and every way to it (the canvas, find, a
+  link, an agent's show) leads to that same page, so a person always lands
+  somewhere they recognise. A list or dashboard points at
   the page; it never draws its own version of the item. What one kind of item
   needs beyond the common page (a project's roadmap) is a part of that page,
   not a second screen. Before adding a screen, ask whose page it belongs on.
@@ -179,9 +180,10 @@ spatial where it can be):
 - **A mark for a state.** Status, age, authority and counts are pills, marks
   and numbers, not sentences.
 - **One or two actions in sight.** What is done rarely goes in a `menu`.
-- **Draw it when it has a shape.** Structure, order and neighbourhood are
-  drawn (the roadmap, the graph, an item's links), with the list as
-  the second view.
+- **Connections are drawn, never listed.** The canvas is the app: what is
+  inside what, what holds what up and what names what are drawn in space
+  (the canvas pack's drawing, or a view's own), and no page lists an item's
+  links (the owner, 24 Oct 2026; `docs/ui-strategy.md` section 0).
 - **A name is a few words.** An item's title is read in a row, in a box on a
   chart and in a tooltip: name the thing, in 60 characters at most (the
   server refuses longer from an agent), and say the rest in the first line

@@ -1,21 +1,20 @@
-// The page every item lands on, drawn from what every item has and what its kind and type say of it: where it
-// sits, its facts, a picture of what it is tied to, what holds it up, its note and its history. What a pack adds
-// for a kind or type comes as screens (ui/screens.js), one column under the note; the page names no pack's type.
+// The page every item lands on, in the sheet that opens from the side of the canvas: the item read as a document.
+// Its title, one line of marks (its type, status, owner and short fields), its note or its text with what it brings
+// in, and what its pack adds for its kind or type (ui/screens.js) under that. What it is tied to is not listed here:
+// the canvas behind draws it, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
 import { api, ask, h, part, tell } from './base.js';
 import { renderBody } from './body.js';
 import { automationDoes, entityForm } from './forms.js';
 import { documentMenu, documentNote, figureOf, readDocument } from './item-doc.js';
 import { relationEditor } from './item-links.js';
-import { lensView, storyPart } from './lens.js';
+import { storyPart } from './lens.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, drawScreens, fold, keepsFigure, readWhole } from './screens.js';
-import { RAN, ageChip, ago, changeRow, chip, eventLine, gist, idsAsLinks, idsIn, isA, isClosed, link, menu, pill, relations, statusesOf, titles, tokensText, typeTitle, types, when } from './words.js';
+import { RAN, ageChip, ago, changeRow, chip, eventLine, gist, idsAsLinks, idsIn, isA, link, menu, relations, statusesOf, titles, tokensText, types, when } from './words.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
 const rootOf = (type) => relations.get(type)?.root ?? type;
-/** The ties that hold work up: what depends on it, waits on it or needs it. */
-const HOLDING = ['depends_on', 'waits_on', 'needs'];
 /** A session's own record (where it ran, its ids, when it was heard from, what it used): said as marks, not as fields. */
 const RUN_OWN = ['story', 'session_id', 'cwd', 'last_seen', 'tokens_used', 'surface'];
 /** A field that holds an item's id. */
@@ -37,7 +36,6 @@ export async function entity(id, here) {
   }
   const e = data.entity;
   const type = types.get(e.type);
-  const altitude = type?.altitude;
   const change = async (ops, reason) => {
     try {
       await api('change', { ops, reason });
@@ -63,10 +61,6 @@ export async function entity(id, here) {
   const looks = (await api('view', { name: 'style', params: { of: id } })).style;
 
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
-  // What names it, less what the trail already leads to; and what it makes for a reader, named under its title.
-  const made = (r) => rootOf(r.type) === 'part_of' && types.get(r.entity_type)?.deliverable;
-  const mentions = (data.mentioned_in ?? []).filter((m) => !data.trail?.some((t) => t.id === m.id) && !data.incoming.some((r) => r.id === m.id && made(r)));
-  const delivers = data.incoming.filter((r) => made(r) && !isClosed(r.entity_type, r.status));
   // What can be shown to anyone is what its pack says can be; public work (a product) has a page of its own.
   const publishable = !e.archived_at && type?.public;
   // Work an agent can take on: what can be estimated.
@@ -80,9 +74,6 @@ export async function entity(id, here) {
     else sets.push({ changeset: ev.changeset, events: [ev] });
   }
   const lines = sets.flatMap((g) => (g.changeset ? changeRow(g, { here: id }) : g.events.map(eventLine)));
-  const holding = data.incoming.filter((r) => HOLDING.includes(rootOf(r.type)));
-  const heldBy = data.outgoing.filter((r) => HOLDING.includes(rootOf(r.type)));
-  const tieRows = (rows) => h('ul', { class: 'rows' }, rows.map((r) => h('li', { class: 'row-top tie-row' }, chip(r.entity_type), h('span', { class: 'grow', title: r.title }, link(r)), rootOf(r.type) !== 'depends_on' && h('span', { class: 'muted small' }, relations.get(r.type)?.title ?? r.type), pill(r.entity_type, r.status))));
   const endSession = async () => {
     if (!(await ask({ title: `End "${e.title}"?`, message: 'Anything it holds is released.', action: 'End session', danger: true }))) return;
     try {
@@ -160,42 +151,14 @@ export async function entity(id, here) {
       );
   const screens = drawScreens({ e, data, id, redraw: again });
 
+  // Where it stands on the canvas, drawn from: what holds it, or itself when it holds things (Enter).
+  const holds = data.incoming.some((r) => (relations.get(r.type)?.root ?? r.type) === 'part_of');
   const kids = [
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row-top' }, chip(e.type), altitude && h('span', { class: 'pill', title: `How high this sits: workspace, project, stream, step` }, altitude), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), shown?.published ? h('span', { class: `pill ${shown.changed ? 'warn' : 'ok'}`, title: shown.changed ? 'Its draft says something other than what anyone reads: publish it again to show them' : 'Anyone reads it as it is now, at its own address' }, shown.changed ? 'draft changed' : 'published') : e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.some((s) => !s.to_workspace) && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.filter((s) => !s.to_workspace).length})` }, 'shared by link'), links.filter((s) => s.to_workspace).map((s) => h('span', { class: 'pill', title: `Readable in the workspace "${s.to_workspace}" once accepted there` }, `shared with ${s.to_workspace}`)), doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`), plan?.to_publish > 0 && h('span', { class: 'pill warn', title: `Not published as they are now: ${plan.documents.filter((d) => d.changed).map((d) => d.title).join(', ')}` }, `${plan.to_publish} to publish`)),
-      // Where it sits, from Home down, each step a way back up, so a person always knows how high they are; a stream or a
-      // step in nothing says so, as work to file (docs/ui-strategy.md).
-      h(
-        'nav',
-        { class: 'trail', title: 'Where this sits' },
-        h('a', { class: 'trail-step', href: '#/' }, 'Home'),
-        (data.trail ?? []).map((t) => [h('span', { class: 'trail-sep' }, '›'), h('a', { class: 'trail-step', href: `#/e/${t.id}`, title: `${typeTitle(t.type)}: ${t.title}` }, t.title)]),
-        !data.trail?.length && (altitude === 'stream' || altitude === 'step') && [h('span', { class: 'trail-sep' }, '›'), h('span', { class: 'muted', title: 'Part of no project yet' }, 'not filed')],
-      ),
-      h('h1', { style: 'margin-top: var(--space-4)' }, e.title),
-      // The pictures it is drawn in, each a way straight back to it with this item marked, and the documents that show it.
-      data.shown_in?.length > 0 &&
-        h(
-          'div',
-          { class: 'delivers shown-in', title: 'The views this is drawn in' },
-          h('span', { class: 'muted small' }, 'Shown in'),
-          data.shown_in.map((v) => [
-            h('a', { class: 'trail-view', href: `#/graph?from=${v.of.id}&lens=${v.id}&here=${id}`, title: `Open "${v.title}" of ${v.of.title}, with this marked in it` }, v.title),
-            v.documents.map((d) => h('a', { class: 'deliverable', href: `#/e/${d.id}?here=${id}`, title: `"${v.title}" is drawn in this document; it opens with this marked` }, chip(d.type), h('span', { class: 'gist' }, d.title))),
-          ]),
-        ),
-      // What names it in its text: a link written as an id has its way back here.
-      mentions.length > 0 && h('div', { class: 'delivers mentions', title: 'What names this in its text or fields' }, h('span', { class: 'muted small' }, 'Mentioned in'), mentions.map((m) => h('span', { class: 'deliverable' }, chip(m.type), h('span', { class: 'gist', title: m.title }, link(m))))),
-      // What it makes for a reader or a customer, named where it is looked for: under the title of what it is part of.
-      delivers.length > 0 &&
-        h(
-          'div',
-          { class: 'delivers', title: 'What this delivers: documents, files and releases that are part of it' },
-          h('span', { class: 'muted small' }, 'Delivers'),
-          delivers.map((r) => h('span', { class: 'deliverable' }, chip(r.entity_type), h('span', { class: 'gist', title: r.title }, link(r)), pill(r.entity_type, r.status))),
-        ),
+      h('h1', {}, e.title),
+      h('div', { class: 'row-top sheet-marks' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), shown?.published ? h('span', { class: `pill ${shown.changed ? 'warn' : 'ok'}`, title: shown.changed ? 'Its draft says something other than what anyone reads: publish it again to show them' : 'Anyone reads it as it is now, at its own address' }, shown.changed ? 'draft changed' : 'published') : e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.some((s) => !s.to_workspace) && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.filter((s) => !s.to_workspace).length})` }, 'shared by link'), links.filter((s) => s.to_workspace).map((s) => h('span', { class: 'pill', title: `Readable in the workspace "${s.to_workspace}" once accepted there` }, `shared with ${s.to_workspace}`)), doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`), plan?.to_publish > 0 && h('span', { class: 'pill warn', title: `Not published as they are now: ${plan.documents.filter((d) => d.changed).map((d) => d.title).join(', ')}` }, `${plan.to_publish} to publish`)),
     ),
     h(
       'div',
@@ -209,6 +172,7 @@ export async function entity(id, here) {
       runFacts,
       short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), value(v))),
       h('span', { class: 'grow' }),
+      holds && h('a', { class: 'button', href: `#/e/${id}?in=${id}`, title: 'Draw the canvas from this: what is in it, and how it is tied' }, 'Enter'),
       !e.archived_at && h('button', { onclick: edit }, 'Edit'),
       menu('More', [
         !e.archived_at && ties.any && ['Edit links', ties.open],
@@ -251,12 +215,7 @@ export async function entity(id, here) {
     ),
     ties.editor,
     acting,
-    // Where it sits and what it holds, as a picture: the lens and the style kept for it, or the ones every item opens on. It takes no room when there is nothing to draw.
-    // Whether its page draws that picture is its style's (a document's preset says no: what it holds is in its text).
-    ...(story ? [storyPart(story)].flat() : !looks.page.picture ? [] : [h('section', { class: 'card lens-card', style: 'margin-bottom: var(--space-8)' }, lensView({ lens: { from: id }, quiet: true }))]),
-    // What it holds up and what holds it, said outright: a picture places them, these say which way the tie runs.
-    (holding.length + heldBy.length > 0 || '') &&
-      h('div', { class: 'grid', style: 'margin-bottom: var(--space-8)' }, holding.length > 0 && fold(id, 'holding', 'Waiting on this', holding.length, looks.page.ties === 'open', tieRows(holding)), heldBy.length > 0 && fold(id, 'held', 'This waits on', heldBy.length, looks.page.ties === 'open', tieRows(heldBy))),
+    ...(story ? [storyPart(story)].flat() : []),
     // What it is comes before what its screens draw of it: said under a chart, it reads as a caption to it.
     // A session that tells its story keeps its log of notes behind a fold: the story is what it says.
     h('div', { class: 'grid', style: 'margin-bottom: var(--space-8)' }, story ? fold(id, 'log', 'Log', 0, false, note) : note),

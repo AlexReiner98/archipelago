@@ -37,7 +37,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   assert.deepEqual([project.style.page.picture, project.style.page.notes], [true, 'folded'], 'a project has the house style');
   const doc = await of(made.d);
   assert.deepEqual([doc.style.page.picture, doc.style.page.notes, doc.style.page.ties], [false, 'whole', 'open'], 'a document reads through, the rest of its page the house style\'s');
-  assert.deepEqual(doc.used.map((u) => u.preset), ['core.house', 'work.reading']);
+  assert.deepEqual(doc.used.map((u) => u.preset), ['core.house', 'canvas.house', 'work.reading']);
   // The owner's version of the reading preset: documents fold again, the picture still left out.
   await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Mine', props: { preset: 'work.reading', page: { notes: 'folded' } } }]);
   const mine = await of(made.d);
