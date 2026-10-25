@@ -74,7 +74,9 @@ export function picture({ answer, style, types = {}, reduced }, tools) {
     return `${t}…`;
   };
   const root = answer.items.find((i) => i.id === answer.lens.from);
-  const g = layout({ items: answer.items, links: answer.links, rootId: root?.id, measure, sizes: style.sizes, numbers: style.numbers });
+  // The link types the style draws no wire for (undrawn: core's house style, tagged) tie nothing here either.
+  const undrawn = new Set(Array.isArray(style.undrawn) ? style.undrawn : []);
+  const g = layout({ items: answer.items, links: answer.links.filter((l) => !undrawn.has(l.kind ?? l.type)), rootId: root?.id, measure, sizes: style.sizes, numbers: style.numbers });
   const steps = g.all.filter((n) => !n.dummy);
   // Steps put where a person put them, and the wires to them solved again at right angles (./free.js).
   const placed = story ? {} : placesOf(answer, style);

@@ -320,7 +320,7 @@ seen working, what bites when working here, what to do next and why.
 Types live in files under `packs/`, one folder per pack:
 
 - `core`: the seven kinds of the work and the system kind, the common
-  types of them (person, company, agent, goal, area, event, resource), the
+  types of them (person, company, agent, goal, area, tag, event, resource), the
   system's own (lens, style, screen) and the root links, which name
   kinds at their ends.
 - `work`, on in every workspace: project, task, decision, issue, meeting,

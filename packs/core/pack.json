@@ -149,6 +149,13 @@
       "statuses": { "open": ["active"], "closed": ["retired"] }
     },
     {
+      "id": "tag",
+      "extends": "aim",
+      "title": "Tag",
+      "description": "What items belong with, named in a word or two: an item is tagged with any number of them (tagged), and a lens's filter selects by it (tagged <tag>).",
+      "statuses": { "open": ["active"], "closed": ["retired"] }
+    },
+    {
       "id": "event",
       "capabilities": { "when": { "start": "at", "end": "ends" }, "where": { "field": "location" } },
       "extends": "occurrence",
@@ -200,6 +207,7 @@
       "fields": {
         "shape": { "type": "enum", "values": ["list", "flow", "grid", "time", "architecture"], "description": "One of the drawings that come built in, used when the style has no code of its own. architecture: a system read from the top down, each part a box (a store a cylinder, a client a pill) inside a box for the place it is part of (a host, a cloud), wires at right angles from a part to what it depends on or calls, each labelled with what the link says; a dot for each part's health (read from its status: up, degraded, down, being wired, planned), and each wire wired, not yet wired (dashed) or broken (red), by the link's own state or else by its two ends. list: a table, one line a row, its marks in columns; a thing that holds others a group that folds. grid: rows by what the start holds, columns by the lens's lanes, each thing a card; no lines are drawn. time: along a time axis (the lens's time), as a calendar of days with hours down (layout: calendar) or as bars across days (layout: bars, a Gantt chart), each lane a row; the one a lens on a time axis is drawn in unless said. flow: a process map read from the top down, each item a step (work a box, a question a diamond, an occurrence a pill, a record a sheet), wires at right angles from what is depended on to what depends on it, an open question's choices as dashed scenarios. Any other look is code of its own. list unless said." },
         "lit": { "type": "enum", "values": ["all", "you", "blocked"], "description": "What stays lit as it opens." },
+        "undrawn": { "type": "json", "description": "The link types drawn as no wire, as a list, e.g. [\"tagged\"]: the items are still drawn and still filtered by them. An empty list draws every link the drawing draws." },
         "places": { "type": "json", "large": true, "description": "Where a person put things on the canvas: by canvas (the id of the item a view is drawn from, else of the view, else map), then by item, the middle of each as [x, y] in the picture's own units. Written by the page in one change just before the person's next action (the owner, 25 Oct 2026); a drawing that draws free places reads it (the flow does)." },
         "layout": { "type": "enum", "values": ["calendar", "bars"], "description": "time: a calendar of days, hours running down (calendar), or each lane a row of bars across the days (bars, a Gantt chart). calendar unless said." },
         "hours": { "type": "json", "description": "time, calendar: the hours of the day shown, as [from, to], e.g. [6, 22]. The whole day unless said." },
@@ -390,6 +398,15 @@
       "from": ["*"],
       "to": ["*"],
       "description": "A loose link. Prefer a specific relation when one fits."
+    },
+    {
+      "id": "tagged",
+      "extends": "relates_to",
+      "title": "is tagged",
+      "inverse": "tags",
+      "from": ["*"],
+      "to": ["tag"],
+      "description": "What the item belongs with: any number of tags to an item. A lens's filter selects by it (tagged <tag id or name>); the house style draws no wire for it (undrawn)."
     }
   ],
   "rules": [
@@ -786,6 +803,7 @@
       "title": "House style",
       "props": {
         "shape": "list",
+        "undrawn": ["tagged"],
         "lit": "all",
         "open": 1,
         "show": ["status", "waits", "sessions"],

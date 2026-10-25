@@ -1,0 +1,37 @@
+// The flow drawing honours the style's undrawn: a link type it names (core's house style names tagged) draws no wire
+// and ties nothing, so an item tagged and nothing else stays a loose step of its own; a style can turn it back on.
+
+import assert from 'node:assert/strict';
+import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+import { pathToFileURL } from 'node:url';
+
+const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
+const house = { ...pack.styles.find((s: any) => s.id === 'core.house').props, shape: 'flow' };
+const laid = mkdtempSync(join(tmpdir(), 'flow-undrawn-'));
+for (const [name, file] of Object.entries(pack.drawings.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
+const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
+const measure = (t: string, px: number) => t.length * px * 0.55;
+const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
+const ROOT = 'e_rootzzzz';
+const item = (id: string, title: string, inside: string | null = ROOT) => ({ id, kind: 'work', type: 'work.task', inside, title, place: 0, open: true, status: 'todo', state, within: { items: 0 }, fields: {} });
+const answer = {
+  lens: { from: ROOT },
+  items: [{ ...item(ROOT, 'A process', null), kind: 'aim' }, item('e_askzzzzz', 'Ask'), item('e_planzzzz', 'Plan'), item('e_loosezzz', 'Tagged only', null), { ...item('e_tagzzzzz', 'A tag', null), kind: 'aim', type: 'tag' }],
+  links: [
+    { kind: 'depends_on', from: 'e_planzzzz', to: 'e_askzzzzz' },
+    { kind: 'tagged', from: 'e_loosezzz', to: 'e_tagzzzzz' },
+  ],
+};
+const steps = (style: any) => JSON.stringify(picture({ answer, style, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene.svg).match(/"key":"s:e_[a-z]+"/g)!.map((k) => k.slice(9, -1)).sort();
+
+test('the house style draws no tagged wire: what is tagged and nothing else stays loose', () => {
+  assert.deepEqual(house.undrawn, ['tagged']);
+  assert.ok(steps(house).includes('e_loosezzz'), 'the tagged item is a loose step of its own');
+});
+
+test('a style that draws every link ties the tagged item as any link does', () => {
+  assert.ok(!steps({ ...house, undrawn: [] }).includes('e_loosezzz'), 'tied by its tag, it is no loose step');
+});
