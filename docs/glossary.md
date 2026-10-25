@@ -56,8 +56,8 @@ drawn in a **style** (how it looks; `src/styles.ts`). Both are items, so a
 view is kept on the map and changed like anything else. Replaces *picture*
 where a picture meant this (an *image* is a picture file, such as a test's
 screenshot). The read tools a pack declares (`views` in a pack file) are
-also called views; one declared with a `lens` is a **lens preset**,
-answered by the lens query like any view on the map.
+also called views; one declared with a `lens` is answered by a read of the
+kernel's that it names (the flat lens, the graph, the tree, attention...).
 
 **drawing.** The code that draws one form of view (list, flow, grid, time,
 architecture): shipped by a pack (`drawings` in its pack file), run in the

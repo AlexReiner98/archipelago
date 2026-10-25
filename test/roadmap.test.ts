@@ -178,12 +178,11 @@ test('a lens answers with one shape of data: what is inside what, the same count
   await make(l, [{ op: 'archive', id: onlyShortcut.s }]);
 
   // A hub is an item that holds enough to need views of its own: how much is enough is its project's to say.
-  assert.deepEqual([hubP.hub, ((await ask(l, 'hubs', { within: made.p })) as any).hubs], [{ is: false }, []], 'six things are not twelve');
+  assert.deepEqual(((await ask(l, 'hubs', { within: made.p })) as any).hubs, [], 'six things are not twelve');
   await make(l, [{ op: 'update', id: made.p, props: { hub_at: 2 } }]);
   const found = ((await ask(l, 'hubs', { within: made.p })) as any).hubs.map((h: any) => [h.title, h.inside, h.at, h.views]);
   assert.deepEqual(found, [['P', 5, 2, 3], ['Early', 2, 2, 0]], 'while a project is shaped, most of what is in it is a hub');
   await assert.rejects(ask(l, 'hubs', {}), /within an item or a place/, 'across the whole map, hubs are not read');
-  assert.deepEqual((await run({ from: made.early })).hub, { is: true, inside: 2, at: 2 });
 
   // Code in a style runs in the browser of whoever looks: an agent that writes it proposes it, whatever else agents may do unreviewed.
   const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', merge: 'auto' });

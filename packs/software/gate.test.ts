@@ -24,7 +24,7 @@ const TYPES: Record<string, { estimated: boolean; settles: boolean; settled_by: 
   'work.note': { estimated: false, settles: false, settled_by: null },
 };
 
-/** A map of items and links, read as the kernel would answer: what the lens from an item reads, links out of an item by kind (flavours included), what is part of what, and what blocks what. */
+/** A map of items and links, read as the kernel would answer: what is read around an item, links out of an item by kind (flavours included), what is part of what, and what blocks what. */
 function ctxOver(items: Item[], links: [string, string, string][], blocked: Record<string, string[]> = {}, me = 'e_me') {
   const byId = new Map(items.map((e) => [e.id, { status: 'todo', is_open: true, owner: null, props: {}, ...e, is: LINEAGE[e.type] ?? [e.type] }]));
   const kinds: Record<string, string[]> = { ships: ['ships', 'software.ships'] };
@@ -33,8 +33,8 @@ function ctxOver(items: Item[], links: [string, string, string][], blocked: Reco
   return {
     read: async (q: Record<string, any>) => {
       if (q.me) return me;
-      // What the lens from the event reads: here, all of the map.
-      if (q.lens) return { items: [...byId.values()], links: links.map(([from, type, to], i) => ({ id: `r${i}`, type, from, to, is: type === 'software.ships' ? ['software.ships', 'ships', 'relates_to'] : [type] })) };
+      // What is read around the event: here, all of the map.
+      if (q.around) return { items: [...byId.values()], links: links.map(([from, type, to], i) => ({ id: `r${i}`, type, from, to, is: type === 'software.ships' ? ['software.ships', 'ships', 'relates_to'] : [type] })) };
       if (q.parts_of) return [...new Set(q.parts_of.flatMap((id: string) => [id, ...parts(id)]))].map((id) => byId.get(id as string)!);
       if (q.get) return byId.get(q.get) ?? null;
       if (q.items) return [...byId.values()].filter((e) => e.is.includes(q.items.type));

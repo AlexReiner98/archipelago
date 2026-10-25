@@ -46,7 +46,7 @@ export interface Input {
 }
 
 /**
- * What a lens read, handed to attention as its state stage (src/lens-scan.ts): the items, with their fields, and the
+ * What a lens read, handed to attention as its state stage (src/region.ts): the items, with their fields, and the
  * links among them. Attention then reads no items or links of its own: what it answers is the state of what was read.
  */
 export interface Read {

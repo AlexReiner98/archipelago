@@ -1,10 +1,10 @@
 // The brief: everything a session needs to start on one task, as data and as text to paste. What it is part of,
 // its repository, what blocks it, what it needs and who holds that, and what it rests on beyond structure. Answered
-// from what the brief's lens read around the task (src/lens-presets.ts): the task, what holds it, and what they link to.
+// from what the brief reads around the task (briefRead): the task, what holds it, and what they link to.
 
 import { commitRule } from './commit-rule.ts';
 import { blockGraph } from './blocking.ts';
-import type { Row } from './lens-scan.ts';
+import { scanAround, type Row } from './region.ts';
 import { whereOf } from './places.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 
@@ -25,6 +25,15 @@ export interface BriefRead {
 
 /** How far up what holds a task the brief reads: what it is part of, outwards. */
 export const BRIEF_UP = 6;
+
+/**
+ * What a brief reads around its task (src/region.ts): what holds it, BRIEF_UP steps up; what it and those link to
+ * by the links named (over); what it needs, with what that is tied to; and nothing linked to them.
+ */
+export function briefRead(l: Archipelago, task: string, over: string[]) {
+  const reg = l.registry;
+  return scanAround(l, { starts: [task], by: reg.relationFamily('part_of'), over: reg.relationFamily(...over), waits: [], up: BRIEF_UP, through: reg.relationFamily('needs'), narrow: true });
+}
 
 const due = (e: Row) => (e.props.due == null ? null : String(e.props.due));
 
