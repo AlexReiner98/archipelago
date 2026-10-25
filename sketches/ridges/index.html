@@ -25,6 +25,8 @@
   #photo { display: none; max-width: 100%; border-radius: 4px; margin-top: 6px; }
   main { display: grid; place-items: center; overflow: auto; padding: 20px; }
   canvas { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
+  #sources { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #sources a { color: inherit; }
   #note { opacity: .6; font-variant-numeric: tabular-nums; font-size: 12px; }
 </style>
 </head>
@@ -34,7 +36,8 @@
   <h2>Palette</h2>
   <select id="place" aria-label="Palette"></select>
   <div class="swatches" id="swatches" title="Paper and ink first, then the island colours. Click one to change it."></div>
-  <div class="row"><button id="shuffle" title="Same colours, another order">Shuffle colours</button></div>
+  <div id="sources"></div>
+  <div class="row"><button id="shuffle" title="Same colours, another order">Shuffle colours</button><label class="check" title="Use each colour as much as it covers the photos"><input id="weighted" type="checkbox" checked> As in the photos</label></div>
   <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
   <img id="photo" alt="">
   <h2>Land</h2>
@@ -72,7 +75,14 @@
   const pal = () => palettes[$('place').value];
 
   const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), wrap: $('wrap').checked, seed });
-  const colourOf = (p, i) => p.colours[i % p.colours.length];
+  // A colour for a shape's number: in proportion to the palette's weights when it has them, else evenly.
+  const colourOf = (p, i) => {
+    if (!p.weights || !$('weighted').checked) return p.colours[i % p.colours.length];
+    const total = p.weights.reduce((a, b) => a + b, 0);
+    let t = ((Math.imul(i, 2654435761) >>> 0) / 4294967296) * total;
+    for (let k = 0; k < p.colours.length; k++) if ((t -= p.weights[k]) < 0) return p.colours[k];
+    return p.colours[p.colours.length - 1];
+  };
 
   function draw() {
     const t0 = performance.now(), p = pal();
@@ -100,6 +110,7 @@
   function swatches() {
     const p = pal();
     const all = [['paper', p.paper], ['ink', p.ink], ...p.colours.map((c, i) => [i, c])];
+    $('sources').innerHTML = p.photos ? 'From photos: ' + p.photos.map((s, i) => `<a href="${s.page}" target="_blank" rel="noopener" title="${s.by}, ${s.license}">${i + 1}</a>`).join(' · ') : '';
     $('swatches').innerHTML = all.map(([k, c]) => `<input type="color" value="${c}" data-k="${k}" class="${typeof k === 'string' ? 'role' : ''}" title="${typeof k === 'string' ? k : 'colour ' + (k + 1)}">`).join('');
   }
   $('swatches').addEventListener('input', (ev) => {
@@ -128,13 +139,17 @@
   $('drop').addEventListener('drop', (e) => e.dataTransfer.files[0] && usePhoto(e.dataTransfer.files[0]));
 
   $('shuffle').onclick = () => {
-    const c = pal().colours;
-    for (let i = c.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [c[i], c[j]] = [c[j], c[i]]; }
+    const p = pal(), c = p.colours, w = p.weights;
+    for (let i = c.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [c[i], c[j]] = [c[j], c[i]];
+      if (w) [w[i], w[j]] = [w[j], w[i]];
+    }
     swatches(); draw();
   };
   $('reseed').onclick = () => ((seed += 1), draw());
   $('place').onchange = () => (swatches(), draw());
-  for (const k of [...DIALS, 'wrap']) $(k).addEventListener('input', draw);
+  for (const k of [...DIALS, 'wrap', 'weighted']) $(k).addEventListener('input', draw);
 
   const save = (name, blob) => Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name }).click();
   $('png').onclick = () => $('view').toBlob((b) => save(`archipelago-${$('place').value}-${seed}.png`, b));
