@@ -142,12 +142,40 @@ where, and how that server is run.
 
 ## UI rules
 
-What each surface is for (the canvas, the sheet over it, named views kept on
-the map) is in `docs/ui-strategy.md`; read it before adding or changing a
-screen. How a pack sets how the canvas looks is `packs/canvas/README.md`.
+The page is one flat canvas with a sheet over it. Its principles, and the
+modules they lead to, are `docs/canvas.md`; what each surface is for is
+`docs/ui-strategy.md`. Read both before adding or changing a screen. How a
+pack sets how the canvas looks is `packs/canvas/README.md`.
+
+The canvas keeps to these (the flat canvas, 25 Oct 2026: document
+"Rework: the canvas as a flat graph"):
+
+- **Depth is never drawn.** Every item is a node on one plane and every
+  link a wire; `part_of` is a quiet tie, never a box inside a box. Zoom is
+  scale and how much text shows, never structure.
+- **Lens and style are the whole surface.** What a canvas shows is a flat
+  lens (a filter of terms that add seeds and terms that must all hold of
+  them, a walk, a limit), always in sight in the query bar; how it
+  looks is a style. A click adds to the filter and a search sets its text:
+  growing a canvas is editing its lens. A person and an agent read the same
+  lens (`query` name `flat`), and the page calls no tool an agent lacks for
+  it; `npm test` freezes the names the page calls through `/api`.
+- **Home is the saved canvases.** A canvas kept on the map is a lens and a
+  style (core's `lens` type); Home lists them, and the bar switches between
+  them. There is no other list of views.
+- **Places never carry meaning.** Where a person puts a node is kept in the
+  places stream, one place per canvas and item, read only to draw it there.
+  A grouping that matters is made as a link.
+- **Every gesture is a change.** A wire drawn, a status, Save in the sheet:
+  each is `change` on the person's authority, through the one write path, and
+  a held change is drawn as a ghost where it would land. Moves are the one
+  batch that is not, written to the places stream before the next action.
+- **The page is a replica of the log.** It holds a lens's answer as items
+  and links by id and keeps it current from the facts after its position
+  (`tail`), with the projector the server runs; it never polls for a picture.
 
 The UI is for a person glancing at it, and most of what it shows was written
-by agents, who write paragraphs. Every screen keeps to these (the owner's
+by agents, who write paragraphs. Every screen keeps to these too (the owner's
 goal, 8 Oct 2026: minimal, no walls of text, text never stacking vertically,
 spatial where it can be):
 
@@ -180,10 +208,9 @@ spatial where it can be):
 - **A mark for a state.** Status, age, authority and counts are pills, marks
   and numbers, not sentences.
 - **One or two actions in sight.** What is done rarely goes in a `menu`.
-- **Connections are drawn, never listed.** The canvas is the app: what is
-  inside what, what holds what up and what names what are drawn in space
-  (the flow by the canvas pack's preset, or a view's own), and no page lists an item's
-  links (the owner, 24 Oct 2026; `docs/ui-strategy.md` section 0).
+- **Connections are drawn, never listed.** What an item is tied to is a
+  wire on the canvas (the flow, by the canvas pack's preset, or a view's own
+  drawing), and no page lists an item's links (the owner, 24 Oct 2026).
 - **A name is a few words.** An item's title is read in a row, in a box on a
   chart and in a tooltip: name the thing, in 60 characters at most (the
   server refuses longer from an agent), and say the rest in the first line

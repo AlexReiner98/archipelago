@@ -51,7 +51,8 @@ refused unless its field is declared `"large": true`, which only a type of the
 system kind may do: a drawing's code, a story's steps, a stylesheet.
 
 **view.** A named way of looking at part of the map: a **lens** (what is in
-it: a filter, a walk along links and a limit; `src/lens-flat.ts`)
+it: a filter, of terms that add seeds and terms that must all hold of them,
+a walk along links and a limit; `src/lens-flat.ts`)
 drawn in a **style** (how it looks; `src/styles.ts`). Both are items, so a
 view is kept on the map and changed like anything else. Replaces *picture*
 where a picture meant this (an *image* is a picture file, such as a test's
@@ -64,6 +65,27 @@ architecture): shipped by a pack (`drawings` in its pack file), run in the
 sandbox (`ui/draw.html`), answering with marks the page checks
 (`docs/drawings.md`). Replaces *shape* where a shape meant this; the field
 that names it is still `shape`.
+
+**canvas.** The page's one flat plane, where every item a lens reaches is a
+node and every link a wire; depth is never drawn (`docs/canvas.md`). A
+**saved canvas** is a lens and a style kept on the map, listed on Home. In
+the code: `ui/canvas.js`; a saved canvas is an item of core's system type
+`lens` (`src/lens-saved.ts`, `ui/canvases.js`).
+
+**sheet.** The panel that opens over the canvas from the side, holding one
+item's page (or a new item, the Workspace page, a screen, For you). In the
+code: `#sheet` in `ui/index.html`, routed by `ui/app.js`.
+
+**tag.** What items belong with, named in a word or two: an item of core's
+`tag` type, tied by a `tagged` link, any number to an item. A lens filters by
+one (`tagged <tag>`); the house style draws no wire for it.
+
+**place.** Where a person put an item on a canvas: one per canvas and item,
+kept in the places stream, never an item or a link, and never meaning
+anything. In the code: `src/canvas-places.ts`, `places` and `places_put`.
+
+**ghost.** A held change drawn where it would land on the canvas: a faint
+node, a dashed wire, a badge. In the code: `ui/ghosts.js`.
 
 **pack.** A folder under `packs/` with a `pack.json`: the types, links,
 rules, views, drawings and styles of one way of working, and any code it runs.
