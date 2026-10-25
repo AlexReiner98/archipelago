@@ -1,4 +1,4 @@
-import { api, h, main, route, state } from './base.js';
+import { api, h, hooks, main, route, state } from './base.js';
 
 // ---- live updates --------------------------------------------------------
 
@@ -174,6 +174,8 @@ export async function checkPulse() {
     ear.hidden = !beat.listening;
     ear.textContent = beat.listening > 1 ? `${beat.listening} agents are listening` : 'An agent is listening';
     follow(beat.steps);
+    // What changes touched, for whoever follows items as they are tied (ui/canvas.js).
+    if (touched) hooks.touched?.(touched);
   } catch {
     return;
   }

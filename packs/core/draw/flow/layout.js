@@ -75,11 +75,14 @@ export function layout({ items, links, rootId, measure, sizes, numbers }) {
     }
   }
   // Work about a step rather than a step of the process (nothing leads to it or from it) is not drawn as a step: it
-  // is a mark on the step it is part of, there when that step is.
+  // is a mark on the step it is part of, there when that step is. What is loose (in nothing, holding nothing, tied
+  // by nothing: started on the canvas, not yet wired up) has no step to be a mark on, so it stays a step of its own.
   const wired = new Set(edges.flatMap((e) => [e.a, e.b]));
+  const tied = new Set([...items.map((i) => i.inside).filter(Boolean), ...links.flatMap((l) => [l.from, l.to])]);
+  const loose = (n) => !n.item.inside && !tied.has(n.id);
   if (wired.size)
     for (const n of [...nodes.values()]) {
-      if (wired.has(n.id)) continue;
+      if (wired.has(n.id) || loose(n)) continue;
       nodes.delete(n.id);
       const host = nodes.get(n.item.inside);
       if (host) (host.notes ??= []).push(n.item);

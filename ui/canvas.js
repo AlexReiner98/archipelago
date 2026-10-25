@@ -5,7 +5,7 @@
 // it keeps which lens is up, lights the item whose page is open, says in the bar where on the map it stands, and moves
 // as the reader chose in the settings menu: fitted on every change, or left where they put it.
 
-import { api, h } from './base.js';
+import { api, h, hooks } from './base.js';
 import { lensView } from './lens.js';
 
 const host = document.getElementById('canvas');
@@ -40,6 +40,39 @@ export function mark(here) {
   at.here = here;
   at.view.mark?.(here);
 }
+
+// ---- What was started here and is loose: the canvas goes to each once it is tied (the owner, 25 Oct 2026).
+
+/** The loose items this reader started, kept in this browser until each is tied to something. */
+const loose = new Set();
+try {
+  for (const id of JSON.parse(localStorage.getItem('pelago-loose') ?? '[]')) loose.add(id);
+} catch {
+  // Without storage, only what is started on this page is followed.
+}
+const keepLoose = () => {
+  try {
+    localStorage.setItem('pelago-loose', JSON.stringify([...loose]));
+  } catch {
+    // Kept until the page is reloaded.
+  }
+};
+/** Follow an item just started, loose: when a change ties it (its own, or an agent's once approved), it is the focus. */
+export const followLoose = (id) => id && (loose.add(id), keepLoose());
+// The pulse says which items changes touched (ui/live.js): one of these, now tied, becomes the canvas's focus.
+hooks.touched = async (touched) => {
+  const ids = touched?.ids === null ? [...loose] : (touched?.ids ?? []).filter((id) => loose.has(id));
+  for (const id of ids) {
+    const got = await api('get', { id }).catch(() => null);
+    if (got && !got.entity.archived_at && !got.incoming.length && !got.outgoing.length) continue;
+    loose.delete(id);
+    keepLoose();
+    // Words being written in the sheet are not left for it: the reader goes there themselves.
+    if (!got || got.entity.archived_at || document.querySelector('#sheet [data-draft="unsaved"]')) continue;
+    if (location.hash.split('?')[0] === `#/e/${id}`) hooks.route?.();
+    else location.hash = `#/e/${id}`;
+  }
+};
 
 // ---- What the reader chose for the canvas, in the settings menu: kept in this browser.
 

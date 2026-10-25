@@ -6,6 +6,7 @@
 
 import { api, ask, h, state, tell } from './base.js';
 import { renderBody } from './body.js';
+import { followLoose, refreshCanvas } from './canvas.js';
 
 /** Whether the sheet holds words not yet saved: the router asks before they are left behind. */
 export const unsaved = () => Boolean(document.querySelector('#sheet [data-draft="unsaved"]'));
@@ -66,6 +67,8 @@ export function draftOf({ base, style, editable = true, note = true, saved }) {
       if (isNew) {
         const made = await api('change', { ops: [{ op: 'create', ref: 'new', type: base.type, title: next.title, ...(next.body.trim() && { body: next.body }) }], reason: 'Started on the canvas' });
         box.dataset.draft = '';
+        followLoose(made.created?.new);
+        refreshCanvas();
         return saved(made.created?.new);
       }
       // Someone else's words since the sheet opened are not written over unseen.
