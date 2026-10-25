@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { architectureCases, flowCases } from './drawing-cases.ts';
+import { architectureCases, flowCases, house } from './drawing-cases.ts';
 import { readSteps, stepsShown } from '../src/lens-steps.ts';
 import { serve } from './serve.ts';
 
@@ -182,6 +182,8 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
   }
 });
 
+/** The house style's numbers, which the frame a picture moves in is moved by (ui/pan-zoom.js). */
+const numbers = JSON.stringify(house('flow').numbers);
 /** A drawing's index.js that answers with this scene, after what `before` runs. */
 const hostile = (scene: string, before = '') => `export async function picture(input, tools) { ${before}; return { scene: ${scene} }; }`;
 
@@ -199,6 +201,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       escape: hostile(`{ css: '} body { display: none } x {', svg: ['svg', {}] }`),
       sibling: hostile(`{ css: '~ * { display: none }', svg: ['svg', {}] }`),
       fetch: hostile(`{ css: 'x { background: url(https://example.com/) }', svg: ['svg', {}] }`),
+      viewport: `export async function picture() { return { scene: { svg: ['svg', { key: 'x' }], size: { width: 100, height: 100 } }, viewport: () => [{ key: 'x', mark: ['script', {}, 'parent.document.body.remove()'] }] }; }`,
       tip: hostile(`{ svg: ['svg', { key: 'x' }] }`, `setTimeout(() => tools.patch([{ tip: { key: 'x', mark: ['script', {}, 'parent.document.body.remove()'] } }]), 50)`),
     };
     const body = await page.evaluate('getComputedStyle(document.body).display');
@@ -208,7 +211,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       for (const [name, code] of Object.entries(${JSON.stringify(tries)})) {
         const host = document.createElement('div');
         document.body.append(host);
-        drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
+        drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
         // What it sends after its scene (a tip) is checked when it comes: wait for what it says then.
         for (let n = 0; n < 200 && !host.textContent.startsWith('This drawing stopped'); n++) await new Promise((r) => setTimeout(r, 25));
         out[name] = host.textContent;
@@ -227,7 +230,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       const { drawWith } = await import('/drawing.js');
       const host = document.createElement('div');
       document.body.append(host);
-      drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: 'reach'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(reach)} } } }, () => {});
+      drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: 'reach'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(reach)} } } }, () => {});
       for (let n = 0; n < 200 && !host.textContent; n++) await new Promise((r) => setTimeout(r, 25));
       return host.textContent;
     })()`);
@@ -239,7 +242,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       const { drawWith } = await import('/drawing.js');
       const host = document.createElement('div');
       document.body.append(host);
-      drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: 'stuck'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(stuck)} } } }, () => {});
+      drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: 'stuck'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(stuck)} } } }, () => {});
       for (let n = 0; n < 800 && !host.textContent; n++) await new Promise((r) => setTimeout(r, 25));
       return host.textContent;
     })()`);
@@ -270,7 +273,7 @@ test('in a browser, a drawing that asks for a surface paints pixels over its pic
       const draw = async (name, code, done) => {
         const host = document.createElement('div');
         document.body.append(host);
-        drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
+        drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
         for (let n = 0; n < 400 && !done(host); n++) await new Promise((r) => setTimeout(r, 25));
         return host;
       };

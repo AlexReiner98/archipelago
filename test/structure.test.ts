@@ -204,7 +204,6 @@ const LOOKS_IN_KERNEL: Record<string, number> = {
   'ui/saved-views.js': 1,
   'ui/draw.html': 6,
   'ui/list.css': 2,
-  'ui/pan-zoom.js': 1,
   'ui/public.css': 1,
   'ui/style.css': 16,
   'ui/token-ask.js': 1,
