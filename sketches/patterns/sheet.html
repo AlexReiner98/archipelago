@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pattern sheet</title>
+<style>
+  :root { font: 12px/1.3 system-ui, sans-serif; color: #1d2428; }
+  body { margin: 0; background: #f4f2ec; }
+  #sheet { display: grid; grid-template-columns: 70px repeat(8, 1fr); gap: 2px; padding: 8px; }
+  #sheet span { align-self: center; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #sheet svg { display: block; width: 100%; aspect-ratio: 1; }
+</style>
+</head>
+<body>
+<div id="sheet"></div>
+<script type="module">
+  // Every motif family (columns, rock to reef) against the order dial (rows, strict to loose), each place's palette in turn.
+  import { PLACES, pattern, svgTile } from './pattern.js';
+  const places = Object.values(PLACES);
+  const q = new URLSearchParams(location.search);
+  const density = +(q.get('density') ?? 0.6), line = +(q.get('line') ?? 0.35), seed = +(q.get('seed') ?? 3);
+  const families = ['basalt', 'strata', 'shingle', 'lichen', 'seagrass', 'frond', 'coral', 'polyp'];
+  let html = '<span></span>' + families.map((f) => `<span>${f}</span>`).join('');
+  for (const order of [1, 0.75, 0.45, 0]) {
+    html += `<span>order ${order}</span>`;
+    families.forEach((_, c) => {
+      const p = pattern({ dials: { substrate: c / 7, density, order, line }, palette: places[c % places.length].palette, seed });
+      const id = `p${order}-${c}`.replace('.', '_');
+      html += `<svg><defs><pattern id="${id}" width="${p.w}" height="${p.h}" patternUnits="userSpaceOnUse" patternTransform="scale(0.5)">${svgTile(p, id + 'm')}</pattern></defs><rect width="100%" height="100%" fill="url(#${id})"/></svg>`;
+    });
+  }
+  document.getElementById('sheet').innerHTML = html;
+</script>
+</body>
+</html>

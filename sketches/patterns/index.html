@@ -32,7 +32,7 @@
   <div class="row"><select id="a"></select><select id="b"></select></div>
   <label>Between places <output for="mix"></output><input id="mix" type="range" min="0" max="1" step="0.01" value="0"></label>
   <div class="swatch" id="swatch"></div>
-  <label>Substrate <small>basalt · frond · coral · polyp</small><input id="substrate" type="range" min="0" max="1" step="0.01" value="0.4"></label>
+  <label>Substrate <small>rock · shore · kelp · reef</small><input id="substrate" type="range" min="0" max="1" step="0.01" value="0.4"></label>
   <label>Density <small>bare · dense</small><input id="density" type="range" min="0" max="1" step="0.01" value="0.5"></label>
   <label>Order <small>loose · strict</small><input id="order" type="range" min="0" max="1" step="0.01" value="0.85"></label>
   <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="1" step="0.01" value="0.3"></label>
@@ -54,7 +54,7 @@
 
   const dials = () => Object.fromEntries(['substrate', 'density', 'order', 'line'].map((k) => [k, +$(k).value]));
   const fill = (svg, p, id, zoom = 1) => {
-    svg.innerHTML = `<defs><pattern id="${id}" width="${p.w}" height="${p.h}" patternUnits="userSpaceOnUse" patternTransform="scale(${zoom})">${svgTile(p)}</pattern></defs><rect width="100%" height="100%" fill="url(#${id})"/>`;
+    svg.innerHTML = `<defs><pattern id="${id}" width="${p.w}" height="${p.h}" patternUnits="userSpaceOnUse" patternTransform="scale(${zoom})">${svgTile(p, `${id}-m`)}</pattern></defs><rect width="100%" height="100%" fill="url(#${id})"/>`;
   };
 
   function draw() {
@@ -64,7 +64,7 @@
     fill($('big'), p, 'big-p', +$('zoom').value);
     const ms = performance.now() - t0;
     $('swatch').innerHTML = palette.map((c) => `<span style="background:${c}"></span>`).join('');
-    $('group').textContent = `${p.group} · ${p.shapes.length} shapes · ${ms.toFixed(1)} ms`;
+    $('group').textContent = `${p.group} · ${p.motif.length}×${p.placements.length} · ${ms.toFixed(1)} ms`;
     $('places').innerHTML = keys.map((k) => `<figure data-k="${k}"><svg></svg><figcaption>${PLACES[k].title}</figcaption></figure>`).join('');
     for (const fig of $('places').children) fill(fig.querySelector('svg'), pattern({ dials: dials(), palette: PLACES[fig.dataset.k].palette, seed }), `p-${fig.dataset.k}`, 0.6);
   }

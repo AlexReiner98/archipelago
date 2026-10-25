@@ -91,7 +91,7 @@ function frond(rnd, R, A, d, k) {
 
 function coral(rnd, R, A, d, k) {
   const out = [];
-  const depth = 2 + Math.round(d.density * 3 * k);
+  const depth = 2 + Math.round(d.density * 2 * k);
   const grow = (x, y, ang, len, left) => {
     const [x2, y2] = [x + Math.cos(ang) * len, y + Math.sin(ang) * len];
     out.push({ ops: [['M', x, y], ['L', x2, y2]], stroke: 3, width: (0.8 + d.line * 4) * (0.5 + left / depth) });
@@ -116,7 +116,76 @@ function polyps(rnd, R, A, d, k) {
   return out;
 }
 
-const FAMILIES = [basalt, frond, coral, polyps];
+/** A closed curve through the midpoints of points, rounded at each: a pebble, a lobe, a leaf. */
+function smooth(pts) {
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const ops = [['M', ...mid(pts[pts.length - 1], pts[0])]];
+  pts.forEach((p, i) => ops.push(['Q', ...p, ...mid(p, pts[(i + 1) % pts.length])]));
+  return [...ops, ['Z']];
+}
+/** n points round (x, y), radius r, each pushed out by lobe(t). */
+const ring = (x, y, r, n, lobe = () => 1, turn = 0) => Array.from({ length: n }, (_, i) => at(r * lobe((i / n) * 2 * Math.PI), turn + (i / n) * 2 * Math.PI)).map(([px, py]) => [x + px, y + py]);
+
+// Rock strata and tide lines: wavy bands across the wedge.
+function strata(rnd, R, A, d, k) {
+  const out = [];
+  const bands = Math.round((3 + d.density * 6) * k);
+  const steps = Math.max(3, Math.round(A * 4));
+  for (let i = 0; i < bands; i++) {
+    const r = R * (0.2 + (0.78 * (i + 0.5)) / bands), amp = R * 0.04 * (1 + rnd()), freq = 2 + Math.floor(rnd() * 3), phase = rnd() * 6;
+    const pts = Array.from({ length: steps + 1 }, (_, j) => at(r + amp * Math.sin(freq * (j / steps) * Math.PI * 2 + phase), (A * j) / steps));
+    const ops = [['M', ...pts[0]]];
+    for (let j = 1; j < pts.length - 1; j++) ops.push(['Q', ...pts[j], (pts[j][0] + pts[j + 1][0]) / 2, (pts[j][1] + pts[j + 1][1]) / 2]);
+    ops.push(['L', ...pts[pts.length - 1]]);
+    out.push({ ops, stroke: i % 3 === 2 ? 5 : i % 2 ? 2 : 1, width: 0.6 + d.line * (i % 2 ? 2 : 4) });
+  }
+  return out;
+}
+
+// Shingle beaches: rounded pebbles, packed loosely.
+function shingle(rnd, R, A, d, k) {
+  const out = [];
+  const count = Math.round((4 + d.density * 12) * k);
+  for (let i = 0; i < count; i++) {
+    const [x, y] = at(R * (0.12 + 0.82 * Math.sqrt(rnd())), A * rnd());
+    const r = R * (0.04 + 0.09 * rnd()) * (1.2 - 0.5 * d.density), squash = 0.55 + rnd() * 0.4, turn = rnd() * 3;
+    const pts = ring(0, 0, r, 6, (t) => 0.85 + 0.25 * rnd()).map(([px, py]) => [x + px * Math.cos(turn) - py * squash * Math.sin(turn), y + px * Math.sin(turn) + py * squash * Math.cos(turn)]);
+    out.push({ ops: smooth(pts), fill: [1, 3, 4][i % 3], stroke: d.line > 0.5 ? 5 : undefined, width: 0.5 + (d.line - 0.5) * 2 });
+  }
+  return out;
+}
+
+// Lichen on rock: lobed rings, one inside another.
+function lichen(rnd, R, A, d, k) {
+  const out = [];
+  const count = Math.max(1, Math.round((1 + d.density * 4) * k));
+  for (let i = 0; i < count; i++) {
+    const [x, y] = at(R * (0.25 + 0.6 * rnd()), A * (0.15 + 0.7 * rnd()));
+    const r = R * (0.08 + 0.14 * rnd()), lobes = 5 + Math.floor(rnd() * 5), wob = 0.12 + 0.12 * rnd();
+    [[1, 4], [0.68, 0], [0.4, 1]].forEach(([s, fill]) => out.push({ ops: smooth(ring(x, y, r * s, lobes * 2, (t) => 1 + wob * Math.sin(lobes * t))), fill }));
+    out.push({ circle: [x, y, r * 0.12], fill: 5 });
+  }
+  return out;
+}
+
+// Seagrass: thin tapered blades fanning from a root.
+function seagrass(rnd, R, A, d, k) {
+  const out = [];
+  const blades = Math.round((4 + d.density * 10) * k);
+  const [bx, by] = at(R * 0.1, A / 2);
+  for (let i = 0; i < blades; i++) {
+    const ang = A * (0.1 + 0.8 * (i + rnd() * 0.5) / blades), len = R * (0.5 + 0.45 * rnd()), sway = (rnd() - 0.5) * 0.8;
+    const [tx, ty] = [bx + Math.cos(ang + sway) * len, by + Math.sin(ang + sway) * len];
+    const [cx, cy] = [bx + Math.cos(ang) * len * 0.55, by + Math.sin(ang) * len * 0.55];
+    const wid = 0.8 + d.line * 2.5 + d.density;
+    const [nx, ny] = [-Math.sin(ang) * wid, Math.cos(ang) * wid];
+    out.push({ ops: [['M', bx - nx, by - ny], ['Q', cx - nx, cy - ny, tx, ty], ['Q', cx + nx, cy + ny, bx + nx, by + ny], ['Z']], fill: i % 3 ? 1 : 3 });
+  }
+  return out;
+}
+
+// From rock to reef: the order the substrate dial runs through.
+const FAMILIES = [basalt, strata, shingle, lichen, seagrass, frond, coral, polyps];
 
 // ---- lattices: strict to loose ----
 
@@ -154,8 +223,9 @@ export function pattern({ dials, palette, seed = 1 }) {
 
   // What goes in one wedge: the families near the substrate dial, the nearest weighed most.
   const wedge = [];
+  const span = 1 / (FAMILIES.length - 1);
   FAMILIES.forEach((draw, i) => {
-    const k = 1 - Math.abs(d.substrate - i / (FAMILIES.length - 1)) * 2.2;
+    const k = 1 - Math.abs(d.substrate - i * span) / (span * 1.6);
     if (k > 0.05) wedge.push(...draw(rnd, U * 0.5, A, d, Math.min(1, k + 0.2)));
   });
 
@@ -171,32 +241,51 @@ export function pattern({ dials, palette, seed = 1 }) {
   let places = [[0, 0, 0, 1], [U / 2, U / 2, 0, group.n === 2 ? 1 : 0]];
   if (group.lattice === 'hex') (h = U * Math.sqrt(3)), (places = [[0, 0, 0, 1], [U / 2, h / 2, 0, 1]]);
   if (group.lattice === 'square') places = group.n === 2 ? [[0, 0, 0, 1], [U / 2, U / 2, Math.PI / 2, 0.7]] : [[0, 0, 0, 1]];
+  // Below strict, each rosette on a tile twice as wide leans, shrinks and strays a little, more the looser the order.
+  const loose = Math.min(1, Math.max(0, (0.9 - d.order) / 0.9));
+  if (group.lattice !== 'scatter' && loose > 0.08) {
+    places = [...places, ...places.map(([x, y, a, s]) => [x + w, y, a, s])].map(([x, y, a, s]) => [x + (rnd() - 0.5) * loose * U * 0.2, y + (rnd() - 0.5) * loose * U * 0.2, a + (rnd() - 0.5) * loose * 0.9, s * (1 - loose * 0.35 * rnd())]);
+    w *= 2;
+  }
   if (group.lattice === 'scatter') {
     w = h = U * 2;
-    const count = 3 + Math.round(d.density * 4);
-    places = Array.from({ length: count }, () => [rnd() * w, rnd() * h, rnd() * Math.PI * 2, 0.7 + rnd() * 0.6]);
+    // Spaced as things grow, not thrown: each clump keeps its distance from the others, across the seams too.
+    const far = (x, y, gap) => places.every(([px, py, , ps]) => Math.hypot(Math.min(Math.abs(x - px), w - Math.abs(x - px)), Math.min(Math.abs(y - py), h - Math.abs(y - py))) > gap * (0.5 + ps * 0.5));
+    // A current drifts across the tile, and each clump turns with it; the field repeats with the tile.
+    const [p1, p2] = [rnd() * 6, rnd() * 6];
+    const drift = (x, y) => 1.3 * Math.sin((2 * Math.PI * x) / w + p1) + 1.3 * Math.cos((2 * Math.PI * y) / h + p2);
+    places = [];
+    for (const [count, size, gap] of [[3 + Math.round(d.density * 3), [0.75, 0.55], U * 0.9], [4 + Math.round(d.density * 8), [0.3, 0.2], U * 0.45]]) {
+      for (let tries = 0, n = 0; tries < 300 && n < count; tries++) {
+        const [x, y] = [rnd() * w, rnd() * h];
+        const s = size[0] + size[1] * rnd() ** 2;
+        if (far(x, y, gap)) places.push([x, y, drift(x, y) + (rnd() - 0.5) * 0.5, s]), n++;
+      }
+    }
     // A loose clump is the wedge drawn three times, unevenly: it grows like a colony, not a star.
     rosette.splice(0, rosette.length, ...[0, 1, 2].map((i) => rot(i * 2.1 + rnd() * 0.6, 1 - i * 0.18)));
     R *= 1.3;
   }
 
-  // Each rosette drawn wherever it reaches into the tile, so the tile repeats with no seam.
-  const shapes = [];
+  // The motif is written once; each rosette stands wherever it reaches into the tile, so the tile repeats with no seam.
+  const motif = wedge.map((shape) => ({ d: path(shape, rot(0)), fill: shape.fill != null ? palette[shape.fill] : 'none', stroke: shape.stroke != null ? palette[shape.stroke] : 'none', width: shape.width ?? 0 }));
+  const placements = [];
   for (const [x, y, a, s] of places) {
     if (!s) continue;
     for (const dx of [-w, 0, w]) for (const dy of [-h, 0, h]) {
       const [cx, cy] = [x + dx, y + dy];
       if (cx < -R * s || cx > w + R * s || cy < -R * s || cy > h + R * s) continue;
       const place = rot(a, s, cx, cy);
-      for (const r of rosette) for (const shape of wedge) {
-        shapes.push({ d: path(shape, then(place, r)), fill: shape.fill != null ? palette[shape.fill] : 'none', stroke: shape.stroke != null ? palette[shape.stroke] : 'none', width: shape.width ?? 0 });
-      }
+      // A small clump is drawn once, not three times: it reads the same and costs a third.
+      for (const r of s < 0.5 && group.lattice === 'scatter' ? rosette.slice(0, 1) : rosette) placements.push(then(place, r).map((v) => +v.toFixed(3)));
     }
   }
-  return { w, h, ground: palette[0], group: group.name, shapes };
+  return { w, h, ground: palette[0], group: group.name, motif, placements };
 }
 
-/** The pattern as an SVG <pattern> element's inside, for a page or a test to look at. */
-export const svgTile = ({ w, h, ground, shapes }) =>
-  `<rect width="${w}" height="${h}" fill="${ground}"/>` +
-  shapes.map((s) => `<path d="${s.d}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${n1(s.width)}" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+/** The pattern as an SVG <pattern> element's inside, for a page or a test to look at: the motif once, then placed. */
+export const svgTile = ({ w, h, ground, motif, placements }, id = 'm') =>
+  `<defs><g id="${id}">` +
+  motif.map((s) => `<path d="${s.d}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${n1(s.width)}" stroke-linecap="round" stroke-linejoin="round"/>`).join('') +
+  `</g></defs><rect width="${w}" height="${h}" fill="${ground}"/>` +
+  placements.map((m) => `<use href="#${id}" transform="matrix(${m.join(' ')})"/>`).join('');
