@@ -32,6 +32,8 @@ body[data-sheet="open"] #nav { right: calc(min(var(--sheet), 50%) + var(--space-
 #trail .trail-sep { color: var(--muted); flex: none; }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
 #marks .count.held { background: var(--warn); }
+#new-item { display: inline-flex; align-items: center; justify-content: center; width: var(--box-8); height: var(--box-8); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); color: var(--text); font-size: var(--text-8); line-height: 1; text-decoration: none; }
+#new-item:hover { border-color: var(--accent); }
 #listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
 #listening::before { content: "● "; }
 #listening[hidden] { display: none; }
@@ -71,12 +73,31 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 @media (prefers-reduced-motion: reduce) { #sheet, body[data-sheet="open"] #sheet { transition: none; } }
 #sheet-close { position: sticky; z-index: 1; top: var(--space-6); float: right; margin: var(--space-6) var(--space-6) 0 0; width: var(--box-8); height: var(--box-8); padding: 0; border-radius: var(--radius-pill); font-size: var(--text-8); line-height: 1; }
 #main { padding: var(--space-11) var(--space-11) var(--space-14); }
-#sheet .page-head { margin-bottom: var(--space-8); }
-#sheet .page-head h1 { font-size: var(--text-9); line-height: 1.2; margin: 0 0 var(--space-5); padding-right: var(--box-8); }
-#sheet .sheet-marks { gap: var(--space-4); }
-#sheet .toolbar.facts { flex-wrap: wrap; margin-bottom: var(--space-9); }
-#sheet .grid { grid-template-columns: minmax(0, 1fr); }
-#sheet .card.note { background: none; border: 0; border-radius: 0; }
-#sheet .card.note > .body, #sheet .card.note > .fields { padding-left: 0; padding-right: 0; }
-#sheet a.button { display: inline-flex; align-items: center; padding: var(--space-4) var(--space-7); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); color: var(--text); text-decoration: none; background: var(--panel); }
-#sheet a.button:hover { border-color: var(--accent); }
+/* The sheet reads as a document: a title, one quiet line of marks, the note, and what a pack adds as plain sections
+   under small headings. No cards, no borders between parts: space and type set them apart. */
+#sheet .page-head { margin-bottom: var(--space-9); }
+#sheet .draft-title { font-size: var(--text-9); line-height: 1.2; margin: 0 0 var(--space-5); padding-right: var(--box-8); outline: none; overflow-wrap: anywhere; }
+#sheet .draft-title:empty::before { content: attr(data-placeholder); color: var(--muted); }
+#sheet .sheet-marks { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-4); }
+#sheet .sheet-marks > .grow { flex: 1; }
+#sheet .mark-type { color: var(--muted); }
+#sheet .sheet-marks select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
+#sheet .sheet-marks details.menu > summary { border: 0; padding: var(--space-2) var(--space-5); font-size: var(--text-7); line-height: 1; color: var(--muted); }
+#sheet .note { margin-bottom: var(--space-10); }
+#sheet .note > .fields { padding: 0; margin: 0 0 var(--space-8); }
+#sheet .draft-read { cursor: text; }
+#sheet .draft-read .body-text, #sheet .note.doc .body-text { padding-left: 0; padding-right: 0; }
+#sheet .note.doc h3.doc-head, #sheet .note > img.figure { margin-left: 0; margin-right: 0; }
+#sheet .draft-body { display: block; width: 100%; min-height: var(--box-10); padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: var(--text-6); line-height: 1.6; resize: none; outline: none; overflow: hidden; }
+#sheet .draft-body::placeholder { color: var(--muted); }
+#sheet .draft-body[hidden] { display: none; }
+#sheet .draft-bar { position: sticky; z-index: 1; bottom: 0; display: flex; align-items: center; gap: var(--space-5); margin: 0 calc(-1 * var(--space-11)) var(--space-10); padding: var(--space-6) var(--space-11); background: var(--bg); border-top: var(--border-1) solid var(--line); }
+#sheet .draft-bar[hidden] { display: none; }
+#sheet .draft-said { color: var(--muted); font-size: var(--text-4); }
+#sheet .draft-bar > .grow { flex: 1; }
+#sheet .grid { display: block; }
+#sheet .card { margin: 0 0 var(--space-10); background: none; border: 0; border-radius: 0; overflow: visible; }
+#sheet .card > header, #sheet details.fold > summary { padding: 0 0 var(--space-4); border: 0; background: none; }
+#sheet .card > header h2, #sheet details.fold > summary h2 { font-size: var(--text-3); font-weight: 600; letter-spacing: var(--track-2); text-transform: uppercase; color: var(--muted); }
+#sheet .card .rows > li, #sheet .card .empty { padding-left: 0; padding-right: 0; }
+#sheet .part > :first-child .card:first-child > header, #sheet .part > .card:first-child > header { padding-right: calc(var(--box-8) + var(--space-5)); }

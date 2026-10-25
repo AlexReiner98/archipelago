@@ -28,10 +28,23 @@ important facts on hover, and clicking it opens it from the side to act on.
   this or This waits on.
 - **Hover says the point.** What a step says on hover is the drawing's: the
   flow's, for now.
-- **The sheet is the item's one page.** It opens from the right on a click
-  and holds the item read as a document: its title, one line of marks, its
-  note or text, and what its pack adds for its kind or type. Rare actions go
-  in one menu. Enter redraws the canvas from the item. The sheet also holds a
+- **Clicking a node refocuses the canvas on it.** An item that holds things,
+  or is tied by what it depends on or waits on, becomes the canvas's focus,
+  with all of that around it; an item tied to nothing is lit where it sits.
+- **The sheet is the item's one page, and it is written in.** It opens from
+  the right on a click and holds the item read as a document: its title, one
+  quiet line of marks, its note or text, and what its pack adds for its kind
+  or type, as plain sections. Rare actions go in one menu.
+- **Only intentional actions reach the map** (the owner, 25 Oct 2026). The
+  title and note are written in place as a draft and reach the map on Save,
+  one change set on the person's authority, undoable as one. Changing the
+  status is an action of its own. Save asks first if someone changed the item
+  since the sheet opened. Leaving a draft unsaved asks first.
+- **A new node is started on the canvas.** Double-click the canvas or press
+  + to open a draft. It becomes an item once it has a title and is saved, and
+  it is loose, tied to nothing: its note says how it relates, and an agent
+  proposes the links, which wait for the owner. The flow draws it once it is
+  tied. The sheet also holds a
   new item, the Workspace page, a screen in the menu, and For you. It never
   takes more than half the screen; on a phone it takes the whole of it. Esc
   or × goes back to the canvas.

@@ -4,14 +4,14 @@
 // the canvas behind draws it, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
 import { api, ask, h, part, tell } from './base.js';
-import { renderBody } from './body.js';
+import { draftOf } from './draft.js';
 import { automationDoes, entityForm } from './forms.js';
 import { documentMenu, documentNote, figureOf, readDocument } from './item-doc.js';
 import { relationEditor } from './item-links.js';
 import { storyPart } from './lens.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, drawScreens, fold, keepsFigure, readWhole } from './screens.js';
-import { RAN, ageChip, ago, changeRow, chip, eventLine, gist, idsAsLinks, idsIn, isA, link, menu, relations, statusesOf, titles, tokensText, types, when } from './words.js';
+import { RAN, ago, changeRow, eventLine, gist, idsAsLinks, idsIn, isA, link, menu, relations, statusesOf, titles, tokensText, typeTitle, types, when } from './words.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
 const rootOf = (type) => relations.get(type)?.root ?? type;
@@ -140,42 +140,52 @@ export async function entity(id, here) {
   };
 
   redraw.inPlace = inPlace;
+  // Its title and note, written in place and saved as one change (ui/draft.js); a document's text is read whole.
+  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, note: !doc, saved: again });
   const note = doc
     ? documentNote(doc, id, here, looks)
     : h(
         'section',
-        { class: 'card wide note' },
+        { class: 'note' },
         keepsFigure(e.type) && figureOf(e, 'figure'),
         long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > looks.numbers.field_fold_at ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
-        e.body ? renderBody(e.body, { style: looks }) : !long.length && h('div', { class: 'empty' }, 'No notes.'),
+        draft.note,
       );
   const screens = drawScreens({ e, data, id, redraw: again });
 
-  // Where it stands on the canvas, drawn from: what holds it, or itself when it holds things (Enter).
-  const holds = data.incoming.some((r) => (relations.get(r.type)?.root ?? r.type) === 'part_of');
+  const history = fold(id, 'history', 'History', lines.length, looks.page.history === 'open', lines);
   const kids = [
     h(
       'div',
       { class: 'page-head' },
-      h('h1', {}, e.title),
-      h('div', { class: 'row-top sheet-marks' }, chip(e.type), e.archived_at && h('span', { class: 'pill closed' }, 'archived'), e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`), e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private to you'), shown?.published ? h('span', { class: `pill ${shown.changed ? 'warn' : 'ok'}`, title: shown.changed ? 'Its draft says something other than what anyone reads: publish it again to show them' : 'Anyone reads it as it is now, at its own address' }, shown.changed ? 'draft changed' : 'published') : e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'), links.some((s) => !s.to_workspace) && h('span', { class: 'pill warn', title: `Readable with no login by whoever holds the link (${links.filter((s) => !s.to_workspace).length})` }, 'shared by link'), links.filter((s) => s.to_workspace).map((s) => h('span', { class: 'pill', title: `Readable in the workspace "${s.to_workspace}" once accepted there` }, `shared with ${s.to_workspace}`)), doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`), plan?.to_publish > 0 && h('span', { class: 'pill warn', title: `Not published as they are now: ${plan.documents.filter((d) => d.changed).map((d) => d.title).join(', ')}` }, `${plan.to_publish} to publish`)),
-    ),
-    h(
-      'div',
-      { class: 'toolbar facts' },
-      h('select', { title: 'Status', onchange: (ev) => change([{ op: 'update', id, status: ev.target.value }], `Status set to ${ev.target.value} in the UI`) }, statusesOf(e.type).map((st) => h('option', { value: st, selected: st === e.status }, st))),
-      live && ageChip(e),
-      session && h('button', { title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
-      automation && h('span', { class: 'fact' }, automationDoes(e.props)),
-      automation && e.props.last_fired && h('span', { class: `fact${String(e.props.last_result).startsWith('failed') ? ' error' : ''}`, title: String(e.props.last_result) }, `last fired ${when(e.props.last_fired)}`),
-      h('span', { class: 'fact' }, owner ? link(owner) : h('span', { class: 'muted' }, 'no owner')),
-      runFacts,
-      short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), value(v))),
-      h('span', { class: 'grow' }),
-      holds && h('a', { class: 'button', href: `#/e/${id}?in=${id}`, title: 'Draw the canvas from this: what is in it, and how it is tied' }, 'Enter'),
-      !e.archived_at && h('button', { onclick: edit }, 'Edit'),
-      menu('More', [
+      draft.title,
+      // One quiet line: what it is, its status (changing it is an action of its own), who has it, its short fields;
+      // a mark only for a state that matters (archived, private, public, shared); everything rare in one menu.
+      h(
+        'div',
+        { class: 'sheet-marks' },
+        h('span', { class: 'mark-type', title: e.type }, typeTitle(e.type)),
+        h('select', { class: 'mark-status', title: 'Status', disabled: Boolean(e.archived_at), onchange: (ev) => change([{ op: 'update', id, status: ev.target.value }], `Status set to ${ev.target.value} in the UI`) }, statusesOf(e.type).map((st) => h('option', { value: st, selected: st === e.status }, st))),
+        h('span', { class: 'fact' }, owner ? link(owner) : h('span', { class: 'muted' }, 'no owner')),
+        short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), value(v))),
+        runFacts,
+        automation && h('span', { class: 'fact' }, automationDoes(e.props)),
+        automation && e.props.last_fired && h('span', { class: `fact${String(e.props.last_result).startsWith('failed') ? ' error' : ''}`, title: String(e.props.last_result) }, `last fired ${when(e.props.last_fired)}`),
+        // Tied to nothing: started on the canvas, for an agent to propose its links; the canvas draws it once it is tied.
+        !data.incoming.length && !data.outgoing.length && !e.archived_at && h('span', { class: 'fact', title: 'An agent will propose how it is tied; the canvas draws it then' }, 'tied to nothing yet'),
+        e.archived_at && h('span', { class: 'pill closed' }, 'archived'),
+        e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`),
+        e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private'),
+        shown?.published ? h('span', { class: `pill ${shown.changed ? 'warn' : 'ok'}`, title: shown.changed ? 'Its draft says something other than what anyone reads: publish it again to show them' : 'Anyone reads it as it is now, at its own address' }, shown.changed ? 'draft changed' : 'published') : e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'),
+        links.length > 0 && h('span', { class: 'pill warn', title: links.map((s) => (s.to_workspace ? `Shared with the workspace "${s.to_workspace}"` : 'Readable with no login by whoever holds the link')).join(', ') }, 'shared'),
+        doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`),
+        plan?.to_publish > 0 && h('span', { class: 'pill warn', title: `Not published as they are now: ${plan.documents.filter((d) => d.changed).map((d) => d.title).join(', ')}` }, `${plan.to_publish} to publish`),
+        h('span', { class: 'grow' }),
+        session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
+      menu('⋯', [
+        !e.archived_at && ['Edit its fields', edit],
         !e.archived_at && ties.any && ['Edit links', ties.open],
+        ['History', () => ((history.open = true), history.scrollIntoView({ block: 'start' }))],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.
         ...(e.archived_at ? [] : actionsFor(e.type).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),
@@ -212,15 +222,17 @@ export async function entity(id, here) {
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),
+      ),
     ),
     ties.editor,
     acting,
     ...(story ? [storyPart(story)].flat() : []),
     // What it is comes before what its screens draw of it: said under a chart, it reads as a caption to it.
     // A session that tells its story keeps its log of notes behind a fold: the story is what it says.
-    h('div', { class: 'grid', style: 'margin-bottom: var(--space-8)' }, story ? fold(id, 'log', 'Log', 0, false, note) : note),
+    story ? fold(id, 'log', 'Log', 0, false, note) : note,
+    draft.bar,
     screens.column,
-    h('div', { class: 'grid' }, fold(id, 'history', 'History', lines.length, looks.page.history === 'open', lines)),
+    history,
   ].map((k) => (k?.nodeType ? k : document.createTextNode(String(k))));
   redraw.inPlace = false;
   if (inPlace) return settleWhenFilled(page, kids, screens.after);

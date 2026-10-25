@@ -29,7 +29,7 @@ async function look() {
   if (!type) rows = rows.filter((e) => !e.type.startsWith('sys.') || e.type === 'sys.connection');
   found.replaceChildren(
     ...(rows.length ? rows.map((e) => h('li', {}, h('a', { href: `#/e/${e.id}`, title: e.title, onclick: () => (found.hidden = true) }, chip(e.type), h('span', { class: 'gist grow' }, e.title), pill(e.type, e.status)))) : [h('li', { class: 'muted' }, 'Nothing matches.')]),
-    h('li', { class: 'found-new' }, h('a', { href: `#/new/${type ?? workType()}`, onclick: () => (found.hidden = true) }, `New ${type ? '' : 'item'}`.trim(), q && h('span', { class: 'muted' }, ` named "${q}"`))),
+    h('li', { class: 'found-new' }, h('a', { href: `#/new/${type ?? workType()}${q ? `?title=${encodeURIComponent(q)}` : ''}`, onclick: () => (found.hidden = true) }, `New ${type ? '' : 'item'}`.trim(), q && h('span', { class: 'muted' }, ` named "${q}"`))),
   );
   found.hidden = false;
 }

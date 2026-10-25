@@ -11,8 +11,9 @@ import { lensView } from './lens.js';
 const host = document.getElementById('canvas');
 const trail = document.getElementById('trail');
 const sheet = document.getElementById('sheet');
-/** Home: the map's top and what is directly in each thing, every kind but people and the app's own records. */
-export const HOME = { kinds: ['aim', 'work', 'question', 'record', 'occurrence', 'place'], far: 1 };
+/** Home: the map's top and what is directly in each thing, every kind but people and the app's own records, and what
+ * is loose (tied to nothing yet: what a person started on the canvas, for an agent to wire up). */
+export const HOME = { kinds: ['aim', 'work', 'question', 'record', 'occurrence', 'place'], far: 1, fold: ['closed', 'system'] };
 /** What is up: the lens asked for, the view drawing it, the item lit in it, the address that brings it back. */
 let at = null;
 
@@ -81,6 +82,8 @@ new MutationObserver((list) => {
   if (settings.fit) fitNow();
   else if (at?.kept) moves()?.restore(at.kept);
 }).observe(host, { childList: true, subtree: true });
+// A new item is started where the canvas is double-clicked, away from anything drawn on it.
+host.addEventListener('dblclick', (ev) => !ev.target.closest('a, button, input, select') && (location.hash = '#/new'));
 // The sheet opening or shutting, and the window resized, change the room it is fitted to.
 new MutationObserver(fitNow).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 addEventListener('resize', fitNow);

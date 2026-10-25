@@ -4,15 +4,15 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { SignInNeeded, api, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
-import { HOME, canvasHas, canvasHref, mark, refreshCanvas, showCanvas } from './canvas.js';
+import { HOME, canvasHref, mark, refreshCanvas, showCanvas } from './canvas.js';
+import { mayLeave, newItem } from './draft.js';
 import { drawFind } from './find.js';
-import { newEntity } from './forms.js';
 import { home } from './home.js';
 import { entity } from './item.js';
 import { readLens } from './lens.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
-import { loadSchema } from './words.js';
+import { loadSchema, relations, typeChoice, types, workType } from './words.js';
 import { workspace } from './workspace.js';
 
 /** The pages the sheet holds, by the name in their address. */
@@ -27,6 +27,22 @@ async function drawMarks() {
   const [held, mine] = await Promise.all([api('proposals').catch(() => []), api('view', { name: 'attention', params: { person: 'me', reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 50 } }).catch(() => ({ items: [] }))]);
   const n = held.length + mine.items.length;
   document.getElementById('marks').replaceChildren(n ? h('a', { class: `count${held.length ? ' held' : ''}`, href: '#/you', title: [held.length && `${held.length} held for your word`, mine.items.length && `${mine.items.length} your move`].filter(Boolean).join(', ') }, String(n)) : '');
+}
+
+/** The links that make an item a canvas of its own: what is in it, and what it depends on or waits on. */
+const FOCUS = ['part_of', 'depends_on', 'waits_on'];
+/**
+ * Where the canvas stands for an item (one way to read: a lens from it). An item that holds things, or is tied by what
+ * it depends on, is the canvas's focus, with all that around it; one tied to nothing is lit where it sits, among what
+ * is beside it (in what holds it, or on Home).
+ */
+async function focusOf(id) {
+  const got = await api('get', { id }).catch(() => null);
+  if (!got) return [HOME, id];
+  const root = (r) => relations.get(r.type)?.root ?? r.type;
+  const tied = got.incoming.some((r) => FOCUS.includes(root(r))) || got.outgoing.some((r) => FOCUS.includes(root(r)) && root(r) !== 'part_of');
+  const up = got.trail?.at(-1)?.id;
+  return [tied ? { from: id } : up ? { from: up } : HOME, id];
 }
 
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
@@ -56,12 +72,7 @@ async function route(pulse = false) {
   else if (name === 'e' && arg) {
     const within = params.get('in');
     if (within) showCanvas({ ...readLens(query).lens, from: within }, arg);
-    else if (canvasHas(arg)) mark(arg);
-    else {
-      const got = await api('get', { id: arg }).catch(() => null);
-      const up = got?.trail?.at(-1)?.id;
-      showCanvas(up ? { from: up } : HOME, arg);
-    }
+    else showCanvas(...(await focusOf(arg)));
   } else if (!SHEET[name] || !document.querySelector('#canvas .lens-wrap')) showCanvas(HOME);
   if (name !== 'e') mark(undefined);
   // The sheet: open over the canvas for what it holds, else shut.
@@ -73,7 +84,10 @@ async function route(pulse = false) {
   if (!page) return showIdentity();
   if (main.firstElementChild?.dataset.part !== page) main.replaceChildren(h('div', { class: 'part', 'data-part': page }));
   const draw = {
-    item: () => (name === 'e' ? entity(arg, params.get('here') ?? undefined) : newEntity(arg)),
+    item: () =>
+      name === 'e'
+        ? entity(arg, params.get('here') ?? undefined)
+        : newItem(part('item'), { type: arg ?? workType(), title: params.get('title') ?? '', types, choices: [types.get(workType()), ...state.schema.types.filter((t) => t.id !== workType())].filter((t) => t && !t.dormant && !t.system && t.kind !== 'system' && !t.id.startsWith('sys.')).map((t) => ({ id: t.id, label: typeChoice(t) })) }),
     screen: () => screenPage(decodeURIComponent(arg ?? '')),
     workspace,
     you: home,
@@ -89,6 +103,13 @@ async function route(pulse = false) {
 }
 
 hooks.route = route;
-window.addEventListener('hashchange', () => route());
+// Words written in the sheet and not saved are not left behind without asking (ui/draft.js).
+let at = location.hash, back = false;
+window.addEventListener('hashchange', async () => {
+  if (back) return void (back = false);
+  if (!(await mayLeave())) return void ((back = true), (location.hash = at));
+  at = location.hash;
+  route();
+});
 
 route();
