@@ -25,6 +25,7 @@
   #photo { display: none; max-width: 100%; border-radius: 4px; margin-top: 6px; }
   main { display: grid; place-items: center; overflow: auto; padding: 20px; }
   canvas { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
+  body:not(.diffusion) .only-diffusion, body.noise .not-noise, body.noise .mix { display: none; }
   .mix { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; font-size: 12px; }
   .mix label { margin: 0; display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -43,7 +44,14 @@
   <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
   <img id="photo" alt="">
   <h2>Archipelagos</h2>
-  <label>Chains <output id="chainsOut"></output><input id="chains" type="range" min="0" max="7" step="1" title="Island chains across the page; 0 for one field"></label>
+  <select id="source" aria-label="Land source" title="Where land comes from">
+    <option value="noise">Land from noise: one field</option>
+    <option value="chains" selected>Land from chains</option>
+    <option value="diffusion">Land from diffusion</option>
+  </select>
+  <label class="only-diffusion">Pattern <small>spots · worms · coral</small><input id="pattern" type="range" min="0" max="1" step="0.05"></label>
+  <label class="only-diffusion">Scale <small>large · fine</small><input id="scale" type="range" min="0" max="1" step="0.05"></label>
+  <label class="not-noise">Archipelagos <output id="chainsOut"></output><input id="chains" type="range" min="1" max="7" step="1" title="How many archipelagos share the page"></label>
   <div class="mix" id="mix" title="Which places' palettes the chains take, in turn, after the palette above"></div>
   <h2>Land</h2>
   <label>Land <small>sea · land</small><input id="land" type="range" min="0.1" max="0.9" step="0.01"></label>
@@ -72,7 +80,7 @@
   import { PLACES, fromPixels, signature } from './palettes.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'bars', 'line'];
+  const DIALS = ['pattern', 'scale', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'bars', 'line'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   const palettes = Object.fromEntries(Object.entries(PLACES).map(([k, p]) => [k, structuredClone(p)]));
   $('place').innerHTML = Object.entries(palettes).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('');
@@ -105,7 +113,7 @@
     }
   }
 
-  const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), wrap: $('wrap').checked, seed });
+  const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed });
   // A colour for a shape's number: in proportion to the palette's weights when it has them, else evenly.
   const colourOf = (p, i) => {
     if (!p.weights || !$('weighted').checked) return p.colours[i % p.colours.length];
@@ -136,7 +144,7 @@
     }
     $('bandsOut').textContent = $('bands').value;
     $('rowsOut').textContent = $('rows').value;
-    $('chainsOut').textContent = +$('chains').value || 'one field';
+    $('chainsOut').textContent = $('chains').value;
     $('note').textContent = `${given.length ? given.map((k) => palettes[k].title).join(', ') + ' · ' : ''}${pic.shapes.length} shapes · ${(performance.now() - t0).toFixed(0)} ms`;
   }
 
@@ -182,7 +190,11 @@
   };
   $('reseed').onclick = () => ((seed += 1), draw());
   $('place').onchange = () => (swatches(), draw());
-  for (const k of [...DIALS, 'wrap', 'weighted']) $(k).addEventListener('input', draw);
+  // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
+  for (const k of [...DIALS, 'wrap', 'weighted']) $(k).addEventListener(k === 'pattern' || k === 'scale' ? 'change' : 'input', draw);
+  const showSource = () => { document.body.classList.toggle('diffusion', $('source').value === 'diffusion'); document.body.classList.toggle('noise', $('source').value === 'noise'); };
+  $('source').addEventListener('change', () => (showSource(), draw()));
+  showSource();
   $('mix').addEventListener('change', draw);
 
   const save = (name, blob) => Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name }).click();
