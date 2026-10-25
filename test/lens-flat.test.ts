@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { flatLens } from '../src/lens-flat.ts';
 import { callTool } from '../src/tools.ts';
-import { agent, fresh, make } from './map.ts';
+import { agent, fresh, human, make } from './map.ts';
 
 const titles = (answer: { items: { title: string }[] }) => answer.items.map((i) => i.title).sort();
 
@@ -105,4 +105,24 @@ test('an agent asks it by name, and sees only what the viewer may', async () => 
   assert.ok(titles(await flatLens(l.as(bo), walk)).includes('Bo private'));
   assert.ok(!titles(await flatLens(l.as('e_someone'), walk)).includes('Bo private'), "someone else's private item is not reached");
   assert.ok(!titles(await flatLens(l.as('e_someone'), { filter: { text: 'Bo private' } })).includes('Bo private'), 'nor found by its text');
+});
+
+test('tags: an item is tagged with any number of tags, and the filter selects by a tag by its id or its name', async () => {
+  const { l, made } = await chain();
+  const tags = await make(l, [
+    { op: 'create', ref: 'canvas', type: 'tag', title: 'Canvas' },
+    { op: 'create', ref: 'soon', type: 'tag', title: 'Needs doing soon' },
+    { op: 'link', type: 'tagged', from: made.a, to: 'canvas' },
+    { op: 'link', type: 'tagged', from: made.a, to: 'soon' },
+    { op: 'link', type: 'tagged', from: made.n, to: 'canvas' },
+    { op: 'link', type: 'tagged', from: made.p, to: 'soon' },
+  ]);
+  await assert.rejects(l.change(human, { ops: [{ op: 'link', type: 'tagged', from: made.a, to: made.b }], reason: 'test' }), /tag/, 'a tag is an item of type tag');
+  assert.deepEqual(titles(await flatLens(l, { filter: { links: [`tagged ${tags.canvas}`] } })), ['A note on it', 'Flat lens'], 'by its id');
+  assert.deepEqual(titles(await flatLens(l, { filter: { links: ['tagged canvas'] } })), ['A note on it', 'Flat lens'], 'by its name, in any case');
+  assert.deepEqual(titles(await flatLens(l, { filter: { links: ['tagged Needs doing soon'] } })), ['Flat lens', 'Rework'], 'a name of several words');
+  assert.deepEqual(titles(await flatLens(l, { filter: { links: [{ link: 'tagged', from: made.a }] } })), ['Canvas', 'Needs doing soon'], 'the tags of an item');
+  assert.deepEqual(titles(await flatLens(l, { filter: { links: ['tagged Flat lens'] } })), [], 'a name is looked for only among tags');
+  const asked = (await callTool(l, agent, 'view', { name: 'flat', params: { filter: { links: ['tagged Canvas'], exclude: ['work.note'] } } })) as { items: { title: string }[] };
+  assert.deepEqual(titles(asked), ['Flat lens']);
 });

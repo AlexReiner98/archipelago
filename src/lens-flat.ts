@@ -43,11 +43,11 @@ const names = (value: unknown, field: string): string[] => {
   return value as string[];
 };
 
-/** A link term written as words ("tagged e_x", "waits_on me", "part_of e_y") or as { link, to } or { link, from }. */
+/** A link term written as words ("tagged e_x", "tagged Urgent", "waits_on me", "part_of e_y") or as { link, to } or { link, from }; the end an id or a name. */
 function readTerm(l: Archipelago, term: unknown): LinkTerm {
-  const parsed = typeof term === 'string' ? ((([link, to]) => ({ link, to }))(term.trim().split(/\s+/)) as LinkTerm) : (term as LinkTerm);
+  const parsed = typeof term === 'string' ? ((([, link, to]) => ({ link, to }))(/^(\S+)\s+(.+)$/.exec(term.trim()) ?? []) as LinkTerm) : (term as LinkTerm);
   if (!parsed || typeof parsed.link !== 'string' || (typeof parsed.to === 'string') === (typeof parsed.from === 'string'))
-    throw new Error(`include.links: a link term is "<link type> <id>", or { link, to } or { link, from }; not ${JSON.stringify(term)}`);
+    throw new Error(`include.links: a link term is "<link type> <id or name>", or { link, to } or { link, from }; not ${JSON.stringify(term)}`);
   if (!l.registry.relations.has(parsed.link)) throw new Error(`include.links: unknown link type "${parsed.link}". Known: ${[...l.registry.relations.keys()].join(', ')}`);
   return parsed.to !== undefined ? { link: parsed.link, to: parsed.to } : { link: parsed.link, from: parsed.from };
 }
@@ -98,6 +98,16 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const room = () => lens.limit + 1 - sent.size;
   const add = (ids: string[]) => { for (const id of ids) if (room() > 0) sent.add(id); };
   const me = l.viewer || (await l.setting<string>('me')) || null;
+  // A term's end is an item's id, or else its name: the items so titled (any case) of the types that end of the link
+  // takes ("tagged Urgent" is the tag named Urgent), as the viewer may see them.
+  const ends = async (term: LinkTerm, end: string) => {
+    if ((await l.db.query('select 1 from entity where id = $1', [end])).rows.length) return [end];
+    const def = l.registry.relations.get(term.link)!;
+    const takes = term.to !== undefined ? def.to : def.from;
+    const types = takes.includes('*') ? null : takes.flatMap((t) => l.registry.family(t));
+    const { rows } = await l.db.query<{ id: string }>(`select id from entity where lower(title) = lower($1) and archived_at is null${types ? ' and type = any($3::text[])' : ''} order by updated_at desc, id limit $2`, [end, LENS_LIMIT, ...(types ? [types] : [])]);
+    return rows.map((r) => r.id);
+  };
 
   // The seeds: ids first, then what a link term finds, what the text finds, the newest of each type named.
   const { ids, links, text, types } = lens.include;
@@ -105,10 +115,10 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   for (const term of links ?? []) {
     if (room() <= 0) break;
     const end = term.to ?? term.from!;
-    const at = end === 'me' ? me : end;
-    if (!at) continue;
+    const at = end === 'me' ? (me ? [me] : []) : await ends(term, end);
+    if (!at.length) continue;
     const [near, far] = term.to !== undefined ? ['from_id', 'to_id'] : ['to_id', 'from_id'];
-    add(await find((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = $1 and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), room()]));
+    add(await find((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), room()]));
   }
   if (text && room() > 0) add(await find((k) => `select e.id from entity e where e.id in (select pelago_search_ids($1, false)) and ${k} order by e.updated_at desc, e.id limit $2`, [text, room()]));
   if (types?.length && room() > 0) add(await find((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), room()]));
