@@ -23,7 +23,7 @@ test('a lens from an item reads what is around it, and nothing else', async () =
     { op: 'link', type: 'part_of', from: 'x1', to: 'x' },
     { op: 'link', type: 'part_of', from: 'u', to: 'o' },
   ]);
-  const { entities } = await scanAround(l, aroundOf(l, made.p, {}, undefined, []));
+  const { entities } = await scanAround(l, aroundOf(l, made.p, {}, []));
   const read = new Set(entities.map((e) => e.id));
   // Inside it, what it is tied to, and what is inside that (for the counts); not what is beside that.
   for (const id of [made.p, made.a, made.x, made.x1]) assert.ok(read.has(id), `reads ${id}`);
@@ -53,6 +53,6 @@ test('a lens that goes near reads what it walks to', async () => {
     { op: 'link', type: 'depends_on', from: 'b', to: 'c' },
     { op: 'link', type: 'depends_on', from: 'c', to: 'd' },
   ]);
-  const answer = await lens(l, { from: made.a }, { near: 2, over: ['depends_on'], fold: [] });
+  const answer = await lens(l, { from: made.a, near: 2, over: ['depends_on'], fold: [] });
   assert.deepEqual(answer.items.map((i) => i.title).sort(), ['A', 'B', 'C'], 'two steps either way, and no further');
 });

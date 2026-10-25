@@ -2,6 +2,8 @@
 // ad8eb76, before they moved off it), so a view that moves to the flat lens or a read of its own answers agents the
 // same. Ids are named by the ref that made them and times are dropped; a list whose order differs from run to run
 // (one ordered by random ids) is compared as a set, and that is recorded too. PIN_RECORD=1 records it again.
+// The `lens` answers are the page's picture, which the old lens still draws: pinned so that cutting it down leaves
+// the page's answer as it was (hub and views_of_it, read by nothing, were taken out of it and out of the pin).
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

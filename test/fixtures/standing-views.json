@@ -3964,11 +3964,6 @@
   },
   "lens app": {
    "controls": [],
-   "hub": {
-    "at": 2,
-    "inside": 11,
-    "is": true
-   },
    "items": [
     {
      "id": "<app>",
@@ -4147,17 +4142,13 @@
      "id": "when",
      "title": "When"
     }
-   ],
-   "views_of_it": 1
+   ]
   },
   "lens holding": {
    "controls": [
     "lit",
     "closed"
    ],
-   "hub": {
-    "is": false
-   },
    "items": [
     {
      "id": "<extras>",
@@ -4338,8 +4329,7 @@
      "id": "holding",
      "title": "What holds it"
     }
-   ],
-   "views_of_it": 0
+   ]
   },
   "lens kinds": {
    "controls": [],
@@ -4549,9 +4539,6 @@
     "lit",
     "closed"
    ],
-   "hub": {
-    "is": false
-   },
    "items": [
     {
      "id": "<cert>",
@@ -4727,16 +4714,10 @@
      "id": "holding",
      "title": "What holds it"
     }
-   ],
-   "views_of_it": 0
+   ]
   },
   "lens view": {
    "controls": [],
-   "hub": {
-    "at": 2,
-    "inside": 11,
-    "is": true
-   },
    "items": [
     {
      "id": "<app>",
@@ -4915,8 +4896,7 @@
      "id": "when",
      "title": "When"
     }
-   ],
-   "views_of_it": 1
+   ]
   },
   "tree addin": {
    "branches": [

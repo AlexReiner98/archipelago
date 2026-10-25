@@ -274,16 +274,19 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 There are more (`hubs`, `proof`, `changelog`, `recheck`, `agent_usage`,
 `notifications`, `graph`).
 
-Every view of the work is a lens. A pack declares its views in its pack file
-(`views`): one with `lens` is a lens preset, answered by the one lens query
-(`src/lens-presets.ts`) and read back into the form that view has always
-had; any other is answered by the pack's own code. The core pack's are
-presets: `lens`, `attention`, `brief`, `graph`, `tree` and `hubs`. `gate` is
-the software pack's, and reads around its event through the same lens query
-(the pack read `lens`). No view reads the whole map: a lens that starts
-from an item reads only what is around it (`src/lens-scan.ts`), so what it
-costs follows what it answers; a lens of the whole map reads the kinds it
-names (`kinds`), by the index on type, and opens on the map's top, its
+The lens is the flat lens (`flat`): a filter, a walk and a limit, answered as
+items and the links among them (`src/lens-flat.ts`). A pack declares its views
+in its pack file (`views`): one with `lens` is answered by a read of the
+kernel's that its `answer` names (`src/lens-presets.ts`), in the form that view
+has always had; any other is answered by the pack's own code. The core pack's
+are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`), `tree`
+(`src/view-tree.ts`) and `hubs`, each read on its own, and `lens`, the page's
+picture, which the old lens (`src/lens.ts`) answers until the page reads the
+flat lens. `gate` is the software pack's, and reads around its event (the pack
+read `around`). No view reads the whole map: a read around an item reads only
+what is around it (`src/region.ts`), so what it costs follows what it answers;
+the page's picture of the whole map reads the kinds it names (`kinds`), by the
+index on type, and opens on the map's top, its
 projects, when it names none. `attention` reads what is a person's
 (`person`) or inside an item (`within`); for everyone, only `to_confirm`,
 from the log. `hubs` read within an item (`within`). A `graph` with no

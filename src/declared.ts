@@ -89,15 +89,15 @@ export interface ViewDef {
   /** rows: one-line rows the kernel draws, each with an item; data: for agents only. */
   shape: 'rows' | 'data';
   limit_ms?: number;
-  /** A lens preset: the view is this lens (its fields, under what is asked), answered by the kernel's lens query, never by the pack's code. */
+  /** A view the kernel answers, never the pack's code: by the read its answer names (src/lens-presets.ts), with these fields (the brief's links, over; the old lens's view, its fields under what is asked). */
   lens?: Record<string, unknown>;
-  /** With lens: how the lens's answer is read (one of LENS_ANSWERS); the lens's own form when left out. */
+  /** With lens: which read answers it (one of LENS_ANSWERS); the old lens, for the page, when left out. */
   answer?: string;
   /** With lens: for a param, the lens fields each of its values stands for. */
   choices?: Record<string, Record<string, Record<string, unknown>>>;
 }
 
-/** How a lens preset's answer may be read, each kept to the form its view had (src/lens-presets.ts). */
+/** The reads a view the kernel answers may name, each kept to the form its view had (src/lens-presets.ts). */
 export const LENS_ANSWERS = ['lens', 'flat', 'graph', 'tree', 'hubs', 'attention', 'brief'] as const;
 
 /**

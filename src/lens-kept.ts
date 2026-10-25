@@ -91,16 +91,6 @@ async function hubAtAbove(l: Archipelago, id: string): Promise<number> {
   return rows.length ? Number(rows[0].hub_at) : HUB_AT;
 }
 
-/** Whether one item is a hub: the open things inside it (from the part_of closure), against the hub_at above it. */
-export async function hubOf(l: Archipelago, id: string): Promise<{ is: boolean; inside?: number; at?: number }> {
-  const { rows } = await l.db.query<{ n: number }>(
-    `select count(*)::int as n from part_closure c join entity e on e.id = c.descendant where c.ancestor = $1 and e.is_open and e.archived_at is null and (e.kind is null or e.kind <> 'system')`,
-    [id],
-  );
-  const [inside, at] = [rows[0].n, await hubAtAbove(l, id)];
-  return inside > 0 && inside >= at ? { is: true, inside, at } : { is: false };
-}
-
 /** Where on the page a lens or a style is seen at work: the picture of what it is about, or of the whole map. Nothing for any other item. */
 export async function pictureOf(l: Archipelago, id: string): Promise<string | undefined> {
   const item = await l.entity(id);
