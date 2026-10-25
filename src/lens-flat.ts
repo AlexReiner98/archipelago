@@ -20,7 +20,7 @@ export interface LinkTerm {
 export interface FlatLens {
   /** What picks the seeds: any item any of these finds. */
   include: { text?: string; types?: string[]; ids?: string[]; links?: LinkTerm[] };
-  /** What must all hold of a seed as well: one of these types (flavours too), and part of each of these items, at any depth. */
+  /** What must all hold of a seed as well: one of these types (flavours too), and part of each of these items, however far down. */
   narrow: { only?: string[]; within?: string[] };
   /** What is left out of everything: closed, system, or a type (its flavours too). */
   exclude: string[];
