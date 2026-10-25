@@ -8,9 +8,9 @@ import { closed } from '../life/shapes.js';
 const CASES = { 1: [[3, 2]], 2: [[2, 1]], 3: [[3, 1]], 4: [[0, 1]], 6: [[0, 2]], 7: [[0, 3]], 8: [[0, 3]], 9: [[0, 2]], 11: [[0, 1]], 12: [[3, 1]], 13: [[2, 1]], 14: [[3, 2]] };
 
 /** The level t of field f as closed loops, in tile units (the tile is size wide); loops may run past the tile's edges. */
-export function loops({ n, v }, t, size) {
+export function loops({ n, v }, t, size, pad = -1e9) {
   const m = 3 * n + 2;
-  const at = (x, y) => (x <= 0 || y <= 0 || x >= m - 1 || y >= m - 1 ? -1 : v[((y - 1) % n) * n + ((x - 1) % n)]);
+  const at = (x, y) => (x <= 0 || y <= 0 || x >= m - 1 || y >= m - 1 ? pad : v[((y - 1) % n) * n + ((x - 1) % n)]);
   // An edge's key, and where on it the level falls.
   const hKey = (x, y) => 2 * (y * m + x), vKey = (x, y) => 2 * (y * m + x) + 1;
   const where = (key) => {
