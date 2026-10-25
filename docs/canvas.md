@@ -32,8 +32,8 @@ never structure. Containment is a projection the server keeps (the
 ### 3. The lens is a filter, a walk and a limit, and the only bound
 The filter has two kinds of term. Those that include add seeds, each its
 own (text, types, ids, links such as `tagged e_x`: a union); those that
-narrow must all hold of a seed (an AND: a type within an item, say; the
-term's field is `<narrowing term>` until task e_jakhtaf3 lands). What it
+narrow must all hold of a seed (an AND: `only`, types; `within`, items it
+is part of at any depth, read from the part_of closure). What it
 excludes applies to everything the walk reaches; the
 walk follows the link types named, either way, for some steps; the limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
@@ -42,7 +42,8 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
 - `test/lens-flat.test.ts`: "a filter that includes nothing is refused";
   "what is excluded is left out of everything the walk reaches, and is not
   walked through"; "the limit caps what is sent, seeds first, and says it
-  cut"; "the text is the search read".
+  cut"; "the text is the search read"; "narrowing: only and within must all
+  hold of every seed, not of what the walk reaches".
 - `test/find-lens.test.ts`: "in a browser, the find bar sets the text of the
   canvas lens".
 
@@ -168,5 +169,3 @@ the places stream just before the person's next action.
   browser (`canvas.js`), not yet through a store.
 - A store does not judge the filter again: an item that stops matching stays
   until the lens is read again.
-- The narrowing terms (task e_jakhtaf3) are being built; until they land a
-  type chip adds seeds and cannot narrow.
