@@ -21,7 +21,7 @@ import { agent, all, fresh, human, make } from './map.ts';
 async function pageModules() {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-replica-'));
   writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
-  for (const f of ['project.js', 'replica.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
+  for (const f of ['project.js', 'ghosts.js', 'replica.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
   return {
     project: await import(pathToFileURL(join(dir, 'project.js')).href),
     replica: await import(pathToFileURL(join(dir, 'replica.js')).href),

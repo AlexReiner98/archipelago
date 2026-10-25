@@ -23,6 +23,17 @@ export const css = `
 .lf-tie { fill: none; stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-flow-dash-choice); }
 .lf-tie.near { stroke-dasharray: none; }
 .lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke); }
+/* A change held for the owner, where it would land: a new step faint, an edit marked on its step, a link dashed in the
+   colour of what waits on you; a link just drawn here dashed until it is; the badge where it is decided. */
+.lf-step.ghost { opacity: var(--ln-flow-ghost); cursor: default; }
+.lf-step.ghost .lf-shape, .lf-step.held .lf-shape { stroke: var(--ln-you); stroke-dasharray: var(--ln-flow-dash-held); }
+.lf-wire.held, .lf-tie.held { stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke); stroke-dasharray: var(--ln-flow-dash-held); }
+.lf-wire.held.mine, .lf-tie.held.mine { stroke: var(--ln-text); }
+.lf-head.held { fill: var(--ln-you); } .lf-head.held.mine { fill: var(--ln-text); }
+.lf-held { cursor: pointer; }
+.lf-held circle { fill: var(--ln-land); stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke); }
+.lf-held:hover circle { stroke-width: var(--ln-flow-stroke-lit); }
+.lf-held text { fill: var(--ln-you); font-size: var(--ln-flow-held-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: central; }
 /* A step's tip (the page puts it beside the step): its title, then the start of its note. */
 .lf-tip { max-width: var(--tip-most); padding: var(--space-5) var(--space-7); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--edge); border-radius: var(--radius-3); font-size: var(--text-3); line-height: 1.4; }
 .lf-tip b { display: block; }

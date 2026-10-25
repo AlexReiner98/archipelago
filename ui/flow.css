@@ -24,3 +24,7 @@
 .lf-surface { position: absolute; display: block; pointer-events: none; }
 /* The frame drawings run in: drawn, with no size, so the browser does not slow it as a frame that is not drawn. */
 .drawing-sandbox { position: fixed; left: 0; top: 0; width: 0; height: 0; border: 0; pointer-events: none; }
+/* A wire drawn by hand (ui/drag.js): a line from the step it starts on to the pointer, solid once it is over a step it can end on. The pointer on a step's edge says a press there draws one. */
+[data-wire="edge"] .lf-stage svg a[href] { cursor: crosshair; }
+.wire-draft { fill: none; stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); stroke-dasharray: var(--ln-flow-dash-choice); pointer-events: none; }
+.wire-draft.onto { stroke-dasharray: none; }

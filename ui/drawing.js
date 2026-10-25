@@ -6,7 +6,8 @@
 // paints in its worker shown on a canvas laid over its picture (surface.js).
 
 import { h } from './base.js';
-import { dragOf } from './drag.js';
+import { dragOf, wireHover } from './drag.js';
+import { HELD } from './ghosts.js';
 import { tipOf } from './drawing-tip.js';
 import { build, cssFor, patch, step } from './marks.js';
 import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './lens-base.js';
@@ -133,7 +134,15 @@ export function drawWith(host, answer, style, keep) {
   const send = (event) => !ended && port.postMessage({ type: 'event', event });
   // A press on a mark that asked to be dragged is followed by the page (drag.js); every other event is told as it is.
   const drag = dragOf(host, keys, send, style);
-  const tell = (key, name, ev) => (name === 'drag' ? drag(key, ev) : send({ key, name }));
+  // A click on a mark keyed for a held change (`held:<proposal>…`, ui/ghosts.js) also asks the page to put that change to
+  // the person, where it is drawn (`drawing-held` on the host): the drawing only says where; the page says what it is.
+  const tell = (key, name, ev) => {
+    if (name === 'drag') return drag(key, ev);
+    const held = name === 'click' && HELD.exec(key);
+    if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1] } }));
+    send({ key, name });
+  };
+  wireHover(host, style);
   const run = (now) => step(moving, now) && requestAnimationFrame(run);
   // What a drawing patches: its marks, and its tip (drawing-tip.js), whose marks are checked as every mark is.
   const tip = tipOf(host);

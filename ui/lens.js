@@ -314,8 +314,10 @@ export function flatView({ lens, style = {}, of, key }) {
   let raw;
   // The answer is held in a store kept current from the log (ui/replica.js): facts redraw it without the lens being
   // read again; only a link made to something it does not hold reads the lens again, since the walk may now reach more.
-  const draw = (answer, refreshing) => {
-    const said = JSON.stringify(answer);
+  // What is drawn is the answer with what is held for the owner and the links drawn here not yet answered for drawn
+  // into it (`shown`, ui/ghosts.js); what the canvas holds (`host.answer`) is the answer alone.
+  const draw = (answer, shown, refreshing) => {
+    const said = JSON.stringify(shown);
     if (refreshing && said === host.said) return;
     host.said = said;
     host.answer = answer;
@@ -327,7 +329,7 @@ export function flatView({ lens, style = {}, of, key }) {
     Object.assign(chosen, look.style, keptStyle(key), style, { noLit: true });
     dress(body, chosen);
     const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === chosen.shape;
-    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(answer), chosen, keep, place);
+    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(shown), chosen, keep, place);
   };
   const load = async (refreshing = false) => {
     let store;
@@ -347,9 +349,9 @@ export function flatView({ lens, style = {}, of, key }) {
       if (host.store !== store) return;
       if (!host.isConnected) return unfollow(store);
       if (changed.missing.length) return load(true);
-      draw({ ...raw, ...store.answer() }, true);
+      draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, true);
     });
-    draw({ ...raw, ...store.answer() }, refreshing);
+    draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, refreshing);
   };
   warmDrawings();
   host.ready = load();
