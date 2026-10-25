@@ -25,11 +25,24 @@ body[data-sheet="open"] #nav { right: calc(min(var(--sheet), 50%) + var(--space-
 #nav > .grow { flex: 1; pointer-events: none; }
 #nav .brand { flex: none; font-weight: 700; font-size: var(--text-7); color: var(--text); text-decoration: none; padding: var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
 #nav .brand .workspace-name { display: none; }
-#trail { display: flex; align-items: center; gap: var(--space-4); min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--text-4); }
-#trail:empty { display: none; }
-#trail .trail-step { color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
-#trail .trail-step:hover, #trail .trail-step.here { color: var(--text); }
-#trail .trail-sep { color: var(--muted); flex: none; }
+/* The query bar (ui/query-bar.js): the canvas's lens on one line under the top bar, its terms as chips; what does not fit scrolls along it. */
+#query { position: fixed; z-index: 2; top: calc(var(--box-9) + var(--space-8)); left: var(--space-9); right: var(--space-9); display: flex; align-items: stretch; gap: var(--space-6); overflow-x: auto; white-space: nowrap; scrollbar-width: none; pointer-events: none; }
+#query[hidden] { display: none; }
+body[data-sheet="open"] #query { right: calc(min(var(--sheet), 50%) + var(--space-9)); }
+#query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); pointer-events: auto; }
+#query .q-term { display: inline-flex; align-items: center; border-radius: var(--radius-pill); background: var(--accent-soft); font-size: var(--text-3); }
+#query .q-term.q-out { background: none; border: var(--border-1) dashed var(--line); color: var(--muted); }
+#query .q-term.q-walk { background: none; border: var(--border-1) solid var(--line); }
+#query .q-term button, #query .q-term .q-said { border: 0; background: none; padding: var(--space-2) var(--space-4); font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
+#query .q-term .q-x { padding-left: 0; color: var(--muted); }
+#query .q-term .q-x:hover { color: var(--text); }
+#query .q-box { border: 0; background: none; padding: var(--space-2) var(--space-3); font-size: var(--text-3); min-width: var(--space-8); outline: none; }
+#query .q-box.wrong { text-decoration: underline wavy var(--accent); }
+#query .q-add { border: 0; background: none; color: var(--muted); font-size: var(--text-3); max-width: var(--space-10); }
+#query .q-steps button { padding: var(--space-2) var(--space-4); font-size: var(--text-3); }
+#query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-3); font-size: var(--text-3); text-align: right; }
+#query .q-count { color: var(--muted); font-size: var(--text-3); padding-right: var(--space-3); }
+#query .q-count.cut { color: var(--accent); }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
 #marks .count.held { background: var(--warn); }
 #new-item { display: inline-flex; align-items: center; justify-content: center; width: var(--box-8); height: var(--box-8); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); color: var(--text); font-size: var(--text-8); line-height: 1; text-decoration: none; }
@@ -66,6 +79,7 @@ body[data-sheet="open"] #find { left: calc((100% - min(var(--sheet), 50%)) / 2);
 #find .found .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 #find .found > li.muted, #find .found > li.error { padding: var(--space-4) var(--space-5); }
 #find .found-new { border-top: var(--border-1) solid var(--line); margin-top: var(--space-3); padding-top: var(--space-3); }
+#find .found-draw { border-bottom: var(--border-1) solid var(--line); margin-bottom: var(--space-3); padding-bottom: var(--space-3); }
 
 /* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
    (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */

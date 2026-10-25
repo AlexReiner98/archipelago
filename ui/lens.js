@@ -239,3 +239,104 @@ export const lensPlace = new Map();
 
 /** The shapes the kernel draws. Each reads only what a lens answers with. */
 export const LENS_SHAPES = { list: drawList };
+
+// ---- The flat lens: a filter, a walk and a limit (decision e_sdsaxxq4) ------------------------------------------
+
+/** The links an item is drawn with when the canvas opens on it: what is in it, what it depends on and waits on. */
+export const FOCUS = ['part_of', 'depends_on', 'waits_on'];
+const list = (value) => (value ?? '').split(',').filter(Boolean);
+
+/**
+ * A flat lens and a style, as the end of an address says them: ?text=…&types=…&ids=…&link=tagged e_x&exclude=closed
+ * &over=part_of&steps=1&limit=500 (a link term each `link`; exclude with nothing after it leaves nothing out). An
+ * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null.
+ */
+export function readFlatLens(query) {
+  const p = new URLSearchParams(query);
+  const filter = {};
+  const ids = [...list(p.get('from')), ...list(p.get('ids'))];
+  if (p.get('text')?.trim()) filter.text = p.get('text').trim();
+  if (p.get('types')) filter.types = list(p.get('types'));
+  if (ids.length) filter.ids = [...new Set(ids)];
+  if (p.getAll('link').length) filter.links = p.getAll('link').filter(Boolean);
+  if (p.has('exclude')) filter.exclude = list(p.get('exclude'));
+  const style = {};
+  for (const key of ['lit', 'shape', 'style']) if (p.get(key)) style[key] = p.get(key);
+  if (!filter.text && !filter.types?.length && !filter.ids?.length && !filter.links?.length) return { lens: null, style };
+  const over = p.get('over') === 'all' ? 'all' : p.has('over') ? list(p.get('over')) : p.has('from') ? FOCUS : [];
+  const lens = { filter, walk: { over, steps: p.has('steps') ? Number(p.get('steps')) : over.length ? 1 : 0 } };
+  if (p.has('limit')) lens.limit = Number(p.get('limit'));
+  return { lens, style };
+}
+
+/** The end of the address that says this flat lens (and the style asked of it): what readFlatLens reads back. */
+export function flatQuery(lens, style = {}) {
+  const p = new URLSearchParams();
+  const { text, types, ids, links, exclude } = lens.filter;
+  if (text) p.set('text', text);
+  if (types?.length) p.set('types', types.join(','));
+  if (ids?.length) p.set('ids', ids.join(','));
+  for (const term of links ?? []) p.append('link', term);
+  if (exclude) p.set('exclude', exclude.join(','));
+  const { over, steps } = lens.walk ?? { over: [], steps: 0 };
+  if (over === 'all' || over.length) p.set('over', over === 'all' ? 'all' : over.join(','));
+  if (steps || over === 'all' || over.length) p.set('steps', String(steps));
+  if (lens.limit) p.set('limit', String(lens.limit));
+  for (const key of ['lit', 'shape', 'style']) if (style[key]) p.set(key, style[key]);
+  return p.toString();
+}
+
+/**
+ * A flat answer as the drawings made for the old lens read it, until each reads the flat answer itself (the flat flow
+ * is being built beside this): what the old answer counted of each item, nothing, and each link's type as its kind.
+ * Only adds fields: a drawing that reads the flat answer is given it as it is.
+ */
+const asDrawn = (answer) => ({
+  ...answer,
+  items: answer.items.map((i) => ({ state: { needs_you: false, blocked: false, sessions: 0, waits_on: [] }, within: { items: 0, needs_you: 0, blocked: 0, work: 0, sessions: 0 }, size: { work: 0 }, ...i })),
+  links: answer.links.map((l) => ({ kind: l.type, ...l })),
+});
+
+/**
+ * The canvas's picture of a flat lens: its answer (items and the links among them) drawn with the style of what it
+ * opens on (`of`), by the drawing that style names. `refresh` asks again and draws again only when the answer
+ * differs; `mark` lights the item whose page is open.
+ */
+export function flatView({ lens, style = {}, of, key }) {
+  const chosen = {};
+  const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
+  const host = h('div', { class: 'lens-wrap' }, body);
+  const place = { opened: new Map(), ask: {} };
+  const keep = (change) => Object.assign(chosen, change);
+  const load = async (refreshing = false) => {
+    let answer, look;
+    try {
+      [answer, look] = await Promise.all([api('view', { name: 'flat', params: lens }), api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), have: [...drawings.keys()] } })]);
+    } catch (err) {
+      host.failed = err.message;
+      host.dispatchEvent(new CustomEvent('lens-answer'));
+      return refreshing || body.replaceChildren(h('div', { class: 'error' }, err.message));
+    }
+    const said = JSON.stringify(answer);
+    if (refreshing && said === host.said) return;
+    host.said = said;
+    host.answer = answer;
+    host.failed = null;
+    for (const item of answer.items) titles.set(item.id, item.title);
+    host.dispatchEvent(new CustomEvent('lens-answer'));
+    if (!answer.items.length) return body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this lens.'));
+    for (const name of Object.keys(chosen)) delete chosen[name];
+    Object.assign(chosen, look.style, keptStyle(key), style, { noLit: true });
+    dress(body, chosen);
+    const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === chosen.shape;
+    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(answer), chosen, keep, place);
+  };
+  warmDrawings();
+  host.ready = load();
+  host.refresh = () => load(true);
+  host.mark = (id) => {
+    style.here = chosen.here = id;
+    body.redraw?.();
+  };
+  return host;
+}
