@@ -199,6 +199,21 @@
       }
     },
     {
+      "id": "canvas",
+      "extends": "system",
+      "title": "Canvas",
+      "description": "A saved canvas view: a flat lens (a filter, a walk and a limit, as query flat takes them) and a style, kept so a person opens it anywhere and it draws the same. Its pins are drawn with what its filter finds; where things sit on it is kept in the places stream under its id, apart from the map's. Home lists them; report show with its id opens one.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "filter": { "type": "json", "description": "What it finds: { text, types, ids, links, exclude }, as query flat's filter. It must include something." },
+        "walk": { "type": "json", "description": "From what the filter finds, along these links either way: { over: a list of link types or \"all\", steps }." },
+        "limit": { "type": "number", "description": "The most items it draws." },
+        "style": { "type": "json", "description": "How it is drawn: { shape, lit, style } (a built-in drawing, what stays lit, a style kept on the map by its id)." },
+        "pins": { "type": "json", "description": "Items kept on it by hand, as a list of ids: drawn with what the filter finds." },
+        "pinned": { "type": "boolean", "description": "Kept in sight by the owner: first on Home." }
+      }
+    },
+    {
       "id": "style",
       "extends": "system",
       "title": "Style",
@@ -689,11 +704,11 @@
       "title": "For you",
       "at": "home",
       "pieces": [
+        { "piece": "saved_views", "title": "Canvases" },
         { "piece": "start", "title": "Start here" },
         { "piece": "token_ask" },
         { "piece": "held", "title": "Held for you" },
-        { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "unsettled"], "limit": 5 },
-        { "piece": "saved_views", "title": "Saved views", "limit": 6 }
+        { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "unsettled"], "limit": 5 }
       ]
     },
     {

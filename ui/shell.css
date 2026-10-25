@@ -43,6 +43,9 @@ body[data-sheet="open"] #query { right: calc(min(var(--sheet), 50%) + var(--spac
 #query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-3); font-size: var(--text-3); text-align: right; }
 #query .q-count { color: var(--muted); font-size: var(--text-3); padding-right: var(--space-3); }
 #query .q-count.cut { color: var(--accent); }
+#query .q-pick { border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
+#query .q-save { border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
+#query .q-save:hover { color: var(--accent); }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
 #marks .count.held { background: var(--warn); }
 #new-item { display: inline-flex; align-items: center; justify-content: center; width: var(--box-8); height: var(--box-8); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); color: var(--text); font-size: var(--text-8); line-height: 1; text-decoration: none; }

@@ -16,7 +16,7 @@ const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<stri
 
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place', 'system'];
 const ROOTS = ['part_of', 'depends_on', 'defers', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'supersedes', 'relates_to'];
-const SYSTEM = ['lens', 'style', 'screen', 'sys.source', 'sys.run', 'sys.notification', 'sys.automation'];
+const SYSTEM = ['lens', 'canvas', 'style', 'screen', 'sys.source', 'sys.run', 'sys.notification', 'sys.automation'];
 const human: Actor = { kind: 'human', name: 'test' };
 
 /** A copy of the shipped packs, with one more pack beside them when given. */
