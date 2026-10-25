@@ -69,7 +69,7 @@
 <main><canvas id="view"></canvas></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
-  import { PLACES, fromPixels } from './palettes.js';
+  import { PLACES, fromPixels, signature } from './palettes.js';
 
   const $ = (id) => document.getElementById(id);
   const DIALS = ['chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'bars', 'line'];
@@ -79,11 +79,31 @@
   $('mix').innerHTML = Object.entries(palettes).filter(([, p]) => p.photos).map(([k, p]) => `<label><input type="checkbox" value="${k}" checked> ${p.title}</label>`).join('');
   let seed = 1;
   const pal = () => palettes[$('place').value];
-  // The palette each chain takes: the one chosen above first, then the ticked places in turn.
-  const palOf = (group) => {
-    const mix = [$('place').value, ...[...$('mix').querySelectorAll('input:checked')].map((c) => c.value).filter((k) => k !== $('place').value)];
-    return palettes[mix[group % mix.length]] ?? pal();
-  };
+  // The palette each chain takes. The first chain has the one chosen above; each next chain, nearest the ones
+  // already given first, takes the ticked place whose cast differs most from its neighbours', a neighbour counting
+  // less the further off it is, and a place not yet used preferred.
+  let given = [];
+  const palOf = (group) => palettes[given[group]] ?? pal();
+  function assign(chains, width) {
+    const mix = [...new Set([$('place').value, ...[...$('mix').querySelectorAll('input:checked')].map((c) => c.value)])];
+    const sig = Object.fromEntries(mix.map((k) => [k, signature(palettes[k])]));
+    const contrast = (a, b) => Math.hypot(sig[a][0] - sig[b][0], sig[a][1] - sig[b][1], sig[a][2] - sig[b][2]);
+    const apart = chains.map((p) => chains.map((q) => Math.min(...p.map(([x, y]) => Math.min(...q.map(([u, v]) => Math.hypot(x - u, y - v))))) / width));
+    given = chains.map(() => null);
+    if (!chains.length) return;
+    given[0] = mix[0];
+    for (let n = 1; n < chains.length; n++) {
+      const done = given.map((k, i) => (k ? i : -1)).filter((i) => i >= 0);
+      const near = (i) => Math.min(...done.map((j) => apart[i][j]));
+      const next = given.map((k, i) => (k ? -1 : i)).filter((i) => i >= 0).sort((a, b) => near(a) - near(b))[0];
+      let best = mix[0], score = -Infinity;
+      for (const k of mix) {
+        const s = Math.min(...done.map((j) => contrast(k, given[j]) + apart[next][j] * 0.4)) - (given.includes(k) ? 0.05 : 0);
+        if (s > score) (score = s), (best = k);
+      }
+      given[next] = best;
+    }
+  }
 
   const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), wrap: $('wrap').checked, seed });
   // A colour for a shape's number: in proportion to the palette's weights when it has them, else evenly.
@@ -98,6 +118,7 @@
   function draw() {
     const t0 = performance.now(), p = pal();
     const pic = ridges(dials());
+    assign(pic.chains, pic.width);
     const cv = $('view'), dpr = devicePixelRatio || 1;
     cv.width = pic.width * dpr; cv.height = pic.height * dpr;
     cv.style.aspectRatio = `${pic.width} / ${pic.height}`;
@@ -116,7 +137,7 @@
     $('bandsOut').textContent = $('bands').value;
     $('rowsOut').textContent = $('rows').value;
     $('chainsOut').textContent = +$('chains').value || 'one field';
-    $('note').textContent = `${pic.shapes.length} shapes · ${(performance.now() - t0).toFixed(0)} ms`;
+    $('note').textContent = `${given.length ? given.map((k) => palettes[k].title).join(', ') + ' · ' : ''}${pic.shapes.length} shapes · ${(performance.now() - t0).toFixed(0)} ms`;
   }
 
   function swatches() {
@@ -168,6 +189,7 @@
   $('png').onclick = () => $('view').toBlob((b) => save(`archipelago-${$('place').value}-${seed}.png`, b));
   $('svg').onclick = () => {
     const p = pal(), pic = ridges(dials()), f = (v) => +v.toFixed(1);
+    assign(pic.chains, pic.width);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
     const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none"/>` : `<path d="${d(s)}" fill="${colourOf(palOf(s.group), s.fill)}"/>`)).join('');
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${p.paper}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));

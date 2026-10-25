@@ -54,6 +54,54 @@ export const PLACES = {
       commons("Haida Gwaii (Queen Charlotte Islands) - around Louise Island by Zodiak - visit to an old logging site where Sitka Spruce trees in the early 1940's were harvested for the contruction of mosquito (21536456356).jpg", 'Murray Foubister', 'CC BY-SA 2.0'),
     ],
   },
+  cyclades: {
+    title: 'Cyclades', paper: '#ece3d7', ink: '#222022', colours: ['#6f1f3c', '#0e4978', '#6d5c48', '#3672b2', '#c06d47', '#6d9bc9', '#b19a81', '#c8baa7', '#8ed0fe'],
+    weights: [0.086, 0.168, 0.193, 0.229, 0.237, 0.354, 0.233, 0.207, 0.149],
+    photos: [
+      commons('Oia - Santorini - Greece - 16.jpg', 'Norbert Nagel', 'CC BY-SA 3.0'),
+      commons('Oia - Santorini - Greece - 13.jpg', 'Norbert Nagel', 'CC BY-SA 3.0'),
+      commons('Sarakiniko from boat, Milos, 152762.jpg', 'Zde', 'CC BY-SA 4.0'),
+      commons('Sarakiniko beach, Milos, 15M6402.jpg', 'Zde', 'CC BY-SA 4.0'),
+      commons('Santorini, Oia 12.jpg', 'LBM1948', 'CC BY-SA 4.0'),
+      commons('Bougainvillea Tree, Mykonos, Greece (53503388869).jpg', 'Warren LeMay', 'CC BY-SA 2.0'),
+    ],
+  },
+  svalbard: {
+    title: 'Svalbard', paper: '#e6ebe4', ink: '#1b110c', colours: ['#604a34', '#45516e', '#56698a', '#846e56', '#71829d', '#9498a3', '#b99a71', '#d7b88e', '#c7d2dd'],
+    weights: [0.137, 0.173, 0.201, 0.213, 0.223, 0.311, 0.159, 0.178, 0.254],
+    photos: [
+      commons('Sveabreen 1.JPG', 'Superchilum', 'CC BY-SA 3.0'),
+      commons('Sveabreen 2.JPG', 'Superchilum', 'CC BY-SA 3.0'),
+      commons('Svalbardrein pho.jpg', 'Per Harald Olsen', 'CC BY 2.5'),
+      commons('Svalbard reindeers (Rangifer tarandus platyrhynchus) in the Tundra of Reinsdyrflya.jpg', 'Andreas Weith', 'CC BY-SA 4.0'),
+      commons('Adventdalen Birkafjellet Operafjellet.jpg', 'Bjoertvedt', 'CC BY-SA 3.0'),
+      commons('Albert I Land Arlabreen Westmanfjellet Liljeborgfjellet IMG 5208.JPG', 'Bjoertvedt', 'CC BY-SA 3.0'),
+    ],
+  },
+  maldives: {
+    title: 'Maldives', paper: '#e7e5db', ink: '#000000', colours: ['#141908', '#0d3b83', '#3e4746', '#3f6269', '#518082', '#468ecb', '#7c9a9f', '#52b1e5', '#b5b9ad'],
+    weights: [0.135, 0.174, 0.191, 0.235, 0.245, 0.178, 0.255, 0.165, 0.281],
+    photos: [
+      commons('Ari Atoll passes.jpg', 'Bruno de Giusti', 'CC BY-SA 2.5 it'),
+      commons('Maldives-Vakarufalhi.JPG', 'Civvi', 'CC BY-SA 3.0'),
+      commons('Baa atoll islands.JPG', 'Frédéric Ducarme', 'CC BY-SA 4.0'),
+      commons('Maldives (15383006025).jpg', 'Laika ac', 'CC BY-SA 2.0'),
+      commons('Coco Palm Bodu Hithi Maldives - panoramio (7).jpg', 'calvinstkm', 'CC BY-SA 3.0'),
+      commons('Coco Palm Bodu Hithi Maldives - panoramio (14).jpg', 'calvinstkm', 'CC BY-SA 3.0'),
+    ],
+  },
+  hawaii: {
+    title: 'Hawaiʻi', paper: '#fcf8f0', ink: '#0a0c0e', colours: ['#1e282c', '#4d3827', '#565c2c', '#89432b', '#bd603f', '#3593c5', '#97a869', '#c3d4d8', '#efe061'],
+    weights: [0.309, 0.235, 0.167, 0.217, 0.151, 0.091, 0.176, 0.149, 0.117],
+    photos: [
+      commons('Pāhoehoe Lava flow.JPG', 'Brocken Inaglory', 'CC BY-SA 3.0'),
+      commons('Na Pali coast Kauai 2.jpg', 'Aion (English Wikipedia)', 'CC BY-SA 3.0'),
+      commons('Na Pali Coast, Kauai, Hawaii.jpg', 'Jeff Kubina', 'CC BY-SA 2.0'),
+      commons('2021-10-07 10 55 03 The Red Dirt Waterfall along Hawaii State Route 550 (Waimea Canyon Drive) in Kauai, Hawaii.jpg', 'Famartin', 'CC BY-SA 4.0'),
+      commons('Maohauhele.jpg', 'see Commons page', 'CC BY-SA 3.0'),
+      commons('Starr 030424-0086 Hibiscus brackenridgei subsp. brackenridgei.jpg', 'Forest & Kim Starr', 'CC BY 3.0'),
+    ],
+  },
   faroeHand: { title: 'Faroe, by hand', paper: '#e7e1d4', ink: '#23292b', colours: ['#4f6b54', '#93a98a', '#2f3a40', '#5f7f95', '#b7c4c8', '#b5533a', '#d27a92', '#f1ece0', '#8a6a4a'] },
   galapagosHand: { title: 'Galápagos, by hand', paper: '#ecdfc4', ink: '#2a241f', colours: ['#3b3a36', '#c9512c', '#e2b13c', '#3f8f8a', '#6f7d3e', '#a9ad6c', '#d98f6a', '#f6eedb', '#2f5f7a'] },
   rajaAmpatHand: { title: 'Raja Ampat, by hand', paper: '#e6e8de', ink: '#14262b', colours: ['#2f7a5a', '#7fb38a', '#2bb3a6', '#1f5f8b', '#f2c14e', '#e76f51', '#d9487a', '#ef8a3c', '#f7f3e6'] },
@@ -71,6 +119,15 @@ function hex([L, a, b]) {
   const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3, m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3, s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
   const rgb = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
   return '#' + rgb.map((v) => Math.round(Math.min(1, Math.max(0, gam(v))) * 255).toString(16).padStart(2, '0')).join('');
+}
+
+/** A palette's overall cast, in OKLab: its colours averaged by weight, vividness counted double. */
+export function signature({ colours, weights }) {
+  const w = weights ?? colours.map(() => 1), total = w.reduce((a, b) => a + b, 0);
+  return colours.reduce((s, h, i) => {
+    const [L, a, b] = oklab(...[1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16)));
+    return [s[0] + (L * w[i]) / total, s[1] + (2 * a * w[i]) / total, s[2] + (2 * b * w[i]) / total];
+  }, [0, 0, 0]);
 }
 
 /** How much of a photo's pixels each colour stands for (nearest in OKLab), softened so an accent still shows. */

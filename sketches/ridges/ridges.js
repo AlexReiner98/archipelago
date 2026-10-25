@@ -141,5 +141,5 @@ export function ridges(dials) {
       shapes.push({ fill: Math.floor(rnd() * 1000), group: nearest((a + b) / 2, y), points: [[a, y - gap * 0.45], [Math.min(b, xs[xs.length - 1]), y - gap * 0.45], [Math.min(b, xs[xs.length - 1]), y], [a, y]] });
     }
   }
-  return { width: W, height: H, shapes, line: d.line };
+  return { width: W, height: H, shapes, line: d.line, chains: chains.map((c) => c.pts) };
 }
