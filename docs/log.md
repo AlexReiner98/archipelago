@@ -438,21 +438,52 @@ and never cares which stream a fact came from beyond its retention.
 
 ### Segments and their hashes
 
-A compacted stream is cut into **segments**, one per day per stream (the time
-partitions of `e_m6a2uw2f`). When a day closes, its segment is sealed: its
+A compacted stream is cut into **segments**, one per day per stream, each
+inside the year's partition of `log_op` (below). When a day closes, its segment is sealed: its
 hash is SHA-256 of `"pelago-segment\n"` and the canonical entries in order,
 and a system entry in the fact stream records it:
 
 ```json
-{ "rule": { "outcome": "apply", "spared": [] }, "actor": { "id": "system" }, "reason": "Day sealed",
-  "facts": [["+", "seg_sessions_20261024", "segment", { "stream": "sessions", "from": 5101, "to": 9877, "hash": "ab03…" }]] }
+{ "rule": { "outcome": "apply", "spared": [] }, "actor": { "id": "system" }, "reason": "Day sealed", "action": "segment.seal",
+  "facts": [["+", "seg_sessions_20261024", "segment", { "stream": "sessions", "days": ["2026-10-24", "2026-10-24"], "from": 5101, "to": 9877, "entries": 4777, "hash": "ab03…" }]] }
 ```
 
 So the chain commits to every operational day. **Compaction** later drops
 entries a retention rule no longer keeps: it writes a compacted segment in
 place of one or more sealed ones and records it the same way, naming the
 segments it replaces and the rule it followed. An operational entry is never
-rewritten; it is dropped whole, by rule, and the drop is in the chain.
+rewritten; it is dropped whole, by rule, and the drop is in the chain:
+
+```json
+{ "reason": "Compacted by rule", "action": "segment.compact",
+  "facts": [["-", "seg_automations_20261004", "segment"], ["-", "seg_automations_20261014", "segment"],
+            ["+", "seg_automations_20261004_20261014_x7k2", "segment", { "stream": "automations", "days": ["2026-10-04", "2026-10-14"],
+              "from": 1, "to": 2, "entries": 0, "hash": "…", "replaces": ["seg_automations_20261004", "seg_automations_20261014"], "rules": ["automations"] }]] }
+```
+
+The segments that stand are those asserted and not since retracted;
+`verifySegments` (`src/streams.ts`) hashes each one's entries again. Only
+sealed days are compacted, neighbouring segments that lost entries become one,
+and the server does both once a day for every workspace (`src/duties.ts`).
+
+The compacted streams are kept in their own table, `log_op (stream, pos, at,
+head, facts)`: the light header in `head`, the facts inline. Its trigger
+refuses an update, a delete and a truncate to everyone but one role,
+`pelago_compactor`; compaction takes it for the end of its transaction. That
+role may delete, and may change a row in one way only: a sealed value, or a
+sealed reason, put as its digest, which is what a forget asks of it. The fact
+stream's tables let no one through.
+
+The streams keep the fact stream's guarantees (`src/opseal.ts`, step 24): a
+fact's value about an item or a link is sealed with that item's key, as in
+section 5, and `CLEAR` stays clear; an entry's reason is sealed with the key
+of the first item it names, or with its stream's own (`op:<stream>`) when it
+names none. A segment hashes each sealed value as its digest, so it verifies
+with no key and still does after a forget. Row security lets a member read an
+entry only when they may see every item and link it names; the next position
+comes from a function that sees them all. A forget puts every value its keys
+sealed, and every reason, as its digest, through the compaction role, and
+backups carry `log_op` as stored, beside the vault.
 
 ### The retention rule format
 
@@ -469,10 +500,11 @@ with a `stream` and a `keep` in place of `then`:
 }
 ```
 
-- `when` selects facts by what they are written to, with today's
-  conditions (type, kind, op, fields), and `fields` matters here: a run's
-  `story` and `tokens_used` go to the `sessions` stream while its start,
-  end and the task it is on stay facts.
+- `when` selects facts by their field (`fields`): a run's `story` and
+  `tokens_used` go to the `sessions` stream while its start, end and the task
+  it is on stay facts. Of a stream's rules, the one naming a fact's field
+  keeps it, else the one naming none; an entry's header names that rule, and
+  facts kept by different rules are appended as entries of their own.
 - `stream` names the stream; a rule with no `stream` leaves its facts in the
   fact stream.
 - `keep` says what compaction leaves:
@@ -483,7 +515,10 @@ with a `stream` and a `keep` in place of `then`:
     they are older than `after` (`[["P1D", "PT1H"], ["P30D", "P1D"]]`).
   - `closed: <duration>`: how long a record is kept at all after it ends
     (a run ended, a notification read, a token revoked, a claim released);
-    then every fact of it is dropped.
+    then every fact of it is dropped. A link retracted in the stream ends
+    there; an item ends when its projection is closed or archived.
+  - `open: <duration>`: how long a record that has not ended is kept after
+    its last fact (a notification never read).
   - `forever: true`: never compacted.
 - A workspace setting may lengthen a `keep` its pack declares liftable; it
   never shortens one below what a pack declares as needed (the spent view's
@@ -499,7 +534,7 @@ kept forever as facts instead: a run's start, end and the task it is on
 | --- | --- | --- |
 | `sessions` | a run's story, tokens_used, cost, stale_flagged (its start, end and task are facts) | `latest`, `history: P14D`, `closed: P180D` |
 | `claims` | `holds` links: claim and release | `latest`, `history: P30D`, `closed: P90D` |
-| `notifications` | notification items and who may read them; outbox deliveries | `latest`, `closed: P30D` after read, `P90D` unread |
+| `notifications` | notification items and who may read them; outbox deliveries | `latest`, `closed: P30D` after read, `open: P90D` unread |
 | `automations` | an automation's last_run, last_fired, last_result; the event cursor; `run_once` marks; `rechecked_at` | `latest`, `history: P7D` |
 | `settings` | the workspace's settings, `me`, each person's `changes.seen` and `questions.confirmed` (not packs: adding and removing one is a fact, section 8; not secrets: they are in the vault) | `latest`, `history: P365D` |
 | `access` | a token's last use (at most hourly), backup downloads (the grants themselves are facts) | `latest`, `history: P365D` |
@@ -531,6 +566,48 @@ codes, OAuth state) go in an **unlogged** Postgres table, `transient (key,
 value, expires_at)`, its entries expiring and swept, never backed up and
 never part of the log (`e_a7fjzcwv`). It is the one store outside the log
 besides the key vault, named so in `src/operational.ts`.
+
+### Partitions by time
+
+`log_entry`, `log_fact` and `log_op` are each range-partitioned on `at`, one
+partition a year (UTC), in the workspace's own database (`e_m6a2uw2f`,
+`src/partitions.ts`). A fact carries its entry's `at`, so it lives with its
+entry; a segment's days never cross a year, so a segment and a compacted one
+live in one partition, and reading one reads only it.
+
+- **The keys name the time.** Postgres needs the partition key in every unique
+  index: the keys are `(stream, at, pos)` and `(stream, pos, n, at)`. What the
+  old key promised a trigger promises: an entry must be its stream's next
+  position, name the last entry's hash and be no earlier than it, under the
+  append lock. The chain is held by the database across partitions.
+- **Append-only in every partition.** The row triggers on each table reach every
+  partition, a new one too; each partition is given its own truncate trigger
+  when it is made.
+- **Made ahead.** Partitions are made through two months from now when a
+  database opens and daily, and by an append whose own is missing. There is no
+  default partition: a row outside them all is refused.
+- **Pruned reads.** BRIN indexes on `at` serve a stretch of time inside a
+  partition. The history index is `(id, field, at, pos, n)`: an as-of read is
+  bounded by its entry's `at` and walks the partitions newest first, stopping
+  at the first that answers.
+- **Why a year, not a month.** In PGlite a read that time cannot prune is
+  planned against every partition, and planning costs more than running:
+  three years of months took an as-of read from 0.7 to 11 ms, a year each
+  keeps it near 1.5 ms (the numbers are on the task). `pelago_log_unit()`
+  names the length.
+
+### Where this stands (24 Oct 2026)
+
+Each write the table of section 10 sends to a compacted stream appends there
+as it is made, beside today's tables, which are still written and read until
+the projections read the streams: `operational`, `claim`, `release` and
+`checkConnections` in `src/pelago.ts`, settings and secrets by name, the
+event and audit cursors, `run_once` marks, a token's use (hourly), backup
+downloads, audit imports and a picture's hash. Not yet: the notification item
+itself (still facts through `apply`), a run's heartbeat (still on the run's
+row, in no stream), `pack_store` (the server's own log, `e_8g9feum7`), and
+`log_blob` (a picture's bytes stay in `picture`). `transient` is unlogged on a
+Postgres server.
 
 ---
 
@@ -635,6 +712,29 @@ forgotten with an item without the person choosing it.
   `keys`, so a page read decrypts nothing (projections are plaintext) and a
   replay unwraps each key once.
 
+### As built
+
+The vault is `src/vault.ts`, sealing `src/seal.ts`, the forget `src/forget.ts`
+(step 20). Where the build had to choose:
+
+- A held change's `ops`, `warnings` and `source` are sealed with a key of
+  their own, `<p_…>/ops`, beside the one for its reason: forgetting an item
+  it touches takes what it asked and leaves why, which goes only if chosen.
+  The proposal leaves the queue as superseded.
+- Backups are format 2 (`src/backup-seal.ts`): the rows of today's tables
+  sealed as the log is, keyed the same way, with the log's tables in the
+  file. A restore opens them with the vault as it is then, or with a vault
+  backup given beside the file, on a server with the same sealing key; a
+  row with no key stays out. Vault backups are written to
+  `backups/<ws>/vault/`, deleted after 30 days, and never sent off the server.
+- A download (`backup_download`, and so `npm run pull`) carries the vault
+  beside the file, its keys wrapped under a one-time key that only the
+  download's answer holds; the server that takes it in wraps them under its
+  own. A copy saved off the server is out of a forget's reach, as any copy
+  is (an open question for the owner, `e_98ddd7ha`).
+- Values are opened for their reader in `entries`, `entry` and `factAt`;
+  `stored` and `verify` read the log as it is kept.
+
 ---
 
 ## 6. Versioning
@@ -668,7 +768,7 @@ forgotten with an item without the person choosing it.
 | projection | reads from a fact |
 | --- | --- |
 | current state (`entity`, `relation` as tables) | every fact: the newest value of each (id, field), plaintext; `created_at`, `updated_at`, `archived_at`, `valid_from`, `valid_to` from entry times |
-| history index | nothing beyond the log itself: `log_fact` indexed on `(id, field, pos)` and on `(id, pos)` is the index by item and by field; an as-of value is one index lookup |
+| history index | nothing beyond the log itself: `log_fact` indexed on `(id, field, at, pos, n)` is the index by item and by field; an as-of value is one index lookup in the newest partition that has one |
 | change sets by id, undo | `log_entry.id`, `undoes`, indexed |
 | search index | `title`, `body`, and fields declared searchable, after unsealing, as the append happens; a forget deletes its rows |
 | part_of closure | `link` facts whose type is in the `part_of` family: add or drop ancestor pairs |
@@ -681,6 +781,32 @@ forgotten with an item without the person choosing it.
 Each projection declares the fields and streams it reads, and its version.
 Projections are written in the append's transaction (commitment 2): a page
 never sees the log ahead of them.
+
+### As built
+
+- **The projector** is `src/replay.ts`. The write path plans each op into
+  facts and projects them at once, under the fact stream's lock, so the next
+  op reads what it did; the entry is appended at the end of the same
+  transaction. `rebuild` projects a log into empty tables the same way, and
+  `test/projections.test.ts` compares the two row for row.
+- **An item's kind is not a fact.** It is read from its type, as `is_open`
+  is from its status, so a field a pack calls `kind` is the pack's own. A
+  link is known by its id (`r_…`), so an item may have a field called `link`.
+- **The activity log** reads change sets from the log (`src/eventlog.ts`):
+  one event per item or link an entry touched, the before-values and the
+  title then from the history index. Facts are numbered from the event
+  table's sequence (`log_fact.seq`, not hashed), so one cursor runs over
+  both. `event` keeps only what is not yet a fact. A backup carries the
+  change sets as the events they read as, until it carries the log itself.
+- **The review queue** (`proposal`) is projected: a pending record makes its
+  row, the entry that decides it says what became of it.
+- **The search index** is the indexes on `entity` (`src/search.ts`), kept
+  current by the projector's writes. The part_of closure, blocking roots and
+  the counts are not kept: measured on 20,000 items, the block graph of the
+  whole map takes 36 ms, the open and blocked counts 48 ms and a hub's
+  part_of closure 1 ms, while attention takes 345 ms, nearly all of it the
+  lens read that none of them would save (the task records the numbers).
+  They wait for the 10-million-event benchmark (section 9) to show a need.
 
 ### What a snapshot records
 
@@ -705,6 +831,54 @@ never sees the log ahead of them.
   snapshots and backups through the vault.
 - A snapshot is taken every 100,000 fact entries or daily, whichever comes
   first; it is not part of the log and can be deleted and taken again.
+
+### As built (`src/snapshot.ts`, `src/rebuild.ts`, `src/backup-log.ts`)
+
+- **Where kept.** `log_snapshot`, one row per snapshot in the workspace's
+  database (step 23), its rows gzipped JSON sealed per item as a backup's
+  rows are (`entity.title`, …), never readable by a member. Its id is
+  `s_<facts>_<pending>_<code>`; taken again at the same position, it is
+  replaced. The newest three of the running code are kept.
+- **The code's version.** `PROJECTION_VERSION` is raised by hand when what
+  the projector makes changes in meaning; beside it the snapshot keeps the
+  digest of the projector's source (`src/replay.ts`, `src/facts.ts`), so a
+  projector changed without raising it is still not built on. A snapshot
+  whose version or code is not the running one, whose anchor is not the fact
+  entry at its position, or whose rows do not hash to its hash, is passed
+  over.
+- **The hash.** SHA-256 of `"pelago-snapshot\n"`, the header canonical, a
+  newline, and the SHA-256 of the sealed rows' bytes: the rows by digest, so
+  a forget, which only destroys keys, changes nothing a snapshot hashed.
+- **Rebuild.** Into a schema of its own (`pelago_rebuild`, named first on
+  the search path: the projector is the write path's own, unchanged), from
+  the newest snapshot this code can build on, both streams merged in the
+  order the write path projects them, a chunk of entries per transaction so
+  pages are served between them. When one chunk is left, one transaction
+  takes both streams' locks, projects the rest, keeps a snapshot at the head
+  and swaps: what differs from the live tables is written, what is the same
+  is left, so the live tables keep their policies, triggers and foreign
+  keys. An item keeps its operational fields; a link the fact stream never
+  said (a claim's, in its own stream) is not removed. A snapshot is also
+  kept every 100,000 fact entries of a walk.
+- **When.** Daily, by the leader: a snapshot at the head, walked from the
+  newest one; where none fits the running code (a new projector, or none
+  yet), the projections are rebuilt from the start in the background and
+  swapped in.
+- **As of a position.** The nearest snapshot at or before it, then the
+  entries of both streams up to the moment of that fact entry, projected
+  into temporary tables that live for one transaction. The reader sees of it
+  only what their database shows them now, as the log's facts are read.
+- **Backups (format 3).** The log's rows whole, a snapshot of the live
+  projections at the head of the log (read in the backup's own transaction),
+  and the tables that are not projections; no rows of `entity`, `relation`
+  or `proposal`. The live snapshot holds what the log alone does not make:
+  rows a merge of another backup wrote, a claim's link, an item's
+  operational fields. Restored or read, the projections are that snapshot
+  with what the log says after it projected on; when it cannot be built on
+  (other code, off the chain), the log alone from its start. Keys travel
+  apart as section 5 says. A merge of a format 3 file reads the same
+  projections and merges them as rows, with the other map's history as
+  events: two hash chains are not joined (`e_z2kv3ejs`).
 
 ---
 
@@ -837,8 +1011,8 @@ Estimates for the benchmark to confirm, in Postgres, with indexes:
 | `log_entry` header row: ids, actor, authority, rule, two 32-byte hashes, reason of ~120 characters sealed (+28 bytes nonce and tag), tuple overhead | ~420 |
 | one `log_fact` row with a short clear value (a status) | ~80 |
 | one `log_fact` row with a sealed title of ~50 characters | ~130 |
-| index entries per fact: primary key `(pos, n)`, `(id, field, pos)`, `(id, pos)` | ~90 |
-| index entries per header: primary key, `id`, `at` (BRIN, nearly free) | ~60 |
+| index entries per fact: primary key `(stream, pos, n, at)`, `(id, field, at, pos, n)`, `at` (BRIN) | ~100 |
+| index entries per header: primary key `(stream, at, pos)`, `(stream, pos)`, `id`, `at` (BRIN, nearly free) | ~80 |
 
 A one-field update: ~650 bytes. Example 1 (a task with a note of ~60
 characters, two links, a new source; 15 facts): ~3.5 KB. A typical change set
@@ -1017,3 +1191,37 @@ decision under `e_j8df78ar`, stated as settled in the sections above:
     last use is operational (`e_x9wxnqz4`).
 13. A type a pack moves is a system change set asserting the new type on
     every item (`e_w66xm7kt`).
+
+## 12. One log, two databases
+
+A map runs on PGlite (a folder, one process) or on a Postgres server (many
+processes, one database per workspace). The schema and the log are the same
+on both, and moving a map from one to the other is a replay of its log.
+Where a map should move is the owner's question `e_fcusktmz`.
+
+### The move
+
+`node src/cli.ts move <from> <to>`, each a data folder or a `postgres://`
+address of one database, with no server on either (src/move.ts):
+
+1. **Verify** the source: both chains and every sealed segment.
+2. **Replay**: the key vault is carried first, then every entry of both
+   streams as it is stored (sealed, the same position, time and hash), in the
+   order a rebuild projects them (section 7), each projected as it lands.
+   What the log does not hold yet comes as rows: the operational fields kept
+   on items (`KEPT_FIELDS`) and every store beside the log, the operational
+   streams (`log_op`) among them. `transient` and `schema_version` never move.
+3. **Compare**, before the target's transaction commits: its chains verify to
+   the same heads, its projections hash to the source's row for row, and every
+   carried store has as many rows. Otherwise nothing of it stays.
+
+The target must be empty. Sealed words stay sealed, so a server on the target
+needs the sealing key the source's had (`PELAGO_SECRETS_KEY`, or the
+`secrets.key` beside a folder's data); a move refuses when the source's words
+do not open with the key it is given.
+
+### The hosted product
+
+Every hosted workspace is its own database on the server (`databaseFor` in
+src/pg.ts), so a workspace is the unit that is sharded: placed on another
+server by moving that one database, with nothing joined across workspaces.

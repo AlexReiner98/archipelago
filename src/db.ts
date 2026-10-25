@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { migrate, schemaKey } from './migrate.ts';
+import { makePartitions } from './partitions.ts';
 import { openPg, scratchPg } from './pg.ts';
 import { keepStatistics } from './stats.ts';
 
@@ -40,10 +41,12 @@ export async function openDb(where?: string): Promise<Database> {
 // The steps of the schema this database lacks (src/migrate.ts). pg_trgm, which search uses for near-misses and typos,
 // is in the first; a Postgres server has it too.
 async function prepared<D extends Database>(db: D, server = false) {
-  await migrate(db, server).catch(async (err) => {
-    if (!server) await db.close(); // a server's pool is closed by its opener
-    throw err;
-  });
+  await migrate(db, server)
+    .then(() => makePartitions(db)) // the log's partitions, made ahead of need (src/partitions.ts)
+    .catch(async (err) => {
+      if (!server) await db.close(); // a server's pool is closed by its opener
+      throw err;
+    });
   return db;
 }
 

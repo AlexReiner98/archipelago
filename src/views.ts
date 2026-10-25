@@ -4,6 +4,10 @@
 
 import { type Entity, type Archipelago } from './pelago.ts';
 import { spent } from './spent.ts';
+import { factEvents } from './eventlog.ts';
+
+/** The most change sets' events changed_since counts: past that, its counts are of the newest. */
+const COUNTED = 20_000;
 import { livesIn } from './places.ts';
 import { savedViews } from './saved-views.ts'; import { pageStyle } from './styles.ts';
 
@@ -19,7 +23,10 @@ async function changedSince(l: Archipelago, input: { since?: string; limit?: num
   if (!input.since || Number.isNaN(Date.parse(input.since))) throw new Error('changed_since needs "since" as an ISO date or date-time');
   // The counts are of everything since; the events are the newest of them, few enough to read.
   const events = await l.events({ since: input.since, limit: input.limit ?? 50 });
-  const { rows } = await l.db.query<{ action: string; n: number }>(`select action, count(*)::int as n from event where ts >= $1::timestamptz group by action order by n desc`, [input.since]);
+  const { rows: kept } = await l.db.query<{ action: string; n: number }>(`select action, count(*)::int as n from event where ts >= $1::timestamptz group by action`, [input.since]);
+  const counts = new Map(kept.map((r) => [r.action, r.n]));
+  for (const ev of await factEvents(l.db, { since: input.since }, COUNTED)) counts.set(ev.action, (counts.get(ev.action) ?? 0) + 1);
+  const rows = [...counts].map(([action, n]) => ({ action, n })).sort((a, b) => b.n - a.n);
   const total = rows.reduce((sum, r) => sum + r.n, 0);
   return {
     since: input.since,
@@ -89,7 +96,7 @@ export interface View {
 
 export const VIEWS: Record<string, View> = {
   changed_since: {
-    description: 'What changed since a moment in time: how many events of each kind, and the newest of them. Long notes are cut to their start, and a change set says its reason once. Params: since (ISO date-time, required), limit (events listed, default 50), full (true for everything whole).',
+    description: 'What changed since a moment in time: how many events of each kind, and the newest of them. Long notes are cut to their start, and a change set says its reason once. Params: since (ISO date-time, required), limit (events listed, default 50; an agent is given the newest five unless it asks), full (true for everything whole).',
     run: changedSince,
   },
   spent: {

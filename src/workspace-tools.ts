@@ -20,7 +20,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: {},
     run: async (l) => {
-      const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on to_jsonb(e.id) = s.value where s.key = 'me'`);
+      const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on e.id = s.value #>> '{}' where s.key = 'me'`);
       return { ...(await settings(l)), owner: rows[0] ?? null, member_limit: (await limitOf(l.workspace)) ?? null, ended: (await endedOf(l.workspace)) ?? null };
     },
   },
@@ -40,6 +40,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       for (const [key, value] of Object.entries(input)) {
         await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
         await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${key} set to ${JSON.stringify(value)}` });
+        await l.record('settings', actorId(actor), [['+', 'setting', key, value]]);
       }
       return settings(l);
     },

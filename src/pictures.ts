@@ -1,6 +1,7 @@
 // The pictures kept for items whose page shows one: a figure (a test result's, a note's, a file's), and the still
 // of a lens. What a test run found is the software pack's test_report, which asks for pictures to be dropped.
 
+import { createHash } from 'node:crypto';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 
 /** The most a kept picture may weigh. A capture of a view at screen size is well under it. */
@@ -26,6 +27,7 @@ export async function putPicture(l: Archipelago, actor: Actor, input: { result: 
      on conflict (entity_id) do update set content_type = excluded.content_type, bytes = excluded.bytes, size = excluded.size, created_at = now()`,
     [result.id, input.content_type, bytes.toString('base64'), bytes.length],
   );
+  await l.record('observations', actorId(actor), [['+', result.id, 'picture', { $blob: createHash('sha256').update(bytes).digest('hex'), size: bytes.length, type: input.content_type }]]);
   await l.log(l.db, { actor: actorId(actor), action: 'picture.stored', target: result.id, reason: `Picture kept for "${result.title}"`, detail: { size: bytes.length, content_type: input.content_type } });
   return { result: result.id, size: bytes.length, content_type: input.content_type };
 }

@@ -7,6 +7,7 @@ import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
+import { summed } from './summary.ts';
 import { keep, kept } from './transient.ts';
 
 export interface HookBody {
@@ -42,7 +43,7 @@ const LIMITED =
   'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one that is theirs: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made on the Workspace screen.';
 
 const restarted = ({ started, commit }: HookCall['running']) =>
-  `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). If that was a deploy, its tools may have changed, and your client still holds the list from when it connected: a tool or an input that CLAUDE.md or a tool's answer names, but your list lacks, is there on the server. Ask the owner to reconnect the pelago MCP server, or until then call the tool as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
+  `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). If that was a deploy, its tools may have changed, and your client still holds the list from when it connected: a tool, an action or an input that CLAUDE.md or a tool's answer names, but your list lacks, is there on the server (the tools are query, change, undo and the six verbs, each taking an action by name). Ask the owner to reconnect the pelago MCP server, or until then call the tool as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
 
 /** The answer to one hook, or undefined for an event there is none for. */
 export async function answerHook(event: string, call: HookCall): Promise<object | undefined> {
@@ -70,7 +71,10 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     const began = (await kept(whole, restartKey)) ? undefined : await sessionBegan(pelago, body.session_id);
     await keep(whole, restartKey, true, HEARD_MS);
     if (began && began.getTime() < Date.parse(running.started)) told.push(restarted(running));
-    if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${describeChanges(changes)}`);
+    // How many of each, and the newest few: the rest is one query away.
+    const { newest, counts, more } = summed(changes, (c) => c.action);
+    const tally = counts ? `${newest.length + more!} changes (${Object.entries(counts).map(([action, n]) => `${n} ${action}`).join(', ')}); the newest ${newest.length}, the rest with query events:\n` : '';
+    if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${describeChanges(newest)}`);
     return told.length ? { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } } : {};
   }
   if (event === 'session-start') {

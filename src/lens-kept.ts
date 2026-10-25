@@ -2,7 +2,7 @@
 // their own; and where a lens or a style is seen at work.
 
 import { SYSTEM } from './head.ts';
-import { lensRead } from './lens-scan.ts';
+import { scopeOf } from './places.ts';
 import type { Archipelago } from './pelago.ts';
 
 export interface Kept {
@@ -27,16 +27,25 @@ export async function keptOf(l: Archipelago, type: 'lens' | 'style', named: unkn
 export const HUB_AT = 12;
 
 /**
- * The hubs: open items that hold enough to need views of their own. How much
- * is enough is the nearest project's hub_at, or HUB_AT: a project still being
- * shaped sets it low, so that most of what is in it is treated as a hub.
- * Read off the map each time, by the core pack's lens of them (core.hubs: what is
- * open and not the system's, and what is part of what); nothing says an item is a
- * hub that could go stale.
+ * The hubs within an item or a place: open items in it that hold enough to need views of their own. How much is
+ * enough is the nearest project's hub_at, or HUB_AT: a project still being shaped sets it low, so that most of what
+ * is in it is treated as a hub. Read off what is in it each time (what is open and not the system's, and what is
+ * part of what); nothing says an item is a hub that could go stale. Across the whole map it is not read: it would
+ * read every item.
  */
-export async function hubs(l: Archipelago) {
-  const lens = l.registry.packs.find((p) => p.id === 'core')?.views?.find((v) => v.id === 'core.hubs')?.lens ?? {};
-  const read = await lensRead(l, {}, lens, {}, ['hub_at'], []);
+export async function hubs(l: Archipelago, within?: string) {
+  if (!within) throw new Error('hubs reads within an item or a place (within): across the whole map it would read every item.');
+  const scope = [...(await scopeOf(l, within, true))];
+  const { rows: entities } = await l.db.query<{ id: string; type: string; title: string; kind: string | null; is_open: boolean; props: Record<string, unknown> }>(
+    `select id, type, title, kind, is_open, jsonb_build_object('hub_at', props -> 'hub_at') as props from entity where id = any($1::text[]) and archived_at is null`,
+    [scope],
+  );
+  const { rows: relations } = await l.db.query<{ type: string; from_id: string; to_id: string }>(
+    `with s(id) as (select unnest($1::text[])) select r.type, r.from_id, r.to_id from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null and r.type = 'part_of' order by r.id`,
+    [scope],
+  );
+  const above = await hubAtAbove(l, within);
+  const read = { entities, relations };
   const byId = new Map(read.entities.filter((e) => e.is_open && e.kind !== SYSTEM).map((e) => [e.id, e]));
   const parts = read.relations.filter((r) => r.type === 'part_of');
   const up = new Map<string, string>();
@@ -62,7 +71,7 @@ export async function hubs(l: Archipelago) {
       const e = byId.get(cur)!;
       if (typeof e.props.hub_at === 'number') return e.props.hub_at;
     }
-    return HUB_AT;
+    return above;
   };
   const views = new Map<string, number>();
   for (const lens of await keptOf(l, 'lens', undefined)) for (const id of lens.about) views.set(id, (views.get(id) ?? 0) + 1);
@@ -70,6 +79,26 @@ export async function hubs(l: Archipelago) {
     .map((e) => ({ id: e.id, type: e.type, title: e.title, inside: inside(e.id), at: at(e.id), views: views.get(e.id) ?? 0 }))
     .filter((h) => h.inside > 0 && h.inside >= h.at)
     .sort((a, b) => b.inside - a.inside || a.title.localeCompare(b.title));
+}
+
+/** The hub_at of the nearest item an item is part of (itself included) that says one, step by step up; else HUB_AT. */
+async function hubAtAbove(l: Archipelago, id: string): Promise<number> {
+  const { rows } = await l.db.query<{ hub_at: unknown }>(
+    `with recursive up(id, n) as (select $1::text, 0 union select r.to_id, up.n + 1 from relation r join up on r.from_id = up.id where r.type = 'part_of' and r.valid_to is null and up.n < 64)
+     select e.props -> 'hub_at' as hub_at from up join entity e on e.id = up.id where jsonb_typeof(e.props -> 'hub_at') = 'number' order by up.n limit 1`,
+    [id],
+  );
+  return rows.length ? Number(rows[0].hub_at) : HUB_AT;
+}
+
+/** Whether one item is a hub: the open things inside it (from the part_of closure), against the hub_at above it. */
+export async function hubOf(l: Archipelago, id: string): Promise<{ is: boolean; inside?: number; at?: number }> {
+  const { rows } = await l.db.query<{ n: number }>(
+    `select count(*)::int as n from part_closure c join entity e on e.id = c.descendant where c.ancestor = $1 and e.is_open and e.archived_at is null and (e.kind is null or e.kind <> 'system')`,
+    [id],
+  );
+  const [inside, at] = [rows[0].n, await hubAtAbove(l, id)];
+  return inside > 0 && inside >= at ? { is: true, inside, at } : { is: false };
 }
 
 /** Where on the page a lens or a style is seen at work: the picture of what it is about, or of the whole map. Nothing for any other item. */

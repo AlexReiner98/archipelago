@@ -55,9 +55,9 @@ test('the XML escapes what it is given and refuses an edge to nothing', () => {
 
 test('every type is drawn under what it extends, down to the kinds, and an unknown parent is refused', () => {
   const packs: PackFile[] = [
-    { id: 'core', types: [{ id: 'work', kind: true }, { id: 'question', kind: true }, { id: 'system', kind: true }, { id: 'lens', extends: 'system' }], relations: [{ id: 'relates_to', root: true }, { id: 'about', root: true }] },
-    { id: 'work', requires: ['core'], types: [{ id: 'work.task', extends: 'work', capabilities: { bound: {}, where: {} } }], relations: [{ id: 'work.based_on', extends: 'relates_to', from: ['*'], to: ['work.task'] }] },
-    { id: 'lab', requires: ['core', 'work'], types: [{ id: 'lab.trial', extends: 'work.task' }], extend: { 'work.task': { fields: { cost: {} } } } },
+    { id: 'core', types: [{ id: 'work', kind: true }, { id: 'question', kind: true }, { id: 'system', kind: true }, { id: 'lens', extends: 'system' }], links: [{ id: 'relates_to', root: true }, { id: 'about', root: true }] },
+    { id: 'work', requires: ['core'], types: [{ id: 'work.task', extends: 'work', capabilities: { bound: {}, where: {} } }], links: [{ id: 'work.based_on', extends: 'relates_to', from: ['*'], to: ['work.task'] }] },
+    { id: 'lab', requires: ['core', 'work'], types: [{ id: 'lab.trial', extends: 'work.task' }, { of: 'work.task', fields: { cost: {} } }] },
   ];
   const [inheritance, relations, packMap] = typeDiagram(packs);
   const xml = pageXml(inheritance);
@@ -82,7 +82,7 @@ test('the diagrams of this repository are made whole, and the same each time', (
   assert.deepEqual(Object.keys(made), ['modules.drawio', 'types.drawio']);
   assert.deepEqual(diagrams(files, packs), made);
   for (const f of files.filter((f) => /^src\/[^/]+\.ts$/.test(f.path))) assert.ok(made['modules.drawio'].includes(`>${f.path.slice(4)}<`) || made['modules.drawio'].includes(`label="${f.path.slice(4)}"`), `${f.path} is drawn`);
-  const types = packs.flatMap((p) => p.types ?? []);
+  const types = packs.flatMap((p) => (p.types ?? []).filter((t) => t.id));
   assert.equal(cells(made['types.drawio'].split('</diagram>')[0], 'vertex'), types.length + 1, 'every type and the key');
 });
 

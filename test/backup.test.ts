@@ -5,13 +5,14 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { backupAll, dump, merge, newestBackup, readBackup, restore } from '../src/backup.ts';
+import { backupAll, dump, merge, newestBackup, readable, readBackup, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { sessionEnd, sessionStart } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { askView } from '../src/askview.ts';
 import { Workspaces } from '../src/workspaces.ts';
+import { dumpVault } from '../src/vault.ts';
 import { human, agent, fresh, make } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
@@ -26,7 +27,8 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
   await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'work.note', title: 'Proposed' }] });
-  const snapshot = async (l: Archipelago) => JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' })));
+  // Each map has its own vault: a copy carries the vault's backup beside it.
+  const snapshot = async (l: Archipelago) => ({ ...JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))), vault: await dumpVault(l.db) });
   // b starts as a copy of a, then each goes its own way.
   const b = new Archipelago(await openDb(), a.registry);
   await restore(b.db, await snapshot(a));
@@ -91,10 +93,13 @@ test('backups are written per workspace, read back, and only the newest are kept
     assert.deepEqual(done.map((d) => [d.workspace, d.error]), [['default', undefined], ['acme', undefined]]);
     await new Promise((r) => setTimeout(r, 5));
   }
-  const files = readdirSync(join(dir, 'acme'));
+  const files = readdirSync(join(dir, 'acme')).filter((f) => f.endsWith('.json.gz'));
   assert.equal(files.length, 2, 'the oldest was removed');
+  assert.equal(readdirSync(join(dir, 'acme', 'vault')).length, 3, 'the vault is backed up apart, and kept by age, not by count');
   const read = readBackup(join(dir, 'acme', files.sort().at(-1)!));
-  assert.deepEqual([read.workspace, read.tables.entity.map((e) => e.title)], [{ id: 'acme', name: 'Acme' }, ['Theirs']]);
+  assert.ok(!JSON.stringify(read).includes('Theirs'), 'what items say is sealed in the file');
+  const opened = await readable((await workspaces.get('acme')).pelago.db, read);
+  assert.deepEqual([read.workspace, opened.tables.entity.map((e) => e.title)], [{ id: 'acme', name: 'Acme' }, ['Theirs']]);
   assert.ok(Date.now() - newestBackup(dir)!.getTime() < 60_000, 'the newest backup\'s time is read from its name');
 
   // A copy of each new backup goes to a place that takes a file by POST with a key.

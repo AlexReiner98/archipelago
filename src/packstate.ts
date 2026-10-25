@@ -1,26 +1,74 @@
-// Turning a pack off and on in a running workspace. What the pack registered (types and relations, rules, actions
-// and views, trees) unwinds at once: its types turn dormant in the type table, its tools leave the tool list, its
-// process stops, and connected agents are told the list changed. What it made stays, as dormant items a person can
-// still edit. Turning it on again brings it all back. It is the owner's: a pack carries rules and code.
+// Packs in time (Rule 8 of the target model, docs/log.md section 8): a pack's presence in a workspace is a fact on its
+// log, kept forever: ["+", "pack:<id>", "pack", { version, manifest }] when it is added (the manifest is the SHA-256 of
+// its pack.json as read), ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
+// and everything a pack registers is derived from the set (src/packs.ts), so taking one out unwinds it at once: its
+// types turn dormant in the type table, its tools leave the tool list, its process stops, and connected agents are
+// told the list changed. What it made stays, as dormant items a person can still edit. Adding it back brings it all
+// back. It is the owner's: a pack carries rules and code.
 
 import { z } from 'zod';
+import { newId } from './db.ts';
+import { append, type Fact } from './log.ts';
 import { decideAct, listActs, setPackSecret } from './outside.ts';
+import { KERNEL_PACKS } from './packorder.ts';
+import { LOCAL_PACK } from './packs.ts';
 import { hostFor } from './packtools.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
 import { syncTypes } from './typetable.ts';
 
-/** The setting that holds the packs turned off in a workspace. */
+/** The setting that held the packs turned off in a workspace before they were facts: read until the first pack fact. */
 export const PACKS_OFF = 'packs_off';
+
+/** The id a pack's presence is kept under on the log. */
+export const packFact = (pack: string) => `pack:${pack}`;
+
+type Said = { id: string; op: '+' | '-'; value: { version?: string; manifest?: string } | null };
+
+/** The last fact said of each pack here. */
+async function packFacts(l: Archipelago): Promise<Map<string, Said>> {
+  const { rows } = await l.db.query<Said>(`select distinct on (id) id, op, value from log_fact where stream = 'facts' and field = 'pack' and id like 'pack:%' order by id, pos desc, n desc -- index log_fact_kept`);
+  return new Map(rows.map((r) => [r.id.slice('pack:'.length), r]));
+}
 
 /** Told when a workspace's tools change, so the server can tell the agents connected to it. */
 let toolsChanged: (workspace: string) => void = () => {};
 export const onToolsChanged = (fn: (workspace: string) => void) => (toolsChanged = fn);
 
-/** The packs turned off in a workspace, as it keeps them. */
+/** The packs taken out of a workspace: those whose last fact retracts them; before any pack fact, the old setting. */
 export async function packsOff(l: Archipelago): Promise<string[]> {
+  const said = await packFacts(l);
+  if (said.size) return [...said.values()].filter((f) => f.op === '-').map((f) => f.id.slice('pack:'.length));
   const { rows } = await l.db.query<{ value: unknown }>(`select value from setting where key = $1`, [PACKS_OFF]);
   return Array.isArray(rows[0]?.value) ? (rows[0].value as string[]) : [];
+}
+
+/** Append a change set of pack facts, as who made it. */
+const appendPacks = (l: Archipelago, by: string, action: string, reason: string, facts: Fact[]) =>
+  l.db.transaction((tx) => append(tx, l.workspace, 'facts', { id: newId('c'), actor: { id: by }, authority: by === 'system' ? null : { of: 'human', who: by }, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts));
+
+/**
+ * Bring the log in line with the packs this server has, when a workspace opens: a pack found here and not yet said to
+ * be present is asserted, and so is one whose version or manifest changed; one taken out stays out (and one the old
+ * setting turned off is retracted once). A pack the server does not enable is not said either way. One system change set.
+ */
+export async function syncPacks(l: Archipelago): Promise<Fact[]> {
+  const said = await packFacts(l);
+  const off = new Set(await packsOff(l));
+  const facts: Fact[] = [];
+  for (const p of l.registry.found) {
+    const state = l.registry.states.get(p.id);
+    if (p.id === LOCAL_PACK || (state?.state === 'off' && !off.has(p.id))) continue;
+    const was = said.get(p.id);
+    if (off.has(p.id) && !KERNEL_PACKS.includes(p.id)) {
+      if (!was) facts.push(['-', packFact(p.id), 'pack']);
+      continue;
+    }
+    const manifest = l.registry.hashes.get(p.id);
+    if (!was || was.op === '-' || was.value?.version !== p.version || was.value?.manifest !== manifest) facts.push(['+', packFact(p.id), 'pack', { version: p.version, manifest }]);
+  }
+  if (facts.length) await appendPacks(l, 'system', 'pack.sync', 'The packs as this server has them', facts);
+  return facts;
 }
 
 /** Every pack on this server, with its state in this workspace and why. */
@@ -32,11 +80,17 @@ export function packStates(l: Archipelago) {
 export async function setPack(l: Archipelago, actor: Actor, input: { pack: string; on: boolean }) {
   if (actor.kind !== 'human') throw new Error('Turning a pack on or off is the owner’s.');
   if (!l.registry.states.has(input.pack)) throw new Error(`No pack "${input.pack}" on this server. Packs: ${[...l.registry.states.keys()].join(', ')}`);
+  if (!input.on && KERNEL_PACKS.includes(input.pack)) throw new Error(`The ${input.pack} pack is the kernel's own: it is never taken out.`);
+  const needing = input.on ? [] : l.registry.packs.filter((p) => (p.requires ?? []).includes(input.pack)).map((p) => p.id);
+  if (needing.length) throw new Error(`${needing.join(', ')} require${needing.length === 1 ? 's' : ''} the ${input.pack} pack: take ${needing.length === 1 ? 'it' : 'them'} out first.`);
+  await syncPacks(l); // the log says what is present before it says what changed
   const off = new Set(await packsOff(l));
   if (input.on) off.delete(input.pack);
   else off.add(input.pack);
   const list = [...off].sort();
-  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = $2::jsonb`, [PACKS_OFF, JSON.stringify(list)]);
+  const pack = l.registry.found.find((p) => p.id === input.pack)!;
+  const fact: Fact = input.on ? ['+', packFact(input.pack), 'pack', { version: pack.version, manifest: l.registry.hashes.get(input.pack) }] : ['-', packFact(input.pack), 'pack'];
+  await appendPacks(l, actorId(actor), input.on ? 'pack.on' : 'pack.off', `${input.on ? 'Added' : 'Took out'} the ${input.pack} pack`, [fact]);
   l.registry.turnOff(list);
   if (!input.on) hostFor(l.registry).stop();
   const synced = await syncTypes(l);

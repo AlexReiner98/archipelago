@@ -57,8 +57,7 @@ const count = (files: string[], pattern: RegExp) =>
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
-  'src/tools.ts': 908,
-  'src/pelago.ts': 934,
+  'src/pelago.ts': 852,
   'ui/style.css': 732,
 };
 
@@ -76,12 +75,13 @@ test('the kernel names no pack', () => {
   assert.deepEqual(ratchet(named, NAMES_PACKS), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
 
-// 3. Writes to items and relations go through the write path (src/pelago.ts): change for facts, and the
-// operational writes and the restore path src/operational.ts names. Every other store is named there too.
+// 3. Writes to items and relations go through the write path (src/pelago.ts): change for facts, projected by the
+// projector it runs (src/replay.ts), and the operational writes and the restore path src/operational.ts names.
+// Every other store is named there too.
 const WRITES_ELSEWHERE: Record<string, number> = {};
 
 test('items and relations are written in one place', () => {
-  const others = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/pelago.ts');
+  const others = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/pelago.ts' && f !== 'src/replay.ts');
   const writes = count(others, /\b(?:insert\s+into|update|delete\s+from)\s+(?:entity|relation)\b/gi);
   assert.deepEqual(ratchet(writes, WRITES_ELSEWHERE), [], 'Send the change through Archipelago.change.');
 });
@@ -99,8 +99,9 @@ test('every store is named, with its rule', () => {
 // the server's policy only as the rules it lifts or adds.
 test('every approval is decided by a rule', () => {
   const src = walk('src').filter((f) => f.endsWith('.ts'));
-  const held = count(src, /insert\s+into\s+proposal\s*\(/gi);
+  const held = count(src, /append\(tx, this\.workspace, 'pending'/g);
   assert.deepEqual(held, { 'src/pelago.ts': 1 }, 'A change waits only where Archipelago.change holds it on the verdict of decide.');
+  assert.deepEqual(count(src, /insert\s+into\s+proposal\s*\(/gi), { 'src/replay.ts': 1 }, 'The queue is projected from the pending stream, nowhere else.');
   assert.match(read('src/pelago.ts'), /verdict\.outcome === 'hold'/, 'Archipelago.change holds a change on the verdict of decide.');
   const lifts = count(src.filter((f) => f !== 'src/rules.ts' && f !== 'src/schema.ts'), /['"`](?:agent_changes|agent_code|agent_publish|agent_backups)['"`]/g);
   assert.deepEqual(lifts, {}, 'A setting lifts a rule a pack declared liftable: read it through src/rules.ts (decide, mayDo, liftsOn).');
@@ -283,8 +284,55 @@ test('every kernel view is a lens preset or named as operational', async () => {
   const unnamed = Object.keys(VIEWS).filter((name) => !(name in VIEWS_OPERATIONAL));
   assert.deepEqual(unnamed, [], 'Make it a lens preset (packs/core/pack.json views, with lens), or a pack view, or name it in src/operational.ts with what it reads.');
   assert.deepEqual(Object.keys(VIEWS_OPERATIONAL).filter((name) => !(name in VIEWS)), [], 'A view src/operational.ts names that the kernel no longer answers: take it out.');
-  const core = JSON.parse(read('packs/core/pack.json')) as { views?: { id: string; lens?: unknown }[] };
-  assert.deepEqual((core.views ?? []).filter((v) => !v.lens).map((v) => v.id), [], 'The core pack carries no code: each of its views is a lens preset.');
-  const presets = (core.views ?? []).map((v) => v.id.slice(v.id.indexOf('.') + 1));
+  const core = JSON.parse(read('packs/core/pack.json')) as { views?: { id: string; lens?: unknown; form?: string }[] };
+  const reads = (core.views ?? []).filter((v) => !v.form);
+  assert.deepEqual(reads.filter((v) => !v.lens).map((v) => v.id), [], 'The core pack carries no code: each of its views is a lens preset.');
+  const presets = reads.map((v) => v.id.slice(v.id.indexOf('.') + 1));
   assert.deepEqual(presets.filter((name) => name in VIEWS), [], 'A kernel view of the same name hides the lens preset: one name, one view.');
+});
+
+// 14. A small pack manifest (Rule 8 of the target model): a pack file says what it declares in the manifest's keys
+// (src/manifest.ts), and nothing else. A key of the shape before is one LEGACY maps, read for one release with a
+// warning; here no pack file uses one. A key that is neither is refused.
+test('every pack file is in the manifest shape, and every old key is mapped', async () => {
+  const { LEGACY, MANIFEST_KEYS, REACH_KEYS, SERVER_KEYS } = await import('../src/manifest.ts');
+  const unmapped: string[] = [];
+  for (const file of [...walk('packs'), ...walk('test'), ...walk('examples')].filter((f) => f.endsWith('/pack.json'))) {
+    const m = JSON.parse(read(file)) as Record<string, unknown> & { reach?: Record<string, unknown> & { server?: Record<string, unknown> } };
+    const out = (where: string, given: Record<string, unknown> | undefined, keys: readonly string[]) => Object.keys(given ?? {}).filter((k) => !keys.includes(k)).map((k) => `${file}: ${where}${k}${k in LEGACY ? ` (now ${LEGACY[k]})` : ''}`);
+    unmapped.push(...out('', m, MANIFEST_KEYS), ...out('reach.', m.reach, REACH_KEYS), ...out('reach.server.', m.reach?.server, SERVER_KEYS));
+  }
+  assert.deepEqual(unmapped, [], 'Write it in the manifest shape (docs/packs.md): a key the manifest does not have is refused.');
+  const lands = (to: string) => to.startsWith('nothing') || [...MANIFEST_KEYS, 'reach.server'].some((k) => to === k || to.startsWith(`${k} `) || to.startsWith(`${k}.`)) || REACH_KEYS.some((k) => to.startsWith(`reach.${k}`));
+  assert.deepEqual(Object.entries(LEGACY).filter(([, to]) => !lands(to)).map(([k]) => k), [], 'Every old key says the manifest key it is read as, or that it goes.');
+});
+
+// 15. No read of the whole map ("Refuse unscoped reads", 24 Oct 2026). At millions of items a query of the items,
+// links, log or queue with nothing to bound it reads them all: each is bounded by an id or a set of them, a subtree
+// (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
+// (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
+const WHOLE_READS: Record<string, number> = {
+  'src/backup.ts': 2,
+  'src/forget.ts': 2,
+  'src/log.ts': 2,
+  'src/mentions.ts': 1,
+  'src/pelago.ts': 1,
+  'src/search.ts': 1,
+  'src/server.ts': 1,
+  'src/streams.ts': 1,
+};
+
+/** The tables that grow with the map. */
+const GROWS = /\b(?:from|join)\s+(?:entity|relation|event|log_entry|log_fact|log_op|proposal)\b(?!\s*\()/i;
+/** What bounds a read. */
+const BOUND = /=\s*any\s*\(|unnest\s*\(|\b(?:id|from_id|to_id|target_id|ancestor|descendant|owner|changeset|undoes)\s*=\s*(?:\$|[a-z_]+\b(?!\s*\())|\bid\s+in\s*\(\s*select|\blimit\s+(?:\$|\d|\$\{)|\b(?:seq|pos|ts|at)\s*(?:>=?|=)\s*\$|--\s*index\s+[a-z_]+/i;
+
+test('no read of the whole map', () => {
+  const indexes = new Set(walk('src').flatMap((f) => [...read(f).matchAll(/create (?:unique )?index if not exists (\w+)/g)].map((m) => m[1])));
+  const queries = (text: string) => [...text.matchAll(/`(?:[^`\\]|\\.)*`/gs)].map((m) => m[0]).filter((q) => /\bselect\b/i.test(q) && GROWS.test(q));
+  const files = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/read-indexes.ts');
+  const named = files.flatMap((f) => queries(read(f)).flatMap((q) => [...q.matchAll(/--\s*index\s+([a-z_, ]+)/g)].flatMap((m) => m[1].split(',').map((n) => n.trim()).filter(Boolean)))).filter((name) => !indexes.has(name));
+  assert.deepEqual(named, [], 'A read names an index the schema makes.');
+  const counted = Object.fromEntries(files.map((f) => [f, queries(read(f)).filter((q) => !BOUND.test(q)).length]).filter(([, n]) => (n as number) > 0));
+  assert.deepEqual(ratchet(counted, WHOLE_READS), [], 'Bound the read: by an id, a subtree (part_closure), a person, a time or a limit; or name the index it goes by (-- index <name>).');
 });

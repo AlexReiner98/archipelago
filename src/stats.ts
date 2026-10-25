@@ -19,11 +19,14 @@ const CHECK_MS = 60_000;
 
 // A table is due if it was never analysed, if enough rows changed since, or if it has grown by more than the share
 // in pages: the counts are held in memory and lost if the process stops without closing the database.
-const DUE = `select s.relname as name from pg_stat_user_tables s join pg_class c on c.oid = s.relid
+// A partition of the log (src/partitions.ts) is analysed through its table, which the planner reads the statistics of
+// as well as each month's.
+const DUE = `select distinct coalesce(p.relname, s.relname) as name from pg_stat_user_tables s join pg_class c on c.oid = s.relid
+  left join pg_inherits i on i.inhrelid = c.oid left join pg_class p on p.oid = i.inhparent
   where s.schemaname = 'public' and (c.reltuples < 0
     or s.n_mod_since_analyze > ${ANALYZE_ROWS} + ${ANALYZE_SHARE} * c.reltuples
     or pg_relation_size(c.oid) / current_setting('block_size')::int > ${ANALYZE_ROWS} + (1 + ${ANALYZE_SHARE}) * c.relpages)
-  order by s.relname`;
+  order by 1`;
 
 /** Analyse the tables whose statistics are missing or stale. Returns their names. */
 export async function analyzeDue(db: Q): Promise<string[]> {

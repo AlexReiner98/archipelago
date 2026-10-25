@@ -9,13 +9,14 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
 /** The head fields an update op sets by name; any other field of an item is a declared one, in props. */
 const HEAD: Record<string, unknown> = { title: undefined, body: '', status: undefined, owner: null, visibility: undefined, confidence: 1 };
 /** Fields that move with another (private_to with visibility) or that no op sets. */
-const FOLLOWS = ['private_to', 'kind', 'type', 'source', 'checked'];
+const FOLLOWS = ['private_to', 'type', 'source', 'checked'];
 
 export async function undo(l: Archipelago, actor: Actor, input: { changeset: string }) {
   const done = await entry(l.db, input.changeset);
   if (!done || done.stream !== 'facts' || !done.facts.length) throw new Error(`No change set "${input.changeset}"`);
   const { rows: already } = await l.db.query(`select 1 from log_entry where undoes = $1 and stream = 'facts'`, [input.changeset]);
   if (already.length) throw new Error(`Change set ${input.changeset} has already been undone`);
+  if (done.facts.some((f) => f[2] === 'forgotten')) throw new Error(`Change set ${input.changeset} forgot something: its key is gone, and it cannot be undone`);
 
   const ops: Op[] = [];
   const skipped: string[] = [];
@@ -38,7 +39,7 @@ export async function undo(l: Archipelago, actor: Actor, input: { changeset: str
       skipped.push(`defining type ${id} cannot be undone here: remove it from the local pack file`);
       continue;
     }
-    if (field === 'link') {
+    if (field === 'link' && id.startsWith('r_')) {
       const was = await before(id, 'link');
       if (op === '+' && !was) {
         const { rows } = await l.db.query(`select 1 from relation where id = $1 and valid_to is null`, [id]);

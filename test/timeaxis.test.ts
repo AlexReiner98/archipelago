@@ -39,7 +39,8 @@ test('a lens on a time axis places what falls in its window, repeats as their da
       { op: 'create', ref: 'loose', type: 'work.task', title: 'No date' },
     ],
   })) as { created: Record<string, string> };
-  const answer = (await lens(l, { time: { from: '2026-10-12', to: '2026-10-18' }, fold: [] })) as { items: Item[]; rest: { time: number }; said: string };
+  const kinds = ['work.task', 'event', 'time.routine'];
+  const answer = (await lens(l, { kinds, time: { from: '2026-10-12', to: '2026-10-18' }, fold: [] })) as { items: Item[]; rest: { time: number }; said: string };
   const of = (ref: string) => answer.items.find((i) => i.id === made.created[ref]);
   assert.deepEqual(of('task')!.time!.map((s) => [s.by, s.start]), [['bound', '2026-10-15T04:00:00.000Z']], 'a due date is a whole day in Toronto');
   assert.deepEqual(of('meet')!.time, [{ start: '2026-10-14T14:00:00.000Z', end: '2026-10-14T15:30:00.000Z', by: 'when' }]);
@@ -49,7 +50,7 @@ test('a lens on a time axis places what falls in its window, repeats as their da
   assert.ok(answer.rest.time >= 2);
   assert.match(answer.said, /placed in time from 2026-10-12 to 2026-10-18/);
 
-  const deadlines = (await lens(l, { time: { from: '2026-10-12', to: '2026-10-18', by: ['bound'] }, fold: [] })) as { items: Item[] };
+  const deadlines = (await lens(l, { kinds, time: { from: '2026-10-12', to: '2026-10-18', by: ['bound'] }, fold: [] })) as { items: Item[] };
   assert.deepEqual(deadlines.items.map((i) => i.title), ['Send the forms'], 'only by bound');
   await assert.rejects(lens(l, { time: { from: '2026-10-18', to: '2026-10-12' } }), /comes after/);
 });
@@ -60,7 +61,7 @@ test('a time axis kept on a lens item is read like its other fields', async () =
     reason: 'test',
     ops: [
       { op: 'create', ref: 'meet', type: 'event', title: 'Standup', props: { at: '2026-10-14T13:00:00Z' } },
-      { op: 'create', ref: 'week', type: 'lens', title: 'This week', props: { time: { from: '2026-10-12', to: '2026-10-18' }, fold: [] } },
+      { op: 'create', ref: 'week', type: 'lens', title: 'This week', props: { kinds: ['event'], time: { from: '2026-10-12', to: '2026-10-18' }, fold: [] } },
     ],
   })) as { created: Record<string, string> };
   const answer = (await lens(l, { lens: made.created.week })) as { items: Item[] };

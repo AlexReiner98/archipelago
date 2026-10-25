@@ -9,11 +9,14 @@
 // A database without table statistics plans the scope query badly: on 20,000 items the handoff took over 20 s
 // without them and 0.7 s with. The server collects them as it opens, after a restore and after enough writes
 // (src/stats.ts); a server that has just started also takes a backup, so let that finish before timing.
+// At year-three size, on a generated map of ten million events: npm run bench:scale (docs/bench.md), which sets
+// SLOW: a call slower than that many ms is timed once.
 
 const args = process.argv.slice(2);
 const seed = args.includes('--seed') ? Number(args[args.indexOf('--seed') + 1]) : 0;
 const [base = 'http://127.0.0.1:3100', runsArg = '20'] = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--seed');
 const RUNS = Number(runsArg);
+const SLOW = Number(process.env.SLOW ?? Infinity);
 const ACTOR = 'bench';
 
 async function call(tool: string, body: Record<string, unknown> = {}): Promise<{ result: any; bytes: number }> {
@@ -71,11 +74,19 @@ const percentile = (sorted: number[], p: number) => sorted[Math.min(sorted.lengt
 
 async function time(label: string, run: () => Promise<{ bytes: number }>, after?: () => Promise<unknown>) {
   // A call that fails (a pack view stopped at its time limit) is reported, once, and the rest go on.
+  const first = performance.now();
   try {
-    await run();
+    const { bytes } = await run();
+    // A call slower than SLOW ms (unset: no limit) is timed this once: at year-three size one view can take minutes.
+    const once = performance.now() - first;
     await after?.();
+    if (once > SLOW) {
+      const row = { label, median: Math.round(once), p95: Math.round(once), kb: Math.round(bytes / 1024), once: true };
+      console.log(`${label.padEnd(34)} ${String(row.median).padStart(7)} ${'once'.padStart(7)} ${String(row.kb).padStart(7)}`);
+      return row;
+    }
   } catch (err) {
-    console.log(`${label.padEnd(34)} failed: ${(err as Error).message}`);
+    console.log(`${label.padEnd(34)} failed after ${Math.round(performance.now() - first)} ms: ${(err as Error).message}`);
     return { label, error: (err as Error).message };
   }
   for (let i = 1; i < 3; i++) {
@@ -99,8 +110,6 @@ async function time(label: string, run: () => Promise<{ bytes: number }>, after?
 if (seed) await fill(seed);
 
 const view = (name: string, params: Record<string, unknown> = {}) => () => call('view', { name, params });
-const hubs = (await call('view', { name: 'hubs' })).result.hubs as { id: string; inside: number }[];
-const HUB = process.env.HUB ?? hubs[0]?.id;
 const relations = async (id: string) => ((r) => r.incoming.length + r.outgoing.length)((await call('get', { id })).result);
 let REPO = process.env.REPO;
 if (!REPO) {
@@ -111,9 +120,14 @@ if (!REPO) {
     if (n > most) [most, REPO] = [n, id];
   }
 }
+// The hubs within the repository (since 24 Oct a server reads hubs within an item only; an older one reads them all).
+const hubs = (await call('view', { name: 'hubs', params: { ...(REPO && { within: REPO }) } })).result.hubs as { id: string; inside: number }[];
+const HUB = process.env.HUB ?? hubs[0]?.id;
 const TASK = process.env.TASK ?? (await call('search', { type: 'work.task', open: true, limit: 1 })).result[0]?.id;
 // A map with no owner set (a throwaway one) has no "me": one person's attention stands in.
 const PERSON = process.env.PERSON ?? (await call('view', { name: 'attention', params: { person: 'me', limit: 1 } }).then(() => 'me', async () => (await call('search', { type: 'person', limit: 1 })).result[0]?.id));
+// The kinds Home lists as your projects: the types at the altitude of a project.
+const PROJECTS = ((await call('schema')).result.types as { id: string; altitude?: string }[]).filter((t) => t.altitude === 'project').map((t) => t.id);
 let BUSY = process.env.BUSY;
 if (!BUSY) {
   let most = -1;
@@ -130,12 +144,14 @@ console.log(`${'call'.padEnd(34)} ${'median'.padStart(7)} ${'p95'.padStart(7)} $
 
 const rows = [
   await time('view attention (everyone)', view('attention')),
+  ...(REPO ? [await time('view attention (within repo)', view('attention', { within: REPO }))] : []),
   await time(`view attention (person ${PERSON === 'me' ? 'me' : 'one'})`, view('attention', { person: PERSON })),
   await time('view lens (whole map)', view('lens')),
   await time(`view lens (from hub)`, view('lens', { from: HUB })),
   ...(REPO ? [await time('view handoff (repo)', view('handoff', { repo: REPO }))] : []),
   await time('view brief (task)', view('brief', { task: TASK })),
   await time('view hubs', view('hubs')),
+  ...(REPO ? [await time('view hubs (within repo)', view('hubs', { within: REPO }))] : []),
   await time('view graph (whole map)', view('graph')),
   // As the roadmap asks it: around its project, two steps, every link, finished work too.
   await time('view graph (roadmap)', view('graph', { focus: ROOT, depth: 2, relations: 'all', include_closed: true })),
@@ -146,6 +162,19 @@ const rows = [
   await time('search "review"', () => call('search', { q: 'review', limit: 20 })),
   // Nothing found as typed: titles with a word close to it are taken instead.
   await time('search "rendr" (a slip)', () => call('search', { q: 'rendr', limit: 20 })),
+  // What Home asks, one after another, as the page does: the schema, what is held, your move, your projects, saved views.
+  await time('Home (its reads)', async () => {
+    const parts = await Promise.all([
+      call('schema'),
+      call('proposals'),
+      call('search', { limit: 200, include_archived: true }),
+      call('view', { name: 'attention', params: { person: PERSON, reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 5 } }),
+      call('view', { name: 'lens', params: { kinds: PROJECTS, fold: ['closed', 'system'] } }),
+      call('view', { name: 'saved_views', params: { limit: 6 } }),
+    ]);
+    return { bytes: parts.reduce((n, p) => n + p.bytes, 0) };
+  }),
+  await time('changed_since (a day)', view('changed_since', { since: new Date(Date.now() - 86_400_000).toISOString() })),
 ];
 // A typical change: a task made inside the hub, linked to the one being briefed, and a note added to that one.
 let changeset = '';

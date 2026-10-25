@@ -9,6 +9,7 @@ import { openDb } from '../src/db.ts';
 import { PackHost } from '../src/packhost.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
+import { readEvents } from '../src/eventlog.ts';
 
 const human: Actor = { kind: 'human', name: 'test' };
 const dir = mkdtempSync(join(tmpdir(), 'pelago-host-'));
@@ -24,7 +25,7 @@ test("an action reads the map and its ops are applied as one change set with the
   assert.deepEqual(result.answer, { earlier: 0, by: 'test', visit: result.created.v }, 'a {ref} in its answer is the id of what it made');
   const visit = await l.entity(result.created.v);
   assert.equal(visit!.type, 'demo.visit');
-  const { rows } = await l.db.query<{ action: string; reason: string; detail: { action?: string } }>(`select action, reason, detail from event where changeset = $1`, [result.changeset]);
+  const rows = (await readEvents(l.db, {})).filter((e) => e.changeset === result.changeset);
   assert.equal(rows.length, 2, 'a create, its link and nothing else');
   assert.ok(rows.every((r) => r.detail.action === 'demo.plan_visit' && r.reason === 'Plan a visit to Barn for "Survey the barn"'));
   const again = (await host.act(l, human, 'demo', 'demo.plan_visit', { task: made.created.t, site: 'Barn' })) as { answer: { earlier: number } };

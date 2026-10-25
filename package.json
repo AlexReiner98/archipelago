@@ -21,7 +21,9 @@
     "typecheck": "tsc --noEmit",
     "diagrams": "node src/diagrams.ts",
     "diagrams:publish": "node scripts/publish-diagrams.ts",
-    "eval:reader": "node scripts/reader-eval/main.ts"
+    "eval:reader": "node scripts/reader-eval/main.ts",
+    "bench:scale": "node scripts/bench-scale.ts",
+    "bench:rebuild": "node --max-old-space-size=8192 scripts/bench-rebuild.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

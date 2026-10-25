@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { dumpVault } from '../src/vault.ts';
 import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
@@ -45,7 +46,7 @@ test('a picture is kept for a result only when sent, travels in a backup, and go
 
   // A backup carries the picture, byte for byte.
   const copy = new Archipelago(await openDb(), l.registry);
-  const counts = await restore(copy.db, JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))));
+  const counts = await restore(copy.db, { ...JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))), vault: await dumpVault(l.db) });
   assert.equal(counts.picture, 1);
   const restored = (await callTool(copy, human, 'picture', { result: first.id })) as { data: string };
   assert.ok(Buffer.from(restored.data, 'base64').equals(Buffer.concat([png, png])));

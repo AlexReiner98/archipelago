@@ -101,7 +101,7 @@ export async function sessionStart(
     blocked,
     note: blocked.length
       ? 'Do not start work that needs the resources listed under blocked. Take work that does not need them, or wait.'
-      : 'Call session_update with a note when something worth knowing happens, and session_end when you finish.',
+      : 'Call report with action session_update and a note when something worth knowing happens, and report with action session_end when you finish.',
     commit: task ? commitRule(task.id) : undefined,
   };
 }
@@ -336,7 +336,7 @@ export async function story(l: Archipelago, input: Record<string, unknown>) {
 // Asked like any standing question; kept here, beside what writes it.
 VIEWS.story = {
   description:
-    'The story a session told of its work (the tell tool): its beats in order (n, said, about, links; one taken back says replaced_by; a finding says finding), and which beat its page opens on (finding: the latest finding that stands, else the latest beat). The picture of it is the lens view with story: the run. Params: run (required): a run id or session id.',
+    'The story a session told of its work (report, action tell): its beats in order (n, said, about, links; one taken back says replaced_by; a finding says finding), and which beat its page opens on (finding: the latest finding that stands, else the latest beat). The picture of it is the lens view with story: the run. Params: run (required): a run id or session id.',
   run: story,
 };
 
@@ -353,9 +353,9 @@ type Item = { id: string; type: string; title: string; status: string };
 async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
   const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = any($2::text[]) and from_id = $1 and valid_to is null`, [run.id, livesIn(l)]);
   if (!repos.length) return [];
-  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id))], [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
-  const graph = await blockGraph(l);
-  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending'`);
+  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id, true))], [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
+  const graph = await blockGraph(l, work.map((i) => i.id));
+  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending' -- index proposal_status`);
   const proposed = new Set(held.flatMap((p) => p.ops.flatMap((o) => ('id' in o && o.id ? [o.id] : []))));
   const open = work.filter((i) => !graph.waitsOnSomeone(i.id) && !proposed.has(i.id));
   const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
@@ -397,7 +397,7 @@ export async function sessionEnd(
       status: run.status,
       ended: false,
       unreconciled: left,
-      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with the change tool; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named), and do not vouch for what you did not look at. Then call session_end again.',
+      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named), and do not vouch for what you did not look at. Then call report with action session_end again.',
     };
   }
   const said = [
@@ -444,11 +444,11 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
     const work = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
     // Where things stand is read off the map; the session is told how much has moved since someone last wrote it down.
-    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { note: { id: string; title: string; written: string } | null; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]>; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
+    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { note: { id: string; title: string; written: string } | null; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]> & { counts: Record<'pushes' | 'settled' | 'opened' | 'sessions', number> }; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
     const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
     const then = stand.since_then;
     const from = stand.note ? `Its note, "${stand.note.title}" (${stand.note.id}), was written ${new Date(stand.note.written).toISOString().slice(0, 10)}; since then` : 'Nobody has written a handoff note here; in the last week';
-    lines.push(`Where things stand: view "handoff" with repo ${repo.id}. ${from}: ${n(then.pushes.length, 'push', 'pushes')}, ${n(then.settled.length, 'item')} settled, ${n(then.opened.length, 'item')} opened, ${n(then.sessions.length, 'session')} ended.`);
+    lines.push(`Where things stand: view "handoff" with repo ${repo.id}. ${from}: ${n(then.counts.pushes, 'push', 'pushes')}, ${n(then.counts.settled, 'item')} settled, ${n(then.counts.opened, 'item')} opened, ${n(then.counts.sessions, 'session')} ended.`);
     const kind = (t: { type: string }) => `${l.registry.type(t.type)?.title ?? t.type}: `;
     // What nobody has touched for a while is said to be so: it may no longer be true.
     const age = (t: { last_confirmed: string | Date }) => {
@@ -474,19 +474,19 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   if (ask.on_agents_judgment)
     lines.push(
       '',
-      `For the owner, in your first reply: since they last looked, agents have settled ${ask.on_agents_judgment} ${ask.on_agents_judgment === 1 ? 'question' : 'questions'} on their own judgment${ask.on_owners_word ? ` (and recorded ${ask.on_owners_word} more as the owner's own answers in chat: say how many, and list them only if asked, with view "attention", reason to_confirm)` : ''}. Show them these, a line for each, and ask them to confirm or correct. When they have answered, call confirmed with upto ${ask.upto} and what they said; change or reopen what they correct.`,
+      `For the owner, in your first reply: since they last looked, agents have settled ${ask.on_agents_judgment} ${ask.on_agents_judgment === 1 ? 'question' : 'questions'} on their own judgment${ask.on_owners_word ? ` (and recorded ${ask.on_owners_word} more as the owner's own answers in chat: say how many, and list them only if asked, with query "attention", reason to_confirm)` : ''}. Show them these, a line for each, and ask them to confirm or correct. When they have answered, call settle with action confirmed, upto ${ask.upto} and what they said; change or reopen what they correct.`,
       ...judged.map((q) => `- ${q.title}: ${q.answer} (${q.id})`),
-      ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: view "attention" with person "me" and reasons ["to_confirm"].`] : []),
+      ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: query "attention" with person "me" and reasons ["to_confirm"].`] : []),
     );
   const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [l.registry.having('capacity')])]);
   for (const res of holdable.filter((one) => l.registry.capacity(one) !== Infinity)) {
     const held = heldNow.find((h) => h.resource === res.id);
-    lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago claim tool (holder ${started.run}) before using it and release it after.`);
+    lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago assign tool, action claim (holder ${started.run}), before using it, and give it back with revise, action release, after.`);
   }
   lines.push(
     '',
     'When you take on a task that has no estimate, give it one: how many tokens you expect it to take (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.',
-    `If the pelago MCP tools are available: when you take on one of these, call session_update with its id as task; as you reason about the work, tell its story with tell (run ${started.run}): a beat for each thing you conclude, the items it is about and the ties between them, so the owner sees what you see; call session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call session_end with a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.`,
+    `If the pelago MCP tools are available (query reads, change writes, and every other action is called under its verb by name: report with action tell): when you take on one of these, call report with action session_update and its id as task; as you reason about the work, tell its story with report, action tell (run ${started.run}): a beat for each thing you conclude, the items it is about and the ties between them, so the owner sees what you see; report session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call report with action session_end and a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.`,
     'When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.',
     'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm unless this workspace applies agents’ changes as made, so send the answer with what was chosen and why.',
   );

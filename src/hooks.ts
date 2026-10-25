@@ -4,6 +4,7 @@
 // agent, so what they write follows the workspace's policy, and both may read from hosts but never act.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { parts } from './manifest.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Registry } from './packs.ts';
 import { hostFor } from './packtools.ts';
@@ -28,7 +29,7 @@ export async function serveHook(req: IncomingMessage, res: ServerResponse, l: Ar
     res.end(JSON.stringify(body));
   };
   const file = l.registry.packs.find((p) => p.id === pack);
-  const hook = file?.webhooks?.find((w) => w.id === id);
+  const hook = file && parts(file).webhooks.find((w) => w.id === id);
   // Gone, as the contract says, when the pack is off or does not declare it.
   if (!hook) return reply(410, { error: `No webhook ${pack}/${id} here.` });
   if (Number(req.headers['content-length'] ?? 0) > HOOK_MAX) return reply(413, { error: 'Too large.' });
@@ -64,13 +65,13 @@ export function runHook(l: Archipelago, pack: string, id: string, input: { paylo
 
 /** The pack that records a kind of event from a webhook of its own, and that webhook: who takes it in, where the kernel hears of it first. */
 export function hookFor(l: Archipelago, event: string): { pack: string; hook: string; secret: string } | undefined {
-  const file = l.registry.packs.find((p) => p.events?.includes(event) && p.webhooks?.length);
-  return file && { pack: file.id, hook: file.webhooks![0].id, secret: file.webhooks![0].secret };
+  const file = l.registry.packs.find((p) => parts(p).events.includes(event) && parts(p).webhooks.length);
+  return file && { pack: file.id, hook: parts(file).webhooks[0].id, secret: parts(file).webhooks[0].secret };
 }
 
 /** Run one schedule now, as the pack. */
 export function runSchedule(l: Archipelago, pack: string, id: string) {
-  const limit = l.registry.packs.find((p) => p.id === pack)?.schedules?.find((s) => s.id === id)?.limit_ms;
+  const limit = parts(l.registry.packs.find((p) => p.id === pack) ?? { id: pack, version: '', title: '' }).schedules.find((s) => s.id === id)?.limit_ms;
   return hostFor(l.registry).act(l, asPack(pack), pack, id, {}, limit, 'schedule');
 }
 
@@ -87,7 +88,7 @@ export function startSchedules(l: Archipelago): void {
   const started = Date.now();
   const tick = () => {
     for (const pack of l.registry.packs)
-      for (const s of pack.schedules ?? []) {
+      for (const s of parts(pack).schedules) {
         const key = `${pack.id}/${s.id}`;
         const first = s.at_start && !last.has(key);
         if (!first && (s.every_minutes === undefined || Date.now() - (last.get(key) ?? started) < s.every_minutes * 60_000)) continue;

@@ -25,7 +25,7 @@ export async function refuser(l: Archipelago, within: string[]) {
 /** Whether this actor may write these ops: refused with the reason when it may not. */
 export async function mayWrite(l: Archipelago, actor: Actor, ops: Op[], measured: boolean): Promise<void> {
   if (actor.kind === 'human') return;
-  if (actor.may === 'report' && !measured) throw new Error('This token may only report: send what was measured with the report tool. It cannot change the map.');
+  if (actor.may === 'report' && !measured) throw new Error('This token may only report: send what was measured with report (action health, or as Uptime Kuma posts it). It cannot change the map.');
   if (actor.within?.length) await opsWithin(l, actor.within, ops);
 }
 
@@ -67,6 +67,7 @@ export async function opsWithin(l: Archipelago, within: string[], ops: Op[]): Pr
       if (rows[0]) await mustBeIn(rows[0].from_id, 'change what it is linked to');
     }
     if (op.op === 'define_type') refuse('It cannot define a type: that changes the whole map.');
+    if (op.op === 'forget') refuse('It cannot forget: that reaches the log, the backups and every read.');
   }
 }
 

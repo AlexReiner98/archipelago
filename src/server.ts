@@ -1,8 +1,9 @@
 // One local process owns the databases and serves every surface:
 //   POST /mcp          MCP (streamable HTTP) for agents
 //   POST /api/<tool>   the same tools for the human CLI and web UI
-//   POST /agent/<tool> the same tools as plain JSON, for hooks and scripts
-//                      that cannot speak MCP
+//   POST /agent/<tool> what MCP offers as plain JSON, for hooks and scripts
+//                      that cannot speak MCP; an old tool name still answers
+//                      for one release, with moved_to naming its new call
 //   POST /hooks/session-start, /hooks/session-end, /hooks/prompt
 //                      Claude Code HTTP hooks: a session registers itself and
 //                      is handed what the map knows about its repository
@@ -32,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
 import { notify } from './notify.ts';
-import { backupAll, parseBackup } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
+import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { serveConnect } from './connect.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
@@ -50,7 +51,7 @@ import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
-import { callTool, configureBackup, configureRestart, devMode } from './tools.ts';
+import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, uiFile, uiPage } from './ui-files.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
@@ -151,7 +152,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     res.once('close', workspaces.hold(id));
     const ws = await workspaces.get(id);
     // Where the request came from is a help in noticing a token used somewhere new, not a control.
-    const identity = await verifyToken(ws.pelago.db, token, address || undefined);
+    const identity = await verifyToken(ws.pelago.db, token, address || undefined, ws.pelago.workspace);
     if (!identity) throw deny();
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
@@ -277,7 +278,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           if (surface === 'api') return send(res, 200, { result: await callTool(pelago, actor(), name, body) });
           // Scripts say which one they are in the body, as MCP callers do in their arguments.
           const { actor: label, ...input } = body;
-          return send(res, 200, { result: await callTool(pelago, actor((label as string) || 'script'), name, input) });
+          // An old name answers for one release, saying the call that replaces it (src/surface.ts).
+          const moved_to = replacementOf(pelago.registry, name);
+          return send(res, 200, { result: await callTool(pelago, actor((label as string) || 'script'), name, input), ...(moved_to && { moved_to }) });
         } catch (err) {
           if (err instanceof Refused) throw err;
           return send(res, 400, { error: (err as Error).message });
@@ -321,9 +324,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (req.method === 'GET') return send(res, 200, { result: await workspaces.list() });
         if (req.method === 'POST') {
           // `backup` is a backup file's bytes in base64: the workspace starts as that map.
-          const { id, name, backup } = ((await readJson(req)) ?? {}) as { id?: string; name?: string; backup?: string };
+          const { id, name, backup, vault } = ((await readJson(req)) ?? {}) as { id?: string; name?: string; backup?: string; vault?: string };
           try {
-            const from = backup === undefined ? undefined : parseBackup(Buffer.from(String(backup), 'base64'));
+            // `vault`: the backup of the key vault taken with it, which a sealed backup is read with.
+            const from = backup === undefined ? undefined : { ...parseBackup(Buffer.from(String(backup), 'base64')), ...(vault && { vault: parseVault(Buffer.from(vault, 'base64')) }) };
             const ws = await workspaces.create(id ?? '', name ?? '', from);
             const owner = await ownerToken(ws, 'owner');
             if (!from) return send(res, 200, { result: owner });

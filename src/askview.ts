@@ -4,6 +4,7 @@
 // lens query (src/lens-presets.ts), or its own code's. A kernel view's name wins; among packs, the first to load.
 
 import type { ViewDef } from './declared.ts';
+import { parts } from './manifest.ts';
 import { hostFor } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import type { Registry } from './packs.ts';
@@ -16,7 +17,7 @@ const short = (id: string) => id.slice(id.indexOf('.') + 1);
 /** The pack view a short name stands for, if a loaded pack declares one. */
 function packView(l: Archipelago, name: string): { pack: string; def: ViewDef } | undefined {
   for (const pack of l.registry.packs) {
-    const def = (pack.views ?? []).find((v) => short(v.id) === name);
+    const def = parts(pack).views.find((v) => short(v.id) === name);
     if (def) return { pack: pack.id, def };
   }
   return undefined;
@@ -25,13 +26,13 @@ function packView(l: Archipelago, name: string): { pack: string; def: ViewDef } 
 /** Every question that can be asked here, with what each answers. */
 export function viewList(l: Archipelago): Record<string, string> {
   const out = Object.fromEntries(Object.entries(VIEWS).map(([name, v]) => [name, v.description]));
-  for (const pack of l.registry.packs) for (const v of pack.views ?? []) out[short(v.id)] ??= pack.id === 'core' ? v.description : `${v.description} (from the ${pack.id} pack)`;
+  for (const pack of l.registry.packs) for (const v of parts(pack).views) out[short(v.id)] ??= pack.id === 'core' ? v.description : `${v.description} (from the ${pack.id} pack)`;
   return out;
 }
 
 /** What the view tool says it answers: the lenses the core pack declares (none without a registry), then the kernel's own views, then the packs'. */
 export function viewsSaid(reg?: Registry): string {
-  const lenses = (reg?.packs.find((p) => p.id === 'core')?.views ?? []).map((v): [string, string] => [short(v.id), v.description]);
+  const lenses = (reg ? parts(reg.packs.find((p) => p.id === 'core')!).views : []).map((v): [string, string] => [short(v.id), v.description]);
   const views = [...lenses, ...Object.entries(VIEWS).map(([name, v]): [string, string] => [name, v.description])];
   return (
     'Answer one of the standing questions. Call with no name to list them. An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ' +
@@ -51,7 +52,7 @@ export async function askView(l: Archipelago, actor: Actor, name: string, params
   const view = VIEWS[name];
   if (view) return view.run(l, params);
   const found = packView(l, name);
-  if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask view attention with params ${REPLACED[name]}.`);
+  if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask query attention with params ${REPLACED[name]}.`);
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(l)).join(', ')}`);
   if (found.def.lens) return answerPreset(l, found.def, params);
   return (await hostFor(l.registry).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;
