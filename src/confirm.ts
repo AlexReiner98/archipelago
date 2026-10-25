@@ -11,12 +11,12 @@ import { openSaid } from './seal.ts';
  * a notification for each.
  */
 export async function toConfirm(l: Archipelago, input: { limit?: number } = {}) {
-  const { rows: marks } = await l.db.query<{ upto: number | null }>(`select max((detail->>'upto')::int) as upto from event where action in ('changes.seen', 'questions.confirmed')`);
+  const { rows: marks } = await l.db.query<{ upto: number | null }>(`select max((detail->>'upto')::int) as upto from event where action in ('changes.seen', 'questions.confirmed') -- index event_marks`);
   const since = marks[0]?.upto ?? 0;
   const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; outcome: string | null; seq: number; ts: Date; actor: string; changeset: string; authority: { of?: string; basis?: unknown } | null }>(
     // Read from the log: each status an agent set, on its own say or a human's word it reported, that the item still has.
     `select distinct on (e.id) e.id, e.type, e.title, e.status, e.props->>'outcome' as outcome, f.seq::int as seq, le.at as ts, le.head->'actor'->>'id' as actor, le.head->'authority' as authority, le.id as changeset
-     from log_fact f join log_entry le on le.stream = f.stream and le.pos = f.pos join entity e on e.id = f.id
+     from log_fact f join log_entry le on le.stream = f.stream and le.at = f.at and le.pos = f.pos join entity e on e.id = f.id
      where f.stream = 'facts' and f.seq > $1 and f.field = 'status' and f.op = '+' and le.head->'actor'->>'id' not like 'human:%' and coalesce(le.head->'authority'->>'who', '') not like 'human:%'
        and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and f.value = to_jsonb(e.status)
      order by e.id, f.seq desc`,

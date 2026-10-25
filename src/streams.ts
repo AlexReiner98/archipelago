@@ -3,13 +3,16 @@
 // log_op, beside the fact stream's tables, cut into one segment per day per stream. A day closed is sealed by a system
 // entry in the fact stream carrying the segment's hash, so the chain commits to every operational day; compaction
 // drops whole entries a retention rule (src/retention.ts) no longer keeps and records the compacted segment the same
-// way. Deleting from log_op is refused by its trigger to everyone but the compaction role.
+// way. Deleting from log_op is refused by its trigger to everyone but the compaction role. What is someone's words is
+// sealed with its item's key (src/opseal.ts), and a member reads only the entries about what they may see.
 
 import { createHash } from 'node:crypto';
 import { jcs } from './jcs.ts';
 import { append, type Fact } from './log.ts';
 import { newId, type Db, type Q } from './db.ts';
 import { kept, ruleFor, type OpEntry, type Retention } from './retention.ts';
+import { makePartitions, partitionMade } from './partitions.ts';
+import { hashed, openOps, sealOp } from './opseal.ts';
 
 export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | `pack:${string}`;
 export type OpFact = ['+', string, string, unknown] | ['-', string, string];
@@ -41,20 +44,20 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
     groups.set(rule, [...(groups.get(rule) ?? []), f]);
   }
   await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.oplog'), hashtext($1))`, [stream]);
-  const { rows } = await tx.query<{ now: Date; pos: number | null; at: Date | null }>(
-    `select date_trunc('milliseconds', now()) as now, l.pos::int as pos, l.at
-     from (select 1) one left join lateral (select pos, at from log_op where stream = $1 order by pos desc limit 1) l on true`,
+  const { rows } = await tx.query<{ now: Date; pos: number | null; at: Date | null; made: boolean }>(
+    `select date_trunc('milliseconds', now()) as now, l.pos::int as pos, l.at, ${partitionMade('log_op')} as made
+     from (select 1) one left join lateral pelago_log_op_last($1) l on true`,
     [stream],
   );
+  if (!rows[0].made) await makePartitions(tx);
   let pos = rows[0].pos ?? 0;
   // Never before the last entry: a day's entries are one run of positions, so a segment is a range of them.
   const at = new Date(Math.max(new Date(rows[0].now).getTime(), rows[0].at ? new Date(rows[0].at).getTime() : 0)).toISOString();
   const out: Light[] = [];
   for (const [rule, of] of groups) {
     const e: Light = { v: 1, ws, stream, pos: ++pos, at, actor: { id: actor }, rule, facts: of, ...(opts.reason && { reason: opts.reason }) };
-    await tx.query(`insert into log_op (stream, pos, at, head, facts) values ($1, $2, $3, $4::jsonb, $5::jsonb)`, [
-      stream, e.pos, at, JSON.stringify({ v: 1, ws, actor: e.actor, rule, ...(opts.reason && { reason: opts.reason }) }), JSON.stringify(of),
-    ]);
+    const stored = await sealOp(tx, ws, stream, { v: 1, ws, actor: e.actor, rule, ...(opts.reason && { reason: opts.reason }) }, of);
+    await tx.query(`insert into log_op (stream, pos, at, head, facts) values ($1, $2, $3, $4::jsonb, $5::jsonb)`, [stream, e.pos, at, JSON.stringify(stored.head), JSON.stringify(stored.facts)]);
     out.push(e);
   }
   return out;
@@ -63,19 +66,26 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
 type Row = { stream: OpStream; pos: number; at: Date; head: Omit<Light, 'stream' | 'pos' | 'at' | 'facts'>; facts: OpFact[] };
 const toLight = (r: Row): Light => ({ ...r.head, stream: r.stream, pos: r.pos, at: new Date(r.at).toISOString(), facts: r.facts });
 
-/** A compacted stream's entries, in order: all of them, or those in a range of positions. */
-export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number } = {}): Promise<Light[]> {
+/**
+ * A compacted stream's entries as stored, sealed, in order: all of them, or those in a range of positions. A
+ * segment's range names its days too, so only the partition that holds them is read (src/partitions.ts).
+ */
+export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number; days?: [string, string] } = {}): Promise<Light[]> {
   const { rows } = await q.query<Row>(
-    `select stream, pos::int as pos, at, head, facts from log_op where stream = $1 and pos >= $2 and ($3::bigint is null or pos <= $3) order by pos`,
-    [stream, range.from ?? 1, range.to ?? null],
+    `select stream, pos::int as pos, at, head, facts from log_op where stream = $1 and pos >= $2 and ($3::bigint is null or pos <= $3)
+       and ($4::date is null or (at >= $4::date at time zone 'UTC' and at < ($5::date + 1) at time zone 'UTC')) order by at, pos`,
+    [stream, range.from ?? 1, range.to ?? null, range.days?.[0] ?? null, range.days?.[1] ?? null],
   );
   return rows.map(toLight);
 }
 
-/** SHA-256 of "pelago-segment\n" and each entry's canonical form, one per line, in order. */
+/** The entries as their reader reads them: opened with the keys the vault holds (src/opseal.ts). */
+export const readOps = async (q: Q, stream: OpStream, range: Parameters<typeof opEntries>[2] = {}) => openOps(q, await opEntries(q, stream, range));
+
+/** SHA-256 of "pelago-segment\n" and each entry's canonical form, its sealed values as their digests, one per line. */
 export function segmentHash(entries: Light[]): string {
   const h = createHash('sha256').update('pelago-segment\n');
-  for (const e of entries) h.update(`${jcs(e)}\n`);
+  for (const e of entries) h.update(`${jcs(hashed(e))}\n`);
   return h.digest('hex');
 }
 
@@ -95,7 +105,7 @@ export interface Segment {
 /** The segments that stand: each one asserted in the fact stream and not since replaced. */
 export async function segments(q: Q, stream?: OpStream): Promise<Segment[]> {
   const { rows } = await q.query<{ id: string; op: string; value: Omit<Segment, 'id'> }>(
-    `select distinct on (id) id, op, value from log_fact where stream = 'facts' and field = 'segment' order by id, pos desc, n desc`,
+    `select distinct on (id) id, op, value from log_fact where stream = 'facts' and field = 'segment' order by id, pos desc, n desc -- index log_fact_kept`,
   );
   return rows.filter((r) => r.op === '+' && (!stream || r.value.stream === stream)).map((r) => ({ id: r.id, ...r.value })).sort((a, b) => a.stream.localeCompare(b.stream) || a.from - b.from);
 }
@@ -157,12 +167,13 @@ export async function compact(db: Db, ws: string, rules: Retention[], now = new 
       const ended = await closedOn(tx, [...new Set(all.flatMap((e) => e.facts.map((f) => f[1])))]);
       const keep = kept(all as OpEntry[], rules, now, (id) => ended.get(id));
       const inside = (s: Segment) => all.filter((e) => e.pos >= s.from && e.pos <= s.to);
-      // Runs of neighbouring segments that each lose an entry become one segment.
+      // Runs of neighbouring segments that each lose an entry become one segment, within a year: a segment lives in
+      // the partition that holds its days (src/partitions.ts).
       const runs: Segment[][] = [];
       for (const s of standing) {
         if (!inside(s).some((e) => !keep.has(e.pos))) continue;
         const last = runs.at(-1)?.at(-1);
-        if (last && standing.indexOf(last) === standing.indexOf(s) - 1) runs.at(-1)!.push(s);
+        if (last && standing.indexOf(last) === standing.indexOf(s) - 1 && last.days[1].slice(0, 4) === s.days[0].slice(0, 4)) runs.at(-1)!.push(s);
         else runs.push([s]);
       }
       const gone: number[] = [];

@@ -90,3 +90,33 @@ export function readLens(l: Archipelago, input: Record<string, unknown>, under: 
   }
   return lens;
 }
+
+/** A view kept on the map, read over a lens: a field it does not name is that lens's. */
+export function viewLens(l: Archipelago, view: { title: string; props: Record<string, unknown> } | undefined, under: Lens): Lens {
+  if (!view) return under;
+  try {
+    return readLens(l, Object.fromEntries(Object.entries(view.props).filter(([key, value]) => key in LENS_KEPT && value != null)), under);
+  } catch (err) {
+    throw new Error(`The lens "${view.title}" cannot be read: ${(err as Error).message}`);
+  }
+}
+
+/** Whether a type is of a kind a lens names: "work" is what can be estimated and what such things are part of. */
+export const ofKind = (l: Archipelago, type: string, kind: string) =>
+  kind === 'work' ? Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'work') : l.registry.isA(type, kind);
+
+/** The top of the map: the types at the altitude of a project or above (src/altitude.ts), its own kinds included. */
+export const topKinds = (l: Archipelago) => [...l.registry.types.values()].filter((t) => t.altitude === 'workspace' || t.altitude === 'project').map((t) => t.id);
+
+/**
+ * What a lens of the whole map may read: the types of the kinds it names, by the index on type. A lens that names
+ * none, or only kinds to leave out, would read every item of the map, and is refused: at millions of items no
+ * picture reads them all. It starts from an item instead, or says what it is of.
+ */
+export function wholeRead(l: Archipelago, asked: Lens) {
+  const wanted = (asked.kinds ?? []).filter((k) => !k.startsWith('-'));
+  const unwanted = (asked.kinds ?? []).filter((k) => k.startsWith('-')).map((k) => k.slice(1));
+  if (!wanted.length) throw new Error('A lens of the whole map names the kinds it is of (kinds), or starts from an item (from): at millions of items no picture reads them all.');
+  const types = [...l.registry.types.keys()].filter((t) => wanted.some((k) => ofKind(l, t, k)) && !unwanted.some((k) => ofKind(l, t, k)));
+  return { types, fold: asked.fold, by: asked.by, over: asked.over === 'all' ? null : asked.over, ...(asked.time && { time: asked.time }) };
+}

@@ -353,9 +353,9 @@ type Item = { id: string; type: string; title: string; status: string };
 async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
   const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = any($2::text[]) and from_id = $1 and valid_to is null`, [run.id, livesIn(l)]);
   if (!repos.length) return [];
-  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id))], [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
-  const graph = await blockGraph(l);
-  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending'`);
+  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id, true))], [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
+  const graph = await blockGraph(l, work.map((i) => i.id));
+  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending' -- index proposal_status`);
   const proposed = new Set(held.flatMap((p) => p.ops.flatMap((o) => ('id' in o && o.id ? [o.id] : []))));
   const open = work.filter((i) => !graph.waitsOnSomeone(i.id) && !proposed.has(i.id));
   const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
@@ -444,11 +444,11 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
     const work = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
     // Where things stand is read off the map; the session is told how much has moved since someone last wrote it down.
-    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { note: { id: string; title: string; written: string } | null; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]>; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
+    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { note: { id: string; title: string; written: string } | null; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]> & { counts: Record<'pushes' | 'settled' | 'opened' | 'sessions', number> }; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
     const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
     const then = stand.since_then;
     const from = stand.note ? `Its note, "${stand.note.title}" (${stand.note.id}), was written ${new Date(stand.note.written).toISOString().slice(0, 10)}; since then` : 'Nobody has written a handoff note here; in the last week';
-    lines.push(`Where things stand: view "handoff" with repo ${repo.id}. ${from}: ${n(then.pushes.length, 'push', 'pushes')}, ${n(then.settled.length, 'item')} settled, ${n(then.opened.length, 'item')} opened, ${n(then.sessions.length, 'session')} ended.`);
+    lines.push(`Where things stand: view "handoff" with repo ${repo.id}. ${from}: ${n(then.counts.pushes, 'push', 'pushes')}, ${n(then.counts.settled, 'item')} settled, ${n(then.counts.opened, 'item')} opened, ${n(then.counts.sessions, 'session')} ended.`);
     const kind = (t: { type: string }) => `${l.registry.type(t.type)?.title ?? t.type}: `;
     // What nobody has touched for a while is said to be so: it may no longer be true.
     const age = (t: { last_confirmed: string | Date }) => {

@@ -104,7 +104,7 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
  * applied nor declined.
  */
 export async function supersede(l: Archipelago, changeset: string): Promise<void> {
-  const { rows } = await l.db.query<Proposal>(`select * from proposal where status = 'pending'`);
+  const { rows } = await l.db.query<Proposal>(`select * from proposal where status = 'pending' -- index proposal_status`);
   for (const p of rows) {
     let moot = p.ops.length > 0;
     for (const op of p.ops) {

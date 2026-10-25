@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make } from './map.ts';
 import { entries, verify } from '../src/log.ts';
-import { compact, opEntries, record, seal, segments, verifySegments, type OpStream } from '../src/streams.ts';
+import { compact, opEntries, readOps, record, seal, segments, verifySegments, type OpStream } from '../src/streams.ts';
 import { checkRetention, duration, kept, type OpEntry, type Retention } from '../src/retention.ts';
 import { checkRules } from '../src/rules.ts';
 import { createToken, verifyToken } from '../src/auth.ts';
@@ -15,7 +15,7 @@ import { callTool } from '../src/tools.ts';
 import type { Archipelago } from '../src/pelago.ts';
 
 const DAY = 86_400_000;
-const facts = async (l: Archipelago, stream: OpStream) => (await opEntries(l.db, stream)).flatMap((e) => e.facts.map((f) => [e.rule, ...f]));
+const facts = async (l: Archipelago, stream: OpStream) => (await readOps(l.db, stream)).flatMap((e) => e.facts.map((f) => [e.rule, ...f]));
 
 test('each operational write lands in its stream, at once, with the light header', async () => {
   const l = await fresh();

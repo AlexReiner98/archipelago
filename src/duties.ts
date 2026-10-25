@@ -1,4 +1,4 @@
-// What the server does on a clock for every workspace at once: backups, the streams' days sealed and compacted, and the server packs' schedules (a workspace's
+// What the server does on a clock for every workspace at once: backups, the streams' days sealed and compacted, a snapshot of the projections, and the server packs' schedules (a workspace's
 // own packs run theirs in src/hooks.ts). Only the leader does them (src/leader.ts): they start when this process takes
 // the lead and stop when it loses it.
 
@@ -8,19 +8,46 @@ import type { Leader } from './leader.ts';
 import type { ServerPacks } from './server-host.ts';
 import type { Workspaces } from './workspaces.ts';
 import { compact, seal } from './streams.ts';
+import { makePartitions } from './partitions.ts';
+import { rebuildProjections, snapshotNow } from './rebuild.ts';
+import { snapshots } from './snapshot.ts';
 
-/** Seal each workspace's compacted streams up to today and compact what their rules no longer keep (docs/log.md, section 4). */
+/** Make each workspace's log's partitions ahead, seal its compacted streams up to today and compact what their rules no longer keep (docs/log.md, section 4). */
 export async function keepStreams(workspaces: Workspaces, now = new Date()) {
   for (const { id } of await workspaces.list()) {
     const wasOpen = workspaces.isOpen(id);
     const release = workspaces.hold(id);
     try {
       const { pelago } = await workspaces.get(id);
+      await makePartitions(pelago.db); // the log's partitions, two months ahead (src/partitions.ts)
       const sealed = await seal(pelago.db, pelago.workspace, now);
       const { dropped } = await compact(pelago.db, pelago.workspace, pelago.registry.rules, now);
       if (sealed.length || dropped) console.log(`${id}: ${sealed.length} days sealed, ${dropped} entries compacted away`);
     } catch (err) {
       console.error(`keeping the streams of ${id} failed:`, err);
+    } finally {
+      release();
+      if (!wasOpen) await workspaces.closeIfUnused(id).catch(() => false);
+    }
+  }
+}
+
+/**
+ * Each workspace's projections kept as a snapshot at the head of its log, made from the newest one before it (docs/log.md,
+ * section 7). Where no snapshot fits the projector this code runs (a new projector, or a map that has none), the
+ * projections are made again from the log's start, beside the live ones, and swapped in.
+ */
+export async function keepSnapshots(workspaces: Workspaces) {
+  for (const { id } of await workspaces.list()) {
+    const wasOpen = workspaces.isOpen(id);
+    const release = workspaces.hold(id);
+    try {
+      const { pelago } = await workspaces.get(id);
+      const fits = (await snapshots(pelago.db, pelago.workspace)).some((s) => !s.problems.length);
+      const done = await (fits ? snapshotNow : rebuildProjections)(pelago.db, pelago.registry, pelago.workspace);
+      console.log(`${id}: ${fits ? 'snapshot taken' : 'projections rebuilt from the log'} at ${done.to.facts} (${done.entries} entries, ${done.ms} ms)${done.swapped ? `, rows put right: ${JSON.stringify(done.swapped)}` : ''}`);
+    } catch (err) {
+      console.error(`keeping the snapshots of ${id} failed:`, err);
     } finally {
       release();
       if (!wasOpen) await workspaces.closeIfUnused(id).catch(() => false);
@@ -48,7 +75,7 @@ export function serverDuties(leader: Leader, workspaces: Workspaces, serverPacks
   let keptOn = '';
   const keepIfDue = () => {
     const today = new Date().toISOString().slice(0, 10);
-    if (today !== keptOn) void keepStreams(workspaces).then(() => (keptOn = today), (err) => console.error('keeping the streams failed:', err));
+    if (today !== keptOn) void keepStreams(workspaces).then(() => keepSnapshots(workspaces)).then(() => (keptOn = today), (err) => console.error('keeping the streams failed:', err));
   };
 
   let timers: NodeJS.Timeout[] = [];

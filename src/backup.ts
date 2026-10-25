@@ -11,6 +11,9 @@
 // What the map's rows say is sealed in the file with each item's key (src/backup-seal.ts), and the keys are backed up
 // apart, kept 30 days (src/vault.ts): a backup is read with the vault as it is when it is restored, or with a vault
 // backup given beside it, on a server with the same sealing key. What was forgotten since it was taken stays out.
+//
+// Since format 3 a backup is the log and a snapshot (src/backup-log.ts): the log's rows whole, the newest snapshot of
+// the projections, and only what the log does not say. Items, links and the review queue are made again from them.
 
 import { isSealed, seal, SECRET_SETTINGS } from './secrets.ts';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,19 +23,26 @@ import { isServer, openDb, type Db, type Q } from './db.ts';
 import { addLocalType, addWorkspace } from './control.ts';
 import type { Registry } from './packs.ts';
 import { restoreRows } from './pelago.ts';
+import { regatherAll } from './closure.ts';
+import { mentionedAll } from './mentions.ts';
 import { databaseFor } from './pg.ts';
 import { analyzeAll, analyzeDue } from './stats.ts';
 import { FACT_ACTIONS, factEvents } from './eventlog.ts';
 import { openTables, sealTables, sealedDump } from './backup-seal.ts';
+import { projectBackup } from './backup-log.ts';
+import { liveSnapshot } from './snapshot.ts';
 import { dumpVault, restoreVault, VAULT_BACKUP_DAYS, type VaultDump } from './vault.ts';
 import type { Workspaces } from './workspaces.ts';
+import { makePartitions } from './partitions.ts';
 
 /** Every table, parents before the rows that point at them. */
-const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'log_entry', 'log_fact'] as const;
+const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'log_entry', 'log_fact', 'log_op'] as const;
+/** What the log makes, and a backup since format 3 does not carry but makes again. */
+const PROJECTIONS: readonly string[] = ['entity', 'relation', 'proposal'];
 
 export interface Dump {
-  /** 1: rows in clear, as written before keys were; 2: sealed, read with the vault. */
-  format: 1 | 2;
+  /** 1: rows in clear, as written before keys were; 2: sealed, read with the vault; 3: the log and a snapshot, sealed. */
+  format: 1 | 2 | 3;
   taken: string;
   workspace: { id: string; name: string };
   /** The types this workspace defined for itself, as its local pack file. */
@@ -40,23 +50,28 @@ export interface Dump {
   tables: Record<string, Record<string, unknown>[]>;
   /** A backup of the vault given beside the file, never written into it: what a restore opens the rows with. */
   vault?: VaultDump;
+  /** Format 3: the projections at the head of the log, as a snapshot (src/snapshot.ts, liveSnapshot). */
+  snapshot?: Record<string, unknown> | null;
 }
 
 /** All of a database's rows as they stand at one moment. Give it the unscoped database: a backup hides nothing. */
 export async function dump(db: Db, workspace: { id: string; name: string }, localPack?: unknown): Promise<Dump> {
   const tables: Dump['tables'] = {};
+  let snapshot: Record<string, unknown> | undefined;
   await db.transaction(async (tx) => {
     await tx.query(`set transaction isolation level repeatable read`);
-    for (const table of TABLES) tables[table] = (await tx.query<{ row: Record<string, unknown> }>(`select to_jsonb(t) as row from ${table} t`)).rows.map((r) => r.row);
-    // The log goes in as its rows, which a restore reads again; a merge does not take another map's log, so what its
-    // change sets did goes in as well, as the events it reads as (a restore leaves those out).
+    for (const table of TABLES.filter((t) => !PROJECTIONS.includes(t))) tables[table] = (await tx.query<{ row: Record<string, unknown> }>(`select to_jsonb(t) as row from ${table} t`)).rows.map((r) => r.row);
+    // The projections go in as one snapshot of them at the head of the log, sealed, hashed and anchored to it.
+    snapshot = await liveSnapshot(tx, workspace.id);
+    // A merge does not take another map's log, so what its change sets did goes in as well, as the events it reads
+    // as (a restore leaves those out).
     const done = await factEvents(tx, {}, Number.MAX_SAFE_INTEGER);
     tables.event.push(...done.map(({ target_title: _t, target_type: _y, ...ev }) => ({ ...ev, workspace: workspace.id, private_to: null })));
     await sealTables(tx, workspace.id, tables);
   });
   // A secret stored before secrets were sealed has not been read since, and so is still as it was typed: it does not leave like that.
   for (const row of tables.setting ?? []) if (SECRET_SETTINGS.includes(row.key as string) && typeof row.value === 'string' && !isSealed(row.value)) row.value = seal(row.value);
-  return { format: 2, taken: new Date().toISOString(), workspace, local_pack: localPack ?? null, tables };
+  return { format: 3, taken: new Date().toISOString(), workspace, local_pack: localPack ?? null, tables, snapshot: snapshot ?? null };
 }
 
 /**
@@ -66,8 +81,18 @@ export async function dump(db: Db, workspace: { id: string; name: string }, loca
 async function opened(tx: Q, backup: Dump, keep: boolean): Promise<Dump> {
   if (backup?.vault && keep) await restoreVault(tx, backup.vault);
   if (backup?.format === 1 && typeof backup.tables === 'object') return backup;
-  if (!sealedDump(backup?.format) || typeof backup.tables !== 'object') throw new Error(`This backup is format ${backup?.format}; this version reads formats 1 and 2.`);
+  if (!sealedDump(backup?.format) || typeof backup.tables !== 'object') throw new Error(`This backup is format ${backup?.format}; this version reads formats 1 to 3.`);
   const { tables, left_out } = await openTables(tx, structuredClone(backup.tables), backup.vault);
+  if (backup.format === 3) {
+    // The projections are its snapshot, with what the log says after it projected on; the log alone when the
+    // snapshot cannot be built on (other projector code, or not anchored to this log).
+    const made = await projectBackup(tx, tables, backup.snapshot ?? undefined, backup.vault);
+    if (made.left_out && !made.rows.entity.length) throw new Error('This backup is sealed: give the backup of the key vault taken with it, on a server with the same sealing key.');
+    const ids = new Set(made.rows.entity.map((r) => r.id));
+    Object.assign(tables, made.rows);
+    for (const t of ['picture', 'share', 'published']) tables[t] = (tables[t] ?? []).filter((r) => ids.has(r.entity_id));
+    return { ...backup, format: 1, tables };
+  }
   if (left_out && left_out === backup.tables.entity?.length) throw new Error('This backup is sealed: give the backup of the key vault taken with it, on a server with the same sealing key.');
   return { ...backup, format: 1, tables };
 }
@@ -92,6 +117,13 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     // What a change set in the file's log did is read from that log again: its events are not rows.
     const logged = new Set((backup.tables.log_entry ?? []).map((e) => e.id as string));
     backup.tables.event = (backup.tables.event ?? []).filter((ev) => !(logged.has(ev.changeset as string) && FACT_ACTIONS.includes(ev.action as string)));
+    // The log goes into the years it was written in, in order: each entry follows the one before (src/partitions.ts),
+    // the compacted streams' too, whose rows a forget has rewritten out of their order on disk.
+    const logAt = new Map((backup.tables.log_entry ?? []).map((e) => [`${e.stream} ${e.pos}`, e.at]));
+    for (const f of backup.tables.log_fact ?? []) f.at ??= logAt.get(`${f.stream} ${f.pos}`);
+    for (const table of ['log_entry', 'log_fact', 'log_op'] as const) backup.tables[table]?.sort((a, b) => String(a.stream).localeCompare(String(b.stream)) || Number(a.pos) - Number(b.pos) || Number(a.n ?? 0) - Number(b.n ?? 0));
+    const first = [...logAt.values(), ...(backup.tables.log_op ?? []).map((o) => o.at)].reduce((min: number, at) => Math.min(min, new Date(at as string).getTime()), Infinity);
+    if (Number.isFinite(first)) await makePartitions(tx, new Date(first));
     for (const table of TABLES) {
       const rows = backup.tables[table] ?? [];
       // One statement per table: rows that point at each other (an entity's owner) are checked together.
@@ -99,6 +131,9 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
       counts[table] = rows.length;
     }
     await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), 1))`);
+    // What is inside what is a projection of the links just written: made again whole.
+    await regatherAll(tx, ['part_of']);
+    await mentionedAll(tx);
     // The types it defined for itself go in its database, where the server looks for them.
     for (const def of (given.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
     if (as !== undefined && as !== given.workspace?.id) {
@@ -161,6 +196,8 @@ export async function merge(db: Db, given: Dump, options: { workspace: string; s
       const count = (what: string) => plan.filter((p) => p.what === what).length;
       const some = (what: string) => plan.filter((p) => p.what === what).slice(0, 20).map((p) => p.title);
       const rels = await restoreRows(tx, entities, JSON.stringify(here(relations.filter((r) => !held(r)))));
+      await regatherAll(tx, ['part_of']);
+      await mentionedAll(tx);
       const { rows: props } = await tx.query<{ added: boolean }>(
         `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)
          on conflict (id) do update set status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at, note = excluded.note

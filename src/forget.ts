@@ -2,13 +2,15 @@
 // destroys its key and the keys of every link with it at either end (e_grqeftj2), puts each value they sealed in the
 // log as its digest (e_k2aex62z), and takes what it said out of the stores beside the log. A held change that touches it
 // loses its ops with it; a change set's reason and basis go only when the person forgetting chooses them, from those
-// mentions() finds (e_4uzgmsry). The chain still verifies: it always hashed a sealed value by that same digest.
+// mentions() finds (e_4uzgmsry). The chain still verifies: it always hashed a sealed value by that same digest. The
+// compacted streams lose what they sealed with those keys the same way, through the compaction role (src/opseal.ts).
 // Today's rows of the item leave in the write path (src/pelago.ts), through asOwner.
 
 import type { Q } from './db.ts';
 import { digested } from './seal.ts';
 import { entries } from './log.ts';
 import { destroy } from './vault.ts';
+import { forgetOps, opLinksOf } from './opseal.ts';
 
 /** Forget an item, for good. `reasons`: change sets (c_…) and held changes (p_…) whose reason and basis go with it. */
 export interface ForgetOp {
@@ -95,7 +97,7 @@ async function heldTouching(tx: Q, item: string, links: string[]): Promise<strin
 /** The log, the vault and the stores beside the log, once the item is forgotten. Run in the forget's transaction. */
 export async function forgetIn(tx: Q, op: ForgetOp): Promise<{ links: string[]; held: string[] }> {
   const reasons = op.reasons ?? [];
-  const links = await linksOf(tx, op.id);
+  const links = [...new Set([...(await linksOf(tx, op.id)), ...(await opLinksOf(tx, op.id))])];
   const held = await heldTouching(tx, op.id, links);
   const { rows } = await tx.query<{ stream: string; pos: number; id: string; head: Record<string, any> }>(
     `select stream, pos::int as pos, id, head from log_entry where id = any($1::text[])`,
@@ -111,6 +113,7 @@ export async function forgetIn(tx: Q, op: ForgetOp): Promise<{ links: string[]; 
     return { stream: r.stream, pos: r.pos, head };
   });
   await tx.query(`select pelago_log_forget($1::text[], $2::jsonb)`, [[op.id, ...links], JSON.stringify(heads)]);
+  await forgetOps(tx, [op.id, ...links]);
   await destroy(tx, [op.id, ...links, ...reasons, ...held.map((p) => `${p}/ops`)]);
   await tx.query(`select pelago_forget_stores($1, $2::text[], $3::text[])`, [op.id, reasons, held]);
   return { links, held };

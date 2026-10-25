@@ -27,7 +27,7 @@ type Said = { id: string; op: '+' | '-'; value: { version?: string; manifest?: s
 
 /** The last fact said of each pack here. */
 async function packFacts(l: Archipelago): Promise<Map<string, Said>> {
-  const { rows } = await l.db.query<Said>(`select distinct on (id) id, op, value from log_fact where stream = 'facts' and field = 'pack' and id like 'pack:%' order by id, pos desc, n desc`);
+  const { rows } = await l.db.query<Said>(`select distinct on (id) id, op, value from log_fact where stream = 'facts' and field = 'pack' and id like 'pack:%' order by id, pos desc, n desc -- index log_fact_kept`);
   return new Map(rows.map((r) => [r.id.slice('pack:'.length), r]));
 }
 

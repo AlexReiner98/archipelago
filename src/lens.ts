@@ -9,12 +9,12 @@ import type { Archipelago } from './pelago.ts';
 import { placeAll, zoneOf } from './timeaxis.ts';
 import { needsOf } from './attention.ts';
 import { blockGraph } from './blocking.ts';
-import { hubs, keptOf, type Kept } from './lens-kept.ts';
+import { hubOf, keptOf, type Kept } from './lens-kept.ts';
 import { styleFor, drawn as withDrawing } from './styles.ts'; import { SYSTEM } from './head.ts';
 import { readSteps, stepIds } from './lens-steps.ts';
 import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
-import { LENS_DEFAULT, LENS_KEPT, readLens, WAITS, type Lens } from './lens-read.ts';
-import { aroundOf, scanAll, scanAround, type Row } from './lens-scan.ts';
+import { LENS_DEFAULT, ofKind, readLens, topKinds, viewLens, WAITS, wholeRead, type Lens } from './lens-read.ts';
+import { aroundOf, scanAround, scanKinds, type Row } from './lens-scan.ts';
 
 // Kept where they were first imported from.
 export { hubs, HUB_AT, pictureOf } from './lens-kept.ts';
@@ -94,12 +94,16 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
     if (!one) throw new Error(`No beat ${input.beat} stands in the story of "${told.title}"`);
     told.beats = [one];
   }
-  // The item the picture is asked for. Each lens kept about it is a view of it, with a name; the first in order is the one it opens on.
-  const hub = input.from === undefined ? undefined : String(input.from);
   // "around" (what an item is tied to, by every kind of link) was a view of its own until 18 Oct; asked for in an old address, it is no view at all.
   if (input.lens === 'around') input = { ...input, lens: undefined };
-  const builtIn = hub !== undefined && [HOLDING, WHEN, IN].includes(input.lens as string);
+  const builtIn = input.from !== undefined && [HOLDING, WHEN, IN].includes(input.lens as string);
   const [lenses, styles] = preset ? [[], []] : [await keptOf(l, 'lens', builtIn ? undefined : input.lens), await keptOf(l, 'style', input.style)];
+  // A view asked for by its id alone starts where it is kept: from the item it is about, or the one it names.
+  const named = input.from === undefined && !told && typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : undefined;
+  const startsAt = typeof named?.props.from === 'string' ? named.props.from : named?.about.length === 1 ? named.about[0] : undefined;
+  if (startsAt !== undefined) input = { ...input, from: startsAt };
+  // The item the picture is asked for. Each lens kept about it is a view of it, with a name; the first in order is the one it opens on.
+  const hub = input.from === undefined ? undefined : String(input.from);
   const placed = (one: Kept) => (typeof one.props.place === 'number' ? one.props.place : Infinity);
   // Every lens that applies can be chosen: those about the item, then what holds it, then the workspace's own (about nothing), each in its order.
   const own = hub === undefined ? [] : lenses.filter((one) => one.about.includes(hub)).sort((a, b) => placed(a) - placed(b));
@@ -107,10 +111,18 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
   const views = told ? [] : [...own, ...shared];
   // A preset is known before anything is read: what it folds away, and the links it does not send, are not read at all.
   const early = preset && readLens(l, input, readLens(l, preset));
-  // A lens from an item reads what is around it, for any view of it that may be chosen; one of the whole map reads it all.
-  // A view of it that goes near reads only what it walks to: kept on the map, among others to choose from, it is read whole.
-  const scoped = hub !== undefined && !told && (Boolean(early) || ![input, ...own.map((one) => one.props)].some((x) => typeof x.near === 'number'));
-  const { entities, relations, unread } = scoped ? await scanAround(l, aroundOf(l, hub, input, early, [...own, ...lenses.filter((one) => one.id === input.lens)])) : await scanAll(l, early ? { from: early.from, fold: early.fold, types: early.over === 'all' ? null : [early.by, ...early.over], count: counted } : undefined);
+  // A lens from an item reads what is around it, for any view of it that may be chosen (one that goes near, what it
+  // walks to as well); a story, what it is about; one of the whole map, the items of the kinds it names, and no more.
+  const scoped = hub !== undefined && !told;
+  // Of the whole map, a lens that names no kinds to keep opens on its top: what is at the altitude of a project or above.
+  const whole = !scoped && !told ? (early ?? readLens(l, input, viewLens(l, typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : shared[0], LENS_DEFAULT))) : undefined;
+  if (whole && !(whole.kinds ?? []).some((k) => !k.startsWith('-'))) input = { ...input, kinds: [...topKinds(l), ...(whole.kinds ?? [])] };
+  const toldOf = told ? [...new Set(told.beats.flatMap((b) => b.about))] : [];
+  const { entities, relations, unread, more, tied: organised } = scoped
+    ? { ...(await scanAround(l, aroundOf(l, hub, input, early, [...own, ...lenses.filter((one) => one.id === input.lens)]))), more: 0, tied: new Set<string>() }
+    : told
+      ? { ...(await scanAround(l, { starts: toldOf, by: [], over: [], waits: [], narrow: true })), more: 0, tied: new Set<string>() }
+      : await scanKinds(l, wholeRead(l, readLens(l, input, early ?? viewLens(l, typeof input.lens === 'string' ? lenses.find((one) => one.id === input.lens) : shared[0], LENS_DEFAULT))));
   const all = new Map(entities.map((e) => [e.id, e]));
   // What the item waits on, step by step through what that waits on, finished or not: the view of what holds it,
   // offered beside the others while some of it is still open, and the one an item opens on when it has none of its own.
@@ -138,17 +150,11 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
   let under: Lens = told ? { ...LENS_DEFAULT, over: 'all', fold: ['system'] } : holding ? { ...LENS_DEFAULT, over: [...WAITS] } : when ? { ...LENS_DEFAULT, over: [], lanes: 'person', fold: [], time: thisWeek(zone) } : preset ? readLens(l, preset) : LENS_DEFAULT;
   // One view at a time, over what is built in: a field it does not name is the built-in one.
   const read = view ? [view] : [];
-  for (const one of read) {
-    try {
-      under = readLens(l, Object.fromEntries(Object.entries(one.props).filter(([key, value]) => key in LENS_KEPT && value != null)), under);
-    } catch (err) {
-      throw new Error(`The lens "${one.title}" cannot be read: ${(err as Error).message}`);
-    }
-  }
+  under = viewLens(l, view, under);
   const asked = readLens(l, { ...input, ...(start !== undefined && { from: start }), ...(told && { story: told.id, from: undefined }) }, under);
   // What the story is about, in the order it came to them; and for each, the beats that are about it.
   // A view's steps name what was once in it: sent with it whatever it folds away (src/lens-steps.ts).
-  const about = told ? [...new Set(told.beats.flatMap((b) => b.about))] : view ? stepIds(view.props.steps) : [];
+  const about = told ? toldOf : view ? stepIds(view.props.steps) : [];
   const beatsOf = (id: string) => (told ? told.beats.filter((b) => b.about.includes(id)).map((b) => b.n) : []);
   // A style is passed on as it is kept: only the page that draws reads it. The packs' presets, then the workspace's, the item's kind's, the item's, this view's, one named.
   // Asked for by its id alone (in a document), a view is drawn as the item it starts from is.
@@ -165,11 +171,11 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
   // The system kind (a lens, a style, a run) is how the map is kept and looked at, not part of what is seen.
   const system = (e: Row) => e.kind === SYSTEM;
   // What is work: what can be estimated, and what such things are part of.
-  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || isA(type, 'work');
+  const work = (type: string) => ofKind(l, type, 'work');
   const wanted = (asked.kinds ?? []).filter((k) => !k.startsWith('-'));
   const unwanted = (asked.kinds ?? []).filter((k) => k.startsWith('-')).map((k) => k.slice(1));
-  const is = (type: string, kind: string) => (kind === 'work' ? work(type) : isA(type, kind));
-  const rest = { closed: unread.closed, system: unread.system, kinds: 0, unlinked: 0, far: 0, limit: 0 };
+  const is = (type: string, kind: string) => ofKind(l, type, kind);
+  const rest = { closed: unread.closed, system: unread.system, kinds: 0, unlinked: 0, far: 0, limit: more };
 
   const eligible = new Map<string, Row>();
   // What stands on the map for this picture before kinds are chosen: the ladder a thing is found on when what holds it is not of the kinds kept.
@@ -263,25 +269,26 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
     }
   } else {
     for (const id of eligible.keys()) {
-      if (asked.fold.includes('unlinked') && !parent.has(id) && !kids.has(id)) rest.unlinked++;
+      if (asked.fold.includes('unlinked') && !parent.has(id) && !kids.has(id) && !organised.has(id)) rest.unlinked++;
       else if (asked.far !== undefined && depths.get(id)! > asked.far) rest.far++;
       else sent.add(id);
     }
   }
   if (sent.size > LENS_LIMIT) {
     const kept = [...sent].sort((a, b) => depths.get(a)! - depths.get(b)!).slice(0, LENS_LIMIT);
-    rest.limit = sent.size - kept.length;
+    rest.limit += sent.size - kept.length;
     sent = new Set(kept);
   }
 
   // The state of each thing, and the same counted over everything inside it, sent or not.
-  // What blocks what is read across the map: a chain of waiting may leave what was read, and it is cheap.
-  const blocked = await blockGraph(l);
+  // What blocks what is read from what was read, along every chain of waiting, wherever it leads.
+  const blocked = await blockGraph(l, [...all.keys()]);
   // What needs the person it is answered for: what waits on them, theirs to confirm, due, or unsettled and theirs.
-  const viewer = l.viewer || (await l.setting<string>('me')) || null, yours = preset ? new Set<string>() : await needsOf(l, viewer, { entities, relations, whole: !scoped, graph: blocked });
+  const viewer = l.viewer || (await l.setting<string>('me')) || null, yours = preset ? new Set<string>() : await needsOf(l, viewer, { entities, relations, graph: blocked });
   const { rows: at } = await l.db.query<{ target: string }>(
     `select r.to_id as target from relation r join entity s on s.id = r.from_id
-     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null`,
+     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null and r.to_id = any($1::text[])`,
+    [[...all.keys()]],
   );
   const sessions = new Map<string, number>();
   for (const { target } of at) sessions.set(target, (sessions.get(target) ?? 0) + 1);
@@ -390,10 +397,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
     view: view?.id ?? (holding ? HOLDING : when ? WHEN : null),
     ...(hub !== undefined && !preset && {
       views_of_it: own.length,
-      hub: await (async () => {
-        const known = (await hubs(l)).find((h) => h.id === hub);
-        return known ? { is: true, inside: known.inside, at: known.at } : { is: false };
-      })(),
+      hub: await hubOf(l, hub),
     }),
     // What the person looking may change on the page, where the view says.
     // A story is what the session chose to show: there is nothing to light by but what it says.

@@ -35,6 +35,8 @@ export const STORES: Record<string, string> = {
   share: 'A link that lets someone with no login, or another workspace, read one document: made and revoked by a human only.',
   setting: "The workspace's settings and sealed secrets: set by the human or by the server, never by an agent's change; each set appended to the settings stream (a secret by its name only).",
   member: 'Who belongs to the workspace, by email: written by an admin or a server pack, read only by the whole database.',
+  part_closure: 'What is inside what, all the way down: a projection of the open part_of links, kept by the projector in the append (src/closure.ts), made again whole after a restore.',
+  mention: "What names an item in its note or fields: a projection of items' text, kept by the projector as each is written (src/mentions.ts), made again whole after a restore.",
   proposal: 'The review queue, a projection of the log: a held change’s record in the pending stream makes its row, the entry that decides it in the fact stream says what became of it (src/replay.ts).',
   published: 'A document as it was published, frozen: written only when a human publishes.',
   picture: 'The picture a test drew, kept for a public result: one per result, replaced when the test runs again; its hash appended to the observations stream.',
@@ -48,6 +50,7 @@ export const STORES: Record<string, string> = {
   github_installation: 'Which GitHub installation belongs to which workspace: written by the GitHub sign-up.',
   schema_version: 'Which schema steps have run: written by migrate only.',
   vault_key: "Each item's, link's and change set's key, wrapped with the server's sealing key: made in the append that first seals with it, deleted only by a forget, backed up apart and kept 30 days.",
+  log_snapshot: 'The projections as they stood at a position of the log, sealed per item and anchored to the chain (src/snapshot.ts): taken by the server, never by a change, and deleted and taken again at will.',
   vault_secret: 'Secrets kept by name, wrapped like a key: set and removed by the owner or the server, never in the log or its backups.',
 };
 

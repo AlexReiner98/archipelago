@@ -438,8 +438,8 @@ and never cares which stream a fact came from beyond its retention.
 
 ### Segments and their hashes
 
-A compacted stream is cut into **segments**, one per day per stream (the time
-partitions of `e_m6a2uw2f`). When a day closes, its segment is sealed: its
+A compacted stream is cut into **segments**, one per day per stream, each
+inside the year's partition of `log_op` (below). When a day closes, its segment is sealed: its
 hash is SHA-256 of `"pelago-segment\n"` and the canonical entries in order,
 and a system entry in the fact stream records it:
 
@@ -469,8 +469,21 @@ and the server does both once a day for every workspace (`src/duties.ts`).
 The compacted streams are kept in their own table, `log_op (stream, pos, at,
 head, facts)`: the light header in `head`, the facts inline. Its trigger
 refuses an update, a delete and a truncate to everyone but one role,
-`pelago_compactor`, and that role may only delete; compaction takes it for
-the end of its transaction. The fact stream's tables let no one through.
+`pelago_compactor`; compaction takes it for the end of its transaction. That
+role may delete, and may change a row in one way only: a sealed value, or a
+sealed reason, put as its digest, which is what a forget asks of it. The fact
+stream's tables let no one through.
+
+The streams keep the fact stream's guarantees (`src/opseal.ts`, step 24): a
+fact's value about an item or a link is sealed with that item's key, as in
+section 5, and `CLEAR` stays clear; an entry's reason is sealed with the key
+of the first item it names, or with its stream's own (`op:<stream>`) when it
+names none. A segment hashes each sealed value as its digest, so it verifies
+with no key and still does after a forget. Row security lets a member read an
+entry only when they may see every item and link it names; the next position
+comes from a function that sees them all. A forget puts every value its keys
+sealed, and every reason, as its digest, through the compaction role, and
+backups carry `log_op` as stored, beside the vault.
 
 ### The retention rule format
 
@@ -553,6 +566,35 @@ codes, OAuth state) go in an **unlogged** Postgres table, `transient (key,
 value, expires_at)`, its entries expiring and swept, never backed up and
 never part of the log (`e_a7fjzcwv`). It is the one store outside the log
 besides the key vault, named so in `src/operational.ts`.
+
+### Partitions by time
+
+`log_entry`, `log_fact` and `log_op` are each range-partitioned on `at`, one
+partition a year (UTC), in the workspace's own database (`e_m6a2uw2f`,
+`src/partitions.ts`). A fact carries its entry's `at`, so it lives with its
+entry; a segment's days never cross a year, so a segment and a compacted one
+live in one partition, and reading one reads only it.
+
+- **The keys name the time.** Postgres needs the partition key in every unique
+  index: the keys are `(stream, at, pos)` and `(stream, pos, n, at)`. What the
+  old key promised a trigger promises: an entry must be its stream's next
+  position, name the last entry's hash and be no earlier than it, under the
+  append lock. The chain is held by the database across partitions.
+- **Append-only in every partition.** The row triggers on each table reach every
+  partition, a new one too; each partition is given its own truncate trigger
+  when it is made.
+- **Made ahead.** Partitions are made through two months from now when a
+  database opens and daily, and by an append whose own is missing. There is no
+  default partition: a row outside them all is refused.
+- **Pruned reads.** BRIN indexes on `at` serve a stretch of time inside a
+  partition. The history index is `(id, field, at, pos, n)`: an as-of read is
+  bounded by its entry's `at` and walks the partitions newest first, stopping
+  at the first that answers.
+- **Why a year, not a month.** In PGlite a read that time cannot prune is
+  planned against every partition, and planning costs more than running:
+  three years of months took an as-of read from 0.7 to 11 ms, a year each
+  keeps it near 1.5 ms (the numbers are on the task). `pelago_log_unit()`
+  names the length.
 
 ### Where this stands (24 Oct 2026)
 
@@ -726,7 +768,7 @@ The vault is `src/vault.ts`, sealing `src/seal.ts`, the forget `src/forget.ts`
 | projection | reads from a fact |
 | --- | --- |
 | current state (`entity`, `relation` as tables) | every fact: the newest value of each (id, field), plaintext; `created_at`, `updated_at`, `archived_at`, `valid_from`, `valid_to` from entry times |
-| history index | nothing beyond the log itself: `log_fact` indexed on `(id, field, pos)` and on `(id, pos)` is the index by item and by field; an as-of value is one index lookup |
+| history index | nothing beyond the log itself: `log_fact` indexed on `(id, field, at, pos, n)` is the index by item and by field; an as-of value is one index lookup in the newest partition that has one |
 | change sets by id, undo | `log_entry.id`, `undoes`, indexed |
 | search index | `title`, `body`, and fields declared searchable, after unsealing, as the append happens; a forget deletes its rows |
 | part_of closure | `link` facts whose type is in the `part_of` family: add or drop ancestor pairs |
@@ -789,6 +831,54 @@ never sees the log ahead of them.
   snapshots and backups through the vault.
 - A snapshot is taken every 100,000 fact entries or daily, whichever comes
   first; it is not part of the log and can be deleted and taken again.
+
+### As built (`src/snapshot.ts`, `src/rebuild.ts`, `src/backup-log.ts`)
+
+- **Where kept.** `log_snapshot`, one row per snapshot in the workspace's
+  database (step 23), its rows gzipped JSON sealed per item as a backup's
+  rows are (`entity.title`, …), never readable by a member. Its id is
+  `s_<facts>_<pending>_<code>`; taken again at the same position, it is
+  replaced. The newest three of the running code are kept.
+- **The code's version.** `PROJECTION_VERSION` is raised by hand when what
+  the projector makes changes in meaning; beside it the snapshot keeps the
+  digest of the projector's source (`src/replay.ts`, `src/facts.ts`), so a
+  projector changed without raising it is still not built on. A snapshot
+  whose version or code is not the running one, whose anchor is not the fact
+  entry at its position, or whose rows do not hash to its hash, is passed
+  over.
+- **The hash.** SHA-256 of `"pelago-snapshot\n"`, the header canonical, a
+  newline, and the SHA-256 of the sealed rows' bytes: the rows by digest, so
+  a forget, which only destroys keys, changes nothing a snapshot hashed.
+- **Rebuild.** Into a schema of its own (`pelago_rebuild`, named first on
+  the search path: the projector is the write path's own, unchanged), from
+  the newest snapshot this code can build on, both streams merged in the
+  order the write path projects them, a chunk of entries per transaction so
+  pages are served between them. When one chunk is left, one transaction
+  takes both streams' locks, projects the rest, keeps a snapshot at the head
+  and swaps: what differs from the live tables is written, what is the same
+  is left, so the live tables keep their policies, triggers and foreign
+  keys. An item keeps its operational fields; a link the fact stream never
+  said (a claim's, in its own stream) is not removed. A snapshot is also
+  kept every 100,000 fact entries of a walk.
+- **When.** Daily, by the leader: a snapshot at the head, walked from the
+  newest one; where none fits the running code (a new projector, or none
+  yet), the projections are rebuilt from the start in the background and
+  swapped in.
+- **As of a position.** The nearest snapshot at or before it, then the
+  entries of both streams up to the moment of that fact entry, projected
+  into temporary tables that live for one transaction. The reader sees of it
+  only what their database shows them now, as the log's facts are read.
+- **Backups (format 3).** The log's rows whole, a snapshot of the live
+  projections at the head of the log (read in the backup's own transaction),
+  and the tables that are not projections; no rows of `entity`, `relation`
+  or `proposal`. The live snapshot holds what the log alone does not make:
+  rows a merge of another backup wrote, a claim's link, an item's
+  operational fields. Restored or read, the projections are that snapshot
+  with what the log says after it projected on; when it cannot be built on
+  (other code, off the chain), the log alone from its start. Keys travel
+  apart as section 5 says. A merge of a format 3 file reads the same
+  projections and merges them as rows, with the other map's history as
+  events: two hash chains are not joined (`e_z2kv3ejs`).
 
 ---
 
@@ -921,8 +1011,8 @@ Estimates for the benchmark to confirm, in Postgres, with indexes:
 | `log_entry` header row: ids, actor, authority, rule, two 32-byte hashes, reason of ~120 characters sealed (+28 bytes nonce and tag), tuple overhead | ~420 |
 | one `log_fact` row with a short clear value (a status) | ~80 |
 | one `log_fact` row with a sealed title of ~50 characters | ~130 |
-| index entries per fact: primary key `(pos, n)`, `(id, field, pos)`, `(id, pos)` | ~90 |
-| index entries per header: primary key, `id`, `at` (BRIN, nearly free) | ~60 |
+| index entries per fact: primary key `(stream, pos, n, at)`, `(id, field, at, pos, n)`, `at` (BRIN) | ~100 |
+| index entries per header: primary key `(stream, at, pos)`, `(stream, pos)`, `id`, `at` (BRIN, nearly free) | ~80 |
 
 A one-field update: ~650 bytes. Example 1 (a task with a note of ~60
 characters, two links, a new source; 15 facts): ~3.5 KB. A typical change set
@@ -1101,3 +1191,37 @@ decision under `e_j8df78ar`, stated as settled in the sections above:
     last use is operational (`e_x9wxnqz4`).
 13. A type a pack moves is a system change set asserting the new type on
     every item (`e_w66xm7kt`).
+
+## 12. One log, two databases
+
+A map runs on PGlite (a folder, one process) or on a Postgres server (many
+processes, one database per workspace). The schema and the log are the same
+on both, and moving a map from one to the other is a replay of its log.
+Where a map should move is the owner's question `e_fcusktmz`.
+
+### The move
+
+`node src/cli.ts move <from> <to>`, each a data folder or a `postgres://`
+address of one database, with no server on either (src/move.ts):
+
+1. **Verify** the source: both chains and every sealed segment.
+2. **Replay**: the key vault is carried first, then every entry of both
+   streams as it is stored (sealed, the same position, time and hash), in the
+   order a rebuild projects them (section 7), each projected as it lands.
+   What the log does not hold yet comes as rows: the operational fields kept
+   on items (`KEPT_FIELDS`) and every store beside the log, the operational
+   streams (`log_op`) among them. `transient` and `schema_version` never move.
+3. **Compare**, before the target's transaction commits: its chains verify to
+   the same heads, its projections hash to the source's row for row, and every
+   carried store has as many rows. Otherwise nothing of it stays.
+
+The target must be empty. Sealed words stay sealed, so a server on the target
+needs the sealing key the source's had (`PELAGO_SECRETS_KEY`, or the
+`secrets.key` beside a folder's data); a move refuses when the source's words
+do not open with the key it is given.
+
+### The hosted product
+
+Every hosted workspace is its own database on the server (`databaseFor` in
+src/pg.ts), so a workspace is the unit that is sharded: placed on another
+server by moving that one database, with nothing joined across workspaces.

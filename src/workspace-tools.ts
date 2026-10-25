@@ -20,7 +20,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: {},
     run: async (l) => {
-      const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on to_jsonb(e.id) = s.value where s.key = 'me'`);
+      const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on e.id = s.value #>> '{}' where s.key = 'me'`);
       return { ...(await settings(l)), owner: rows[0] ?? null, member_limit: (await limitOf(l.workspace)) ?? null, ended: (await endedOf(l.workspace)) ?? null };
     },
   },

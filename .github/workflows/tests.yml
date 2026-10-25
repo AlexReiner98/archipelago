@@ -79,3 +79,11 @@ jobs:
           -c "select pg_reload_conf()"
 
       - run: npm test
+
+      # The log's triggers refuse everyone, but a superuser could drop them: a server should not log in as one. The
+      # log, its lock and the move again as a role that may make databases and roles, and nothing more. The roles the
+      # superuser's run made are granted to it to hand on, as it hands them to itself on opening (src/pg.ts).
+      - name: The log as a role that is not a superuser
+        run: |
+          psql "$PELAGO_TEST_DATABASE_URL" -c "create role pelago_app login password 'app' createdb createrole" -c "create database pelago_app owner pelago_app" -c "grant pelago_member, pelago_public, pelago_compactor to pelago_app with admin option"
+          PELAGO_TEST_DATABASE_URL=postgres://pelago_app:app@127.0.0.1:5432/pelago_app node --test --test-force-exit --test-global-setup=./test/global.ts --import ./test/each.ts test/log.test.ts test/connections.test.ts test/move.test.ts test/streams.test.ts test/keys.test.ts

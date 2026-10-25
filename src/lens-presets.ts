@@ -5,6 +5,7 @@
 
 import { attention, type Input } from './attention.ts';
 import { brief, BRIEF_UP } from './brief.ts';
+import { blockGraph } from './blocking.ts';
 import { lensRead } from './lens-scan.ts';
 import type { LENS_ANSWERS, ViewDef } from './declared.ts';
 import { HUB_AT, hubs } from './lens-kept.ts';
@@ -38,14 +39,15 @@ async function graph(l: Archipelago, def: ViewDef, params: Record<string, unknow
   const fold = [...(params.include_closed ? [] : ['closed']), ...(params.include_system ? [] : ['system'])];
   const over = family(l, chosen(def, 'relations', preset).over);
   const near = Math.min(Math.max(Number(params.depth ?? 2) || 2, 1), 4);
-  const answer = await lens(l, { ...(focus && { from: focus }) }, { ...def.lens, over, fold, ...(focus && { near }) }, false);
+  // Without a focus, the newest links of the kinds asked, and what they join: the whole map is never read.
+  const answer = focus ? await lens(l, { from: focus }, { ...def.lens, over, fold, near }, false) : await newest(l, over, fold);
   const sent = new Map(answer.items.map((i) => [i.id, i]));
   // The links among them as the map keeps them, in the order it keeps them, which decides what a graph too big to
   // send keeps: walked out from the focus a step at a time, or, without one, as the links come.
   const types = answer.lens.over === 'all' ? null : answer.lens.over;
   const ids = [...sent.keys()];
   const { rows: links } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string }>(
-    `with s(id) as (select unnest($1::text[])) select r.id, r.type, r.from_id, r.to_id from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null${types ? ' and r.type = any($2::text[])' : ''} order by r.ctid`,
+    `with s(id) as (select unnest($1::text[])) select r.id, r.type, r.from_id, r.to_id from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null${types ? ' and r.type = any($2::text[])' : ''} order by ${focus ? 'r.ctid' : 'r.valid_from desc, r.id'}`,
     types ? [ids, types] : [ids],
   );
   let order: string[];
@@ -57,7 +59,7 @@ async function graph(l: Archipelago, def: ViewDef, params: Record<string, unknow
       frontier = next;
     }
     order = [...keep];
-  } else order = [...new Set(links.flatMap((r) => [r.from_id, r.to_id]))];
+  } else order = [...new Set(links.flatMap((r) => [r.from_id, r.to_id]))].filter((id) => sent.has(id));
   const nodes = order.slice(0, GRAPH_LIMIT).map((id) => sent.get(id)!);
   const kept = new Set(nodes.map((n) => n.id));
   const tokens = await rolledTokens(l, nodes.map((n) => n.id));
@@ -70,6 +72,29 @@ async function graph(l: Archipelago, def: ViewDef, params: Record<string, unknow
       return { id: i.id, type: i.type, root: i.root, kind: i.kind, title: i.title, status: i.status, open: i.open, created: t?.created, blocked: i.state.blocked, ...(t?.work && { work: true, tokens: t.tokens, estimated: t.estimated, order: t.order }) };
     }),
     edges: links.filter((r) => kept.has(r.from_id) && kept.has(r.to_id)).map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id })),
+  };
+}
+
+/** The most links a graph with no focus reads of each kind: the newest, by the index on open links of a kind. */
+const NEWEST_LINKS = GRAPH_LIMIT;
+
+/** What a graph with no focus is drawn from: the newest open links of each kind asked, and the items they join, folded as asked. */
+async function newest(l: Archipelago, over: unknown, fold: string[]) {
+  const kinds = Array.isArray(over) ? (over as string[]) : [...l.registry.relations.keys()];
+  const ends = new Set<string>();
+  for (const type of kinds) {
+    const { rows } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = $1 and valid_to is null order by valid_from desc limit ${NEWEST_LINKS}`, [type]);
+    for (const r of rows) ends.add(r.from_id).add(r.to_id);
+  }
+  const keep = [fold.includes('closed') && 'is_open', fold.includes('system') && "(kind is null or kind <> 'system')"].filter(Boolean).join(' and ');
+  const { rows: items } = await l.db.query<{ id: string; type: string; title: string; status: string; is_open: boolean }>(
+    `select id, type, title, status, is_open from entity where id = any($1::text[]) and archived_at is null${keep ? ` and ${keep}` : ''}`,
+    [[...ends]],
+  );
+  const blocked = await blockGraph(l, items.map((e) => e.id));
+  return {
+    lens: { over: Array.isArray(over) ? (over as string[]) : 'all' },
+    items: items.map((e) => ({ id: e.id, type: e.type, ...l.registry.ancestry(e.type), title: e.title, status: e.status, open: e.is_open, state: { blocked: blocked.isBlocked(e.id) } })),
   };
 }
 
@@ -151,7 +176,8 @@ async function tree(l: Archipelago, def: ViewDef, params: Record<string, unknown
   }
   const { rows: sessions } = await l.db.query<{ target: string; id: string; title: string }>(
     `select r.to_id as target, s.id, s.title from relation r join entity s on s.id = r.from_id
-     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null`,
+     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null and r.to_id = any($1::text[])`,
+    [answer.items.map((i) => i.id)],
   );
   const props = new Map((await l.db.query<{ id: string; place: unknown; created_at: Date }>(`select e.id, e.props->$2 as place, e.created_at from entity e join unnest($1::text[]) s(id) on s.id = e.id`, [answer.items.map((i) => i.id), t.order])).rows.map((r) => [r.id, r]));
   // What is under each thing comes as the map keeps its links; branches in their order, then the oldest first.
@@ -207,15 +233,13 @@ async function tree(l: Archipelago, def: ViewDef, params: Record<string, unknown
 }
 
 /** The hubs, by the core pack's lens of them (src/lens-kept.ts), with the size at which an item counts as one where its project does not say. */
-const hubsOf: Reading = async (l) => ({ at: HUB_AT, hubs: await hubs(l) });
+const hubsOf: Reading = async (l, _def, params) => ({ at: HUB_AT, within: params.within ?? null, hubs: await hubs(l, params.within === undefined ? undefined : String(params.within)) });
 
 /**
- * What deserves attention: the state stage of its lens (open work and questions, the links that say what waits on
- * what), answered without drawing the picture. Every lens item's needs_you is read from the same reasons.
+ * What deserves attention: what is the person's, or inside what it is asked within, weighed by its reasons
+ * (src/attention.ts). Every lens item's needs_you is read from the same reasons.
  */
-/** The one field of an item attention reads: when it is due. */
-const DUE = ['due'];
-const attend: Reading = async (l, def, params) => attention(l, params as Input, await lensRead(l, {}, { ...def.lens, over: family(l, def.lens?.over) }, {}, DUE, ['status', 'owner', 'updated_at']));
+const attend: Reading = async (l, _def, params) => attention(l, params as Input);
 
 /** Everything a session needs to start on a task: what the lens from the task reads, with what holds the task and what it needs. */
 const briefOf: Reading = async (l, def, params) => {

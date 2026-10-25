@@ -24,7 +24,7 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
   const ofIds = [...new Set(lenses.flatMap((x) => x.about))];
   const { rows } = ofIds.length ? await l.db.query<{ id: string; title: string; type: string }>(`select id, title, type from entity where id = any($1::text[]) and archived_at is null`, [ofIds]) : { rows: [] };
   const items = new Map(rows.map((r) => [r.id, r]));
-  const projectOf = await projects(l);
+  const projectOf = await projects(l, ofIds);
   // keptOf answers oldest first; saved views read newest first, the pinned above the rest.
   const pictures = lenses
     .reverse()
@@ -39,16 +39,22 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
   return { pictures: pictures.slice(0, limit), more: Math.max(0, pictures.length - limit) };
 }
 
-/** The nearest project an item is or is part of, going up "is part of": a project is a type the packs put at that altitude. */
-async function projects(l: Archipelago): Promise<(id: string) => { id: string; title: string } | undefined> {
+/**
+ * The nearest project each of some items is or is part of, going up "is part of" (the part_of closure): a project is
+ * a type the packs put at that altitude, and the nearest is the one the others hold too.
+ */
+async function projects(l: Archipelago, ids: string[]): Promise<(id: string) => { id: string; title: string } | undefined> {
   const kinds = [...l.registry.types.values()].filter((t) => t.altitude === 'project').map((t) => t.id);
-  const { rows: found } = await l.db.query<{ id: string; title: string }>(`select id, title from entity where type = any($1::text[]) and archived_at is null`, [kinds]);
-  const isProject = new Map(found.map((p) => [p.id, p]));
-  const { rows: parts } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null order by id`);
-  const up = new Map<string, string>();
-  for (const p of parts) if (!up.has(p.from_id) && p.from_id !== p.to_id) up.set(p.from_id, p.to_id);
+  const { rows } = await l.db.query<{ id: string; project: string; title: string; above: number }>(
+    `select s.id, e.id as project, e.title, (select count(*)::int from part_closure up where up.descendant = e.id) as above
+     from unnest($1::text[]) s(id) join entity e on (e.id = s.id or e.id in (select ancestor from part_closure c where c.descendant = s.id))
+     where e.type = any($2::text[]) and e.archived_at is null`,
+    [ids, kinds],
+  );
+  const nearest = new Map<string, { id: string; title: string; above: number }>();
+  for (const r of rows) if (r.id === r.project || (nearest.get(r.id)?.id !== r.id && r.above > (nearest.get(r.id)?.above ?? -1))) nearest.set(r.id, { id: r.project, title: r.title, above: r.id === r.project ? Infinity : r.above });
   return (id) => {
-    for (let cur: string | undefined = id, steps = 0; cur !== undefined && steps < 64; cur = up.get(cur), steps++) if (isProject.has(cur)) return isProject.get(cur);
-    return undefined;
+    const found = nearest.get(id);
+    return found && { id: found.id, title: found.title };
   };
 }

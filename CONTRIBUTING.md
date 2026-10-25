@@ -17,7 +17,17 @@ change and why. It saves you writing something that does not fit.
 A change is ready to be looked at when:
 
 - `npm test` and `npm run typecheck` pass. Both run on every pull request, on
-  Linux and Windows.
+  Linux and Windows, and the tests once more on a Postgres server. To run them
+  on one here, any Postgres 18 will do; with Docker:
+
+  ```bash
+  docker run -d --name pelago-test-pg -p 127.0.0.1:5435:5432 -e POSTGRES_USER=pelago -e POSTGRES_PASSWORD=pelago --tmpfs /var/lib/postgresql postgres:18 -c fsync=off
+  PELAGO_TEST_DATABASE_URL=postgres://pelago:pelago@127.0.0.1:5435/pelago npm test
+  ```
+
+  Each test gets a database of its own there, dropped when it ends. Through
+  Docker on Windows every query is a slow round trip, and the longest test
+  (the approvals table) can outrun its ten minutes.
 - What it changes in behaviour has a test that would fail without it.
 - What it changes in the web UI you have looked at in a browser, at 1280 and
   at 560 pixels wide.

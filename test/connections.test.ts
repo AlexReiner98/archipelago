@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { heldResources } from '../src/blocking.ts';
 import { agent, fresh, make } from './map.ts';
+import { append, verify } from '../src/log.ts';
 
 test('an exclusive resource taken by many at once has one holder', async () => {
   const l = await fresh();
@@ -48,4 +49,44 @@ test('changes at once to the same items in either order all go through', async (
   const order = (n: number) => (n % 2 ? [made.a, made.b] : [made.b, made.a]);
   const results = await Promise.allSettled([1, 2, 3, 4, 5, 6, 7, 8].map((n) => make(l, order(n).map((id) => ({ op: 'update' as const, id, props: { priority: n % 3 ? 'high' : 'low' } })))));
   assert.deepEqual(results.filter((r) => r.status === 'rejected').map((r) => String((r as PromiseRejectedResult).reason)), []);
+});
+
+test('writers at once append one chain: every position once, in time order, each entry the hash of the one before', async () => {
+  const l = await fresh();
+  const made = await make(l, [{ op: 'create', ref: 'a', type: 'work.task', title: 'A' }]);
+  await Promise.all([1, 2, 3, 4, 5].map(() => l.db.query(`select pg_sleep(0.05)`)));
+  const writes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) =>
+    n % 3 ? make(l, [{ op: 'create', type: 'work.task', title: `T${n}` }, { op: 'update', id: made.a, props: { priority: n % 2 ? 'high' : 'low' } }]) : l.change(agent, { reason: `held ${n}`, ops: [{ op: 'update', id: made.a, title: `A${n}` }] }),
+  );
+  assert.deepEqual((await Promise.allSettled(writes)).filter((r) => r.status === 'rejected').map((r) => String((r as PromiseRejectedResult).reason)), []);
+  for (const stream of ['facts', 'pending'] as const) {
+    const v = await verify(l.db, stream);
+    assert.deepEqual(v.problems, [], `the ${stream} stream verifies`);
+    const { rows } = await l.db.query<{ pos: number; at: string }>(`select pos::int as pos, at from log_entry where stream = $1 order by pos`, [stream]);
+    assert.deepEqual(rows.map((r) => r.pos), rows.map((_, i) => i + 1), 'no position twice, none missing');
+    assert.ok(rows.every((r, i) => !i || new Date(r.at) >= new Date(rows[i - 1].at)), 'time never goes back');
+  }
+  assert.equal((await verify(l.db)).entries, 1 + 7);
+  assert.equal((await verify(l.db, 'pending')).entries, 3);
+});
+
+test('an append waits for the stream’s lock while another holds it, and follows it', async () => {
+  const l = await fresh();
+  let open!: () => void;
+  const gate = new Promise<void>((r) => (open = r));
+  const first = l.db.transaction(async (tx) => {
+    await append(tx, 'default', 'facts', { id: 'c_first', actor: { id: 'human:test' }, reason: 'first' }, []);
+    await gate;
+  });
+  await new Promise((r) => setTimeout(r, 100));
+  let second = false;
+  const after = l.db.transaction((tx) => append(tx, 'default', 'facts', { id: 'c_second', actor: { id: 'human:test' }, reason: 'second' }, [])).then(() => (second = true));
+  await new Promise((r) => setTimeout(r, 300));
+  const waited = !second;
+  open();
+  await Promise.all([first, after]);
+  assert.ok(waited, 'the second append waited for the first to commit');
+  const { rows } = await l.db.query<{ id: string; pos: number }>(`select id, pos::int as pos from log_entry order by pos`);
+  assert.deepEqual(rows, [{ id: 'c_first', pos: 1 }, { id: 'c_second', pos: 2 }]);
+  assert.deepEqual((await verify(l.db)).problems, []);
 });

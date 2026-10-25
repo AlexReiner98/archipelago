@@ -34,7 +34,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
       return;
     case 'undo': {
       const { rows } = await l.db.query<{ target_id: string | null }>(`select distinct case when left(f.id, 2) = 'r_' then coalesce(f.value->>1, (select p.value->>1 from log_fact p where p.id = f.id and p.field = 'link' and p.op = '+' limit 1)) else f.id end as target_id
-         from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos where e.id = $1 and ((f.field = 'link' and left(f.id, 2) = 'r_') or left(f.id, 2) = 'e_')`, [input.changeset]);
+         from log_fact f join log_entry e on e.stream = f.stream and e.at = f.at and e.pos = f.pos where e.id = $1 and ((f.field = 'link' and left(f.id, 2) = 'r_') or left(f.id, 2) = 'e_')`, [input.changeset]);
       for (const row of rows) if (row.target_id) await mustBeIn(row.target_id, 'undo a change to it');
       return;
     }

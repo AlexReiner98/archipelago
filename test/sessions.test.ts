@@ -205,13 +205,13 @@ test('a session that finishes says where the repository\'s open work stands', as
   await l.db.query(`update entity set updated_at = now() - interval '20 days' where id = $1`, [made.live]);
   const old = await attend(l, { reasons: ['stale'], within: made.repo });
   assert.deepEqual(old.items.map((i: any) => [i.title, i.reasons[0].days]).sort(), [['Capture probe', 20], ['Tune the solver', 40]]);
-  assert.equal((await attend(l, { reasons: ['stale'], stale_days: 30 })).items.length, 1, 'only those older than asked for');
+  assert.equal((await attend(l, { reasons: ['stale'], stale_days: 30, within: made.repo })).items.length, 1, 'only those older than asked for');
   const told = await hookSessionStart(l, { session_id: 'r0', cwd: 'C:\\code\\Apex' });
   assert.match(told, /Capture probe \(e_\w+\), not confirmed for 20 days/);
   assert.doesNotMatch(told, /Write unit tests.*not confirmed/);
   // Saying it is still true takes it off the list.
   await make(l, [{ op: 'update', id: made.gated }]);
-  assert.deepEqual((await attend(l, { reasons: ['stale'] })).items.map((i: any) => i.title), ['Capture probe']);
+  assert.deepEqual((await attend(l, { reasons: ['stale'], within: made.repo })).items.map((i: any) => i.title), ['Capture probe']);
   await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r0', outcome: 'cancelled' });
 
   // A scheduled re-check asks what is due: a project says how often, weekly when it does not.
@@ -279,11 +279,11 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   ]);
 
   // It is blocked, by the person; it needs them though it is not theirs; and its owner is waiting on them.
-  const offline = (await attend(l, {})).items.find((b: any) => b.id === made.offline);
+  const offline = (await attend(l, { within: made.repo })).items.find((b: any) => b.id === made.offline);
   assert.deepEqual(offline.reasons.map((r: any) => [r.why, r.who ?? r.by]), [['waits_on', 'Owner'], ['blocked', ['Owner']]]);
   assert.deepEqual((await attend(l, { person: 'me', reasons: ['waits_on'] })).items.map((e: any) => e.title), ['Write unit tests']);
   assert.deepEqual((await attend(l, { person: sam, reasons: ['blocked'] })).items.map((r: any) => r.reasons[0].by), [['Owner']]);
-  assert.ok(!(await attend(l, { reasons: ['ready'] })).items.some((t: any) => t.id === made.offline), 'what waits on a person is not ready');
+  assert.ok(!(await attend(l, { reasons: ['ready'], within: made.repo })).items.some((t: any) => t.id === made.offline), 'what waits on a person is not ready');
   const work = (await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
   assert.deepEqual(work.blocked.find((b: any) => b.id === made.offline).waiting_on, ['Owner']);
 

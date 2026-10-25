@@ -60,6 +60,36 @@ test('every projection made again from the log is the live one', async () => {
   assert.deepEqual(replay.items, live.items, 'every item, row for row');
   assert.deepEqual(replay.links, live.links, 'every link, row for row');
   assert.deepEqual(replay.queue, live.queue, 'every held change, and what became of it');
+  assert.deepEqual(replay.closure, live.closure, 'what is inside what, all the way down');
+  assert.deepEqual(replay.mentions, live.mentions, 'what names what');
+});
+
+test('what is inside what, all the way down, follows every link made, ended and moved, and is read by index', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'top', type: 'work.project', title: 'Top' },
+    { op: 'create', ref: 'mid', type: 'work.project', title: 'Middle' },
+    { op: 'create', ref: 'other', type: 'work.project', title: 'Other' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'A', body: 'See {mid} first.' },
+    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'link', type: 'part_of', from: 'mid', to: 'top' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'mid' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'a' },
+  ]);
+  const above = async (id: string) => (await l.db.query<{ ancestor: string }>(`select ancestor from part_closure where descendant = $1 order by ancestor`, [id])).rows.map((r) => r.ancestor);
+  assert.deepEqual(await above(made.b), [made.a, made.mid, made.top].sort(), 'held at every depth');
+  assert.deepEqual((await l.get(made.mid)).mentioned_in.map((m) => m.id), [made.a], 'what names it, by the mention projection');
+  // Moved: the middle leaves the top for another, and everything below it goes with it.
+  const link = ((await l.get(made.mid)).outgoing as { type: string; id: string; relation: string }[]).find((o) => o.type === 'part_of')!;
+  await make(l, [{ op: 'unlink', relation: link.relation }, { op: 'link', type: 'part_of', from: made.mid, to: made.other }]);
+  assert.deepEqual(await above(made.b), [made.a, made.mid, made.other].sort());
+  // Held twice, it keeps the other way up when one ends.
+  await make(l, [{ op: 'link', type: 'part_of', from: made.a, to: made.top }]);
+  const twice = ((await l.get(made.a)).outgoing as { type: string; id: string; relation: string }[]).find((o) => o.type === 'part_of' && o.id === made.mid)!;
+  await make(l, [{ op: 'unlink', relation: twice.relation }]);
+  assert.deepEqual(await above(made.b), [made.a, made.top].sort());
+  const { live, replay } = await replayed(l);
+  assert.deepEqual(replay.closure, live.closure);
 });
 
 test('what a change set did is read from the log, not kept a second time as events', async () => {

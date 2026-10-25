@@ -54,6 +54,25 @@ It is written in bulk, not through `change`: the write path stamps every row wit
 
 Before merging any change to the log, the schema, the write path or a heavy view, and once a week while the Rework is under way, on both databases, with the results recorded on the scale benchmark's task on the map. The numbers taken on 24 Oct 2026, before the log became the source of truth, are the baseline there.
 
+## The log itself
+
+`gen-map.ts` writes today's tables, not the log, so `scripts/bench-log.ts` lays down a fact stream of its own: a million change sets (`--entries`) over three years, chained and hashed, then times through `src/log.ts` what the log is read and written for: the head, an as-of value at a past position, a change set by id, a page from a past position, a week a year back, an item's history, the activity log newest first and since a day or a month, appends of 1, 5 and 15 facts, and verifying the chain.
+
+```bash
+node scripts/bench-log.ts --entries 1000000 --runs 30
+node scripts/bench-log.ts --entries 1000000 --url postgres://postgres:bench@127.0.0.1:5434/pelago_bench_log --fresh
+```
+
+It runs against whatever schema the checkout has, so the same command run in two checkouts compares them; opening a map an older checkout laid down applies the new steps, and the time that took is in the results (`opened_ms`). `--unit month` lays a partitioned log down a month a partition instead of a year, to compare the two. A million entries take three minutes to lay down on PGlite and about 1.2 GB.
+
 ## When the log lands
 
 The bench reads and writes only through `/agent` tools, so it runs against the log as it is. The generator is the one part that knows the tables: it writes rows of `entity`, `relation`, `event` and `proposal` in `flush`. When the log is the truth, that becomes appending the same change sets in the log's format and letting the projections be rebuilt from it, which is itself worth timing.
+
+## Rebuilds and snapshots
+
+```bash
+npm run bench:rebuild -- --events 300000
+```
+
+`scripts/bench-rebuild.ts` generates a map with `gen-map.ts`, writes the log for its rows (one change set per item and per link, through `append`), then times a walk of the whole log into a snapshot, a rebuild from the start swapped in, a rebuild from that snapshot after `--more` change sets, an as-of read halfway and after the snapshot, and a backup (format 3: snapshot and log) dumped and restored. It works in a temporary folder it deletes. The numbers are on the snapshots task on the map.

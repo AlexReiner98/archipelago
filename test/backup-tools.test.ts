@@ -4,8 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { dump, parseBackup, parseVault, restore, restoreTo } from '../src/backup.ts';
-import { openTables } from '../src/backup-seal.ts';
+import { dump, parseBackup, parseVault, readable, restore, restoreTo } from '../src/backup.ts';
 import { dumpVault, rewrap } from '../src/vault.ts';
 import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
@@ -41,7 +40,7 @@ test('the owner downloads the whole map by a link that works once', async () => 
   const made = (await callTool(l, owner, 'backup_download', {})) as Made;
   assert.match(made.path, new RegExp(`^/backup-file/${l.workspace}/`), 'the link names its workspace, so any server can give it');
   const file = (await fetched(l, made))!;
-  assert.ok((await openTables(l.db, parseBackup(file.file).tables)).tables.entity.some((e) => e.title === 'Kept in the file'));
+  assert.ok((await readable(l.db, parseBackup(file.file))).tables.entity.some((e) => e.title === 'Kept in the file'));
   // Its keys come by a link of their own, wrapped under a key only the answer holds: opened with it, the copy reads anywhere.
   const sent = parseVault(takeFile(await takeBackup(l.db, (made as Made & { vault_path: string }).vault_path.split('/').at(-1)!)));
   const there = await openDb();
@@ -88,7 +87,7 @@ test('a backup is restored from the command line into a new folder, and never ov
   const dir = mkdtempSync(join(tmpdir(), 'pelago-restore-'));
   try {
     const done = await restoreTo(taken, join(dir, 'data'));
-    assert.equal(done.counts.entity, taken.tables.entity.length);
+    assert.equal(done.counts.entity, (await readable(l.db, taken)).tables.entity.length);
     await assert.rejects(restoreTo(taken, join(dir, 'data')), /already exists/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
