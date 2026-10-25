@@ -1,8 +1,8 @@
 // The shape of the code, checked. Files stay small; the kernel names no pack; writes to items and
 // relations go through one path; a pack reaches the kernel only through what it is handed; a pack's
 // code is tested without a database; kernel modules import one way; the UI loads as modules; and
-// there are five dependencies; every picture is a drawing a pack ships; and every view the kernel answers is a
-// lens preset or named as operational.
+// there are four dependencies; every picture is a drawing a pack ships; every view the kernel answers is a
+// lens preset or named as operational; the page calls no more tools than it did; and the canvas draws no depth.
 //
 // Each rule keeps a list of what already broke it when the rule was made (16 Oct 2026). An entry
 // may only shrink, and goes once the rule is met: when you bring a number down, lower it here.
@@ -333,4 +333,36 @@ test('no read of the whole map', () => {
   assert.deepEqual(named, [], 'A read names an index the schema makes.');
   const counted = Object.fromEntries(files.map((f) => [f, queries(read(f)).filter((q) => !BOUND.test(q)).length]).filter(([, n]) => (n as number) > 0));
   assert.deepEqual(ratchet(counted, WHOLE_READS), [], 'Bound the read: by an id, a subtree (part_closure), a person, a time or a limit; or name the index it goes by (-- index <name>).');
+});
+
+// 16. The page's surface is the agents' (the flat canvas, 25 Oct 2026; docs/canvas.md): a canvas is read as a lens
+// (`view`), kept current from the log (`tail`) and written through `change`, the tools an agent calls. Every other tool
+// the page calls through /api is one more way in that an agent does not share, so the names it calls are frozen as
+// they stood on 25 Oct 2026, and may only go: a name the page stops calling comes off this list. A tool a pack's
+// screen names (ui/screens.js calls it by the name its pack declares) is the pack's, and is not counted.
+const PAGE_CALLS = [
+  'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'github', 'import_backup', 'init',
+  'launch', 'member_add', 'member_list', 'member_set', 'model_account', 'pack_set', 'packs', 'picture', 'places',
+  'places_put', 'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
+  'session_end', 'share_create', 'share_figure', 'share_list', 'share_revoke', 'share_workspace', 'tail',
+  'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',
+  'token_request_answer', 'token_requests', 'token_revoke', 'unpublish', 'view', 'workspace_info', 'workspace_set',
+];
+
+test('the page calls no more tools through /api than it did', () => {
+  const files = walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f));
+  const called = new Set(files.flatMap((f) => [...read(f).matchAll(/\bapi\(\s*['"`]([a-z_]+)['"`]/g)].map((m) => m[1])));
+  const counted = Object.fromEntries([...called].map((name) => [name, 1]));
+  assert.deepEqual(ratchet(counted, Object.fromEntries(PAGE_CALLS.map((name) => [name, 1]))), [], 'Read through a lens (view), keep it current with tail, write through change: what an agent calls.');
+});
+
+// 17. Depth is never drawn on the canvas (decision e_ktdensts): the flat lens answers items and links with nothing of
+// what is inside what, and the canvas asks for no nesting of its picture (flatView's `nest` is for a kept view drawn in
+// a document or a screen). Places never carry meaning (decision e_n2825x2w): the places stream is read in one module,
+// to hand a drawing where things were put, and no lens, rule or view reads it.
+test('the canvas draws no depth, and places are read only to draw', () => {
+  assert.doesNotMatch(read('ui/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
+  assert.doesNotMatch(read('src/lens-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
+  const readers = walk('src').filter((f) => f.endsWith('.ts') && /readOps\([^)]*'places'/.test(read(f)));
+  assert.deepEqual(readers, ['src/canvas-places.ts'], 'Where a person put a thing is read only to draw it there (src/canvas-places.ts); grouping that matters is a link.');
 });
