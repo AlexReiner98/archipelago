@@ -109,7 +109,33 @@ export function flowCases(): DrawingCase[] {
     cases.push({ name: `${name}, narrow`, answer, style: { ...style, noLit: true }, width: 560 });
     cases.push({ name: `${name}, still`, answer, style: { ...style, noLit: true, still: true }, width: 900 });
   }
+  // The same answers as the flat lens sends them (src/lens-flat.ts), as the canvas draws them, at 1280 and 560 px.
+  for (const [name, answer] of Object.entries(answers)) {
+    const flat = flatAnswer(answer);
+    cases.push({ name: `${name}, flat, wide`, answer: flat, style: { ...style, noLit: true }, width: 1280 });
+    cases.push({ name: `${name}, flat, narrow`, answer: flat, style: { ...style, noLit: true }, width: 560 });
+  }
   return cases;
+}
+
+/**
+ * An older lens's answer as the flat lens sends the same items (src/lens-flat.ts): each item its head, the start of
+ * its note and its shown fields, with no inside, place, state or within; each link with its type, what an item was
+ * inside a part_of link.
+ */
+export function flatAnswer(answer: any) {
+  const at = '2026-10-25T12:00:00.000Z';
+  const items = answer.items.map((i: any, k: number) => ({
+    id: i.id, kind: i.kind, type: i.type, title: i.title,
+    ...(k % 2 === 0 && { body: `${i.title} is one of the things this map holds.\n\nIts note goes on, in a section of its own that a tip does not show.` }),
+    visibility: 'shared', status: i.status, open: i.open, owner: null, created_at: at, updated_at: at,
+    ...(i.choices && { fields: { choices: i.choices } }),
+  }));
+  const links = [
+    ...answer.links.map((l: any, k: number) => ({ id: `r_flat${String(k).padStart(4, '0')}`, type: l.kind, from: l.from, to: l.to, ...(l.says && { props: { says: l.says } }) })),
+    ...answer.items.filter((i: any) => i.inside).map((i: any, k: number) => ({ id: `r_part${String(k).padStart(4, '0')}`, type: 'part_of', from: i.id, to: i.inside })),
+  ];
+  return { lens: { filter: { ids: [answer.lens.from] }, walk: { over: ['part_of', 'depends_on'], steps: 2 }, limit: 500 }, items, links };
 }
 
 /** A big system: 12 places of 16 parts, each calling three in the next place. */

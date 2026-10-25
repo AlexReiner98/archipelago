@@ -2,7 +2,8 @@
 // live, still at right angles. Where things were put on this canvas is the style's `placed`, by item: the page reads it
 // from the places stream beside the lens and keeps what was moved here in it, with `moved` over it when given. A wire
 // to a step that was put by hand leaves the foot of the step it comes from and comes down into the head of the one it
-// goes to, round both when the second is not below the first. Pure: positions in, points out.
+// goes to, round both when the second is not below the first. A tie is a straight line between two edges. Pure:
+// positions in, points out.
 
 /** Where each step of this picture was put by hand: the middle of each, by item. */
 export function placesOf(answer, style) {
@@ -36,11 +37,13 @@ export function route(a, b, lead, others = []) {
   return best(columns, (cx) => [[ax, ay], [ax, ay + lead], [cx, ay + lead], [cx, by - lead], [bx, by - lead], [bx, by]]);
 }
 
-/** The picture's size once steps may be anywhere (never above or left of its corner: the page keeps them there). */
-export function sizeOf(g, margin) {
-  const steps = g.all.filter((n) => !n.dummy);
-  return {
-    width: Math.max(g.width, ...steps.map((n) => g.x.get(n.id) + n.w / 2 + margin)),
-    height: Math.max(g.height, ...steps.map((n) => g.y.get(n.id) + n.h / 2 + margin)),
+/** A tie (part_of, or any link that is not the order): straight, from the edge of a to the edge of b, toward each other's middle. */
+export function tieLine(a, b) {
+  const [dx, dy] = [b.x - a.x, b.y - a.y];
+  if (!dx && !dy) return [[a.x, a.y], [b.x, b.y]];
+  const edge = (box, sx, sy) => {
+    const t = Math.min(sx ? box.w / 2 / Math.abs(sx) : Infinity, sy ? box.h / 2 / Math.abs(sy) : Infinity);
+    return [box.x + sx * t, box.y + sy * t];
   };
+  return [edge(a, dx, dy), edge(b, -dx, -dy)];
 }
