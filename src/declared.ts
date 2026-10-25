@@ -89,16 +89,16 @@ export interface ViewDef {
   /** rows: one-line rows the kernel draws, each with an item; data: for agents only. */
   shape: 'rows' | 'data';
   limit_ms?: number;
-  /** A view the kernel answers, never the pack's code: by the read its answer names (src/lens-presets.ts), with these fields (the brief's links, over; the old lens's view, its fields under what is asked). */
+  /** A view the kernel answers, never the pack's code: by the read its answer names (src/lens-presets.ts), with these fields (the brief's links, over). */
   lens?: Record<string, unknown>;
-  /** With lens: which read answers it (one of LENS_ANSWERS); the old lens, for the page, when left out. */
+  /** With lens: which read answers it (one of LENS_ANSWERS); the flat lens when left out. */
   answer?: string;
   /** With lens: for a param, the lens fields each of its values stands for. */
   choices?: Record<string, Record<string, Record<string, unknown>>>;
 }
 
 /** The reads a view the kernel answers may name, each kept to the form its view had (src/lens-presets.ts). */
-export const LENS_ANSWERS = ['lens', 'flat', 'graph', 'tree', 'hubs', 'attention', 'brief'] as const;
+export const LENS_ANSWERS = ['flat', 'graph', 'tree', 'hubs', 'attention', 'brief'] as const;
 
 /**
  * A tree a pack declares over "is part of": a roadmap, for one. The `tree`
@@ -133,8 +133,10 @@ export interface PieceDef {
   action?: string;
   /** For a short note: what it says. */
   text?: string;
-  /** For a picture: a lens's id, or the params of the lens view. From the item the page is of, unless it says. */
+  /** For a picture: a kept view's id, or a flat lens ({ filter, walk, limit }, as query flat takes it), where "{here}" in its ids or link terms is the item the page is of. */
   lens?: string | Record<string, unknown>;
+  /** For a picture: the types it draws of what its lens finds (flavours included); all of it when left out. */
+  only?: string[];
   /** For a picture: a style's id, or its fields (code aside: code runs only from a style kept on the map). */
   style?: string | Record<string, unknown>;
   /** For fields: the item's fields shown, in order. */
@@ -278,6 +280,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (piece.action && !parts(pack).actions.some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
       if (piece.page && !PAGES.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}`);
       for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
+      if (piece.lens && typeof piece.lens === 'object' && (typeof piece.lens.filter !== 'object' || !piece.lens.filter)) problems.push(`${at}: a view piece's lens is a flat lens: { filter, walk, limit }`);
       if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a view's style has no code: code runs only from a style kept on the map`);
     }
   }

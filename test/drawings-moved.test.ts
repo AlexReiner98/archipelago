@@ -16,10 +16,10 @@ const browser = chrome();
 const fixture = (name: string) => join(import.meta.dirname, 'fixtures', 'drawings', `${name}.kernel.${process.platform}.json`);
 
 /** The drawing a picture kept in this shape is sent, and what it draws of each case, captured in the page. */
-async function drawn(shape: string, cases: DrawingCase[], lens: Record<string, unknown> = {}) {
+async function drawn(shape: string, cases: DrawingCase[]) {
   const { call, base } = await serve('off');
-  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'p', type: 'work.project', title: 'A plan' }, { op: 'create', ref: 'l', type: 'lens', title: `As ${shape}`, status: 'current', props: lens }, { op: 'link', type: 'about', from: 'l', to: 'p' }, { op: 'create', ref: 's', type: 'style', title: shape, status: 'current', props: { shape } }, { op: 'link', type: 'about', from: 's', to: 'l' }] })).result.created;
-  const { drawing } = (await call('/api/view', undefined, { name: 'lens', params: { from: made.p, lens: made.l } })).result.style;
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'style', title: shape, status: 'current', props: { shape } }] })).result.created;
+  const { drawing } = (await call('/api/view', undefined, { name: 'style', params: { style: made.s, have: [] } })).result.style;
   assert.equal(drawing.id, `core.${shape}`);
   const page = await open(`${base}/`);
   try {
@@ -64,5 +64,5 @@ test('in a browser, the grid drawing draws what the kernel drew: the same cards,
 test('in a browser, the time drawing draws what the kernel drew: the same days, hours, lanes, blocks, places and looks', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   // A colour and the key are classes; a block opens its item through the drawing, so it is not a tab stop of its own;
   // and the kernel left the word "false" after its last hour line, as text an SVG does not draw.
-  same(await drawn('time', timeCases(), { time: { from: '2026-11-02', to: '2026-11-08' } }), fixture('time'), /^t-(key|hued|h-)/, [], (text) => text.replaceAll(' tabindex="0"', '').replaceAll('></line>false<', '></line><'));
+  same(await drawn('time', timeCases()), fixture('time'), /^t-(key|hued|h-)/, [], (text) => text.replaceAll(' tabindex="0"', '').replaceAll('></line>false<', '></line><'));
 });

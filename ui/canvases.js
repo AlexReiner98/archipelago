@@ -1,16 +1,15 @@
-// Saved canvases (task e_uq77ps44): a flat lens and a style kept on the map as an item of core's `canvas` type, so a
+// Saved canvases (task e_uq77ps44): a flat lens and a style kept on the map as an item of core's `lens` type, so a
 // person opens it anywhere and it draws the same. Its id travels in the address beside the lens (`canvas=`, ui/lens.js),
 // so what is moved on it goes to its own places (the places stream, under its id, apart from the map's) and the bar
 // names it. The bar switches between them and keeps what is up as one; Home lists them, one line each.
-//
-// The views kept before the flat lens (items of type `lens`) stay as they were, read by the old lens; Home offers
-// each whose fields say a filter (an item it is drawn from, or types) to be kept as a canvas, translated once.
+// The views kept before the flat lens were translated into such canvases when the workspace opened
+// (src/lens-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
 
 import { api, ask, h, tell } from './base.js';
-import { flatQuery } from './lens.js';
-import { typeTitle } from './words.js';
+import { flatQuery, flatView } from './lens.js';
+import { isA, typeTitle } from './words.js';
 
-const TYPE = 'canvas';
+const TYPE = 'lens';
 /** The saved canvases, pinned first, then by name: so a switch keeps its order as they change. */
 let known = null;
 export function savedCanvases(fresh = false) {
@@ -37,9 +36,36 @@ export const canvasAt = (id) => `#/v?canvas=${id}`;
 /** Open a saved canvas named with no lens beside it: its lens and style put in the address, in place of the one asked. */
 export async function openCanvas(id) {
   const got = await api('get', { id }).catch(() => null);
-  if (!got || got.entity.type !== TYPE) return void location.replace('#/');
+  if (!got || !isA(got.entity.type, TYPE)) return void location.replace('#/');
   const { lens, style } = canvasLens(got.entity);
   location.replace(`#/v?${flatQuery(lens, style)}`);
+}
+
+/**
+ * A saved canvas drawn where something brings it in (a document's section, a screen's piece): its lens and style read
+ * from the map, drawn with the style of what it is about.
+ */
+export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
+  const host = h('div', { class: 'lens-wrap' }, h('div', { class: 'empty' }, 'Loading…'));
+  host.ready = api('get', { id })
+    .then((got) => {
+      const kept = canvasLens(got.entity);
+      const of = got.outgoing.find((o) => o.type === 'about')?.id;
+      // Its steps are played by a drawing that knows them, with what they name drawn too.
+      const steps = Array.isArray(got.entity.props?.steps) ? got.entity.props.steps : undefined;
+      const told = (steps ?? []).flatMap((s) => [...(s.add ?? []), ...(s.remove ?? []), ...Object.keys(s.titles ?? {}), ...Object.keys(s.fields ?? {}), ...Object.keys(s.flag ?? {})]);
+      if (told.length) kept.lens.filter.ids = [...new Set([...(kept.lens.filter.ids ?? []), ...told])];
+      // It starts from what it is about, where it draws that; else from the one item it names.
+      const ids = kept.lens.filter.ids ?? [];
+      const from = ids.includes(of) ? of : ids.length === 1 ? ids[0] : true;
+      const view = flatView({ lens: kept.lens, style: { ...kept.style, ...style }, of, key, nest: from, ...(steps && { extra: { steps } }) });
+      Object.defineProperty(host, 'answer', { get: () => view.answer, configurable: true });
+      host.mark = (here) => view.mark(here);
+      host.replaceChildren(view);
+      return view.ready;
+    })
+    .catch((err) => host.replaceChildren(h('div', { class: 'error' }, err.message)));
+  return host;
 }
 
 /** The style a canvas keeps: how it is drawn, not which canvas it is. */
@@ -112,45 +138,20 @@ const row = (c, now) =>
     c.id === now && h('span', { class: 'pill ok', title: 'The canvas up now' }, 'up'),
   );
 
-/** A view kept before the flat lens, as a canvas: what it is drawn from (or the types it keeps), its links walked. Null when its fields say no filter. */
-export function fromOldView(item, of) {
-  const x = item.props ?? {};
-  const ids = [x.from ?? of?.id].filter(Boolean);
-  const kinds = Array.isArray(x.kinds) ? x.kinds : [];
-  // Types said of a view from an item kept what was in it; in a flat filter they would add every such item, so they go.
-  const types = ids.length ? [] : kinds.filter((k) => !k.startsWith('-'));
-  if (!ids.length && !types.length) return null;
-  const exclude = [...new Set(['system', ...(Array.isArray(x.fold) ? x.fold.filter((f) => f === 'closed') : []), ...kinds.filter((k) => k.startsWith('-')).map((k) => k.slice(1))])];
-  const over = x.over === 'all' ? 'all' : [...new Set([...(ids.length ? [x.by ?? 'part_of'] : []), ...(Array.isArray(x.over) ? x.over : [])])];
-  const steps = over === 'all' || over.length ? Math.min(Math.max(Number(x.far) || 1, 1), 6) : 0;
-  return { filter: { ...(ids.length && { ids }), ...(types.length && { types }), exclude }, walk: { over, steps } };
-}
-
-/** Keep an old view as a canvas, under its name, and open it. */
-async function keepOld(p) {
-  const got = await api('get', { id: p.lens }).catch(() => null);
-  const lens = got && fromOldView(got.entity, p.of);
-  if (!lens) return tell('Not kept', 'Its fields say nothing a flat lens can find.');
-  const made = await api('change', { ops: [{ op: 'create', ref: 'canvas', type: TYPE, title: p.title.slice(0, 60), props: { ...lens, style: p.shape ? { shape: p.shape } : {} } }], reason: `Kept the view “${p.title}” as a canvas` });
-  savedCanvases(true);
-  if (made.created?.canvas) location.hash = canvasAt(made.created.canvas);
-}
-
-/** Home's list: every saved canvas, then, folded, the views from before that can be kept as one. */
+/** Home's list: every saved canvas of the workspace, then, folded, those kept as views of an item. */
 export async function canvasesPiece(host, title) {
-  const [all, old] = await Promise.all([savedCanvases(true), api('view', { name: 'saved_views' }).catch(() => null)]);
+  const [all, kept] = await Promise.all([savedCanvases(true), api('view', { name: 'saved_views' }).catch(() => null)]);
   if (!host.isConnected) return;
   const now = up;
-  const names = new Set(all.map((c) => c.title.toLowerCase()));
-  const offered = (old?.pictures ?? []).filter((p) => !names.has(p.title.toLowerCase()));
-  const oldRow = (p) => h('li', { class: 'row-top nowrap-row' }, h('span', { class: 'gist', title: p.title }, p.title), h('button', { class: 'quiet-button', title: 'Keep it as a saved canvas: what it is drawn from, its links walked', onclick: () => keepOld(p) }, 'Keep'));
+  const ofItem = new Set((kept?.pictures ?? []).filter((p) => p.of && !p.pinned).map((p) => p.lens));
+  const [own, items] = [all.filter((c) => !ofItem.has(c.id)), all.filter((c) => ofItem.has(c.id))];
   host.replaceChildren(
     h(
       'section',
       { class: 'card wide canvases', style: 'margin-bottom: var(--space-8); min-width: 0' },
       h('header', {}, h('h2', {}, title)),
-      all.length ? h('ul', { class: 'rows' }, all.map((c) => row(c, now))) : h('div', { class: 'empty', title: '☆ in the bar keeps what is up as one' }, 'None saved yet.'),
-      offered.length > 0 && h('details', { class: 'old-views' }, h('summary', { class: 'muted small', title: 'Views kept before the canvas: each can be kept as a saved canvas' }, `Views from before (${offered.length})`), h('ul', { class: 'rows' }, offered.map(oldRow))),
+      own.length ? h('ul', { class: 'rows' }, own.map((c) => row(c, now))) : h('div', { class: 'empty', title: '☆ in the bar keeps what is up as one' }, 'None saved yet.'),
+      items.length > 0 && h('details', { class: 'old-views' }, h('summary', { class: 'muted small', title: 'Canvases kept as views of one item' }, `Views of items (${items.length})`), h('ul', { class: 'rows' }, items.map((c) => row(c, now)))),
     ),
   );
 }

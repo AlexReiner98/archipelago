@@ -96,7 +96,7 @@ your next message, what you did since it last heard (the `UserPromptSubmit`
 hook the setup writes into `.claude/settings.json`).
 
 **Views.** An item's page draws it among what it is tied to. What a
-view holds is a `lens` (which kinds, how far, along which links) and how
+view holds is a `lens` (a filter, a walk along links and a limit) and how
 it looks is a `style`; both are items on the map, so a project can keep views
 of its own, each named for the question it answers. A style may carry its own
 drawing code, which runs in a sandboxed worker with no page and no network
@@ -266,7 +266,7 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 | `questions` | What is still to be decided in a project? |
 | `gate` | What does a release wait for, and what can follow it? |
 | `tree` | A project's roadmap |
-| `lens` | What is in a view |
+| `flat` | What is in a view: the flat lens |
 | `to_confirm` | What did agents settle that I have not confirmed? |
 | `oldest` | What has gone longest without being checked? |
 | `costs` | What does the work cost? |
@@ -282,14 +282,13 @@ in its pack file (`views`): one with `lens` is answered by a read of the
 kernel's that its `answer` names (`src/lens-presets.ts`), in the form that view
 has always had; any other is answered by the pack's own code. The core pack's
 are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`), `tree`
-(`src/view-tree.ts`) and `hubs`, each read on its own, and `lens`, the page's
-picture, which the old lens (`src/lens.ts`) answers until the page reads the
-flat lens. `gate` is the software pack's, and reads around its event (the pack
+(`src/view-tree.ts`) and `hubs`, each read on its own. A view kept on the map
+(an item of type `lens`, a saved canvas on the page) is a flat lens and a
+style (`src/lens-saved.ts`): a document draws it where a line names it, and
+publishing freezes its picture. `gate` is the software pack's, and reads around its event (the pack
 read `around`). No view reads the whole map: a read around an item reads only
 what is around it (`src/region.ts`), so what it costs follows what it answers;
-the page's picture of the whole map reads the kinds it names (`kinds`), by the
-index on type, and opens on the map's top, its
-projects, when it names none. `attention` reads what is a person's
+the flat lens refuses a filter that includes nothing. `attention` reads what is a person's
 (`person`) or inside an item (`within`); for everyone, only `to_confirm`,
 from the log. `hubs` read within an item (`within`). A `graph` with no
 focus is drawn from the newest links of each kind. What is inside what, all

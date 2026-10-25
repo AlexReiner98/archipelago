@@ -51,7 +51,7 @@ refused unless its field is declared `"large": true`, which only a type of the
 system kind may do: a drawing's code, a story's steps, a stylesheet.
 
 **view.** A named way of looking at part of the map: a **lens** (what is in
-it: which kinds, from where, how far, along which links; `src/lens.ts`)
+it: a filter, a walk along links and a limit; `src/lens-flat.ts`)
 drawn in a **style** (how it looks; `src/styles.ts`). Both are items, so a
 view is kept on the map and changed like anything else. Replaces *picture*
 where a picture meant this (an *image* is a picture file, such as a test's

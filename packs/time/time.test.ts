@@ -59,7 +59,7 @@ function ctxOver(items: Item[], links: Link[], lens: unknown = { items: [] }, no
           }
           return up.map(typed);
         }
-        if (q.view === 'lens') return lens;
+        if (q.placed) return (lens as { items: unknown[] }).items;
         throw new Error(`no read ${JSON.stringify(q)}`);
       },
     },
@@ -145,7 +145,7 @@ test('the week draws the owner’s blocks, routine days and the agents’ stretc
     { id: 'plan', type: 'time.entry', title: 'Site visit', status: 'planned', props: { date: '2026-10-13', start: '2026-10-13T13:00:00Z', end: '2026-10-13T15:00:00Z' } },
   ];
   const links: Link[] = [...LINKS, { id: 'l1', type: 'software.lives_in', from: 'ar', to: 'repo' }, { id: 'l2', type: 'part_of', from: 'deep', to: 'p' }, { id: 'l3', type: 'part_of', from: 'plan', to: 'p' }, { id: 'l4', type: 'part_of', from: 'late', to: 'ar' }];
-  // What the kernel's lens answers on the time axis: a routine's days, and sessions' stretches with what each was on.
+  // What the kernel's read placed answers on the time axis: a routine's days, and sessions' stretches with what each was on.
   const lens = {
     items: [
       { id: 'deep', type: 'time.routine', title: 'Deep work', open: true, time: [{ start: '2026-10-14T13:00:00Z', end: '2026-10-14T15:00:00Z', by: 'repeat' }] },
@@ -157,8 +157,8 @@ test('the week draws the owner’s blocks, routine days and the agents’ stretc
   const { ctx, asked } = ctxOver(items, links, lens);
   const { answer: wk } = await handler['time.week']({ from: '2026-10-15' }, ctx);
   assert.deepEqual([wk.from, wk.to, wk.zone], ['2026-10-12', '2026-10-18', 'America/Toronto']);
-  const axis = asked.find((q) => q.view === 'lens') as { params: { kinds: string[]; time: { from: string; to: string } } };
-  assert.deepEqual([axis.params.kinds, axis.params.time.from, axis.params.time.to], [['time.routine', 'sys.run'], '2026-10-03', '2026-10-18'], 'the week and the two weeks before today');
+  const axis = asked.find((q) => q.placed) as { placed: { types: string[]; from: string; to: string } };
+  assert.deepEqual([axis.placed.types, axis.placed.from, axis.placed.to], [['time.routine', 'sys.run'], '2026-10-03', '2026-10-18'], 'the week and the two weeks before today');
   const wed = wk.days[2];
   assert.deepEqual(wed.owner.map((b: { what: string; from_hour: number; routine?: boolean }) => [b.what, b.from_hour, b.routine ?? false]), [['Read the program', null, false], ['Deep work', 9, true]], 'hours alone have no place in the day');
   assert.equal(wed.planned, 2, 'a routine for work is planned time');

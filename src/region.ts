@@ -2,7 +2,7 @@
 // where it starts, so what it costs follows what it answers and not the size of the map: everything inside the starts
 // (down the links that say what is inside what), what they wait on step by step, what any of those is tied to by a
 // link it may send and everything inside that, the sessions at work on it, and who owns it all. One that goes near
-// reads what it walks to, and nothing inside it. Read by the brief, by a pack's lens read, and by the old lens.
+// reads what it walks to, and nothing inside it. Read by the brief and by a pack's read around an item.
 
 import type { Archipelago } from './pelago.ts';
 

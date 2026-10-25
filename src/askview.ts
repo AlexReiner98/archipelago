@@ -30,12 +30,9 @@ export function viewList(l: Archipelago): Record<string, string> {
   return out;
 }
 
-/** The view the page draws its picture from (the old lens): not said in the tool text, since agents read the flat lens. */
-const PAGE_ONLY = new Set(['lens']);
-
 /** What the view tool says it answers: the views the core pack declares (none without a registry), the flat lens first, then the kernel's own views, then the packs'. */
 export function viewsSaid(reg?: Registry): string {
-  const core = reg ? parts(reg.packs.find((p) => p.id === 'core')!).views.filter((v) => !PAGE_ONLY.has(short(v.id))) : [];
+  const core = reg ? parts(reg.packs.find((p) => p.id === 'core')!).views : [];
   const lenses = core.map((v): [string, string] => [short(v.id), v.description]).sort(([a], [b]) => Number(b === 'flat') - Number(a === 'flat'));
   const views = [...lenses, ...Object.entries(VIEWS).map(([name, v]): [string, string] => [name, v.description])];
   return (
