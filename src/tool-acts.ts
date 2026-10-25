@@ -9,7 +9,7 @@ import { putPlaces } from './canvas-places.ts';
 import { importAudit } from './audit.ts';
 import { toConfirm } from './confirm.ts';
 import { stopLaunched } from './launcher.ts';
-import { readLens } from './lens.ts';
+import { readFlat } from './lens-flat.ts';
 import { notify } from './notify.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
@@ -33,7 +33,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   },
   show: {
     description:
-      'Point the human\'s web UI at something, so they can follow what you are doing: an item, a screen (optionally "of" one item: the graph around it, or a project\'s roadmap), or a view of the map (a lens, with a style). ' +
+      'Point the human\'s web UI at something, so they can follow what you are doing: an item, a screen (optionally "of" one item: the graph around it, or a project\'s roadmap), or what their canvas draws (a flat lens, the one query flat reads, with a style). ' +
       'Their page goes there within a couple of seconds if they have "Follow agents" on. Add a short note saying what they are looking at. ' +
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
     input: {
@@ -43,7 +43,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       lens: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('A view of the map, drawn on the graph screen for this one look: the params of the lens view (from, story, kinds, by, over, far, lanes, order, measure, fold). {} is the whole map as it opens; story: a run id draws what that session told of.'),
+        .describe('What their canvas draws: a flat lens, as query flat takes it ({ filter: { text, types, ids, links, exclude }, walk: { over, steps }, limit }), shown in their query bar as if they had written it. With entity, under that item\'s page. {} is the canvas as it opens.'),
       style: z
         .object({
           lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
@@ -56,16 +56,29 @@ export const ACT_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       if (input.lens || input.style) {
-        // Read as the lens view reads it, so a lens the page could not draw is refused here and not on the owner's screen.
-        const asked = readLens(l, input.lens ?? {});
-        if (asked.from && !(await l.entity(asked.from))) throw new Error(`No item "${asked.from}"`);
+        // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on the owner's screen.
+        const asked = (input.lens ?? {}) as { filter?: { exclude?: unknown }; limit?: unknown };
+        const lens = Object.keys(asked).length ? readFlat(l, asked) : undefined;
+        for (const id of [...(lens?.include.ids ?? []), ...(input.entity ? [input.entity] : [])]) if (!(await l.entity(id))) throw new Error(`No item "${id}"`);
+        // The address says the lens as the page reads it (ui/lens.js, readFlatLens): each term of the filter, the walk, the limit.
         const query = new URLSearchParams();
-        for (const [key, value] of Object.entries(input.lens ?? {})) if (key in asked || key === 'lens') query.set(key, Array.isArray(value) ? value.join(',') : String(value));
+        if (lens) {
+          const { text, types, ids, links } = lens.include;
+          const walked = lens.walk.over === 'all' || lens.walk.over.length > 0;
+          if (text) query.set('text', text);
+          if (types?.length) query.set('types', types.join(','));
+          if (ids?.length) query.set('ids', ids.join(','));
+          for (const t of links ?? []) query.append('link', `${t.link} ${t.to ?? t.from}`);
+          if (asked.filter?.exclude !== undefined) query.set('exclude', lens.exclude.join(','));
+          if (walked) query.set('over', lens.walk.over === 'all' ? 'all' : (lens.walk.over as string[]).join(','));
+          if (walked) query.set('steps', String(lens.walk.steps));
+          if (asked.limit !== undefined) query.set('limit', String(lens.limit));
+        }
         if (input.style?.lit) query.set('lit', input.style.lit);
         if (input.style?.shape) query.set('shape', input.style.shape);
         if (input.style?.id) query.set('style', input.style.id);
-        // The address always says it is a lens: the graph screen without one is still the old drawing.
-        return point(l, actor, 'show', `graph?${query.size ? query : 'lens'}`, input.note);
+        // Their canvas draws it, under the item's page when one is named.
+        return point(l, actor, 'show', `${input.entity ? `e/${input.entity}` : 'v'}${query.size ? `?${query}` : ''}`, input.note);
       }
       if (!input.entity && !input.screen) throw new Error('show needs "entity", "screen" or "lens".');
       return point(l, actor, 'show', input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);

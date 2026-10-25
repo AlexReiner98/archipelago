@@ -10,13 +10,14 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   const { call } = await serve('off');
   assert.match((await call('/agent/show', undefined, {})).error, /needs "entity", "screen" or "lens"/);
 
-  // A picture of the map: the lens and the style go in the address, and a lens that could not be drawn is refused here.
-  await call('/agent/show', undefined, { actor: 'robot', lens: { far: 1, over: ['depends_on'] }, style: { lit: 'blocked' } });
-  assert.equal((await call('/api/pulse')).result.focus.hash, 'graph?far=1&over=depends_on&lit=blocked');
+  // What the canvas draws: a flat lens and the style go in the address, as the page reads them, and a lens that could not be drawn is refused here.
+  await call('/agent/show', undefined, { actor: 'robot', lens: { filter: { text: 'login', links: ['waits_on me'], exclude: ['closed'] }, walk: { over: ['depends_on'], steps: 2 } }, style: { lit: 'blocked' } });
+  assert.equal((await call('/api/pulse')).result.focus.hash, 'v?text=login&link=waits_on+me&exclude=closed&over=depends_on&steps=2&lit=blocked');
   await call('/agent/show', undefined, { actor: 'robot', lens: {} });
-  assert.equal((await call('/api/pulse')).result.focus.hash, 'graph?lens', 'the whole map as it opens');
-  assert.match((await call('/agent/show', undefined, { lens: { by: 'nope' } })).error, /unknown kind of link/);
-  assert.match((await call('/agent/show', undefined, { lens: { from: 'e_nothing0' } })).error, /No item/);
+  assert.equal((await call('/api/pulse')).result.focus.hash, 'v', 'the canvas as it opens');
+  assert.match((await call('/agent/show', undefined, { lens: { filter: {} } })).error, /includes something/);
+  assert.match((await call('/agent/show', undefined, { lens: { filter: { ids: ['e_nothing0'] } } })).error, /No item/);
+  assert.match((await call('/agent/show', undefined, { lens: { filter: { text: 'x' }, walk: { over: ['nope'] } } })).error, /unknown link type/);
 
   await call('/agent/show', undefined, { actor: 'robot', screen: 'roadmap', of: 'e_x', note: 'Look here' });
   const shown = (await call('/api/pulse')).result.focus;

@@ -91,12 +91,18 @@ export async function withStyles<T extends { styles: Preset[] }>(l: Archipelago,
   };
 }
 
-/** The style a page is drawn in: of one item (its kind's, then its own), or the workspace's. What the item page and the pages that are not pictures read. */
-export async function pageStyle(l: Archipelago, input: { of?: unknown }) {
+/**
+ * The style a page is drawn in: of one item (its kind's, then its own), or the workspace's, under a style kept on the
+ * map when one is named (`style`). What the item page, the pages that are not pictures and the canvas read; asked
+ * with `have` (the drawings' hashes the page holds), with the drawing it names, as a lens answer's style is.
+ */
+export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; have?: unknown }) {
   const of = typeof input.of === 'string' ? input.of : undefined;
+  const named = typeof input.style === 'string' ? input.style : undefined;
   const item = of === undefined ? undefined : (await l.db.query<{ id: string; type: string }>('select id, type from entity where id = $1', [of])).rows[0];
   if (of !== undefined && !item) throw new Error(`No item "${of}"`);
-  return styleFor(l, await keptOf(l, 'style', undefined), item ? { hub: item } : {});
+  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(named && { named }) });
+  return input.have === undefined ? read : { ...read, style: await drawn(l, read.style, input.have) };
 }
 
 /**

@@ -4,15 +4,15 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { SignInNeeded, api, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
-import { HOME, canvasHref, mark, refreshCanvas, showCanvas } from './canvas.js';
+import { canvasHas, canvasHref, focusOn, lensNow, mark, refreshCanvas, showCanvas } from './canvas.js';
 import { mayLeave, newItem } from './draft.js';
 import { drawFind } from './find.js';
 import { home } from './home.js';
 import { entity } from './item.js';
-import { readLens } from './lens.js';
+import { readFlatLens } from './lens.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
-import { loadSchema, relations, typeChoice, types, workType } from './words.js';
+import { loadSchema, typeChoice, types, workType } from './words.js';
 import { workspace } from './workspace.js';
 
 /** The pages the sheet holds, by the name in their address. */
@@ -27,22 +27,6 @@ async function drawMarks() {
   const [held, mine] = await Promise.all([api('proposals').catch(() => []), api('view', { name: 'attention', params: { person: 'me', reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 50 } }).catch(() => ({ items: [] }))]);
   const n = held.length + mine.items.length;
   document.getElementById('marks').replaceChildren(n ? h('a', { class: `count${held.length ? ' held' : ''}`, href: '#/you', title: [held.length && `${held.length} held for your word`, mine.items.length && `${mine.items.length} your move`].filter(Boolean).join(', ') }, String(n)) : '');
-}
-
-/** The links that make an item a canvas of its own: what is in it, and what it depends on or waits on. */
-const FOCUS = ['part_of', 'depends_on', 'waits_on'];
-/**
- * Where the canvas stands for an item (one way to read: a lens from it). An item that holds things, or is tied by what
- * it depends on, is the canvas's focus, with all that around it; one tied to nothing is lit where it sits, among what
- * is beside it (in what holds it, or on Home).
- */
-async function focusOf(id) {
-  const got = await api('get', { id }).catch(() => null);
-  if (!got) return [HOME, id];
-  const root = (r) => relations.get(r.type)?.root ?? r.type;
-  const tied = got.incoming.some((r) => FOCUS.includes(root(r))) || got.outgoing.some((r) => FOCUS.includes(root(r)) && root(r) !== 'part_of');
-  const up = got.trail?.at(-1)?.id;
-  return [tied ? { from: id } : up ? { from: up } : HOME, id];
 }
 
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
@@ -66,14 +50,16 @@ async function route(pulse = false) {
   drawFind();
   drawNav();
   const params = new URLSearchParams(query);
-  // The canvas: what is up stays up when the item asked for is on it; else it moves to where the item stands.
+  // The canvas: the lens the address says (ui/query-bar.js shows it); an item's page with none keeps what is up when
+  // it draws the item, and else opens on the item. An address from before the flat lens (?in=) opens on what it names.
+  const asked = readFlatLens(params.has('in') ? `from=${params.get('in')}` : query);
   if (pulse) refreshCanvas();
-  else if (name === 'v') showCanvas(readLens(query).lens, params.get('here') ?? undefined);
+  else if (name === 'v') showCanvas(asked.lens, params.get('here') ?? undefined, asked.style);
   else if (name === 'e' && arg) {
-    const within = params.get('in');
-    if (within) showCanvas({ ...readLens(query).lens, from: within }, arg);
-    else showCanvas(...(await focusOf(arg)));
-  } else if (!SHEET[name] || !document.querySelector('#canvas .lens-wrap')) showCanvas(HOME);
+    if (asked.lens) showCanvas(asked.lens, arg, asked.style);
+    else if (lensNow() && canvasHas(arg)) mark(arg);
+    else showCanvas(focusOn(arg), arg);
+  } else if (!SHEET[name] || !document.querySelector('#canvas .lens-wrap')) showCanvas(null);
   if (name !== 'e') mark(undefined);
   // The sheet: open over the canvas for what it holds, else shut.
   const page = SHEET[name];
