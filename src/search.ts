@@ -42,6 +42,14 @@ export interface SearchInput {
   limit?: number;
 }
 
+/** How well an item (its columns unqualified, or as `e.`) matches the words in parameter `q`, the best highest: the
+ * words as typed in the title, a title that is mostly the words asked for, the words in any form in the title. What
+ * matches in its note alone comes after, by how near its title is, then the newest. The note is not ranked: parsing every note that matches
+ * cost 1.7 s for a phrase found in 8,000 items of a 416,000-item map, and the title alone 0.12 s. The flat lens's text
+ * term orders what it finds by the same. */
+export const rankSql = (q: string, e = '') =>
+  `(case when ${e}title ilike '%' || ${q} || '%' then 1 else 0 end) + similarity(${q}, ${e}title) + ts_rank(to_tsvector('english', ${e}title), websearch_to_tsquery('english', ${q}), 1)`;
+
 /** Items matching the input, best match first. `family` gives a type and the types that extend it. */
 export async function search(db: Q, family: (type: string) => string[], input: SearchInput) {
   const run = async (near: boolean) => {
@@ -54,11 +62,7 @@ export async function search(db: Q, family: (type: string) => string[], input: S
     let rank = '';
     if (input.q) {
       add(`id in (select pelago_search_ids(?, ${near}))`, input.q);
-      const q = `$${params.length}`;
-      // Best first: the words in the title count for more than in the notes,
-      // and a title that is mostly the words asked for beats a long one that mentions them.
-      const WEIGHTED = `setweight(to_tsvector('english', title), 'A') || setweight(to_tsvector('english', body), 'D')`;
-      rank = `(case when title ilike '%' || ${q} || '%' then 1 else 0 end) + similarity(${q}, title) + ts_rank(${WEIGHTED}, websearch_to_tsquery('english', ${q}), 1) desc, `;
+      rank = `${rankSql(`$${params.length}`)} desc, `;
     }
     if (input.type) add(`type = any(?::text[])`, family(input.type));
     if (input.status) add(`status = ?`, input.status);

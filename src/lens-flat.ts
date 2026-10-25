@@ -10,6 +10,7 @@
 import { SYSTEM } from './head.ts';
 import { LENS_LIMIT } from './lens.ts';
 import type { Archipelago } from './pelago.ts';
+import { rankSql } from './search.ts';
 
 /** One link term of a filter: the items that have a link of this type to `to` (or, with `from`, the items `from` links to). */
 export interface LinkTerm {
@@ -120,7 +121,19 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     const [near, far] = term.to !== undefined ? ['from_id', 'to_id'] : ['to_id', 'from_id'];
     add(await find((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), room()]));
   }
-  if (text && room() > 0) add(await find((k) => `select e.id from entity e where e.id in (select pelago_search_ids($1, false)) and ${k} order by e.updated_at desc, e.id limit $2`, [text, room()]));
+  // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
+  // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
+  // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps.
+  let matched: number | undefined;
+  if (text && room() > 0) {
+    const finding = async (near: boolean) => (await l.db.query<{ id: string; n: number }>(
+      `select e.id, count(*) over ()::int as n from entity e where e.id in (select pelago_search_ids($1, ${near})) and ${keep(3)} order by ${rankSql('$1', 'e.')} desc, e.updated_at desc, e.id limit $2`,
+      [text, room(), leftOut])).rows;
+    let rows = await finding(false);
+    if (!rows.length) rows = await finding(true);
+    matched = rows[0]?.n ?? 0;
+    add(rows.map((r) => r.id));
+  }
   if (types?.length && room() > 0) add(await find((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), room()]));
 
   // The walk: a step at a time, either way along the links named, to what the filter does not exclude. An excluded
@@ -159,5 +172,6 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     }),
     links: relations.map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
     ...(cut && { cut: true }),
+    ...(matched !== undefined && { matched }),
   };
 }

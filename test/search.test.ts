@@ -12,8 +12,8 @@ async function before(db: Q, input: { q: string; type?: string[]; limit?: number
     const TEXT = `to_tsvector('english', title || ' ' || body)`;
     const where = [near ? `word_similarity($1, title) > 0.5` : `(title ilike '%' || $1 || '%' or ${TEXT} @@ websearch_to_tsquery('english', $1))`, 'archived_at is null'];
     if (input.type) where.push(`type = any($${params.push(input.type)}::text[])`);
-    const WEIGHTED = `setweight(to_tsvector('english', title), 'A') || setweight(to_tsvector('english', body), 'D')`;
-    const rank = `(case when title ilike '%' || $1 || '%' then 1 else 0 end) + similarity($1, title) + ts_rank(${WEIGHTED}, websearch_to_tsquery('english', $1), 1) desc, `;
+    // Ranked by the title alone since 25 Oct 2026 (src/search.ts rankSql): a note is matched, not ranked.
+    const rank = `(case when title ilike '%' || $1 || '%' then 1 else 0 end) + similarity($1, title) + ts_rank(to_tsvector('english', title), websearch_to_tsquery('english', $1), 1) desc, `;
     const { rows } = await db.query<{ id: string }>(
       `select id from entity where ${where.join(' and ')} order by ${rank}updated_at desc limit $${params.push(Math.min(input.limit ?? 25, 200))}`,
       params,

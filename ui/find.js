@@ -1,52 +1,65 @@
-// Find: a bar at the foot of the canvas. What is typed is looked for in titles and notes, the best first; what is
-// found rises above the bar, one line each, and opens on the canvas where it stands. Enter adds the words to the
-// canvas's lens instead (its filter's text, in the query bar), so all that matches is drawn. / puts the cursor in it;
-// Esc takes what was found away. A type can be chosen, and anything can be looked for finished as well.
+// Find: a bar at the canvas's foot that sets the text of the canvas's lens (decision e_sdsaxxq4: search is the text
+// term of the filter). What is found becomes seeds, the walk carries on from them, and it is drawn in place with what
+// it is tied to; the query bar shows the term as a chip. Typing shows what the words would find, in one line above the
+// bar (how many, the first few names); Enter draws it; clearing the bar takes the term out. / puts the cursor in it.
+// The search is the flat lens's text term, the search read's own (src/lens-flat.ts): types and what is left out are
+// the query bar's terms, so what it would find is read under the canvas's exclusions.
 
 import { api, h, state } from './base.js';
 import { goLens, home, lensNow } from './canvas.js';
-import { chip, pill, typeChoice, workType } from './words.js';
+import { numberOf } from './lens-base.js';
+import { workType } from './words.js';
 
 const bar = document.getElementById('find');
-const found = h('ul', { class: 'found', hidden: true, role: 'listbox' });
-const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map  /', autocomplete: 'off', 'aria-label': 'Find on the map' });
-const kind = h('select', { title: 'Of one type', 'aria-label': 'Of one type' });
-const finished = h('button', { type: 'button', class: 'quiet-button', title: 'Look among what is finished too' }, 'Finished');
+const peek = h('div', { class: 'find-peek', hidden: true, role: 'status' });
+const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map  /', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Words to find: Enter draws what they find on the canvas, with what it is tied to' });
 let asked = 0;
-/** The canvas's lens with these words as its filter's text. */
-const withText = (q) => {
-  const lens = lensNow() ?? home();
-  return { ...lens, filter: { ...lens.filter, text: q } };
-};
-const drawText = (q) => (found.hidden = true, goLens(withText(q)));
 
-/** Ask for what is typed, and show what comes back. */
-async function look() {
-  const q = input.value.trim(), type = kind.value || undefined;
-  const mine = ++asked;
-  if (!q && !type) return void (found.hidden = true);
-  let rows;
-  try {
-    rows = await api('search', { q: q || undefined, type, open: finished.classList.contains('on') ? undefined : true, limit: 12 });
-  } catch (err) {
-    rows = [];
-    found.replaceChildren(h('li', { class: 'error' }, err.message));
-  }
-  if (mine !== asked) return;
-  // The app's own records are found from what they are about, unless their type is asked for.
-  if (!type) rows = rows.filter((e) => !e.type.startsWith('sys.') || e.type === 'sys.connection');
-  found.replaceChildren(
-    q && h('li', { class: 'found-draw' }, h('a', { href: '#/', title: 'Add the words to the lens: everything that matches is drawn (Enter)', onclick: (ev) => (ev.preventDefault(), drawText(q)) }, 'Draw all', h('span', { class: 'muted' }, ` that matches "${q}"`))),
-    ...(rows.length ? rows.map((e) => h('li', {}, h('a', { href: `#/e/${e.id}`, title: e.title, onclick: () => (found.hidden = true) }, chip(e.type), h('span', { class: 'gist grow' }, e.title), pill(e.type, e.status)))) : [h('li', { class: 'muted' }, 'Nothing matches.')]),
-    h('li', { class: 'found-new' }, h('a', { href: `#/new/${type ?? workType()}${q ? `?title=${encodeURIComponent(q)}` : ''}`, onclick: () => (found.hidden = true) }, `New ${type ? '' : 'item'}`.trim(), q && h('span', { class: 'muted' }, ` named "${q}"`))),
-  );
-  found.hidden = false;
+const lensUp = () => lensNow() ?? home();
+const includes = (f) => Boolean(f.text || f.types?.length || f.ids?.length || f.links?.length);
+/** Draw the canvas's lens with these words as its filter's text. */
+const drawText = (q) => (peek.hidden = true, goLens({ ...lensUp(), filter: { ...lensUp().filter, text: q } }));
+/** Take the text out of the canvas's lens; a lens left including nothing is Home (or the open item's own canvas). */
+function takeOut() {
+  peek.hidden = true;
+  const lens = lensNow();
+  if (!lens?.filter.text) return;
+  const { text, ...filter } = lens.filter;
+  if (includes(filter)) return goLens({ ...lens, filter });
+  const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(location.hash)?.[1];
+  location.hash = open ? `#/e/${open}` : '#/';
 }
 
-/** The bar, drawn once the types are known. */
+/** Ask what the words would find under the canvas's exclusions, and say it in one line. */
+async function look() {
+  const q = input.value.trim();
+  const mine = ++asked;
+  if (!q || q === lensNow()?.filter.text) return void (peek.hidden = true);
+  let said;
+  try {
+    const exclude = lensUp().filter.exclude;
+    const found = await api('view', { name: 'flat', params: { filter: { text: q, ...(exclude && { exclude }) }, limit: numberOf(state.style, 'find_peek_names') } });
+    const names = found.items.map((i) => i.title);
+    said = [
+      h('span', { class: 'count', title: 'How many the words find' }, String(found.matched ?? names.length)),
+      h('span', { class: 'gist grow', title: names.join('\n') }, names.length ? names.join(' · ') : 'Nothing matches.'),
+      names.length > 0 && h('button', { type: 'button', class: 'quiet-button', title: 'Draw what the words find on the canvas (Enter)', onclick: () => drawText(q) }, 'Draw'),
+      h('button', { type: 'button', class: 'quiet-button', title: `A new item named "${q}"`, onclick: () => ((peek.hidden = true), (location.hash = `#/new/${workType()}?title=${encodeURIComponent(q)}`)) }, 'New'),
+    ];
+  } catch (err) {
+    said = [h('span', { class: 'gist grow error', title: err.message }, err.message)];
+  }
+  if (mine !== asked) return;
+  peek.replaceChildren(...said);
+  peek.hidden = false;
+}
+
+/** The bar shows the lens's text, unless it is being written. */
+const keepUp = () => document.activeElement !== input && (input.value = lensNow()?.filter.text ?? '');
+
+/** The bar, drawn once. */
 export function drawFind() {
   if (bar.childElementCount) return;
-  kind.replaceChildren(h('option', { value: '' }, 'Any type'), ...(state.schema?.types ?? []).filter((t) => !t.dormant).map((t) => h('option', { value: t.id }, typeChoice(t))));
   let wait;
   input.addEventListener('input', (ev) => {
     // Typing here is not an edit a redraw of the page would lose.
@@ -54,19 +67,22 @@ export function drawFind() {
     clearTimeout(wait);
     wait = setTimeout(look, 160);
   });
-  kind.addEventListener('change', look);
-  finished.addEventListener('click', () => (finished.classList.toggle('on'), look()));
+  // The bar's own × (and Esc in it) empties it: the term goes out of the lens.
+  input.addEventListener('search', () => !input.value.trim() && takeOut());
   bar.addEventListener('submit', (ev) => {
     ev.preventDefault();
+    clearTimeout(wait);
     const q = input.value.trim();
-    if (q) drawText(q);
+    q ? drawText(q) : takeOut();
   });
-  bar.replaceChildren(found, h('div', { class: 'find-row' }, input, kind, finished));
+  bar.replaceChildren(peek, h('div', { class: 'find-row' }, input));
+  addEventListener('hashchange', () => setTimeout(keepUp, 0));
+  keepUp();
 }
 
 addEventListener('keydown', (ev) => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') || document.activeElement?.isContentEditable;
   if (ev.key === '/' && !typing) (ev.preventDefault(), input.focus());
-  if (ev.key === 'Escape' && !found.hidden) (found.hidden = true, input.blur());
+  if (ev.key === 'Escape' && !peek.hidden) (peek.hidden = true, input.blur());
 });
-document.addEventListener('click', (ev) => !bar.contains(ev.target) && (found.hidden = true));
+document.addEventListener('click', (ev) => !bar.contains(ev.target) && (peek.hidden = true));
