@@ -7,7 +7,7 @@ import { lastSeq, readEvents } from './eventlog.ts';
 import { listening } from './presence.ts';
 import { askView, viewList, viewsSaid } from './askview.ts';
 import { placesOn } from './canvas-places.ts';
-import { shownIn } from './lens.ts';
+import { shownIn } from './lens-saved.ts';
 import { wholeMap } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
 import { getPicture } from './pictures.ts';

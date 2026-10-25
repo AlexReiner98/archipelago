@@ -178,31 +178,9 @@
     {
       "id": "lens",
       "extends": "system",
-      "title": "Lens",
-      "description": "What is in a picture of the map. About a project or item, it is a view of that thing, named by its title: an item's page shows its views as a switch and opens on the first (place). About nothing, it is the workspace's: a view that can be chosen for any picture, and the one the whole map opens on. A field left empty is the built-in one. Read by the lens view.",
-      "statuses": { "open": ["current"], "closed": ["retired"] },
-      "fields": {
-        "place": { "type": "number", "description": "Its order among the views of the item it is about: the lowest is the one the page opens on." },
-        "pinned": { "type": "boolean", "description": "Kept in sight by the owner: shown on Home and first among saved views." },
-        "from": { "type": "string", "description": "The id of the item this view starts from, when that is not the item it is about. Such a view is a shortcut: the page shows it as a way to that item." },
-        "controls": { "type": "json", "description": "What the person looking may change on the page, as a list of: lit (what stays lit), far (how many steps down), closed (whether what is finished shows). None when not set." },
-        "kinds": { "type": "json", "description": "Types to keep, as a list: a type (flavours included) or \"work\"; with a leading \"-\", to leave out." },
-        "by": { "type": "string", "description": "The kind of link that says what is inside what, e.g. part_of." },
-        "over": { "type": "json", "description": "The kinds of link sent along as links, as a list, or \"all\"." },
-        "far": { "type": "number", "description": "How many steps down from the start." },
-        "steps": { "type": "json", "large": true, "description": "How the picture came to be, step by step, ending on the map as it is: a list of steps, each changing the one before from nothing. add and remove (lists of ids), titles and flag (by id: the title then, a word marked on it then; null takes it back), fields (by id, then by name), chapter (name, when, count: the chapter this step starts) and lines (by and text: what was said). The last step is the map as it is, whatever the steps say. What a step names is sent with the picture even when finished. A drawing that knows steps plays them; others draw the map as it is." },
-        "lanes": { "type": "string", "description": "What each item is filed under: stage, link, person, or field:<name> for the value of one of its fields (e.g. field:phase)." },
-        "order": { "type": "string", "description": "The number field that orders things beside each other." },
-        "measure": { "type": "enum", "values": ["work", "tokens"], "description": "What size counts." },
-        "fold": { "type": "json", "description": "What is left out, as a list of: closed, system, unlinked." },
-        "time": { "type": "json", "description": "A time axis: {from, to} as dates or date-times, and by: [\"when\", \"bound\"] if not both. Only what falls in the window is in the picture, each item with its spans (time)." }
-      }
-    },
-    {
-      "id": "canvas",
-      "extends": "system",
       "title": "Canvas",
-      "description": "A saved canvas view: a flat lens (a filter, a walk and a limit, as query flat takes them) and a style, kept so a person opens it anywhere and it draws the same. Its pins are drawn with what its filter finds; where things sit on it is kept in the places stream under its id, apart from the map's. Home lists them; report show with its id opens one.",
+      "description": "A view kept on the map: a flat lens (a filter, a walk and a limit, as query flat takes them) and a style, so a person opens it anywhere and it draws the same. About a project or item (an about link), it is a view of that thing; about nothing, the workspace's. Its pins are drawn with what its filter finds; where things sit on it is kept in the places stream under its id, apart from the map's. Home lists them; a document line holding its id draws it there; report show with its id opens one.",
+      "moved_from": ["canvas"],
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "filter": { "type": "json", "description": "What it finds: { text, types, ids, links, exclude }, as query flat's filter. It must include something." },
@@ -210,7 +188,9 @@
         "limit": { "type": "number", "description": "The most items it draws." },
         "style": { "type": "json", "description": "How it is drawn: { shape, lit, style } (a built-in drawing, what stays lit, a style kept on the map by its id)." },
         "pins": { "type": "json", "description": "Items kept on it by hand, as a list of ids: drawn with what the filter finds." },
-        "pinned": { "type": "boolean", "description": "Kept in sight by the owner: first on Home." }
+        "pinned": { "type": "boolean", "description": "Kept in sight by the owner: first on Home." },
+        "place": { "type": "number", "description": "Its order among the views of the item it is about: the lowest first." },
+        "steps": { "type": "json", "large": true, "description": "How the picture came to be, step by step, ending on the map as it is: a list of steps, each changing the one before from nothing. add and remove (lists of ids), titles and flag (by id: the title then, a word marked on it then; null takes it back), fields (by id, then by name), chapter (name, when, count: the chapter this step starts) and lines (by and text: what was said). The last step is the map as it is, whatever the steps say. What a step names is sent with the picture even when finished. A drawing that knows steps plays them; others draw the map as it is." }
       }
     },
     {
@@ -260,7 +240,7 @@
       "description": "A page the kernel draws as one column of pieces: a picture (a lens in a style), rows from a pack's view, an action's form, an item's fields, a short note. On kinds or types (on), it is shown on the page of every such item; given a place in the nav (nav), it is a page of its own there; on Home (home), it is drawn there after the screens before it. A pack ships screens as presets; one kept on the map with the preset's id (preset) is the owner's version of it, and retired, the preset is not shown. Only a person changes a screen: an agent's change waits for them.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
-        "pieces": { "type": "json", "description": "The column, in order: each {piece, ...what it needs}. picture: lens (a lens's id, or the params of the lens view) and style (a style's id, or its fields, code aside); view: view (a pack's view of rows) and item (the input the item's id goes in); action: action (a pack's action); fields: fields (a list of the item's fields); note: text. Left empty, the preset's." },
+        "pieces": { "type": "json", "description": "The column, in order: each {piece, ...what it needs}. picture: lens (a kept view's id, or a flat lens { filter, walk, limit }, \"{here}\" in its ids or link terms the item the page is of), only (the types it draws of what that finds) and style (a style's id, or its fields, code aside); view: view (a pack's view of rows) and item (the input the item's id goes in); action: action (a pack's action); fields: fields (a list of the item's fields); note: text. Left empty, the preset's." },
         "on": { "type": "json", "description": "The kinds or types on whose page it is shown, as a list. Left empty, the preset's." },
         "nav": { "type": "number", "description": "Its place in the nav, after Home and Search: the lowest first. Left empty, it is not in the nav." },
         "home": { "type": "boolean", "description": "Drawn on Home (true) or taken off it (false). Left empty, the preset's: a pack's screen for Home is on it." },
@@ -647,12 +627,6 @@
     }
   ],
   "views": [
-    {
-      "id": "core.lens",
-      "shape": "data",
-      "lens": {},
-      "description": "The page's picture of the map, drawn by the old lens until the page reads the flat lens: items with what each is inside, its place and counts, links moved up to what was sent, the views to choose, the style and what the person may change. Agents read the flat lens (flat) instead. Params: lens and style (one kept on the map, or holding, when or in), from, story, kinds, by, over, far, near, lanes, order, measure, fold, time."
-    },
     {
       "id": "core.flat",
       "shape": "data",

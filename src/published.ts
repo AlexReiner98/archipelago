@@ -4,13 +4,13 @@
 // allowed it (agent_publish, a rule of the core pack the owner lifts on the Workspace page), each time logged with the authority it said it acted on.
 // Taking a document down stays the human's.
 //
-// What is frozen is what the public read gives (src/public-document.ts), and for each lens it brings in, the
-// picture's data with nothing private in it and nothing that names a person or a session.
+// What is frozen is what the public read gives (src/public-document.ts), and for each view kept on the map it brings
+// in, the picture's data (src/lens-saved.ts) with nothing private in it and nothing that names a person or a session.
 
 import { authorityOf } from './authority.ts';
 import { drawingFor } from './drawings.ts';
+import { isKept, keptPicture } from './lens-saved.ts';
 import { stepsShown } from './lens-steps.ts';
-import { lens } from './lens.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
 import { publicDocument, readable } from './public-document.ts';
@@ -28,25 +28,26 @@ export function gist(body: string, most = 160): string {
   return sentence.length <= most ? sentence : `${sentence.slice(0, most - 1).replace(/\s+\S*$/, '')}…`;
 }
 
-type Answer = Awaited<ReturnType<typeof lens>>;
+type Answer = Awaited<ReturnType<typeof keptPicture>>;
 
-/** A lens's answer as a reader may have it: the picture's data, each part with its first line, nothing about who or which session. */
-export function freezeLens(answer: Answer, bodies: Map<string, string>) {
-  const quiet = <T extends { waits_on: unknown; sessions: number }>(s: T) => ({ ...s, waits_on: Array.isArray(s.waits_on) ? [] : {}, sessions: 0 });
+/**
+ * A view's picture as a reader may have it: its items and the links among them, each item with its first line and
+ * the counts a drawing reads all nothing, each link's type as its kind; nothing about who or which session.
+ */
+export function freezeLens(answer: Answer, bodies: Map<string, string>, partOf: string[] = ['part_of']) {
   const { code: _code, ...style } = (answer.style ?? {}) as Record<string, unknown>;
+  // What each is inside, for the drawings that nest: what it is part of, where that is drawn too, said by inside and not by a link as well.
+  const ids = new Set(answer.items.map((i) => i.id));
+  const inside = new Map<string, (typeof answer.links)[number]>();
+  for (const k of answer.links) if (partOf.includes(k.type) && ids.has(k.to) && k.from !== k.to && !inside.has(k.from)) inside.set(k.from, k);
+  const nothing = { items: 0, needs_you: 0, blocked: 0, work: 0, sessions: 0 };
   return {
     lens: answer.lens,
     style,
     // How it came to be, naming only what it shows.
     ...(answer.steps && { steps: stepsShown(answer.steps, new Set(bodies.keys())) }),
-    said: answer.said,
-    views: [],
-    view: null,
-    controls: [],
-    viewer: null,
-    items: answer.items.map((item) => ({ ...item, state: quiet(item.state), within: quiet(item.within), gist: gist(bodies.get(item.id) ?? '') })),
-    links: answer.links,
-    rest: answer.rest,
+    items: answer.items.map(({ owner: _owner, body: _body, ...item }) => ({ ...item, inside: inside.get(item.id)?.to ?? null, state: { needs_you: false, blocked: false, sessions: 0, waits_on: [] }, within: nothing, size: { work: 0 }, gist: gist(bodies.get(item.id) ?? '') })),
+    links: answer.links.filter((k) => inside.get(k.from) !== k).map((k) => ({ kind: k.type, ...k })),
   };
 }
 
@@ -67,15 +68,16 @@ async function freeze(l: Archipelago, id: string) {
   const sections = reader.parts.flatMap((part) => ('section' in part ? [part.section] : []));
   const lenses: Record<string, ReturnType<typeof freezeLens>> = {};
   const types: Record<string, string> = {};
-  for (const section of sections.filter((s) => l.registry.isA(s.type, 'lens'))) {
-    const answer = await lens(l, { lens: section.id });
+  for (const section of sections.filter((s) => isKept(l, s.type))) {
+    const answer = await keptPicture(l, section.id).catch(() => null);
+    if (!answer) continue;
     const { rows } = await l.db.query<{ id: string; body: string }>(
       `select id, body from entity where id = any($1::text[]) and visibility <> 'private' and private_to is null`,
       [answer.items.map((i) => i.id)],
     );
     const shown = new Map(rows.map((r) => [r.id, r.body]));
     const kept = { ...answer, items: answer.items.filter((i) => shown.has(i.id)), links: answer.links.filter((k) => shown.has(k.from) && shown.has(k.to)) };
-    lenses[section.id] = freezeLens(kept, shown);
+    lenses[section.id] = freezeLens(kept, shown, l.registry.relationFamily('part_of'));
     for (const i of kept.items) types[i.type] = l.registry.type(i.type)?.title ?? i.type;
   }
   // Each picture's first frame, so a reader's page has it on screen with the text.

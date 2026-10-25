@@ -2,8 +2,7 @@
 // ad8eb76, before they moved off it), so a view that moves to the flat lens or a read of its own answers agents the
 // same. Ids are named by the ref that made them and times are dropped; a list whose order differs from run to run
 // (one ordered by random ids) is compared as a set, and that is recorded too. PIN_RECORD=1 records it again.
-// The `lens` answers are the page's picture, which the old lens still draws: pinned so that cutting it down leaves
-// the page's answer as it was (hub and views_of_it, read by nothing, were taken out of it and out of the pin).
+// The `lens` answers, the page's picture the old lens drew, went with it (task e_vtvhebut): the page draws flat lenses.
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -43,7 +42,7 @@ async function fixture() {
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
     { op: 'create', ref: 'rule', type: 'work.decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives the CAD app.' } },
     { op: 'create', ref: 'q', type: 'work.decision', title: 'Is the cert enough?' },
-    { op: 'create', ref: 'view', type: 'lens', title: 'The app, flat', props: { far: 1 } },
+    { op: 'create', ref: 'view', type: 'lens', title: 'The app, flat', props: { walk: { over: ['part_of'], steps: 1 } } },
     { op: 'link', type: 'software.lives_in', from: 'app', to: 'repo' },
     { op: 'link', type: 'part_of', from: 'addin', to: 'app' },
     { op: 'link', type: 'part_of', from: 'installer', to: 'addin' },
@@ -111,11 +110,6 @@ async function answers() {
     'handoff repo': await ask('handoff', { repo: made.repo }),
     'gate release': await ask('gate', { event: made.release }),
     'gate events': await ask('gate', {}),
-    'lens app': await ask('lens', { from: made.app }),
-    'lens kinds': await ask('lens', { kinds: ['software.feature'] }),
-    'lens view': await ask('lens', { lens: made.view }),
-    'lens holding': await ask('lens', { from: made.extras, lens: 'holding' }),
-    'lens near': await ask('lens', { from: made.sign, near: 2, over: 'all' }),
   };
   // Names for ids: the refs that made them, the workspace owner's person as "owner".
   const names = new Map<string, string>(Object.entries(made).map(([ref, id]) => [id, ref]));

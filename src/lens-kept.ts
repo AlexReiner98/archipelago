@@ -1,4 +1,4 @@
-// What the map keeps for looking at it: lenses and styles, with what each is about; the hubs that need views of
+// What the map keeps for looking at it: kept views (lens items) and styles, with what each is about; the hubs that need views of
 // their own; and where a lens or a style is seen at work.
 
 import { SYSTEM } from './head.ts';
@@ -91,10 +91,11 @@ async function hubAtAbove(l: Archipelago, id: string): Promise<number> {
   return rows.length ? Number(rows[0].hub_at) : HUB_AT;
 }
 
-/** Where on the page a lens or a style is seen at work: the picture of what it is about, or of the whole map. Nothing for any other item. */
+/** Where on the page a kept view or a style is seen at work: the view itself, or the picture of what a style is about, or of the whole map. Nothing for any other item. */
 export async function pictureOf(l: Archipelago, id: string): Promise<string | undefined> {
   const item = await l.entity(id);
-  if (!item || !(l.registry.isA(item.type, 'lens') || l.registry.isA(item.type, 'style'))) return undefined;
+  if (item && l.registry.isA(item.type, 'lens')) return `v?canvas=${id}`;
+  if (!item || !l.registry.isA(item.type, 'style')) return undefined;
   const { rows } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'about' and from_id = $1 and valid_to is null order by id limit 1`, [id]);
   return rows.length ? `graph?from=${rows[0].to_id}` : 'graph?lens';
 }

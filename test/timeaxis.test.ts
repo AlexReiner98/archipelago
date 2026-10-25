@@ -1,4 +1,4 @@
-// A time axis for lenses: items placed by when and bound, repeats as their occurrences, sessions where they ran.
+// A time axis, read by packs (placed): items placed by when and bound, repeats as their occurrences, sessions where they ran.
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { openDb } from '../src/db.ts';
 import '../src/views.ts';
-import { lens } from '../src/lens.ts';
+import { answerRead } from '../src/packreads.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { dayStart } from '../src/timeaxis.ts';
@@ -27,7 +27,7 @@ test('a day starts at midnight in the zone it is counted in', () => {
   assert.equal(new Date(dayStart('2026-10-14', 'UTC')).toISOString(), '2026-10-14T00:00:00.000Z');
 });
 
-test('a lens on a time axis places what falls in its window, repeats as their days', async () => {
+test('a read placed in time places what falls in its window, repeats as their days', async () => {
   const l = await map();
   const made = (await l.change(human, {
     reason: 'test',
@@ -40,30 +40,16 @@ test('a lens on a time axis places what falls in its window, repeats as their da
     ],
   })) as { created: Record<string, string> };
   const kinds = ['work.task', 'event', 'time.routine'];
-  const answer = (await lens(l, { kinds, time: { from: '2026-10-12', to: '2026-10-18' }, fold: [] })) as { items: Item[]; rest: { time: number }; said: string };
-  const of = (ref: string) => answer.items.find((i) => i.id === made.created[ref]);
+  const placed = (time: Record<string, unknown>) => answerRead(l, { placed: { types: kinds, ...time } as never }) as Promise<Item[]>;
+  const items = await placed({ from: '2026-10-12', to: '2026-10-18' });
+  const of = (ref: string) => items.find((i) => i.id === made.created[ref]);
   assert.deepEqual(of('task')!.time!.map((s) => [s.by, s.start]), [['bound', '2026-10-15T04:00:00.000Z']], 'a due date is a whole day in Toronto');
   assert.deepEqual(of('meet')!.time, [{ start: '2026-10-14T14:00:00.000Z', end: '2026-10-14T15:30:00.000Z', by: 'when' }]);
   assert.deepEqual(of('gym')!.time!.map((s) => s.start), ['2026-10-12T11:00:00.000Z', '2026-10-14T11:00:00.000Z', '2026-10-16T11:00:00.000Z'], 'Monday, Wednesday and Friday at 07:00');
   assert.equal(of('later'), undefined, 'outside the window');
   assert.equal(of('loose'), undefined, 'with no time');
-  assert.ok(answer.rest.time >= 2);
-  assert.match(answer.said, /placed in time from 2026-10-12 to 2026-10-18/);
 
-  const deadlines = (await lens(l, { kinds, time: { from: '2026-10-12', to: '2026-10-18', by: ['bound'] }, fold: [] })) as { items: Item[] };
-  assert.deepEqual(deadlines.items.map((i) => i.title), ['Send the forms'], 'only by bound');
-  await assert.rejects(lens(l, { time: { from: '2026-10-18', to: '2026-10-12' } }), /comes after/);
-});
-
-test('a time axis kept on a lens item is read like its other fields', async () => {
-  const l = await map();
-  const made = (await l.change(human, {
-    reason: 'test',
-    ops: [
-      { op: 'create', ref: 'meet', type: 'event', title: 'Standup', props: { at: '2026-10-14T13:00:00Z' } },
-      { op: 'create', ref: 'week', type: 'lens', title: 'This week', props: { kinds: ['event'], time: { from: '2026-10-12', to: '2026-10-18' }, fold: [] } },
-    ],
-  })) as { created: Record<string, string> };
-  const answer = (await lens(l, { lens: made.created.week })) as { items: Item[] };
-  assert.deepEqual(answer.items.map((i) => i.title), ['Standup']);
+  const deadlines = await placed({ from: '2026-10-12', to: '2026-10-18', by: ['bound'] });
+  assert.deepEqual(deadlines.map((i) => i.title), ['Send the forms'], 'only by bound');
+  await assert.rejects(placed({ from: '2026-10-18', to: '2026-10-12' }), /comes after/);
 });

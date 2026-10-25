@@ -100,7 +100,7 @@ test('a published document reads as it was published until it is published again
         { op: 'create', ref: 'a', type: 'work.task', title: 'A part', visibility: 'shared', body: 'Does the first thing. Then more ({b}).' },
         { op: 'create', ref: 'b', type: 'work.task', title: 'Another part', visibility: 'shared', body: 'Does the second.' },
         { op: 'create', ref: 'x', type: 'work.task', title: 'A private part', visibility: 'private', body: 'Never shown.' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'The system, drawn', visibility: 'shared', status: 'current', props: { far: 2 } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'The system, drawn', visibility: 'shared', status: 'current', props: { filter: { types: ['work.task', 'software.feature'] } } },
         { op: 'link', type: 'about', from: 'l', to: 'f' },
         { op: 'link', type: 'part_of', from: 'a', to: 'f' },
         { op: 'link', type: 'part_of', from: 'b', to: 'f' },
@@ -114,14 +114,14 @@ test('a published document reads as it was published until it is published again
   const { d, s, l, a, x } = made;
   assert.equal((await call('/api/published', undefined, { id: d })).result.published, false);
   assert.equal((await call('/api/publish', undefined, { id: d })).status, 200);
-  const read = async () => (await (await fetch(`${base}/p/default/${d}/data`)).json()) as { published_at: string; parts: { section?: { id: string; body: string } }[]; lenses: Record<string, { items: { id: string; title: string; gist: string; state: { waits_on: unknown[]; sessions: number } }[]; viewer: unknown }> };
+  const read = async () => (await (await fetch(`${base}/p/default/${d}/data`)).json()) as { published_at: string; parts: { section?: { id: string; body: string } }[]; lenses: Record<string, { items: { id: string; title: string; gist: string; state: { waits_on: unknown[]; sessions: number } }[] }> };
   const first = await read();
   assert.ok(first.published_at);
   const picture = first.lenses[l];
   assert.ok(picture, 'a lens it holds is frozen with it');
   assert.deepEqual(picture.items.map((i) => i.title).sort(), ['A part', 'Another part', 'The system']);
   assert.equal(picture.items.find((i) => i.id === a)!.gist, 'Does the first thing.');
-  assert.equal(picture.viewer, null);
+  assert.ok(picture.items.every((i) => !('owner' in i)), 'nothing about who');
   assert.ok(!JSON.stringify(first).includes(x) && !JSON.stringify(first).includes('Never shown'), 'nothing private is frozen');
 
   // The draft is changed: nothing public changes, and the owner is told the draft says something else.

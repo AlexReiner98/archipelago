@@ -37,7 +37,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       'Their page goes there within a couple of seconds if they have "Follow agents" on. Add a short note saying what they are looking at. ' +
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
     input: {
-      entity: z.string().optional().describe('An item id: open its page; a saved canvas (type canvas) is opened as their canvas, its lens in their query bar.'),
+      entity: z.string().optional().describe('An item id: open its page; a view kept on the map (type lens, a saved canvas) is opened as their canvas, its lens in their query bar.'),
       screen: z.enum(['today', 'review', 'map', 'graph', 'roadmap', 'questions', 'automations', 'activity', 'workspace']).optional(),
       of: z.string().optional().describe('With screen graph, roadmap or questions: the item (for the last two, a project) it is drawn for.'),
       lens: z
@@ -56,7 +56,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       // A saved canvas is opened as what their canvas draws: the page reads its lens and style from the map.
-      if (input.entity && !input.lens && !input.style && (await l.entity(input.entity))?.type === 'canvas') return point(l, actor, 'show', `v?canvas=${input.entity}`, input.note);
+      const kept = input.entity && (await l.entity(input.entity));
+      if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return point(l, actor, 'show', `v?canvas=${input.entity}`, input.note);
       if (input.lens || input.style) {
         // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on the owner's screen.
         const asked = (input.lens ?? {}) as { filter?: { exclude?: unknown }; limit?: unknown };

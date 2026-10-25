@@ -1,4 +1,4 @@
-// Saved canvases (task e_uq77ps44): a flat lens and a style kept as an item of core's `canvas` type. An agent makes and
+// Saved canvases (task e_uq77ps44): a flat lens and a style kept as an item of core's `lens` type. An agent makes and
 // changes one through change and opens it on the owner's screen with report show; in a real browser (skipped where
 // there is no Chrome) one is saved from the query bar, listed on Home one line each, opened in one click and switched
 // to from the bar, its places kept apart from the map's, at 1280 and at 560 px.
@@ -15,7 +15,7 @@ const browser = chrome();
 test('an agent makes and changes a saved canvas through change, and report show opens it', async () => {
   const l = await fresh();
   const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'work.project', title: 'P' }]);
-  const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'canvas', title: 'P and its parts', props: { filter: { ids: [p] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'flow' } } }] };
+  const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'lens', title: 'P and its parts', props: { filter: { ids: [p] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'flow' } } }] };
   const made = (await callTool(l, agent, 'change', asked)) as { status: string; created?: Record<string, string>; proposal?: string };
   // Held for a person, as every agent's change is until the owner lets them apply: approved, it is made.
   const id = made.created?.c ?? ((await l.change(human, asked)) as { created: Record<string, string> }).created.c;
@@ -41,7 +41,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       { op: 'create', ref: 'q', type: 'work.project', title: 'Another project' },
     ],
   })).result.created as Record<string, string>;
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'lens', title: 'An old view of it', props: { from: made.p, far: 2 } }] });
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A view of it', props: { filter: { ids: [made.p] }, walk: { over: ['part_of'], steps: 2 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] });
   const page = await open(`${base}/#/v?ids=${made.p}&over=part_of&steps=1`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string, ms = 20000) => {
@@ -51,7 +51,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
   const drawn = (id: string) => `Boolean(document.querySelector('#canvas svg a[href="#/e/${id}"]'))`;
   const canvasUp = () => page.evaluate<string | null>(`new URLSearchParams(location.hash.split('?')[1] ?? '').get('canvas')`);
   const picked = `document.querySelector('#query .q-pick')?.selectedOptions[0]?.textContent`;
-  const canvases = async () => (await call('/api/search', undefined, { type: 'canvas', limit: 50 })).result as { id: string; title: string; props: Record<string, any> }[];
+  const canvases = async () => (await call('/api/search', undefined, { type: 'lens', limit: 50 })).result as { id: string; title: string; props: Record<string, any> }[];
   try {
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -90,7 +90,8 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     }
 
     // An agent's canvas of another project; switched between from the bar.
-    const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'canvas', title: 'The other one', props: { filter: { ids: [made.q] }, walk: { over: [], steps: 0 } } }] })).result.created.c as string;
+    const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: 'The other one', props: { filter: { ids: [made.q] }, walk: { over: [], steps: 0 } } }] })).result.created.c as string;
+    await page.go(`${base}/#/v?ids=${made.q}`);
     await page.go(`${base}/#/you`);
     assert.ok(await until(`[...document.querySelectorAll('.canvases a')].some((a) => a.textContent === 'The other one')`), 'the new one is listed');
     await page.evaluate(`[...document.querySelectorAll('.canvases a')].find((a) => a.textContent === 'The other one').click()`);
@@ -102,14 +103,13 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     assert.ok(await until(drawn(made.a)), 'switched from the bar');
     assert.ok(await until(`${picked} === 'Saved at 1280'`));
 
-    // A view from before the flat lens, kept as a canvas from Home.
+    // A view kept about an item: folded on Home under the views of items, and opened from there.
     await page.go(`${base}/#/you`);
-    assert.ok(await until(`Boolean(document.querySelector('.canvases .old-views'))`), 'the old view is offered');
-    await page.evaluate(`(() => { const d = document.querySelector('.canvases .old-views'); d.open = true; [...d.querySelectorAll('li')].find((li) => li.textContent.includes('An old view of it')).querySelector('button').click(); })()`);
-    assert.ok(await until(`${picked} === 'An old view of it'`), `opened as a canvas: ${page.logs().join(' | ')}`);
+    assert.ok(await until(`Boolean(document.querySelector('.canvases .old-views'))`), 'the views of items are folded');
+    assert.ok(!(await page.evaluate<boolean>(`[...document.querySelectorAll('.canvases > .rows a')].some((a) => a.textContent === 'A view of it')`)), 'not among the workspace’s own');
+    await page.evaluate(`(() => { const d = document.querySelector('.canvases .old-views'); d.open = true; [...d.querySelectorAll('a')].find((a) => a.textContent === 'A view of it').click(); })()`);
+    assert.ok(await until(`${picked} === 'A view of it'`), `opened as a canvas: ${page.logs().join(' | ')}`);
     assert.ok(await until(drawn(made.a)));
-    const kept = (await canvases()).find((c) => c.title === 'An old view of it')!;
-    assert.deepEqual([kept.props.filter.ids, kept.props.walk], [[made.p], { over: ['part_of'], steps: 2 }], 'its fields translated');
   } finally {
     page.close();
   }

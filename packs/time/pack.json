@@ -158,7 +158,7 @@
       "id": "time.invoices",
       "title": "Invoices",
       "on": ["company"],
-      "pieces": [{ "piece": "picture", "lens": { "kinds": ["time.invoice"], "far": 1 }, "style": { "shape": "list", "show": ["status"] } }]
+      "pieces": [{ "piece": "picture", "lens": { "filter": { "links": ["part_of {here}"] } }, "only": ["time.invoice"], "style": { "shape": "list", "show": ["status"] } }]
     }
   ],
   "actions": [

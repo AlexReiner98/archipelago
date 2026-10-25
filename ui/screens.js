@@ -12,7 +12,8 @@ import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { gate } from './gate.js';
 import { proofPart } from './proof.js';
-import { lensView } from './lens.js';
+import { flatView } from './lens.js';
+import { keptView } from './canvases.js';
 import { roadmap } from './roadmap.js';
 import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
@@ -166,18 +167,19 @@ const PIECES = {
     return { node, later: () => attentionCard(node, params, p.title ?? p.screen.title, Boolean(ctx.id), p.limit) };
   },
   note: (ctx, p) => ({ node: h('section', { class: 'card wide note' }, renderBody(p.text)) }),
-  // A picture: from the item the page is of, unless the lens says where. A style named by id is read by the server;
-  // one written into the screen is its fields only, never code.
+  // A picture: a view kept on the map (by its id), or a flat lens where "{here}" is the item the page is of. A style
+  // named by id is read by the server; one written into the screen is its fields only, never code.
   picture: (ctx, p) => {
-    const lens = typeof p.lens === 'string' ? { lens: p.lens } : { ...p.lens };
-    // A level of the hierarchy (docs/ui-strategy.md) is every type the packs put at it.
-    if (lens.altitude) (lens.kinds = (state.schema?.types ?? []).filter((t) => t.altitude === lens.altitude).map((t) => t.id)), delete lens.altitude;
-    if (ctx.id && !lens.from) lens.from = ctx.id;
-    if (typeof p.style === 'string') lens.style = p.style;
+    const key = `screen:${p.screen.id}:${ctx.id ?? ''}`;
     const { code, ...style } = typeof p.style === 'object' && p.style ? p.style : {};
+    if (typeof p.style === 'string') style.style = p.style;
     // A screen that names its shape is drawn in it, not by the code of a style the workspace keeps for every picture.
     if (style.shape) style.code = '';
-    const view = lensView({ lens, style, key: `screen:${p.screen.id}:${ctx.id ?? ''}`, quiet: true });
+    const here = (term) => (term.includes('{here}') && !ctx.id ? null : term.replaceAll('{here}', ctx.id));
+    const filter = typeof p.lens === 'object' && p.lens ? { ...p.lens.filter } : {};
+    for (const k of ['ids', 'links']) if (filter[k]) filter[k] = filter[k].map(here);
+    if (Object.values(filter).some((v) => Array.isArray(v) && v.includes(null))) return null;
+    const view = typeof p.lens === 'string' ? keptView(p.lens, { key, style }) : flatView({ lens: { ...p.lens, filter }, style, of: ctx.id, key, only: p.only, quiet: true });
     return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, p.title ?? p.screen.title)), view) };
   },
   // Some of the item's fields, together under the screen's name.

@@ -1,7 +1,7 @@
 // The week as a calendar: for each day, the owner's blocks (time entries, timed or not, and the days routines fall
 // on) and the agents' lanes (the sessions the map recorded, each stretch with the work it was on), every block with
 // the project it counts toward. Where a routine falls and when a session was at work is the kernel's time axis
-// (a lens with time); the pack reads it rather than working it out again.
+// (the read `placed`); the pack reads it rather than working it out again.
 
 import { DAY, addDays, cents, dayStart, mondayOf, today } from './days.js';
 import { isA, Reader } from './work.js';
@@ -61,7 +61,7 @@ export async function week(input, ctx) {
 
   // Routines and sessions, placed by the kernel's time axis over the week and the two weeks before today.
   const back = addDays(day0, -13);
-  const placed = await r.read({ view: 'lens', params: { kinds: ['time.routine', 'sys.run'], fold: [], time: { from: back < from ? back : from, to: day0 > to ? day0 : to, by: ['when'] } } });
+  const placed = { items: await r.read({ placed: { types: ['time.routine', 'sys.run'], from: back < from ? back : from, to: day0 > to ? day0 : to, by: ['when'] } }) };
   const routines = [];
   for (const item of placed.items.filter((i) => i.open && i.time?.some((s) => s.by === 'repeat'))) {
     const [part] = await r.read({ related: item.id, relation: 'part_of' });

@@ -1,13 +1,11 @@
 // Standing views a pack declares as data (a view with `lens` in its pack.json), each answered by its own read, in
 // the form it has always had: the flat lens (src/lens-flat.ts), the graph (src/view-graph.ts), the tree
-// (src/view-tree.ts), the hubs, attention and the brief. The old lens (src/lens.ts) answers `lens` alone, for the
-// page, until the page reads the flat lens.
+// (src/view-tree.ts), the hubs, attention and the brief.
 
 import { attention, type Input } from './attention.ts';
 import { brief, briefRead } from './brief.ts';
 import type { LENS_ANSWERS, ViewDef } from './declared.ts';
 import { HUB_AT, hubs } from './lens-kept.ts';
-import { lens } from './lens.ts';
 import { flatLens } from './lens-flat.ts';
 import type { Archipelago } from './pelago.ts';
 import { graph } from './view-graph.ts';
@@ -32,7 +30,6 @@ const briefOf: Reading = async (l, def, params) => {
 };
 
 const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
-  lens: (l, def, params) => lens(l, { ...def.lens, ...params }),
   flat: (l, _def, params) => flatLens(l, params),
   graph,
   tree: (l, _def, params) => tree(l, params),
@@ -43,5 +40,5 @@ const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
 
 /** Answer a standing view a pack declares as data: read as its answer says. */
 export function answerPreset(l: Archipelago, def: ViewDef, params: Record<string, unknown>): Promise<unknown> {
-  return READINGS[(def.answer ?? 'lens') as keyof typeof READINGS](l, def, params);
+  return READINGS[(def.answer ?? 'flat') as keyof typeof READINGS](l, def, params);
 }

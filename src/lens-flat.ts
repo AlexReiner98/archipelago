@@ -1,14 +1,12 @@
 // The flat lens (the decision "The lens is a filter, a walk and a limit", 25 Oct 2026): a filter, a walk and a limit,
 // and nothing else. What the filter includes picks the seeds; what it excludes applies to everything, what the walk
 // reaches included; the walk follows the link types named, either way, step by step; the limit is the most it sends.
-// The answer is items and the links among them: no containment, no places, no views, no style. The old lens
-// (src/lens.ts) stays for the standing views until they move.
+// The answer is items and the links among them: no containment, no places, no views, no style.
 //
 // Every read is bounded by the ids in hand, an end of a link, the type index or the limit, and runs as the viewer:
 // row-level security keeps what they may not see out of the seeds, the walk and the links alike.
 
 import { SYSTEM } from './head.ts';
-import { LENS_LIMIT } from './lens.ts';
 import type { Archipelago } from './pelago.ts';
 import { rankSql } from './search.ts';
 
@@ -32,6 +30,8 @@ export interface FlatLens {
 
 /** What is left out unless the lens says otherwise: the app's own configuration. */
 const EXCLUDE_DEFAULT = [SYSTEM];
+/** The most items one answer sends. */
+export const LENS_LIMIT = 2000;
 /** Items sent unless the lens says otherwise. */
 const FLAT_LIMIT = 500;
 /** The most steps a walk takes. */

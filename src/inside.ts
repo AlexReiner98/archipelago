@@ -1,5 +1,5 @@
 // What a thing is inside: where the link that says what is inside what leads, up past what is not kept to the nearest
-// thing that is. Read by the tree view and by the old lens; the flat lens has no containment.
+// thing that is. Read by the tree view; the flat lens has no containment.
 
 /**
  * Each kept thing's holder, its depth below the start (or below what is inside nothing) and what each holds. Led to
