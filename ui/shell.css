@@ -32,6 +32,7 @@ body[data-sheet="open"] #query { right: calc(min(var(--sheet), 50%) + var(--spac
 #query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); pointer-events: auto; }
 #query .q-term { display: inline-flex; align-items: center; border-radius: var(--radius-pill); background: var(--accent-soft); font-size: var(--text-3); }
 #query .q-term.q-out { background: none; border: var(--border-1) dashed var(--line); color: var(--muted); }
+#query .q-term.q-narrow { background: none; border: var(--border-1) solid var(--accent); }
 #query .q-term.q-walk { background: none; border: var(--border-1) solid var(--line); }
 #query .q-term button, #query .q-term .q-said { border: 0; background: none; padding: var(--space-2) var(--space-4); font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
 #query .q-term .q-x { padding-left: 0; color: var(--muted); }

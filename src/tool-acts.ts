@@ -43,7 +43,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       lens: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('What their canvas draws: a flat lens, as query flat takes it ({ filter: { text, types, ids, links, exclude }, walk: { over, steps }, limit }), shown in their query bar as if they had written it. With entity, under that item\'s page. {} is the canvas as it opens.'),
+        .describe('What their canvas draws: a flat lens, as query flat takes it ({ filter: { text, types, ids, links, only, within, exclude }, walk: { over, steps }, limit }), shown in their query bar as if they had written it. With entity, under that item\'s page. {} is the canvas as it opens.'),
       style: z
         .object({
           lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),

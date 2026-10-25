@@ -52,7 +52,9 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   // It starts from what it is about, where it draws that; else from the one item it names (as the lens's from was).
   const { rows } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'about' and from_id = $1 and valid_to is null order by id`, [id]);
   const ids = list((lens.filter as Props).ids);
-  const from = rows.map((r) => r.to_id).find((x) => ids.includes(x)) ?? (ids.length === 1 ? ids[0] : undefined);
+  // Or what it draws what is in: the items it is narrowed within, and the ends of its link terms.
+  const ends = [...list((lens.filter as Props).within), ...list((lens.filter as Props).links).map((t) => t.split(/\s+/).slice(1).join(' '))];
+  const from = rows.map((r) => r.to_id).find((x) => ids.includes(x) || ends.includes(x)) ?? (ids.length === 1 ? ids[0] : undefined);
   return { ...answer, lens: { ...answer.lens, ...(from && { from }) }, ...(steps && { steps }), style: await drawn(l, style, have ?? []) };
 }
 
@@ -90,9 +92,11 @@ const UNSAID: Record<string, string> = {
 /**
  * A view kept before the flat lens, as a flat lens: it starts from what it names (from) or is about, and from what
  * is part of that (its by), walks the links it sent along one step; of the whole map, it takes the types it kept.
- * What is left out stays left out. `lost` says each thing it said that the flat lens cannot: deeper than one step
- * down (the flat walk goes either way, so walking part_of further would climb to what holds it), the types it kept
- * of what is in an item (a type in a filter adds every such item), unlinked, lanes, a time axis, controls...
+ * The types it kept of what is in an item narrow it: those types within that item (every step down) or only those
+ * types of what is part of it (a step), drawn in it as the frame, and not walked (the walk is not narrowed).
+ * What is left out stays left out. `lost` says each thing it said that the flat lens cannot: a depth other than one
+ * step or every step (the flat walk goes either way, so walking part_of further would climb to what holds it), what
+ * the links of a narrowed view reached, unlinked, lanes, a time axis, controls...
  * Null when nothing in it says what a filter includes.
  */
 export function oldLens(l: Archipelago, props: Props, about: string[]): { lens: { filter: Props; walk: { over: string[] | 'all'; steps: number } } | null; lost: string[] } {
@@ -104,20 +108,31 @@ export function oldLens(l: Archipelago, props: Props, about: string[]): { lens: 
   const kinds = list(props.kinds);
   const wanted = kinds.filter((k) => !k.startsWith('-'));
   if (wanted.some((k) => !known(k))) lost.push(`kinds ${wanted.filter((k) => !known(k)).join(', ')}`);
-  if (start.length && wanted.length) lost.push(`kinds kept of what is in it (${wanted.join(', ')})`);
-  const types = start.length ? [] : wanted.filter(known);
+  const types = wanted.filter(known);
+  // The types it kept of what is in an item narrow what is in it (only, or within): its walk went only to more of those,
+  // and a walk is not narrowed, so it is not kept.
+  const narrowed = start.length > 0 && types.length > 0 && props.far !== 0;
+  if (start.length && types.length && props.far === 0) lost.push(`kinds kept of the start alone (${types.join(', ')})`);
   // Left out: what it folded (closed and system unless it said), and the types it named with a "-".
   const fold = props.fold === undefined ? ['closed', 'system'] : list(props.fold);
   if (fold.includes('unlinked')) lost.push('leaving out what is linked to nothing');
   const exclude = [...new Set([...fold.filter((f) => f === 'closed' || f === 'system'), ...kinds.filter((k) => k.startsWith('-') && known(k.slice(1))).map((k) => k.slice(1))])];
   const by = typeof props.by === 'string' && linked(props.by) ? props.by : 'part_of';
   const over = props.over === 'all' ? 'all' : (props.over === undefined ? ['depends_on', 'waits_on'] : list(props.over)).filter(linked);
-  if (start.length && (props.far === undefined || Number(props.far) > 1)) lost.push(`${props.far === undefined ? 'every step' : `${props.far} steps`} down (one is kept)`);
+  // Every step down is what is within it, read from the closure of part_of; any other depth, or another link, one step.
+  const within = narrowed && props.far === undefined && start.length === 1 && l.registry.relationFamily('part_of').includes(by);
+  if (start.length && !within && (props.far === undefined || Number(props.far) > 1)) lost.push(`${props.far === undefined ? 'every step' : `${props.far} steps`} down (one is kept)`);
+  if (narrowed && (over === 'all' || over.length)) lost.push(`what its links reach of the types it kept (${types.join(', ')})`);
   for (const [field, said] of Object.entries(UNSAID)) if (props[field] != null && !(Array.isArray(props[field]) && !(props[field] as unknown[]).length)) lost.push(said);
   if (!start.length && !types.length) return { lens: null, lost: ['nothing a filter can include: the whole map, of no types', ...lost] };
   // What is part of where it starts is found by a link term, not walked: walking part_of either way would climb.
+  // Narrowed, the start is the frame it is drawn in (what the view is about), not one of what is drawn.
+  if (narrowed) {
+    const filter = within ? { types, within: start, exclude } : { links: start.map((id) => `${by} ${id}`), only: types, exclude };
+    return { lens: { filter, walk: { over: [], steps: 0 } }, lost };
+  }
   const down = start.length && props.far !== 0 ? start.map((id) => `${by} ${id}`) : [];
-  const filter = { ...(start.length && { ids: start }), ...(down.length && { links: down }), ...(types.length && { types }), exclude };
+  const filter = { ...(start.length && { ids: start }), ...(down.length && { links: down }), ...(!start.length && types.length && { types }), exclude };
   return { lens: { filter, walk: { over, steps: over === 'all' || over.length ? 1 : 0 } }, lost };
 }
 
