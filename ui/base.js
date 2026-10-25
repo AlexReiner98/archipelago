@@ -34,8 +34,9 @@ export function h(tag, attrs, ...kids) {
 
 // Questions are asked in the page rather than with confirm() and prompt(), so
 // they can be styled and browser automation can answer them. Resolves to null
-// when dismissed; otherwise true, or the text typed when `input` is given.
-export function ask({ title, message, input, action = 'OK', cancel = 'Cancel', danger = false }) {
+// when dismissed; otherwise true, or the text typed when `input` is given, or,
+// given `choices` ([value, label, title?] each, a short list), the value chosen.
+export function ask({ title, message, input, choices, action = 'OK', cancel = 'Cancel', danger = false }) {
   return new Promise((resolve) => {
     // A secret is typed into a field that does not show it, and that the browser is asked not to remember.
     const field = input && (input.secret ? h('input', { type: 'password', autocomplete: 'off', spellcheck: false, placeholder: input.placeholder ?? '', style: 'width: 100%' }) : h('textarea', { rows: 3, placeholder: input.placeholder ?? '' }));
@@ -48,7 +49,8 @@ export function ask({ title, message, input, action = 'OK', cancel = 'Cancel', d
         h('h2', {}, title),
         message && h('p', { class: 'ask-message' }, message),
         field,
-        h('div', { class: 'toolbar' }, cancel && h('button', { value: 'cancel' }, cancel), h('button', { value: 'ok', class: danger ? 'danger' : 'primary' }, action)),
+        choices && h('div', { class: 'ask-choices', style: 'display: flex; flex-direction: column; gap: var(--space-3)' }, choices.map(([value, label, hint], n) => h('button', { value: `choice:${n}`, title: hint ?? label, class: n === 0 ? 'primary' : '', style: 'text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis' }, label))),
+        h('div', { class: 'toolbar' }, cancel && h('button', { value: 'cancel' }, cancel), !choices && h('button', { value: 'ok', class: danger ? 'danger' : 'primary' }, action)),
       ),
     );
     // Answered on the button press itself: the browser holds the dialog's close
@@ -57,7 +59,12 @@ export function ask({ title, message, input, action = 'OK', cancel = 'Cancel', d
       dialog.remove();
       resolve(ok ? (field ? field.value.trim() : true) : null);
     };
-    dialog.firstChild.addEventListener('submit', (e) => answer(e.submitter?.value === 'ok'));
+    dialog.firstChild.addEventListener('submit', (e) => {
+      const chose = /^choice:(\d+)$/.exec(e.submitter?.value ?? '')?.[1];
+      if (chose === undefined) return answer(e.submitter?.value === 'ok');
+      dialog.remove();
+      resolve(choices[Number(chose)][0]);
+    });
     dialog.addEventListener('cancel', () => answer(false));
     document.body.append(dialog);
     dialog.showModal();

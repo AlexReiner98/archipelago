@@ -42,9 +42,9 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
   // the ties: every other link, from what is part of to what it is part of.
   const seen = new Set();
   let edges = [];
-  for (const l of links) if (l.type === ORDER && !seen.has(`${l.to} ${l.from}`)) (seen.add(`${l.to} ${l.from}`), edges.push({ a: l.to, b: l.from, ...(l.says && { says: l.says }) }));
+  for (const l of links) if (l.type === ORDER && !seen.has(`${l.to} ${l.from}`)) (seen.add(`${l.to} ${l.from}`), edges.push({ a: l.to, b: l.from, ...(l.says && { says: l.says }), ...(l.pending && { pending: l.pending }) }));
   edges = reduced(acyclic(edges, [...nodes.keys()]));
-  const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type }));
+  const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
 
   // An open question's choices: each one no wire follows yet ends in a pill of its own.
   const decisions = [...nodes.values()].filter((n) => n.shape === 'diamond' && n.item.open);

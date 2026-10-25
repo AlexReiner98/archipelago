@@ -1,3 +1,4 @@
+import { ghostsOf, withGhosts } from './ghosts.js';
 import { NOTE_START, project } from './project.js';
 
 // ---- the page as a replica of the log -------------------------------------
@@ -6,7 +7,10 @@ import { NOTE_START, project } from './project.js';
 // server sends after its position (ui/live.js tails them, src/tail.ts reads them), with the projector the server
 // runs (src/project.ts, served as /project.js). A change made anywhere reaches it without the lens being read again;
 // listeners are told what changed. The store keeps what it was given and what links bring to it: it does not judge
-// the lens's filter again, so an item that no longer matches stays until the lens is read again.
+// the lens's filter again, so an item that no longer matches stays until the lens is read again. Beside the answer it
+// keeps the changes held for the owner (`held`, the pending proposals, read again as the queue moves) and the links the
+// person drew here that the server has not yet answered for (`mine`): `drawn()` is the answer with both drawn into it
+// (ui/ghosts.js), what the canvas hands its drawing.
 
 /** An item of a lens answer as the row the projector folds facts into. */
 const itemRow = (i) => ({
@@ -26,6 +30,9 @@ export class Replica {
     this.links = new Map();
     this.pos = 0;
     this.listeners = new Set();
+    this.held = [];
+    this.mine = new Map();
+    this.drew = 0;
   }
 
   /** Hold a lens answer read at a position: `pos` must be read before the answer, so nothing between is missed. */
@@ -94,9 +101,46 @@ export class Replica {
     for (const id of moved.gone) if (was.has(id) || wasLinks.has(id)) changed[was.has(id) ? 'items' : 'links'].removed.push(id);
     // A link made to what is not held: its other end, for the page to read if it wants it.
     for (const id of changed.links.added) for (const end of [this.links.get(id).from_id, this.links.get(id).to_id]) if (!this.items.has(end)) changed.missing.push(end);
+    // A link drawn here whose fact has come: it is drawn as it is now, no longer pending.
+    for (const id of changed.links.added) {
+      const r = this.links.get(id);
+      for (const [key, l] of this.mine) if (l.type === r.type && l.from === r.from_id && l.to === r.to_id) this.mine.delete(key);
+    }
     const any = ['items', 'links'].some((k) => Object.values(changed[k]).some((list) => list.length));
-    if (any) for (const listen of this.listeners) listen(changed, this);
+    if (any) this.tell(changed);
     return changed;
+  }
+
+  /** The answer with what is held for the owner drawn where it would land, and the links drawn here and not yet answered for. */
+  drawn() {
+    const holds = (id) => Boolean(this.items.get(id) && !this.items.get(id).archived_at);
+    return withGhosts(this.answer(), ghostsOf(this.held, holds, (type) => this.kinds.type?.(type)?.kind ?? null), [...this.mine.values()]);
+  }
+
+  /** Keep these held changes (the pending proposals) beside the answer; listeners are told when what is held moved. */
+  holdChanges(proposals) {
+    const said = JSON.stringify(proposals ?? []);
+    if (said === this.heldSaid) return;
+    this.heldSaid = said;
+    this.held = proposals ?? [];
+    this.tell({ ...blank(), held: true });
+  }
+
+  /** A link the person drew, drawn at once as pending until its fact arrives or it is refused (`forget`): answers its key. */
+  expect({ type, from, to }) {
+    const id = `mine:${++this.drew}`;
+    this.mine.set(id, { id, type, from, to });
+    this.tell({ ...blank(), held: true });
+    return id;
+  }
+
+  /** Stop drawing a link drawn here: refused, held for the owner instead, or arrived. */
+  forget(id) {
+    if (this.mine.delete(id)) this.tell({ ...blank(), held: true });
+  }
+
+  tell(changed) {
+    for (const listen of this.listeners) listen(changed, this);
   }
 
   /** Call `listen(changed, store)` whenever facts change what the store holds; answers how to stop. */

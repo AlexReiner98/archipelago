@@ -7,6 +7,7 @@
 // every change, or left where they put it.
 
 import { api, hooks, state } from './base.js';
+import { wiresOn } from './canvas-wires.js';
 import { FOCUS, flatQuery, flatView } from './lens.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
@@ -219,6 +220,8 @@ host.addEventListener('click', (ev) => {
   ev.preventDefault();
   location.hash = `#/e/${id}?${flatQuery(withItem(at.lens, id), at.asked)}`;
 });
+// A wire drawn by hand from one step to another makes a link; a held change is decided where it is drawn.
+wiresOn(host, () => at?.view.store);
 // A new item is started where the canvas is double-clicked, away from anything drawn on it.
 host.addEventListener('dblclick', (ev) => !ev.target.closest('a, button, input, select') && (location.hash = '#/new'));
 // The sheet opening or shutting, and the window resized, change the room it is fitted to.

@@ -155,10 +155,30 @@ export const kinds = {
  * stands is read first, so nothing said while the lens is read is missed. Stop with `unfollow` (ui/replica.js).
  */
 export async function replicate(read) {
-  const { pos } = await api('tail', {});
+  const { pos, queue } = await api('tail', {});
   const store = new Replica(kinds);
-  store.hold(await read(), pos);
+  const [answer, held] = await Promise.all([read(), heldNow()]);
+  store.hold(answer, pos);
+  store.holdChanges(held);
+  heard.queue ??= queue;
   return keepCurrent(store);
+}
+/** The changes held for the owner, as this viewer may see them; none where they may not. */
+const heldNow = () => api('proposals').catch(() => []);
+/** Where the queue of held changes stood when the stores last read it. */
+const heard = { queue: undefined };
+/** Read the log and what is held again now, not at the next beat: after the person decided or made something here. */
+export async function heldAgain() {
+  await checkTail();
+  const held = await heldNow();
+  for (const store of kept) store.holdChanges(held);
+}
+/** The queue moved (a change held, applied or declined): every store reads what is held again. */
+async function queueMoved(queue, stores) {
+  if (queue === heard.queue || !stores.length) return;
+  heard.queue = queue;
+  const held = await heldNow();
+  for (const store of stores) store.holdChanges(held);
 }
 
 /** Whether what changed (the items facts and events touched, and whether the held changes or a story moved) bears on the page in view. */
@@ -201,6 +221,7 @@ export async function checkTail() {
         console.error(err);
       }
     }
+    queueMoved(beat.queue, stores).catch(() => {});
     touched = state.pos === undefined ? undefined : touchedBy(beat, state.pos);
     now = `${beat.pos}.${beat.seq}.${beat.queue}`;
     state.pos = beat.pos;

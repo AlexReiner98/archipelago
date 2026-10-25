@@ -7,7 +7,9 @@
 // draws, what each item is `inside` read as part_of. The layout is ./layout.js; this answers with the marks to draw
 // (SVG and HTML as data), which the page checks and mounts, so every name is in the page and every step a link. Its
 // look is ./look.js, in the lens's colours. A lens with steps tells the process as it happens (./story.js), the
-// conversation beside it.
+// conversation beside it. What is `pending` is a ghost: a change held for the owner, drawn where it would land (an
+// item faint, a link dashed, an edit marked on its step), each with a badge keyed `held:<proposal>` that the page
+// answers a click on by putting the change to the person; a link the person just drew (`mine`) is dashed until it is.
 
 import { placesOf, route, tieLine } from './free.js';
 import { layout } from './layout.js';
@@ -80,22 +82,37 @@ export function picture({ answer, style, reduced }, tools) {
   };
   const head = (x, y) => `M${x} ${y}L${x - z('head_half')} ${y - z('head_length')}L${x + z('head_half')} ${y - z('head_length')}Z`;
   const line = (points) => `M${points.map((p) => p.join(' ')).join('L')}`;
+  // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
+  let badges = 0;
+  const badge = (pending, [bx, by]) => titled(m('g', { key: `held:${pending.proposal}:${++badges}`, on: ['click'], class: 'lf-held', transform: `translate(${bx} ${by})` }, m('circle', { cx: 0, cy: 0, r: z('held_badge') }), m('text', { x: 0, y: 0 }, '?')), `Held for you${pending.reason ? `: ${pending.reason}` : ''}`);
+  const held = (pending) => Boolean(pending?.proposal);
+  /** Where a wire's badge goes: the middle of its middle stretch. */
+  const middleOf = (points) => {
+    const k = Math.max(0, Math.floor((points.length - 2) / 2)), [a, b] = [points[k], points[k + 1] ?? points[k]];
+    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  };
 
-  // What can be dimmed, by the item it is of; each step's key, for hovering.
-  const dims = new Map(), keyed = new Map(), tipped = new Set();
+  // What can be dimmed, by the item it is of; each step's key, for hovering; the badge of each step a held change is on.
+  const dims = new Map(), keyed = new Map(), tipped = new Set(), stepBadges = new Map();
   // Ties under everything, then wires, then the breaks cut across them, then the steps over all, then what each choice is.
   const drawIn = story ? { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 } : {};
-  const tieLayer = g.ties.map((t, n) => m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}`, ...drawIn, ...hidden }));
+  const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
+  const tieLayer = g.ties.map((t, n) => m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${pend(t.pending)}`, ...drawIn, ...hidden }));
   const wireLayer = g.chains.map((c, n) => {
     const [ex, ey] = c.points.at(-1);
-    return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${c.dashed ? ' dashed' : ''}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(ex, ey), class: 'lf-head', ...hidden })];
+    return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(ex, ey), class: `lf-head${pend(c.pending)}`, ...hidden })];
   });
+  // The badges of held links, with the wire or tie each sits on, so a step moved takes them with its wires. A link of a
+  // new item held in the same change is decided with it: the item's badge is the one.
+  const madeBy = (id, p) => g.nodes.get(id)?.item?.pending?.op === 'create' && g.nodes.get(id).item.pending.proposal === p.proposal;
+  const linkBadges = [...g.chains, ...g.ties].filter((l) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map((l) => ({ l, mark: badge(l.pending, middleOf(l.points)) }));
   const breakLayer = g.breaks.map(([bx, by]) => m('g', { class: 'lf-break' }, m('rect', { x: bx - z('break_half'), y: by - z('break_reach'), width: 2 * z('break_half'), height: 2 * z('break_reach') }), m('path', { d: `M${bx - z('break_track')} ${by}H${bx + z('break_track')}` })));
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + (n.stub ? z('stub_text_x') : z('text_x'));
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
-    const cls = ['lf-step', n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here'].filter(Boolean).join(' ');
+    const ghost = !n.stub && i.pending?.op === 'create';
+    const cls = ['lf-step', n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held'].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER),
       !n.stub && m('circle', { cx: left - z('dot_gap'), cy: Y, r: z('dot'), class: `lf-dot ${dotOf(i)}` }),
@@ -104,7 +121,10 @@ export function picture({ answer, style, reduced }, tools) {
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
     if (n.stub) return titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nA choice nothing follows yet`);
+    // Held for the owner: a new item is a faint step that opens nothing; an edit is marked on its step. Either way a badge on its corner.
+    if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
     tipped.add(key);
+    if (ghost) return titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`);
     const el = titled(m('a', { key, on: story ? ['enter', 'leave'] : ['enter', 'leave', 'drag'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.title);
     dims.set(n.id, el);
     return el;
@@ -117,7 +137,7 @@ export function picture({ answer, style, reduced }, tools) {
     const lx = g.x.get(d.id) + w / 2 + z('says_aside'), ly = (g.y.get(d.id) + d.h / 2 + c.points[1][1]) / 2, sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, breakLayer, stepLayer, saysLayer);
+  const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, breakLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
   // The legend: only the marks this picture uses, one to a line.
   const mark = (inner, label) => m('span', {}, m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label);
@@ -132,6 +152,7 @@ export function picture({ answer, style, reduced }, tools) {
     g.breaks.length > 0 && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
     g.ties.some((t) => t.type === 'part_of') && mark(m('path', { d: 'M1 7H21', class: 'lf-tie near' }), 'Part of'),
     g.ties.some((t) => t.type !== 'part_of') && mark(m('path', { d: 'M1 7H21', class: 'lf-tie' }), 'Linked'),
+    (stepBadges.size > 0 || linkBadges.length > 0) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
   );
 
   // What stays lit, as the style says: the rest dimmed.
@@ -144,7 +165,7 @@ export function picture({ answer, style, reduced }, tools) {
   ];
   /** A step's tip: its title, and the start of its note. */
   const tipFor = (key) => {
-    const i = g.nodes.get(key.slice(2)).item, note = opening(i);
+    const i = g.nodes.get(key.slice(2)).item, note = held(i.pending) ? `Held for you${i.pending.reason ? `: ${i.pending.reason}` : ''}` : opening(i);
     return m('div', { class: 'lf-tip' }, m('b', {}, i.title), note && m('span', {}, note));
   };
   // Opened from an item's page, the picture is brought to that item; else to the step nearest its top left.
@@ -173,6 +194,8 @@ export function picture({ answer, style, reduced }, tools) {
     if (done) at.set(id, [x, y]);
     const [ox, oy] = drawnAt.get(id);
     const patches = [{ key, set: { transform: `translate(${x - ox} ${y - oy})` } }, { tip: null }];
+    const was = g.nodes.get(id);
+    if (stepBadges.has(id)) patches.push({ key: stepBadges.get(id)[1].key, set: { transform: `translate(${x + was.w / 2} ${y - was.h / 2})` } });
     g.chains.forEach((c, n) => {
       if (c.a !== id && c.b !== id) return;
       const [[ex, ey]] = solve(c).slice(-1);
@@ -181,6 +204,7 @@ export function picture({ answer, style, reduced }, tools) {
     g.ties.forEach((t, n) => {
       if (t.a === id || t.b === id) patches.push({ key: `n:${n}`, set: { d: line((t.points = tieLine(boxOf(t.a), boxOf(t.b)))) } });
     });
+    for (const b of linkBadges) if (b.l.a === id || b.l.b === id) patches.push({ key: b.mark[1].key, set: { transform: `translate(${middleOf(b.l.points).join(' ')})` } });
     return patches;
   };
   return {

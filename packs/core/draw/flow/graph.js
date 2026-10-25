@@ -1,5 +1,6 @@
 // A lens answer as a flat graph (the flow's layout, ./layout.js, lays it out): items, and links each with its type, and
-// what the order is without its loops and without the wires another path implies. Pure.
+// what the order is without its loops and without the wires another path implies. An item or link may be `pending`:
+// a change held for the owner (or a link just drawn, `mine`), drawn as a ghost (docs/drawings.md). Pure.
 
 export const ORDER = 'depends_on', NEAR = 'part_of';
 /** What an item says of its state when the answer says nothing (the flat lens's does not). */
@@ -16,13 +17,14 @@ export const lowest = (list) => list.reduce((m, v) => (v < m ? v : m), Infinity)
  */
 export function flatten({ items, links = [], undrawn = [] }) {
   const ids = new Set(items.map((i) => i.id)), skip = new Set(undrawn), seen = new Set(), out = [];
-  const add = (type, from, to, says) => {
+  const add = (type, from, to, says, pending) => {
     const key = `${type} ${from} ${to}`;
     if (!type || skip.has(type) || from === to || !ids.has(from) || !ids.has(to) || seen.has(key)) return;
     seen.add(key);
-    out.push({ type, from, to, ...(says && { says }) });
+    out.push({ type, from, to, ...(says && { says }), ...(pending && { pending }) });
   };
-  for (const l of links) add(l.type ?? l.kind, l.from, l.to, l.says ?? l.props?.says);
+  // A link that is there is drawn before one held for the owner between the same two (a held unlink marks it).
+  for (const l of [...links].sort((a, b) => Number(a.pending?.op === 'link') - Number(b.pending?.op === 'link'))) add(l.type ?? l.kind, l.from, l.to, l.says ?? l.props?.says, l.pending);
   for (const i of items) if (i.inside) add(NEAR, i.id, i.inside);
   return { items: items.map((i) => ({ ...i, state: i.state ?? QUIET, choices: i.choices ?? i.fields?.choices })), links: out };
 }
