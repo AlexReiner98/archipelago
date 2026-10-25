@@ -1,5 +1,5 @@
-// The flow drawing honours the style's undrawn: a link type it names (core's house style names tagged) draws no wire
-// and ties nothing, so an item tagged and nothing else stays a loose step of its own; a style can turn it back on.
+// The flow drawing honours the style's undrawn: a link type it names (core's house style names tagged) draws no tie,
+// so an item tagged and nothing else is a step on its own, apart from its tag; a style can turn it back on.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -25,13 +25,16 @@ const answer = {
     { kind: 'tagged', from: 'e_loosezzz', to: 'e_tagzzzzz' },
   ],
 };
-const steps = (style: any) => JSON.stringify(picture({ answer, style, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene.svg).match(/"key":"s:e_[a-z]+"/g)!.map((k) => k.slice(9, -1)).sort();
+const drawn = (style: any) => JSON.stringify(picture({ answer, style, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene.svg);
+const steps = (style: any) => drawn(style).match(/"key":"s:e_[a-z]+"/g)!.map((k) => k.slice(9, -1)).sort();
+const ties = (style: any) => (drawn(style).match(/"key":"n:\d+"/g) ?? []).length;
 
-test('the house style draws no tagged wire: what is tagged and nothing else stays loose', () => {
+test('the house style draws no tagged tie: what is tagged and nothing else is a step on its own', () => {
   assert.deepEqual(house.undrawn, ['tagged']);
-  assert.ok(steps(house).includes('e_loosezzz'), 'the tagged item is a loose step of its own');
+  assert.ok(steps(house).includes('e_loosezzz') && steps(house).includes('e_tagzzzzz'), 'the tagged item and its tag are steps');
+  assert.equal(ties(house), 2, 'what is part of the process is tied to it; the tag ties nothing');
 });
 
-test('a style that draws every link ties the tagged item as any link does', () => {
-  assert.ok(!steps({ ...house, undrawn: [] }).includes('e_loosezzz'), 'tied by its tag, it is no loose step');
+test('a style that draws every link ties the tagged item to its tag', () => {
+  assert.equal(ties({ ...house, undrawn: [] }), 3);
 });

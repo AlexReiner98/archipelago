@@ -1,4 +1,4 @@
-// How the flow drawing looks (index.js): a process map in the lens's colours. The frame, the key and the breaks' place
+// How the flow drawing looks (index.js): a flat graph in the lens's colours. The frame, the key and the breaks' place
 // are the page's (ui/flow.css). Every width and number here is the style's (sizes and numbers, read as --ln-*).
 
 export const css = `
@@ -15,26 +15,20 @@ export const css = `
 .lf-dot { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-dot-ring); }
 .lf-dot.done { fill: var(--ln-done); stroke: none; } .lf-dot.you { fill: var(--ln-you); stroke: none; }
 .lf-dot.blocked { fill: var(--ln-blocked); stroke: none; } .lf-dot.session { fill: var(--ln-session); stroke: none; }
-.lf-badge circle { fill: var(--ln-inner); stroke: var(--ln-line); } .lf-badge.you circle { fill: var(--ln-you); }
-.lf-badge text { fill: var(--ln-text); font-weight: 700; font-size: var(--ln-flow-badge-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: middle; }
-.lf-badge.you text { fill: var(--ln-sea); }
 .lf-wire { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
 .lf-wire.dashed { stroke-dasharray: var(--ln-flow-dash-choice); }
 .lf-wire.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-head { fill: var(--ln-muted); } .lf-head.lit { fill: var(--ln-text); }
+/* A tie (part_of, or any link that is not the order): quiet, under the wires; one to what a step is part of is solid. */
+.lf-tie { fill: none; stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-flow-dash-choice); }
+.lf-tie.near { stroke-dasharray: none; }
+.lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke); }
+/* A step's tip (the page puts it beside the step): its title, then the start of its note. */
+.lf-tip { max-width: var(--tip-most); padding: var(--space-5) var(--space-7); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--edge); border-radius: var(--radius-3); font-size: var(--text-3); line-height: 1.4; }
+.lf-tip b { display: block; }
+.lf-tip span { display: block; margin-top: var(--space-2); color: var(--muted); }
 .lf-break rect { fill: var(--ln-sea); } .lf-break path { stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
-/* Zoomed out until only names are read (ui/pan-zoom.js): what a choice is and how much is on a step are not drawn. */
-[data-text=names] .lf-says, [data-text=names] .lf-badge text { display: none; }
+/* Zoomed out until only names are read (ui/pan-zoom.js): what a choice is is not drawn. */
+[data-text=names] .lf-says { display: none; }
 .lf-says rect { fill: var(--ln-sea); } .lf-says text { fill: var(--ln-muted); font-size: var(--ln-flow-says-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: middle; }
-/* A checklist: plain things before one step, a row each. The head says the type and how many are left. */
-.lf-list { cursor: default; }
-.lf-list:hover .lf-shape { stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
-.lf-step text.lf-list-head { font-size: var(--ln-flow-row-text); font-weight: 600; fill: var(--ln-muted); }
-.lf-list-rule { stroke: var(--ln-line); stroke-width: var(--ln-rule); }
-.lf-row { cursor: pointer; }
-.lf-row text { font-size: var(--ln-flow-row-text); }
-.lf-row-hit { fill: transparent; }
-.lf-row:hover .lf-row-hit, .lf-row:focus .lf-row-hit { fill: var(--ln-sea); }
-.lf-row.closed text { fill: var(--ln-muted); }
-.lf-row.dim { opacity: var(--ln-dim); }
 `;
