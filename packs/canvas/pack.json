@@ -2,7 +2,7 @@
   "id": "canvas",
   "version": "0.1.0",
   "title": "Canvas",
-  "description": "The map drawn in space: what holds others as land with what it holds on it, each thing a node in an outline its type or kind is given, every link a wire and what names another a faint thread. Its preset makes it the view every lens is drawn in unless a nearer style says otherwise; take the pack out and views are drawn as before. A template for a drawing pack: a layout, a look, a library of outlines, a style preset and tests run without a database.",
+  "description": "The canvas the app opens on. Its preset draws every view as a flow unless a nearer style says otherwise; its own drawing, space, draws the map in space for a style that asks for it: what holds others as land with what it holds on it, each thing a node in an outline its type or kind is given, every link a wire and what names another a faint thread. Take the pack out and views are drawn as before. A template for a drawing pack: a layout, a look, a library of outlines, a style preset and tests run without a database.",
   "requires": ["core"],
   "types": [
     {
@@ -25,7 +25,7 @@
       "id": "canvas.house",
       "title": "Canvas",
       "props": {
-        "shape": "space",
+        "shape": "flow",
         "outlines": {
           "work": "box",
           "question": "diamond",

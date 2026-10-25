@@ -111,10 +111,10 @@ test('a lens answers with one shape of data: what is inside what, the same count
   await assert.rejects(run({ from: 'e_nothing0' }), /No item/);
 
   // The packs' presets first: with nothing kept on the map, a view is drawn in the core pack's house style, with the
-  // canvas pack's preset over it (packs/canvas), which draws it in space.
+  // canvas pack's preset over it (packs/canvas), which draws it as a flow.
   const house = { id: 'core.house', title: 'House style', preset: 'core.house' };
   const canvas = { id: 'canvas.house', title: 'Canvas', preset: 'canvas.house' };
-  assert.deepEqual([whole.style.shape, whole.style.lit, whole.style.open, whole.kept], ['space', 'all', 1, { lens: [], style: [house, canvas] }]);
+  assert.deepEqual([whole.style.shape, whole.style.lit, whole.style.open, whole.kept], ['flow', 'all', 1, { lens: [], style: [house, canvas] }]);
   // Kept on the map: the workspace's lens and style (about nothing), then those about what the picture starts from, then what is asked.
   const drawn = await make(l, [
     { op: 'create', ref: 'wl', type: 'lens', title: 'As it opens', props: { far: 1 } },

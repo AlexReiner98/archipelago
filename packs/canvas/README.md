@@ -1,8 +1,10 @@
 # The canvas pack
 
-The map drawn in space, and a template for any pack that changes how the map
-looks. Its preset makes the canvas the view every lens is drawn in unless a
-nearer style says otherwise. Take the pack out and views are drawn as before.
+The canvas the app opens on, and a template for any pack that changes how the
+map looks. Its preset draws every view as a flow (core's drawing, kept as it
+is on the owner's word, 25 Oct 2026) unless a nearer style says otherwise; a
+style with `shape: space` draws it with this pack's own drawing. Take the pack
+out and views are drawn as before.
 
 ## What it ships
 
@@ -20,8 +22,9 @@ nearer style says otherwise. Take the pack out and views are drawn as before.
 - **A field on the style type**, `outlines`, so a style can name an outline
   for a type, a root type or a kind. The nearest name wins, and an item with
   no name is drawn as a box.
-- **A preset**, `canvas.house`: the shape, the outlines per kind and per
-  common type, and every length the drawing uses (`space_*` sizes).
+- **A preset**, `canvas.house`: the flow as the shape, the outlines per kind
+  and per common type, and every length the `space` drawing uses (`space_*`
+  sizes).
 
 ## Making a view evocative
 

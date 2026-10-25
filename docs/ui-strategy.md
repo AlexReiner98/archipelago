@@ -19,8 +19,10 @@ important facts on hover, and clicking it opens it from the side to act on.
   directly in each thing. An item's address (`#/e/<id>`) is the canvas where
   that item stands, among what is beside it, with the item lit. A view's
   address (`#/v?...`) is that view. What the canvas draws is a lens in the
-  drawing its style names: the canvas pack's `space` unless a nearer style
-  says otherwise, a project's own view where it keeps one.
+  drawing its style names: the core flow drawing for now (the owner, 25 Oct
+  2026: keep the flow as it is), set by the canvas pack's preset; a project's
+  own view where it keeps one. The canvas pack's `space` drawing is there
+  for a style that asks for it.
 - **Connections are drawn, never listed.** What is inside what is land within
   land (the part_of closure). What holds what up is a wire pointing at the
   one that waits. What names what is a faint thread (mentions). No page
