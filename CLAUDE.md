@@ -144,7 +144,7 @@ where, and how that server is run.
 
 What each surface is for (the canvas, the sheet over it, named views kept on
 the map) is in `docs/ui-strategy.md`; read it before adding or changing a
-screen. How to make a drawing pack is `packs/canvas/README.md`.
+screen. How a pack sets how the canvas looks is `packs/canvas/README.md`.
 
 The UI is for a person glancing at it, and most of what it shows was written
 by agents, who write paragraphs. Every screen keeps to these (the owner's
@@ -182,7 +182,7 @@ spatial where it can be):
 - **One or two actions in sight.** What is done rarely goes in a `menu`.
 - **Connections are drawn, never listed.** The canvas is the app: what is
   inside what, what holds what up and what names what are drawn in space
-  (the canvas pack's drawing, or a view's own), and no page lists an item's
+  (the flow by the canvas pack's preset, or a view's own), and no page lists an item's
   links (the owner, 24 Oct 2026; `docs/ui-strategy.md` section 0).
 - **A name is a few words.** An item's title is read in a row, in a box on a
   chart and in a tooltip: name the thing, in 60 characters at most (the

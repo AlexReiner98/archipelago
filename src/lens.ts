@@ -15,7 +15,6 @@ import { readSteps, stepIds } from './lens-steps.ts';
 import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
 import { LENS_DEFAULT, ofKind, readLens, topKinds, viewLens, WAITS, wholeRead, type Lens } from './lens-read.ts';
 import { aroundOf, scanAround, scanKinds, type Row } from './lens-scan.ts';
-import { mentionsAmong, notesOf } from './lens-notes.ts';
 
 // Kept where they were first imported from.
 export { hubs, HUB_AT, pictureOf } from './lens-kept.ts';
@@ -386,9 +385,6 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
     lines.set(key, line);
   }
 
-  // Asked for by a page that draws them: what names what among the items sent, and the first line of each note.
-  const mentioned = input.mentions === true ? await mentionsAmong(l, [...sent]) : [];
-  const notes = input.notes === true ? await notesOf(l, [...sent]) : undefined;
   return {
     lens: asked, ...(view && Array.isArray(view.props.steps) && { steps: readSteps(view.props.steps) }),
     style: preset ? style : await withDrawing(l, asked.time ? { ...style, shape: 'time' } : style, input.have), // drawn along its time axis, if it has one
@@ -415,7 +411,6 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
         type: e.type,
         ...l.registry.ancestry(e.type),
         title: e.title,
-        ...(notes?.has(id) && { note: notes.get(id) }),
         status: e.status,
         open: e.is_open,
         inside: inside(id),
@@ -431,7 +426,7 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
         ...(told && { told: beatsOf(id) }),
       };
     }),
-    links: [...lines.values(), ...mentioned],
+    links: [...lines.values()],
     ...(laneOrder && { lanes: laneOrder }),
     ...(streamOf && { streams: [...new Set(streamOf.values())].map((key) => ({ key, title: all.get(key)?.title ?? key })) }),
     rest: spans ? { ...rest, time: untimed } : rest,

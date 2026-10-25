@@ -21,26 +21,30 @@ important facts on hover, and clicking it opens it from the side to act on.
   address (`#/v?...`) is that view. What the canvas draws is a lens in the
   drawing its style names: the core flow drawing for now (the owner, 25 Oct
   2026: keep the flow as it is), set by the canvas pack's preset; a project's
-  own view where it keeps one. The canvas pack's `space` drawing is there
-  for a style that asks for it.
-- **Connections are drawn, never listed.** What is inside what is land within
-  land (the part_of closure). What holds what up is a wire pointing at the
-  one that waits. What names what is a faint thread (mentions). No page
-  lists links: not the trail rows, Shown in, Mentioned in, Delivers, Waiting
-  on this or This waits on.
-- **Hover says the point.** A tip gives the name, the type and status, what
-  needs you, and the first line of the note.
+  own view where it keeps one.
+- **Connections are drawn, never listed.** What holds what up is a wire on
+  the canvas; where the canvas stands is the bar's trail. No page lists
+  links: not the trail rows, Shown in, Mentioned in, Delivers, Waiting on
+  this or This waits on.
+- **Hover says the point.** What a step says on hover is the drawing's: the
+  flow's, for now.
 - **The sheet is the item's one page.** It opens from the right on a click
   and holds the item read as a document: its title, one line of marks, its
   note or text, and what its pack adds for its kind or type. Rare actions go
   in one menu. Enter redraws the canvas from the item. The sheet also holds a
-  new item, the Workspace page, a screen in the menu, and For you. On a
-  narrow screen it takes the whole width. Esc or × goes back to the canvas.
+  new item, the Workspace page, a screen in the menu, and For you. It never
+  takes more than half the screen; on a phone it takes the whole of it. Esc
+  or × goes back to the canvas.
 - **Nothing else is on screen.** A thin bar on top shows where the canvas
   stands, a mark counting what waits for you, and the menu. Find is a bar at
-  the foot of the canvas.
-- **Looks are the drawing's.** Node outlines are named per type or kind in a
-  style (`outlines`), so a view is made evocative on the map, not in code.
+  the foot of the canvas. The drawing's own controls are not drawn: the key
+  and fit are settings in the menu, kept in the reader's browser. With fit on,
+  the drawing is brought whole into sight on every change (a new view, the map
+  changing, the sheet opening or shutting, the window resized); with it off,
+  the canvas moves only when the reader moves it, and keeps where they left
+  it when it is drawn again.
+- **Looks are the drawing's.** How the canvas draws is a style: the canvas
+  pack's preset, or one kept on the map, never the page's own code.
 
 ## The problem, as seen on 19 Oct 2026
 

@@ -8,7 +8,8 @@ export const READABLE = 0.62;
 /**
  * Make `svg` (`width` by `height` in its own units) move inside `frame`. `start` is a point to open on when all of
  * it cannot be read at once; `aside` is room kept on the left for what floats over the frame (a legend).
- * Answers with what a control may do: zoom by a factor, fit it all, open again, or bring a point into sight.
+ * Answers with what a control may do: zoom by a factor, fit it all, open again, bring a point into sight, or say and
+ * restore where it stands.
  */
 export function panZoom(frame, svg, { width, height, start = [width / 2, 0], aside = 0 }) {
   const view = { s: 1, x: 0, y: 0 };
@@ -26,12 +27,13 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     clamp();
     svg.setAttribute('viewBox', `${view.x} ${view.y} ${W / view.s} ${H / view.s}`);
   };
-  const fit = () => {
+  /** All of it in sight, centred in the room beside what floats on the left and what covers the frame's right (`right`). */
+  const fit = (right = 0) => {
     const [W, H] = size();
-    fitted = Math.min(1, (W - aside - 16) / width, (H - 16) / height);
+    const room = Math.max(1, W - aside - right);
+    fitted = Math.min(1, (room - 16) / width, (H - 16) / height);
     view.s = fitted;
-    // Centred in the room beside what floats on the left.
-    view.x = -(aside + (W - aside - width * view.s) / 2) / view.s;
+    view.x = -(aside + (room - width * view.s) / 2) / view.s;
     view.y = -((H - height * view.s) / 2) / view.s;
     apply();
   };
@@ -107,5 +109,8 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   let opened = Boolean(frame.clientWidth);
   if (opened) open();
   new ResizeObserver(() => (frame.clientWidth ? (opened ? apply() : ((opened = true), open())) : null)).observe(frame);
-  return { zoomBy, fit, open, show };
+  /** Where it stands now, and put back where it stood (a picture drawn again, kept where the reader left it). */
+  const state = () => ({ ...view });
+  const restore = (was) => (Object.assign(view, was), apply());
+  return { zoomBy, fit, open, show, state, restore };
 }

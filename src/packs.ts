@@ -198,9 +198,6 @@ export class Registry {
         for (const field of Object.keys(ext.fields)) (added.get(typeId) ?? added.set(typeId, new Map()).get(typeId)!).set(field, pack.id);
       }
     }
-    // A style may name the shape of any drawing a pack ships: a pack that adds a drawing adds its shape (docs/drawings.md).
-    const shape = raw.get('style')?.fields?.shape;
-    if (shape?.values) extra.set('style', { ...extra.get('style'), shape: { ...shape, values: [...new Set([...shape.values, ...ordered.flatMap((p) => (p.drawings ?? []).map((d) => d.shape))])] } });
 
     const types = new Map<string, ResolvedType>();
     const resolve = (id: string, trail: string[]): ResolvedType => {

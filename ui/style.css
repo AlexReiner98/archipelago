@@ -348,12 +348,11 @@ button.quiet-button { padding: var(--space-2) var(--space-6); font-size: var(--t
 
 @media (max-width: 720px) {
   .ops td.kind { width: auto; }
-  /* The two surfaces on a narrow screen (ui/shell.css). */
   #nav { top: var(--space-5); left: var(--space-5); right: var(--space-5); }
   #trail { display: none; }
   #main { padding: var(--space-9) var(--space-8) var(--space-14); }
   #find { bottom: var(--space-5); }
-  #canvas .lens-view > .toolbar, #canvas .lf-legend { bottom: calc(var(--box-10) + var(--space-5)); }
+  #canvas .lf-legend { bottom: calc(var(--box-10) + var(--space-5)); }
 }
 
 /* Forms */
@@ -563,6 +562,7 @@ details.menu > .menu-items > button { max-width: var(--menu-item-most); overflow
   .row-top:not(.nowrap-row) > .grow { flex-basis: 100%; }
   table.list td { overflow-wrap: anywhere; }
   .toolbar.facts > .grow { display: none; }
+  #sheet { width: 100%; }
 }
 
 /* What a thing is for: asked for, not printed. A dotted line under a heading, or a small ? beside a control. */
