@@ -14,7 +14,7 @@ import { kept, ruleFor, type OpEntry, type Retention } from './retention.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
 import { hashed, openOps, sealOp } from './opseal.ts';
 
-export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | `pack:${string}`;
+export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | 'places' | `pack:${string}`;
 export type OpFact = ['+', string, string, unknown] | ['-', string, string];
 
 export interface Light {
@@ -68,13 +68,15 @@ const toLight = (r: Row): Light => ({ ...r.head, stream: r.stream, pos: r.pos, a
 
 /**
  * A compacted stream's entries as stored, sealed, in order: all of them, or those in a range of positions. A
- * segment's range names its days too, so only the partition that holds them is read (src/partitions.ts).
+ * segment's range names its days too, so only the partition that holds them is read (src/partitions.ts). `field`
+ * keeps only the entries with a fact about that field (a canvas's places).
  */
-export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number; days?: [string, string] } = {}): Promise<Light[]> {
+export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number; days?: [string, string]; field?: string } = {}): Promise<Light[]> {
   const { rows } = await q.query<Row>(
     `select stream, pos::int as pos, at, head, facts from log_op where stream = $1 and pos >= $2 and ($3::bigint is null or pos <= $3)
-       and ($4::date is null or (at >= $4::date at time zone 'UTC' and at < ($5::date + 1) at time zone 'UTC')) order by at, pos`,
-    [stream, range.from ?? 1, range.to ?? null, range.days?.[0] ?? null, range.days?.[1] ?? null],
+       and ($4::date is null or (at >= $4::date at time zone 'UTC' and at < ($5::date + 1) at time zone 'UTC'))
+       and ($6::jsonb is null or facts @> $6::jsonb) order by at, pos`,
+    [stream, range.from ?? 1, range.to ?? null, range.days?.[0] ?? null, range.days?.[1] ?? null, range.field === undefined ? null : JSON.stringify([[range.field]])],
   );
   return rows.map(toLight);
 }

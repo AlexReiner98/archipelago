@@ -140,7 +140,7 @@ export class SignInNeeded extends Error {}
 const ACTS = new Set(['change', 'decide', 'undo', 'session_end', 'publish', 'publish_all', 'unpublish', 'launch']);
 
 export async function api(tool, input = {}) {
-  // What waits to be written in one batch (where things were put on the canvas) goes first, as a change of its own.
+  // What waits to be written in one batch (where things were put on the canvas) goes first, in a call of its own.
   if (ACTS.has(tool)) await hooks.act?.();
   const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() }, body: JSON.stringify(input) });
   const body = await res.json();

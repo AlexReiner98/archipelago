@@ -143,5 +143,6 @@ test('a step put by hand is wired live at right angles, round the steps in the w
   // Not below: out and round, still square, still into the head from above.
   const up = route(b, a, 12);
   assert.ok(square(up) && up.at(-2)[1] < a.y - a.h / 2, 'into the head of one above it, from above');
-  assert.deepEqual(placesOf({ lens: { from: 'p' } }, { places: { p: { x: [1, 2] }, q: { y: [3, 4] } }, moved: { z: [5, 6] } }), { x: [1, 2], z: [5, 6] }, "this canvas's places, with what was moved and not yet saved over them");
+  assert.deepEqual(placesOf({ lens: { from: 'p' } }, { placed: { x: [1, 2], z: [0, 0] }, moved: { z: [5, 6] } }), { x: [1, 2], z: [5, 6] }, "this canvas's places, as the page read them, with what was moved over them");
+  assert.deepEqual(placesOf({ lens: {} }, {}), {}, 'nothing placed: the drawing lays every step');
 });
