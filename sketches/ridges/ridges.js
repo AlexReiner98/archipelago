@@ -37,6 +37,9 @@ const smooth = (a, b, t) => {
   return x * x * (3 - 2 * x);
 };
 
+/** A landform that changes nothing: the dials as they are. */
+const BASE_FORM = { rise: 1, rugged: 0, step: 1, soft: 0, top: 0, cliff: 0, atoll: false };
+
 export const DEFAULTS = {
   width: 800, height: 1000, margin: 60,
   rows: 90,        // how many rows
@@ -56,6 +59,10 @@ export const DEFAULTS = {
   variety: 0.3,    // diffusion: one pattern everywhere (0) to spots, worms and coral side by side (1)
   warp: 0.3,       // diffusion: read through noise, so its even spacing goes irregular
   mix: 0.2,        // diffusion: how much of the old noise field is blended in
+  hierarchy: 0.6,  // islands all alike (0) to a few large leading many small (1)
+  age: 0.6,        // along a chain, young tall dark islands (one end) to old low sinking atolls (the other)
+  shallows: 0.4,   // how wide the pale shallow water round the land reaches
+  forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   line: 1.2,       // outline weight
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
@@ -88,17 +95,22 @@ export function ridges(dials) {
     });
     return { pts, width: (0.08 + 0.08 * rnd()) * W * (0.6 + d.land) };
   });
-  /** How strongly each chain claims a point: 1 on its line, 0 a width away. */
-  const pull = (x, y) =>
-    chains.map(({ pts, width }) => {
-      let best = Infinity;
-      for (const [px, py] of pts) {
+  /** Which chain claims a point most, how strongly (1 on its line, 0 a width away), and how far along it (0 to 1). */
+  const claim = (x, y) => {
+    let best = { c: 0, g: 0, t: 0 };
+    chains.forEach(({ pts, width }, g) => {
+      let near = Infinity, along = 0;
+      pts.forEach(([px, py], i) => {
         let dx = Math.abs(x - px);
         if (d.wrap) dx = Math.min(dx, W - dx);
-        best = Math.min(best, dx * dx + (y - py) ** 2);
-      }
-      return 1 - smooth(0, width, Math.sqrt(best));
+        const dd = dx * dx + (y - py) ** 2;
+        if (dd < near) (near = dd), (along = i);
+      });
+      const c = 1 - smooth(0, width, Math.sqrt(near));
+      if (c > best.c) best = { c, g, t: along / (pts.length - 1) };
     });
+    return best;
+  };
   // Or reaction diffusion: land where the field is high, its islands gathered into archipelagos by where they lie.
   const rd = d.source.startsWith('diffusion') ? diffusionFor(d, W, H) : null;
   const cellOf = (x, y) => [(x / W) * rd.field.nx, (y / H) * rd.field.ny];
@@ -109,45 +121,96 @@ export function ridges(dials) {
     const n = Math.max(0, Math.min(1, (land(toCell(x), yc) - 0.5) * 2.2 + 0.5));
     return (1 - d.mix) * sample(rd.field, ...cellOf(wx, wy)) + d.mix * n;
   };
-  const nearest = (x, y) => {
-    if (rd && !chains.length) {
-      const [cx, cy] = cellOf(x, y), g = rd.arch.group[Math.floor(cy) * rd.field.nx + Math.floor(cx)];
-      if (g >= 0) return g;
-      const { nx, ny } = rd.field, far = (c) => Math.hypot(Math.min(Math.abs(cx - c.x), nx - Math.abs(cx - c.x)), Math.min(Math.abs(cy - c.y), ny - Math.abs(cy - c.y)));
-      return rd.arch.centres.map((c, i) => [far(c), i]).sort((a, b) => a[0] - b[0])[0]?.[1] ?? 0;
+  /** The diffusion archipelago a point is in (or the nearest), and the rank of the island it stands on. */
+  const rdAt = (x, y) => {
+    const { nx, ny } = rd.field, [cx, cy] = cellOf(x, y);
+    const i = (((Math.floor(cy) % ny) + ny) % ny) * nx + (((Math.floor(cx) % nx) + nx) % nx);
+    const isl = rd.arch.island[i], rank = isl >= 0 ? rd.arch.rank[isl] : 1, g = rd.arch.group[i];
+    if (g >= 0) return { g, rank };
+    const far = (c) => Math.hypot(Math.min(Math.abs(cx - c.x), nx - Math.abs(cx - c.x)), Math.min(Math.abs(cy - c.y), ny - Math.abs(cy - c.y)));
+    return { g: rd.arch.centres.map((c, k) => [far(c), k]).sort((a, b) => a[0] - b[0])[0]?.[1] ?? 0, rank };
+  };
+  const nearest = (x, y) => (chains.length ? claim(x, y).g : rd ? rdAt(x, y).g : 0);
+
+  // Where each archipelago lies, for the page to give neighbours contrasting palettes; and so how its land stands.
+  const groups = rd && !chains.length
+    ? rd.arch.members.map((ms, i) => (ms.length ? ms : [rd.arch.centres[i]]).map((m) => [(m.x / rd.field.nx) * W, (m.y / rd.field.ny) * H]))
+    : chains.map((c) => c.pts);
+  const forms = d.forms ? d.forms(groups) : [];
+  const formOf = (g) => ({ ...BASE_FORM, ...(forms[g] ?? forms[0] ?? {}) });
+
+  /**
+   * Land at a point: how far into land it is (u, against the band lo to hi, times gate), whose it is (g), how far
+   * along its chain (t: the young end 0, the old 1), and how its island ranks among its neighbours (rank: largest 1).
+   */
+  const at = (x, y, yc) => {
+    if (chains.length) {
+      const { c, g, t } = claim(x, y);
+      // The main island stands near the young end of a chain; the islands thin away toward the old end.
+      const rank = 1 - d.hierarchy * 0.75 * (1 - Math.exp(-(((t - 0.12) / 0.25) ** 2)));
+      if (rd) {
+        const lo = rd.level + d.hierarchy * 0.15 * (1 - rank);
+        return { u: field(x, y, yc), lo, hi: lo + 0.12, gate: smooth(0.02, 0.35, c), g, t, rank };
+      }
+      const lo = 0.78 - d.land * 0.6;
+      return { u: c * rank * (0.2 + 1.3 * land(toCell(x) * 2.5, yc * 2.5)), lo, hi: lo + 0.14, gate: 1, g, t, rank };
     }
-    if (!chains.length) return 0;
-    const p = pull(x, y);
-    return p.indexOf(Math.max(...p));
+    if (rd) {
+      // A smaller island in its archipelago is cut lower into the sea, so a few large islands lead many small ones.
+      const { g, rank } = rdAt(x, y), lo = rd.level + d.hierarchy * 0.18 * (1 - rank);
+      return { u: field(x, y, yc), lo, hi: lo + 0.12, gate: 1, g, t: 0, rank };
+    }
+    const lo = 1 - d.land - 0.05;
+    return { u: land(toCell(x), yc), lo, hi: lo + 0.17, gate: 1, g: 0, t: 0, rank: 1 };
   };
 
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
-    // Height along the row: land decides where, crest how high, terraced into softened steps.
-    const h = xs.map((x) => {
-      // Along a chain, finer noise breaks the land into separate islands, strung along its line.
-      const v = rd ? field(x, y, yc) : 0;
-      const mask = rd
-        ? smooth(rd.level, rd.level + 0.12, v) * (chains.length ? smooth(0.02, 0.35, Math.max(...pull(x, y))) : 1)
-        : chains.length
-          ? smooth(0.78 - d.land * 0.6, 0.92 - d.land * 0.6, Math.max(...pull(x, y)) * (0.2 + 1.3 * land(toCell(x) * 2.5, yc * 2.5)))
-          : smooth(1 - d.land - 0.05, 1 - d.land + 0.12, land(toCell(x), yc));
-      if (!mask) return 0;
-      // With diffusion the field shapes the heights too: an island rises toward its heart.
+    const h = [], shelf = [], gs = [], ts = [];
+    for (const x of xs) {
+      const L = at(x, y, yc), f = formOf(L.g), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
+      gs.push(L.g), ts.push(L.t);
+      // Shallows: a reach of pale sea round the land, wider as the dial turns.
+      const sea = smooth(L.lo - span * (0.25 + 1.5 * d.shallows), L.lo, L.u) * L.gate * (d.shallows > 0 ? 1 : 0);
+      shelf.push(sea > 0.02 ? gap * (0.2 + 0.3 * sea) : 0);
+      let mask = smooth(L.lo, L.hi, L.u) * L.gate;
+      // An atoll, or an old island sinking at the far end of its chain: only a ring of land, its heart a lagoon.
+      const sinking = Math.max(f.atoll ? 1 : 0, chains.length ? smooth(1 - d.age * 0.4, 1, L.t) * (d.age > 0 ? 1 : 0) : 0);
+      if (sinking) mask *= 1 - sinking * smooth(L.hi + span * 0.6, L.hi + span * 1.4, L.u);
+      // Sheer sides: the land reaches its full height almost at once.
+      if (f.cliff) mask = smooth(0, 1 - 0.85 * f.cliff, mask);
+      if (!mask) { h.push(0); continue; }
+      // Height: the place's own, lower for a lesser island and for an older one; with diffusion, rising to the heart.
       const c = crest(toCell(x) * 3, r * 0.12);
-      const peak = (rd ? 0.4 * c + 0.6 * smooth(rd.level, 1, v) : c) ** (1 + d.rugged * 2.5);
-      const raw = mask * rise * (0.25 + 0.75 * peak);
-      const q = raw / step, k = Math.floor(q);
-      return step * (k + smooth(1 - d.soft, 1, q - k));
-    });
+      const rugged = Math.max(0, Math.min(1, d.rugged + f.rugged - age * 0.5));
+      const peak = (rd ? 0.4 * c + 0.6 * smooth(rd.level, 1, L.u) : c) ** (1 + rugged * 2.5);
+      const tall = rise * f.rise * (1 - 0.8 * age) * (1 - d.hierarchy * 0.6 * (1 - L.rank));
+      let raw = mask * tall * (0.25 + 0.75 * peak);
+      if (f.top) raw = Math.min(raw, tall * (1 - 0.65 * f.top));
+      const stp = step * f.step, soft = Math.max(0.02, Math.min(1, d.soft + f.soft));
+      const q = raw / stp, k = Math.floor(q);
+      h.push(stp * (k + smooth(1 - soft, 1, q - k)));
+    }
+    // The shallows first, so the land stands in them.
+    for (let i = 0; i < xs.length; ) {
+      if (shelf[i] <= 0) { i++; continue; }
+      let j = i;
+      while (j < xs.length && shelf[j] > 0) j++;
+      const pts = [];
+      for (let q = Math.max(0, i - 1); q <= Math.min(xs.length - 1, j); q++) pts.push([xs[q], y - (q >= i && q < j ? shelf[q] : 0)]);
+      shapes.push({ sea: true, group: gs[(i + j) >> 1], points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] });
+      i = j;
+    }
     // Each island: a run of x where the row rises. Its bands are the same profile, lowered step by step.
     for (let i = 0; i < xs.length; ) {
       if (h[i] < 0.5) { i++; continue; }
       let j = i;
       while (j < xs.length && h[j] >= 0.5) j++;
-      const start = Math.floor(rnd() * 1000), group = nearest(xs[(i + j) >> 1], y);
+      const mid = (i + j) >> 1, group = gs[mid], start = Math.floor(rnd() * 1000), stp = step * formOf(group).step;
+      // Along an aged chain, colour follows age: the young end in the palette's dark colours, the old in its light.
+      const tone = chains.length && d.age > 0 ? 0.1 + 0.8 * ts[mid] : null;
       for (let b = 0; b < d.bands; b++) {
-        const lift = b * step;
+        const lift = b * stp;
         let any = false;
         // A lowered band may split into several hills: each is its own shape.
         for (let k = i; k < j; ) {
@@ -157,7 +220,7 @@ export function ridges(dials) {
           const pts = [];
           for (let q = Math.max(0, k - 1); q <= Math.min(xs.length - 1, e); q++) pts.push([xs[q], y - Math.max(0, h[q] - lift)]);
           // Down to the floor at both ends, even where the page edge cuts the island off mid-slope.
-          if (pts.length >= 3) shapes.push({ fill: start + b, group, points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] }), (any = true);
+          if (pts.length >= 3) shapes.push({ fill: start + b, group, tone, points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] }), (any = true);
           k = e;
         }
         if (!any) break;
@@ -171,10 +234,6 @@ export function ridges(dials) {
       shapes.push({ fill: Math.floor(rnd() * 1000), group: nearest((a + b) / 2, y), points: [[a, y - gap * 0.45], [Math.min(b, xs[xs.length - 1]), y - gap * 0.45], [Math.min(b, xs[xs.length - 1]), y], [a, y]] });
     }
   }
-  // Where each archipelago lies, for the page to give neighbours contrasting palettes.
-  const groups = rd && !chains.length
-    ? rd.arch.members.map((ms, i) => (ms.length ? ms : [rd.arch.centres[i]]).map((m) => [(m.x / rd.field.nx) * W, (m.y / rd.field.ny) * H]))
-    : chains.map((c) => c.pts);
   return { width: W, height: H, shapes, line: d.line, chains: groups };
 }
 

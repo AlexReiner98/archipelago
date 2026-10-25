@@ -69,6 +69,11 @@
   <h2>Rows</h2>
   <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="20" max="200" step="1"></label>
   <label>Bars <small>none · many</small><input id="bars" type="range" min="0" max="0.6" step="0.01"></label>
+  <h2>Geography</h2>
+  <label class="check" title="Each place's own landforms: fjord cliffs, karst towers, shield volcanoes, low reef islets"><input id="forms" type="checkbox" checked> Landforms by place</label>
+  <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1" step="0.01"></label>
+  <label class="not-noise" title="Along a chain: young, tall, dark islands at one end; old, low, sinking atolls at the other">Age <small>none · strong</small><input id="age" type="range" min="0" max="1" step="0.01"></label>
+  <label title="Pale shallow water round the land">Shallows <small>none · wide</small><input id="shallows" type="range" min="0" max="1" step="0.01"></label>
   <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="3" step="0.05"></label>
   <label class="check"><input id="wrap" type="checkbox"> Repeat left to right</label>
   <div class="row">
@@ -81,10 +86,10 @@
 <main><canvas id="view"></canvas></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
-  import { PLACES, fromPixels, signature } from './palettes.js';
+  import { PLACES, fromPixels, signature, shallowOf } from './palettes.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'bars', 'line'];
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'bars', 'line', 'hierarchy', 'age', 'shallows'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   const palettes = Object.fromEntries(Object.entries(PLACES).map(([k, p]) => [k, structuredClone(p)]));
   $('place').innerHTML = Object.entries(palettes).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('');
@@ -117,20 +122,25 @@
     }
   }
 
-  const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed });
-  // A colour for a shape's number: in proportion to the palette's weights when it has them, else evenly.
-  const colourOf = (p, i) => {
-    if (!p.weights || !$('weighted').checked) return p.colours[i % p.colours.length];
-    const total = p.weights.reduce((a, b) => a + b, 0);
+  // The archipelagos' palettes are given as the land is laid out, so each can also set how its land stands.
+  const forms = (groups) => (assign(groups, 800), groups.length ? given.map((k) => palettes[k].form) : [pal().form]);
+  const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) });
+  // A colour for a shape's number: in proportion to the palette's weights when it has them, else evenly. With a
+  // tone (0 dark to 1 light), colours near that lightness are favoured: the palettes run dark to light.
+  const colourOf = (p, i, tone = null) => {
+    const n = p.colours.length;
+    let w = p.weights && $('weighted').checked ? [...p.weights] : p.colours.map(() => 1);
+    if (tone !== null) w = w.map((x, k) => x * Math.exp(-((k / (n - 1) - tone) ** 2) / 0.06));
+    const total = w.reduce((a, b) => a + b, 0);
     let t = ((Math.imul(i, 2654435761) >>> 0) / 4294967296) * total;
-    for (let k = 0; k < p.colours.length; k++) if ((t -= p.weights[k]) < 0) return p.colours[k];
-    return p.colours[p.colours.length - 1];
+    for (let k = 0; k < n; k++) if ((t -= w[k]) < 0) return p.colours[k];
+    return p.colours[n - 1];
   };
+  const fillOf = (s) => (s.sea ? shallowOf(palOf(s.group)) : colourOf(palOf(s.group), s.fill, s.tone));
 
   function draw() {
     const t0 = performance.now(), p = pal();
     const pic = ridges(dials());
-    assign(pic.chains, pic.width);
     const cv = $('view'), dpr = devicePixelRatio || 1;
     cv.width = pic.width * dpr; cv.height = pic.height * dpr;
     cv.style.aspectRatio = `${pic.width} / ${pic.height}`;
@@ -143,8 +153,9 @@
       s.points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
       if (s.line) { if (pic.line) g.stroke(); continue; }
       g.closePath();
-      g.fillStyle = colourOf(palOf(s.group), s.fill); g.fill();
-      if (pic.line) g.stroke();
+      g.fillStyle = fillOf(s); g.fill();
+      // Shallows are drawn with a finer line, so the land stays the subject.
+      if (pic.line) { g.lineWidth = s.sea ? pic.line * 0.5 : pic.line; g.stroke(); }
     }
     $('bandsOut').textContent = $('bands').value;
     $('rowsOut').textContent = $('rows').value;
@@ -195,7 +206,7 @@
   $('reseed').onclick = () => ((seed += 1), draw());
   $('place').onchange = () => (swatches(), draw());
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
-  for (const k of [...DIALS, 'wrap', 'weighted']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
+  for (const k of [...DIALS, 'wrap', 'weighted', 'forms']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
   const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
   $('source').addEventListener('change', () => (showSource(), draw()));
   showSource();
@@ -205,9 +216,8 @@
   $('png').onclick = () => $('view').toBlob((b) => save(`archipelago-${$('place').value}-${seed}.png`, b));
   $('svg').onclick = () => {
     const p = pal(), pic = ridges(dials()), f = (v) => +v.toFixed(1);
-    assign(pic.chains, pic.width);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
-    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none"/>` : `<path d="${d(s)}" fill="${colourOf(palOf(s.group), s.fill)}"/>`)).join('');
+    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${p.paper}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
   };
 

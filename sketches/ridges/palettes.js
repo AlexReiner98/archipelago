@@ -215,3 +215,25 @@ export function fromPixels(data, k = 9, seed = 1) {
     weights: chosen.map((i) => +(share[i] ** 0.6).toFixed(3)),
   };
 }
+
+// How each place's land stands, on top of the dials: height and step as multiples, ruggedness and softness as
+// shifts, flat tops (top) and sheer sides (cliff) from 0 to 1, and whether its islands are reef rings (atoll).
+const FORMS = {
+  faroe: { rise: 1.25, rugged: 0.2, step: 1.1, soft: -0.15, top: 0, cliff: 0.6 },        // fjord cliffs, crisp steps
+  svalbard: { rise: 1.1, rugged: 0.3, step: 1, soft: -0.1, top: 0, cliff: 0.5 },         // glaciated peaks
+  rajaAmpat: { rise: 1, rugged: -0.2, step: 0.8, soft: -0.05, top: 0.65, cliff: 0.9 },   // karst towers, sheer and flat-topped
+  galapagos: { rise: 0.9, rugged: -0.35, step: 1, soft: 0.2, top: 0, cliff: 0 },         // broad shield volcanoes
+  hawaii: { rise: 1.35, rugged: -0.15, step: 1, soft: 0.15, top: 0, cliff: 0.2 },        // tall volcanoes
+  maldives: { rise: 0.22, rugged: -0.4, step: 0.7, soft: 0.3, top: 0, cliff: 0, atoll: true }, // low reef islets
+  cyclades: { rise: 0.8, rugged: 0.1, step: 1, soft: 0, top: 0, cliff: 0.45 },           // dry hills, caldera walls
+  haidaGwaii: { rise: 0.8, rugged: 0, step: 1, soft: 0.1, top: 0, cliff: 0.2 },          // forested, rolling
+};
+for (const [k, p] of Object.entries(PLACES)) p.form = FORMS[k.replace(/Hand$/, '')];
+
+/** The colour of a place's shallows: its most sea-like colour (blue to cyan, not dark), lifted toward the light. */
+export function shallowOf({ colours }) {
+  const sea = colours.map((h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))));
+  const score = ([L, a, b]) => -b * 2 - Math.max(0, a) * 2 + Math.min(L, 0.7) - Math.abs(a + 0.03) * 0.5;
+  const [L, a, b] = sea.reduce((best, c) => (score(c) > score(best) ? c : best));
+  return hex([Math.max(L, 0.78), a * 0.6, b * 0.6]);
+}

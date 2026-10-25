@@ -103,7 +103,14 @@ export function archipelagos({ nx, ny, v }, t, k, seed = 1) {
   const { of, centres, nearest } = byPlace(points, k, nx, ny, seed);
   const group = new Int32Array(size).fill(-1);
   for (let i = 0; i < size; i++) if (island[i] >= 0) group[i] = byIsland ? of[island[i]] : nearest(i % nx, Math.floor(i / nx));
-  return { group, centres, members: centres.map((_, i) => points.filter((_, j) => of[j] === i)) };
+  // Each island's standing in its archipelago: the largest 1, the next smaller as sizes fall away (Zipf-like).
+  const rank = new Float32Array(middles.length).fill(1), byGroup = new Map();
+  middles.forEach((m, i) => {
+    const g = group[Math.round(m.y) % ny * nx + (Math.round(m.x) % nx)];
+    (byGroup.get(g) ?? byGroup.set(g, []).get(g)).push(i);
+  });
+  for (const ids of byGroup.values()) ids.sort((a, b) => middles[b].n - middles[a].n).forEach((id, r) => (rank[id] = (r + 1) ** -0.6));
+  return { group, island, rank, centres, members: centres.map((_, i) => points.filter((_, j) => of[j] === i)) };
 }
 
 /** k-means over points on the torus: k centres started far apart, biggest first, settled across the seams. */
