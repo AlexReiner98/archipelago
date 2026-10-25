@@ -12,28 +12,28 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
 
   // What the canvas draws: a flat lens and the style go in the address, as the page reads them, and a lens that could not be drawn is refused here.
   await call('/agent/show', undefined, { actor: 'robot', lens: { filter: { text: 'login', links: ['waits_on me'], exclude: ['closed'] }, walk: { over: ['depends_on'], steps: 2 } }, style: { lit: 'blocked' } });
-  assert.equal((await call('/api/pulse')).result.focus.hash, 'v?text=login&link=waits_on+me&exclude=closed&over=depends_on&steps=2&lit=blocked');
+  assert.equal((await call('/api/tail')).result.focus.hash, 'v?text=login&link=waits_on+me&exclude=closed&over=depends_on&steps=2&lit=blocked');
   await call('/agent/show', undefined, { actor: 'robot', lens: {} });
-  assert.equal((await call('/api/pulse')).result.focus.hash, 'v', 'the canvas as it opens');
+  assert.equal((await call('/api/tail')).result.focus.hash, 'v', 'the canvas as it opens');
   assert.match((await call('/agent/show', undefined, { lens: { filter: {} } })).error, /includes something/);
   assert.match((await call('/agent/show', undefined, { lens: { filter: { ids: ['e_nothing0'] } } })).error, /No item/);
   assert.match((await call('/agent/show', undefined, { lens: { filter: { text: 'x' }, walk: { over: ['nope'] } } })).error, /unknown link type/);
 
   await call('/agent/show', undefined, { actor: 'robot', screen: 'roadmap', of: 'e_x', note: 'Look here' });
-  const shown = (await call('/api/pulse')).result.focus;
+  const shown = (await call('/api/tail')).result.focus;
   assert.deepEqual([shown.hash, shown.actor, shown.note], ['roadmap/e_x', 'robot', 'Look here']);
 
   await call('/agent/change', undefined, { actor: 'robot', reason: 'A note', ops: [{ op: 'create', type: 'work.note', title: 'N' }] });
-  const proposed = (await call('/api/pulse')).result.focus;
+  const proposed = (await call('/api/tail')).result.focus;
   assert.deepEqual([proposed.hash, proposed.note], ['review', 'A note'], 'a change that waits for review points at Review');
   assert.ok(proposed.at >= shown.at);
 
   await call('/api/change', undefined, { reason: 'mine', ops: [{ op: 'create', type: 'work.note', title: 'M' }] });
-  assert.equal((await call('/api/pulse')).result.focus.hash, 'review', 'the human\'s own changes do not move their screen');
+  assert.equal((await call('/api/tail')).result.focus.hash, 'review', 'the human\'s own changes do not move their screen');
 
   // Every step an agent takes is kept, the last few of them, each with its kind: the page follows the kinds the person chose.
-  const last = async () => (await call('/api/pulse')).result.steps.at(-1);
-  const sofar = (await call('/api/pulse')).result.steps.slice(-4);
+  const last = async () => (await call('/api/tail')).result.steps.at(-1);
+  const sofar = (await call('/api/tail')).result.steps.slice(-4);
   assert.deepEqual(sofar.map((s: any) => s.kind), ['show', 'show', 'show', 'change'], 'a show and an agent\'s change are steps; a refused call and the human\'s change are not');
   assert.deepEqual([sofar[2].did, sofar[2].hash, sofar[3].did], ['Look here', 'roadmap/e_x', 'A note']);
   await call('/agent/search', undefined, { actor: 'robot', q: 'N' });
@@ -50,10 +50,10 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   await call('/agent/proposals', undefined, { actor: 'robot' });
   assert.deepEqual([(await last()).kind, (await last()).did], ['read', 'proposals']);
   for (let i = 0; i < 12; i++) await call('/agent/search', undefined, { actor: 'robot', q: 'N' });
-  const kept = (await call('/api/pulse')).result.steps;
+  const kept = (await call('/api/tail')).result.steps;
   assert.equal(kept.length, 12, 'only the last few are kept');
   assert.ok(kept.every((s: any, i: number) => !i || s.at > kept[i - 1].at));
-  assert.equal((await call('/api/pulse')).result.focus.hash, 'review', 'a step leaves where the agent pointed as it was');
+  assert.equal((await call('/api/tail')).result.focus.hash, 'review', 'a step leaves where the agent pointed as it was');
 });
 
 test('an agent hears what the human does: by waiting for it, and with the owner\'s next message', async () => {
@@ -67,12 +67,12 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
 
   const waiting = call('/agent/watch', undefined, { after: latest, wait_seconds: 20 });
   await new Promise((r) => setTimeout(r, 300));
-  assert.equal((await call('/api/pulse')).result.listening, 1, 'the UI can see someone is listening');
+  assert.equal((await call('/api/tail')).result.listening, 1, 'the UI can see someone is listening');
   await call('/agent/change', undefined, { actor: 'robot', reason: 'noise', ops: [{ op: 'create', type: 'work.note', title: 'An agent\'s own change' }] });
   await call('/api/change', undefined, { reason: 'Decided in the UI', ops: [{ op: 'update', id, status: 'decided', props: { outcome: 'This one' } }] });
   const heard = (await waiting).result;
   assert.deepEqual([heard.changes.length, heard.changes[0].target.title, heard.changes[0].changes['props.outcome'].to], [1, 'Which?', 'This one'], 'woken by the human\'s change, not the agent\'s');
-  assert.equal((await call('/api/pulse')).result.listening, 0);
+  assert.equal((await call('/api/tail')).result.listening, 0);
 
   const told = await call('/hooks/prompt', undefined, { session_id: 's1' });
   assert.match(told.hookSpecificOutput.additionalContext, /entity\.update work\.decision "Which\?".*props\.outcome: nothing -> "This one"/s);

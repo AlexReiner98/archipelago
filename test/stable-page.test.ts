@@ -1,31 +1,35 @@
-// A page stays still while the map changes under it. The pulse says what the changes since the last look touched
-// (src/touched.ts); in a real browser (skipped where there is no Chrome), an item's page left open while three agents
+// A page stays still while the map changes under it. It reads the log forward on what it shows (`tail`,
+// src/tail.ts); in a real browser (skipped where there is no Chrome), an item's page left open while three agents
 // write elsewhere is not drawn again, is not taken to what they changed, and a change to an item on it shows in place,
-// with nothing reloaded and an open fold left open.
+// with nothing reloaded and an open fold left open. A store holding a flat lens's answer (ui/replica.js) is brought up
+// to date by an agent's change with no lens read.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { touched } from '../src/touched.ts';
+import { callTool } from '../src/tools.ts';
 import { chrome, open } from './browser.ts';
-import { fresh, make } from './map.ts';
+import { fresh, human, make } from './map.ts';
 import { serve } from './serve.ts';
 
-test('the pulse says which items the changes since a look touched: what changed and both ends of a link', async () => {
+test('the tail says what the changes since a look did to what is shown: what changed and the link made to it', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
     { op: 'create', ref: 'q', type: 'work.project', title: 'Q' },
   ]);
-  const { seq } = await touched(l.db);
-  assert.deepEqual(await touched(l.db, seq), { seq, ids: [], made: 0 }, 'nothing changed since');
+  const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;
+  const { pos, seq } = await tail({});
+  const still = await tail({ after: pos, seq, ids: [made.p, made.q] });
+  assert.deepEqual([still.pos, still.entries, still.events, still.made], [pos, [], [], 0], 'nothing changed since');
   const more = await make(l, [
     { op: 'create', ref: 't', type: 'work.task', title: 'T' },
     { op: 'link', type: 'part_of', from: 't', to: made.p },
   ]);
-  const after = await touched(l.db, seq);
-  assert.ok(after.seq > seq);
-  assert.ok(after.ids!.includes(more.t) && after.ids!.includes(made.p), 'the new item and what it was linked to');
-  assert.ok(!after.ids!.includes(made.q), 'not what was left alone');
+  const after = await tail({ after: pos, seq, ids: [made.p, made.q] });
+  assert.ok(after.pos > pos);
+  const named = new Set(after.entries.flatMap((e: any) => e.facts.flatMap((f: any) => (f[2] === 'link' ? f[3].slice(1) : [f[1]]))));
+  assert.ok(named.has(more.t) && named.has(made.p), 'the new item and what it was linked to');
+  assert.ok(!named.has(made.q), 'not what was left alone');
   assert.equal(after.made, 1);
 });
 
@@ -77,6 +81,53 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     assert.ok(await until(`document.querySelector('main').textContent.includes('Renamed on the page')`), 'the change shows');
     const after = await page.evaluate<{ mark: number; open: boolean }>(`({ mark: window.stillMark, open: [...document.querySelectorAll('details.fold')].at(-1).open })`);
     assert.deepEqual(after, { mark: 1, open: true }, 'not reloaded, the open fold still open');
+  } finally {
+    page.close();
+  }
+});
+
+test("in a browser, an agent's change reaches a store holding a flat lens's answer, with no lens read", { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  await call('/api/workspace_set', undefined, { agent_changes: 'apply' });
+  const change = async (ops: unknown[]) => {
+    const res = (await (await fetch(`${base}/agent/change`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ actor: 'agent:test', reason: 'test', ops }) })).json()) as any;
+    assert.equal(res.result?.status, 'applied', JSON.stringify(res));
+    return res.result.created as Record<string, string>;
+  };
+  const made = await change([
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Canvas' },
+    { op: 'create', ref: 'a', type: 'work.task', title: 'Flat lens' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'p' },
+  ]);
+  const page = await open(`${base}/#/e/${made.p}`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const until = async (expression: string) => {
+    for (const end = Date.now() + 15000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
+    return false;
+  };
+  try {
+    assert.ok(await until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Canvas'`), 'the page is drawn');
+    // The page's own modules, as it loaded them: a store from live.js, holding the flat lens around the project.
+    await page.evaluate(`(async () => {
+      const at = (name) => document.querySelector('link[rel="modulepreload"][href^="/' + name + '.js"]').getAttribute('href');
+      const [{ api }, live] = await Promise.all([import(at('base')), import(at('live'))]);
+      window.store = await live.replicate(() => api('view', { name: 'flat', params: { filter: { ids: ['${made.p}'] }, walk: { over: ['part_of'], steps: 1 } } }));
+      window.heard = [];
+      window.store.on((changed) => window.heard.push(changed));
+      // Every lens read from here on is counted.
+      window.reads = 0;
+      const fetched = window.fetch;
+      window.fetch = (url, init) => ((String(url).includes('/api/view') && (window.reads += 1)), fetched(url, init));
+    })()`);
+    assert.equal(await page.evaluate(`window.store.answer().items.length`), 2);
+    const more = await change([
+      { op: 'update', id: made.a, title: 'A flat lens' },
+      { op: 'create', ref: 'r', type: 'work.task', title: 'Replica' },
+      { op: 'link', type: 'part_of', from: 'r', to: made.p },
+    ]);
+    assert.ok(await until(`window.store.item('${made.a}')?.title === 'A flat lens' && window.store.item('${more.r}')?.title === 'Replica'`), 'the change reaches the store');
+    const seen = await page.evaluate<{ reads: number; links: number; added: string[] }>(`({ reads: window.reads, links: window.store.answer().links.length, added: window.heard.flatMap((c) => c.items.added) })`);
+    assert.deepEqual(seen, { reads: 0, links: 2, added: [more.r] }, 'with no lens read, the new task and its link in the store, the listener told');
   } finally {
     page.close();
   }

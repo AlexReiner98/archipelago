@@ -1,9 +1,12 @@
 import { api, h, hooks, main, route, state } from './base.js';
+import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
+import { types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
-// The server's pulse moves whenever the map or what is held for the owner does, and says
-// which items the changes since the last look touched. The page is drawn again, in place,
+// The page reads the log forward (`tail`, src/tail.ts): the facts after where it stands on
+// what it holds. A store that holds a lens's answer (ui/replica.js) projects them itself; the
+// sheet learns which of its items they touched. The page is drawn again, in place,
 // only when one of them is on it, unless that would throw away something half done
 // (typed text, ticked boxes, an open question, a graph being explored); then a notice
 // offers the refresh instead. A change elsewhere on the map leaves the page still.
@@ -139,7 +142,26 @@ export function shownIds() {
 /** The canvas behind the sheet (ui/canvas.js): the view it draws. */
 const canvasView = () => document.querySelector('#canvas > .lens-wrap');
 
-/** Whether what changed (the pulse's `touched`, and whether the held changes or a story moved) bears on the page in view. */
+/** What the projector asks of the types, read from the schema the page loaded; and which fields a lens sends. */
+export const kinds = {
+  isOpen: (type, status) => types.get(type)?.statuses?.open?.includes(status) ?? true,
+  type: (id) => types.get(id),
+  relationFamily: (...roots) => roots,
+  shown: (type, field) => Boolean(types.get(type)?.fields?.[field]?.shown),
+};
+
+/**
+ * A store holding what `read` answers (a flat lens's answer), kept current from the log from then on: where the log
+ * stands is read first, so nothing said while the lens is read is missed. Stop with `unfollow` (ui/replica.js).
+ */
+export async function replicate(read) {
+  const { pos } = await api('tail', {});
+  const store = new Replica(kinds);
+  store.hold(await read(), pos);
+  return keepCurrent(store);
+}
+
+/** Whether what changed (the items facts and events touched, and whether the held changes or a story moved) bears on the page in view. */
 export function bears(touched, queueMoved) {
   if (!touched || touched.ids === null) return true;
   // A list or a screen may hold an item just made; Home holds what waits for the owner.
@@ -149,17 +171,41 @@ export function bears(touched, queueMoved) {
   return touched.ids.some((id) => ids.has(id));
 }
 
+/** The items the facts after `pos` and the other events touched: both ends of a link; null when the read stopped short. */
+function touchedBy(beat, pos) {
+  if (beat.more) return { ids: null, made: beat.made };
+  const ids = new Set([...(beat.events ?? []), ...(beat.gone ?? [])]);
+  for (const e of beat.entries ?? []) if (e.pos > pos) for (const f of e.facts) for (const id of f[2] === 'link' && f[0] === '+' ? f[3].slice(1) : [f[1]]) ids.add(id);
+  return { ids: [...ids], made: beat.made ?? 0 };
+}
+
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;
-export async function checkPulse() {
+export async function checkTail() {
   if (document.hidden || redrawing) return;
   let now;
   let touched;
+  let more = false;
   try {
-    const beat = await api('pulse', state.seq === undefined ? {} : { since: state.seq });
-    now = beat.stamp;
-    touched = beat.touched;
-    state.seq = touched?.seq ?? state.seq;
+    // From the furthest back of the page and its stores, on everything any of them holds.
+    const stores = [...kept];
+    const at = [state.pos, ...stores.map((s) => s.pos)].filter((pos) => pos !== undefined);
+    const from = at.length ? Math.min(...at) : undefined;
+    const ids = [...new Set([...shownIds(), ...stores.flatMap((s) => s.ids())])];
+    const beat = await api('tail', from === undefined ? {} : { after: from, seq: state.seq, ids });
+    // Only an answer that read the facts moves a store: one that says only where the log stands would skip them.
+    if (beat.entries) for (const store of stores) {
+      try {
+        store.apply(beat);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    touched = state.pos === undefined ? undefined : touchedBy(beat, state.pos);
+    now = `${beat.pos}.${beat.seq}.${beat.queue}`;
+    state.pos = beat.pos;
+    state.seq = beat.seq;
+    more = Boolean(beat.more);
     // The page's own files changed on the server: load them, unless that would
     // throw away something half done.
     if (uiFiles !== undefined && beat.ui !== uiFiles) {
@@ -179,14 +225,15 @@ export async function checkPulse() {
   } catch {
     return;
   }
-  const was = state.pulse;
+  const was = state.stamp;
   const moved = was !== undefined && now !== was;
-  state.pulse = now;
+  state.stamp = now;
+  if (more) setTimeout(checkTail);
   if (!moved) return;
   if (state.selfDrawn) return void (state.selfDrawn = false);
-  // Only the map's events moved, and none of them is on the sheet: it stays as it is, and the canvas asks again if
-  // they are on it (drawn again only where its answer changed).
-  if (!bears(touched, now.split('.').slice(1).join() !== was.split('.').slice(1).join())) {
+  // Only the map moved, and nothing of it is on the sheet: it stays as it is, and the canvas asks again if
+  // it is on it (drawn again only where its answer changed).
+  if (!bears(touched, now.split('.').slice(2).join() !== was.split('.').slice(2).join())) {
     const drawn = canvasView();
     if (!touched || touched.ids === null || touched.made || touched.ids.some((id) => drawn?.answer?.items.some((i) => i.id === id))) drawn?.refresh?.();
     return;
@@ -205,5 +252,5 @@ export async function checkPulse() {
   }
   setTimeout(() => (main.style.minHeight = ''), 1000);
 }
-setInterval(checkPulse, 2000);
-document.addEventListener('visibilitychange', checkPulse);
+setInterval(checkTail, 2000);
+document.addEventListener('visibilitychange', checkTail);

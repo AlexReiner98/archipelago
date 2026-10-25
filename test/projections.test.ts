@@ -7,7 +7,6 @@ import { test } from 'node:test';
 import { agent, fresh, human, make, replayed } from './map.ts';
 import { callTool, humanChanges, latestSeq } from '../src/tools.ts';
 import { FACT_ACTIONS, readEvents } from '../src/eventlog.ts';
-import { touched } from '../src/touched.ts';
 import { undo } from '../src/undo.ts';
 
 test('every projection made again from the log is the live one', async () => {
@@ -116,9 +115,6 @@ test('what a change set did is read from the log, not kept a second time as even
   const paged = [...(await readEvents(l.db, { limit: 2 })), ...(await readEvents(l.db, { limit: 50, before: (await readEvents(l.db, { limit: 2 })).at(-1)!.seq }))];
   assert.deepEqual(paged.map((e) => e.seq), everything.map((e) => e.seq));
   assert.equal(new Set(everything.map((e) => e.seq)).size, everything.length, 'each event its own number');
-  const after = await touched(l.db, start);
-  assert.deepEqual(new Set(after.ids), new Set([made.p, made.t]));
-  assert.equal(after.made, 2);
   assert.deepEqual((await humanChanges(l, start)).map((c) => c.action), ['entity.create', 'entity.create', 'relation.link', 'entity.update']);
 
   // An event about what a viewer may not see is not theirs to read.

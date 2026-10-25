@@ -3,7 +3,7 @@
 
 import { applyTheme } from './theme.js';
 
-export const state = { schema: undefined, pulse: undefined, seq: undefined, dirty: false, selfDrawn: false };
+export const state = { schema: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false };
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
 
@@ -128,7 +128,8 @@ export const known = {
 export function enter(token) {
   store.token = token;
   state.schema = undefined;
-  state.pulse = undefined;
+  // Where the page stood in the log was the other workspace's.
+  state.stamp = state.pos = state.seq = undefined;
   // A sign-in opens on Home, as the app does: a new workspace's first steps are there.
   if (location.hash && location.hash !== '#/home') location.hash = '#/home';
   else route();
