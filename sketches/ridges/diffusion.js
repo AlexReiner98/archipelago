@@ -11,10 +11,30 @@ const random = (seed) => () => {
 /** The spectrum the pattern dial runs along: dividing spots (0), worms (0.5), coral labyrinth (1). */
 export const rates = (t) => ({ feed: 0.0367 + (0.0545 - 0.0367) * t, kill: 0.0649 + (0.062 - 0.0649) * t });
 
-/** v, 0 to 1, on an nx × ny torus. */
-export function grow({ nx, ny, pattern = 0.3, steps = 4000, seed = 1 }) {
-  const { feed, kill } = rates(pattern), rnd = random(seed * 104729 + 7);
+/** Smooth noise over the torus, 0 to 1: a few random values per side, eased between, wrapping. */
+function torusNoise(nx, ny, cells, rnd) {
+  const gx = cells, gy = Math.max(1, Math.round((cells * ny) / nx)), g = Array.from({ length: gx * gy }, rnd);
+  const s = (t) => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const fx = (x / nx) * gx, fy = (y / ny) * gy, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = s(fx - x0), ty = s(fy - y0);
+    const at = (i, j) => g[(((j % gy) + gy) % gy) * gx + (((i % gx) + gx) % gx)];
+    return (at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx) * (1 - ty) + (at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx) * ty;
+  };
+}
+
+/**
+ * v, 0 to 1, on an nx × ny torus. With variety, the pattern is not one setting but drifts across the page with a
+ * slow noise: spots in one place, worms or coral in another, grown as one field.
+ */
+export function grow({ nx, ny, pattern = 0.3, variety = 0, steps = 4000, seed = 1 }) {
+  const rnd = random(seed * 104729 + 7);
   const size = nx * ny;
+  const drift = torusNoise(nx, ny, 3, random(seed * 7 + 11));
+  const feedAt = new Float32Array(size), killAt = new Float32Array(size);
+  for (let i = 0; i < size; i++) {
+    const t = Math.max(0, Math.min(1, pattern + variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5)));
+    ({ feed: feedAt[i], kill: killAt[i] } = rates(t));
+  }
   let u = new Float32Array(size).fill(1), v = new Float32Array(size), u2 = new Float32Array(size), v2 = new Float32Array(size);
   // Seeds: small squares of the second chemical, enough that the field fills fast.
   for (let s = 0; s < 6 + Math.round(size / 300); s++) {
@@ -36,8 +56,8 @@ export function grow({ nx, ny, pattern = 0.3, steps = 4000, seed = 1 }) {
       const lu = 0.2 * (u[nb[j]] + u[nb[j + 1]] + u[nb[j + 2]] + u[nb[j + 3]]) + 0.05 * (u[nb[j + 4]] + u[nb[j + 5]] + u[nb[j + 6]] + u[nb[j + 7]]) - ui;
       const lv = 0.2 * (v[nb[j]] + v[nb[j + 1]] + v[nb[j + 2]] + v[nb[j + 3]]) + 0.05 * (v[nb[j + 4]] + v[nb[j + 5]] + v[nb[j + 6]] + v[nb[j + 7]]) - vi;
       const uvv = ui * vi * vi;
-      u2[i] = ui + lu - uvv + feed * (1 - ui);
-      v2[i] = vi + 0.5 * lv + uvv - (feed + kill) * vi;
+      u2[i] = ui + lu - uvv + feedAt[i] * (1 - ui);
+      v2[i] = vi + 0.5 * lv + uvv - (feedAt[i] + killAt[i]) * vi;
     }
     [u, u2] = [u2, u];
     [v, v2] = [v2, v];

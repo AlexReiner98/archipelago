@@ -48,10 +48,14 @@ export const DEFAULTS = {
   soft: 0.3,       // how rounded each stair-step is
   bands: 3,        // colour bands nested in each island
   bars: 0.15,      // how often a row's floor is a bar of colour
-  source: 'chains', // where land is: 'noise' (one field), 'chains' (curves), 'diffusion' (reaction-diffusion)
+  source: 'chains', // where land is: 'noise' (one field), 'chains' (curves), 'diffusion' (reaction-diffusion),
+                   // 'diffusion-chains' (diffusion islands only along the chains)
   chains: 4,       // archipelagos on the page: chains to draw, or groups of diffusion islands
   pattern: 0.3,    // diffusion: dividing spots (0), worms (0.5), coral labyrinth (1)
   scale: 0.4,      // diffusion: large forms (0) to fine (1)
+  variety: 0.3,    // diffusion: one pattern everywhere (0) to spots, worms and coral side by side (1)
+  warp: 0.3,       // diffusion: read through noise, so its even spacing goes irregular
+  mix: 0.2,        // diffusion: how much of the old noise field is blended in
   line: 1.2,       // outline weight
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
@@ -75,7 +79,7 @@ export function ridges(dials) {
 
   // Island chains: each a gentle curve across the page that land gathers along. With none, land is wherever
   // the noise says, as one archipelago.
-  const chains = Array.from({ length: d.source === 'chains' ? d.chains : 0 }, () => {
+  const chains = Array.from({ length: d.source.endsWith('chains') ? d.chains : 0 }, () => {
     const cx = M + rnd() * (W - 2 * M), cy = M + rnd() * (H - 2 * M), a = rnd() * Math.PI, len = (0.35 + 0.4 * rnd()) * W, bend = (rnd() - 0.5) * 0.7 * len;
     const p0 = [cx - (Math.cos(a) * len) / 2, cy - (Math.sin(a) * len) / 2], p2 = [cx + (Math.cos(a) * len) / 2, cy + (Math.sin(a) * len) / 2], p1 = [cx - Math.sin(a) * bend, cy + Math.cos(a) * bend];
     const pts = Array.from({ length: 33 }, (_, i) => {
@@ -96,10 +100,17 @@ export function ridges(dials) {
       return 1 - smooth(0, width, Math.sqrt(best));
     });
   // Or reaction diffusion: land where the field is high, its islands gathered into archipelagos by where they lie.
-  const rd = d.source === 'diffusion' ? diffusionFor(d, W, H) : null;
+  const rd = d.source.startsWith('diffusion') ? diffusionFor(d, W, H) : null;
   const cellOf = (x, y) => [(x / W) * rd.field.nx, (y / H) * rd.field.ny];
+  // The field as read here: through a noise warp, with some of the noise field blended in.
+  const field = (x, y, yc) => {
+    const w = d.warp * 0.12 * W;
+    const wx = x + (land(toCell(x) * 2 + 7, yc * 2) - 0.5) * 2 * w, wy = y + (land(toCell(x) * 2, yc * 2 + 7) - 0.5) * 2 * w;
+    const n = Math.max(0, Math.min(1, (land(toCell(x), yc) - 0.5) * 2.2 + 0.5));
+    return (1 - d.mix) * sample(rd.field, ...cellOf(wx, wy)) + d.mix * n;
+  };
   const nearest = (x, y) => {
-    if (rd) {
+    if (rd && !chains.length) {
       const [cx, cy] = cellOf(x, y), g = rd.arch.group[Math.floor(cy) * rd.field.nx + Math.floor(cx)];
       if (g >= 0) return g;
       const { nx, ny } = rd.field, far = (c) => Math.hypot(Math.min(Math.abs(cx - c.x), nx - Math.abs(cx - c.x)), Math.min(Math.abs(cy - c.y), ny - Math.abs(cy - c.y)));
@@ -115,9 +126,9 @@ export function ridges(dials) {
     // Height along the row: land decides where, crest how high, terraced into softened steps.
     const h = xs.map((x) => {
       // Along a chain, finer noise breaks the land into separate islands, strung along its line.
-      const v = rd ? sample(rd.field, ...cellOf(x, y)) : 0;
+      const v = rd ? field(x, y, yc) : 0;
       const mask = rd
-        ? smooth(rd.level, rd.level + 0.12, v)
+        ? smooth(rd.level, rd.level + 0.12, v) * (chains.length ? smooth(0.02, 0.35, Math.max(...pull(x, y))) : 1)
         : chains.length
           ? smooth(0.78 - d.land * 0.6, 0.92 - d.land * 0.6, Math.max(...pull(x, y)) * (0.2 + 1.3 * land(toCell(x) * 2.5, yc * 2.5)))
           : smooth(1 - d.land - 0.05, 1 - d.land + 0.12, land(toCell(x), yc));
@@ -161,7 +172,7 @@ export function ridges(dials) {
     }
   }
   // Where each archipelago lies, for the page to give neighbours contrasting palettes.
-  const groups = rd
+  const groups = rd && !chains.length
     ? rd.arch.members.map((ms, i) => (ms.length ? ms : [rd.arch.centres[i]]).map((m) => [(m.x / rd.field.nx) * W, (m.y / rd.field.ny) * H]))
     : chains.map((c) => c.pts);
   return { width: W, height: H, shapes, line: d.line, chains: groups };
@@ -171,8 +182,8 @@ export function ridges(dials) {
 let grown = {};
 function diffusionFor(d, W, H) {
   const nx = Math.round(40 + d.scale * 70), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
-  const key = `${nx}|${ny}|${d.pattern}|${d.seed}`;
-  if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, seed: d.seed }) };
+  const key = `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
+  if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
   const akey = `${level}|${d.chains}`;
   if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, Math.max(1, d.chains), d.seed) });
   return { field: grown.field, arch: grown.arch, level };

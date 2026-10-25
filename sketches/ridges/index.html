@@ -48,9 +48,13 @@
     <option value="noise">Land from noise: one field</option>
     <option value="chains" selected>Land from chains</option>
     <option value="diffusion">Land from diffusion</option>
+    <option value="diffusion-chains">Diffusion along chains</option>
   </select>
   <label class="only-diffusion">Pattern <small>spots · worms · coral</small><input id="pattern" type="range" min="0" max="1" step="0.05"></label>
   <label class="only-diffusion">Scale <small>large · fine</small><input id="scale" type="range" min="0" max="1" step="0.05"></label>
+  <label class="only-diffusion" title="Spots, worms and coral side by side, drifting across the page">Variety <small>one · many</small><input id="variety" type="range" min="0" max="1" step="0.05"></label>
+  <label class="only-diffusion" title="Read the field through noise, so its spacing goes irregular">Warp <small>even · wild</small><input id="warp" type="range" min="0" max="1" step="0.01"></label>
+  <label class="only-diffusion" title="Blend in the noise field: islands of every size">Noise <small>pure · mixed</small><input id="mix" type="range" min="0" max="0.8" step="0.01"></label>
   <label class="not-noise">Archipelagos <output id="chainsOut"></output><input id="chains" type="range" min="1" max="7" step="1" title="How many archipelagos share the page"></label>
   <div class="mix" id="mix" title="Which places' palettes the chains take, in turn, after the palette above"></div>
   <h2>Land</h2>
@@ -80,7 +84,7 @@
   import { PLACES, fromPixels, signature } from './palettes.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'bars', 'line'];
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'bars', 'line'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   const palettes = Object.fromEntries(Object.entries(PLACES).map(([k, p]) => [k, structuredClone(p)]));
   $('place').innerHTML = Object.entries(palettes).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('');
@@ -191,8 +195,8 @@
   $('reseed').onclick = () => ((seed += 1), draw());
   $('place').onchange = () => (swatches(), draw());
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
-  for (const k of [...DIALS, 'wrap', 'weighted']) $(k).addEventListener(k === 'pattern' || k === 'scale' ? 'change' : 'input', draw);
-  const showSource = () => { document.body.classList.toggle('diffusion', $('source').value === 'diffusion'); document.body.classList.toggle('noise', $('source').value === 'noise'); };
+  for (const k of [...DIALS, 'wrap', 'weighted']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
+  const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
   $('source').addEventListener('change', () => (showSource(), draw()));
   showSource();
   $('mix').addEventListener('change', draw);
