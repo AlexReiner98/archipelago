@@ -102,3 +102,18 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .card > header h2, #sheet details.fold > summary h2 { font-size: var(--text-3); font-weight: 600; letter-spacing: var(--track-2); text-transform: uppercase; color: var(--muted); }
 #sheet .card .rows > li, #sheet .card .empty { padding-left: 0; padding-right: 0; }
 #sheet .part > :first-child .card:first-child > header, #sheet .part > .card:first-child > header { padding-right: calc(var(--box-8) + var(--space-5)); }
+/* The item's page: what it holds, a section each, as headings over plain rows of a name and its value, one line each. */
+#sheet .page-section { margin: 0 0 var(--space-10); }
+#sheet .page-section > h2 { display: flex; align-items: baseline; gap: var(--space-5); margin: 0 0 var(--space-5); padding-bottom: var(--space-3); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); color: var(--muted); font-weight: 600; }
+#sheet .page-section > h2 .n { font-weight: normal; }
+#sheet .page-section .note { margin: 0; }
+#sheet .page-rows { display: grid; grid-template-columns: var(--label-col) minmax(0, 1fr); gap: var(--space-3) var(--space-8); margin: 0; }
+#sheet .page-rows dt { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd > .gist { display: block; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd details > summary { cursor: pointer; list-style: none; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd details > summary::-webkit-details-marker { display: none; }
+#sheet .page-rows dd details[open] { white-space: normal; max-width: var(--measure); }
+#sheet .page-rows select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
+#sheet .page-json { margin: var(--space-3) 0 0; font-size: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+#sheet .page-lines .change.line { padding-left: 0; padding-right: 0; }
