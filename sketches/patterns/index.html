@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archipelago patterns</title>
+<style>
+  :root { --ink: #1d2428; --paper: #f4f2ec; --line: #0002; font: 13px/1.4 system-ui, sans-serif; color: var(--ink); }
+  body { margin: 0; display: grid; grid-template-columns: 260px 1fr; height: 100vh; background: var(--paper); }
+  aside { padding: 16px; border-right: 1px solid var(--line); overflow: auto; }
+  h1 { font-size: 15px; margin: 0 0 12px; }
+  label { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin: 10px 0; }
+  label input[type=range] { grid-column: 1 / -1; width: 100%; }
+  label small { opacity: .6; }
+  select, button { font: inherit; padding: 3px 6px; }
+  .row { display: flex; gap: 6px; align-items: center; margin: 10px 0; }
+  .row select { flex: 1; min-width: 0; }
+  .swatch { display: flex; height: 14px; margin: 6px 0 14px; border-radius: 3px; overflow: hidden; }
+  .swatch span { flex: 1; }
+  main { display: grid; grid-template-rows: 1fr auto; min-width: 0; }
+  #big { width: 100%; height: 100%; display: block; }
+  #places { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border-top: 1px solid var(--line); }
+  #places figure { margin: 0; background: var(--paper); cursor: pointer; }
+  #places svg { display: block; width: 100%; height: 120px; }
+  #places figcaption { padding: 4px 8px; font-size: 12px; }
+  #group { font-variant-numeric: tabular-nums; opacity: .7; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Archipelago patterns</h1>
+  <div class="row"><select id="a"></select><select id="b"></select></div>
+  <label>Between places <output for="mix"></output><input id="mix" type="range" min="0" max="1" step="0.01" value="0"></label>
+  <div class="swatch" id="swatch"></div>
+  <label>Substrate <small>basalt · frond · coral · polyp</small><input id="substrate" type="range" min="0" max="1" step="0.01" value="0.4"></label>
+  <label>Density <small>bare · dense</small><input id="density" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+  <label>Order <small>loose · strict</small><input id="order" type="range" min="0" max="1" step="0.01" value="0.85"></label>
+  <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="1" step="0.01" value="0.3"></label>
+  <label>Zoom <output for="zoom"></output><input id="zoom" type="range" min="0.3" max="3" step="0.01" value="1"></label>
+  <div class="row"><button id="reseed" title="Same dials, another seed">Reseed</button><span id="group"></span></div>
+</aside>
+<main>
+  <svg id="big"></svg>
+  <div id="places"></div>
+</main>
+<script type="module">
+  import { PLACES, blend, pattern, svgTile } from './pattern.js';
+
+  const $ = (id) => document.getElementById(id);
+  const keys = Object.keys(PLACES);
+  for (const sel of [$('a'), $('b')]) sel.innerHTML = keys.map((k) => `<option value="${k}">${PLACES[k].title}</option>`).join('');
+  $('b').value = keys[2];
+  let seed = 1;
+
+  const dials = () => Object.fromEntries(['substrate', 'density', 'order', 'line'].map((k) => [k, +$(k).value]));
+  const fill = (svg, p, id, zoom = 1) => {
+    svg.innerHTML = `<defs><pattern id="${id}" width="${p.w}" height="${p.h}" patternUnits="userSpaceOnUse" patternTransform="scale(${zoom})">${svgTile(p)}</pattern></defs><rect width="100%" height="100%" fill="url(#${id})"/>`;
+  };
+
+  function draw() {
+    const palette = blend(PLACES[$('a').value].palette, PLACES[$('b').value].palette, +$('mix').value);
+    const t0 = performance.now();
+    const p = pattern({ dials: dials(), palette, seed });
+    fill($('big'), p, 'big-p', +$('zoom').value);
+    const ms = performance.now() - t0;
+    $('swatch').innerHTML = palette.map((c) => `<span style="background:${c}"></span>`).join('');
+    $('group').textContent = `${p.group} · ${p.shapes.length} shapes · ${ms.toFixed(1)} ms`;
+    $('places').innerHTML = keys.map((k) => `<figure data-k="${k}"><svg></svg><figcaption>${PLACES[k].title}</figcaption></figure>`).join('');
+    for (const fig of $('places').children) fill(fig.querySelector('svg'), pattern({ dials: dials(), palette: PLACES[fig.dataset.k].palette, seed }), `p-${fig.dataset.k}`, 0.6);
+  }
+
+  $('places').addEventListener('click', (ev) => {
+    const fig = ev.target.closest('figure');
+    if (fig) ($('a').value = fig.dataset.k), ($('mix').value = 0), draw();
+  });
+  $('reseed').onclick = () => ((seed += 1), draw());
+  document.querySelectorAll('input, select').forEach((el) => el.addEventListener('input', draw));
+  draw();
+</script>
+</body>
+</html>
