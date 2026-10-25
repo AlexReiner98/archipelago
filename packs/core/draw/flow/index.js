@@ -6,6 +6,7 @@
 // mounts, so every name is in the page and every step a link. Its look is ./look.js, in the lens's colours. A lens
 // with steps tells the process as it happens (./story.js), the conversation beside it.
 
+import { placesOf, route, sizeOf } from './free.js';
 import { layout } from './layout.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
@@ -75,6 +76,16 @@ export function picture({ answer, style, types = {}, reduced }, tools) {
   const root = answer.items.find((i) => i.id === answer.lens.from);
   const g = layout({ items: answer.items, links: answer.links, rootId: root?.id, measure, sizes: style.sizes, numbers: style.numbers });
   const steps = g.all.filter((n) => !n.dummy);
+  // Steps put where a person put them, and the wires to them solved again at right angles (./free.js).
+  const placed = story ? {} : placesOf(answer, style);
+  const free = new Set(Object.keys(placed).filter((id) => g.nodes.has(id) && Array.isArray(placed[id])));
+  for (const id of free) (g.x.set(id, Number(placed[id][0])), g.y.set(id, Number(placed[id][1])));
+  const boxOf = (id) => ({ x: g.x.get(id), y: g.y.get(id), w: g.nodes.get(id).w, h: g.nodes.get(id).h });
+  // Round the other steps where it can: the wire takes the track through the fewest of them.
+  const solve = (c) => (c.points = route(boxOf(c.a), boxOf(c.b), z('lead_out'), steps.filter((n) => n.id !== c.a && n.id !== c.b).map((n) => boxOf(n.id))));
+  if (free.size) for (const c of g.chains) if (free.has(c.a) || free.has(c.b)) solve(c);
+  if (free.size) g.breaks.length = 0;
+  const size = free.size ? sizeOf(g, z('margin')) : { width: g.width, height: g.height };
   if (!steps.length) return { scene: { message: 'Nothing here depends on anything.' } };
 
   const yours = (i) => Boolean(i.state.needs_you);
@@ -124,7 +135,7 @@ export function picture({ answer, style, types = {}, reduced }, tools) {
     ];
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
-    const el = titled(n.stub ? m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body) : m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), words(n));
+    const el = titled(n.stub ? m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body) : m('a', { key, on: story ? ['enter', 'leave'] : ['enter', 'leave', 'drag'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), words(n));
     if (!n.stub) dims.set(n.id, el);
     return el;
   });
@@ -136,7 +147,7 @@ export function picture({ answer, style, types = {}, reduced }, tools) {
     const lx = g.x.get(d.id) + w / 2 + z('says_aside'), ly = (g.y.get(d.id) + d.h / 2 + c.points[1][1]) / 2, sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { viewBox: `0 0 ${g.width} ${g.height}`, role: 'img', 'aria-label': `A process of ${steps.length} steps` }, wireLayer, breakLayer, stepLayer, saysLayer);
+  const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A process of ${steps.length} steps` }, wireLayer, breakLayer, stepLayer, saysLayer);
 
   // The legend: only the marks this picture uses, one to a line.
   const mark = (inner, label) => m('span', {}, m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label);
@@ -174,12 +185,33 @@ export function picture({ answer, style, types = {}, reduced }, tools) {
     const frames = statesOf(answer.steps);
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks, ...ctx }) } });
   }
+  // A step moved by hand (the page follows the drag: ui/drag.js): it goes where it is put, and its wires are solved
+  // again at right angles as it moves. Let go, that is where it is, for the next drag.
+  const drawnAt = new Map(steps.map((n) => [n.id, [g.x.get(n.id), g.y.get(n.id)]]));
+  const at = new Map(drawnAt);
+  const move = (key, { dx = 0, dy = 0 }, done) => {
+    const id = keyed.get(key);
+    if (!id || !at.has(id)) return [];
+    const [x0, y0] = at.get(id), [x, y] = [x0 + Number(dx), y0 + Number(dy)];
+    g.x.set(id, x);
+    g.y.set(id, y);
+    if (done) at.set(id, [x, y]);
+    const [ox, oy] = drawnAt.get(id);
+    const patches = [{ key, set: { transform: `translate(${x - ox} ${y - oy})` } }];
+    g.chains.forEach((c, n) => {
+      if (c.a !== id && c.b !== id) return;
+      const [[ex, ey]] = solve(c).slice(-1);
+      patches.push({ key: `w:${n}`, set: { d: `M${c.points.map((p) => p.join(' ')).join('L')}` } }, { key: `h:${n}`, set: { d: `M${ex} ${ey}L${ex - z('head_half')} ${ey - z('head_length')}L${ex + z('head_half')} ${ey - z('head_length')}Z` } });
+    });
+    return patches;
+  };
   return {
-    scene: { css: story ? `${css}\n${storyCss}` : css, svg, legend, ...(player && { before: player.before, aside: player.after }), size: { width: g.width, height: g.height }, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
+    scene: { css: story ? `${css}\n${storyCss}` : css, svg, legend, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
     end: player?.end,
     on(event) {
       const { name, key } = event;
       if (player && (key === 'play' || key === 'chat' || key.startsWith('c:'))) return player.on(event);
+      if (name === 'drag' || name === 'drop') return move(key, event, name === 'drop');
       if (name === 'leave') return light(null);
       return keyed.has(key) ? light(keyed.get(key)) : [];
     },

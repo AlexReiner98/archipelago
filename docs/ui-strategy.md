@@ -40,6 +40,12 @@ important facts on hover, and clicking it opens it from the side to act on.
   one change set on the person's authority, undoable as one. Changing the
   status is an action of its own. Save asks first if someone changed the item
   since the sheet opened. Leaving a draft unsaved asks first.
+- **The canvas is flexible.** A step can be moved anywhere by hand. Moves
+  stay on the page and are written as one change set of their own just before
+  the person's next action (a change or decision, switching canvas, leaving
+  the page), onto the workspace's style that keeps places, by canvas. Wires to
+  a moved step are solved live, still at right angles. Snap (a soft grid) is a
+  setting; Arrange lays the canvas out again.
 - **A new node is started on the canvas.** Double-click the canvas or press
   + to open a draft. It becomes an item once it has a title and is saved, and
   it is loose, tied to nothing: its note says how it relates, and an agent

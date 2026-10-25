@@ -3,6 +3,7 @@
 
 export const css = `
 .lf-step { cursor: pointer; }
+.lf-step.dragging { cursor: grabbing; }
 .lf-step .lf-shape { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
 .lf-step.scenario .lf-shape { stroke: var(--ln-muted); stroke-dasharray: var(--ln-flow-dash-scenario); }
 .lf-step.you .lf-shape { stroke: var(--ln-you); }

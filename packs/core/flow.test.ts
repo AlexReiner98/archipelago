@@ -127,3 +127,21 @@ test('what is loose stays a step, in rows under the process: in nothing, holding
   assert.ok(!g.nodes.has('d') && g.nodes.get('a').notes?.some((i: any) => i.id === 'd'), 'work inside a step is still a mark on it');
   assert.ok(!g.nodes.has('p'), 'one waited on is tied, and not a loose step');
 });
+
+test('a step put by hand is wired live at right angles, round the steps in the way', async () => {
+  // @ts-expect-error: a plain module of the drawing, with no types of its own.
+  const { route, placesOf } = await import('./draw/flow/free.js');
+  const square = (pts: number[][]) => pts.slice(1).every(([x, y], k) => x === pts[k][0] || y === pts[k][1]);
+  const a = { x: 100, y: 50, w: 120, h: 34 }, b = { x: 400, y: 300, w: 120, h: 34 };
+  const straight = route(a, b, 12);
+  assert.ok(square(straight) && straight[0][1] === 67 && straight.at(-1)[1] === 283, 'from the foot of one to the head of the other, every turn square');
+  // A step right across the middle track: the wire takes another.
+  const block = { x: 250, y: 175, w: 600, h: 20 };
+  const round = route(a, b, 12, [block]);
+  const through = (pts: number[][]) => pts.slice(1).some(([x, y], k) => Math.max(y, pts[k][1]) > block.y - block.h / 2 && Math.min(y, pts[k][1]) < block.y + block.h / 2 && Math.max(x, pts[k][0]) > block.x - block.w / 2 && Math.min(x, pts[k][0]) < block.x + block.w / 2 && x !== pts[k][0]);
+  assert.ok(square(round) && !through(round), 'its track across misses the step in the way');
+  // Not below: out and round, still square, still into the head from above.
+  const up = route(b, a, 12);
+  assert.ok(square(up) && up.at(-2)[1] < a.y - a.h / 2, 'into the head of one above it, from above');
+  assert.deepEqual(placesOf({ lens: { from: 'p' } }, { places: { p: { x: [1, 2] }, q: { y: [3, 4] } }, moved: { z: [5, 6] } }), { x: [1, 2], z: [5, 6] }, "this canvas's places, with what was moved and not yet saved over them");
+});

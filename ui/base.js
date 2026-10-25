@@ -136,7 +136,12 @@ export function enter(token) {
 
 export class SignInNeeded extends Error {}
 
+/** The tools that act on the map, as a person does: before each, what was batched on the page is written (hooks.act). */
+const ACTS = new Set(['change', 'decide', 'undo', 'session_end', 'publish', 'publish_all', 'unpublish', 'launch']);
+
 export async function api(tool, input = {}) {
+  // What waits to be written in one batch (where things were put on the canvas) goes first, as a change of its own.
+  if (ACTS.has(tool)) await hooks.act?.();
   const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() }, body: JSON.stringify(input) });
   const body = await res.json();
   if (res.status === 401) throw new SignInNeeded(body.error);

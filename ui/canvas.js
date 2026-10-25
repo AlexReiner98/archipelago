@@ -27,10 +27,12 @@ export function showCanvas(lens, here) {
   const home = lens === HOME;
   const key = JSON.stringify(lens);
   if (at?.key === key && at.view.isConnected) return mark(here);
-  const style = here ? { here } : {};
+  // Moves made on the canvas left are written before another is drawn.
+  writeMoves();
+  const style = { ...(here && { here }), snap: Boolean(settings.snap) };
   const view = lensView({ lens, style, key: `canvas:${lens.from ?? lens.lens ?? 'map'}` });
   host.replaceChildren(view);
-  at = { key, view, lens, home, here, kept: null };
+  at = { key, view, lens, home, here, kept: null, style };
   drawTrail(lens.from);
 }
 
@@ -74,10 +76,67 @@ hooks.touched = async (touched) => {
   }
 };
 
+// ---- Where things were put by hand: batched on the page, written as one change just before the next action
+// (the owner, 25 Oct 2026), onto the workspace's style that keeps places (core's field `places`), by canvas, by item.
+
+/** The name of the style item that keeps where things were put. */
+const PLACES = 'Canvas places';
+/** Moves made and not yet written: by canvas, then by item, the middle of each; null for a canvas laid out again. */
+const batched = {};
+let writing = null;
+/** Which canvas a picture is of, as the drawing reads its places (packs/core/draw/flow/free.js). */
+const placesKey = () => (at?.view.answer ? (at.view.answer.lens?.from ?? at.view.answer.view ?? 'map') : null);
+/** Write what was moved, as one change of its own; asked for before any action (ui/base.js), and when leaving. */
+async function writeMoves() {
+  if (writing) return writing;
+  if (!Object.keys(batched).length) return;
+  writing = (async () => {
+    const batch = { ...batched };
+    for (const k of Object.keys(batch)) delete batched[k];
+    try {
+      const { style, used } = await api('view', { name: 'style' });
+      const kept = used.find((u) => u.title === PLACES && !u.preset);
+      const places = { ...(style.places ?? {}) };
+      for (const [k, put] of Object.entries(batch)) {
+        if (put === null) delete places[k];
+        else places[k] = { ...(places[k] ?? {}), ...put };
+      }
+      const ops = kept ? [{ op: 'update', id: kept.id, props: { places } }] : [{ op: 'create', type: 'style', title: PLACES, status: 'current', props: { places } }];
+      await api('change', { ops, reason: 'Moved on the canvas' });
+      if (at?.style) at.style.moved = {};
+    } catch {
+      // Not written: kept for the next try.
+      for (const [k, put] of Object.entries(batch)) batched[k] = put === null || batched[k] === null ? (batched[k] ?? put) : { ...put, ...(batched[k] ?? {}) };
+    } finally {
+      writing = null;
+    }
+  })();
+  return writing;
+}
+hooks.act = () => (writing ? undefined : writeMoves());
+// Let go on the canvas (ui/drag.js): kept on the page, and in the picture's style, so a redraw keeps it where it was put.
+host.addEventListener('drawing-drop', (ev) => {
+  const k = placesKey();
+  if (!k || !at) return;
+  const put = [Math.round(ev.detail.x), Math.round(ev.detail.y)];
+  batched[k] = { ...(batched[k] ?? {}), [ev.detail.id]: put };
+  at.style.moved = { ...(at.style.moved ?? {}), [ev.detail.id]: put };
+});
+addEventListener('visibilitychange', () => document.hidden && writeMoves());
+/** Lay this canvas out again as its drawing does: what was put by hand here is forgotten, in the next batch. */
+function arrange() {
+  const k = placesKey();
+  if (!k || !at) return;
+  batched[k] = null;
+  at.style.moved = {};
+  writeMoves().then(() => refreshCanvas());
+}
+document.getElementById('canvas-arrange')?.addEventListener('click', () => (document.getElementById('more').open = false, arrange()));
+
 // ---- What the reader chose for the canvas, in the settings menu: kept in this browser.
 
 /** key: the drawing's key shown. fit: all of it brought into sight on every change; else the reader alone moves it. */
-const settings = { key: false, fit: true };
+const settings = { key: false, fit: true, snap: false };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('pelago-canvas') ?? '{}'));
 } catch {
@@ -91,6 +150,7 @@ const covered = () => (document.body.dataset.sheet === 'open' && sheet.offsetWid
 const fitNow = () => settings.fit && moves()?.fit(covered());
 function apply() {
   document.body.classList.toggle('canvas-key', Boolean(settings.key));
+  if (at?.style) at.style.snap = Boolean(settings.snap);
   fitNow();
 }
 for (const box of document.querySelectorAll('#canvas-settings input[data-setting]')) {
