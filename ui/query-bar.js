@@ -1,5 +1,6 @@
 // The query bar: the canvas's lens, always in sight and plain to read, on one line under the top bar (decision
-// e_sdsaxxq4). The filter's terms are chips: text, types, tags, items, links and what is left out; then the walk (the
+// e_sdsaxxq4). The filter's terms are chips: text, types, tags, items, links; what narrows them (only a type, within
+// an item), chips of their own; and what is left out; then the walk (the
 // links it follows, how many steps) and the limit. Each is changed in place: a chip's × takes it away, a click on it
 // puts its words back in the box to be written again, the box takes a new term, and the walk and the limit have their
 // own controls. Every change is a new lens, handed to `go` (the canvas puts it in the address and draws it).
@@ -29,7 +30,7 @@ function nameOf(id, redraw) {
   return '…';
 }
 
-/** What a term written in the box is: `-x` leaves x out, an id is an item, `#name` a tag, `<link> <end>` a link, a type by its name, else text. */
+/** What a term written in the box is: `-x` leaves x out, `only <type>` and `within <id>` narrow, an id is an item, `#name` a tag, `<link> <end>` a link, a type by its name, else text. */
 function termOf(written) {
   const s = written.trim();
   if (!s) return null;
@@ -41,6 +42,8 @@ function termOf(written) {
   if (isId(s)) return { id: s };
   if (s.startsWith('#') && relations.has('tagged') && s.slice(1).trim()) return { link: `tagged ${s.slice(1).trim()}` };
   const [, first, rest] = /^(\S+)\s+(.+)$/.exec(s) ?? [];
+  if (first?.toLowerCase() === 'only') return typeNamed(rest.trim()) ? { only: typeNamed(rest.trim()) } : null;
+  if (first?.toLowerCase() === 'within') return isId(rest.trim()) ? { within: rest.trim() } : null;
   if (first && linkNamed(first)) return { link: `${linkNamed(first)} ${rest.trim()}` };
   if (typeNamed(s)) return { type: typeNamed(s) };
   return { text: s };
@@ -53,6 +56,8 @@ function added(lens, term) {
   if (term.type) f.types = [...new Set([...(f.types ?? []), term.type])];
   if (term.id) f.ids = [...new Set([...(f.ids ?? []), term.id])];
   if (term.link) f.links = [...new Set([...(f.links ?? []), term.link])];
+  if (term.only) f.only = [...new Set([...(f.only ?? []), term.only])];
+  if (term.within) f.within = [...new Set([...(f.within ?? []), term.within])];
   if (term.exclude) f.exclude = [...new Set([...(f.exclude ?? ['system']), term.exclude])];
   return { ...lens, filter: f };
 }
@@ -82,7 +87,7 @@ export function drawQuery(lens, view, go, lead) {
   const filled = (lens.filter.text || lens.filter.types?.length || lens.filter.ids?.length || lens.filter.links?.length);
   // A chip: its words, a click to write them again, an × to take it away. The last term the filter includes is not taken away: a lens includes something.
   const chip = (cls, said, title, field, value, written) => {
-    const alone = field !== 'exclude' && [f.text ? 1 : 0, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0].reduce((a, b) => a + b, 0) === 1;
+    const alone = !['exclude', 'only', 'within'].includes(field) && [f.text ? 1 : 0, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0].reduce((a, b) => a + b, 0) === 1;
     return h(
       'span',
       { class: `q-term ${cls}`, title },
@@ -95,7 +100,7 @@ export function drawQuery(lens, view, go, lead) {
     value: words,
     placeholder: '+',
     'aria-label': 'Add to the filter',
-    title: 'Add to the filter: words to find, a type, #tag, a link and its end (waits_on me), an item id, or -closed, -system, -a type to leave out',
+    title: 'Add to the filter: words to find, a type, #tag, a link and its end (waits_on me), an item id; only a type, within an item id, to narrow what it finds; or -closed, -system, -a type to leave out',
     size: Math.max(words.length, 1),
     onkeydown: (ev) => {
       if (ev.key === 'Escape') return (words = '', ev.target.blur());
@@ -127,6 +132,8 @@ export function drawQuery(lens, view, go, lead) {
       (f.links ?? []).map((t) => chip(t.startsWith('tagged ') ? 'q-tag' : 'q-link', termWords(t, redraw), t.startsWith('tagged ') ? 'Items with this tag' : 'Items with this link', 'links', t, t)),
       (f.ids ?? []).map((id) => chip('q-id', nameOf(id, redraw), 'This item', 'ids', id, id)),
       box,
+      (f.only ?? []).map((t) => chip('q-narrow', `only ${typeTitle(t)}`, 'Only what is of this type, of what the filter finds', 'only', t, `only ${typeTitle(t)}`)),
+      (f.within ?? []).map((id) => chip('q-narrow', `within ${nameOf(id, redraw)}`, 'Only what is within this item, at any depth, of what the filter finds', 'within', id, `within ${id}`)),
       exclude.map((x) => chip('q-out', `−${x === 'closed' || x === 'system' ? x : typeTitle(x)}`, 'Left out of everything', 'exclude', x, `-${x}`)),
     ),
     h('span', { class: 'q-part', title: 'The walk: from what the filter finds, along these links either way' },

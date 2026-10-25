@@ -1,4 +1,4 @@
-// A view kept on the map names types and link types in its flat lens (its filter's types and exclude, its link terms,
+// A view kept on the map names types and link types in its flat lens (its filter's types, only and exclude, its link terms,
 // its walk). When a pack takes a type or a link type over (moved_from), the views that named the old one name the new
 // one (src/pelago.ts, retype): this says what changes in one view's fields, nothing when nothing does.
 
@@ -11,8 +11,8 @@ export function renamedLens(props: Props, from: string, to: string, what: 'entit
   const filter = (props.filter ?? {}) as Props;
   const walk = (props.walk ?? {}) as Props;
   if (what === 'entity') {
-    const [types, exclude] = [swap(filter.types), swap(filter.exclude)];
-    if (types || exclude) out.filter = { ...filter, ...(types && { types }), ...(exclude && { exclude }) };
+    const [types, only, exclude] = [swap(filter.types), swap(filter.only), swap(filter.exclude)];
+    if (types || only || exclude) out.filter = { ...filter, ...(types && { types }), ...(only && { only }), ...(exclude && { exclude }) };
     return out;
   }
   const over = swap(walk.over);

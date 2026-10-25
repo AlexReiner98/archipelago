@@ -177,7 +177,7 @@ const PIECES = {
     if (style.shape) style.code = '';
     const here = (term) => (term.includes('{here}') && !ctx.id ? null : term.replaceAll('{here}', ctx.id));
     const filter = typeof p.lens === 'object' && p.lens ? { ...p.lens.filter } : {};
-    for (const k of ['ids', 'links']) if (filter[k]) filter[k] = filter[k].map(here);
+    for (const k of ['ids', 'links', 'within']) if (filter[k]) filter[k] = filter[k].map(here);
     if (Object.values(filter).some((v) => Array.isArray(v) && v.includes(null))) return null;
     const view = typeof p.lens === 'string' ? keptView(p.lens, { key, style }) : flatView({ lens: { ...p.lens, filter }, style, of: ctx.id, key, only: p.only, quiet: true });
     return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, p.title ?? p.screen.title)), view) };

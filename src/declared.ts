@@ -133,7 +133,7 @@ export interface PieceDef {
   action?: string;
   /** For a short note: what it says. */
   text?: string;
-  /** For a picture: a kept view's id, or a flat lens ({ filter, walk, limit }, as query flat takes it), where "{here}" in its ids or link terms is the item the page is of. */
+  /** For a picture: a kept view's id, or a flat lens ({ filter, walk, limit }, as query flat takes it), where "{here}" in its ids, link terms or within is the item the page is of. */
   lens?: string | Record<string, unknown>;
   /** For a picture: the types it draws of what its lens finds (flavours included); all of it when left out. */
   only?: string[];
