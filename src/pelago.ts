@@ -818,14 +818,6 @@ export class Archipelago {
     return readEvents(this.db, input);
   }
 
-  /** A stamp that moves whenever the map or the review queue does, as this viewer sees them. */
-  async pulse() {
-    const { rows } = await this.db.query<{ stamp: string }>(
-      `select concat_ws('.', greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact)), (select count(*) from proposal where status = 'pending')) as stamp -- index log_fact_seq, proposal_status`,
-    );
-    return rows[0];
-  }
-
   async proposals(input: { status?: string } = {}) {
     const { rows } = await this.db.query<Proposal>(`select * from proposal where status = $1 order by ts -- index proposal_status`, [input.status ?? 'pending']);
     return rows;

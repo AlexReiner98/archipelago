@@ -4,24 +4,12 @@
 
 import type { Fact } from './log.ts';
 import { KEPT_FIELDS } from './operational.ts';
+import { ITEM_COLUMNS } from './project.ts';
 
 type Row = Record<string, any>;
 
-/**
- * An item's columns and the field each is in the log. Kernel defaults are not asserted: the value a field has unsaid.
- * Its kind is not one: it is read from its type, as whether it is open is, and a field named kind is a pack's own.
- */
-export const ITEM_COLUMNS: [column: string, field: string, unsaid: unknown][] = [
-  ['type', 'type', undefined],
-  ['title', 'title', undefined],
-  ['body', 'body', ''],
-  ['status', 'status', undefined],
-  ['visibility', 'visibility', undefined],
-  ['private_to', 'private_to', null],
-  ['owner', 'owner', null],
-  ['confidence', 'confidence', 1],
-  ['source_id', 'source', null],
-];
+// An item's columns and the field each is in the log: kept with the projector's pure part, which the page runs too.
+export { ITEM_COLUMNS };
 
 /** Fields no pack may declare: the head, and what the log says of an item beside its columns. */
 export const RESERVED = [...ITEM_COLUMNS.map(([, f]) => f), 'archived', 'merged_into', 'forgotten', 'checked'];

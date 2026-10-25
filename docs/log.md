@@ -557,7 +557,7 @@ last one; a forget deletes the blobs of the item forgotten. Pack manifests
 ### What is never stored
 
 In memory only, gone on restart, never in a backup: presence, a run's
-heartbeat (`last_seen`, `active`, `busy`), the pulse pages listen to, live
+heartbeat (`last_seen`, `active`, `busy`), where a page stands in the log (`tail`), live
 cursors, the throttle state of `src/limit.ts`.
 
 ### The transient table
