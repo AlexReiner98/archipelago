@@ -235,6 +235,8 @@ export async function checkTail() {
   // it is on it (drawn again only where its answer changed).
   if (!bears(touched, now.split('.').slice(2).join() !== was.split('.').slice(2).join())) {
     const drawn = canvasView();
+    // A canvas whose answer is held in a store is kept current by the facts themselves (ui/replica.js).
+    if (drawn?.store) return;
     if (!touched || touched.ids === null || touched.made || touched.ids.some((id) => drawn?.answer?.items.some((i) => i.id === id))) drawn?.refresh?.();
     return;
   }

@@ -1,4 +1,6 @@
 import { api, h } from './base.js';
+import { replicate } from './live.js';
+import { unfollow } from './replica.js';
 import { drawing as redraw } from './settle.js';
 import { drawWith, drawings, warmDrawings } from './drawing.js';
 import { dress } from './lens-base.js';
@@ -308,15 +310,11 @@ export function flatView({ lens, style = {}, of, key }) {
   const host = h('div', { class: 'lens-wrap' }, body);
   const place = { opened: new Map(), ask: {} };
   const keep = (change) => Object.assign(chosen, change);
-  const load = async (refreshing = false) => {
-    let answer, look;
-    try {
-      [answer, look] = await Promise.all([api('view', { name: 'flat', params: lens }), api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), have: [...drawings.keys()] } })]);
-    } catch (err) {
-      host.failed = err.message;
-      host.dispatchEvent(new CustomEvent('lens-answer'));
-      return refreshing || body.replaceChildren(h('div', { class: 'error' }, err.message));
-    }
+  let look;
+  let raw;
+  // The answer is held in a store kept current from the log (ui/replica.js): facts redraw it without the lens being
+  // read again; only a link made to something it does not hold reads the lens again, since the walk may now reach more.
+  const draw = (answer, refreshing) => {
     const said = JSON.stringify(answer);
     if (refreshing && said === host.said) return;
     host.said = said;
@@ -330,6 +328,28 @@ export function flatView({ lens, style = {}, of, key }) {
     dress(body, chosen);
     const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === chosen.shape;
     (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(answer), chosen, keep, place);
+  };
+  const load = async (refreshing = false) => {
+    let store;
+    try {
+      [store, look] = await Promise.all([
+        replicate(async () => (raw = await api('view', { name: 'flat', params: lens }))),
+        api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), have: [...drawings.keys()] } }),
+      ]);
+    } catch (err) {
+      host.failed = err.message;
+      host.dispatchEvent(new CustomEvent('lens-answer'));
+      return refreshing || body.replaceChildren(h('div', { class: 'error' }, err.message));
+    }
+    if (host.store) unfollow(host.store);
+    host.store = store;
+    store.on((changed) => {
+      if (host.store !== store) return;
+      if (!host.isConnected) return unfollow(store);
+      if (changed.missing.length) return load(true);
+      draw({ ...raw, ...store.answer() }, true);
+    });
+    draw({ ...raw, ...store.answer() }, refreshing);
   };
   warmDrawings();
   host.ready = load();

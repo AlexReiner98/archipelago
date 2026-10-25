@@ -53,7 +53,7 @@ async function route(pulse = false) {
   // The canvas: the lens the address says (ui/query-bar.js shows it); an item's page with none keeps what is up when
   // it draws the item, and else opens on the item. An address from before the flat lens (?in=) opens on what it names.
   const asked = readFlatLens(params.has('in') ? `from=${params.get('in')}` : query);
-  if (pulse) refreshCanvas();
+  if (pulse) refreshCanvas(true);
   else if (name === 'v') showCanvas(asked.lens, params.get('here') ?? undefined, asked.style);
   else if (name === 'e' && arg) {
     if (asked.lens) showCanvas(asked.lens, arg, asked.style);

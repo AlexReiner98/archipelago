@@ -9,6 +9,7 @@
 import { api, hooks, state } from './base.js';
 import { FOCUS, flatQuery, flatView } from './lens.js';
 import { drawQuery } from './query-bar.js';
+import { unfollow } from './replica.js';
 
 const host = document.getElementById('canvas');
 const sheet = document.getElementById('sheet');
@@ -58,6 +59,8 @@ function drawAgain() {
   const of = canvasOf(at.lens);
   const view = flatView({ lens: at.lens, style: at.style, of: of || undefined, key: `canvas:${of || 'map'}` });
   const lens = at.lens;
+  // The picture it replaces stops being kept current from the log.
+  if (at.view?.store) unfollow(at.view.store);
   at.view = view;
   // The bar says the lens at once, and again with what its answer found (the names of the items it names, a cut).
   view.addEventListener('lens-answer', () => at?.view === view && drawQuery(lens, view, goLens));
@@ -222,5 +225,9 @@ host.addEventListener('dblclick', (ev) => !ev.target.closest('a, button, input, 
 new MutationObserver(fitNow).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 addEventListener('resize', fitNow);
 
-/** The map changed: the canvas asks again, and is drawn again only if its answer differs. */
-export const refreshCanvas = () => at?.view.refresh?.();
+/**
+ * Read the canvas's lens again, drawn again only if its answer differs: after something made here, which the lens may
+ * now reach. When the map only changed under the page (`tail`), a canvas held in a store is already kept current by
+ * the facts (ui/replica.js), and is not read again.
+ */
+export const refreshCanvas = (tail = false) => (tail && at?.view.store ? undefined : at?.view.refresh?.());
