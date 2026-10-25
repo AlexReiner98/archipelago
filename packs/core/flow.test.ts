@@ -118,10 +118,12 @@ test('many plain things before one step are checklists, one for each type; the c
   assert.ok(![...few.nodes.values()].some((n: any) => n.shape === 'list'));
 });
 
-test('what is loose stays a step: in nothing, holding nothing, tied by nothing, it is not lost among the wired', () => {
+test('what is loose stays a step, in rows under the process: in nothing, holding nothing, tied by nothing', () => {
   const top = (id: string, extra: Record<string, unknown> = {}) => ({ ...item(id), inside: null, ...extra });
   const g = layout({ items: [top('a'), top('b'), top('c'), item('d', 'work', { inside: 'a' }), top('p', { kind: 'actor' })], links: [dep('b', 'a'), { kind: 'waits_on', from: 'b', to: 'p' }], rootId: undefined, measure, sizes: house.sizes, numbers: house.numbers });
   assert.ok(g.nodes.has('c'), 'started on the canvas and not yet wired up, it is drawn');
+  assert.ok(g.y.get('c') - g.nodes.get('c').h / 2 > Math.max(g.y.get('a'), g.y.get('b')) + g.nodes.get('b').h / 2, 'in rows of its own, under the process, not in its first layer');
+  assert.ok(g.height >= g.y.get('c') + g.nodes.get('c').h / 2, 'the picture holds it');
   assert.ok(!g.nodes.has('d') && g.nodes.get('a').notes?.some((i: any) => i.id === 'd'), 'work inside a step is still a mark on it');
   assert.ok(!g.nodes.has('p'), 'one waited on is tied, and not a loose step');
 });

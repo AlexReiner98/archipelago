@@ -114,6 +114,11 @@ export function layout({ items, links, rootId, measure, sizes, numbers }) {
     else [n.w, n.h] = [text + BOX_PAD, n.shape === 'sheet' ? SHEET_H : BOX_H];
   }
 
+  // What is loose is laid out apart, in rows under the process (at the end), so it does not stretch the first layer.
+  const onWire = new Set(edges.flatMap((e) => [e.a, e.b]));
+  const looseSet = wired.size ? [...nodes.values()].filter((n) => !n.stub && !onWire.has(n.id) && loose(n)) : [];
+  for (const n of looseSet) nodes.delete(n.id);
+
   // ---- Layers: each step one below the lowest it follows, to start with.
   const ins = (id) => edges.filter((e) => e.b === id).map((e) => e.a);
   const asap = new Map();
@@ -396,5 +401,16 @@ export function layout({ items, links, rootId, measure, sizes, numbers }) {
       for (const o of tracks[sg.gap])
         if (o !== sg && inside(p[0], o) && o.y > Math.min(p[1], q[1]) + 1 && o.y < Math.max(p[1], q[1]) - 1) breaks.push([p[0], o.y]);
 
-  return { nodes, all, chains, breaks, potential, x, y, width, height };
+  // The loose, in rows under the process, as wide as it is (and at least three steps wide), each where it fits.
+  const shelf = { x: MARGIN, y: height - MARGIN + LAYER_GAP / 2, row: 0, most: Math.max(width - 2 * MARGIN, 3 * MAX_TEXT, ...looseSet.map((n) => n.w)) };
+  for (const n of looseSet) {
+    if (shelf.x > MARGIN && shelf.x + n.w > MARGIN + shelf.most) Object.assign(shelf, { x: MARGIN, y: shelf.y + shelf.row + NODE_GAP, row: 0 });
+    x.set(n.id, shelf.x + n.w / 2);
+    y.set(n.id, shelf.y + n.h / 2);
+    Object.assign(shelf, { x: shelf.x + n.w + NODE_GAP, row: Math.max(shelf.row, n.h) });
+    nodes.set(n.id, n);
+    all.push(n);
+  }
+  const wide = Math.max(width, ...looseSet.map((n) => x.get(n.id) + n.w / 2 + MARGIN));
+  return { nodes, all, chains, breaks, potential, x, y, width: wide, height: looseSet.length ? shelf.y + shelf.row + MARGIN : height };
 }
