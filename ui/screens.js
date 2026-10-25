@@ -6,7 +6,7 @@
 import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
 import { attentionCard } from './attention.js';
-import { savedViewsStrip } from './saved-views.js';
+import { canvasesPiece } from './canvases.js';
 import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
@@ -207,10 +207,10 @@ const PIECES = {
     const node = h('div');
     return { node, later: () => heldPiece(node, p.title ?? p.screen.title) };
   },
-  // The pictures kept on the map, pinned first: a strip of tiles, each opening its picture.
+  // The saved canvases, one line each, opening in one click (ui/canvases.js).
   saved_views: (ctx, p) => {
     const node = h('div');
-    return { node, later: () => savedViewsStrip(node, p.title ?? p.screen.title, p.limit) };
+    return { node, later: () => canvasesPiece(node, p.title ?? p.screen.title) };
   },
   // Drawn with the note: the item's page reads them by name.
   // A diagram made from the code: the boxes and wires the item keeps, with its draw.io file at the commit it came from.

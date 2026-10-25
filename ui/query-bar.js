@@ -73,10 +73,10 @@ function termWords(term, redraw) {
   return link === 'tagged' ? `#${endName}` : `${linkTitle(link)} ${endName}`;
 }
 
-/** Draw the bar for this lens, over the view that draws it (its answer names what the lens names). */
-export function drawQuery(lens, view, go) {
+/** Draw the bar for this lens, over the view that draws it (its answer names what the lens names); `lead` goes first (the saved canvas up, ui/canvases.js). */
+export function drawQuery(lens, view, go, lead) {
   if (!bar) return;
-  const redraw = () => drawQuery(lens, view, go);
+  const redraw = () => drawQuery(lens, view, go, lead);
   const f = lens.filter;
   const exclude = f.exclude ?? ['system'];
   const filled = (lens.filter.text || lens.filter.types?.length || lens.filter.ids?.length || lens.filter.links?.length);
@@ -120,6 +120,7 @@ export function drawQuery(lens, view, go) {
   );
   const answer = view?.answer;
   bar.replaceChildren(
+    lead ?? '',
     h('span', { class: 'q-part', title: 'The filter: what it finds is drawn, and what is left out is left out of everything' },
       f.text && chip('q-text', `“${f.text}”`, 'Words it finds', 'text', f.text, f.text),
       (f.types ?? []).map((t) => chip('q-type', typeTitle(t), 'Items of this type, the newest first', 'types', t, typeTitle(t))),

@@ -5,6 +5,7 @@
 
 import { SignInNeeded, api, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
 import { canvasHas, canvasHref, focusOn, lensNow, mark, refreshCanvas, showCanvas } from './canvas.js';
+import { openCanvas } from './canvases.js';
 import { mayLeave, newItem } from './draft.js';
 import { drawFind } from './find.js';
 import { home } from './home.js';
@@ -53,6 +54,8 @@ async function route(pulse = false) {
   // The canvas: the lens the address says (ui/query-bar.js shows it); an item's page with none keeps what is up when
   // it draws the item, and else opens on the item. An address from before the flat lens (?in=) opens on what it names.
   const asked = readFlatLens(params.has('in') ? `from=${params.get('in')}` : query);
+  // A saved canvas named alone opens with its lens and style put in the address.
+  if (name === 'v' && !asked.lens && asked.style.canvas) return void openCanvas(asked.style.canvas);
   if (pulse) refreshCanvas(true);
   else if (name === 'v') showCanvas(asked.lens, params.get('here') ?? undefined, asked.style);
   else if (name === 'e' && arg) {

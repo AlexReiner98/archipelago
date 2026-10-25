@@ -201,7 +201,6 @@ test('every UI module parses', () => {
 // keeps the mechanism (layouts, renderers, CSS rules that read variables) and no values: no colours, no lengths, no
 // numeric constants. Counted here as hex colours, CSS lengths and UPPER_CASE number constants, as of 20 Oct 2026.
 const LOOKS_IN_KERNEL: Record<string, number> = {
-  'ui/saved-views.js': 1,
   'ui/draw.html': 6,
   'ui/list.css': 2,
   'ui/public.css': 1,

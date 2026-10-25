@@ -101,8 +101,8 @@ test('attention finds every reason, for the right person, within a scope, and th
   // token, what is held for the owner, your move capped at five, saved views. Your projects are the canvas itself.
   const { screens } = (await callTool(l, human, 'schema', {})) as { screens: { at?: string; pieces: { piece: string; title?: string }[] }[] };
   const home = screens.find((s) => s.at === 'home')!;
-  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['start', 'Start here'], ['token_ask', undefined], ['held', 'Held for you'], ['attention', 'Your move'], ['saved_views', 'Saved views']]);
-  assert.equal((home.pieces[3] as { limit?: number }).limit, 5);
+  assert.deepEqual(home.pieces.map((p) => [p.piece, p.title]), [['saved_views', 'Canvases'], ['start', 'Start here'], ['token_ask', undefined], ['held', 'Held for you'], ['attention', 'Your move']]);
+  assert.equal((home.pieces[4] as { limit?: number }).limit, 5);
 });
 
 test('attention can be read latest first, each item saying when it last changed', async () => {

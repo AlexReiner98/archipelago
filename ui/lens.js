@@ -251,7 +251,8 @@ const list = (value) => (value ?? '').split(',').filter(Boolean);
 /**
  * A flat lens and a style, as the end of an address says them: ?text=…&types=…&ids=…&link=tagged e_x&exclude=closed
  * &over=part_of&steps=1&limit=500 (a link term each `link`; exclude with nothing after it leaves nothing out). An
- * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null.
+ * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null. `canvas` names
+ * the saved canvas it is drawn on (ui/canvases.js): its places, its name in the bar.
  */
 export function readFlatLens(query) {
   const p = new URLSearchParams(query);
@@ -263,7 +264,7 @@ export function readFlatLens(query) {
   if (p.getAll('link').length) filter.links = p.getAll('link').filter(Boolean);
   if (p.has('exclude')) filter.exclude = list(p.get('exclude'));
   const style = {};
-  for (const key of ['lit', 'shape', 'style']) if (p.get(key)) style[key] = p.get(key);
+  for (const key of ['lit', 'shape', 'style', 'canvas']) if (p.get(key)) style[key] = p.get(key);
   if (!filter.text && !filter.types?.length && !filter.ids?.length && !filter.links?.length) return { lens: null, style };
   const over = p.get('over') === 'all' ? 'all' : p.has('over') ? list(p.get('over')) : p.has('from') ? FOCUS : [];
   const lens = { filter, walk: { over, steps: p.has('steps') ? Number(p.get('steps')) : over.length ? 1 : 0 } };
@@ -284,7 +285,7 @@ export function flatQuery(lens, style = {}) {
   if (over === 'all' || over.length) p.set('over', over === 'all' ? 'all' : over.join(','));
   if (steps || over === 'all' || over.length) p.set('steps', String(steps));
   if (lens.limit) p.set('limit', String(lens.limit));
-  for (const key of ['lit', 'shape', 'style']) if (style[key]) p.set(key, style[key]);
+  for (const key of ['lit', 'shape', 'style', 'canvas']) if (style[key]) p.set(key, style[key]);
   return p.toString();
 }
 

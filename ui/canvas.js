@@ -7,6 +7,7 @@
 // every change, or left where they put it.
 
 import { api, hooks, state } from './base.js';
+import { canvasSwitch } from './canvases.js';
 import { FOCUS, flatQuery, flatView } from './lens.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
@@ -36,8 +37,8 @@ export function goLens(lens) {
 }
 /** The lens with this item in its filter: growing a canvas is editing its lens. */
 export const withItem = (lens, id) => (lens.filter.ids?.includes(id) ? lens : { ...lens, filter: { ...lens.filter, ids: [...(lens.filter.ids ?? []), id] } });
-/** The canvas as places are kept for it: the first item its filter names, or the whole map (''). */
-const canvasOf = (lens) => lens.filter.ids?.[0] ?? '';
+/** The canvas as places are kept for it: the saved canvas up (ui/canvases.js), else the first item its filter names, else the whole map (''). */
+const canvasOf = (lens, asked) => asked?.canvas ?? lens.filter.ids?.[0] ?? '';
 
 /** Draw this lens on the canvas (Home when it is null), the item `here` lit, unless it is up already: then only what is lit changes. */
 export function showCanvas(lens, here, asked = {}) {
@@ -51,20 +52,22 @@ export function showCanvas(lens, here, asked = {}) {
   const style = { ...asked, ...(here && { here }), snap: Boolean(settings.snap), placed: {} };
   at = { key, view: null, lens, home: isHome, here, kept: null, style, asked };
   drawAgain();
-  readPlaces(canvasOf(lens), style.placed);
+  readPlaces(canvasOf(lens, asked), style.placed);
 }
 
 /** Draw the lens up now anew, with the places it has now: a picture already drawn takes no new places in a restyle. */
 function drawAgain() {
-  const of = canvasOf(at.lens);
-  const view = flatView({ lens: at.lens, style: at.style, of: of || undefined, key: `canvas:${of || 'map'}` });
-  const lens = at.lens;
+  const of = at.lens.filter.ids?.[0];
+  const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.lens, at.asked) || 'map'}` });
+  const { lens, asked, home: isHome } = at;
+  // The saved canvas up, named first in the bar, with the switch to the others.
+  const lead = canvasSwitch(lens, asked, isHome);
   // The picture it replaces stops being kept current from the log.
   if (at.view?.store) unfollow(at.view.store);
   at.view = view;
   // The bar says the lens at once, and again with what its answer found (the names of the items it names, a cut).
-  view.addEventListener('lens-answer', () => at?.view === view && drawQuery(lens, view, goLens));
-  drawQuery(lens, view, goLens);
+  view.addEventListener('lens-answer', () => at?.view === view && drawQuery(lens, view, goLens, lead));
+  drawQuery(lens, view, goLens, lead);
   host.replaceChildren(view);
 }
 
@@ -116,7 +119,7 @@ hooks.touched = async (touched) => {
 const batched = new Map();
 let writing = null;
 /** The canvas up now, as the places stream names it: what it is drawn from, '' for the whole map. */
-const canvasNow = () => (at ? canvasOf(at.lens) : null);
+const canvasNow = () => (at ? canvasOf(at.lens, at.asked) : null);
 const asked = (canvas) => (canvas ? { canvas } : {});
 /** Where things were put on this canvas, into `placed` (the picture's own), once what waits to be written is. */
 async function readPlaces(canvas, placed) {
