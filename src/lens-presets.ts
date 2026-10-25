@@ -10,6 +10,7 @@ import { lensRead } from './lens-scan.ts';
 import type { LENS_ANSWERS, ViewDef } from './declared.ts';
 import { HUB_AT, hubs } from './lens-kept.ts';
 import { lens } from './lens.ts';
+import { flatLens } from './lens-flat.ts';
 import type { Archipelago } from './pelago.ts';
 
 type Answer = Awaited<ReturnType<typeof lens>>;
@@ -250,6 +251,7 @@ const briefOf: Reading = async (l, def, params) => {
 
 const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
   lens: (l, def, params) => lens(l, { ...def.lens, ...params }),
+  flat: (l, _def, params) => flatLens(l, params),
   graph,
   tree,
   hubs: hubsOf,
