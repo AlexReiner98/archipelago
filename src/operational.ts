@@ -23,6 +23,7 @@ export const ON_THE_MAP: Record<string, string> = {
   notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
   automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
   rechecks: "A project's rechecked_at: kept by operational, appended to the automations stream.",
+  places: "Where a person put an item on a canvas: one place per canvas and item (the field place:<canvas>, its value [x, y]), written in one batch by places_put and read by places (src/canvas-places.ts), appended at once to the places stream and never an item or a link; compacted to the newest per canvas and item.",
   kinds: "An item's kind column, read from its type: filled by fillKinds when a workspace opens, and by the database for a row written without it; never a fact anyone states.",
 };
 

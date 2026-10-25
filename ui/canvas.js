@@ -29,11 +29,18 @@ export function showCanvas(lens, here) {
   if (at?.key === key && at.view.isConnected) return mark(here);
   // Moves made on the canvas left are written before another is drawn.
   writeMoves();
-  const style = { ...(here && { here }), snap: Boolean(settings.snap) };
-  const view = lensView({ lens, style, key: `canvas:${lens.from ?? lens.lens ?? 'map'}` });
-  host.replaceChildren(view);
-  at = { key, view, lens, home, here, kept: null, style };
+  // Where things were put here is read beside the lens, into `placed`: one object the picture keeps, filled in place.
+  const style = { ...(here && { here }), snap: Boolean(settings.snap), placed: {} };
+  at = { key, view: null, lens, home, here, kept: null, style };
+  drawAgain();
+  readPlaces(lens.from ?? '', style.placed);
   drawTrail(lens.from);
+}
+
+/** Draw the lens up now anew, with the places it has now: a picture already drawn takes no new places in a restyle. */
+function drawAgain() {
+  at.view = lensView({ lens: at.lens, style: at.style, key: `canvas:${at.lens.from ?? at.lens.lens ?? 'map'}` });
+  host.replaceChildren(at.view);
 }
 
 /** Light one item on the canvas (its page is open), or none. */
@@ -76,60 +83,65 @@ hooks.touched = async (touched) => {
   }
 };
 
-// ---- Where things were put by hand: batched on the page, written as one change just before the next action
-// (the owner, 25 Oct 2026), onto the workspace's style that keeps places (core's field `places`), by canvas, by item.
+// ---- Where things were put by hand: batched on the page and written in one call just before the next action (the
+// owner, 25 Oct 2026), into the places stream (decision e_n2825x2w): by canvas (what the picture is drawn from, or the
+// whole map), then by item. Read beside the lens when a canvas is drawn, and handed to its drawing as `placed`.
 
-/** The name of the style item that keeps where things were put. */
-const PLACES = 'Canvas places';
-/** Moves made and not yet written: by canvas, then by item, the middle of each; null for a canvas laid out again. */
-const batched = {};
+/** Moves made and not yet written: by canvas ('' for the whole map), each { clear, moves }: laid out again, and the middle of each item moved since. */
+const batched = new Map();
 let writing = null;
-/** Which canvas a picture is of, as the drawing reads its places (packs/core/draw/flow/free.js). */
-const placesKey = () => (at?.view.answer ? (at.view.answer.lens?.from ?? at.view.answer.view ?? 'map') : null);
-/** Write what was moved, as one change of its own; asked for before any action (ui/base.js), and when leaving. */
+/** The canvas up now, as the places stream names it: what it is drawn from, '' for the whole map. */
+const canvasNow = () => (at ? (at.lens.from ?? '') : null);
+const asked = (canvas) => (canvas ? { canvas } : {});
+/** Where things were put on this canvas, into `placed` (the picture's own), once what waits to be written is. */
+async function readPlaces(canvas, placed) {
+  await writeMoves();
+  const got = await api('places', asked(canvas)).catch(() => null);
+  if (!got || at?.style.placed !== placed) return;
+  // What was moved here while they were read stays where it was put.
+  Object.assign(placed, got, batched.get(canvas)?.moves);
+  // Read before the lens answered, they are drawn with it; after, the picture is drawn again with them.
+  if (Object.keys(placed).length && at.view.answer) drawAgain();
+}
+/** Write what was moved, one call for each canvas; asked for before any action (ui/base.js), and when leaving. */
 async function writeMoves() {
   if (writing) return writing;
-  if (!Object.keys(batched).length) return;
+  if (!batched.size) return;
   writing = (async () => {
-    const batch = { ...batched };
-    for (const k of Object.keys(batch)) delete batched[k];
-    try {
-      const { style, used } = await api('view', { name: 'style' });
-      const kept = used.find((u) => u.title === PLACES && !u.preset);
-      const places = { ...(style.places ?? {}) };
-      for (const [k, put] of Object.entries(batch)) {
-        if (put === null) delete places[k];
-        else places[k] = { ...(places[k] ?? {}), ...put };
+    const batch = [...batched];
+    batched.clear();
+    for (const [canvas, put] of batch) {
+      try {
+        await api('places_put', { ...asked(canvas), moves: put.moves, ...(put.clear && { clear: true }) });
+      } catch {
+        // Not written: kept for the next try, under what was moved since.
+        const since = batched.get(canvas);
+        batched.set(canvas, !since ? put : since.clear ? since : { clear: put.clear, moves: { ...put.moves, ...since.moves } });
       }
-      const ops = kept ? [{ op: 'update', id: kept.id, props: { places } }] : [{ op: 'create', type: 'style', title: PLACES, status: 'current', props: { places } }];
-      await api('change', { ops, reason: 'Moved on the canvas' });
-      if (at?.style) at.style.moved = {};
-    } catch {
-      // Not written: kept for the next try.
-      for (const [k, put] of Object.entries(batch)) batched[k] = put === null || batched[k] === null ? (batched[k] ?? put) : { ...put, ...(batched[k] ?? {}) };
-    } finally {
-      writing = null;
     }
+    writing = null;
   })();
   return writing;
 }
-hooks.act = () => (writing ? undefined : writeMoves());
-// Let go on the canvas (ui/drag.js): kept on the page, and in the picture's style, so a redraw keeps it where it was put.
+hooks.act = () => writeMoves();
+// Let go on the canvas (ui/drag.js): kept on the page, and in the picture's places, so a redraw keeps it where it was put.
 host.addEventListener('drawing-drop', (ev) => {
-  const k = placesKey();
-  if (!k || !at) return;
+  const canvas = canvasNow();
+  if (canvas === null) return;
   const put = [Math.round(ev.detail.x), Math.round(ev.detail.y)];
-  batched[k] = { ...(batched[k] ?? {}), [ev.detail.id]: put };
-  at.style.moved = { ...(at.style.moved ?? {}), [ev.detail.id]: put };
+  const was = batched.get(canvas) ?? { clear: false, moves: {} };
+  batched.set(canvas, { ...was, moves: { ...was.moves, [ev.detail.id]: put } });
+  at.style.placed[ev.detail.id] = put;
 });
 addEventListener('visibilitychange', () => document.hidden && writeMoves());
 /** Lay this canvas out again as its drawing does: what was put by hand here is forgotten, in the next batch. */
 function arrange() {
-  const k = placesKey();
-  if (!k || !at) return;
-  batched[k] = null;
-  at.style.moved = {};
-  writeMoves().then(() => refreshCanvas());
+  const canvas = canvasNow();
+  if (canvas === null) return;
+  batched.set(canvas, { clear: true, moves: {} });
+  for (const id of Object.keys(at.style.placed)) delete at.style.placed[id];
+  drawAgain();
+  writeMoves();
 }
 document.getElementById('canvas-arrange')?.addEventListener('click', () => (document.getElementById('more').open = false, arrange()));
 

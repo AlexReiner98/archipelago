@@ -1,13 +1,12 @@
 // Steps put where a person put them (the owner, 25 Oct 2026: the canvas is flexible), and the wires to them solved
-// live, still at right angles. Where things were put is the style's `places`, by canvas (what the picture is drawn
-// from, else its view, else the map) and then by item, with what was moved and not yet saved over it (`moved`). A wire
+// live, still at right angles. Where things were put on this canvas is the style's `placed`, by item: the page reads it
+// from the places stream beside the lens and keeps what was moved here in it, with `moved` over it when given. A wire
 // to a step that was put by hand leaves the foot of the step it comes from and comes down into the head of the one it
 // goes to, round both when the second is not below the first. Pure: positions in, points out.
 
 /** Where each step of this picture was put by hand: the middle of each, by item. */
 export function placesOf(answer, style) {
-  const key = answer.lens?.from ?? answer.view ?? 'map';
-  return { ...(style.places?.[key] ?? {}), ...(style.moved ?? {}) };
+  return { ...(style.placed ?? {}), ...(style.moved ?? {}) };
 }
 
 /** How many of these boxes a path of right angles passes through (each box { x, y, w, h }, its middle and size). */

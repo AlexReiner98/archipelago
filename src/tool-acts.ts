@@ -1,9 +1,11 @@
 // The kernel's actions: what an agent does besides changing facts, each one of the six verbs (KERNEL_VERBS in
 // src/declared.ts): a session registered, reporting in and ending, the story it tells, a resource taken and given
-// back, the owner's screen pointed, a notification sent, the owner's word recorded, a backup taken.
+// back, things put where they stand on a canvas, the owner's screen pointed, a notification sent, the owner's word
+// recorded, a backup taken.
 
 import { z } from 'zod';
 import { askView } from './askview.ts';
+import { putPlaces } from './canvas-places.ts';
 import { importAudit } from './audit.ts';
 import { toConfirm } from './confirm.ts';
 import { stopLaunched } from './launcher.ts';
@@ -88,6 +90,15 @@ export const ACT_TOOLS: Record<string, Tool> = {
       reason: z.string().min(1),
     },
     run: async (l, actor, input) => l.release(actor, input),
+  },
+  places_put: {
+    description: 'Put things where they stand on one canvas, a batch of moves in one call: each item’s middle as [x, y] in the picture’s own units, or null to let the drawing lay it again; clear: true forgets every place on the canvas first. Never a fact about the work: kept in the places stream, newest per canvas and item. Takes effect at once.',
+    input: {
+      canvas: z.string().optional().describe("The canvas: the id of the item it is drawn from; the workspace's (or nothing) for the whole map."),
+      moves: z.record(z.string(), z.tuple([z.number(), z.number()]).nullable()).optional().describe('By item id: where its middle now is, or null.'),
+      clear: z.boolean().optional().describe('Forget every place on this canvas first: it is laid out again.'),
+    },
+    run: async (l, actor, input) => putPlaces(l, actor, input),
   },
   session_start: {
     description: 'Register this agent session in the map so the human can see it. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',

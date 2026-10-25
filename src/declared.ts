@@ -224,6 +224,7 @@ export const KERNEL_VERBS: Record<string, string> = {
   confirmed: 'settle',
   decide: 'settle',
   release: 'revise',
+  places_put: 'revise',
   publish: 'revise',
   publish_all: 'revise',
   restart: 'revise',

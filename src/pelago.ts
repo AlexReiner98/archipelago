@@ -562,8 +562,8 @@ export class Archipelago {
     return id;
   }
 
-  /** A change set the system appends when a pack moves a type or a kind: the new type or kind, and nothing else of the items moves. */
-  private async moved(tx: Q, action: string, reason: string, facts: Fact[]) {
+  /** A change set the system appends in a migration (a pack moves a type or a kind, places move to their stream): what moved, and nothing else. */
+  async moved(tx: Q, action: string, reason: string, facts: Fact[]) {
     await projectFacts(tx, this.registry, await stamp(tx), facts, true);
     await append(tx, this.workspace, 'facts', { id: newId('c'), actor: { id: 'system' }, authority: null, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts);
   }
