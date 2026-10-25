@@ -8,7 +8,7 @@ import type { Archipelago, Entity } from './pelago.ts';
 import { blockGraph } from './blocking.ts';
 import { readEvents } from './eventlog.ts';
 import { askPackView, VIEWS } from './views.ts';
-import { lensRead } from './lens-scan.ts';
+import { scanAround } from './region.ts';
 
 /** The most items one read gives back. */
 const READ_LIMIT = 500;
@@ -35,8 +35,8 @@ export type Read = {
   since?: string;
   /** Everything part of any of these items, and the items themselves, in one read. */
   parts_of?: string[];
-  /** What a lens from an item reads (src/lens-scan.ts), in one read: the items around it and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
-  lens?: { from: string; over?: string[]; above?: boolean };
+  /** What is around an item (src/region.ts), in one read: what is inside it, what it is tied to and what is inside that, and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
+  around?: { from: string; over?: string[]; above?: boolean };
   /** Which of these items have a picture kept for them. */
   pictures?: string[];
   /** Events of a kind, about one item, since a moment, newest first. */
@@ -115,8 +115,11 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     );
     return rows.map(typed);
   }
-  if (q.lens !== undefined) {
-    const read = await lensRead(l, { from: String(q.lens.from) }, { over: q.lens.over ?? 'all', fold: [] }, { above: Boolean(q.lens.above), made: true });
+  if (q.around !== undefined) {
+    const over = q.around.over ?? 'all';
+    if (over !== 'all' && (!Array.isArray(over) || over.some((kind) => !l.registry.relations.has(kind)))) throw new Error(`around.over: a list of kinds of link. Known: ${[...l.registry.relations.keys()].join(', ')}`);
+    const reg = l.registry;
+    const read = await scanAround(l, { starts: [String(q.around.from)], by: reg.relationFamily('part_of'), over: over === 'all' ? null : reg.relationFamily(...over), waits: [], above: Boolean(q.around.above), made: true });
     // What a link is: its kind and those it extends, as an item says what it is.
     const lineage = (type: string): string[] => [type, ...(l.registry.relations.get(type)?.extends ? lineage(l.registry.relations.get(type)!.extends!) : [])];
     return {

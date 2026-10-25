@@ -14,7 +14,9 @@ import { styleFor, drawn as withDrawing } from './styles.ts'; import { SYSTEM } 
 import { readSteps, stepIds } from './lens-steps.ts';
 import { IN, SESSIONS, WHEN, dated, insideOf, personLanes, streamsOf, thisWeek } from './lens-when.ts';
 import { LENS_DEFAULT, ofKind, readLens, topKinds, viewLens, WAITS, wholeRead, type Lens } from './lens-read.ts';
-import { aroundOf, scanAround, scanKinds, type Row } from './lens-scan.ts';
+import { aroundOf } from './lens-scan.ts';
+import { scanAround, scanKinds, type Row } from './region.ts';
+import { holders } from './inside.ts';
 
 // Kept where they were first imported from.
 export { hubs, HUB_AT, pictureOf } from './lens-kept.ts';
@@ -193,40 +195,8 @@ export async function lens(l: Archipelago, input: Record<string, unknown>, prese
   if (spans) for (const [id, found] of spans) if (!found.length && id !== asked.from) (eligible.delete(id), untimed++);
   const live = relations.filter((r) => eligible.has(r.from_id) && eligible.has(r.to_id));
 
-  // What a thing is inside: where its organising link leads. Led to two things (a task of a feature, linked
-  // to the project as well), it is inside the nearer: the one that is itself inside something.
-  const leads = new Map<string, string[]>();
-  for (const r of relations) if (r.type === asked.by && r.from_id !== r.to_id && standing.has(r.from_id) && standing.has(r.to_id)) leads.set(r.from_id, [...(leads.get(r.from_id) ?? []), r.to_id]);
-  const parent = new Map<string, string>();
-  // Of the things it is part of, the one inside another of them is the nearer; failing that, one inside something.
-  const above = (from: string, seek: string, seen = new Set<string>()): boolean =>
-    (leads.get(from) ?? []).some((up) => up === seek || (!seen.has(up) && seen.size < 64 && (seen.add(up), above(up, seek, seen))));
-  const holder = (id: string) => {
-    const ups = leads.get(id);
-    return ups?.find((p) => ups.some((q) => q !== p && above(p, q))) ?? ups?.find((p) => leads.has(p)) ?? ups?.[0];
-  };
-  for (const id of eligible.keys()) {
-    // Up past what is not of the kinds kept, to the nearest thing that is.
-    let up = holder(id);
-    for (let steps = 0; up !== undefined && !eligible.has(up) && steps < 64; steps++) up = holder(up);
-    if (up !== undefined && up !== id && eligible.has(up)) parent.set(id, up);
-  }
-  // A loop of belonging is cut where it closes, so everything has a depth.
-  const depths = new Map<string, number>();
-  const depth = (id: string, trail = new Set<string>()): number => {
-    const known = depths.get(id);
-    if (known !== undefined) return known;
-    const up = parent.get(id);
-    if (up === undefined || id === asked.from) return depths.set(id, 0), 0;
-    if (trail.has(up)) return parent.delete(id), depths.set(id, 0), 0;
-    trail.add(id);
-    const d = depth(up, trail) + 1;
-    depths.set(id, d);
-    return d;
-  };
-  for (const id of eligible.keys()) depth(id);
-  const kids = new Map<string, string[]>();
-  for (const [id, up] of parent) kids.set(up, [...(kids.get(up) ?? []), id]);
+  // What a thing is inside: where its organising link leads, up past what is not of the kinds kept (src/inside.ts).
+  const { parent, depths, kids } = holders(relations, asked.by, standing, eligible, asked.from);
 
   // Which of them are sent.
   const along = (type: string) => asked.over === 'all' || asked.over.includes(type);

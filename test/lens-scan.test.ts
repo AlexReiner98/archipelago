@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { blockGraph } from '../src/blocking.ts';
 import { lens } from '../src/lens.ts';
-import { aroundOf, scanAround } from '../src/lens-scan.ts';
+import { aroundOf } from '../src/lens-scan.ts';
+import { scanAround } from '../src/region.ts';
 import { fresh, make } from './map.ts';
 
 test('a lens from an item reads what is around it, and nothing else', async () => {
