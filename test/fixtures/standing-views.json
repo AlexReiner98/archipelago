@@ -1,0 +1,5375 @@
+{
+ "unordered": [
+  ".graph newest all system.edges",
+  ".graph newest all system.nodes",
+  ".graph newest blocking.edges",
+  ".graph newest blocking.nodes",
+  ".graph newest structure closed.edges",
+  ".graph newest structure closed.nodes",
+  ".lens holding.links",
+  ".lens near.items",
+  ".lens near.links"
+ ],
+ "answers": {
+  "attention app": {
+   "counts": {
+    "blocked": 3,
+    "due": 0,
+    "holding_up": 1,
+    "ready": 6,
+    "stale": 12,
+    "to_confirm": 0,
+    "under_way": 1,
+    "unsettled": 2,
+    "waits_on": 1
+   },
+   "items": [
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<hover>",
+     "kind": "work",
+     "open": true,
+     "owner": "<bo>",
+     "reasons": [
+      {
+       "for": "The card design",
+       "who": "Bo",
+       "why": "waits_on"
+      },
+      {
+       "by": [
+        "Bo"
+       ],
+       "why": "blocked"
+      },
+      {
+       "sessions": 1,
+       "why": "under_way"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "doing",
+     "title": "Hover cards",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "owner": "<me>",
+     "reasons": [
+      {
+       "count": 1,
+       "why": "holding_up"
+      },
+      {
+       "by": "word",
+       "why": "unsettled"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "open",
+     "title": "Which certificate?",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.decision"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "by": "word",
+       "why": "unsettled"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "open",
+     "title": "Is the cert enough?",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.decision"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "by": [
+        "Which certificate?"
+       ],
+       "why": "blocked"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "todo",
+     "title": "Sign the package",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<extras>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "by": [
+        "Bo"
+       ],
+       "why": "blocked"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "todo",
+     "title": "Capture extras",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<guide>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "todo",
+     "title": "Write the guide",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<loose>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "todo",
+     "title": "Loose task in app",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "building",
+     "title": "Installer",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "software.feature"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<docs>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "planned",
+     "title": "Docs",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "software.feature"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<bug>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "open",
+     "title": "Crash on thin walls",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.issue"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<app>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "planned",
+     "title": "App",
+     "top": null,
+     "type": "work.project"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "planned",
+     "title": "Add-in",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "software.feature"
+    }
+   ],
+   "person": null,
+   "to_confirm": {
+    "count": 0,
+    "how": "Show the owner, in your reply, a line for each question settled on an agent’s own judgment, and ask them to confirm or correct; of those recorded on their own word, say how many there are and list them only if asked. When they have answered, call settle with action confirmed, its upto and what they said; change or reopen whatever they correct, on their authority.",
+    "on_agents_judgment": 0,
+    "on_owners_word": 0,
+    "upto": 0
+   },
+   "within": "<app>"
+  },
+  "attention me": {
+   "counts": {
+    "blocked": 3,
+    "due": 0,
+    "holding_up": 3,
+    "ready": 8,
+    "stale": 15,
+    "to_confirm": 0,
+    "under_way": 0,
+    "unsettled": 3,
+    "waits_on": 0
+   },
+   "items": [
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "owner": "<me>",
+     "reasons": [
+      {
+       "count": 1,
+       "why": "holding_up"
+      },
+      {
+       "by": "word",
+       "why": "unsettled"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "open",
+     "title": "Which certificate?",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.decision"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<pricing>",
+     "kind": "question",
+     "open": true,
+     "owner": "<me>",
+     "reasons": [
+      {
+       "count": 1,
+       "why": "holding_up"
+      },
+      {
+       "by": "word",
+       "why": "unsettled"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "open",
+     "title": "What does it cost?",
+     "top": {
+      "id": "<business>",
+      "title": "Business"
+     },
+     "type": "work.decision"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "count": 1,
+       "why": "holding_up"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "building",
+     "title": "Installer",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "software.feature"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "by": "word",
+       "why": "unsettled"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "open",
+     "title": "Is the cert enough?",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.decision"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<release>",
+     "kind": "occurrence",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "by": [
+        "What does it cost?",
+        "Installer"
+       ],
+       "why": "blocked"
+      }
+     ],
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "top": null,
+     "type": "software.release"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "by": [
+        "Which certificate?"
+       ],
+       "why": "blocked"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "todo",
+     "title": "Sign the package",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<extras>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "by": [
+        "Bo"
+       ],
+       "why": "blocked"
+      },
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "todo",
+     "title": "Capture extras",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<tiers>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "todo",
+     "title": "Write the tiers",
+     "top": {
+      "id": "<business>",
+      "title": "Business"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<guide>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "todo",
+     "title": "Write the guide",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<plans>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "planned",
+     "title": "Price plans",
+     "top": {
+      "id": "<business>",
+      "title": "Business"
+     },
+     "type": "software.feature"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<loose>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "todo",
+     "title": "Loose task in app",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.task"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<docs>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "planned",
+     "title": "Docs",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "software.feature"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<bug>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "open",
+     "title": "Crash on thin walls",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "work.issue"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<business>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "planned",
+     "title": "Business",
+     "top": null,
+     "type": "work.project"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<app>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      }
+     ],
+     "status": "planned",
+     "title": "App",
+     "top": null,
+     "type": "work.project"
+    },
+    {
+     "changed": "<time>",
+     "due": null,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "owner": null,
+     "reasons": [
+      {
+       "days": 24,
+       "why": "stale"
+      },
+      {
+       "why": "ready"
+      }
+     ],
+     "status": "planned",
+     "title": "Add-in",
+     "top": {
+      "id": "<app>",
+      "title": "App"
+     },
+     "type": "software.feature"
+    }
+   ],
+   "person": "<me>",
+   "to_confirm": {
+    "count": 0,
+    "how": "Show the owner, in your reply, a line for each question settled on an agent’s own judgment, and ask them to confirm or correct; of those recorded on their own word, say how many there are and list them only if asked. When they have answered, call settle with action confirmed, its upto and what they said; change or reopen whatever they correct, on their authority.",
+    "on_agents_judgment": 0,
+    "on_owners_word": 0,
+    "upto": 0
+   },
+   "within": null
+  },
+  "brief hover": {
+   "blocked_by": [
+    {
+     "entity": {
+      "due": null,
+      "id": "<bo>",
+      "owner": null,
+      "status": "active",
+      "title": "Bo",
+      "type": "person"
+     },
+     "why": "waits_on"
+    }
+   ],
+   "needs": [],
+   "part_of": [
+    {
+     "id": "<addin>",
+     "status": "planned",
+     "title": "Add-in",
+     "type": "software.feature"
+    },
+    {
+     "id": "<app>",
+     "status": "planned",
+     "title": "App",
+     "type": "work.project"
+    }
+   ],
+   "repo": {
+    "id": "<repo>",
+    "path": "C:\\code\\Apex",
+    "status": "active",
+    "title": "Apex repo",
+    "type": "software.repo"
+   },
+   "root_blockers": [
+    {
+     "due": null,
+     "id": "<bo>",
+     "owner": null,
+     "status": "active",
+     "title": "Bo",
+     "type": "person"
+    }
+   ],
+   "task": {
+    "id": "<hover>",
+    "status": "doing",
+    "title": "Hover cards",
+    "type": "work.task"
+   },
+   "text": "# Hover cards\nTask, doing. Archipelago id: <hover>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Bo (person, active)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <hover>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <hover>, end its message with the line \"Closes: <hover>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "ties": []
+  },
+  "brief installer": {
+   "blocked_by": [],
+   "needs": [],
+   "part_of": [
+    {
+     "id": "<addin>",
+     "status": "planned",
+     "title": "Add-in",
+     "type": "software.feature"
+    },
+    {
+     "id": "<app>",
+     "status": "planned",
+     "title": "App",
+     "type": "work.project"
+    }
+   ],
+   "repo": {
+    "id": "<repo>",
+    "path": "C:\\code\\Apex",
+    "status": "active",
+    "title": "Apex repo",
+    "type": "software.repo"
+   },
+   "root_blockers": [],
+   "task": {
+    "id": "<installer>",
+    "status": "building",
+    "title": "Installer",
+    "type": "software.feature"
+   },
+   "text": "# Installer\nFeature, building. Archipelago id: <installer>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <installer>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <installer>, end its message with the line \"Closes: <installer>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "ties": []
+  },
+  "brief sign": {
+   "blocked_by": [
+    {
+     "entity": {
+      "due": null,
+      "id": "<cert>",
+      "owner": "<me>",
+      "status": "open",
+      "title": "Which certificate?",
+      "type": "work.decision"
+     },
+     "why": "depends_on"
+    }
+   ],
+   "needs": [
+    {
+     "exclusive": true,
+     "id": "<lane>",
+     "status": "available",
+     "title": "Live lane",
+     "type": "resource"
+    }
+   ],
+   "part_of": [
+    {
+     "id": "<installer>",
+     "status": "building",
+     "title": "Installer",
+     "type": "software.feature"
+    },
+    {
+     "id": "<addin>",
+     "status": "planned",
+     "title": "Add-in",
+     "type": "software.feature"
+    },
+    {
+     "id": "<app>",
+     "status": "planned",
+     "title": "App",
+     "type": "work.project"
+    }
+   ],
+   "repo": {
+    "id": "<repo>",
+    "path": "C:\\code\\Apex",
+    "status": "active",
+    "title": "Apex repo",
+    "type": "software.repo"
+   },
+   "root_blockers": [
+    {
+     "due": null,
+     "id": "<cert>",
+     "owner": "<me>",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    }
+   ],
+   "task": {
+    "id": "<sign>",
+    "status": "todo",
+    "title": "Sign the package",
+    "type": "work.task"
+   },
+   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (work.decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Relates to\n- Is the cert enough? (open)\n\n## Is governed by\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, end its message with the line \"Closes: <sign>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "ties": [
+    {
+     "id": "<q>",
+     "relation": "relates_to",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    },
+    {
+     "id": "<rule>",
+     "relation": "work.governed_by",
+     "status": "decided",
+     "title": "One live lane.",
+     "type": "work.decision"
+    }
+   ]
+  },
+  "gate events": {
+   "events": [
+    {
+     "at": null,
+     "holding": 2,
+     "id": "<release>",
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "type": "software.release"
+    }
+   ]
+  },
+  "gate release": {
+   "can_follow": [
+    {
+     "id": "<hover>",
+     "open": true,
+     "relation": "<link>",
+     "status": "doing",
+     "title": "Hover cards",
+     "type": "work.task"
+    }
+   ],
+   "clear": false,
+   "counts": {
+    "can_follow": 1,
+    "holding": 5,
+    "open": 4,
+    "to_sort": 3,
+    "yours": 3
+   },
+   "event": {
+    "at": null,
+    "id": "<release>",
+    "open": true,
+    "status": "upcoming",
+    "title": "Version 1.0",
+    "type": "software.release"
+   },
+   "how": "To sort an item: link the event to it with depends_on (the event waits for it) or defers (it can follow). To move one across, unlink the link given here and link the other.",
+   "proof": null,
+   "streams": [
+    {
+     "id": "<installer>",
+     "items": [
+      {
+       "blocked": true,
+       "done": false,
+       "id": "<sign>",
+       "status": "todo",
+       "title": "Sign the package",
+       "type": "work.task",
+       "waiting_on": [
+        {
+         "id": "<cert>",
+         "status": "open",
+         "title": "Which certificate?",
+         "type": "work.decision"
+        }
+       ],
+       "yours": true
+      },
+      {
+       "blocked": false,
+       "done": false,
+       "id": "<cert>",
+       "status": "open",
+       "title": "Which certificate?",
+       "type": "work.decision",
+       "waiting_on": [],
+       "yours": true
+      },
+      {
+       "blocked": false,
+       "done": false,
+       "id": "<q>",
+       "status": "open",
+       "title": "Is the cert enough?",
+       "type": "work.decision",
+       "waiting_on": [],
+       "yours": false
+      },
+      {
+       "blocked": false,
+       "done": true,
+       "id": "<clean>",
+       "status": "done",
+       "title": "Uninstall leaves it clean",
+       "type": "work.task",
+       "waiting_on": [],
+       "yours": false
+      }
+     ],
+     "progress": {
+      "done": 1,
+      "total": 4
+     },
+     "relation": "<link>",
+     "status": "building",
+     "title": "Installer",
+     "type": "software.feature",
+     "yours": 2
+    },
+    {
+     "id": "<business>",
+     "items": [
+      {
+       "blocked": false,
+       "done": false,
+       "id": "<pricing>",
+       "relation": "<link>",
+       "status": "open",
+       "title": "What does it cost?",
+       "type": "work.decision",
+       "waiting_on": [],
+       "yours": true
+      }
+     ],
+     "progress": {
+      "done": 0,
+      "total": 1
+     },
+     "status": "planned",
+     "title": "Business",
+     "type": "work.project",
+     "yours": 1
+    }
+   ],
+   "to_sort": [
+    {
+     "id": "<extras>",
+     "status": "todo",
+     "stream": {
+      "id": "<addin>",
+      "title": "Add-in"
+     },
+     "title": "Capture extras",
+     "type": "work.task"
+    },
+    {
+     "id": "<bug>",
+     "status": "open",
+     "stream": {
+      "id": "<docs>",
+      "title": "Docs"
+     },
+     "title": "Crash on thin walls",
+     "type": "work.issue"
+    },
+    {
+     "id": "<guide>",
+     "status": "todo",
+     "stream": {
+      "id": "<docs>",
+      "title": "Docs"
+     },
+     "title": "Write the guide",
+     "type": "work.task"
+    }
+   ]
+  },
+  "graph focus all 3": {
+   "edges": [
+    {
+     "from": "<app>",
+     "id": "<link>",
+     "to": "<repo>",
+     "type": "software.lives_in"
+    },
+    {
+     "from": "<addin>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<installer>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<docs>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<guide>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<bug>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<loose>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<pricing>",
+     "id": "<link>",
+     "to": "<business>",
+     "type": "part_of"
+    },
+    {
+     "from": "<q>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<cert>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<bo>",
+     "type": "waits_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<lane>",
+     "type": "needs"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<q>",
+     "type": "relates_to"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "software.ships"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<pricing>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "defers"
+    }
+   ],
+   "focus": "<addin>",
+   "nodes": [
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "order": 2,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Add-in",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<app>",
+     "kind": "work",
+     "open": true,
+     "root": "work.project",
+     "status": "planned",
+     "title": "App",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "work.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<docs>",
+     "kind": "work",
+     "open": true,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Docs",
+     "tokens": {
+      "estimated": 2000,
+      "partial": true,
+      "used": 500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<hover>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "doing",
+     "title": "Hover cards",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<extras>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Capture extras",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "id": "<release>",
+     "kind": "occurrence",
+     "open": true,
+     "root": "event",
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "type": "software.release"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<repo>",
+     "kind": "place",
+     "open": true,
+     "root": "software.repo",
+     "status": "active",
+     "title": "Apex repo",
+     "type": "software.repo"
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<guide>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Write the guide",
+     "tokens": {
+      "estimated": 2000,
+      "used": 500
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<bug>",
+     "kind": "work",
+     "open": true,
+     "root": "work.issue",
+     "status": "open",
+     "title": "Crash on thin walls",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.issue",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<loose>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Loose task in app",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<bo>",
+     "kind": "actor",
+     "open": true,
+     "root": "person",
+     "status": "active",
+     "title": "Bo",
+     "type": "person"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<pricing>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "What does it cost?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<business>",
+     "kind": "work",
+     "open": true,
+     "root": "work.project",
+     "status": "planned",
+     "title": "Business",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<lane>",
+     "kind": "place",
+     "open": true,
+     "root": "resource",
+     "status": "available",
+     "title": "Live lane",
+     "type": "resource"
+    }
+   ],
+   "preset": "all"
+  },
+  "graph focus all closed 1": {
+   "edges": [
+    {
+     "from": "<installer>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<clean>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<q>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<cert>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<q>",
+     "type": "relates_to"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "software.ships"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "depends_on"
+    }
+   ],
+   "focus": "<installer>",
+   "nodes": [
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "order": 2,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Add-in",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<clean>",
+     "kind": "work",
+     "open": false,
+     "root": "work.task",
+     "status": "done",
+     "title": "Uninstall leaves it clean",
+     "tokens": {
+      "assumed": true,
+      "estimated": 1000,
+      "used": 1000
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "id": "<release>",
+     "kind": "occurrence",
+     "open": true,
+     "root": "event",
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "type": "software.release"
+    }
+   ],
+   "preset": "all"
+  },
+  "graph focus all closed 2": {
+   "edges": [
+    {
+     "from": "<addin>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<installer>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<docs>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<clean>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<guide>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<q>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<cert>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<guide>",
+     "id": "<link>",
+     "to": "<clean>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<lane>",
+     "type": "needs"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<q>",
+     "type": "relates_to"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "software.ships"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<pricing>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "defers"
+    }
+   ],
+   "focus": "<installer>",
+   "nodes": [
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "order": 2,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Add-in",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<clean>",
+     "kind": "work",
+     "open": false,
+     "root": "work.task",
+     "status": "done",
+     "title": "Uninstall leaves it clean",
+     "tokens": {
+      "assumed": true,
+      "estimated": 1000,
+      "used": 1000
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "id": "<release>",
+     "kind": "occurrence",
+     "open": true,
+     "root": "event",
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "type": "software.release"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<app>",
+     "kind": "work",
+     "open": true,
+     "root": "work.project",
+     "status": "planned",
+     "title": "App",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "work.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<docs>",
+     "kind": "work",
+     "open": true,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Docs",
+     "tokens": {
+      "estimated": 2000,
+      "partial": true,
+      "used": 500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<hover>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "doing",
+     "title": "Hover cards",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<extras>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Capture extras",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<guide>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Write the guide",
+     "tokens": {
+      "estimated": 2000,
+      "used": 500
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<lane>",
+     "kind": "place",
+     "open": true,
+     "root": "resource",
+     "status": "available",
+     "title": "Live lane",
+     "type": "resource"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<pricing>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "What does it cost?",
+     "type": "work.decision"
+    }
+   ],
+   "preset": "all"
+  },
+  "graph focus blocking": {
+   "edges": [
+    {
+     "from": "<installer>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<q>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<cert>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<lane>",
+     "type": "needs"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<q>",
+     "type": "relates_to"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "software.ships"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "depends_on"
+    }
+   ],
+   "focus": "<sign>",
+   "nodes": [
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<lane>",
+     "kind": "place",
+     "open": true,
+     "root": "resource",
+     "status": "available",
+     "title": "Live lane",
+     "type": "resource"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "order": 2,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Add-in",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "id": "<release>",
+     "kind": "occurrence",
+     "open": true,
+     "root": "event",
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "type": "software.release"
+    }
+   ],
+   "preset": "all"
+  },
+  "graph focus closed item": {
+   "edges": [
+    {
+     "from": "<installer>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<docs>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<clean>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<guide>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<q>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<cert>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<guide>",
+     "id": "<link>",
+     "to": "<clean>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<q>",
+     "type": "relates_to"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "software.ships"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "depends_on"
+    }
+   ],
+   "focus": "<clean>",
+   "nodes": [
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<clean>",
+     "kind": "work",
+     "open": false,
+     "root": "work.task",
+     "status": "done",
+     "title": "Uninstall leaves it clean",
+     "tokens": {
+      "assumed": true,
+      "estimated": 1000,
+      "used": 1000
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<guide>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Write the guide",
+     "tokens": {
+      "estimated": 2000,
+      "used": 500
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "order": 2,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Add-in",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<docs>",
+     "kind": "work",
+     "open": true,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Docs",
+     "tokens": {
+      "estimated": 2000,
+      "partial": true,
+      "used": 500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "id": "<release>",
+     "kind": "occurrence",
+     "open": true,
+     "root": "event",
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "type": "software.release"
+    }
+   ],
+   "preset": "all"
+  },
+  "graph focus structure system": {
+   "edges": [
+    {
+     "from": "<app>",
+     "id": "<link>",
+     "to": "<repo>",
+     "type": "software.lives_in"
+    },
+    {
+     "from": "<addin>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<installer>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<docs>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<guide>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<bug>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<loose>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<q>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    }
+   ],
+   "focus": "<app>",
+   "nodes": [
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<app>",
+     "kind": "work",
+     "open": true,
+     "root": "work.project",
+     "status": "planned",
+     "title": "App",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "work.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<repo>",
+     "kind": "place",
+     "open": true,
+     "root": "software.repo",
+     "status": "active",
+     "title": "Apex repo",
+     "type": "software.repo"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "order": 2,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Add-in",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<loose>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Loose task in app",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<docs>",
+     "kind": "work",
+     "open": true,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Docs",
+     "tokens": {
+      "estimated": 2000,
+      "partial": true,
+      "used": 500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<hover>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "doing",
+     "title": "Hover cards",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<extras>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Capture extras",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<guide>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Write the guide",
+     "tokens": {
+      "estimated": 2000,
+      "used": 500
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<bug>",
+     "kind": "work",
+     "open": true,
+     "root": "work.issue",
+     "status": "open",
+     "title": "Crash on thin walls",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.issue",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    }
+   ],
+   "preset": "structure"
+  },
+  "graph newest all system": {
+   "edges": [
+    {
+     "from": "<addin>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<app>",
+     "id": "<link>",
+     "to": "<repo>",
+     "type": "software.lives_in"
+    },
+    {
+     "from": "<bug>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<docs>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<guide>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<bo>",
+     "type": "waits_on"
+    },
+    {
+     "from": "<installer>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<loose>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<plans>",
+     "id": "<link>",
+     "to": "<business>",
+     "type": "part_of"
+    },
+    {
+     "from": "<pricing>",
+     "id": "<link>",
+     "to": "<business>",
+     "type": "part_of"
+    },
+    {
+     "from": "<q>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "software.ships"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "defers"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<pricing>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<run>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "sys.works_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<cert>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<lane>",
+     "type": "needs"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<q>",
+     "type": "relates_to"
+    },
+    {
+     "from": "<tiers>",
+     "id": "<link>",
+     "to": "<business>",
+     "type": "part_of"
+    },
+    {
+     "from": "<tiers>",
+     "id": "<link>",
+     "to": "<plans>",
+     "type": "part_of"
+    },
+    {
+     "from": "<view>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "about"
+    }
+   ],
+   "nodes": [
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "order": 2,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Add-in",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<app>",
+     "kind": "work",
+     "open": true,
+     "root": "work.project",
+     "status": "planned",
+     "title": "App",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "work.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<bug>",
+     "kind": "work",
+     "open": true,
+     "root": "work.issue",
+     "status": "open",
+     "title": "Crash on thin walls",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.issue",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<business>",
+     "kind": "work",
+     "open": true,
+     "root": "work.project",
+     "status": "planned",
+     "title": "Business",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<docs>",
+     "kind": "work",
+     "open": true,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Docs",
+     "tokens": {
+      "estimated": 2000,
+      "partial": true,
+      "used": 500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<loose>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Loose task in app",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<plans>",
+     "kind": "work",
+     "open": true,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Price plans",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<tiers>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Write the tiers",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<guide>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Write the guide",
+     "tokens": {
+      "estimated": 2000,
+      "used": 500
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<bo>",
+     "kind": "actor",
+     "open": true,
+     "root": "person",
+     "status": "active",
+     "title": "Bo",
+     "type": "person"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<lane>",
+     "kind": "place",
+     "open": true,
+     "root": "resource",
+     "status": "available",
+     "title": "Live lane",
+     "type": "resource"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<pricing>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "What does it cost?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<repo>",
+     "kind": "place",
+     "open": true,
+     "root": "software.repo",
+     "status": "active",
+     "title": "Apex repo",
+     "type": "software.repo"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<run>",
+     "kind": "system",
+     "open": true,
+     "root": "sys.run",
+     "status": "running",
+     "title": "Pinning session",
+     "type": "sys.run"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<view>",
+     "kind": "system",
+     "open": true,
+     "root": "lens",
+     "status": "current",
+     "title": "The app, flat",
+     "type": "lens"
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<extras>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Capture extras",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<hover>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "doing",
+     "title": "Hover cards",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "id": "<release>",
+     "kind": "occurrence",
+     "open": true,
+     "root": "event",
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "type": "software.release"
+    }
+   ],
+   "preset": "all"
+  },
+  "graph newest blocking": {
+   "edges": [
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<bo>",
+     "type": "waits_on"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<release>",
+     "id": "<link>",
+     "to": "<pricing>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<cert>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<lane>",
+     "type": "needs"
+    }
+   ],
+   "nodes": [
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<bo>",
+     "kind": "actor",
+     "open": true,
+     "root": "person",
+     "status": "active",
+     "title": "Bo",
+     "type": "person"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<lane>",
+     "kind": "place",
+     "open": true,
+     "root": "resource",
+     "status": "available",
+     "title": "Live lane",
+     "type": "resource"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<pricing>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "What does it cost?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<extras>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Capture extras",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<hover>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "doing",
+     "title": "Hover cards",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "id": "<release>",
+     "kind": "occurrence",
+     "open": true,
+     "root": "event",
+     "status": "upcoming",
+     "title": "Version 1.0",
+     "type": "software.release"
+    }
+   ],
+   "preset": "blocking"
+  },
+  "graph newest structure closed": {
+   "edges": [
+    {
+     "from": "<addin>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<app>",
+     "id": "<link>",
+     "to": "<repo>",
+     "type": "software.lives_in"
+    },
+    {
+     "from": "<bug>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<clean>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<docs>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<extras>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<guide>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<installer>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "part_of"
+    },
+    {
+     "from": "<loose>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<old>",
+     "id": "<link>",
+     "to": "<app>",
+     "type": "part_of"
+    },
+    {
+     "from": "<plans>",
+     "id": "<link>",
+     "to": "<business>",
+     "type": "part_of"
+    },
+    {
+     "from": "<pricing>",
+     "id": "<link>",
+     "to": "<business>",
+     "type": "part_of"
+    },
+    {
+     "from": "<q>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<sign>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<tiers>",
+     "id": "<link>",
+     "to": "<business>",
+     "type": "part_of"
+    },
+    {
+     "from": "<tiers>",
+     "id": "<link>",
+     "to": "<plans>",
+     "type": "part_of"
+    }
+   ],
+   "nodes": [
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<addin>",
+     "kind": "work",
+     "open": true,
+     "order": 2,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Add-in",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<app>",
+     "kind": "work",
+     "open": true,
+     "root": "work.project",
+     "status": "planned",
+     "title": "App",
+     "tokens": {
+      "assumed": true,
+      "estimated": 7000,
+      "partial": true,
+      "used": 1500
+     },
+     "type": "work.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<bug>",
+     "kind": "work",
+     "open": true,
+     "root": "work.issue",
+     "status": "open",
+     "title": "Crash on thin walls",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.issue",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<business>",
+     "kind": "work",
+     "open": true,
+     "root": "work.project",
+     "status": "planned",
+     "title": "Business",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<docs>",
+     "kind": "work",
+     "open": true,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Docs",
+     "tokens": {
+      "estimated": 2000,
+      "partial": true,
+      "used": 500
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<installer>",
+     "kind": "work",
+     "open": true,
+     "order": 1,
+     "root": "software.feature",
+     "status": "building",
+     "title": "Installer",
+     "tokens": {
+      "assumed": true,
+      "estimated": 5000,
+      "used": 1000
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<loose>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Loose task in app",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<old>",
+     "kind": "work",
+     "open": false,
+     "root": "software.feature",
+     "status": "shipped",
+     "title": "Old feature",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<plans>",
+     "kind": "work",
+     "open": true,
+     "root": "software.feature",
+     "status": "planned",
+     "title": "Price plans",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "software.feature",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<tiers>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Write the tiers",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<clean>",
+     "kind": "work",
+     "open": false,
+     "root": "work.task",
+     "status": "done",
+     "title": "Uninstall leaves it clean",
+     "tokens": {
+      "assumed": true,
+      "estimated": 1000,
+      "used": 1000
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<guide>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Write the guide",
+     "tokens": {
+      "estimated": 2000,
+      "used": 500
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<cert>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<pricing>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "What does it cost?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<q>",
+     "kind": "question",
+     "open": true,
+     "root": "work.decision",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "work.decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<repo>",
+     "kind": "place",
+     "open": true,
+     "root": "software.repo",
+     "status": "active",
+     "title": "Apex repo",
+     "type": "software.repo"
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<extras>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Capture extras",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<hover>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "doing",
+     "title": "Hover cards",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    },
+    {
+     "blocked": true,
+     "created": "<time>",
+     "estimated": true,
+     "id": "<sign>",
+     "kind": "work",
+     "open": true,
+     "root": "work.task",
+     "status": "todo",
+     "title": "Sign the package",
+     "tokens": {
+      "estimated": 4000,
+      "used": 0
+     },
+     "type": "work.task",
+     "work": true
+    }
+   ],
+   "preset": "structure"
+  },
+  "handoff repo": {
+   "how": "Nobody has written a handoff note for this repository. To write the first, create a software.handoff and link it software.lives_in to <repo> in the same change; this view finds it from then on. Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be 3000 characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.",
+   "last_push": null,
+   "note": null,
+   "open": {
+    "blocked": [
+     {
+      "id": "<sign>",
+      "status": "todo",
+      "title": "Sign the package",
+      "type": "work.task",
+      "waiting_on": [
+       "Which certificate?"
+      ]
+     },
+     {
+      "id": "<hover>",
+      "status": "doing",
+      "title": "Hover cards",
+      "type": "work.task",
+      "waiting_on": [
+       "Bo"
+      ]
+     },
+     {
+      "id": "<extras>",
+      "status": "todo",
+      "title": "Capture extras",
+      "type": "work.task",
+      "waiting_on": [
+       "Bo"
+      ]
+     }
+    ],
+    "ready": [
+     {
+      "id": "<guide>",
+      "status": "todo",
+      "title": "Write the guide",
+      "type": "work.task"
+     },
+     {
+      "id": "<cert>",
+      "status": "open",
+      "title": "Which certificate?",
+      "type": "work.decision"
+     },
+     {
+      "id": "<loose>",
+      "status": "todo",
+      "title": "Loose task in app",
+      "type": "work.task"
+     },
+     {
+      "id": "<q>",
+      "status": "open",
+      "title": "Is the cert enough?",
+      "type": "work.decision"
+     },
+     {
+      "id": "<bug>",
+      "status": "open",
+      "title": "Crash on thin walls",
+      "type": "work.issue"
+     }
+    ]
+   },
+   "repo": {
+    "id": "<repo>",
+    "title": "Apex repo"
+   },
+   "since": "<time>",
+   "since_then": {
+    "counts": {
+     "opened": 0,
+     "pushes": 0,
+     "sessions": 0,
+     "settled": 0
+    },
+    "opened": [],
+    "pushes": [],
+    "sessions": [],
+    "settled": []
+   },
+   "to_shape": {
+    "how": "Each of these holds enough to be the hub of its problem and has no view of its own. Give it its views: for each, a lens item (change, type lens) linked about it, named for the question it answers, with place for its order, controls for what the person may change (lit, far, closed), and a style about it if it should look its own way. A lens with from set to another item is a shortcut to there. The view named hubs lists every hub.",
+    "hubs": [
+     {
+      "at": 2,
+      "id": "<addin>",
+      "inside": 9,
+      "title": "Add-in",
+      "type": "software.feature",
+      "views": 0
+     },
+     {
+      "at": 2,
+      "id": "<installer>",
+      "inside": 3,
+      "title": "Installer",
+      "type": "software.feature",
+      "views": 0
+     },
+     {
+      "at": 2,
+      "id": "<docs>",
+      "inside": 2,
+      "title": "Docs",
+      "type": "software.feature",
+      "views": 0
+     }
+    ]
+   }
+  },
+  "hubs app": {
+   "at": 12,
+   "hubs": [
+    {
+     "at": 2,
+     "id": "<app>",
+     "inside": 11,
+     "title": "App",
+     "type": "work.project",
+     "views": 1
+    },
+    {
+     "at": 2,
+     "id": "<addin>",
+     "inside": 9,
+     "title": "Add-in",
+     "type": "software.feature",
+     "views": 0
+    },
+    {
+     "at": 2,
+     "id": "<installer>",
+     "inside": 3,
+     "title": "Installer",
+     "type": "software.feature",
+     "views": 0
+    },
+    {
+     "at": 2,
+     "id": "<docs>",
+     "inside": 2,
+     "title": "Docs",
+     "type": "software.feature",
+     "views": 0
+    }
+   ],
+   "within": "<app>"
+  },
+  "hubs repo": {
+   "at": 12,
+   "hubs": [
+    {
+     "at": 2,
+     "id": "<app>",
+     "inside": 11,
+     "title": "App",
+     "type": "work.project",
+     "views": 1
+    },
+    {
+     "at": 2,
+     "id": "<addin>",
+     "inside": 9,
+     "title": "Add-in",
+     "type": "software.feature",
+     "views": 0
+    },
+    {
+     "at": 2,
+     "id": "<installer>",
+     "inside": 3,
+     "title": "Installer",
+     "type": "software.feature",
+     "views": 0
+    },
+    {
+     "at": 2,
+     "id": "<docs>",
+     "inside": 2,
+     "title": "Docs",
+     "type": "software.feature",
+     "views": 0
+    }
+   ],
+   "within": "<repo>"
+  },
+  "lens app": {
+   "controls": [],
+   "hub": {
+    "at": 2,
+    "inside": 11,
+    "is": true
+   },
+   "items": [
+    {
+     "id": "<app>",
+     "inside": null,
+     "kind": "work",
+     "open": true,
+     "place": 1,
+     "root": "work.project",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "planned",
+     "title": "App",
+     "type": "work.project",
+     "within": {
+      "blocked": 3,
+      "items": 11,
+      "needs_you": 2,
+      "not_sent": 9,
+      "sessions": 1,
+      "tokens": {
+       "estimated": 6000,
+       "used": 500
+      },
+      "waiting": 1,
+      "waits_on": {
+       "<bo>": 1
+      },
+      "work": 9
+     }
+    },
+    {
+     "id": "<addin>",
+     "inside": "<app>",
+     "kind": "work",
+     "open": true,
+     "place": 1,
+     "root": "software.feature",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "planned",
+     "title": "Add-in",
+     "type": "software.feature",
+     "within": {
+      "blocked": 3,
+      "items": 9,
+      "needs_you": 2,
+      "not_sent": 9,
+      "sessions": 1,
+      "tokens": {
+       "estimated": 6000,
+       "used": 500
+      },
+      "waiting": 1,
+      "waits_on": {
+       "<bo>": 1
+      },
+      "work": 7
+     }
+    },
+    {
+     "id": "<loose>",
+     "inside": "<app>",
+     "kind": "work",
+     "open": true,
+     "place": 2,
+     "root": "work.task",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "todo",
+     "title": "Loose task in app",
+     "type": "work.task",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    }
+   ],
+   "kept": {
+    "lens": [
+     {
+      "id": "<view>",
+      "title": "The app, flat"
+     }
+    ],
+    "style": [
+     {
+      "id": "core.house",
+      "preset": "core.house",
+      "title": "House style"
+     },
+     {
+      "id": "canvas.house",
+      "preset": "canvas.house",
+      "title": "Canvas"
+     }
+    ]
+   },
+   "lens": {
+    "by": "part_of",
+    "far": 1,
+    "fold": [
+     "closed",
+     "system",
+     "unlinked"
+    ],
+    "from": "<app>",
+    "measure": "work",
+    "order": "order",
+    "over": [
+     "depends_on",
+     "waits_on"
+    ]
+   },
+   "links": [],
+   "rest": {
+    "closed": 2,
+    "far": 4,
+    "kinds": 0,
+    "limit": 0,
+    "system": 1,
+    "unlinked": 0
+   },
+   "said": "\"App\" and what is part of it; 1 step down; with links: depends on, waits on; without what is finished, the system’s own records, what is linked to nothing this way.",
+   "style": "f97004f6542232c47b899a9dd0b0708470a485c4dd66e7afd4462645b42d5eb8",
+   "view": "<view>",
+   "viewer": "<me>",
+   "views": [
+    {
+     "id": "<view>",
+     "title": "The app, flat"
+    },
+    {
+     "id": "when",
+     "title": "When"
+    }
+   ],
+   "views_of_it": 1
+  },
+  "lens holding": {
+   "controls": [
+    "lit",
+    "closed"
+   ],
+   "hub": {
+    "is": false
+   },
+   "items": [
+    {
+     "id": "<extras>",
+     "inside": null,
+     "kind": "work",
+     "open": true,
+     "place": 2,
+     "root": "work.task",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": true,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "todo",
+     "title": "Capture extras",
+     "type": "work.task",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    },
+    {
+     "id": "<hover>",
+     "inside": null,
+     "kind": "work",
+     "open": true,
+     "place": 3,
+     "root": "work.task",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": true,
+      "needs_you": false,
+      "sessions": 1,
+      "waits_on": [
+       "<bo>"
+      ]
+     },
+     "status": "doing",
+     "title": "Hover cards",
+     "type": "work.task",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    },
+    {
+     "id": "<bo>",
+     "inside": null,
+     "kind": "actor",
+     "open": true,
+     "place": 1,
+     "root": "person",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 0
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "active",
+     "title": "Bo",
+     "type": "person",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    }
+   ],
+   "kept": {
+    "lens": [],
+    "style": [
+     {
+      "id": "core.house",
+      "preset": "core.house",
+      "title": "House style"
+     },
+     {
+      "id": "canvas.house",
+      "preset": "canvas.house",
+      "title": "Canvas"
+     }
+    ]
+   },
+   "lens": {
+    "by": "part_of",
+    "fold": [
+     "closed",
+     "system",
+     "unlinked"
+    ],
+    "from": "<extras>",
+    "measure": "work",
+    "order": "order",
+    "over": [
+     "depends_on",
+     "waits_on",
+     "needs"
+    ]
+   },
+   "links": [
+    {
+     "from": "<extras>",
+     "kind": "depends_on",
+     "n": 1,
+     "to": "<hover>"
+    },
+    {
+     "from": "<hover>",
+     "kind": "waits_on",
+     "n": 1,
+     "to": "<bo>"
+    }
+   ],
+   "rest": {
+    "closed": 0,
+    "far": 0,
+    "kinds": 0,
+    "limit": 0,
+    "system": 0,
+    "unlinked": 0
+   },
+   "said": "What \"Capture extras\" waits on, step by step",
+   "style": "f97004f6542232c47b899a9dd0b0708470a485c4dd66e7afd4462645b42d5eb8",
+   "view": "holding",
+   "viewer": "<me>",
+   "views": [
+    {
+     "id": "holding",
+     "title": "What holds it"
+    }
+   ],
+   "views_of_it": 0
+  },
+  "lens kinds": {
+   "controls": [],
+   "items": [
+    {
+     "id": "<plans>",
+     "inside": null,
+     "kind": "work",
+     "open": true,
+     "place": 2,
+     "root": "software.feature",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "planned",
+     "title": "Price plans",
+     "type": "software.feature",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    },
+    {
+     "id": "<installer>",
+     "inside": "<addin>",
+     "kind": "work",
+     "open": true,
+     "place": 1,
+     "root": "software.feature",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "building",
+     "title": "Installer",
+     "type": "software.feature",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    },
+    {
+     "id": "<docs>",
+     "inside": "<addin>",
+     "kind": "work",
+     "open": true,
+     "place": 2,
+     "root": "software.feature",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "planned",
+     "title": "Docs",
+     "type": "software.feature",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    },
+    {
+     "id": "<addin>",
+     "inside": null,
+     "kind": "work",
+     "open": true,
+     "place": 1,
+     "root": "software.feature",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "planned",
+     "title": "Add-in",
+     "type": "software.feature",
+     "within": {
+      "blocked": 0,
+      "items": 2,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 2
+     }
+    }
+   ],
+   "kept": {
+    "lens": [],
+    "style": [
+     {
+      "id": "core.house",
+      "preset": "core.house",
+      "title": "House style"
+     },
+     {
+      "id": "canvas.house",
+      "preset": "canvas.house",
+      "title": "Canvas"
+     }
+    ]
+   },
+   "lens": {
+    "by": "part_of",
+    "fold": [
+     "closed",
+     "system",
+     "unlinked"
+    ],
+    "kinds": [
+     "software.feature"
+    ],
+    "measure": "work",
+    "order": "order",
+    "over": [
+     "depends_on",
+     "waits_on"
+    ]
+   },
+   "links": [],
+   "rest": {
+    "closed": 0,
+    "far": 0,
+    "kinds": 0,
+    "limit": 0,
+    "system": 0,
+    "unlinked": 0
+   },
+   "said": "Everything, by what is part of what; only software.feature; with links: depends on, waits on; without what is finished, the system’s own records, what is linked to nothing this way.",
+   "style": "f97004f6542232c47b899a9dd0b0708470a485c4dd66e7afd4462645b42d5eb8",
+   "view": null,
+   "viewer": "<me>",
+   "views": []
+  },
+  "lens near": {
+   "controls": [
+    "lit",
+    "closed"
+   ],
+   "hub": {
+    "is": false
+   },
+   "items": [
+    {
+     "id": "<cert>",
+     "inside": null,
+     "kind": "question",
+     "open": true,
+     "place": 3,
+     "root": "work.decision",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 0
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": true,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "open",
+     "title": "Which certificate?",
+     "type": "work.decision",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    },
+    {
+     "id": "<lane>",
+     "inside": null,
+     "kind": "place",
+     "open": true,
+     "place": 1,
+     "root": "resource",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 0
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "available",
+     "title": "Live lane",
+     "type": "resource",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    },
+    {
+     "id": "<sign>",
+     "inside": null,
+     "kind": "work",
+     "open": true,
+     "place": 2,
+     "root": "work.task",
+     "size": {
+      "tokens": {
+       "estimated": 4000,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": true,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "todo",
+     "title": "Sign the package",
+     "type": "work.task",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    }
+   ],
+   "kept": {
+    "lens": [],
+    "style": [
+     {
+      "id": "core.house",
+      "preset": "core.house",
+      "title": "House style"
+     },
+     {
+      "id": "canvas.house",
+      "preset": "canvas.house",
+      "title": "Canvas"
+     }
+    ]
+   },
+   "lens": {
+    "by": "part_of",
+    "fold": [
+     "closed",
+     "system",
+     "unlinked"
+    ],
+    "from": "<sign>",
+    "measure": "work",
+    "near": 2,
+    "order": "order",
+    "over": "all"
+   },
+   "links": [
+    {
+     "from": "<sign>",
+     "kind": "depends_on",
+     "n": 1,
+     "to": "<cert>"
+    },
+    {
+     "from": "<sign>",
+     "kind": "needs",
+     "n": 1,
+     "to": "<lane>"
+    }
+   ],
+   "rest": {
+    "closed": 2,
+    "far": 0,
+    "kinds": 0,
+    "limit": 0,
+    "system": 0,
+    "unlinked": 0
+   },
+   "said": "What \"Sign the package\" waits on, step by step",
+   "style": "f97004f6542232c47b899a9dd0b0708470a485c4dd66e7afd4462645b42d5eb8",
+   "view": "holding",
+   "viewer": "<me>",
+   "views": [
+    {
+     "id": "holding",
+     "title": "What holds it"
+    }
+   ],
+   "views_of_it": 0
+  },
+  "lens view": {
+   "controls": [],
+   "hub": {
+    "at": 2,
+    "inside": 11,
+    "is": true
+   },
+   "items": [
+    {
+     "id": "<app>",
+     "inside": null,
+     "kind": "work",
+     "open": true,
+     "place": 1,
+     "root": "work.project",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "planned",
+     "title": "App",
+     "type": "work.project",
+     "within": {
+      "blocked": 3,
+      "items": 11,
+      "needs_you": 2,
+      "not_sent": 9,
+      "sessions": 1,
+      "tokens": {
+       "estimated": 6000,
+       "used": 500
+      },
+      "waiting": 1,
+      "waits_on": {
+       "<bo>": 1
+      },
+      "work": 9
+     }
+    },
+    {
+     "id": "<addin>",
+     "inside": "<app>",
+     "kind": "work",
+     "open": true,
+     "place": 1,
+     "root": "software.feature",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "planned",
+     "title": "Add-in",
+     "type": "software.feature",
+     "within": {
+      "blocked": 3,
+      "items": 9,
+      "needs_you": 2,
+      "not_sent": 9,
+      "sessions": 1,
+      "tokens": {
+       "estimated": 6000,
+       "used": 500
+      },
+      "waiting": 1,
+      "waits_on": {
+       "<bo>": 1
+      },
+      "work": 7
+     }
+    },
+    {
+     "id": "<loose>",
+     "inside": "<app>",
+     "kind": "work",
+     "open": true,
+     "place": 2,
+     "root": "work.task",
+     "size": {
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "work": 1
+     },
+     "state": {
+      "blocked": false,
+      "needs_you": false,
+      "sessions": 0,
+      "waits_on": []
+     },
+     "status": "todo",
+     "title": "Loose task in app",
+     "type": "work.task",
+     "within": {
+      "blocked": 0,
+      "items": 0,
+      "needs_you": 0,
+      "not_sent": 0,
+      "sessions": 0,
+      "tokens": {
+       "estimated": 0,
+       "used": 0
+      },
+      "waiting": 0,
+      "waits_on": {},
+      "work": 0
+     }
+    }
+   ],
+   "kept": {
+    "lens": [
+     {
+      "id": "<view>",
+      "title": "The app, flat"
+     }
+    ],
+    "style": [
+     {
+      "id": "core.house",
+      "preset": "core.house",
+      "title": "House style"
+     },
+     {
+      "id": "canvas.house",
+      "preset": "canvas.house",
+      "title": "Canvas"
+     }
+    ]
+   },
+   "lens": {
+    "by": "part_of",
+    "far": 1,
+    "fold": [
+     "closed",
+     "system",
+     "unlinked"
+    ],
+    "from": "<app>",
+    "measure": "work",
+    "order": "order",
+    "over": [
+     "depends_on",
+     "waits_on"
+    ]
+   },
+   "links": [],
+   "rest": {
+    "closed": 2,
+    "far": 4,
+    "kinds": 0,
+    "limit": 0,
+    "system": 1,
+    "unlinked": 0
+   },
+   "said": "\"App\" and what is part of it; 1 step down; with links: depends on, waits on; without what is finished, the system’s own records, what is linked to nothing this way.",
+   "style": "f97004f6542232c47b899a9dd0b0708470a485c4dd66e7afd4462645b42d5eb8",
+   "view": "<view>",
+   "viewer": "<me>",
+   "views": [
+    {
+     "id": "<view>",
+     "title": "The app, flat"
+    },
+    {
+     "id": "when",
+     "title": "When"
+    }
+   ],
+   "views_of_it": 1
+  },
+  "tree addin": {
+   "branches": [
+    {
+     "active": true,
+     "blocked": false,
+     "branches": [],
+     "id": "<installer>",
+     "open": true,
+     "order": 1,
+     "progress": {
+      "done": 1,
+      "total": 2
+     },
+     "sessions": [],
+     "status": "building",
+     "title": "Installer",
+     "type": "software.feature",
+     "work": [
+      {
+       "active": false,
+       "blocked": true,
+       "id": "<sign>",
+       "open": true,
+       "sessions": [],
+       "status": "todo",
+       "title": "Sign the package",
+       "type": "work.task"
+      },
+      {
+       "active": false,
+       "blocked": false,
+       "id": "<clean>",
+       "open": false,
+       "sessions": [],
+       "status": "done",
+       "title": "Uninstall leaves it clean",
+       "type": "work.task"
+      }
+     ]
+    },
+    {
+     "active": false,
+     "blocked": false,
+     "branches": [],
+     "id": "<docs>",
+     "open": true,
+     "order": null,
+     "progress": {
+      "done": 0,
+      "total": 2
+     },
+     "sessions": [],
+     "status": "planned",
+     "title": "Docs",
+     "type": "software.feature",
+     "work": [
+      {
+       "active": false,
+       "blocked": false,
+       "id": "<guide>",
+       "open": true,
+       "sessions": [],
+       "status": "todo",
+       "title": "Write the guide",
+       "type": "work.task"
+      },
+      {
+       "active": false,
+       "blocked": false,
+       "id": "<bug>",
+       "open": true,
+       "sessions": [],
+       "status": "open",
+       "title": "Crash on thin walls",
+       "type": "work.issue"
+      }
+     ]
+    }
+   ],
+   "by_status": {
+    "building": 1,
+    "planned": 1
+   },
+   "depends": [
+    {
+     "from": "<guide>",
+     "to": "<clean>"
+    },
+    {
+     "from": "<extras>",
+     "to": "<hover>"
+    }
+   ],
+   "now": [
+    {
+     "active": true,
+     "blocked": false,
+     "id": "<installer>",
+     "open": true,
+     "path": [],
+     "sessions": [],
+     "status": "building",
+     "title": "Installer",
+     "type": "software.feature"
+    },
+    {
+     "active": true,
+     "blocked": true,
+     "id": "<hover>",
+     "open": true,
+     "path": [],
+     "sessions": [
+      {
+       "id": "<run>",
+       "title": "Pinning session"
+      }
+     ],
+     "status": "doing",
+     "title": "Hover cards",
+     "type": "work.task"
+    }
+   ],
+   "progress": {
+    "done": 1,
+    "total": 6
+   },
+   "root": {
+    "id": "<addin>",
+    "status": "planned",
+    "title": "Add-in",
+    "type": "software.feature"
+   },
+   "tree": {
+    "id": "software.roadmap",
+    "title": "Roadmap"
+   },
+   "unplaced": [
+    {
+     "active": true,
+     "blocked": true,
+     "id": "<hover>",
+     "open": true,
+     "sessions": [
+      {
+       "id": "<run>",
+       "title": "Pinning session"
+      }
+     ],
+     "status": "doing",
+     "title": "Hover cards",
+     "type": "work.task"
+    },
+    {
+     "active": false,
+     "blocked": true,
+     "id": "<extras>",
+     "open": true,
+     "sessions": [],
+     "status": "todo",
+     "title": "Capture extras",
+     "type": "work.task"
+    }
+   ]
+  },
+  "tree app": {
+   "branches": [
+    {
+     "active": true,
+     "blocked": false,
+     "branches": [
+      {
+       "active": true,
+       "blocked": false,
+       "branches": [],
+       "id": "<installer>",
+       "open": true,
+       "order": 1,
+       "progress": {
+        "done": 1,
+        "total": 2
+       },
+       "sessions": [],
+       "status": "building",
+       "title": "Installer",
+       "type": "software.feature",
+       "work": [
+        {
+         "active": false,
+         "blocked": true,
+         "id": "<sign>",
+         "open": true,
+         "sessions": [],
+         "status": "todo",
+         "title": "Sign the package",
+         "type": "work.task"
+        },
+        {
+         "active": false,
+         "blocked": false,
+         "id": "<clean>",
+         "open": false,
+         "sessions": [],
+         "status": "done",
+         "title": "Uninstall leaves it clean",
+         "type": "work.task"
+        }
+       ]
+      },
+      {
+       "active": false,
+       "blocked": false,
+       "branches": [],
+       "id": "<docs>",
+       "open": true,
+       "order": null,
+       "progress": {
+        "done": 0,
+        "total": 2
+       },
+       "sessions": [],
+       "status": "planned",
+       "title": "Docs",
+       "type": "software.feature",
+       "work": [
+        {
+         "active": false,
+         "blocked": false,
+         "id": "<guide>",
+         "open": true,
+         "sessions": [],
+         "status": "todo",
+         "title": "Write the guide",
+         "type": "work.task"
+        },
+        {
+         "active": false,
+         "blocked": false,
+         "id": "<bug>",
+         "open": true,
+         "sessions": [],
+         "status": "open",
+         "title": "Crash on thin walls",
+         "type": "work.issue"
+        }
+       ]
+      }
+     ],
+     "id": "<addin>",
+     "open": true,
+     "order": 2,
+     "progress": {
+      "done": 1,
+      "total": 6
+     },
+     "sessions": [],
+     "status": "planned",
+     "title": "Add-in",
+     "type": "software.feature",
+     "work": [
+      {
+       "active": true,
+       "blocked": true,
+       "id": "<hover>",
+       "open": true,
+       "sessions": [
+        {
+         "id": "<run>",
+         "title": "Pinning session"
+        }
+       ],
+       "status": "doing",
+       "title": "Hover cards",
+       "type": "work.task"
+      },
+      {
+       "active": false,
+       "blocked": true,
+       "id": "<extras>",
+       "open": true,
+       "sessions": [],
+       "status": "todo",
+       "title": "Capture extras",
+       "type": "work.task"
+      }
+     ]
+    },
+    {
+     "active": false,
+     "blocked": false,
+     "branches": [],
+     "id": "<old>",
+     "open": false,
+     "order": null,
+     "progress": {
+      "done": 0,
+      "total": 0
+     },
+     "sessions": [],
+     "status": "shipped",
+     "title": "Old feature",
+     "type": "software.feature",
+     "work": []
+    }
+   ],
+   "by_status": {
+    "building": 1,
+    "planned": 2,
+    "shipped": 1
+   },
+   "depends": [
+    {
+     "from": "<guide>",
+     "to": "<clean>"
+    },
+    {
+     "from": "<extras>",
+     "to": "<hover>"
+    }
+   ],
+   "now": [
+    {
+     "active": true,
+     "blocked": false,
+     "id": "<installer>",
+     "open": true,
+     "path": [
+      "Add-in"
+     ],
+     "sessions": [],
+     "status": "building",
+     "title": "Installer",
+     "type": "software.feature"
+    },
+    {
+     "active": true,
+     "blocked": true,
+     "id": "<hover>",
+     "open": true,
+     "path": [
+      "Add-in"
+     ],
+     "sessions": [
+      {
+       "id": "<run>",
+       "title": "Pinning session"
+      }
+     ],
+     "status": "doing",
+     "title": "Hover cards",
+     "type": "work.task"
+    }
+   ],
+   "progress": {
+    "done": 1,
+    "total": 7
+   },
+   "root": {
+    "id": "<app>",
+    "status": "planned",
+    "title": "App",
+    "type": "work.project"
+   },
+   "tree": {
+    "id": "software.roadmap",
+    "title": "Roadmap"
+   },
+   "unplaced": [
+    {
+     "active": false,
+     "blocked": false,
+     "id": "<loose>",
+     "open": true,
+     "sessions": [],
+     "status": "todo",
+     "title": "Loose task in app",
+     "type": "work.task"
+    }
+   ]
+  },
+  "tree business": {
+   "branches": [
+    {
+     "active": false,
+     "blocked": false,
+     "branches": [],
+     "id": "<plans>",
+     "open": true,
+     "order": null,
+     "progress": {
+      "done": 0,
+      "total": 1
+     },
+     "sessions": [],
+     "status": "planned",
+     "title": "Price plans",
+     "type": "software.feature",
+     "work": [
+      {
+       "active": false,
+       "blocked": false,
+       "id": "<tiers>",
+       "open": true,
+       "sessions": [],
+       "status": "todo",
+       "title": "Write the tiers",
+       "type": "work.task"
+      }
+     ]
+    }
+   ],
+   "by_status": {
+    "planned": 1
+   },
+   "depends": [],
+   "now": [],
+   "progress": {
+    "done": 0,
+    "total": 1
+   },
+   "root": {
+    "id": "<business>",
+    "status": "planned",
+    "title": "Business",
+    "type": "work.project"
+   },
+   "tree": {
+    "id": "software.roadmap",
+    "title": "Roadmap"
+   },
+   "unplaced": []
+  },
+  "tree roots": {
+   "roots": [
+    {
+     "branches": 2,
+     "id": "<app>",
+     "status": "planned",
+     "title": "App",
+     "type": "work.project"
+    },
+    {
+     "branches": 1,
+     "id": "<business>",
+     "status": "planned",
+     "title": "Business",
+     "type": "work.project"
+    }
+   ],
+   "tree": {
+    "id": "software.roadmap",
+    "title": "Roadmap"
+   }
+  }
+ }
+}
