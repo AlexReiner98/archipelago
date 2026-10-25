@@ -23,6 +23,8 @@ export const css = `
 .lf-wire.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-head { fill: var(--ln-muted); } .lf-head.lit { fill: var(--ln-text); }
 .lf-break rect { fill: var(--ln-sea); } .lf-break path { stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
+/* Zoomed out until only names are read (ui/pan-zoom.js): what a choice is and how much is on a step are not drawn. */
+[data-text=names] .lf-says, [data-text=names] .lf-badge text { display: none; }
 .lf-says rect { fill: var(--ln-sea); } .lf-says text { fill: var(--ln-muted); font-size: var(--ln-flow-says-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: middle; }
 /* A checklist: plain things before one step, a row each. The head says the type and how many are left. */
 .lf-list { cursor: default; }
