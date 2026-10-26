@@ -94,7 +94,9 @@ export function ridges(dials) {
   const d = { ...DEFAULTS, ...dials }, rnd = random(d.seed * 7919);
   const { width: W, height: H, margin: M } = d;
   const gap = (H - 2 * M) / Math.max(1, d.rows);
-  const cells = 2 + d.islands * 10;                         // land field cells across the width
+  // Sizes are kept to the page's width, so a wider frame holds more islands, not larger ones.
+  const across = W / DEFAULTS.width;
+  const cells = (2 + d.islands * 10) * across;              // land field cells across the width
   const land = fbm(noise2(d.seed, d.wrap ? Math.round(cells) : 0), 3);
   const crest = fbm(noise2(d.seed + 1, d.wrap ? Math.round(cells * 3) : 0), 3);
   const puff = fbm(noise2(d.seed + 6, d.wrap ? Math.round(cells * 4) : 0), 2);
@@ -147,7 +149,7 @@ export function ridges(dials) {
   const cellOf = (x, y) => [(x / W) * rd.field.nx, (y / H) * rd.field.ny];
   // The field as read here: through a noise warp, with some of the noise field blended in.
   const field = (x, y, yc) => {
-    const w = d.warp * 0.12 * W;
+    const w = d.warp * 0.12 * DEFAULTS.width;
     const wx = x + (seam(land, x, 2, 7, yc * 2) - 0.5) * 2 * w, wy = y + (seam(land, x, 2, 0, yc * 2 + 7) - 0.5) * 2 * w;
     const n = Math.max(0, Math.min(1, (seam(land, x, 1, 0, yc) - 0.5) * 2.2 + 0.5));
     return (1 - d.mix) * sample(rd.field, ...cellOf(wx, wy)) + d.mix * n;
@@ -427,7 +429,7 @@ export function ridges(dials) {
 /** The field and its archipelagos for these dials, grown once and kept while the dials that shape it hold. */
 let grown = {};
 function diffusionFor(d, W, H) {
-  const nx = Math.max(16, Math.round(40 + d.scale * 70)), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
+  const nx = Math.max(16, Math.round((40 + d.scale * 70) * (W / DEFAULTS.width))), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
   const key = `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
   if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
   // Anchors (page units) start the grouping where the places are, so each archipelago gathers the islands near it.

@@ -59,6 +59,13 @@
   <div class="row"><button id="shuffle" title="Same colours, another order">Shuffle colours</button><label class="check" title="Use each colour as much as it covers the photos"><input id="weighted" type="checkbox" checked> As in the photos</label></div>
   <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
   <img id="photo" alt="">
+  <h2>Frame</h2>
+  <select id="frame" aria-label="Frame" title="The picture's shape: islands and rows keep their size, a wider frame holds more of them">
+    <option value="800x1000">Page, 800 × 1000</option>
+    <option value="1600x800">Hero, 1600 × 800</option>
+    <option value="2400x900">Wide hero, 2400 × 900</option>
+    <option value="1200x630">Share image, 1200 × 630</option>
+  </select>
   <h2>Emblem</h2>
   <label class="check" title="This drawing as an icon: fitted into a square, shown at a chosen size and below at icon sizes"><input id="emblem" type="checkbox"> Emblem</label>
   <label class="only-emblem" title="Draw the emblem above at an icon's size, magnified so each pixel shows: tune it as it will be seen">Draw at <output id="emAtOut"></output><input id="emAt" type="range" min="0" max="6" step="1" value="0"></label>
@@ -191,9 +198,9 @@
   function letterShape() {
     const text = $('letterText').value.trim();
     if (!$('letter').checked || !text) return null;
-    const font = $('letterFont').value, size = +$('letterSize').value, key = [text, font, size].join('|');
+    const font = $('letterFont').value, size = +$('letterSize').value, key = [text, font, size, frame()].join('|');
     if (glyph.key === key) return glyph.shape;
-    const nx = 200, ny = 250, c = document.createElement('canvas');
+    const [w, hgt] = frame(), nx = 200, ny = Math.round((nx * hgt) / w), c = document.createElement('canvas');
     [c.width, c.height] = [nx, ny];
     const g = c.getContext('2d');
     let px = ny * 0.8 * size;
@@ -215,6 +222,7 @@
     return glyph.shape;
   }
 
+  const frame = () => $('frame').value.split('x').map(Number);
   const emblem = () => $('emblem').checked;
   // The drawing as it is shown: with or without the swell lines on the water.
   const shown = (pic) => ($('swell').checked ? pic : { ...pic, shapes: pic.shapes.filter((s) => !s.line) });
@@ -231,7 +239,9 @@
   // The archipelagos' palettes are given as the land is laid out, so each can also set how its land stands.
   const forms = (groups) => (assign(groups, 800), groups.length ? given.map((k) => palettes[k].form) : [pal().form]);
   const dials = () => {
-    const d = { ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed, shape: letterShape(), shapeStrength: +$('letterStrength').value, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), DEFAULTS.width, DEFAULTS.height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) };
+    // Rows count down the page: a frame of another height has as many as keeps them as far apart.
+    const [width, height] = frame(), M = DEFAULTS.margin, rows = Math.max(1, Math.round((+$('rows').value * (height - 2 * M)) / (DEFAULTS.height - 2 * M)));
+    const d = { ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), width, height, rows, source: $('source').value, wrap: $('wrap').checked, seed, shape: letterShape(), shapeStrength: +$('letterStrength').value, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), width, height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) };
     return d;
   };
   const fillOf = (s) => fillWith(s, palOf, $('weighted').checked);
@@ -330,7 +340,7 @@
   for (const b of document.querySelectorAll('[data-ground]')) b.onclick = () => ((bgPicked = b.dataset.ground), draw());
   const showEmblem = () => document.body.classList.toggle('emblem', emblem());
   $('emblem').addEventListener('input', () => (showEmblem(), draw()));
-  for (const k of ['emAt', 'swell']) $(k).addEventListener('input', draw);
+  for (const k of ['emAt', 'swell', 'frame']) $(k).addEventListener('input', draw);
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
   for (const k of [...DIALS, 'wrap', 'weighted', 'forms', 'geo']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
   const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
@@ -375,7 +385,7 @@
     weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked, geo: $('geo').checked,
     seed, bg: bgPicked, richness: +$('richness').value, cloudOpacity: +$('cloudOpacity').value,
     letter: { on: $('letter').checked, text: $('letterText').value, font: $('letterFont').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
-    emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked,
+    emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value,
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
   });
@@ -394,7 +404,7 @@
     const l = s.letter ?? {};
     $('letter').checked = !!l.on; $('letterText').value = l.text ?? 'A'; $('letterFont').value = l.font ?? $('letterFont').options[0].value; $('letterSize').value = l.size ?? 0.85; $('letterStrength').value = l.strength ?? 1;
     const e = s.emblem ?? {};
-    $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true;
+    $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true; $('frame').value = s.frame ?? '800x1000';
     showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
