@@ -79,7 +79,7 @@ export const DEFAULTS = {
 export function ridges(dials) {
   const d = { ...DEFAULTS, ...dials }, rnd = random(d.seed * 7919);
   const { width: W, height: H, margin: M } = d;
-  const gap = (H - 2 * M) / d.rows;
+  const gap = (H - 2 * M) / Math.max(1, d.rows);
   const cells = 2 + d.islands * 10;                         // land field cells across the width
   const land = fbm(noise2(d.seed, d.wrap ? Math.round(cells) : 0), 3);
   const crest = fbm(noise2(d.seed + 1, d.wrap ? Math.round(cells * 3) : 0), 3);
@@ -172,7 +172,7 @@ export function ridges(dials) {
     if (chains.length) {
       const { c, g, t, all } = claim(x, y);
       // The main island stands near the young end of a chain; the islands thin away toward the old end.
-      const rank = 1 - d.hierarchy * 0.75 * (1 - Math.exp(-(((t - 0.12) / 0.25) ** 2)));
+      const rank = Math.max(0.02, 1 - d.hierarchy * 0.75 * (1 - Math.exp(-(((t - 0.12) / 0.25) ** 2))));
       if (rd) {
         const lo = rd.level + d.hierarchy * 0.15 * (1 - rank);
         return { u: field(x, y, yc), lo, hi: lo + 0.12, gate: smooth(0.02, 0.35, c), g, t, rank, all };
@@ -226,7 +226,7 @@ export function ridges(dials) {
       const L = at(x, y, yc), f = formAt(x, y, L), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
       const calm = shore(x, y, yc) * territory(x, y);
       if (calm < 1) L.u -= (1 - calm) * 1.5;
-      gs.push(L.g), ts.push(L.t), steps.push(step * f.step);
+      gs.push(L.g), ts.push(L.t), steps.push(Math.min(step * f.step, Math.max(1, rise * f.rise * 0.6)));
       // Shallows: a reach of pale sea round the land, wider as the dial turns.
       const sea = smooth(L.lo - span * (0.25 + 1.5 * d.shallows), L.lo, L.u) * L.gate * (d.shallows > 0 ? 1 : 0);
       shelf.push(sea);
@@ -241,11 +241,11 @@ export function ridges(dials) {
       // Peaks: each row its own summits (the row index moves the noise faster), set apart from each other, so a
       // row's mountains stand clear of the row behind rather than lining up into bands.
       const c = crest(toCell(x) * (3 + 1.2 * d.peaks), r * (0.12 + 0.55 * d.peaks));
-      const rugged = Math.max(0, Math.min(1, d.rugged + f.rugged - age * 0.5));
+      const rugged = Math.max(0, Math.min(2, d.rugged + f.rugged - age * 0.5));
       const peak = (rd ? 0.4 * c + 0.6 * smooth(rd.level, 1, L.u) : c) ** (1 + rugged * 2.5);
       // Height variety: a slow swell over the page lifts some islands into massifs and keeps others low.
       const massif = 1 + d.relief * (1.5 * land(toCell(x) * 0.6 + 11, yc * 0.6 + 5) - 0.75) * 1.6;
-      const tall = rise * f.rise * Math.max(0.15, massif) * (1 - 0.8 * age) * (1 - d.hierarchy * 0.6 * (1 - L.rank));
+      const tall = rise * f.rise * Math.max(0.15, massif) * Math.max(0.05, 1 - 0.8 * age) * Math.max(0.05, 1 - d.hierarchy * 0.6 * (1 - L.rank));
       let raw = mask * tall * (0.25 - 0.2 * d.peaks + (0.75 + 0.2 * d.peaks) * peak ** (1 + 0.3 * d.peaks));
       if (f.top) raw = Math.min(raw, tall * (1 - 0.65 * f.top));
       // No peak rises past the top of the frame: heights near it are eased under the room left, not sliced off.
@@ -253,7 +253,8 @@ export function ridges(dials) {
         const room = Math.max(1, y - M - gap);
         raw = room * Math.tanh(raw / room);
       }
-      const stp = step * f.step, soft = Math.max(0.02, Math.min(1, d.soft + f.soft));
+      // A coarse step never passes most of the land's own height, so even the coarsest leaves one terrace.
+      const stp = Math.min(step * f.step, Math.max(1, tall * 0.6)), soft = Math.max(0.02, Math.min(1, d.soft + f.soft));
       const q = raw / stp, k = Math.floor(q);
       h.push(stp * (k + smooth(1 - soft, 1, q - k)));
     }
@@ -323,7 +324,7 @@ export function ridges(dials) {
 /** The field and its archipelagos for these dials, grown once and kept while the dials that shape it hold. */
 let grown = {};
 function diffusionFor(d, W, H) {
-  const nx = Math.round(40 + d.scale * 70), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
+  const nx = Math.max(16, Math.round(40 + d.scale * 70)), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
   const key = `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
   if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
   // Anchors (page units) start the grouping where the places are, so each archipelago gathers the islands near it.

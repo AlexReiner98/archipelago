@@ -32,7 +32,7 @@ export function grow({ nx, ny, pattern = 0.3, variety = 0, steps = 4000, seed = 
   const drift = torusNoise(nx, ny, 3, random(seed * 7 + 11));
   const feedAt = new Float32Array(size), killAt = new Float32Array(size);
   for (let i = 0; i < size; i++) {
-    const t = Math.max(0, Math.min(1, pattern + variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5)));
+    const t = Math.max(-0.6, Math.min(2.2, pattern + variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5)));
     ({ feed: feedAt[i], kill: killAt[i] } = rates(t));
   }
   let u = new Float32Array(size).fill(1), v = new Float32Array(size), u2 = new Float32Array(size), v2 = new Float32Array(size);

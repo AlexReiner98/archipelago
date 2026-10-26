@@ -47,7 +47,7 @@
   <div class="swatches" id="swatches" title="Paper and ink first, then the island colours. Click one to change it."></div>
   <div id="sources"></div>
   <div class="row" title="The colour of the open water behind everything"><label class="check">Background <input id="bg" type="color"></label><button id="bgReset" title="Back to this palette's deep water">From palette</button></div>
-  <label title="As photographed (0), enriched (1), or richer still (2): more colour and contrast, every hue kept">Richness <output id="richnessOut"></output><input id="richness" type="range" min="0" max="2" step="0.05" value="1"></label>
+  <label title="As photographed (0), enriched (1), or richer still (2): more colour and contrast, every hue kept">Richness <output id="richnessOut"></output><input id="richness" type="range" min="0" max="3" step="0.05" value="1"></label>
   <div class="row"><button id="shuffle" title="Same colours, another order">Shuffle colours</button><label class="check" title="Use each colour as much as it covers the photos"><input id="weighted" type="checkbox" checked> As in the photos</label></div>
   <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
   <img id="photo" alt="">
@@ -58,36 +58,36 @@
     <option value="diffusion">Land from diffusion</option>
     <option value="diffusion-chains">Diffusion along chains</option>
   </select>
-  <label class="only-diffusion">Pattern <small>spots · worms · coral</small><input id="pattern" type="range" min="0" max="1" step="0.05"></label>
-  <label class="only-diffusion">Scale <small>large · fine</small><input id="scale" type="range" min="0" max="1" step="0.05"></label>
-  <label class="only-diffusion" title="Spots, worms and coral side by side, drifting across the page">Variety <small>one · many</small><input id="variety" type="range" min="0" max="1" step="0.05"></label>
-  <label class="only-diffusion" title="Read the field through noise, so its spacing goes irregular">Warp <small>even · wild</small><input id="warp" type="range" min="0" max="1" step="0.01"></label>
-  <label class="only-diffusion" title="Blend in the noise field: islands of every size">Noise <small>pure · mixed</small><input id="mix" type="range" min="0" max="0.8" step="0.01"></label>
-  <label class="not-noise">Archipelagos <output id="chainsOut"></output><input id="chains" type="range" min="1" max="12" step="1" title="How many archipelagos share the page"></label>
+  <label class="only-diffusion">Pattern <small>spots · worms · coral</small><input id="pattern" type="range" min="-0.3" max="1.5" step="0.05"></label>
+  <label class="only-diffusion">Scale <small>large · fine</small><input id="scale" type="range" min="-0.3" max="1.6" step="0.05"></label>
+  <label class="only-diffusion" title="Spots, worms and coral side by side, drifting across the page">Variety <small>one · many</small><input id="variety" type="range" min="0" max="2" step="0.05"></label>
+  <label class="only-diffusion" title="Read the field through noise, so its spacing goes irregular">Warp <small>even · wild</small><input id="warp" type="range" min="0" max="3" step="0.01"></label>
+  <label class="only-diffusion" title="Blend in the noise field: islands of every size">Noise <small>pure · mixed</small><input id="mix" type="range" min="0" max="1" step="0.01"></label>
+  <label class="not-noise">Archipelagos <output id="chainsOut"></output><input id="chains" type="range" min="1" max="24" step="1" title="How many archipelagos share the page"></label>
   <label class="check not-noise" title="Each ticked place becomes one archipelago where it really is: west to east across, north at the top"><input id="geo" type="checkbox" checked> Place them as on a map</label>
   <div class="row" title="Tick the places the archipelagos are drawn from"><button data-mix="all">All</button><button data-mix="canada">Canada</button><button data-mix="elsewhere">Elsewhere</button></div>
   <div class="mix" id="mix" title="Which places' palettes the chains take, in turn, after the palette above"></div>
   <h2>Land</h2>
-  <label>Land <small>sea · land</small><input id="land" type="range" min="0.1" max="0.9" step="0.01"></label>
-  <label>Islands <small>few, large · many, small</small><input id="islands" type="range" min="0" max="1" step="0.01"></label>
-  <label>Height <small>low · tall</small><input id="rise" type="range" min="0.05" max="1" step="0.01"></label>
-  <label title="Ranges lining up into bands, or distinct summits, each row its own">Peaks <small>bands · summits</small><input id="peaks" type="range" min="0" max="1" step="0.01"></label>
-  <label>Rugged <small>hills · peaks</small><input id="rugged" type="range" min="0" max="1" step="0.01"></label>
+  <label>Land <small>sea · land</small><input id="land" type="range" min="0" max="1" step="0.01"></label>
+  <label>Islands <small>few, large · many, small</small><input id="islands" type="range" min="0" max="3" step="0.01"></label>
+  <label>Height <small>low · tall</small><input id="rise" type="range" min="0" max="3" step="0.01"></label>
+  <label title="Ranges lining up into bands, or distinct summits, each row its own">Peaks <small>bands · summits</small><input id="peaks" type="range" min="0" max="2" step="0.01"></label>
+  <label>Rugged <small>hills · peaks</small><input id="rugged" type="range" min="0" max="2" step="0.01"></label>
   <h2>Terraces</h2>
-  <label>Step <small>fine · coarse</small><input id="step" type="range" min="0.2" max="2" step="0.01"></label>
-  <label>Soft <small>stairs · slopes</small><input id="soft" type="range" min="0.02" max="1" step="0.01"></label>
-  <label>Bands <output id="bandsOut"></output><input id="bands" type="range" min="1" max="8" step="1"></label>
+  <label>Step <small>fine · coarse</small><input id="step" type="range" min="0.05" max="5" step="0.01"></label>
+  <label>Soft <small>stairs · slopes</small><input id="soft" type="range" min="0.01" max="1" step="0.01"></label>
+  <label>Bands <output id="bandsOut"></output><input id="bands" type="range" min="1" max="20" step="1"></label>
   <h2>Rows</h2>
-  <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="20" max="200" step="1"></label>
+  <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="6" max="400" step="1"></label>
   <h2>Geography</h2>
   <label class="check" title="Each place's own landforms: fjord cliffs, karst towers, shield volcanoes, low reef islets"><input id="forms" type="checkbox" checked> Landforms by place</label>
-  <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1" step="0.01"></label>
-  <label class="not-noise" title="Along a chain: young, tall, dark islands at one end; old, low, sinking atolls at the other">Age <small>none · strong</small><input id="age" type="range" min="0" max="1" step="0.01"></label>
-  <label title="Some islands lifted into massifs, others kept low">Relief <small>even · varied</small><input id="relief" type="range" min="0" max="1" step="0.01"></label>
-  <label title="A calm border of open water, its edge wobbling: islands float free of the frame">Edges <small>none · wide</small><input id="edges" type="range" min="0" max="1" step="0.01"></label>
-  <label title="Smaller hills in front of each range, overlapping it into smaller regions, where the species' colours land">Foothills <small>none · many</small><input id="foothills" type="range" min="0" max="1" step="0.01"></label>
-  <label title="Pale shallow water round the land">Shallows <small>none · wide</small><input id="shallows" type="range" min="0" max="1" step="0.01"></label>
-  <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="3" step="0.05"></label>
+  <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1.3" step="0.01"></label>
+  <label class="not-noise" title="Along a chain: young, tall, dark islands at one end; old, low, sinking atolls at the other">Age <small>none · strong</small><input id="age" type="range" min="0" max="1.2" step="0.01"></label>
+  <label title="Some islands lifted into massifs, others kept low">Relief <small>even · varied</small><input id="relief" type="range" min="0" max="2" step="0.01"></label>
+  <label title="A calm border of open water, its edge wobbling: islands float free of the frame">Edges <small>none · wide</small><input id="edges" type="range" min="0" max="2" step="0.01"></label>
+  <label title="Smaller hills in front of each range, overlapping it into smaller regions, where the species' colours land">Foothills <small>none · many</small><input id="foothills" type="range" min="0" max="4" step="0.01"></label>
+  <label title="Pale shallow water round the land">Shallows <small>none · wide</small><input id="shallows" type="range" min="0" max="3" step="0.01"></label>
+  <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="8" step="0.05"></label>
   <label class="check"><input id="wrap" type="checkbox"> Repeat left to right</label>
   <div class="row">
     <button id="reseed" title="Same dials, another map">Reseed</button>
