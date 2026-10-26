@@ -71,9 +71,11 @@ export const DEFAULTS = {
   shapeStrength: 0.8, // how firmly land keeps to the shape: a hint (low) to the shape clearly read (1)
   clouds: 0,       // cloud cover: none (0) to overcast (1)
   cloudSize: 1,    // cloud banks small and many (low) to large and few (high)
-  cloudPuff: 1,    // how high cloud tops billow, in rows
+  cloudPuff: 1,    // how high cloud tops billow at a cloud's heart, in rows
+  cloudTip: 0.15,  // how high they billow at its thin ends, in rows: small tips (low) to blunt ends (high)
   cloudShadow: 0.5, // how dark the shadow a cloud casts on the water beneath it
-  cloudPeaks: 0.8, // where cloud comes from: free in the sky (0) to made by the mountains (1)
+  cloudPeaks: 0.8, // how much cloud is the mountains' own (caps, banners, wave clouds) against the spread (0 to 1)
+  cloudSpread: 0.5, // how far the peaks' cloud spreads across the sky: only on the mountains (0) to all of it (1)
   wind: 0.6,       // wind strength: still air, caps only (0) to long banners and lee-wave clouds (2)
   windDir: 0,      // where the wind blows, in degrees: 0 right, 90 out of the page, 180 left, 270 into it
   slope: 2,        // max slope from the nearest water, height per unit across: steep (high) to gentle (low); 0 for none
@@ -95,7 +97,7 @@ export function ridges(dials) {
   const cells = 2 + d.islands * 10;                         // land field cells across the width
   const land = fbm(noise2(d.seed, d.wrap ? Math.round(cells) : 0), 3);
   const crest = fbm(noise2(d.seed + 1, d.wrap ? Math.round(cells * 3) : 0), 3);
-  const skyNoise = fbm(noise2(d.seed + 5, d.wrap ? Math.round(cells) : 0), 3), puff = fbm(noise2(d.seed + 6, d.wrap ? Math.round(cells * 4) : 0), 2);
+  const puff = fbm(noise2(d.seed + 6, d.wrap ? Math.round(cells * 4) : 0), 2);
   const toCell = (x) => (x / W) * (d.wrap ? Math.round(cells) : cells);
   // Noise read at x on its own scale k: with repeat on, blended with its value a tile-width over, so whatever the
   // scale, the right edge comes back to exactly what the left edge has and the tile joins without a seam.
@@ -213,14 +215,18 @@ export function ridges(dials) {
   // The border: land sinks into the sea toward the frame, along an edge that wobbles with noise so it never runs as
   // a line. At the frame itself nothing stands (shallows included). With repeat on, only top and bottom have one.
   const band = d.edges * 0.2 * Math.min(W - 2 * M, H - 2 * M);
+  const lift = Math.min(rise * 0.15, band * 2);
   const shore = (x, y, yc) => {
     if (!band) return 1;
     // How far in from the frame: to a rounded frame, so the border bends round each corner in an arc instead of
     // meeting there at a right angle (the sides' distances taken apart). With repeat on, top and bottom only.
-    let e = Math.min(y - M, H - M - y);
+    // Land stands up from its row, so at the top it reaches into the border and at the bottom it does not: the
+    // border's top is measured that much lower, so the land keeps the same water above it as below.
+    const top = M + lift;
+    let e = Math.min(y - top, H - M - y);
     if (!d.wrap) {
-      const hx = (W - 2 * M) / 2, hy = (H - 2 * M) / 2, round = Math.min(band * 1.6, hx, hy);
-      const qx = Math.abs(x - W / 2) - hx + round, qy = Math.abs(y - H / 2) - hy + round;
+      const hx = (W - 2 * M) / 2, hy = (H - M - top) / 2, round = Math.min(band * 1.6, hx, hy);
+      const qx = Math.abs(x - W / 2) - hx + round, qy = Math.abs(y - (top + H - M) / 2) - hy + round;
       e = -(Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - round);
     }
     const wobble = (seam(land, x, 1.7, 21, yc * 1.7 + 9) - 0.5) * band * 1.3;
@@ -406,9 +412,9 @@ export function ridges(dials) {
     shapes.push({ line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] });
     sky.push({ y, yc, h, at: shapes.length });
   }
-  // Clouds, from the mountains and the wind (clouds.js): each row's go in just after its land, so nearer land passes
+  // Clouds, from the mountains and spread on the wind (clouds.js): each row's go in just after its land, so nearer land passes
   // in front of farther cloud. Last row first, so the earlier places stay where they were.
-  const made = clouds({ d, rows: sky, xs, dx, gap, sky: skyNoise, puff, seam, shore, smooth });
+  const made = clouds({ d, rows: sky, xs, dx, gap, puff, seam, shore, smooth });
   for (let r = sky.length - 1; r >= 0; r--) shapes.splice(sky[r].at, 0, ...made[r]);
   return { width: W, height: H, shapes, line: d.line, chains: groups };
 }
