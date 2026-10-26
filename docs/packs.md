@@ -15,7 +15,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `types` | Its types. An entry with `of` and `fields` adds fields to another pack's type. |
 | `links` | Its link types, each extending a root. |
 | `rules` | What decides a write (`src/rules.ts`), and what asks an agent to go on when its reply ends (`on: "reply_ended"`, `src/reply-rules.ts`). |
-| `views` | Reads (a `shape` or a `lens`), trees (`form: "tree"`) and screens on an item's page (`form: "screen"`). |
+| `views` | Reads (a `shape` or a `lens`), trees (`form: "tree"`), screens on an item's page (`form: "screen"`), and reasons attention gives (`form: "attention"`: items `of` a type whose fields hold `where`'s values, weighed with the kernel's reason it `joins`). |
 | `actions` | What people and agents can do through it, each under a verb. Core's six verbs are its actions marked `kernel`. |
 | `handlers` | Code run by itself: `{ event }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`. |
 | `drawings`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`src/instructions.ts`). |

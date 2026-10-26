@@ -16,6 +16,7 @@
     "ready": 6,
     "stale": 12,
     "to_confirm": 0,
+    "unaccounted": 0,
     "under_way": 1,
     "unsettled": 2,
     "waits_on": 1
@@ -346,6 +347,7 @@
     "ready": 8,
     "stale": 15,
     "to_confirm": 0,
+    "unaccounted": 0,
     "under_way": 0,
     "unsettled": 3,
     "waits_on": 0

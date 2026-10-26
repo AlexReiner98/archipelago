@@ -206,6 +206,8 @@
         "link_colours": { "type": "json", "description": "A colour for each link type, by its name, as hex colours: the flow draws each wire and tie in its own, and a type not named here takes one of link_hues, the same each time unless another type in the picture has it." },
         "link_hues": { "type": "json", "description": "The colours a link type not named in link_colours takes, as hex colours: by its name, stepping past one another type in the same picture has. hues when not set." },
         "key": { "type": "enum", "values": ["shown", "hidden"], "description": "Whether a picture's key is drawn: what each mark it uses means, as its drawing says (the scene's key), always in sight on the canvas. shown unless said." },
+        "headless": { "type": "json", "description": "The link types whose ties are drawn with no head, as a list, e.g. [\"part_of\"]: every other tie has a head where its link points." },
+        "place_hues": { "type": "json", "description": "The colours places take, in order, as hex colours: the flow then draws no step for a place that holds parts (items of the place kind) in the picture, outlines each of its parts in its colour and names it in the key. Left out or empty, a place is a step tied to its parts." },
         "hover_only": { "type": "json", "description": "The link types whose wires are drawn only while one of their ends is hovered, as a list, e.g. [\"part_of\"]: still laid out by, and drawn always when held for a person." },
         "layout": { "type": "enum", "values": ["calendar", "bars"], "description": "time: a calendar of days, hours running down (calendar), or each lane a row of bars across the days (bars, a Gantt chart). calendar unless said." },
         "hours": { "type": "json", "description": "time, calendar: the hours of the day shown, as [from, to], e.g. [6, 22]. The whole day unless said." },
@@ -813,6 +815,7 @@
         "free.js": "draw/flow/free.js",
         "look.js": "draw/flow/look.js",
         "story.js": "draw/flow/story.js",
+        "places.js": "draw/flow/places.js",
         "marks.js": "draw/architecture/marks.js",
         "play.js": "draw/architecture/play.js",
         "story-look.js": "draw/architecture/story-look.js"
@@ -826,6 +829,8 @@
       "props": {
         "shape": "list",
         "undrawn": ["tagged"],
+        "headless": ["part_of"],
+        "place_hues": ["#2f5fb3", "#a86a12", "#0f7c86", "#b5489a", "#4f8a2b", "#d0622c", "#6f43b0", "#8a8f2a"],
         "key": "shown",
         "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#b23a48", "relates_to": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
         "lit": "all",
@@ -854,7 +859,7 @@
     { "id": "core.map_true", "type": "instruction", "title": "Keep the map true", "body": "When what you do or find settles something still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, rather than leaving it open with a note. Settle only what the work or the owner has in fact settled: closing a decision or hypothesis waits for the owner unless this workspace applies agents’ changes as made, so propose it with what was chosen (props.outcome) and why (props.rationale). A choice that is still the owner’s stays open.", "props": { "for": ["working_rules"], "order": 40 } },
     { "id": "core.authority", "type": "instruction", "title": "Say on whose authority", "body": "Every change takes authority: of \"human\" with what the owner said and where, when they told you to or decided it; of \"agent\" for your own reading of the work. Never claim the owner’s word for your own judgment.", "props": { "for": ["working_rules"], "order": 50 } },
     { "id": "core.names", "type": "instruction", "title": "A name is a few words", "body": "A title names the thing in 60 characters at most; the rest goes in the first line of its note. Lead a note with the point in two or three sentences, and give each further part a short title on a line of its own, so it folds. Write it in the map's one dialect, which every page reads alike: ## titles, - points, - [ ] and - [x] checklists, > [!NOTE] or > [!WARNING] callouts, | tables |, `code`, **strong**, and an item named by its id (e_...) or as [its name](e_...).", "props": { "for": ["working_rules"], "order": 60 } },
-    {"id":"core.unaccounted","type":"instruction","title":"Settle the commits no one has accounted for","body":"{count} commits here are not accounted for (a commit is, once the map holds a commit item for it: type software.commit, its full sha in sha, a software.settles link to each item it settles, none when it settles nothing):\n{commits}\nIn your first reply, tell the owner which these are, and make a commit item for each with change, on the authority you have for it, as you settle what you did. If a commit is not yours to account for, say so.","props":{"for":["unaccounted_commits"],"order":40}},
+    {"id":"core.unaccounted","type":"instruction","title":"Settle the commits no one has accounted for","body":"{count} commits here are not accounted for (a commit is, once the map holds a commit item for it: type software.commit, its full sha in sha, a software.settles link to each item it settles, none when it settles nothing):\n{commits}\nIn your first reply, tell the owner which these are, and make a commit item for each with change (or, where one heard from a push is there already with accounted false, set it true with its links), on the authority you have for it, as you settle what you did. If a commit is not yours to account for, say so.","props":{"for":["unaccounted_commits"],"order":40}},
     { "id": "core.search_first", "type": "instruction", "title": "Search before you create", "body": "Query with name search first, so nothing is made twice.", "props": { "for": ["working_rules"], "order": 70 } },
     { "id": "core.waits_on", "type": "instruction", "title": "Say who is waited on with a link", "body": "A person who has to answer or act is waits_on (what for in props.for), removed once they have; other work is depends_on; a resource is needs, and an exclusive one is taken with assign, action claim, and given back with revise, action release.", "props": { "for": ["working_rules"], "order": 80 } }
   ]

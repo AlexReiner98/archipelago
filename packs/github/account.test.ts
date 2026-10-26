@@ -10,14 +10,17 @@ const sha = (c: string) => c.repeat(40);
 const repo = { id: 'e_repo0001', type: 'software.repo', title: 'Shop', props: { remote: 'https://github.com/Acme/Shop' } };
 
 /** The map holds these commit items (by sha); GitHub answers `github` by path through the app, or the app is not connected. */
-function ctxOver(accounted: string[], github?: Record<string, unknown>) {
+function ctxOver(accounted: string[], github?: Record<string, unknown>, heard: string[] = []) {
   const reads: Record<string, any>[] = [];
   return {
     reads,
     read: async (q: Record<string, any>) => {
       reads.push(q);
       if (q.items?.type === 'software.repo') return [repo];
-      if (q.items?.type === 'software.commit') return accounted.includes(q.items.where.sha) ? [{ id: `e_c${q.items.where.sha.slice(0, 7)}`, type: 'software.commit', props: { sha: q.items.where.sha } }] : [];
+      if (q.items?.type === 'software.commit') {
+        const s = q.items.where.sha;
+        return [...(accounted.includes(s) ? [{ id: `e_c${s.slice(0, 7)}`, type: 'software.commit', props: { sha: s } }] : []), ...(heard.includes(s) ? [{ id: `e_h${s.slice(0, 7)}`, type: 'software.commit', props: { sha: s, accounted: false } }] : [])];
+      }
       if (q.events) return [];
       if (q.request) {
         if (!github) throw new Error('This workspace has not connected GitHub App.');
@@ -49,6 +52,11 @@ test('a push to main is checked: red while a commit has no commit item on the ma
 
   const green = await handler['github.push'](push([commit('1'), commit('2')]), ctxOver([sha('1'), sha('2')]));
   assert.deepEqual([green.answer.check.conclusion, green.answer.check.title], ['success', 'All 2 commits accounted for']);
+
+  // An item made only because the commit was pushed and nobody accounted for it (accounted false) accounts for nothing.
+  const heard = await handler['github.push'](push([commit('1'), commit('2')]), ctxOver([sha('1')], undefined, [sha('2')]));
+  assert.equal(heard.answer.check.title, '1 of 2 commits not accounted for');
+  assert.match(heard.answer.check.summary, /accounted` true/);
 });
 
 test('only the main branch is checked; a longer push than GitHub lists is read whole through the app', async () => {

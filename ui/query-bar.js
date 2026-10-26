@@ -3,7 +3,9 @@
 // an item), chips of their own; and what is left out; then the walk (the
 // links it follows, how many steps) and the limit. Each is changed in place: a chip's × takes it away, a click on it
 // puts its words back in the box to be written again, the box takes a new term, and the walk and the limit have their
-// own controls. Every change is a new lens, handed to `go` (the canvas puts it in the address and draws it).
+// own controls. Every change is a new lens, handed to `go` (the canvas puts it in the address and draws it). The bar is
+// never wider than the screen: a filter whose chips do not fit is folded to one short line of what it finds, its
+// chips a click away (e_6p6eysty), and unfolded they scroll inside their part.
 
 import { api, h } from './base.js';
 import { relations, titles, typeTitle, types } from './words.js';
@@ -11,6 +13,8 @@ import { relations, titles, typeTitle, types } from './words.js';
 const bar = document.getElementById('query');
 /** The words the box was given back by a chip, to be written again. */
 let words = '';
+/** Whether the person unfolded the filter's chips, for as long as the page is open. */
+let unfolded = false;
 /** Items the bar has asked the names of, so each is asked once. */
 const asking = new Set();
 
@@ -78,8 +82,39 @@ function termWords(term, redraw) {
   return link === 'tagged' ? `#${endName}` : `${linkTitle(link)} ${endName}`;
 }
 
+/** The filter's link terms but tags, by their link type, in order. */
+function linkGroups(links) {
+  const groups = new Map();
+  for (const t of links.filter((l) => !l.startsWith('tagged '))) {
+    const link = /^(\S+)/.exec(t)?.[1] ?? t;
+    (groups.get(link) ?? groups.set(link, []).get(link)).push(t);
+  }
+  return groups;
+}
+
+/** A link term's end, by its name. */
+function endWords(term, redraw) {
+  const end = /^\S+\s+(.+)$/.exec(term)?.[1] ?? term;
+  return end === 'me' ? 'me' : isId(end) ? nameOf(end, redraw) : end;
+}
+
+/** What the filter finds, in a few words: each kind of term once, a second of the same counted ("is part of Server +3"). */
+function summary(f, redraw) {
+  const some = (list, one, many) => (list?.length ? (list.length === 1 ? one(list[0]) : many(list)) : null);
+  const tags = (f.links ?? []).filter((t) => t.startsWith('tagged '));
+  return [
+    f.text && `“${f.text}”`,
+    some(f.types, typeTitle, (l) => `${l.length} types`),
+    some(tags, (t) => termWords(t, redraw), (l) => `${termWords(l[0], redraw)} +${l.length - 1}`),
+    ...[...linkGroups(f.links ?? []).values()].map((l) => `${termWords(l[0], redraw)}${l.length > 1 ? ` +${l.length - 1}` : ''}`),
+    some(f.ids, (id) => nameOf(id, redraw), (l) => `${l.length} items`),
+    some(f.only, (t) => `only ${typeTitle(t)}`, (l) => `only ${l.length} types`),
+    some(f.within, (id) => `within ${nameOf(id, redraw)}`, (l) => `within ${l.length} items`),
+  ].filter(Boolean).join(' · ');
+}
+
 /** Draw the bar for this lens, over the view that draws it (its answer names what the lens names); `lead` goes first (the saved canvas up, ui/canvases.js). */
-export function drawQuery(lens, view, go, lead) {
+export function drawQuery(lens, view, go, lead, folded = false) {
   if (!bar) return;
   const redraw = () => drawQuery(lens, view, go, lead);
   const f = lens.filter;
@@ -124,18 +159,31 @@ export function drawQuery(lens, view, go, lead) {
     [...relations.values()].filter((r) => !r.id.startsWith('sys.') && !walked.includes(r.id)).map((r) => h('option', { value: r.id }, r.title ?? r.id)),
   );
   const answer = view?.answer;
-  bar.replaceChildren(
-    lead ?? '',
-    h('span', { class: 'q-part', title: 'The filter: what it finds is drawn, and what is left out is left out of everything' },
+  const fold = (open) => ((unfolded = open), redraw());
+  const terms = [
       f.text && chip('q-text', `“${f.text}”`, 'Words it finds', 'text', f.text, f.text),
       (f.types ?? []).map((t) => chip('q-type', typeTitle(t), 'Items of this type, the newest first', 'types', t, typeTitle(t))),
-      (f.links ?? []).map((t) => chip(t.startsWith('tagged ') ? 'q-tag' : 'q-link', termWords(t, redraw), t.startsWith('tagged ') ? 'Items with this tag' : 'Items with this link', 'links', t, t)),
+      // Tags as #name; other links grouped under their link's name, each chip its end's name, so a cut leaves the name.
+      (f.links ?? []).filter((t) => t.startsWith('tagged ')).map((t) => chip('q-tag', termWords(t, redraw), 'Items with this tag', 'links', t, t)),
+      [...linkGroups(f.links ?? []).entries()].map(([link, list]) => h('span', { class: 'q-group' },
+        h('span', { class: 'q-group-word', title: `Items with the link “${linkTitle(link)}” to each of these` }, linkTitle(link)),
+        list.map((t) => chip('q-link', endWords(t, redraw), `Items with this link: ${termWords(t, redraw)}`, 'links', t, t)))),
       (f.ids ?? []).map((id) => chip('q-id', nameOf(id, redraw), 'This item', 'ids', id, id)),
       box,
       (f.only ?? []).map((t) => chip('q-narrow', `only ${typeTitle(t)}`, 'Only what is of this type, of what the filter finds', 'only', t, `only ${typeTitle(t)}`)),
       (f.within ?? []).map((id) => chip('q-narrow', `within ${nameOf(id, redraw)}`, 'Only what is within this item, at any depth, of what the filter finds', 'within', id, `within ${id}`)),
       exclude.map((x) => chip('q-out', `−${x === 'closed' || x === 'system' ? x : typeTitle(x)}`, 'Left out of everything', 'exclude', x, `-${x}`)),
-    ),
+  ];
+  const said = summary(f, redraw);
+  bar.replaceChildren(
+    lead ?? '',
+    folded
+      ? h('span', { class: 'q-part q-filter', title: 'The filter: what it finds is drawn, and what is left out is left out of everything' },
+          h('button', { type: 'button', class: 'q-sum', title: `${said}: show each term`, onclick: () => fold(true) }, said || 'The filter'),
+          box)
+      : h('span', { class: 'q-part q-filter', title: 'The filter: what it finds is drawn, and what is left out is left out of everything' },
+          unfolded && h('button', { type: 'button', class: 'q-fold', title: 'Fold the filter to one line', 'aria-label': 'Fold the filter', onclick: () => fold(false) }, '‹'),
+          terms),
     h('span', { class: 'q-part', title: 'The walk: from what the filter finds, along these links either way' },
       over === 'all' ? h('span', { class: 'q-term q-walk' }, h('span', { class: 'q-said' }, 'every link'), h('button', { type: 'button', class: 'q-x', title: 'Take it out', onclick: () => walk({ over: [], steps: 0 }) }, '×'))
         : walked.map((r) => h('span', { class: 'q-term q-walk' }, h('span', { class: 'q-said' }, linkTitle(r)), h('button', { type: 'button', class: 'q-x', title: 'Take it out', onclick: () => walk({ over: walked.filter((o) => o !== r), steps: walked.length > 1 ? steps : 0 }) }, '×'))),
@@ -152,6 +200,9 @@ export function drawQuery(lens, view, go, lead) {
     ),
   );
   bar.hidden = !filled;
+  // Folded unless the person unfolded it, when its chips do not fit.
+  const part = bar.querySelector('.q-filter');
+  if (!folded && !unfolded && part && part.scrollWidth > part.clientWidth) drawQuery(lens, view, go, lead, true);
 }
 
 /** Put the cursor in the box, once the bar is drawn again. */

@@ -99,11 +99,12 @@
     {
       "id": "software.commit",
       "extends": "record",
-      "capabilities": { "accounts": { "field": "sha" } },
+      "capabilities": { "accounts": { "field": "sha", "accounted": "accounted" } },
       "title": "Commit",
-      "description": "A commit accounted for: made by its session or a person, it says which items the commit settles, each by a settles link, and none when it has none. A commit with no such item is unaccounted for, and the check on the main branch stays red.",
+      "description": "A commit accounted for: made by its session or a person, it says which items the commit settles, each by a settles link, and none when it has none. A commit with no such item is unaccounted for, and the check on the main branch stays red. One heard from a push that nobody accounted for in time is made with accounted false: accounting for it is setting accounted true, with its links.",
       "fields": {
-        "sha": { "type": "string", "description": "The commit's full id (40 hex characters)." }
+        "sha": { "type": "string", "description": "The commit's full id (40 hex characters)." },
+        "accounted": { "type": "boolean", "description": "false while the commit was only heard from a push and nobody has said what it settles; true, or left out, once someone has." }
       }
     },
     {
@@ -136,6 +137,17 @@
         "host": { "type": "string", "shown": true, "description": "Where it runs, as its operator names it: a container, a machine, a region." },
         "url": { "type": "url", "description": "The address its health is read from: what its monitor checks (http(s)://…, or tcp://host:port for a port). A monitor reporting on it moves the status between up and down." },
         "commit": { "type": "string", "system": true, "description": "The commit it runs, as its deploy last reported." }
+      }
+    },
+    {
+      "id": "software.part",
+      "extends": "place",
+      "title": "Part",
+      "description": "A part of a mechanism: a rule, a hook, a tool, a step of how something works. Its status says whether it does its job (sketched, works, partly, broken), not whether it answers: what runs and is watched is a component. Part of the mechanism or place it belongs to; it calls (software.calls) what it hands on to. Drawn by the same shapes as a component.",
+      "statuses": { "open": ["sketched", "works", "partly", "broken"], "closed": ["retired"] },
+      "fields": {
+        "role": { "type": "enum", "values": ["client", "edge", "app", "data", "storage", "model", "monitor", "network", "tool", "service"], "shown": true, "description": "What it does in the mechanism, as a component's role: data and storage are drawn as a cylinder, client as a pill." },
+        "layer": { "type": "enum", "values": ["kernel", "type_pack", "server_pack", "store", "outside", "yours"], "shown": true, "description": "What it is, in a system of a kernel and packs, as a component's layer. A style may colour a part's dot by it (dots)." }
       }
     },
     {
@@ -172,7 +184,7 @@
       "on": "reply_ended",
       "when": { "reply": { "unaccounted": true } },
       "then": "ask",
-      "say": "This reply committed or pushed commits the map does not account for. In one change, give each a software.commit (full sha) with a software.settles link to each item it settles, or none.",
+      "say": "This reply made commits the map does not account for. In one change: a software.commit (full sha) each, a software.settles link per item it settles, or none; one heard from a push: accounted true.",
       "record": { "type": "software.commit", "field": "sha" },
       "lifted": "reply_account_commits"
     }
@@ -234,6 +246,17 @@
     }
   ],
   "views": [
+    {
+      "form": "attention",
+      "id": "software.unaccounted",
+      "reason": "unaccounted",
+      "description": "Pushed, and nobody has said what it settles: account for it with its settles links, and accounted true.",
+      "of": "software.commit",
+      "where": { "accounted": false },
+      "joins": "waits_on",
+      "mark": "not accounted for",
+      "ask": "Account for"
+    },
     {
       "id": "software.handoff",
       "shape": "data",

@@ -62,7 +62,8 @@ export async function pullCommits(ctx, repo, number) {
 export async function account(ctx, head, commits, whole = true) {
   const read = [];
   for (const c of commits.slice(0, MOST)) {
-    const found = await ctx.read({ items: { type: 'software.commit', where: { sha: c.id } }, fields: ['sha'] });
+    // One heard only from a push (accounted false, heard.js) accounts for nothing yet.
+    const found = (await ctx.read({ items: { type: 'software.commit', where: { sha: c.id } }, fields: ['sha', 'accounted'] })).filter((e) => e.props?.accounted !== false);
     read.push({ sha: c.id, subject: subject(c.message), run: runOf(c.message), accounted: found.length > 0 ? found[0].id : null });
   }
   const open = read.filter((c) => !c.accounted);
@@ -70,7 +71,7 @@ export async function account(ctx, head, commits, whole = true) {
   const title = !n ? 'No commits to account for' : open.length ? `${open.length} of ${n} commit${n === 1 ? '' : 's'} not accounted for` : `All ${n === 1 ? 'one commit' : `${n} commits`} accounted for`;
   const lines = open.slice(0, 50).map((c) => `- \`${c.sha.slice(0, 7)}\` ${c.subject.replace(/[`*_[\]]/g, '')}${c.run ? ` (run ${c.run})` : ''}`);
   const how = [
-    'A commit is accounted for once the map holds a commit item for it: type `software.commit`, its full sha in `sha`, with a `software.settles` link to each item it settles, and none when it settles nothing.',
+    'A commit is accounted for once the map holds a commit item for it: type `software.commit`, its full sha in `sha`, with a `software.settles` link to each item it settles, and none when it settles nothing. Where one heard from a push is there already (`accounted` false), set `accounted` true with its links.',
     'Its session makes it with `change`; a person can on the map. This check turns green by itself once the last one is made.',
   ];
   const summary = [

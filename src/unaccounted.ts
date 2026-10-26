@@ -32,10 +32,11 @@ export async function unaccounted(l: Archipelago, commits: SentCommit[]): Promis
   // The types that account for a commit say which field holds its id.
   const held = new Set<string>();
   for (const type of l.registry.having('accounts')) {
-    const field = l.registry.type(type)!.capabilities.accounts!.field;
+    const { field, accounted } = l.registry.type(type)!.capabilities.accounts!;
+    // One only heard of from a push (its accounted field false) accounts for nothing yet.
     const { rows } = await l.db.query<{ sha: string }>(
-      `select props->>$2 as sha from entity where type = $1 and archived_at is null and props->>$2 = any($3::text[]) -- index entity_type_created`,
-      [type, field, commits.map((c) => c.id)],
+      `select props->>$2 as sha from entity where type = $1 and archived_at is null and props->>$2 = any($3::text[]) and ($4::text is null or coalesce(props->>$4, 'true') <> 'false') -- index entity_type_created`,
+      [type, field, commits.map((c) => c.id), accounted ?? null],
     );
     for (const r of rows) held.add(r.sha);
   }

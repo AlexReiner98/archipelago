@@ -5,6 +5,8 @@ export const css = `
 .lf-step { cursor: pointer; }
 .lf-step.dragging { cursor: grabbing; }
 .lf-step .lf-shape { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
+/* A part outlined in the colour of the place it is part of (place_hues): the place is not drawn, the key names it. */
+.lf-step.placed .lf-shape { stroke: var(--lf-place); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-step.scenario .lf-shape { stroke: var(--ln-muted); stroke-dasharray: var(--ln-flow-dash-scenario); }
 .lf-step.you .lf-shape { stroke: var(--ln-you); }
 .lf-step.here .lf-shape, .lf-step:hover .lf-shape, .lf-step:focus .lf-shape { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
@@ -22,6 +24,9 @@ export const css = `
 /* A tie (part_of, or any link that is not the order): quiet, under the wires; one to what a step is part of is solid. */
 .lf-tie { fill: none; stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-flow-dash-choice); }
 .lf-tie.near { stroke-dasharray: none; }
+/* A tie with a head says which way its link points, as a wire does: solid, the head in its colour. */
+.lf-tie.headed { stroke-dasharray: none; }
+.lf-head.on-hover:not(.lit) { visibility: hidden; }
 .lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke); }
 /* Each link type in its own colour (the style's link_colours, else one of its hues), lit or not; a held change keeps
    the colour of what waits on you, below. */
