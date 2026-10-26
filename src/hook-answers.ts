@@ -5,7 +5,7 @@
 import { SETUP_VERSION, setupCommand } from './connect.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
-import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
+import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard } from './sessions.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { summed } from './summary.ts';
 import { keep, kept } from './transient.ts';
@@ -33,6 +33,8 @@ export interface HookCall {
   running: { commit?: string; started: string };
   /** The address the hook called, for the setup command. */
   origin: string;
+  /** Says the run a session is registered as beside the answer (a header), for the hook to keep: Claude Code reads only the answer. */
+  ran?: (run: string) => void;
 }
 
 /** How long a session's place is kept after it was last heard from. */
@@ -80,6 +82,9 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   if (event === 'session-start') {
     await keep(whole, heardKey(body.session_id), await latestSeq(pelago), HEARD_MS);
     let additionalContext = await hookSessionStart(pelago, body);
+    // The hook keeps it in the checkout, where the commit-msg hook the setup installs finds it to name the run in a commit.
+    const run = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
+    if (run) call.ran?.(run.id);
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
     if (body.setup !== SETUP_VERSION)

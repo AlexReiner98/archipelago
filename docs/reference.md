@@ -234,8 +234,20 @@ at once; they are the session's own state, not facts about the world.
   runs it: that writes `.mcp.json`, the hook script and the four hooks that
   call it, the friction skill, and the working rules
   ([examples/working-rules.md](../examples/working-rules.md)), which it reads
-  into the project's `CLAUDE.md`. It adds to what is there, holds no secret,
-  and can be run again.
+  into the project's `CLAUDE.md`. In a git checkout it also installs a
+  `commit-msg` hook (not over one of the project's own, nor where
+  `core.hooksPath` gives the hooks to another tool). It adds to what is
+  there, holds no secret, and can be run again.
+- **Each commit a session makes names its run,** as a trailer
+  (`Archipelago-Run: e_...`). At the start of a session the server says the
+  run beside its answer (the `x-pelago-run` header), and the hook script
+  keeps it in the checkout's git folder, one file per session
+  (`.git/pelago-runs/<session id>`, shared by its worktrees), taking it out
+  when the session ends. The `commit-msg` hook, plain sh and git, reads it by
+  the session id Claude Code gives every command it runs
+  (`CLAUDE_CODE_SESSION_ID`). So several sessions in one checkout each name
+  their own, and a commit made by a person, or by a session with no run
+  kept, carries no trailer.
 - **What the setup changes is shown first.** At a terminal it lists each
   file it will write or change and asks before it does. A file of yours
   that it changes (`.mcp.json`, `.claude/settings.json`, `CLAUDE.md`, the

@@ -17,11 +17,18 @@
 // not counting cached re-reads. Archipelago gives what is new to the work the
 // session is on.
 //
+// It also keeps the run the session is registered as (the server says it beside its answer to session-start) in
+// the checkout's git folder, one file per session (pelago-runs/<session id>), and takes it out at the end. The
+// commit-msg hook the setup installs reads it by the session id Claude Code gives every command it runs
+// (CLAUDE_CODE_SESSION_ID), so a commit made in the session names its run, and one made by anybody else does not:
+// several sessions in one checkout each find their own.
+//
 // It never fails the session: if the server is away it says so on stderr and
 // answers nothing.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 // Which hand-out of Archipelago's files this project has: the setup writes it in, and the server says when it is behind.
 const SETUP = '';
@@ -50,6 +57,18 @@ function tokensUsed(file) {
   let total = 0;
   for (const n of answers.values()) total += n;
   return total;
+}
+
+/** The file in the checkout's git folder (shared by its worktrees) that holds a session's run, or null outside a checkout. */
+function runFile(said) {
+  if (typeof said.session_id !== 'string' || !/^[\w-]+$/.test(said.session_id)) return null;
+  const cwd = said.cwd || '.';
+  try {
+    const git = execFileSync('git', ['-C', cwd, 'rev-parse', '--git-common-dir'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim();
+    return git ? resolve(cwd, git, 'pelago-runs', said.session_id) : null;
+  } catch {
+    return null;
+  }
 }
 
 let body = input.trim() || '{}';
@@ -88,6 +107,28 @@ try {
   const answer = await res.text();
   if (res.ok) process.stdout.write(answer);
   else console.error(`Archipelago ${name} hook: ${base} answered ${res.status}`);
+  const run = res.ok && name === 'session-start' ? res.headers.get('x-pelago-run') : null;
+  if (run && /^[\w-]+$/.test(run)) {
+    try {
+      const file = runFile(JSON.parse(body));
+      if (file) {
+        mkdirSync(resolve(file, '..'), { recursive: true });
+        writeFileSync(file, run);
+      }
+    } catch (err) {
+      console.error(`Archipelago ${name} hook: the run could not be kept for commits (${err.message})`);
+    }
+  }
 } catch (err) {
   console.error(`Archipelago ${name} hook: ${base} did not answer (${err.message})`);
+}
+
+// A session that has ended makes no more commits: its run is not left for another to be named by.
+if (name === 'session-end') {
+  try {
+    const file = runFile(JSON.parse(body));
+    if (file) rmSync(file, { force: true });
+  } catch {
+    // Nothing kept, or nothing to read it by.
+  }
 }
