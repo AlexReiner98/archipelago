@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Archipelago ridges</title>
 <!-- Display faces to try, open licence (SIL OFL), for the sketch only: the app loads none of them. -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400..900&family=Newsreader:wght@400..800&family=Literata:wght@400..900&family=Inter:wght@400..900&family=Manrope:wght@400..800&family=Space+Grotesk:wght@400..700&family=Bricolage+Grotesque:wght@400..800&family=Archivo:wght@400..900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400..900;1,400..900&family=Newsreader:ital,wght@0,400..800;1,400..800&family=Literata:ital,wght@0,400..900;1,400..900&family=Inter:ital,wght@0,400..900;1,400..900&family=Manrope:wght@400..800&family=Space+Grotesk:wght@400..700&family=Bricolage+Grotesque:wght@400..800&family=Archivo:ital,wght@0,400..900;1,400..900&display=swap">
 <style>
   :root { --ink: #1d2428; --paper: #f4f2ec; --line: #0002; font: 13px/1.4 system-ui, sans-serif; color: var(--ink); }
   body { margin: 0; display: grid; grid-template-columns: 260px 1fr; height: 100vh; background: #d9d6ce; }
@@ -95,6 +95,8 @@
   <div class="row"><label class="check" title="Set a name over the picture, in the app's typeface"><input id="name" type="checkbox"> Name</label><input id="nameText" value="Archipelago" aria-label="Name" title="The name to set"></div>
   <label class="only-name" title="How large the name is, against the frame's height">Name size <small>small · large</small><input id="nameSize" type="range" min="0.04" max="0.3" step="0.005" value="0.1"></label>
   <label class="only-name" title="Open water round the name, the islands parting round it: none, a little, or a wide bay">Clearing <small>none · wide</small><input id="nameClear" type="range" min="0" max="2" step="0.01" value="1"></label>
+  <div class="row only-name" title="Set as a chart labels a sea or a group of islands: capitals spaced wide, often in italic"><label class="check"><input id="nameCaps" type="checkbox"> Capitals</label><label class="check"><input id="nameItalic" type="checkbox"> Italic</label></div>
+  <label class="only-name" title="Space between the letters, as a share of the type size">Spacing <small>none · wide</small><input id="nameSpacing" type="range" min="0" max="0.8" step="0.01" value="0"></label>
   <select id="namePlace" class="only-name" aria-label="Where the name goes" title="Where the name goes">
     <option value="low-left">Lower left</option>
     <option value="low">Lower centre</option>
@@ -262,8 +264,10 @@
   const named = () => $('name').checked && $('nameText').value.trim();
   function nameOf(pic, p) {
     const px = Math.round(+$('nameSize').value * pic.height), at = $('namePlace').value, M = DEFAULTS.margin;
-    const x = at === 'low-left' ? M : pic.width / 2, y = at === 'centre' ? pic.height / 2 + px * 0.35 : pic.height - M;
-    return { text: $('nameText').value.trim(), px, x, y, align: at === 'low-left' ? 'left' : 'center', colour: p && (isLight(background(p)) ? p.ink : p.paper), font: `${$('faceWeight').value} ${px}px ${$('face').value}` };
+    // Letter spacing is added after every letter, the last too: centred, the name is moved by half of it to stay centred.
+    const spacing = Math.round(+$('nameSpacing').value * px * 10) / 10, text = $('nameText').value.trim();
+    const x = at === 'low-left' ? M : pic.width / 2 + spacing / 2, y = at === 'centre' ? pic.height / 2 + px * 0.35 : pic.height - M;
+    return { text: $('nameCaps').checked ? text.toUpperCase() : text, px, x, y, spacing, italic: $('nameItalic').checked, align: at === 'low-left' ? 'left' : 'center', colour: p && (isLight(background(p)) ? p.ink : p.paper), font: `${$('nameItalic').checked ? 'italic ' : ''}${$('faceWeight').value} ${px}px ${$('face').value}` };
   }
   // The clearing round the name: the name drawn on a small canvas the frame's shape, thickened and blurred by the
   // Clearing dial, so the land keeps off it with room to spare. Drawn again only when it changes.
@@ -271,13 +275,13 @@
   function clearOf() {
     const pad = +$('nameClear').value;
     if (!named() || !pad) return null;
-    const [width, height] = frame(), n = nameOf({ width, height }, null), key = [n.text, n.font, n.x, n.y, n.align, pad].join('|');
+    const [width, height] = frame(), n = nameOf({ width, height }, null), key = [n.text, n.font, n.x, n.y, n.align, n.spacing, pad].join('|');
     if (clearing.key === key) return clearing.grid;
     const nx = 240, ny = Math.round((nx * height) / width), k = nx / width, c = document.createElement('canvas');
     [c.width, c.height] = [nx, ny];
     const g = c.getContext('2d');
     g.scale(k, k);
-    Object.assign(g, { font: n.font, textAlign: n.align, fillStyle: '#000', strokeStyle: '#000', lineJoin: 'round', lineWidth: n.px * pad * 0.9, filter: `blur(${n.px * pad * 0.35 * k}px)` });
+    Object.assign(g, { font: n.font, letterSpacing: `${n.spacing}px`, textAlign: n.align, fillStyle: '#000', strokeStyle: '#000', lineJoin: 'round', lineWidth: n.px * pad * 0.9, filter: `blur(${n.px * pad * 0.35 * k}px)` });
     g.fillText(n.text, n.x, n.y);
     g.strokeText(n.text, n.x, n.y);
     const data = g.getImageData(0, 0, nx, ny).data, v = new Float32Array(nx * ny);
@@ -287,9 +291,9 @@
   }
   function setName(g, pic, p) {
     const n = nameOf(pic, p);
-    Object.assign(g, { font: n.font, textAlign: n.align, textBaseline: 'alphabetic', fillStyle: n.colour, shadowColor: background(p), shadowBlur: n.px * 0.4 });
+    Object.assign(g, { font: n.font, letterSpacing: `${n.spacing}px`, textAlign: n.align, textBaseline: 'alphabetic', fillStyle: n.colour, shadowColor: background(p), shadowBlur: n.px * 0.4 });
     g.fillText(n.text, n.x, n.y);
-    g.shadowBlur = 0;
+    Object.assign(g, { shadowBlur: 0, letterSpacing: '0px' });
   }
   // The drawing as it is shown: with or without the swell lines on the water.
   const shown = (pic) => ($('swell').checked ? pic : { ...pic, shapes: pic.shapes.filter((s) => !s.line) });
@@ -410,7 +414,7 @@
   for (const b of document.querySelectorAll('[data-ground]')) b.onclick = () => ((bgPicked = b.dataset.ground), draw());
   const showEmblem = () => document.body.classList.toggle('emblem', emblem());
   $('emblem').addEventListener('input', () => (showEmblem(), draw()));
-  for (const k of ['emAt', 'swell', 'frame', 'nameText', 'nameSize', 'namePlace', 'nameClear']) $(k).addEventListener('input', draw);
+  for (const k of ['emAt', 'swell', 'frame', 'nameText', 'nameSize', 'namePlace', 'nameClear', 'nameCaps', 'nameSpacing']) $(k).addEventListener('input', draw);
   const showName = () => document.body.classList.toggle('named', $('name').checked);
   $('name').addEventListener('input', () => (showName(), draw()));
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
@@ -427,8 +431,8 @@
   const showLetter = () => document.body.classList.toggle('letter', $('letter').checked);
   for (const k of ['letter', 'letterText', 'letterSize', 'letterStrength']) $(k).addEventListener('input', () => (showLetter(), draw()));
   // A face is drawn once it has loaded, the weights the name and the letter use; the canvas would draw a fallback before.
-  const faceReady = () => Promise.all([`${$('faceWeight').value} 64px ${$('face').value}`, `900 64px ${$('face').value}`].map((f) => document.fonts.load(f).catch(() => null)));
-  for (const k of ['face', 'faceWeight']) $(k).addEventListener('input', () => (($('faceWeightOut').textContent = $('faceWeight').value), faceReady().then(draw)));
+  const faceReady = () => Promise.all([`${$('faceWeight').value} 64px ${$('face').value}`, `italic ${$('faceWeight').value} 64px ${$('face').value}`, `900 64px ${$('face').value}`].map((f) => document.fonts.load(f).catch(() => null)));
+  for (const k of ['face', 'faceWeight', 'nameItalic']) $(k).addEventListener('input', () => (($('faceWeightOut').textContent = $('faceWeight').value), faceReady().then(draw)));
   $('faceWeightOut').textContent = $('faceWeight').value;
   showLetter();
   $('richness').addEventListener('input', draw);
@@ -444,7 +448,7 @@
   const text = (pic, p) => {
     if (!named()) return '';
     const n = nameOf(pic, p), esc = n.text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-    return `<text x="${n.x}" y="${n.y}" text-anchor="${n.align === 'left' ? 'start' : 'middle'}" fill="${n.colour}" font-family="${$('face').value.replace(/"/g, "'")}" font-weight="${$('faceWeight').value}" font-size="${n.px}">${esc}</text>`;
+    return `<text x="${n.x}" y="${n.y}" text-anchor="${n.align === 'left' ? 'start' : 'middle'}" fill="${n.colour}" font-family="${$('face').value.replace(/"/g, "'")}" font-weight="${$('faceWeight').value}"${n.italic ? ' font-style="italic"' : ''} letter-spacing="${n.spacing}" font-size="${n.px}">${esc}</text>`;
   };
   $('svg').onclick = () => {
     const p = richOf(pal()), pic = shown(ridges(dials())), f = (v) => +v.toFixed(1);
@@ -467,7 +471,7 @@
     face: { font: $('face').value, weight: +$('faceWeight').value },
     letter: { on: $('letter').checked, text: $('letterText').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
     emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value,
-    name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value },
+    name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value, caps: $('nameCaps').checked, italic: $('nameItalic').checked, spacing: +$('nameSpacing').value },
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
   });
@@ -493,7 +497,7 @@
     const e = s.emblem ?? {};
     $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true; $('frame').value = s.frame ?? '800x1000';
     const n = s.name ?? {};
-    $('name').checked = !!n.on; $('nameText').value = n.text ?? 'Archipelago'; $('nameSize').value = n.size ?? 0.1; $('namePlace').value = n.place ?? 'low-left'; $('nameClear').value = n.clear ?? 1; showName();
+    $('name').checked = !!n.on; $('nameText').value = n.text ?? 'Archipelago'; $('nameSize').value = n.size ?? 0.1; $('namePlace').value = n.place ?? 'low-left'; $('nameClear').value = n.clear ?? 1; $('nameCaps').checked = !!n.caps; $('nameItalic').checked = !!n.italic; $('nameSpacing').value = n.spacing ?? 0; showName();
     showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
