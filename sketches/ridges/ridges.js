@@ -281,10 +281,10 @@ export function ridges(dials) {
         const room = Math.max(1, y - M - gap);
         stands = room * Math.tanh(stands / room);
       }
-      // The border reckoned from near the top of the land that would stand here (most of its height: the slope
-      // limit and the terraces take some off later), so a tall peak keeps as clear of the top as the coast does of
+      // The border reckoned from part way up the land that would stand here (the coast's mask, the slope limit and
+      // the terraces bring it lower than this), so a tall peak keeps about as clear of the top as the coast does of
       // the bottom.
-      const calm = shore(x, y, yc, stands * 0.75) * territory(x, y);
+      const calm = shore(x, y, yc, stands * 0.4) * territory(x, y);
       if (calm < 1) L.u -= (1 - calm) * 1.5;
       // A seeding shape (a letter): land rises inside it and sinks outside, so the archipelago takes its form.
       if (d.shape && d.shapeStrength > 0) {

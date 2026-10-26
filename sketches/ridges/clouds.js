@@ -92,7 +92,7 @@ export function clouds({ d, rows, xs, dx, gap, puff, seam, shore, smooth }) {
     const base = y - gap * 0.55 - Math.min(level * hmax * (0.3 + 0.7 * p), Math.max(0, y - d.margin - gap * 2)), cstep = gap * 0.9;
     // The border reckoned from the cloud's tops (as high as its heart could billow there), as the land's is, and
     // ending about where the land's does rather than fading out across the whole band.
-    const amount = xs.map((x, i) => made[r][i] * smooth(0.5, 0.95, shore(x, y, yc, y - base + gap * (0.15 + 1.8 * d.cloudPuff * Math.sqrt(made[r][i])))));
+    const amount = xs.map((x, i) => made[r][i] * smooth(0.2, 0.65, shore(x, y, yc, y - base + gap * (0.15 + 1.8 * d.cloudPuff * Math.sqrt(made[r][i])))));
     const runs = [];
     for (let i = 0; i < N; ) {
       if (!(amount[i] >= 0.05)) { i++; continue; }
