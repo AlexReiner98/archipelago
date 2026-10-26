@@ -1,6 +1,6 @@
 // Rules on a session's reply ending (the owner, 26 Oct 2026: e_na4u9smw, e_dj9aa8fv). A rule in a pack's rules with
 // on "reply_ended" decides about a reply, not a change: when the facts the session's hook read from its transcript
-// (what the reply read of the map, showed, changed, committed and pushed) are as its when.reply says, it asks the
+// (what the reply read of the map, surveyed, showed, changed, edited, committed and pushed) are as its when.reply says, it asks the
 // agent once, with its one-line say, to go on before it stops. It asks never while the agent is already going on
 // because a hook asked (stop_hook_active), never twice in one turn, and only of a registered session, whose story
 // keeps each time it asked as a step. Every such rule names the setting the owner turns it off by (lifted).
@@ -10,8 +10,12 @@ import type { RuleDef } from './rules.ts';
 
 /** The event a reply rule is on. */
 export const REPLY_ENDED = 'reply_ended';
-/** What a reply did, as the hook counts it since the owner's last message. */
-export const REPLY_FACTS = ['read', 'showed', 'changed', 'committed', 'pushed'] as const;
+/**
+ * What a reply did, as the hook counts it since the owner's last message. surveyed counts the reads that answer about
+ * several items (search, a lens, a view), not one item's get nor a read of what the tools take or where to start;
+ * edited counts the files it wrote.
+ */
+export const REPLY_FACTS = ['read', 'surveyed', 'showed', 'changed', 'edited', 'committed', 'pushed'] as const;
 export type ReplyFacts = Partial<Record<(typeof REPLY_FACTS)[number], number>>;
 
 /** A reply rule's setting: what the owner turns it off by. */

@@ -18,8 +18,8 @@
 // session is on. From the same record it says which items the session's calls
 // to the map named (read, shown or changed), so the session's end asks about
 // what it touched: the server cannot tell apart sessions that share a token.
-// And what the reply did since the owner's last message (the turn): how many times it read the map, showed the owner
-// something, changed the map, committed and pushed, so that a rule on a reply's end can ask the agent to go on.
+// And what the reply did since the owner's last message (the turn): how many times it read the map (and of those,
+// surveyed it: read about several items), showed the owner something, changed the map, edited a file, committed and pushed, so that a rule on a reply's end can ask the agent to go on.
 //
 // It also keeps the run the session is registered as (the server says it beside its answer to session-start) in
 // the checkout's git folder, one file per session (pelago-runs/<session id>), and takes it out at the end. The
@@ -51,6 +51,10 @@ const ITEM = /\be_[a-z0-9]{8}\b/g;
 const GIT = (sub) => new RegExp(String.raw`(^|[\s;&|(])git(\s+(-[Cc]\s+("[^"]*"|'[^']*'|\S+)|--?[\w-]+(=\S+)?))*\s+` + sub + String.raw`(?![\w-])`);
 const COMMIT = GIT('commit');
 const PUSH = GIT('push');
+// The reads that are not about several items: one item, what the tools take, where a session starts, how a page looks.
+const NOT_SURVEYS = new Set(['get', 'document', 'actions', 'schema', 'watch', 'picture', 'packs', 'places', 'style', 'story', 'published', 'publish_plan', 'backup_download', 'share_figure', 'brief', 'handoff']);
+// The tools that write a file.
+const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 
 /** Whether a transcript entry is a message the owner wrote: not a tool's answer, nor what Claude Code put in. */
 const prompted = (entry) =>
@@ -77,12 +81,12 @@ function readTranscript(text) {
     const calls = line.includes('"mcp__pelago__') || line.includes('"mcp__lattice__');
     const answered = changes.size > 0 && line.includes('"tool_result"');
     const asked = line.includes('"user"') && !line.includes('"tool_result"');
-    if (!line.includes('"usage"') && !calls && !answered && !asked && !line.includes('"Bash"')) continue;
+    if (!line.includes('"usage"') && !calls && !answered && !asked && !line.includes('"Bash"') && !/"(Edit|Write|MultiEdit|NotebookEdit)"/.test(line)) continue;
     try {
       const entry = JSON.parse(line);
       if (prompted(entry)) {
         turn = entry.uuid;
-        reply = { read: 0, showed: 0, changed: 0, committed: 0, pushed: 0 };
+        reply = { read: 0, surveyed: 0, showed: 0, changed: 0, edited: 0, committed: 0, pushed: 0 };
       }
       const usage = entry.message?.usage;
       if (entry.type === 'assistant' && usage) answers.set(entry.message.id ?? entry.uuid, (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0));
@@ -92,7 +96,9 @@ function readTranscript(text) {
           if (part.name.endsWith('__change')) changes.add(part.id);
           const did = part.name.endsWith('__query') ? 'read' : part.name.endsWith('__change') ? 'changed' : part.name.endsWith('__report') && part.input?.action === 'show' ? 'showed' : undefined;
           if (did) reply[did] = (reply[did] ?? 0) + 1;
+          if (did === 'read' && typeof part.input?.name === 'string' && !NOT_SURVEYS.has(part.input.name)) reply.surveyed = (reply.surveyed ?? 0) + 1;
         }
+        if (part.type === 'tool_use' && EDITS.has(part.name)) reply.edited = (reply.edited ?? 0) + 1;
         if (part.type === 'tool_use' && part.name === 'Bash' && typeof part.input?.command === 'string') {
           if (COMMIT.test(part.input.command)) reply.committed = (reply.committed ?? 0) + 1;
           if (PUSH.test(part.input.command)) reply.pushed = (reply.pushed ?? 0) + 1;
