@@ -132,6 +132,33 @@ is a **retention rule**: it says which facts go to an operational stream and
 how long that stream keeps them (`src/retention.ts`). In the code: `rules` in
 a pack file, `RuleDef` and `decide` in `src/rules.ts`.
 
+**instruction.** What an agent is told, as an item: as a style is how things
+look, an instruction is what an agent is asked to do. A pack ships it as a
+preset; one kept on the map with the preset's id is the owner's version of
+it, and one kept about a repository is said only there. Its `for` says where
+it is said (session start, the rules file a project is handed, a tool's
+description). In the code: core's `instruction` type, `src/instructions.ts`,
+`src/working-rules.ts` (`docs/agents.md`).
+
+**reply.** What an agent did between the owner's message and the moment it
+stops: how many times it read and surveyed the map, showed the owner
+something, changed the map, edited a file, committed and pushed, as its
+session's hook counts them from the transcript. A rule with `on:
+"reply_ended"` reads those and asks the agent, once a turn, to go on before
+it stops; it never decides a change. In the code: `src/reply-rules.ts`,
+`src/replies.ts`.
+
+**run trailer.** The line `Archipelago-Run: <run>` at the end of a commit a
+session makes, naming the run it is registered as, so the commit can be
+traced to its session. Added by the commit-msg hook the setup installs. In
+the code: `scripts/pelago-setup.mjs`, read by `packs/github/account.js`.
+
+**accounted for.** A commit is accounted for once the map holds a commit item
+for its full sha, with a settles link to each item it settles, or none. The
+check "Every commit accounted for" on the main branch is red until every
+commit in a push or pull request is. In the code: `software.commit` and
+`software.settles` (`packs/software/pack.json`), `packs/github/account.js`.
+
 ## Retired words
 
 | Retired | Say |
