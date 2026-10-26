@@ -1,13 +1,13 @@
 // The commits a session made, and which of them the map does not yet account for. A commit is accounted for once the
 // map holds the record a rule on a reply's end names (its record: a type, and the field holding the commit's full
 // sha), as the check on the main branch reads it. The session's hook reads its commits from its transcript (what git
-// answered each commit with) and says them at each turn's end; the server keeps them with the run, in the transient
+// answered each commit with, and the checkout's HEAD log while it ran) and says them at each turn's end; the server keeps them with the run, in the transient
 // store (src/transient.ts), as it keeps what the run touched (src/touched.ts), so report, action session_end, lists
 // those still unaccounted for.
 
 import type { Q } from './db.ts';
 import { wholeMap } from './outbox.ts';
-import type { Archipelago } from './pelago.ts';
+import type { Archipelago, Op } from './pelago.ts';
 import { onReply } from './reply-rules.ts';
 import { keep, kept } from './transient.ts';
 import { TOUCHED_MS } from './touched.ts';
@@ -34,12 +34,17 @@ export function commitRecord(l: Archipelago): { types: string[]; field: string }
   return record && l.registry.type(record.type) ? { types: l.registry.family(record.type), field: record.field } : undefined;
 }
 
-/** Those of these commits no record accounts for, in their order; none when nothing here says what accounts for one. */
+/**
+ * Those of these commits no record accounts for, in their order; none when nothing here says what accounts for one.
+ * A record waiting for the owner counts: the session has said it, and the check on main waits for it to apply.
+ */
 export async function unaccounted(l: Archipelago, commits: string[]): Promise<string[]> {
   const record = commitRecord(l);
   if (!record || !commits.length) return [];
   const { rows } = await l.db.query<{ sha: string }>(`select props ->> $2 as sha from entity where type = any($1::text[]) and archived_at is null and props ->> $2 = any($3::text[]) -- index entity_type`, [record.types, record.field, commits]);
-  const found = new Set(rows.map((r) => r.sha));
+  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending' -- index proposal_status`);
+  const proposed = held.flatMap((p) => p.ops.flatMap((o) => (o.op === 'create' && record.types.includes(o.type) ? [o.props?.[record.field]] : [])));
+  const found = new Set([...rows.map((r) => r.sha), ...proposed]);
   return commits.filter((c) => !found.has(c));
 }
 

@@ -62,7 +62,9 @@ test('a session’s end lists its commits not accounted for, and ends once they 
   assert.equal(asked.ended, false);
   assert.deepEqual(asked.unaccounted_commits, [A, B]);
   assert.match(asked.note, /unaccounted_commits/);
-  await account(l, { [A]: [], [B]: [] });
+  await account(l, { [A]: [] });
+  // A record waiting for the owner is said: the session ends, and the check on main waits for it to apply.
+  await l.change(agent, { reason: 'test', hold: true, ops: [{ op: 'create', type: 'software.commit', title: 'Held', props: { sha: B } }] });
   const ended = (await callTool(l, agent, 'session_end', { run, cannot_tell_rest: true })) as any;
   assert.equal(ended.status, 'finished');
   assert.equal(ended.unaccounted_commits, undefined);
@@ -76,6 +78,12 @@ test('the hook reads the session’s commits from what git answered, by their fu
   const one = git('rev-parse', 'HEAD');
   git('commit', '-q', '--allow-empty', '-m', 'Two');
   const two = git('rev-parse', 'HEAD');
+  // A quiet commit answers nothing: what it made is in the HEAD log, at the time the command ran.
+  await new Promise((done) => setTimeout(done, 2500));
+  const before = new Date().toISOString();
+  git('commit', '-q', '--allow-empty', '-m', 'Three');
+  const three = git('rev-parse', 'HEAD');
+  const after = new Date().toISOString();
   const use = (id: string, command: string) => ({ type: 'assistant', message: { id, content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] } });
   const result = (id: string, content: unknown) => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content }] } });
   const lines = [
@@ -89,6 +97,8 @@ test('the hook reads the session’s commits from what git answered, by their fu
     result('b2', '[main 1234567] not a commit'),
     use('b3', 'git commit -m Gone'),
     result('b3', '[main fedcba9] Gone'),
+    { ...use('b4', 'git commit -q -m Three'), timestamp: before },
+    { ...result('b4', ''), timestamp: after },
   ];
   const transcript = join(repo, 'session.jsonl');
   writeFileSync(transcript, lines.map((x) => JSON.stringify(x)).join('\n') + '\n');
@@ -111,9 +121,9 @@ test('the hook reads the session’s commits from what git answered, by their fu
     return got;
   };
   const got = await sent([]);
-  assert.deepEqual(got.commits, [one, two], 'every commit of the session, and only what the checkout holds');
-  assert.deepEqual(got.turn_commits, [two], 'the reply’s own');
-  assert.equal(got.reply.committed, 2);
-  const after = await sent([use('c1', 'git push origin main')]);
-  assert.deepEqual(after.turn_commits, [one, two], 'a push is asked about every commit the session made');
+  assert.deepEqual(got.commits, [one, two, three], 'every commit of the session, and only what the checkout holds');
+  assert.deepEqual(got.turn_commits, [two, three], 'the reply’s own');
+  assert.equal(got.reply.committed, 3);
+  const pushed = await sent([use('c1', 'git push origin main')]);
+  assert.deepEqual(pushed.turn_commits, [one, two, three], 'a push is asked about every commit the session made');
 });
