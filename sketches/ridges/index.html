@@ -68,7 +68,6 @@
   <label>Bands <output id="bandsOut"></output><input id="bands" type="range" min="1" max="8" step="1"></label>
   <h2>Rows</h2>
   <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="20" max="200" step="1"></label>
-  <label>Bars <small>none · many</small><input id="bars" type="range" min="0" max="0.6" step="0.01"></label>
   <h2>Geography</h2>
   <label class="check" title="Each place's own landforms: fjord cliffs, karst towers, shield volcanoes, low reef islets"><input id="forms" type="checkbox" checked> Landforms by place</label>
   <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1" step="0.01"></label>
@@ -86,10 +85,10 @@
 <main><canvas id="view"></canvas></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
-  import { PLACES, fromPixels, signature, shallowOf } from './palettes.js';
+  import { PLACES, fromPixels, signature, waterOf } from './palettes.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'bars', 'line', 'hierarchy', 'age', 'shallows'];
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   const palettes = Object.fromEntries(Object.entries(PLACES).map(([k, p]) => [k, structuredClone(p)]));
   $('place').innerHTML = Object.entries(palettes).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('');
@@ -136,7 +135,9 @@
     for (let k = 0; k < n; k++) if ((t -= w[k]) < 0) return p.colours[k];
     return p.colours[n - 1];
   };
-  const fillOf = (s) => (s.sea ? shallowOf(palOf(s.group)) : colourOf(palOf(s.group), s.fill, s.tone));
+  const fillOf = (s) => ('sea' in s ? waterOf(palOf(s.group)).shallows[s.sea] : colourOf(palOf(s.group), s.fill, s.tone));
+  // The row lines on the deep water: the paper's colour, faint, so they read as swell, not as ink.
+  const swell = (p) => p.paper + '4d';
 
   function draw() {
     const t0 = performance.now(), p = pal();
@@ -146,16 +147,16 @@
     cv.style.aspectRatio = `${pic.width} / ${pic.height}`;
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = p.paper; g.fillRect(0, 0, pic.width, pic.height);
+    g.fillStyle = waterOf(p).deep; g.fillRect(0, 0, pic.width, pic.height);
     g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = p.ink; g.lineWidth = pic.line;
     for (const s of pic.shapes) {
       g.beginPath();
       s.points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
-      if (s.line) { if (pic.line) g.stroke(); continue; }
+      if (s.line) { g.strokeStyle = swell(p); g.lineWidth = Math.max(0.6, pic.line * 0.8); g.stroke(); g.strokeStyle = p.ink; continue; }
       g.closePath();
       g.fillStyle = fillOf(s); g.fill();
       // Shallows are drawn with a finer line, so the land stays the subject.
-      if (pic.line) { g.lineWidth = s.sea ? pic.line * 0.5 : pic.line; g.stroke(); }
+      if (pic.line) { g.lineWidth = 'sea' in s ? pic.line * 0.5 : pic.line; g.stroke(); }
     }
     $('bandsOut').textContent = $('bands').value;
     $('rowsOut').textContent = $('rows').value;
@@ -217,8 +218,8 @@
   $('svg').onclick = () => {
     const p = pal(), pic = ridges(dials()), f = (v) => +v.toFixed(1);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
-    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
-    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${p.paper}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
+    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p)}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
+    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${waterOf(p).deep}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
   };
 
   swatches();

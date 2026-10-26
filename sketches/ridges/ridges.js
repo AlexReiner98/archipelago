@@ -50,7 +50,6 @@ export const DEFAULTS = {
   step: 0.9,       // terrace height, as a share of a row
   soft: 0.3,       // how rounded each stair-step is
   bands: 3,        // colour bands nested in each island
-  bars: 0.15,      // how often a row's floor is a bar of colour
   source: 'chains', // where land is: 'noise' (one field), 'chains' (curves), 'diffusion' (reaction-diffusion),
                    // 'diffusion-chains' (diffusion islands only along the chains)
   chains: 4,       // archipelagos on the page: chains to draw, or groups of diffusion islands
@@ -130,7 +129,6 @@ export function ridges(dials) {
     const far = (c) => Math.hypot(Math.min(Math.abs(cx - c.x), nx - Math.abs(cx - c.x)), Math.min(Math.abs(cy - c.y), ny - Math.abs(cy - c.y)));
     return { g: rd.arch.centres.map((c, k) => [far(c), k]).sort((a, b) => a[0] - b[0])[0]?.[1] ?? 0, rank };
   };
-  const nearest = (x, y) => (chains.length ? claim(x, y).g : rd ? rdAt(x, y).g : 0);
 
   // Where each archipelago lies, for the page to give neighbours contrasting palettes; and so how its land stands.
   const groups = rd && !chains.length
@@ -172,7 +170,7 @@ export function ridges(dials) {
       gs.push(L.g), ts.push(L.t);
       // Shallows: a reach of pale sea round the land, wider as the dial turns.
       const sea = smooth(L.lo - span * (0.25 + 1.5 * d.shallows), L.lo, L.u) * L.gate * (d.shallows > 0 ? 1 : 0);
-      shelf.push(sea > 0.02 ? gap * (0.2 + 0.3 * sea) : 0);
+      shelf.push(sea);
       let mask = smooth(L.lo, L.hi, L.u) * L.gate;
       // An atoll, or an old island sinking at the far end of its chain: only a ring of land, its heart a lagoon.
       const sinking = Math.max(f.atoll ? 1 : 0, chains.length ? smooth(1 - d.age * 0.4, 1, L.t) * (d.age > 0 ? 1 : 0) : 0);
@@ -191,16 +189,19 @@ export function ridges(dials) {
       const q = raw / stp, k = Math.floor(q);
       h.push(stp * (k + smooth(1 - soft, 1, q - k)));
     }
-    // The shallows first, so the land stands in them.
-    for (let i = 0; i < xs.length; ) {
-      if (shelf[i] <= 0) { i++; continue; }
-      let j = i;
-      while (j < xs.length && shelf[j] > 0) j++;
-      const pts = [];
-      for (let q = Math.max(0, i - 1); q <= Math.min(xs.length - 1, j); q++) pts.push([xs[q], y - (q >= i && q < j ? shelf[q] : 0)]);
-      shapes.push({ sea: true, group: gs[(i + j) >> 1], points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] });
-      i = j;
-    }
+    // The shallows first, so the land stands in them: three depths, offshore to the coast (sea 0, 1, 2), each
+    // narrower than the last, all one gently rising profile.
+    [0.02, 0.4, 0.75].forEach((from, depth) => {
+      for (let i = 0; i < xs.length; ) {
+        if (shelf[i] <= from) { i++; continue; }
+        let j = i;
+        while (j < xs.length && shelf[j] > from) j++;
+        const pts = [];
+        for (let q = Math.max(0, i - 1); q <= Math.min(xs.length - 1, j); q++) pts.push([xs[q], y - (q >= i && q < j ? gap * (0.2 + 0.3 * shelf[q]) : 0)]);
+        shapes.push({ sea: depth, group: gs[(i + j) >> 1], points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] });
+        i = j;
+      }
+    });
     // Each island: a run of x where the row rises. Its bands are the same profile, lowered step by step.
     for (let i = 0; i < xs.length; ) {
       if (h[i] < 0.5) { i++; continue; }
@@ -227,12 +228,8 @@ export function ridges(dials) {
       }
       i = j;
     }
-    // The row's floor: a line, now and then a bar of colour.
+    // The row's floor: a line across the water.
     shapes.push({ line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] });
-    if (rnd() < d.bars) {
-      const a = xs[0] + rnd() * (xs[xs.length - 1] - xs[0]) * 0.8, b = a + (0.05 + rnd() * 0.3) * W;
-      shapes.push({ fill: Math.floor(rnd() * 1000), group: nearest((a + b) / 2, y), points: [[a, y - gap * 0.45], [Math.min(b, xs[xs.length - 1]), y - gap * 0.45], [Math.min(b, xs[xs.length - 1]), y], [a, y]] });
-    }
   }
   return { width: W, height: H, shapes, line: d.line, chains: groups };
 }

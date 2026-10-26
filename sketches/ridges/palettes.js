@@ -230,10 +230,24 @@ const FORMS = {
 };
 for (const [k, p] of Object.entries(PLACES)) p.form = FORMS[k.replace(/Hand$/, '')];
 
-/** The colour of a place's shallows: its most sea-like colour (blue to cyan, not dark), lifted toward the light. */
-export function shallowOf({ colours }) {
-  const sea = colours.map((h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))));
-  const score = ([L, a, b]) => -b * 2 - Math.max(0, a) * 2 + Math.min(L, 0.7) - Math.abs(a + 0.03) * 0.5;
-  const [L, a, b] = sea.reduce((best, c) => (score(c) > score(best) ? c : best));
-  return hex([Math.max(L, 0.78), a * 0.6, b * 0.6]);
+/**
+ * A place's water, from its own blues: the deep sea (its darkest blue, taken deeper still) and three shallows from
+ * offshore to the coast (its blues, dark to light, kept clear of the deep). A palette with too few blues has them
+ * made from its most sea-like colour.
+ */
+export function waterOf({ colours }) {
+  const lab = colours.map((h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))));
+  const seaLike = ([L, a, b]) => -b * 2 - Math.max(0, a) * 2 + Math.min(L, 0.7) - Math.abs(a + 0.03) * 0.5;
+  const blues = lab.filter(([, a, b]) => b < -0.03 && a < 0.03).sort((p, q) => p[0] - q[0]);
+  const base = blues[0] ?? lab.reduce((best, c) => (seaLike(c) > seaLike(best) ? c : best));
+  // Hue of the place's sea, at least a little blue, for the deep and for any shade a palette lacks.
+  const hue = [Math.min(base[1], 0), Math.min(base[2], -0.05)];
+  const deep = [0.3, hue[0] * 0.9, hue[1] * 0.9];
+  // Three shallows, darkest offshore: the place's blues where it has them, spread from L 0.5 up to the light.
+  const want = [0.52, 0.66, 0.8];
+  const shallows = want.map((L, i) => {
+    const pick = blues.length ? blues[Math.min(blues.length - 1, Math.round((i * (blues.length - 1)) / 2))] : [L, ...hue];
+    return hex([Math.max(pick[0], L), pick[1], pick[2]]);
+  });
+  return { deep: hex(deep), shallows };
 }
