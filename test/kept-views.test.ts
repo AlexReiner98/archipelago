@@ -1,6 +1,7 @@
 // What still drew from the old lens, drawn from flat lenses (task e_vtvhebut), in a real browser (skipped where there
-// is no Chrome): a document's kept view, drawn where its line names it, nested as before; and the pictures the packs'
-// screens draw: the software pack's Releases on Home, the time pack's Invoices on a company, only invoices.
+// is no Chrome): a document's kept view, opened as a canvas, drawn flat; and the pictures the packs' screens draw on Home
+// (the software pack's Releases). An item's page is bare (task e_cbjpfd2f; the owner, 26 Oct 2026: bare means bare):
+// the sheet shows a document's words and draws no view, and a company's page no pack's screen.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -9,7 +10,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, a document draws its kept view, and the packs’ screens draw their pictures, from flat lenses', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a document’s kept view is drawn as a canvas, the packs’ screens draw Home, and an item’s page is bare', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
   const change = async (body: unknown) => {
     const got = await call('/api/change', undefined, body);
@@ -54,9 +55,12 @@ test('in a browser, a document draws its kept view, and the packs’ screens dra
   };
   const linked = (scope: string, id: string) => `Boolean(document.querySelector('${scope} a[href="#/e/${id}"]'))`;
   try {
-    // The document: its kept view drawn where its line names it, the parts inside the place they are part of.
-    assert.ok(await until(`document.querySelectorAll('.doc-lens .lf-stage a.ar-part').length === 2`), `the view is drawn in the document: ${page.logs().join('\n')}`);
-    assert.ok(await page.evaluate<boolean>(`Boolean(document.querySelector('.doc-lens .lf-stage .ar-place-box'))`), 'the server a place holding them');
+    // The document: its page in the sheet is its words, with no view drawn in it.
+    assert.ok(await until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Closing words')`), `the document's words: ${page.logs().join('\n')}`);
+    assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#sheet .lf-stage, #sheet .doc-lens'))`)), 'no view drawn on a bare page');
+    // Its kept view, opened as a canvas: drawn flat (depth is never drawn on the canvas), the server and both parts.
+    await page.go(`${base}/#/v?canvas=${kept.l}`);
+    assert.ok(await until(`${linked('#canvas', made.a)} && ${linked('#canvas', made.b)} && ${linked('#canvas', made.e)}`), `the view is drawn as a canvas: ${page.logs().join('\n')}`);
 
     // Home: the software pack's Releases, the open ones.
     await page.go(`${base}/#/v?ids=${made.p}`);
@@ -64,10 +68,10 @@ test('in a browser, a document draws its kept view, and the packs’ screens dra
     assert.ok(await until(linked('.lens-card', made.r)), `Releases drawn on Home: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate<boolean>(linked('.lens-card', made.old))), 'not what has happened');
 
-    // A company: the time pack's Invoices, what is part of it and is an invoice.
+    // A company: its page is bare, with no pack's screen drawn on it.
     await page.go(`${base}/#/e/${made.co}`);
-    assert.ok(await until(linked('.lens-card', made.inv)), `Invoices drawn on the company: ${page.logs().join('\n')}`);
-    assert.ok(!(await page.evaluate<boolean>(linked('.lens-card', made.job))), 'only invoices');
+    assert.ok(await until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Client Co')`), `the company's page: ${page.logs().join('\n')}`);
+    assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#sheet .lens-card'))`)), 'no pack screen on a bare page');
   } finally {
     page.close();
   }
