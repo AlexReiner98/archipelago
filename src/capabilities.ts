@@ -46,11 +46,18 @@ export interface Where {
 /** How many at once: a number field, a boolean field (true for one, false for any number), or a fixed number. */
 export type Capacity = number | { field: string };
 
-/** A question settled by someone's word or by evidence, whose word it is, and the field that lists the choices weighed. */
+/**
+ * A question settled by someone's word or by evidence, whose word it is, the field that lists the choices weighed,
+ * the field that says which was chosen, the field that says why and the day field it was settled on: so a page settles
+ * it by picking one (Rule 11).
+ */
 export interface Settles {
   by: 'word' | 'evidence';
   whose?: 'owner' | 'waits_on';
   choices?: string;
+  chosen?: string;
+  why?: string;
+  on?: string;
 }
 
 /**
@@ -141,6 +148,10 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     if (!['word', 'evidence'].includes(settles.by)) problems.push('settles.by is "word" or "evidence"');
     if (settles.whose !== undefined && !['owner', 'waits_on'].includes(settles.whose)) problems.push('settles.whose is "owner" or "waits_on"');
     has('settles.choices', settles.choices, ['json']);
+    has('settles.chosen', settles.chosen, ['string']);
+    has('settles.why', settles.why, ['string']);
+    has('settles.on', settles.on, ['date']);
+    if (settles.chosen && !settles.choices) problems.push('settles.chosen says which of the choices was chosen: name the choices too');
   }
   if (watch) {
     if (!watch.field) problems.push('watch needs the field its address is in');

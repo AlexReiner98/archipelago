@@ -64,13 +64,13 @@ The web UI has five places, and one page for each thing.
 - **Workspace** holds the owner, agent tokens, members, GitHub, what agents
   may change unreviewed, importing a backup, and what the work has cost.
 
-Every item has a single page, and every way to it leads there: its fields,
-its note folded to the first paragraph, its links drawn as a graph, and
-its history. A project's page also draws its **roadmap** (its features in
+Every item has a single page, and every way to it leads there: its head,
+its note folded to the first paragraph, each field drawn by its kind, where
+it came from, and its history; what it is tied to is drawn on the canvas. A project's page also draws its **roadmap** (its features in
 the order they are to be built, with progress, and marked where a session is
 open) and lists its open **questions**: decisions not made and hypotheses not
 settled, the ones holding up the most first. A decision is made where it
-stands: pick an option or type the outcome, and say why. The whole log of
+stands: pick one of its options and say why. The whole log of
 changes is at `#/activity`.
 
 The roadmap is the `tree` view, which agents can call too. The tree is

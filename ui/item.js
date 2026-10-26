@@ -2,15 +2,15 @@
 // holds, a section for each (ui/item-sections.js), under its title. What it is tied to is not on it: the canvas
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
-import { api, ask, h, part, tell } from './base.js';
+import { api, ask, h, part, state, tell } from './base.js';
 import { draftOf } from './draft.js';
-import { entityForm } from './forms.js';
 import { documentMenu, figureOf, readDocument } from './item-doc.js';
-import { fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
+import { choicesOf } from './fields.js';
+import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { relationEditor } from './item-links.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, keepsFigure, readWhole } from './screens.js';
-import { idsIn, isA, menu, relations, titles, types } from './words.js';
+import { idsIn, isA, label, menu, relations, titles, types } from './words.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
 const rootOf = (type) => relations.get(type)?.root ?? type;
@@ -71,19 +71,17 @@ export async function entity(id, here) {
   for (const r of [...data.outgoing, ...data.incoming, ...(data.mentioned_in ?? [])]) titles.set(r.id, r.title);
   const noted = idsIn([e.body ?? '', ...Object.values(e.props).map((v) => (typeof v === 'string' ? v : ''))].join(' ')).filter((n) => !titles.has(n));
   await Promise.all(noted.map((n) => api('get', { id: n }).then((r) => titles.set(r.entity.id, r.entity.title), () => null)));
-  const edit = () => {
-    const form = entityForm(e.type, e, {
-      submitLabel: 'Save',
-      onCancel: again,
-      onSubmit: async (next) => {
-        const props = { ...next.props };
-        for (const key of Object.keys(e.props)) if (!(key in props) && !type?.fields[key]?.system) props[key] = null;
-        await api('change', { ops: [{ op: 'update', id, title: next.title, body: next.body, status: next.status, visibility: next.visibility || undefined, props }], reason: 'Edited in the UI' });
-        again();
-      },
-    });
-    page.querySelector('.note').replaceWith(form);
-    form.scrollIntoView({ block: 'nearest' });
+  // Settling a question by picking one of its choices: what was chosen, and why if it is said, and its first closed
+  // status, as one change on the person's word. Whether it applies or waits is the rules' to say.
+  const pick = async (choice) => {
+    const c = choicesOf(e, type);
+    const why = await ask({ title: `Settle "${e.title}"?`, message: choice, input: c.why ? { placeholder: 'Why? (optional)' } : undefined, action: 'Settle it' });
+    if (why === null || why === false) return;
+    // The day it was settled on, where its type keeps one (settles.on): the reader's own day.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const props = { ...(c.chosen && { [c.chosen]: choice }), ...(c.why && typeof why === 'string' && why.trim() && { [c.why]: why.trim() }), ...(c.on && { [c.on]: today }) };
+    change([{ op: 'update', id, status: type.statuses.closed[0], props }], `Settled in the UI: ${choice}`);
   };
   // A pack's action on this kind of item opens its form under the page's head.
   const acting = h('div');
@@ -111,7 +109,24 @@ export async function entity(id, here) {
   redraw.inPlace = inPlace;
   // Its title and note, written in place and saved as one change (ui/draft.js).
   const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, saved: again });
-  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, draft.note), draft.bar);
+  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, draft.note));
+  // A field picked is changed at once; words written in a field wait with the note for its Save. A pick made while
+  // words wait leaves the page as it stands, so they are not lost: it is drawn again when they are saved.
+  const fieldEdit = !e.archived_at && {
+    pick: async (name, value) => {
+      const words = draft.unsaved();
+      try {
+        const made = await api('change', { ops: [{ op: 'update', id, props: { [name]: value } }], reason: `${label(name)} set in the UI` });
+        if (made.status && made.status !== 'applied') await tell('Saved as a proposal', 'A rule holds this change for a person to approve before it applies.');
+        state.selfDrawn = made.status === 'applied';
+      } catch (err) {
+        await tell('That change was not made', err.message);
+      }
+      if (!words) again();
+    },
+    keep: draft.field,
+    save: draft.save,
+  };
   const history = historySection(id, past);
   const kids = [
     h(
@@ -124,7 +139,6 @@ export async function entity(id, here) {
         h('span', { class: 'grow' }),
         session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
       menu('⋯', [
-        !e.archived_at && ['Edit its fields', edit],
         !e.archived_at && ties.any && ['Edit links', ties.open],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.
@@ -165,10 +179,13 @@ export async function entity(id, here) {
     ),
     ties.editor,
     acting,
-    headSection(e, owner, (st) => change([{ op: 'update', id, status: st }], `Status set to ${st} in the UI`)),
+    headSection(e, owner, (st) => change([{ op: 'update', id, status: st }], `Status set to ${st} in the UI`), (v) => change([{ op: 'update', id, visibility: v }], `Visibility set to ${v} in the UI`)),
     note,
-    fieldsSection(e, looks),
+    choicesSection(e, pick, fieldEdit),
+    fieldsSection(e, looks, fieldEdit),
     sourceSection(data.source),
+    // One Save for the note and every field written in place, kept in sight at the foot of the page.
+    draft.bar,
     history,
   ].filter(Boolean);
   redraw.inPlace = false;
