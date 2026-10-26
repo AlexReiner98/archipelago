@@ -239,6 +239,24 @@ const FORMS = {
 // Canada's archipelagos join the places, with Haida Gwaii, for the study.
 Object.assign(PLACES, CANADA);
 PLACES.haidaGwaii.region = 'canada';
+/**
+ * Accents draw the eye, so each must be its own colour. Tried most vivid first, one is kept only if it is truly
+ * vivid (chroma 0.1 or more), stands clear of every colour of its palette (0.12 in OKLab), and differs in hue by 35
+ * degrees or more from every accent kept before it: two pinks, or two sea greens, do not both stay. Three at most.
+ */
+function distinctAccents(accents, base) {
+  const lab = (h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+  const chroma = (h) => Math.hypot(...lab(h).slice(1)), hue = (h) => (Math.atan2(lab(h)[2], lab(h)[1]) * 180) / Math.PI;
+  const apart = (a, b) => Math.hypot(...lab(a).map((v, i) => v - lab(b)[i]));
+  const hueGap = (a, b) => Math.abs(((hue(a) - hue(b) + 540) % 360) - 180);
+  const kept = [];
+  for (const c of [...accents].sort((a, b) => chroma(b) - chroma(a))) {
+    if (kept.length >= 3 || chroma(c) < 0.1 || base.some((b) => apart(c, b) < 0.12) || kept.some((k) => hueGap(c, k) < 35)) continue;
+    kept.push(c);
+  }
+  return kept;
+}
+
 // Seven more of them, and every Canadian place's accents from its flora and fauna. An accent joins the palette in
 // lightness order at a modest weight, and is marked (accent) so the drawing can keep it for the smaller shapes.
 const credit = ([file, by, license]) => commons(file, by, license);
@@ -247,7 +265,8 @@ for (const [k, more] of Object.entries(MORE)) {
   const p = (PLACES[k] ??= { ...NEW[k], region: 'canada', paper: more.paper, ink: more.ink, colours: more.colours, weights: more.weights, sea: more.sea, photos: more.photos.map(credit) });
   p.flora = more.flora.map(credit);
   const small = Math.min(...p.weights) * 0.6;
-  const all = [...p.colours.map((c, i) => [c, p.weights[i], false]), ...more.accents.map((c) => [c, small, true])];
+  p.accentsDropped = more.accents.filter((c) => !distinctAccents(more.accents, p.colours).includes(c));
+  const all = [...p.colours.map((c, i) => [c, p.weights[i], false]), ...distinctAccents(more.accents, p.colours).map((c) => [c, small, true])];
   all.sort((a, b) => oklab(...[1, 3, 5].map((i) => parseInt(a[0].slice(i, i + 2), 16)))[0] - oklab(...[1, 3, 5].map((i) => parseInt(b[0].slice(i, i + 2), 16)))[0]);
   [p.colours, p.weights, p.accent] = [all.map((x) => x[0]), all.map((x) => +x[1].toFixed(3)), all.map((x) => x[2])];
 }
