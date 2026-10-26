@@ -10,7 +10,7 @@
 // open question is a scenario, and a choice nothing follows yet ends in a step of its own. Pure: an answer in,
 // geometry out; `measure(text, px)` gives a title's width at a size.
 
-import { route, tieLine } from './free.js';
+import { drawnPaths, field, route, take, tieRoute } from './free.js';
 import { acyclic, flatten, grouped, highest, lowest, NEAR, ORDER, QUIET, reduced } from './graph.js';
 
 /** Past this many steps in a cluster the layer search and the sifting are skipped: they grow with the square of the steps. */
@@ -478,7 +478,8 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
     Object.assign(shelf, { x: shelf.x + c.width + GAP, row: Math.max(shelf.row, c.height) });
   }
 
-  // ---- Wires to and from the steps put by hand, solved round the others; then the ties, straight, edge to edge.
+  // ---- Wires to and from the steps put by hand, solved round the others; then the ties, at right angles as the
+  // wires are, round the other steps, from the higher of their two ends to the lower.
   const all = [...nodes.values()].filter((n) => x.has(n.id));
   const steps = all.filter((n) => !n.dummy);
   for (const e of edges)
@@ -486,7 +487,12 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
       const others = steps.filter((n) => n.id !== e.a && n.id !== e.b).map((n) => box(n.id));
       chains.push({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b), points: route(box(e.a), box(e.b), LEAD_OUT, others) });
     }
-  for (const t of ties) t.points = tieLine(box(t.a), box(t.b));
+  // Each tie keeps off what is drawn already: the order's wires, then the ties before it (a tie that shares a step
+  // with another may run along it, as a bus out of one step).
+  const around = field(steps.map((n) => ({ id: n.id, ...box(n.id) })), LAYER_GAP);
+  const taken = drawnPaths(LEAD_OUT / 2);
+  for (const c of chains) take(taken, c.points, [c.a, c.b]);
+  for (const t of ties) t.points = tieRoute({ id: t.a, ...box(t.a) }, { id: t.b, ...box(t.b) }, LEAD_OUT, around, taken);
   const reachX = [...steps.map((n) => x.get(n.id) + n.w / 2), ...chains.flatMap((c) => c.points.map((p) => p[0]))];
   const reachY = [...steps.map((n) => y.get(n.id) + n.h / 2), ...chains.flatMap((c) => c.points.map((p) => p[1]))];
   return { nodes, all, chains, ties, breaks, potential, x, y, width: highest(reachX) + MARGIN, height: highest(reachY) + MARGIN };

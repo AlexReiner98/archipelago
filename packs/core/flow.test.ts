@@ -39,8 +39,11 @@ function checks(g: any) {
     const [[x1, y1], [x2, y2]] = pts.slice(-2);
     assert.ok(Math.abs(x1 - x2) < 0.01 && y2 - y1 >= 22 - 0.01, `${c.key} runs ${y2 - y1} px into its head`);
   }
-  // Every tie is a straight line between two steps.
-  for (const t of g.ties) assert.equal(t.points.length, 2, `${t.a} ${t.b} is a line`);
+  // Every tie is routed as a wire is: at right angles, from one of its steps to the other.
+  for (const t of g.ties) {
+    assert.ok(t.points.length >= 2, `${t.a} ${t.b} is drawn`);
+    for (let k = 1; k < t.points.length; k++) assert.ok(Math.abs(t.points[k][0] - t.points[k - 1][0]) < 0.01 || Math.abs(t.points[k][1] - t.points[k - 1][1]) < 0.01, `${t.a} ${t.b} turns at a slant`);
+  }
 }
 
 test('a chain is a straight line down, with nothing crossing', () => {

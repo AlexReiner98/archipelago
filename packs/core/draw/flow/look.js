@@ -23,6 +23,10 @@ export const css = `
 .lf-tie { fill: none; stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-flow-dash-choice); }
 .lf-tie.near { stroke-dasharray: none; }
 .lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke); }
+/* Each link type in its own colour (the style's link_colours, else one of its hues), lit or not; a held change keeps
+   the colour of what waits on you, below. */
+.lf-wire[class*=lf-k-], .lf-tie[class*=lf-k-] { stroke: var(--lf-link); }
+.lf-head[class*=lf-k-] { fill: var(--lf-link); }
 /* A tie the style draws only on hover: out of sight until one of its ends is hovered and lights it. */
 .lf-tie.on-hover:not(.lit) { visibility: hidden; }
 /* A change held for the owner, where it would land: a new step faint, an edit marked on its step, a link dashed in the

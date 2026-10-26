@@ -11,7 +11,7 @@
 // item faint, a link dashed, an edit marked on its step), each with a badge keyed `held:<proposal>` that the page
 // answers a click on by putting the change to the person; a link the person just drew (`mine`) is dashed until it is.
 
-import { placesOf, route, tieLine } from './free.js';
+import { placesOf, route, tieRoute } from './free.js';
 import { layout } from './layout.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
@@ -19,6 +19,16 @@ import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 
 /** Whether an item stays lit: what was asked for by name (style.only), else what the style's lit says. */
+/** A colour a style may name. */
+const HEX = /^#[0-9a-f]{3,8}$/i;
+/** The link type the order's wires are, for their colour. */
+const ORDER_TYPE = 'depends_on';
+/** A link type as the key says it: its name without its pack, in words ("funding.could_fund" is "Could fund"). */
+const linkName = (type) => {
+  const words = type.split('.').pop().replaceAll('_', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
 function lit(i, style) {
   if (Array.isArray(style.only)) return style.only.includes(i.id);
   return style.lit === 'you' ? Boolean(i.state.needs_you) : style.lit === 'blocked' ? Boolean(i.state.blocked) : true;
@@ -100,10 +110,33 @@ export function picture({ answer, style, reduced }, tools) {
   // A tie of a link type the style draws only on hover (hover_only: the canvas pack's, part_of) shows while one of its
   // ends is hovered, lit as every tie is; one held for a person shows always.
   const onHover = new Set(Array.isArray(style.hover_only) ? style.hover_only : []);
-  const tieLayer = g.ties.map((t, n) => m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${onHover.has(t.type) && !t.pending ? ' on-hover' : ''}${pend(t.pending)}`, ...drawIn, ...hidden }));
+  // Each link type its colour: the one the style names for it (link_colours), else one of link_hues, the same for the
+  // same type every time unless another type in this picture has it. A colour is a class with a rule of its own: a drawing sets no style on a mark.
+  const named = style.link_colours && typeof style.link_colours === 'object' ? style.link_colours : {};
+  const hues = Array.isArray(style.link_hues) && style.link_hues.length ? style.link_hues : Array.isArray(style.hues) ? style.hues : [];
+  // A type not named starts at the hue its name picks, and steps past those another type in this picture has.
+  const present = [...new Set([...(g.chains.length ? [ORDER_TYPE] : []), ...g.ties.map((t) => t.type)])].sort();
+  const taken = new Set(present.filter((type) => HEX.test(String(named[type]))).map((type) => named[type].toLowerCase()));
+  const given = new Map();
+  for (const type of present.filter((t) => !HEX.test(String(named[t])) && hues.length)) {
+    let k = [...type].reduce((s, ch) => (s * 31 + ch.charCodeAt(0)) >>> 0, 7) % hues.length;
+    for (let tries = 0; tries < hues.length && taken.has(String(hues[k]).toLowerCase()); tries++) k = (k + 1) % hues.length;
+    taken.add(String(hues[k]).toLowerCase());
+    given.set(type, hues[k]);
+  }
+  const colourOf = (type) => (HEX.test(String(named[type])) ? named[type] : given.get(type) ?? null);
+  const colourRules = new Set();
+  const kind = (type) => {
+    const hex = colourOf(type);
+    if (typeof hex !== 'string' || !HEX.test(hex)) return '';
+    const cls = `lf-k-${hex.slice(1).toLowerCase()}`;
+    colourRules.add(`.${cls} { --lf-link: ${hex}; }`);
+    return ` ${cls}`;
+  };
+  const tieLayer = g.ties.map((t, n) => m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${kind(t.type)}${onHover.has(t.type) && !t.pending ? ' on-hover' : ''}${pend(t.pending)}`, ...drawIn, ...hidden }));
   const wireLayer = g.chains.map((c, n) => {
     const [ex, ey] = c.points.at(-1);
-    return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(ex, ey), class: `lf-head${pend(c.pending)}`, ...hidden })];
+    return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(ex, ey), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
   });
   // The badges of held links, with the wire or tie each sits on, so a step moved takes them with its wires. A link of a
   // new item held in the same change is decided with it: the item's badge is the one.
@@ -150,11 +183,10 @@ export function picture({ answer, style, reduced }, tools) {
     { class: 'lf-legend' },
     [['box', 'Work'], ['diamond', 'Question'], ['pill', 'Event'], ['sheet', 'Record'], ['end', 'Possible end']].filter(([shape]) => uses((n) => n.shape === shape)).map(([shape, label]) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 11, CORNER)), label)),
     [['done', 'Done'], ['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way'], ['', 'Not started']].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)).map(([dot, label]) => mark(m('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
-    g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: 'lf-wire' }), 'Leads to'),
+    g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
     g.chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
     g.breaks.length > 0 && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
-    g.ties.some((t) => t.type === 'part_of') && mark(m('path', { d: 'M1 7H21', class: 'lf-tie near' }), 'Part of'),
-    g.ties.some((t) => t.type !== 'part_of') && mark(m('path', { d: 'M1 7H21', class: 'lf-tie' }), 'Linked'),
+    [...new Set(g.ties.map((t) => t.type))].sort().map((type) => mark(m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${kind(type)}` }), linkName(type))),
     (stepBadges.size > 0 || linkBadges.length > 0) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
   );
 
@@ -185,7 +217,7 @@ export function picture({ answer, style, reduced }, tools) {
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks, ...ctx }) } });
   }
   // A step moved by hand (the page follows the drag: ui/drag.js): it goes where it is put, and its wires are solved
-  // again at right angles as it moves, its ties drawn again straight. Let go, that is where it is, for the next drag.
+  // again at right angles as it moves, its ties too. Let go, that is where it is, for the next drag.
   const drawnAt = new Map(steps.map((n) => [n.id, [g.x.get(n.id), g.y.get(n.id)]]));
   const at = new Map(drawnAt);
   const move = (key, { dx = 0, dy = 0 }, done) => {
@@ -205,13 +237,13 @@ export function picture({ answer, style, reduced }, tools) {
       patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(ex, ey) } });
     });
     g.ties.forEach((t, n) => {
-      if (t.a === id || t.b === id) patches.push({ key: `n:${n}`, set: { d: line((t.points = tieLine(boxOf(t.a), boxOf(t.b)))) } });
+      if (t.a === id || t.b === id) patches.push({ key: `n:${n}`, set: { d: line((t.points = tieRoute(boxOf(t.a), boxOf(t.b), z('lead_out'), steps.filter((s) => s.id !== t.a && s.id !== t.b).map((s) => boxOf(s.id))))) } });
     });
     for (const b of linkBadges) if (b.l.a === id || b.l.b === id) patches.push({ key: b.mark[1].key, set: { transform: `translate(${middleOf(b.l.points).join(' ')})` } });
     return patches;
   };
   return {
-    scene: { css: story ? `${css}\n${storyCss}` : css, svg, legend, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
+    scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, legend, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
     end: player?.end,
     on(event) {
       const { name, key } = event;
