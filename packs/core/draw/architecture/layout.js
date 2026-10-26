@@ -10,11 +10,11 @@ import { route } from './route.js';
 
 /** How a part is, read from its status word alone: no type is named. */
 const HEALTH = {
-  ok: ['up', 'available', 'in_use', 'active', 'running', 'live', 'shipped', 'built', 'current', 'happened', 'done'],
-  warn: ['degraded', 'mitigated', 'waiting', 'investigating', 'unavailable_partly'],
+  ok: ['up', 'available', 'in_use', 'active', 'running', 'live', 'shipped', 'built', 'current', 'happened', 'done', 'works'],
+  warn: ['degraded', 'mitigated', 'waiting', 'investigating', 'unavailable_partly', 'partly'],
   down: ['down', 'unavailable', 'failed', 'broken', 'open_incident'],
   building: ['wiring', 'building', 'doing', 'in_progress', 'testing'],
-  planned: ['planned', 'todo', 'draft', 'upcoming', 'raw', 'untested'],
+  planned: ['planned', 'todo', 'draft', 'upcoming', 'raw', 'untested', 'sketched'],
   standby: ['standby', 'idle', 'paused'],
 };
 export function health(item) {

@@ -55,7 +55,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       await enter();
       assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter draws what is found, with what it is tied to: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       assert.ok(await page.evaluate(has('Elsewhere')), 'in place: what was drawn stays');
-      assert.ok(await until(`[...document.querySelectorAll('#query .q-text')].some((c) => c.textContent.includes('roof'))`), 'the query bar shows the term');
+      assert.ok(await until(`[...document.querySelectorAll('#query .q-text, #query .q-sum')].some((c) => c.textContent.includes('roof'))`), 'the query bar shows the term, as a chip or in the folded line');
       assert.ok(await page.evaluate(`${peek}.hidden`), 'the line goes once it is drawn');
       if (shots) writeFileSync(`${shots}/find-drawn-${width}.png`, await page.screenshot());
       // Clearing the bar takes the term out.

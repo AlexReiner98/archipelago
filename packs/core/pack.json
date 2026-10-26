@@ -206,6 +206,8 @@
         "link_colours": { "type": "json", "description": "A colour for each link type, by its name, as hex colours: the flow draws each wire and tie in its own, and a type not named here takes one of link_hues, the same each time unless another type in the picture has it." },
         "link_hues": { "type": "json", "description": "The colours a link type not named in link_colours takes, as hex colours: by its name, stepping past one another type in the same picture has. hues when not set." },
         "key": { "type": "enum", "values": ["shown", "hidden"], "description": "Whether a picture's key is drawn: what each mark it uses means, as its drawing says (the scene's key), always in sight on the canvas. shown unless said." },
+        "headless": { "type": "json", "description": "The link types whose ties are drawn with no head, as a list, e.g. [\"part_of\"]: every other tie has a head where its link points." },
+        "place_hues": { "type": "json", "description": "The colours places take, in order, as hex colours: the flow then draws no step for a place that holds parts (items of the place kind) in the picture, outlines each of its parts in its colour and names it in the key. Left out or empty, a place is a step tied to its parts." },
         "hover_only": { "type": "json", "description": "The link types whose wires are drawn only while one of their ends is hovered, as a list, e.g. [\"part_of\"]: still laid out by, and drawn always when held for a person." },
         "layout": { "type": "enum", "values": ["calendar", "bars"], "description": "time: a calendar of days, hours running down (calendar), or each lane a row of bars across the days (bars, a Gantt chart). calendar unless said." },
         "hours": { "type": "json", "description": "time, calendar: the hours of the day shown, as [from, to], e.g. [6, 22]. The whole day unless said." },
@@ -812,6 +814,7 @@
         "free.js": "draw/flow/free.js",
         "look.js": "draw/flow/look.js",
         "story.js": "draw/flow/story.js",
+        "places.js": "draw/flow/places.js",
         "marks.js": "draw/architecture/marks.js",
         "play.js": "draw/architecture/play.js",
         "story-look.js": "draw/architecture/story-look.js"
@@ -825,6 +828,8 @@
       "props": {
         "shape": "list",
         "undrawn": ["tagged"],
+        "headless": ["part_of"],
+        "place_hues": ["#2f5fb3", "#a86a12", "#0f7c86", "#b5489a", "#4f8a2b", "#d0622c", "#6f43b0", "#8a8f2a"],
         "key": "shown",
         "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#b23a48", "relates_to": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
         "lit": "all",
