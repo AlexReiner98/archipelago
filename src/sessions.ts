@@ -4,13 +4,13 @@
 // release: they are the session's own operational state, not facts about the
 // world, and coordination that waits for approval is no coordination.
 
-import { livesIn, livesInFor, placeFor, scopeOf } from './places.ts';
+import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
-import { blockGraph, heldResources } from './blocking.ts';
+import { heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
 import { STALE_DAYS } from './attention.ts';
-import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts';
+import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts';
 
 const now = () => new Date().toISOString();
 
@@ -340,28 +340,6 @@ VIEWS.story = {
   run: story,
 };
 
-type Item = { id: string; type: string; title: string; status: string };
-
-/**
- * What a session has left unsaid: the open work of the repository it ran in
- * that nobody has changed since it began. A session that settled something
- * says so by changing it; what it leaves as it found it, it has to vouch for,
- * or say it could not tell. What waits on a person's answer is not asked
- * about: no work in the repository settles it. Nor is what has a change
- * waiting for the human: what was found has been said, and is theirs to confirm.
- */
-async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
-  const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = any($2::text[]) and from_id = $1 and valid_to is null`, [run.id, livesIn(l)]);
-  if (!repos.length) return [];
-  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id, true))], [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
-  const graph = await blockGraph(l, work.map((i) => i.id));
-  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending' -- index proposal_status`);
-  const proposed = new Set(held.flatMap((p) => p.ops.flatMap((o) => ('id' in o && o.id ? [o.id] : []))));
-  const open = work.filter((i) => !graph.waitsOnSomeone(i.id) && !proposed.has(i.id));
-  const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
-  return open.filter((i) => untouched.some((u) => u.id === i.id)).map(({ id, type, title, status }) => ({ id, type, title, status }));
-}
-
 export async function sessionEnd(
   l: Archipelago,
   actor: Actor,
@@ -387,7 +365,8 @@ export async function sessionEnd(
   const vouched = unsaid.filter((i) => input.still_true?.includes(i.id));
   // "Cannot tell" is an answer too: the item is left exactly as it was, last known true when it was, and the run says so.
   const named = unsaid.filter((i) => !vouched.includes(i) && input.cannot_tell?.includes(i.id));
-  const unknown = input.cannot_tell_rest ? unsaid.filter((i) => !vouched.includes(i)) : named;
+  // What this session touched it looked at: the rest of it, unnamed, is not covered by cannot_tell_rest.
+  const unknown = input.cannot_tell_rest ? unsaid.filter((i) => !vouched.includes(i) && (!i.touched || named.includes(i))) : named;
   // The rest are counted, not listed: a session that never looked at thirty items has nothing to say of each.
   const rest = unknown.length - named.length;
   const left = unsaid.filter((i) => !vouched.includes(i) && !unknown.includes(i));
@@ -397,7 +376,7 @@ export async function sessionEnd(
       status: run.status,
       ended: false,
       unreconciled: left,
-      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named), and do not vouch for what you did not look at. Then call report with action session_end again.',
+      note: 'Not ended yet. These are open in the repository this session worked in or were touched by it (read, shown or changed: marked touched, and listed first), and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named and did not touch), and do not vouch for what you did not look at. Then call report with action session_end again.',
     };
   }
   const said = [
@@ -419,6 +398,7 @@ export async function sessionEnd(
   const { rows: held } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'holds' and from_id = $1 and valid_to is null`, [run.id]);
   for (const h of held) await l.release(actor, { resource: h.to_id, holder: run.id, reason: `Session ${outcome}` });
   await touch(l, run.id, 'close');
+  await keepTouched(l, run.id);
   const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'sys.works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
     ops: [

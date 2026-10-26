@@ -15,7 +15,9 @@
 // has used so far, counted from the session's own record on this machine
 // (the transcript Claude Code names in the hook's input): input and output,
 // not counting cached re-reads. Archipelago gives what is new to the work the
-// session is on.
+// session is on. From the same record it says which items the session's calls
+// to the map named (read, shown or changed), so the session's end asks about
+// what it touched: the server cannot tell apart sessions that share a token.
 //
 // It never fails the session: if the server is away it says so on stderr and
 // answers nothing.
@@ -33,23 +35,43 @@ const token = process.env.PELAGO_AGENT_TOKEN || process.env.LATTICE_AGENT_TOKEN;
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 
-/** Tokens used so far, from a transcript: each answer counted once, however many lines it was written as. */
-function tokensUsed(file) {
+// The map's tools, as the setup names their server (pelago; lattice before it), and an item's id.
+const MAP_TOOL = /^mcp__(pelago|lattice)__/;
+const ITEM = /\be_[a-z0-9]{8}\b/g;
+
+/**
+ * From a transcript: the tokens used so far, each answer counted once however many lines it was written as, and the
+ * items the session's calls to the map named, in what it sent and in what a change answered (the items it made).
+ */
+function readTranscript(text) {
   const answers = new Map();
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (!line.includes('"usage"')) continue;
+  const touched = new Set();
+  const changes = new Set();
+  const named = (said) => {
+    for (const id of JSON.stringify(said ?? '').match(ITEM) ?? []) touched.add(id);
+  };
+  for (const line of text.split('\n')) {
+    const calls = line.includes('"mcp__pelago__') || line.includes('"mcp__lattice__');
+    const answered = changes.size > 0 && line.includes('"tool_result"');
+    if (!line.includes('"usage"') && !calls && !answered) continue;
     try {
       const entry = JSON.parse(line);
       const usage = entry.message?.usage;
-      if (entry.type !== 'assistant' || !usage) continue;
-      answers.set(entry.message.id ?? entry.uuid, (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0));
+      if (entry.type === 'assistant' && usage) answers.set(entry.message.id ?? entry.uuid, (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0));
+      for (const part of Array.isArray(entry.message?.content) ? entry.message.content : []) {
+        if (part.type === 'tool_use' && MAP_TOOL.test(part.name ?? '')) {
+          named(part.input);
+          if (part.name.endsWith('__change')) changes.add(part.id);
+        }
+        if (part.type === 'tool_result' && changes.has(part.tool_use_id)) named(part.content);
+      }
     } catch {
       // A line that is not whole yet: the next count has it.
     }
   }
-  let total = 0;
-  for (const n of answers.values()) total += n;
-  return total;
+  let tokens = 0;
+  for (const n of answers.values()) tokens += n;
+  return { tokens, touched: [...touched] };
 }
 
 let body = input.trim() || '{}';
@@ -66,7 +88,7 @@ if (name === 'session-start') {
 } else {
   try {
     const said = JSON.parse(body);
-    if (said.transcript_path) body = JSON.stringify({ ...said, tokens: tokensUsed(said.transcript_path) });
+    if (said.transcript_path) body = JSON.stringify({ ...said, ...readTranscript(readFileSync(said.transcript_path, 'utf8')) });
   } catch {
     // No count this time; what the hook is for still goes through.
   }
