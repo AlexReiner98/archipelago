@@ -129,6 +129,17 @@
       }
     },
     {
+      "id": "software.part",
+      "extends": "place",
+      "title": "Part",
+      "description": "A part of a mechanism: a rule, a hook, a tool, a step of how something works. Its status says whether it does its job (sketched, works, partly, broken), not whether it answers: what runs and is watched is a component. Part of the mechanism or place it belongs to; it calls (software.calls) what it hands on to. Drawn by the same shapes as a component.",
+      "statuses": { "open": ["sketched", "works", "partly", "broken"], "closed": ["retired"] },
+      "fields": {
+        "role": { "type": "enum", "values": ["client", "edge", "app", "data", "storage", "model", "monitor", "network", "tool", "service"], "shown": true, "description": "What it does in the mechanism, as a component's role: data and storage are drawn as a cylinder, client as a pill." },
+        "layer": { "type": "enum", "values": ["kernel", "type_pack", "server_pack", "store", "outside", "yours"], "shown": true, "description": "What it is, in a system of a kernel and packs, as a component's layer. A style may colour a part's dot by it (dots)." }
+      }
+    },
+    {
       "id": "software.spec",
       "extends": "work.file",
       "title": "Spec",
