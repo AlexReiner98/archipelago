@@ -68,6 +68,11 @@ export interface Watch {
   commit?: string;
 }
 
+/** Each item of this type accounts for one commit of a repository: the field holds the commit's full id. */
+export interface Accounts {
+  field: string;
+}
+
 export interface Capabilities {
   bound?: Bound;
   when?: When;
@@ -75,9 +80,10 @@ export interface Capabilities {
   capacity?: Capacity;
   settles?: Settles;
   watch?: Watch;
+  accounts?: Accounts;
 }
 
-export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch'] as const;
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'accounts'] as const;
 
 const DATES = ['date', 'datetime'];
 
@@ -91,7 +97,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     else if (!types.includes(def.type)) problems.push(`${what} reads "${field}", a ${def.type}, not a ${types.join(' or ')}`);
   };
   for (const name of Object.keys(caps)) if (!(CAPABILITIES as readonly string[]).includes(name)) problems.push(`"${name}" is not a capability: one of ${CAPABILITIES.join(', ')}`);
-  const { bound, when, where, capacity, settles, watch } = caps;
+  const { bound, when, where, capacity, settles, watch, accounts } = caps;
   if (bound) {
     if (!bound.field) problems.push('bound needs a field');
     if (bound.limit !== undefined && bound.below !== undefined) problems.push('bound has a limit or a field it stays above, not both');
@@ -138,6 +144,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     for (const s of [watch.up, watch.down, ...(watch.also ?? []), ...(watch.idle ? [watch.idle] : [])]) if (!statuses.includes(s)) problems.push(`watch names "${s}", which is no status of it`);
     has('watch.commit', watch.commit, ['string']);
   }
+  if (accounts) has('accounts', accounts.field, ['string']);
   return problems;
 }
 
