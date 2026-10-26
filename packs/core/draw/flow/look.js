@@ -22,6 +22,9 @@ export const css = `
 /* A tie (part_of, or any link that is not the order): quiet, under the wires; one to what a step is part of is solid. */
 .lf-tie { fill: none; stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-flow-dash-choice); }
 .lf-tie.near { stroke-dasharray: none; }
+/* A tie with a head says which way its link points, as a wire does: solid, the head in its colour. */
+.lf-tie.headed { stroke-dasharray: none; }
+.lf-head.on-hover:not(.lit) { visibility: hidden; }
 .lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke); }
 /* Each link type in its own colour (the style's link_colours, else one of its hues), lit or not; a held change keeps
    the colour of what waits on you, below. */

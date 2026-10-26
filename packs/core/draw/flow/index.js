@@ -1,7 +1,8 @@
 // A lens answer drawn as a flat graph on one plane, where depth is never drawn (e_ktdensts): every item a step (work
 // a box, a question a diamond, an occurrence a pill, a record a sheet with a wavy foot) showing its name, the order
 // (depends_on) read from the top down in wires at right angles from what is depended on to what depends on it, broken
-// where one passes under another, and every other link (part_of first) a quiet straight tie between the two it ties.
+// where one passes under another, and every other link (part_of first) a quiet tie between the two it ties, with a
+// head where it points unless the style draws its type headless (core's house style: part_of).
 // What follows an open question is dashed, as a scenario. Hovering a step lights its wires and ties and shows a tip:
 // its title and the start of its note. Drawn from the flat lens's answer (items and links); the older lens's still
 // draws, what each item is `inside` read as part_of. The layout is ./layout.js; this answers with the marks to draw
@@ -90,7 +91,14 @@ export function picture({ answer, style, reduced }, tools) {
     const text = String(i.body ?? i.gist ?? '').split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
     return text.length > NOTE ? `${text.slice(0, NOTE - 1).trimEnd()}…` : text;
   };
-  const head = (x, y) => `M${x} ${y}L${x - z('head_half')} ${y - z('head_length')}L${x + z('head_half')} ${y - z('head_length')}Z`;
+  const head = (x, y, up = false) => {
+    const back = up ? y + z('head_length') : y - z('head_length');
+    return `M${x} ${y}L${x - z('head_half')} ${back}L${x + z('head_half')} ${back}Z`;
+  };
+  // A tie runs from the higher of its ends down into the lower (free.js, tieRoute): its head is on the end its link
+  // points to, into that step's head from above, or into its foot from below.
+  const headless = new Set(Array.isArray(style.headless) ? style.headless : []);
+  const tieHead = (t) => (g.y.get(t.a) <= g.y.get(t.b) ? head(...t.points.at(-1)) : head(...t.points[0], true));
   const line = (points) => `M${points.map((p) => p.join(' ')).join('L')}`;
   // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
   let badges = 0;
@@ -133,7 +141,11 @@ export function picture({ answer, style, reduced }, tools) {
     colourRules.add(`.${cls} { --lf-link: ${hex}; }`);
     return ` ${cls}`;
   };
-  const tieLayer = g.ties.map((t, n) => m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${kind(t.type)}${onHover.has(t.type) && !t.pending ? ' on-hover' : ''}${pend(t.pending)}`, ...drawIn, ...hidden }));
+  const tieLayer = g.ties.map((t, n) => {
+    const cls = `${kind(t.type)}${onHover.has(t.type) && !t.pending ? ' on-hover' : ''}${pend(t.pending)}`;
+    const path = m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
+    return headless.has(t.type) ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
+  });
   const wireLayer = g.chains.map((c, n) => {
     const [ex, ey] = c.points.at(-1);
     return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(ex, ey), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
@@ -175,16 +187,22 @@ export function picture({ answer, style, reduced }, tools) {
   });
   const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, breakLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
-  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/drawings.md).
+  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/drawings.md). An open step
+  // with no other mark is said by its own status ("Up", "Open"), each one its steps have, never a word of the drawing's.
+  const restWords = () => {
+    const said = [...new Set(steps.filter((n) => !n.stub && dotOf(n.item) === '').map((n) => String(n.item.status ?? 'open').replaceAll('_', ' ')))];
+    const words = said.join(', ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  };
   const mark = (inner, label) => ({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label });
   const uses = (test) => steps.some(test);
   const key = [
     [['box', 'Work'], ['diamond', 'Question'], ['pill', 'Event'], ['sheet', 'Record'], ['end', 'Possible end']].filter(([shape]) => uses((n) => n.shape === shape)).map(([shape, label]) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 11, CORNER)), label)),
-    [['done', 'Done'], ['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way'], ['', 'Not started']].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)).map(([dot, label]) => mark(m('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
+    [['done', 'Done'], ['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way'], ['', restWords()]].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)).map(([dot, label]) => mark(m('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
     g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
     g.chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
     g.breaks.length > 0 && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
-    [...new Set(g.ties.map((t) => t.type))].sort().map((type) => mark(m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${kind(type)}` }), linkName(type))),
+    [...new Set(g.ties.map((t) => t.type))].sort().map((type) => mark(headless.has(type) ? m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${kind(type)}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${kind(type)}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${kind(type)}` })), linkName(type))),
     (stepBadges.size > 0 || linkBadges.length > 0) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
   ].flat().filter(Boolean);
 
@@ -194,7 +212,7 @@ export function picture({ answer, style, reduced }, tools) {
   /** Light the wires and ties of a step, or of none. */
   const light = (id) => [
     ...g.chains.flatMap((c, n) => [`w:${n}`, `h:${n}`].map((key) => ({ key, toggle: { lit: Boolean(id) && (c.a === id || c.b === id) } }))),
-    ...g.ties.map((t, n) => ({ key: `n:${n}`, toggle: { lit: Boolean(id) && (t.a === id || t.b === id) } })),
+    ...g.ties.flatMap((t, n) => (headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`]).map((key) => ({ key, toggle: { lit: Boolean(id) && (t.a === id || t.b === id) } }))),
   ];
   /** A step's tip: its title, and the start of its note. */
   const tipFor = (key) => {
@@ -208,7 +226,7 @@ export function picture({ answer, style, reduced }, tools) {
   if (story) {
     const marks = {
       steps: new Map(steps.map((n) => [`s:${n.id}`, [n.item.id]])),
-      wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b).item.id], item: { from: c.a, to: c.b } })), ...g.ties.map((t, n) => ({ keys: [`n:${n}`], from: [t.a], to: [t.b], item: { from: t.a, to: t.b } }))],
+      wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b).item.id], item: { from: c.a, to: c.b } })), ...g.ties.map((t, n) => ({ keys: headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`], from: [t.a], to: [t.b], item: { from: t.a, to: t.b } }))],
       says: new Map([...said.values()].map((c) => [g.chains.indexOf(c), `t:${g.chains.indexOf(c)}`])),
     };
     const frames = statesOf(answer.steps);
@@ -235,7 +253,9 @@ export function picture({ answer, style, reduced }, tools) {
       patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(ex, ey) } });
     });
     g.ties.forEach((t, n) => {
-      if (t.a === id || t.b === id) patches.push({ key: `n:${n}`, set: { d: line((t.points = tieRoute(boxOf(t.a), boxOf(t.b), z('lead_out'), steps.filter((s) => s.id !== t.a && s.id !== t.b).map((s) => boxOf(s.id))))) } });
+      if (t.a !== id && t.b !== id) return;
+      patches.push({ key: `n:${n}`, set: { d: line((t.points = tieRoute(boxOf(t.a), boxOf(t.b), z('lead_out'), steps.filter((s) => s.id !== t.a && s.id !== t.b).map((s) => boxOf(s.id))))) } });
+      if (!headless.has(t.type)) patches.push({ key: `nh:${n}`, set: { d: tieHead(t) } });
     });
     for (const b of linkBadges) if (b.l.a === id || b.l.b === id) patches.push({ key: b.mark[1].key, set: { transform: `translate(${middleOf(b.l.points).join(' ')})` } });
     return patches;
