@@ -110,7 +110,7 @@
   const pal = () => palettes[$('place').value];
   // The palette each chain takes. The first chain has the one chosen above; each next chain, nearest the ones
   // already given first, takes the ticked place whose cast differs most from its neighbours', a neighbour counting
-  // less the further off it is, and a place not yet used preferred.
+  // less the further off it is; no place is used twice until every ticked one is used.
   let given = [];
   const palOf = (group) => palettes[given[group]] ?? pal();
   function assign(chains, width) {
@@ -126,8 +126,10 @@
       const near = (i) => Math.min(...done.map((j) => apart[i][j]));
       const next = given.map((k, i) => (k ? -1 : i)).filter((i) => i >= 0).sort((a, b) => near(a) - near(b))[0];
       let best = mix[0], score = -Infinity;
-      for (const k of mix) {
-        const s = Math.min(...done.map((j) => contrast(k, given[j]) + apart[next][j] * 0.4)) - (given.includes(k) ? 0.05 : 0);
+      // Every ticked place is used once before any is used again.
+      const unused = mix.filter((k) => !given.includes(k));
+      for (const k of unused.length ? unused : mix) {
+        const s = Math.min(...done.map((j) => contrast(k, given[j]) + apart[next][j] * 0.4));
         if (s > score) (score = s), (best = k);
       }
       given[next] = best;
