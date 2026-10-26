@@ -290,3 +290,31 @@ export function waterOf({ colours, sea }) {
   });
   return { deep: hex(deep), shallows };
 }
+
+// Where each place is: latitude and longitude of the archipelago's middle, rounded (general reference, approximate).
+export const WHERE = {
+  haidaGwaii: [53.3, -132.1], brokenGroup: [48.9, -125.3], gulfIslands: [48.8, -123.4], thirtyThousand: [45.4, -80.3],
+  thousandIslands: [44.3, -76], mingan: [50.2, -63.9], magdalen: [47.4, -61.8], fundyIsles: [44.7, -66.8], arctic: [75, -95],
+  faroe: [62, -6.9], galapagos: [-0.6, -90.4], rajaAmpat: [-0.5, 130.5], cyclades: [37, 25.2], svalbard: [78.6, 16],
+  maldives: [3.2, 73.2], hawaii: [20.8, -156.3],
+};
+for (const [k, p] of Object.entries(PLACES)) p.where ??= WHERE[k.replace(/Hand$/, '')];
+
+/**
+ * Places laid out on a page by where they are: west to east across, north at the top (relative, not to scale). Each
+ * axis is half true distance and half even spacing by rank (spread), so the order holds everywhere but a far place
+ * (the Arctic) does not crowd the rest into a corner. Answers [x, y] in page units for each, or null if unknown.
+ */
+export function layout(places, width, height, margin = 0.14, spread = 0.5) {
+  const known = places.filter((p) => p.where);
+  const axis = (i, flip) => {
+    const vs = known.map((p) => p.where[i]), lo = Math.min(...vs), hi = Math.max(...vs), sorted = [...vs].sort((a, b) => a - b);
+    return (v) => {
+      const lin = hi > lo ? (v - lo) / (hi - lo) : 0.5, rank = vs.length > 1 ? sorted.indexOf(v) / (vs.length - 1) : 0.5;
+      const t = (1 - spread) * lin + spread * rank;
+      return margin + (1 - 2 * margin) * (flip ? 1 - t : t);
+    };
+  };
+  const ax = axis(1, false), ay = axis(0, true);
+  return places.map((p) => p.where && [width * ax(p.where[1]), height * ay(p.where[0])]);
+}

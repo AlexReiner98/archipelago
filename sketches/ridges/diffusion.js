@@ -80,7 +80,7 @@ export function sample({ nx, ny, v }, x, y) {
  * The islands the field makes above level t, gathered into k archipelagos by where they lie (k-means on their
  * middles, across the seams). Answers each cell's archipelago (-1 for sea) and each archipelago's island middles.
  */
-export function archipelagos({ nx, ny, v }, t, k, seed = 1) {
+export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null) {
   const size = nx * ny, island = new Int32Array(size).fill(-1), middles = [];
   for (let start = 0; start < size; start++) {
     if (v[start] < t || island[start] >= 0) continue;
@@ -100,7 +100,7 @@ export function archipelagos({ nx, ny, v }, t, k, seed = 1) {
   const byIsland = middles.length >= k;
   const points = byIsland ? middles : [];
   if (!byIsland) for (let i = 0; i < size; i += 3) if (island[i] >= 0) points.push({ x: i % nx, y: Math.floor(i / nx), n: 1 });
-  const { of, centres, nearest } = byPlace(points, k, nx, ny, seed);
+  const { of, centres, nearest } = byPlace(points, k, nx, ny, seed, starts);
   const group = new Int32Array(size).fill(-1);
   for (let i = 0; i < size; i++) if (island[i] >= 0) group[i] = byIsland ? of[island[i]] : nearest(i % nx, Math.floor(i / nx));
   // Each island's standing in its archipelago: the largest 1, the next smaller as sizes fall away (Zipf-like).
@@ -114,18 +114,30 @@ export function archipelagos({ nx, ny, v }, t, k, seed = 1) {
 }
 
 /** k-means over points on the torus: k centres started far apart, biggest first, settled across the seams. */
-function byPlace(points, k, nx, ny, seed) {
+function byPlace(points, k, nx, ny, seed, starts = null) {
   const gap = (a, b) => Math.hypot(Math.min(Math.abs(a.x - b.x), nx - Math.abs(a.x - b.x)), Math.min(Math.abs(a.y - b.y), ny - Math.abs(a.y - b.y)));
+  if (!points.length) return { of: [], centres: (starts ?? []).map((c) => ({ ...c })), nearest: () => 0 };
+  // Given centres (where the places are), each is kept where it is, in order: an island joins the nearest place.
+  // On a map the page does not wrap, so distance to a place is measured straight.
+  if (starts) return settle(points, starts.map((c) => ({ ...c })), nx, ny, 1, false, false);
   k = Math.max(1, Math.min(k, points.length));
-  if (!points.length) return { of: [], centres: [], nearest: () => 0 };
   const rnd = random(seed * 31 + 3), centres = [{ ...points.reduce((a, b) => (b.n > a.n ? b : a)) }];
   const spread = (p) => Math.min(...centres.map((c) => gap(p, c)));
   while (centres.length < k) centres.push({ ...points.reduce((a, b) => (spread(b) * (0.7 + 0.6 * rnd()) > spread(a) ? b : a)) });
+  return settle(points, centres, nx, ny, 10);
+}
+
+/** Lloyd's rounds over points on the torus: each point to its nearest centre, each centre to the middle of its points. */
+function settle(points, centres, nx, ny, rounds, move = true, wraps = true) {
+  const gap = wraps
+    ? (a, b) => Math.hypot(Math.min(Math.abs(a.x - b.x), nx - Math.abs(a.x - b.x)), Math.min(Math.abs(a.y - b.y), ny - Math.abs(a.y - b.y)))
+    : (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const closest = (p) => centres.map((c, i) => [gap(p, c), i]).sort((a, b) => a[0] - b[0])[0][1];
   const off = (a, b, m) => ((((a - b) % m) + 1.5 * m) % m) - m / 2;
   let of = points.map(() => 0);
-  for (let round = 0; round < 10; round++) {
+  for (let round = 0; round < rounds; round++) {
     of = points.map(closest);
+    if (!move) continue;
     centres.forEach((c, i) => {
       const mine = points.filter((_, j) => of[j] === i);
       if (!mine.length) return;

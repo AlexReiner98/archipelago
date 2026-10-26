@@ -63,6 +63,7 @@
   <label class="only-diffusion" title="Read the field through noise, so its spacing goes irregular">Warp <small>even · wild</small><input id="warp" type="range" min="0" max="1" step="0.01"></label>
   <label class="only-diffusion" title="Blend in the noise field: islands of every size">Noise <small>pure · mixed</small><input id="mix" type="range" min="0" max="0.8" step="0.01"></label>
   <label class="not-noise">Archipelagos <output id="chainsOut"></output><input id="chains" type="range" min="1" max="12" step="1" title="How many archipelagos share the page"></label>
+  <label class="check not-noise" title="Each ticked place becomes one archipelago where it really is: west to east across, north at the top"><input id="geo" type="checkbox" checked> Place them as on a map</label>
   <div class="row" title="Tick the places the archipelagos are drawn from"><button data-mix="all">All</button><button data-mix="canada">Canada</button><button data-mix="elsewhere">Elsewhere</button></div>
   <div class="mix" id="mix" title="Which places' palettes the chains take, in turn, after the palette above"></div>
   <h2>Land</h2>
@@ -94,7 +95,7 @@
 <main><canvas id="view"></canvas></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
-  import { PLACES, fromPixels, signature, waterOf, landOf } from './palettes.js';
+  import { PLACES, fromPixels, signature, waterOf, landOf, layout } from './palettes.js';
   import * as presets from './presets.js';
   import { paint, fillOf as fillWith, swell } from './paint.js';
 
@@ -113,7 +114,11 @@
   // less the further off it is; no place is used twice until every ticked one is used.
   let given = [];
   const palOf = (group) => palettes[given[group]] ?? pal();
+  // On a map: the place chosen above and every ticked place that has a position, each one archipelago.
+  const geo = () => $('geo').checked && $('source').value !== 'noise';
+  const geoPlaces = () => [...new Set([$('place').value, ...[...$('mix').querySelectorAll('input:checked')].map((c) => c.value)])].filter((k) => palettes[k].where);
   function assign(chains, width) {
+    if (geo()) return void (given = geoPlaces().slice(0, chains.length));
     const mix = [...new Set([$('place').value, ...[...$('mix').querySelectorAll('input:checked')].map((c) => c.value)])];
     const sig = Object.fromEntries(mix.map((k) => [k, signature(palettes[k])]));
     const contrast = (a, b) => Math.hypot(sig[a][0] - sig[b][0], sig[a][1] - sig[b][1], sig[a][2] - sig[b][2]);
@@ -138,7 +143,7 @@
 
   // The archipelagos' palettes are given as the land is laid out, so each can also set how its land stands.
   const forms = (groups) => (assign(groups, 800), groups.length ? given.map((k) => palettes[k].form) : [pal().form]);
-  const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) });
+  const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), DEFAULTS.width, DEFAULTS.height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) });
   const fillOf = (s) => fillWith(s, palOf, $('weighted').checked);
   // The background: the palette's deep water, until a colour is picked; then that, whatever the palette.
   let bgPicked = null;
@@ -156,7 +161,7 @@
     $('bg').value = background(p);
     $('bandsOut').textContent = $('bands').value;
     $('rowsOut').textContent = $('rows').value;
-    $('chainsOut').textContent = $('chains').value;
+    $('chainsOut').textContent = geo() ? `${given.length}, one per place` : $('chains').value;
     $('note').textContent = `${given.length ? given.map((k) => palettes[k].title).join(', ') + ' · ' : ''}${pic.shapes.length} shapes · ${(performance.now() - t0).toFixed(0)} ms`;
   }
 
@@ -205,7 +210,7 @@
   $('bg').addEventListener('input', () => ((bgPicked = $('bg').value), draw()));
   $('bgReset').onclick = () => ((bgPicked = null), draw());
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
-  for (const k of [...DIALS, 'wrap', 'weighted', 'forms']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
+  for (const k of [...DIALS, 'wrap', 'weighted', 'forms', 'geo']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
   const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
   $('source').addEventListener('change', () => (showSource(), draw()));
   showSource();
@@ -233,7 +238,7 @@
     mix: [...$('mix').querySelectorAll('input:checked')].map((c) => c.value),
     source: $('source').value,
     dials: Object.fromEntries(DIALS.map((k) => [k, +$(k).value])),
-    weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked,
+    weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked, geo: $('geo').checked,
     seed, bg: bgPicked,
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
@@ -248,7 +253,7 @@
     for (const c of $('mix').querySelectorAll('input')) c.checked = (s.mix ?? []).includes(c.value);
     $('source').value = s.source ?? 'chains';
     for (const k of DIALS) if (s.dials?.[k] !== undefined) $(k).value = s.dials[k];
-    $('weighted').checked = s.weighted ?? true; $('forms').checked = s.forms ?? true; $('wrap').checked = !!s.wrap;
+    $('weighted').checked = s.weighted ?? true; $('forms').checked = s.forms ?? true; $('wrap').checked = !!s.wrap; $('geo').checked = s.geo ?? false;
     seed = s.seed ?? 1; bgPicked = s.bg ?? null;
     showSource(); swatches(); draw();
   }

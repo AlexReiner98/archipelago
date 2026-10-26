@@ -63,6 +63,7 @@ export const DEFAULTS = {
   shallows: 0.4,   // how wide the pale shallow water round the land reaches
   relief: 0.6,     // height variety within an archipelago: even (0) to massifs among low islands (1)
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
+  anchors: null,   // [[x, y], ...] in page units: put archipelago i at anchor i (one per anchor), as on a map
   line: 1.2,       // outline weight
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
@@ -86,14 +87,17 @@ export function ridges(dials) {
 
   // Island chains: each a gentle curve across the page that land gathers along. With none, land is wherever
   // the noise says, as one archipelago.
-  const chains = Array.from({ length: d.source.endsWith('chains') ? d.chains : 0 }, () => {
-    const cx = M + rnd() * (W - 2 * M), cy = M + rnd() * (H - 2 * M), a = rnd() * Math.PI, len = (0.35 + 0.4 * rnd()) * W, bend = (rnd() - 0.5) * 0.7 * len;
+  // With anchors, chain n is centred on anchor n (an archipelago where its place is), and there is one per anchor.
+  const chains = Array.from({ length: d.source.endsWith('chains') ? (d.anchors?.length ?? d.chains) : 0 }, (_, n) => {
+    const at = d.anchors?.[n], cx = at ? at[0] : M + rnd() * (W - 2 * M), cy = at ? at[1] : M + rnd() * (H - 2 * M), a = rnd() * Math.PI, len = (0.35 + 0.4 * rnd()) * W, bend = (rnd() - 0.5) * 0.7 * len;
     const p0 = [cx - (Math.cos(a) * len) / 2, cy - (Math.sin(a) * len) / 2], p2 = [cx + (Math.cos(a) * len) / 2, cy + (Math.sin(a) * len) / 2], p1 = [cx - Math.sin(a) * bend, cy + Math.cos(a) * bend];
     const pts = Array.from({ length: 33 }, (_, i) => {
       const t = i / 32;
       return [(1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0], (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1]];
     });
-    return { pts, width: (0.08 + 0.08 * rnd()) * W * (0.6 + d.land) };
+    // Anchored chains are shorter, so each stays near its place and does not reach into its neighbours'.
+    if (at) for (const p of pts) (p[0] = cx + (p[0] - cx) * 0.5), (p[1] = cy + (p[1] - cy) * 0.5);
+    return { pts, width: (0.08 + 0.08 * rnd()) * W * (0.6 + d.land) * (at ? 0.8 : 1) };
   });
   /** Which chain claims a point most, how strongly (1 on its line, 0 a width away), and how far along it (0 to 1). */
   const claim = (x, y) => {
@@ -259,8 +263,10 @@ function diffusionFor(d, W, H) {
   const nx = Math.round(40 + d.scale * 70), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
   const key = `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
   if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
-  const akey = `${level}|${d.chains}`;
-  if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, Math.max(1, d.chains), d.seed) });
+  // Anchors (page units) start the grouping where the places are, so each archipelago gathers the islands near it.
+  const starts = d.anchors?.map(([x, y]) => ({ x: (x / W) * nx, y: (y / H) * ny }));
+  const akey = `${level}|${d.chains}|${JSON.stringify(starts)}`;
+  if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, starts?.length ?? Math.max(1, d.chains), d.seed, starts) });
   return { field: grown.field, arch: grown.arch, level };
 }
 
