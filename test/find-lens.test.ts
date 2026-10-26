@@ -61,8 +61,8 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       // Clearing the bar takes the term out.
       await type('');
       await enter();
-      assert.ok(await until(`!location.hash.includes('text=') && !${has('Roof the shed')}`), `cleared, the term is out: ${page.logs().join('\n')}`);
-      assert.ok(await page.evaluate(has('Elsewhere')));
+      // Waited for together: between the two pictures the canvas holds none, and neither is drawn.
+      assert.ok(await until(`!location.hash.includes('text=') && !${has('Roof the shed')} && ${has('Elsewhere')}`), `cleared, the term is out and what was there before is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
     }
     // The bar shows the lens's text when an address carries one.
     await page.evaluate(`document.activeElement.blur()`);
