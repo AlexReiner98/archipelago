@@ -14,7 +14,7 @@ import { notify } from './notify.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
 import { putPicture } from './pictures.ts';
-import { tellStamp, took } from './presence.ts';
+import { tellStamp, took, watching } from './presence.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { point } from './tool-change.ts';
 import { backupNow, restartNow } from './tool-config.ts';
@@ -34,7 +34,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   show: {
     description:
       'Point the human\'s web UI at something, so they can follow what you are doing: an item, a screen (optionally "of" one item: the graph around it, or a project\'s roadmap), or what their canvas draws (a flat lens, the one query flat reads, with a style). ' +
-      'Their page goes there within a couple of seconds if they have "Follow agents" on. Add a short note saying what they are looking at. ' +
+      'Their page goes there within a couple of seconds if it follows agents; one that does not offers the link instead. The answer says how many of their pages are open and how many follow you (pages). Add a short note saying what they are looking at. ' +
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
     input: {
       entity: z.string().optional().describe('An item id: open its page; a view kept on the map (type lens, a saved canvas) is opened as their canvas, its lens in their query bar.'),
@@ -55,9 +55,11 @@ export const ACT_TOOLS: Record<string, Tool> = {
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
     },
     run: async (l, actor, input) => {
+      // Where it pointed, and whether a page of theirs is there to follow it.
+      const shown = async (hash: string, note?: string) => ({ ...(await point(l, actor, 'show', hash, note)), pages: await watching((await wholeMap(l)).db, l, actor.name) });
       // A saved canvas is opened as what their canvas draws: the page reads its lens and style from the map.
       const kept = input.entity && (await l.entity(input.entity));
-      if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return point(l, actor, 'show', `v?canvas=${input.entity}`, input.note);
+      if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return shown(`v?canvas=${input.entity}`, input.note);
       if (input.lens || input.style) {
         // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on the owner's screen.
         const asked = (input.lens ?? {}) as { filter?: { exclude?: unknown }; limit?: unknown };
@@ -81,10 +83,10 @@ export const ACT_TOOLS: Record<string, Tool> = {
         if (input.style?.shape) query.set('shape', input.style.shape);
         if (input.style?.id) query.set('style', input.style.id);
         // Their canvas draws it, under the item's page when one is named.
-        return point(l, actor, 'show', `${input.entity ? `e/${input.entity}` : 'v'}${query.size ? `?${query}` : ''}`, input.note);
+        return shown(`${input.entity ? `e/${input.entity}` : 'v'}${query.size ? `?${query}` : ''}`, input.note);
       }
       if (!input.entity && !input.screen) throw new Error('show needs "entity", "screen" or "lens".');
-      return point(l, actor, 'show', input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);
+      return shown(input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);
     },
   },
   claim: {
