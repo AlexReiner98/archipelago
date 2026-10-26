@@ -63,3 +63,13 @@ pack out is the owner's, and is refused while another active pack requires
 it; the kernel's packs are never taken out. Everything a pack registers is
 derived from the set of packs, so taking one out unwinds it: its tools,
 screens, rules and handlers go, and its items stay, their types dormant.
+
+## Not yet
+
+- A manifest is named in the log by its hash; the manifest itself is not
+  kept beside the log yet, so the registry as of an old position reads the
+  pack files the server has now.
+- A pack the log says is present but whose code the server lacks is not yet
+  listed as waiting.
+- Taking out a pack together with the packs that require it, in one change,
+  is not offered yet.

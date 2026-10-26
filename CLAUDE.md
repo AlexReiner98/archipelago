@@ -99,12 +99,26 @@ where, and how that server is run.
   point a second server at `data/`; the lock refuses it.
 - **Before changing the database schema, take a backup** with `capture` action `backup`
   (the server also writes one every 6 hours, to `backups/default/`), then
-  confirm the item and event counts are unchanged after the restart. Never copy `data/` while the
-  server runs and call it a backup.
-- **One write path.** Every change to items and links goes through
-  `Archipelago.change` / `apply`. What skips approval is operational state,
-  and every store of it is named in `src/operational.ts` with its rule: add a
-  new one there, or the structure test refuses it.
+  confirm the item count and the log's entries are unchanged after the restart. Never copy `data/` while the
+  server runs and call it a backup. A schema change never rewrites the log: an
+  entry is kept as it was appended, and a new form is read through an
+  upcaster (`docs/log.md`, section 6).
+- **The log is the truth; the tables are its projections.** Every change to
+  items and links goes through `Archipelago.change` / `apply`, which appends
+  it to the workspace's log (`log_entry`, `log_fact`; `docs/log.md`) and
+  projects its facts into `entity`, `relation`, `proposal`, the part_of
+  closure and mentions in the same transaction (`src/replay.ts`). Never write
+  a projection any other way, and never treat one as the record: a rebuild
+  from the log replaces it. What skips approval is operational state, kept in
+  the operational streams (`log_op`) by its pack's retention rules, and every
+  store of it is named in `src/operational.ts` with its rule: add a new one
+  there, or the structure test refuses it. Free text in the log is sealed
+  with its item's key (`src/seal.ts`): a read of `log_fact` opens it with
+  `openSaid`, never reads the bytes as words.
+- **A forget cannot be undone.** It destroys the item's key, so its words
+  leave the log, the projections and every backup that needs that key. An
+  agent's forget waits for the owner (core's rule `forget`); never send one
+  on the owner's map to test something.
 - **Visibility is enforced by the database** (row level security in
   `src/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
@@ -233,8 +247,13 @@ else a pack"). These rules keep it composable while that happens, and
 - **The kernel names no pack.** No pack's type or link type by name in `src/`
   or `ui/`: ask the registry for a kind or a capability.
 - **One write path, checked.** Items and links are written only in
-  `src/pelago.ts`: through `change`, or through the operational writes and the
-  restore path `src/operational.ts` names.
+  `src/pelago.ts` and the projector it runs (`src/replay.ts`): through
+  `change`, or through the operational writes and the restore path
+  `src/operational.ts` names.
+- **No read of the whole map.** Every SQL read of items, links, the log or
+  the review queue is bounded (an id or set of ids, a subtree, a person, a
+  cursor, a limit) or names an index the schema makes (`-- index <name>`).
+  A view that needs everything inside an item reads the part_of closure.
 - **A pack's code imports nothing of the kernel.** It is handed what it reads
   and answers with ops and requests.
 - **A pack's code comes with its tests,** run without a database: input in,
