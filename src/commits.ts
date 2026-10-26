@@ -29,9 +29,10 @@ export async function addCommits(db: Q, run: string, said: unknown): Promise<voi
 }
 
 /** What accounts for a commit here: the record the first rule on a reply's end names, its type with its flavours. */
-export function commitRecord(l: Archipelago): { types: string[]; field: string } | undefined {
+export function commitRecord(l: Archipelago): { types: string[]; field: string; accounted?: string } | undefined {
   const record = l.registry.rules.find((r) => onReply(r) && r.record)?.record;
-  return record && l.registry.type(record.type) ? { types: l.registry.family(record.type), field: record.field } : undefined;
+  const type = record && l.registry.type(record.type);
+  return type ? { types: l.registry.family(record.type), field: record.field, accounted: type.capabilities.accounts?.accounted } : undefined;
 }
 
 /**
@@ -41,9 +42,14 @@ export function commitRecord(l: Archipelago): { types: string[]; field: string }
 export async function unaccounted(l: Archipelago, commits: string[]): Promise<string[]> {
   const record = commitRecord(l);
   if (!record || !commits.length) return [];
-  const { rows } = await l.db.query<{ sha: string }>(`select props ->> $2 as sha from entity where type = any($1::text[]) and archived_at is null and props ->> $2 = any($3::text[]) -- index entity_type`, [record.types, record.field, commits]);
+  // A record only heard of from a push (its accounted field false) accounts for nothing yet, made or proposed.
+  const flag = record.accounted ?? null;
+  const { rows } = await l.db.query<{ sha: string }>(
+    `select props ->> $2 as sha from entity where type = any($1::text[]) and archived_at is null and props ->> $2 = any($3::text[]) and ($4::text is null or coalesce(props ->> $4, 'true') <> 'false') -- index entity_type`,
+    [record.types, record.field, commits, flag],
+  );
   const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending' -- index proposal_status`);
-  const proposed = held.flatMap((p) => p.ops.flatMap((o) => (o.op === 'create' && record.types.includes(o.type) ? [o.props?.[record.field]] : [])));
+  const proposed = held.flatMap((p) => p.ops.flatMap((o) => (o.op === 'create' && record.types.includes(o.type) && !(flag && o.props?.[flag] === false) ? [o.props?.[record.field]] : [])));
   const found = new Set([...rows.map((r) => r.sha), ...proposed]);
   return commits.filter((c) => !found.has(c));
 }

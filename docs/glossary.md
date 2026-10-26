@@ -159,7 +159,10 @@ the code: `scripts/pelago-setup.mjs`, read by `packs/github/account.js`.
 for its full sha, with a settles link to each item it settles, or none. The
 check "Every commit accounted for" on the main branch is red until every
 commit in a push or pull request is; a session is asked to account for
-its own commits before its reply and its run end. In the code: `software.commit` and
+its own commits before its reply and its run end. A pushed commit nobody
+accounted for within an hour is made a commit item with `accounted` false,
+which is the owner's attention (reason `unaccounted`) until someone sets it
+true with its links. In the code: `software.commit` and
 `software.settles` (`packs/software/pack.json`), `packs/github/account.js`.
 
 ## Retired words

@@ -99,11 +99,12 @@
     {
       "id": "software.commit",
       "extends": "record",
-      "capabilities": { "accounts": { "field": "sha" } },
+      "capabilities": { "accounts": { "field": "sha", "accounted": "accounted" } },
       "title": "Commit",
-      "description": "A commit accounted for: made by its session or a person, it says which items the commit settles, each by a settles link, and none when it has none. A commit with no such item is unaccounted for, and the check on the main branch stays red.",
+      "description": "A commit accounted for: made by its session or a person, it says which items the commit settles, each by a settles link, and none when it has none. A commit with no such item is unaccounted for, and the check on the main branch stays red. One heard from a push that nobody accounted for in time is made with accounted false: accounting for it is setting accounted true, with its links.",
       "fields": {
-        "sha": { "type": "string", "description": "The commit's full id (40 hex characters)." }
+        "sha": { "type": "string", "description": "The commit's full id (40 hex characters)." },
+        "accounted": { "type": "boolean", "description": "false while the commit was only heard from a push and nobody has said what it settles; true, or left out, once someone has." }
       }
     },
     {
@@ -172,7 +173,7 @@
       "on": "reply_ended",
       "when": { "reply": { "unaccounted": true } },
       "then": "ask",
-      "say": "This reply committed or pushed commits the map does not account for. In one change, give each a software.commit (full sha) with a software.settles link to each item it settles, or none.",
+      "say": "This reply made commits the map does not account for. In one change: a software.commit (full sha) each, a software.settles link per item it settles, or none; one heard from a push: accounted true.",
       "record": { "type": "software.commit", "field": "sha" },
       "lifted": "reply_account_commits"
     }
@@ -234,6 +235,17 @@
     }
   ],
   "views": [
+    {
+      "form": "attention",
+      "id": "software.unaccounted",
+      "reason": "unaccounted",
+      "description": "Pushed, and nobody has said what it settles: account for it with its settles links, and accounted true.",
+      "of": "software.commit",
+      "where": { "accounted": false },
+      "joins": "waits_on",
+      "mark": "not accounted for",
+      "ask": "Account for"
+    },
     {
       "id": "software.handoff",
       "shape": "data",
