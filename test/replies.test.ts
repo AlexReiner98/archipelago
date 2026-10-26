@@ -11,7 +11,7 @@ import { answerHook } from '../src/hook-answers.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { checkRules, type RuleDef } from '../src/rules.ts';
-import { sessionStart, story } from '../src/sessions.ts';
+import { hookSessionStart, sessionStart, story } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { syncTypes } from '../src/typetable.ts';
 
@@ -75,7 +75,7 @@ test('a reply that did what a rule names is asked once a turn, the asking kept i
 
   await assert.rejects(callTool(l, owner, 'workspace_set', { lifted: { reply_nothing: true } }), /No rule here is turned off by "reply_nothing"/);
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
-  assert.deepEqual(((await callTool(l, owner, 'workspace_info', {})) as any).lifted, { reply_show_changes: true });
+  assert.deepEqual(((await callTool(l, owner, 'workspace_info', {})) as any).lifted, { reply_draw_answers: false, reply_show_changes: true });
   assert.deepEqual(await stop(l, { session_id: 's1', turn: 'u4', reply: changed }), {}, 'turned off');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: false } });
   assert.equal(((await stop(l, { session_id: 's1', turn: 'u5', reply: changed })) as any).decision, 'block', 'and on again');
@@ -97,6 +97,9 @@ test('the hook counts what the reply did since the owner’s last message', asyn
     use('b4', 'mcp__pelago__report', { action: 'tell', params: { run: 'x', said: 'y' } }),
     use('b5', 'Bash', { command: 'cd x && git -C "a b" commit -m "Closes: e_readitem"' }),
     use('b6', 'Bash', { command: 'git log --grep commit; git commit-tree x' }),
+    use('b7', 'mcp__pelago__query', { name: 'flat', params: { filter: { text: 'open work' } } }),
+    use('b8', 'mcp__pelago__query', { name: 'actions', params: { verb: 'report' } }),
+    use('b9', 'Edit', { file_path: 'a.ts', old_string: 'a', new_string: 'b' }),
   ];
   const dir = mkdtempSync(join(tmpdir(), 'pelago-reply-'));
   const transcript = join(dir, 'session.jsonl');
@@ -118,7 +121,37 @@ test('the hook counts what the reply did since the owner’s last message', asyn
   });
   server.close();
   assert.equal(got.turn, 'p2');
-  assert.deepEqual(got.reply, { read: 1, showed: 1, changed: 1, committed: 1, pushed: 0 });
+  assert.deepEqual(got.reply, { read: 3, surveyed: 1, showed: 1, changed: 1, edited: 1, committed: 1, pushed: 0 }, 'a get and a read of the tools are not surveys');
   assert.equal(got.stop_hook_active, false, 'what Claude Code said goes through');
   assert.deepEqual(JSON.parse(out), { decision: 'block', reason: 'asked' }, 'and the answer comes back to Claude Code');
+});
+
+test('core asks a reply that answered from the map and drew nothing to draw it, and the owner can turn that off', async () => {
+  const l = await map();
+  const draw = l.registry.rules.find((r) => r.pack === 'core' && r.id === 'draw_answers')!;
+  assert.ok(draw && checkRules([draw], { types: new Map() }).length === 0, 'core ships it, checked as data');
+  await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
+  const { run } = await sessionStart(l, agent, { session_id: 'd1' });
+  const answered = { read: 2, surveyed: 1, showed: 0, changed: 0, edited: 0, committed: 0, pushed: 0 };
+  const asked = (await stop(l, { session_id: 'd1', turn: 't1', reply: answered })) as any;
+  assert.deepEqual(asked, { decision: 'block', reason: draw.say });
+  assert.deepEqual((await story(l, { run })).beats.map((b) => b.asked), ['core.draw_answers']);
+  // Not an answer to draw: what it read was only to then change the map, or to write code; one item, or nothing but a line.
+  const not: [string, Record<string, number>][] = [
+    ['read to change', { ...answered, changed: 1 }],
+    ['read to write code', { ...answered, edited: 2 }],
+    ['read to commit', { ...answered, committed: 1 }],
+    ['one item, or the tools', { ...answered, surveyed: 0 }],
+    ['drawn', { ...answered, showed: 1 }],
+  ];
+  for (const [why, reply] of not) assert.deepEqual(await stop(l, { session_id: 'd1', turn: `t-${why}`, reply }), {}, why);
+  await callTool(l, owner, 'workspace_set', { lifted: { reply_draw_answers: true } });
+  assert.deepEqual(await stop(l, { session_id: 'd1', turn: 't2', reply: answered }), {}, 'turned off');
+});
+
+test('the session-start text tells an agent to answer the owner with a drawing', async () => {
+  const l = await map();
+  const text = await hookSessionStart(l, { session_id: 'd2', cwd: tmpdir() });
+  assert.match(text, /report, action show/);
+  assert.match(text, /A yes, a number or one item is a line in chat/);
 });

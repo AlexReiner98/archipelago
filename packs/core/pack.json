@@ -530,6 +530,14 @@
       "say": "Agents may not download this workspace’s backups: the owner allows it on the Workspace page, under Backups."
     },
     {
+      "id": "draw_answers",
+      "on": "reply_ended",
+      "when": { "reply": { "surveyed": true, "changed": false, "edited": false, "committed": false, "showed": false } },
+      "then": "ask",
+      "lifted": "reply_draw_answers",
+      "say": "You answered from the map and drew nothing: if the answer is about several items or how they relate, order or stand, open it with report, action show, and say it in a line."
+    },
+    {
       "id": "sessions",
       "when": {
         "fields": [
@@ -839,6 +847,7 @@
     },
     { "id": "core.estimate", "type": "instruction", "title": "Estimate what you take on", "body": "When you take on a task that has no estimate, give it one: how many tokens you expect it to take (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.", "props": { "for": ["session_start"], "order": 10 } },
     { "id": "core.report_in", "type": "instruction", "title": "Report in and tell the story", "body": "If the pelago MCP tools are available (query reads, change writes, and every other action is called under its verb by name: report with action tell): when you take on one of these, call report with action session_update and its id as task; as you reason about the work, tell its story with report, action tell (run {run}): a beat for each thing you conclude, the items it is about and the ties between them, so the owner sees what you see; report session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call report with action session_end and a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.", "props": { "for": ["session_start"], "order": 20 } },
+    { "id": "core.draw_answers", "type": "instruction", "title": "Answer the owner with a drawing", "body": "When the owner asks to see something on the map and the answer is about several items or how they relate, order or stand, answer with a lens: open a kept view, or a lens and style of your own, with report, action show, and say in chat in one line what it shows. A yes, a number or one item is a line in chat. The chat is a screen too: no wall of text there.", "props": { "for": ["session_start"], "order": 25 } },
     { "id": "core.bumps", "type": "instruction", "title": "Record what gets in the way", "body": "When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.", "props": { "for": ["session_start"], "order": 30 } },
     { "id": "core.map_true", "type": "instruction", "title": "Keep the map true", "body": "When what you do or find settles something still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, rather than leaving it open with a note. Settle only what the work or the owner has in fact settled: closing a decision or hypothesis waits for the owner unless this workspace applies agents’ changes as made, so propose it with what was chosen (props.outcome) and why (props.rationale). A choice that is still the owner’s stays open.", "props": { "for": ["working_rules"], "order": 40 } },
     { "id": "core.authority", "type": "instruction", "title": "Say on whose authority", "body": "Every change takes authority: of \"human\" with what the owner said and where, when they told you to or decided it; of \"agent\" for your own reading of the work. Never claim the owner’s word for your own judgment.", "props": { "for": ["working_rules"], "order": 50 } },
