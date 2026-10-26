@@ -69,6 +69,7 @@ export const DEFAULTS = {
   undulate: 0.6,   // slope variety: each section of a climb a random check, up or level (0: always up at the max)
   shape: null,     // a seeding shape { nx, ny, v } over the page, 0 to 1 (a letter, rendered by the page)
   shapeStrength: 0.8, // how firmly land keeps to the shape: a hint (low) to the shape clearly read (1)
+  clear: null,     // a clearing { nx, ny, v } over the page, 0 to 1 (round a name set there): land sinks, its coast wobbling
   clouds: 0,       // cloud cover: none (0) to overcast (1)
   cloudSize: 1,    // cloud banks small and many (low) to large and few (high)
   cloudPuff: 1,    // how high cloud tops billow at a cloud's heart, in rows
@@ -254,9 +255,9 @@ export function ridges(dials) {
     shapes.push({ ...shape, small: Math.abs(area) / 2 < small });
   };
 
-  /** The seeding shape at a point, 0 outside to 1 inside, smooth; a grid over the whole page, not wrapping. */
-  const shapeAt = (x, y) => {
-    const { nx, ny, v } = d.shape, fx = Math.max(0, Math.min(nx - 1.001, (x / W) * nx - 0.5)), fy = Math.max(0, Math.min(ny - 1.001, (y / H) * ny - 0.5));
+  /** A grid over the whole page (the seeding shape, the clearing) at a point, 0 outside to 1 inside, smooth; not wrapping. */
+  const gridAt = ({ nx, ny, v }, x, y) => {
+    const fx = Math.max(0, Math.min(nx - 1.001, (x / W) * nx - 0.5)), fy = Math.max(0, Math.min(ny - 1.001, (y / H) * ny - 0.5));
     const x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0, at = (i, j) => v[j * nx + i];
     return (at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx) * (1 - ty) + (at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx) * ty;
   };
@@ -290,8 +291,14 @@ export function ridges(dials) {
       if (calm < 1) L.u -= (1 - calm) * 1.5;
       // A seeding shape (a letter): land rises inside it and sinks outside, so the archipelago takes its form.
       if (d.shape && d.shapeStrength > 0) {
-        const g = shapeAt(x, y);
+        const g = gridAt(d.shape, x, y);
         L.u += d.shapeStrength * (g * (L.hi - L.lo) * 4 - (1 - g) * 1.5);
+      }
+      // A clearing: open water where a name is set, read from part way up what would stand here (as the border is),
+      // its edge wobbling with noise so the islands part round the name rather than tracing its letters.
+      if (d.clear) {
+        const wobble = (seam(land, x, 1.7, 33, yc * 1.7 + 3) - 0.5) * 0.6;
+        L.u -= smooth(0.1, 0.55, gridAt(d.clear, x, y - stands * 0.4) + wobble) * 1.5;
       }
       gs.push(L.g), ts.push(L.t), steps.push(Math.min(step * f.step, Math.max(1, rise * f.rise * 0.6)));
       // Shallows: a reach of pale sea round the land, wider as the dial turns.

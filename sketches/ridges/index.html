@@ -35,6 +35,8 @@
   .mix label { margin: 0; display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources a { color: inherit; }
+  #nameText { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; }
+  body:not(.named) .only-name { display: none; }
   #letterText { width: 4.5em; font: inherit; padding: 3px 6px; }
   #letterFont { flex: 1; }
   #preset, #presetName { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; }
@@ -65,6 +67,14 @@
     <option value="1600x800">Hero, 1600 × 800</option>
     <option value="2400x900">Wide hero, 2400 × 900</option>
     <option value="1200x630">Share image, 1200 × 630</option>
+  </select>
+  <div class="row"><label class="check" title="Set a name over the picture, in the app's typeface"><input id="name" type="checkbox"> Name</label><input id="nameText" value="Archipelago" aria-label="Name" title="The name to set"></div>
+  <label class="only-name" title="How large the name is, against the frame's height">Name size <small>small · large</small><input id="nameSize" type="range" min="0.04" max="0.3" step="0.005" value="0.1"></label>
+  <label class="only-name" title="Open water round the name, the islands parting round it: none, a little, or a wide bay">Clearing <small>none · wide</small><input id="nameClear" type="range" min="0" max="2" step="0.01" value="1"></label>
+  <select id="namePlace" class="only-name" aria-label="Where the name goes" title="Where the name goes">
+    <option value="low-left">Lower left</option>
+    <option value="low">Lower centre</option>
+    <option value="centre">Centre</option>
   </select>
   <h2>Emblem</h2>
   <label class="check" title="This drawing as an icon: fitted into a square, shown at a chosen size and below at icon sizes"><input id="emblem" type="checkbox"> Emblem</label>
@@ -137,7 +147,7 @@
   import { ridges, DEFAULTS } from './ridges.js';
   import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
   import * as presets from './presets.js';
-  import { paint, fillOf as fillWith, swell } from './paint.js';
+  import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
   const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
@@ -224,6 +234,39 @@
 
   const frame = () => $('frame').value.split('x').map(Number);
   const emblem = () => $('emblem').checked;
+  // The name set over the picture: the app's typeface, in the palette's paper on a dark ground and its ink on a light one.
+  const named = () => $('name').checked && $('nameText').value.trim();
+  function nameOf(pic, p) {
+    const px = Math.round(+$('nameSize').value * pic.height), at = $('namePlace').value, M = DEFAULTS.margin;
+    const x = at === 'low-left' ? M : pic.width / 2, y = at === 'centre' ? pic.height / 2 + px * 0.35 : pic.height - M;
+    return { text: $('nameText').value.trim(), px, x, y, align: at === 'low-left' ? 'left' : 'center', colour: p && (isLight(background(p)) ? p.ink : p.paper), font: `600 ${px}px system-ui, -apple-system, 'Segoe UI', sans-serif` };
+  }
+  // The clearing round the name: the name drawn on a small canvas the frame's shape, thickened and blurred by the
+  // Clearing dial, so the land keeps off it with room to spare. Drawn again only when it changes.
+  let clearing = { key: '', grid: null };
+  function clearOf() {
+    const pad = +$('nameClear').value;
+    if (!named() || !pad) return null;
+    const [width, height] = frame(), n = nameOf({ width, height }, null), key = [n.text, n.font, n.x, n.y, n.align, pad].join('|');
+    if (clearing.key === key) return clearing.grid;
+    const nx = 240, ny = Math.round((nx * height) / width), k = nx / width, c = document.createElement('canvas');
+    [c.width, c.height] = [nx, ny];
+    const g = c.getContext('2d');
+    g.scale(k, k);
+    Object.assign(g, { font: n.font, textAlign: n.align, fillStyle: '#000', strokeStyle: '#000', lineJoin: 'round', lineWidth: n.px * pad * 0.9, filter: `blur(${n.px * pad * 0.35 * k}px)` });
+    g.fillText(n.text, n.x, n.y);
+    g.strokeText(n.text, n.x, n.y);
+    const data = g.getImageData(0, 0, nx, ny).data, v = new Float32Array(nx * ny);
+    for (let i = 0; i < v.length; i++) v[i] = data[i * 4 + 3] / 255;
+    clearing = { key, grid: { nx, ny, v } };
+    return clearing.grid;
+  }
+  function setName(g, pic, p) {
+    const n = nameOf(pic, p);
+    Object.assign(g, { font: n.font, textAlign: n.align, textBaseline: 'alphabetic', fillStyle: n.colour, shadowColor: background(p), shadowBlur: n.px * 0.4 });
+    g.fillText(n.text, n.x, n.y);
+    g.shadowBlur = 0;
+  }
   // The drawing as it is shown: with or without the swell lines on the water.
   const shown = (pic) => ($('swell').checked ? pic : { ...pic, shapes: pic.shapes.filter((s) => !s.line) });
   /** Paint the drawing into a square of px: the page fitted and centred on its ground, every setting as at full size. */
@@ -241,7 +284,7 @@
   const dials = () => {
     // Rows count down the page: a frame of another height has as many as keeps them as far apart.
     const [width, height] = frame(), M = DEFAULTS.margin, rows = Math.max(1, Math.round((+$('rows').value * (height - 2 * M)) / (DEFAULTS.height - 2 * M)));
-    const d = { ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), width, height, rows, source: $('source').value, wrap: $('wrap').checked, seed, shape: letterShape(), shapeStrength: +$('letterStrength').value, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), width, height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) };
+    const d = { ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), width, height, rows, clear: clearOf(), source: $('source').value, wrap: $('wrap').checked, seed, shape: letterShape(), shapeStrength: +$('letterStrength').value, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), width, height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) };
     return d;
   };
   const fillOf = (s) => fillWith(s, palOf, $('weighted').checked);
@@ -266,7 +309,10 @@
       cv.width = cv.height = Math.round(at * dpr);
       cv.style.aspectRatio = '1';
       icon(g, pic, at, dpr, opts);
-    } else paint(g, shown(pic), opts);
+    } else {
+      paint(g, shown(pic), opts);
+      if (named()) setName(g, pic, p);
+    }
     $('emAtOut').textContent = AT[+$('emAt').value] ? AT[+$('emAt').value] + ' px' : 'full';
     $('bg').value = background(p);
     if (emblem()) sizes(pic, opts);
@@ -340,7 +386,9 @@
   for (const b of document.querySelectorAll('[data-ground]')) b.onclick = () => ((bgPicked = b.dataset.ground), draw());
   const showEmblem = () => document.body.classList.toggle('emblem', emblem());
   $('emblem').addEventListener('input', () => (showEmblem(), draw()));
-  for (const k of ['emAt', 'swell', 'frame']) $(k).addEventListener('input', draw);
+  for (const k of ['emAt', 'swell', 'frame', 'nameText', 'nameSize', 'namePlace', 'nameClear']) $(k).addEventListener('input', draw);
+  const showName = () => document.body.classList.toggle('named', $('name').checked);
+  $('name').addEventListener('input', () => (showName(), draw()));
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
   for (const k of [...DIALS, 'wrap', 'weighted', 'forms', 'geo']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
   const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
@@ -366,11 +414,16 @@
 
   const save = (name, blob) => Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name }).click();
   $('png').onclick = () => $('view').toBlob((b) => save(`archipelago-${$('place').value}-${seed}.png`, b));
+  const text = (pic, p) => {
+    if (!named()) return '';
+    const n = nameOf(pic, p), esc = n.text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    return `<text x="${n.x}" y="${n.y}" text-anchor="${n.align === 'left' ? 'start' : 'middle'}" fill="${n.colour}" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="600" font-size="${n.px}">${esc}</text>`;
+  };
   $('svg').onclick = () => {
     const p = richOf(pal()), pic = shown(ridges(dials())), f = (v) => +v.toFixed(1);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
     const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p, background(p))}"/>` : s.shadow ? `<path d="${d(s)}" fill="#000" fill-opacity="${(0.35 * s.shadow).toFixed(3)}" stroke="none"/>` : s.cloud ? `<path d="${d(s)}" fill="${p.paper}" fill-opacity="${$('cloudOpacity').value}" stroke-width="${pic.line * 0.6}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
-    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
+    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g>${text(pic, p)}</svg>`], { type: 'image/svg+xml' }));
   };
 
   // Presets: everything that makes this picture, so it can be had again.
@@ -386,6 +439,7 @@
     seed, bg: bgPicked, richness: +$('richness').value, cloudOpacity: +$('cloudOpacity').value,
     letter: { on: $('letter').checked, text: $('letterText').value, font: $('letterFont').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
     emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value,
+    name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value },
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
   });
@@ -405,6 +459,8 @@
     $('letter').checked = !!l.on; $('letterText').value = l.text ?? 'A'; $('letterFont').value = l.font ?? $('letterFont').options[0].value; $('letterSize').value = l.size ?? 0.85; $('letterStrength').value = l.strength ?? 1;
     const e = s.emblem ?? {};
     $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true; $('frame').value = s.frame ?? '800x1000';
+    const n = s.name ?? {};
+    $('name').checked = !!n.on; $('nameText').value = n.text ?? 'Archipelago'; $('nameSize').value = n.size ?? 0.1; $('namePlace').value = n.place ?? 'low-left'; $('nameClear').value = n.clear ?? 1; showName();
     showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
