@@ -68,6 +68,10 @@ export const DEFAULTS = {
   undulate: 0.6,   // slope variety: each section of a climb a random check, up or level (0: always up at the max)
   shape: null,     // a seeding shape { nx, ny, v } over the page, 0 to 1 (a letter, rendered by the page)
   shapeStrength: 0.8, // how firmly land keeps to the shape: a hint (low) to the shape clearly read (1)
+  clouds: 0,       // cloud cover: none (0) to overcast (1)
+  cloudSize: 1,    // cloud banks small and many (low) to large and few (high)
+  cloudPuff: 1,    // how high cloud tops billow, in rows
+  cloudShadow: 0.5, // how dark the shadow a cloud casts on the water beneath it
   slope: 2,        // max slope from the nearest water, height per unit across: steep (high) to gentle (low); 0 for none
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   anchors: null,   // [[x, y], ...] in page units: put archipelago i at anchor i (one per anchor), as on a map
@@ -87,6 +91,7 @@ export function ridges(dials) {
   const cells = 2 + d.islands * 10;                         // land field cells across the width
   const land = fbm(noise2(d.seed, d.wrap ? Math.round(cells) : 0), 3);
   const crest = fbm(noise2(d.seed + 1, d.wrap ? Math.round(cells * 3) : 0), 3);
+  const sky = fbm(noise2(d.seed + 5, d.wrap ? Math.round(cells) : 0), 3), puff = fbm(noise2(d.seed + 6, d.wrap ? Math.round(cells * 4) : 0), 2);
   const toCell = (x) => (x / W) * (d.wrap ? Math.round(cells) : cells);
   // Noise read at x on its own scale k: with repeat on, blended with its value a tile-width over, so whatever the
   // scale, the right edge comes back to exactly what the left edge has and the tile joins without a seam.
@@ -395,6 +400,30 @@ export function ridges(dials) {
     }
     // The row's floor: a line across the water.
     shapes.push({ line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] });
+    // Clouds: pale bands floating just above the row, their tops billowing in soft rounded steps, from their own
+    // slow noise, inside the border. Each sits at its row's depth, so nearer land passes in front of farther cloud.
+    // Their shadows lie on the water of the row beneath them (the land of the row drawn already covers it).
+    if (d.clouds > 0) {
+      const k = 0.9 / Math.max(0.1, d.cloudSize), edge = 1 - d.clouds * 0.6;
+      const amount = xs.map((x) => smooth(edge, edge + 0.09, seam(sky, x, k, 3, yc * k + 11)) * shore(x, y, yc));
+      const base = y - gap * 0.55, cstep = gap * 0.9;
+      for (let i = 0; i < xs.length; ) {
+        if (amount[i] < 0.05) { i++; continue; }
+        let j = i;
+        while (j < xs.length && amount[j] >= 0.05) j++;
+        if (j - i >= 3) {
+          const top = [];
+          for (let q = i; q < j; q++) {
+            // A dome (the square root of cover) with broad, slow billows, so tops round like cumulus, not peaks.
+            const raw = Math.sqrt(amount[q]) * gap * d.cloudPuff * (0.9 + 0.9 * seam(puff, xs[q], k * 1.6, 7, yc * k)), n = Math.floor(raw / cstep);
+            top.push([xs[q], base - cstep * (n + smooth(0.05, 1, raw / cstep - n)) - gap * 0.15]);
+          }
+          if (d.cloudShadow > 0) shapes.push({ shadow: d.cloudShadow, points: [[xs[i], y - gap * 0.12], [xs[j - 1], y - gap * 0.12], [xs[j - 1], y + gap * 0.12], [xs[i], y + gap * 0.12]] });
+          shapes.push({ cloud: true, points: [[xs[i], base], ...top, [xs[j - 1], base]] });
+        }
+        i = j;
+      }
+    }
   }
   return { width: W, height: H, shapes, line: d.line, chains: groups };
 }

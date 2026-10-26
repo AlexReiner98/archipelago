@@ -28,7 +28,7 @@ export const swell = (p) => p.paper + '4d';
  * Paint a picture: the background, then every shape in order. base is the palette that gives ink, paper and the
  * deep water (unless background is given); palOf gives each archipelago's palette.
  */
-export function paint(g, pic, { base, palOf = () => base, background = waterOf(base).deep, weighted = true }) {
+export function paint(g, pic, { base, palOf = () => base, background = waterOf(base).deep, weighted = true, cloudOpacity = 0.92 }) {
   g.fillStyle = background;
   g.fillRect(0, 0, pic.width, pic.height);
   g.lineJoin = 'round';
@@ -43,6 +43,20 @@ export function paint(g, pic, { base, palOf = () => base, background = waterOf(b
       continue;
     }
     g.closePath();
+    // A cloud's shadow: a soft darkening, no outline. A cloud: the palette's paper, a little see-through, fine outline.
+    if (s.shadow) {
+      g.fillStyle = `rgba(0, 0, 0, ${(0.35 * s.shadow).toFixed(3)})`;
+      g.fill();
+      continue;
+    }
+    if (s.cloud) {
+      g.globalAlpha = cloudOpacity;
+      g.fillStyle = base.paper;
+      g.fill();
+      g.globalAlpha = 1;
+      if (pic.line) (g.strokeStyle = base.ink), (g.lineWidth = pic.line * 0.6), g.stroke();
+      continue;
+    }
     g.fillStyle = fillOf(s, palOf, weighted);
     g.fill();
     // Shallows are drawn with a finer line, so the land stays the subject.

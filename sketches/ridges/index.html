@@ -25,7 +25,7 @@
   #photo { display: none; max-width: 100%; border-radius: 4px; margin-top: 6px; }
   main { display: grid; place-items: center; overflow: auto; padding: 20px; }
   canvas { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
-  body:not(.letter) .only-letter, body:not(.diffusion) .only-diffusion, body.noise .not-noise, body.noise .mix { display: none; }
+  body:not(.clouds) .only-clouds, body:not(.letter) .only-letter, body:not(.diffusion) .only-diffusion, body.noise .not-noise, body.noise .mix { display: none; }
   .mix { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; font-size: 12px; }
   .mix label { margin: 0; display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -87,6 +87,12 @@
   <label>Bands <output id="bandsOut"></output><input id="bands" type="range" min="1" max="20" step="1"></label>
   <h2>Rows</h2>
   <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="6" max="400" step="1"></label>
+  <h2>Sky</h2>
+  <label title="Cloud cover: none, to overcast">Clouds <small>none · overcast</small><input id="clouds" type="range" min="0" max="1" step="0.01" value="0"></label>
+  <label class="only-clouds" title="Small, many cloud banks or large, few">Cloud size <small>small · large</small><input id="cloudSize" type="range" min="0.2" max="3" step="0.01" value="1"></label>
+  <label class="only-clouds" title="How high the cloud tops billow">Billow <small>flat · towering</small><input id="cloudPuff" type="range" min="0" max="6" step="0.05" value="1"></label>
+  <label class="only-clouds" title="How solid the clouds are">Opacity <small>veil · solid</small><input id="cloudOpacity" type="range" min="0.2" max="1" step="0.01" value="0.92"></label>
+  <label class="only-clouds" title="The shadow a cloud casts on the water beneath it">Shadow <small>none · dark</small><input id="cloudShadow" type="range" min="0" max="1" step="0.01" value="0.5"></label>
   <h2>Geography</h2>
   <label class="check" title="Each place's own landforms: fjord cliffs, karst towers, shield volcanoes, low reef islets"><input id="forms" type="checkbox" checked> Landforms by place</label>
   <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1.3" step="0.01"></label>
@@ -112,7 +118,7 @@
   import { paint, fillOf as fillWith, swell } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate'];
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudShadow'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   // Palettes are kept as photographed (a palette shipped enriched is taken back to its raw colours); Richness enriches
   // them as they are drawn, so the swatches always show and edit the colours the photos gave.
@@ -210,7 +216,7 @@
     cv.style.aspectRatio = `${pic.width} / ${pic.height}`;
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    paint(g, pic, { base: p, palOf, background: background(p), weighted: $('weighted').checked });
+    paint(g, pic, { base: p, palOf, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value });
     $('bg').value = background(p);
     $('bandsOut').textContent = $('bands').value;
     $('slopeOut').textContent = +$('slope').value ? (+$('slope').value).toFixed(2) : 'none';
@@ -270,6 +276,10 @@
   $('source').addEventListener('change', () => (showSource(), draw()));
   showSource();
   $('mix').addEventListener('change', draw);
+  const showClouds = () => document.body.classList.toggle('clouds', +$('clouds').value > 0);
+  $('clouds').addEventListener('input', showClouds);
+  $('cloudOpacity').addEventListener('input', draw);
+  showClouds();
   const showLetter = () => document.body.classList.toggle('letter', $('letter').checked);
   for (const k of ['letter', 'letterText', 'letterSize', 'letterStrength']) $(k).addEventListener('input', () => (showLetter(), draw()));
   $('letterFont').addEventListener('change', draw);
@@ -287,7 +297,7 @@
   $('svg').onclick = () => {
     const p = richOf(pal()), pic = ridges(dials()), f = (v) => +v.toFixed(1);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
-    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p)}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
+    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p)}"/>` : s.shadow ? `<path d="${d(s)}" fill="#000" fill-opacity="${(0.35 * s.shadow).toFixed(3)}" stroke="none"/>` : s.cloud ? `<path d="${d(s)}" fill="${p.paper}" fill-opacity="${$('cloudOpacity').value}" stroke-width="${pic.line * 0.6}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
   };
 
@@ -301,7 +311,7 @@
     source: $('source').value,
     dials: Object.fromEntries(DIALS.map((k) => [k, +$(k).value])),
     weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked, geo: $('geo').checked,
-    seed, bg: bgPicked, richness: +$('richness').value,
+    seed, bg: bgPicked, richness: +$('richness').value, cloudOpacity: +$('cloudOpacity').value,
     letter: { on: $('letter').checked, text: $('letterText').value, font: $('letterFont').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
@@ -317,10 +327,10 @@
     $('source').value = s.source ?? 'chains';
     for (const k of DIALS) if (s.dials?.[k] !== undefined) $(k).value = s.dials[k];
     $('weighted').checked = s.weighted ?? true; $('forms').checked = s.forms ?? true; $('wrap').checked = !!s.wrap; $('geo').checked = s.geo ?? false;
-    seed = s.seed ?? 1; bgPicked = s.bg ?? null; $('richness').value = s.richness ?? 1;
+    seed = s.seed ?? 1; bgPicked = s.bg ?? null; $('richness').value = s.richness ?? 1; $('cloudOpacity').value = s.cloudOpacity ?? 0.92;
     const l = s.letter ?? {};
     $('letter').checked = !!l.on; $('letterText').value = l.text ?? 'A'; $('letterFont').value = l.font ?? $('letterFont').options[0].value; $('letterSize').value = l.size ?? 0.85; $('letterStrength').value = l.strength ?? 1;
-    showLetter();
+    showLetter(); showClouds();
     showSource(); swatches(); draw();
   }
   function listPresets(chosen = '') {
