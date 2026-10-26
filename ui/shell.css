@@ -133,3 +133,11 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .page-rows select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
 #sheet .page-json { margin: var(--space-3) 0 0; font-size: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 #sheet .page-lines .change.line { padding-left: 0; padding-right: 0; }
+
+/* Buying a workspace (ui/signup.js): a card in the sheet, its two fields on a row. */
+.signup-card { max-width: var(--measure); }
+.signup-row { padding: var(--space-8); }
+.signup-row.top { padding-bottom: 0; }
+.signup-name { flex: 1; min-width: var(--field-least); }
+.signup-email { flex: 2; min-width: var(--field-least); }
+.signup-error { padding: 0 var(--space-8) var(--space-8); }

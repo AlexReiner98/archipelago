@@ -15,6 +15,7 @@ import { recordAgreement } from './agreements.ts';
 import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, typedWorks, workspaceOfCode } from './members.ts';
 import { serverPacksOf } from './server-host.ts';
 import { serveServerPack } from './server-routes.ts';
+import { pollSignup, receiveLemon, signedByLemon, signupOffer, startSignup } from './signup.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
 import type { Workspaces } from './workspaces.ts';
@@ -101,6 +102,35 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   if (req.method === 'GET' && path === '/connect/agreements') {
     if (at.tooOften()) return;
     return reply(res, 200, { agreements: await serverPacksOf(at.workspaces).agreements() });
+  }
+  // Buying a workspace: what is sold, a request that goes on to the checkout, and the browser that began it asking
+  // whether it is made. Lemon Squeezy's word that it is paid for comes signed, from no browser (src/signup.ts).
+  if (path === '/connect/signup' && req.method === 'GET') return reply(res, 200, signupOffer());
+  if (path === '/connect/signup' && req.method === 'POST') {
+    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
+    if (at.tooOften()) return;
+    try {
+      return reply(res, 200, await startSignup(at.workspaces, ((await at.body()) ?? {}) as { name?: unknown; email?: unknown }));
+    } catch (err) {
+      return reply(res, 400, { error: (err as Error).message });
+    }
+  }
+  const signup = req.method === 'POST' ? /^\/connect\/signup\/(su_[a-z0-9]{8})$/.exec(path) : null;
+  if (signup) {
+    if (at.tooOften()) return;
+    const answer = await pollSignup(at.workspaces, signup[1], bearer(req.headers.authorization) ?? '');
+    return reply(res, answer.state === 'gone' ? 410 : 200, answer);
+  }
+  if (path === '/connect/lemon' && req.method === 'POST') {
+    if (at.tooOften()) return;
+    const raw = await at.raw();
+    if (!signedByLemon(raw, req.headers['x-signature'] as string | undefined)) return reply(res, 401, { error: 'Not signed with this server’s webhook secret.' });
+    try {
+      return reply(res, 200, await receiveLemon(at.workspaces, raw));
+    } catch (err) {
+      console.error(`lemon squeezy delivery: ${(err as Error).message}`);
+      return reply(res, 500, { error: (err as Error).message });
+    }
   }
   // Signing in by email: a link asked for at an address, and a link opened, its code traded once for a token.
   if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code')) {

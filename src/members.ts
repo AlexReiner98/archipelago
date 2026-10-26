@@ -99,6 +99,20 @@ export async function humanTokenAllowed(l: Archipelago, person: string | undefin
   if (!rows.length) throw new Error('On this workspace a person signs in as a member: add them under Members first.');
 }
 
+/** A new workspace's first member: its owner, an admin, and the person its views are for. */
+export async function admitOwner(l: Archipelago, email: string): Promise<string> {
+  const { me } = await l.init({ kind: 'human', name: email }, { name: email, email });
+  await l.db.query(`insert into member (email, person_id, admin, added_by) values ($1, $2, true, 'signup') on conflict (email) do nothing`, [email, me]);
+  return me;
+}
+
+/** A month's sign-in for a member, or nothing if the address is not one. */
+export async function memberToken(db: Q, workspace: string, email: string): Promise<string | undefined> {
+  const member = await memberOf(db, email);
+  if (!member) return undefined;
+  return (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
+}
+
 const KEY = 'signin:';
 const hash = (code: string) => createHash('sha256').update(code).digest('hex');
 

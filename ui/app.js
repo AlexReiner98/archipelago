@@ -8,6 +8,7 @@ import { canvasHas, canvasHref, focusOn, lensNow, mark, refreshCanvas, showCanva
 import { openCanvas } from './canvases.js';
 import { mayLeave, newItem } from './draft.js';
 import { drawFind } from './find.js';
+import { signupPage, welcome } from './signup.js';
 import { home } from './home.js';
 import { entity } from './item.js';
 import { readFlatLens } from './lens.js';
@@ -37,6 +38,8 @@ async function route(pulse = false) {
   const [, name = '', arg] = where.split('/');
   // Addresses from before the canvas still lead somewhere.
   if (name === 'join' && arg) return join(arg);
+  // Buying a workspace, and the page a buyer comes back to: in the sheet, before anything is read of a map.
+  if (name === 'signup' || name === 'welcome') return void ((document.body.dataset.sheet = 'open'), name === 'signup' ? signupPage() : welcome());
   if (['home', 'activity', 'review', 'projects', 'today', 'map', 'automations'].includes(name)) return void (location.hash = '#/');
   if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
