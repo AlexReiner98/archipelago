@@ -4,6 +4,7 @@
 
 import { CANADA } from './canada.js';
 import { MORE, NEW, MORE_ACCENTS, ASIDE } from './canada-more.js';
+import { INTERIOR } from './interior.js';
 
 const commons = (file, by, license) => ({ page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file.replaceAll(' ', '_'))}`, by, license });
 
@@ -260,6 +261,13 @@ function distinctAccents(accents, base) {
 // Seven more of them, and every Canadian place's accents from its flora and fauna. An accent joins the palette in
 // lightness order at a modest weight, and is marked (accent) so the drawing can keep it for the smaller shapes.
 const credit = ([file, by, license]) => commons(file, by, license);
+// The core seven's land read again with their interiors (interior.js), before their accents are chosen against it.
+for (const [k, inner] of Object.entries(INTERIOR)) {
+  const p = PLACES[k] ?? MORE[k];
+  [p.colours, p.weights] = [inner.colours, inner.weights];
+  // A place still to be made from MORE keeps its photos as [file, author, licence] until it is made.
+  p.photos = [...(p.photos ?? []), ...(PLACES[k] ? inner.photos.map(([file, by, license]) => commons(file, by, license)) : inner.photos)];
+}
 for (const [k, extra] of Object.entries(MORE_ACCENTS)) (MORE[k].accents = [...MORE[k].accents, ...extra.add]), (MORE[k].flora = [...MORE[k].flora, ...extra.flora]);
 for (const [k, more] of Object.entries(MORE)) {
   const p = (PLACES[k] ??= { ...NEW[k], region: 'canada', paper: more.paper, ink: more.ink, colours: more.colours, weights: more.weights, sea: more.sea, photos: more.photos.map(credit) });
