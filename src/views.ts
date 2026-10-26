@@ -9,7 +9,7 @@ import { factEvents } from './eventlog.ts';
 /** The most change sets' events changed_since counts: past that, its counts are of the newest. */
 const COUNTED = 20_000;
 import { livesIn } from './places.ts';
-import { savedViews } from './saved-views.ts'; import { pageStyle } from './styles.ts';
+import { savedViews } from './saved-views.ts'; import { pageStyle } from './styles.ts'; import { instructionsFor } from './instructions.ts';
 
 /**
  * How kernel code asks a view a pack answers (a pack's read of another view). Handed in by src/askview.ts, which
@@ -118,5 +118,9 @@ export const VIEWS: Record<string, View> = {
   style: {
     description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page, the pages that are not views and the canvas are drawn by. Params: of (an item id), style (the id of one kept on the map, used outright), view (a view kept on the map: the styles kept about it too), have (the hashes of the drawings the page holds: then the style carries the drawing it names, its code left out when the page has it).',
     run: (l, input) => pageStyle(l, input),
+  },
+  instructions: {
+    description: 'What agents are told where: the instructions the packs ship (presets), under the workspace’s kept on the map, under those kept about a repository, nearest last, in order, each with the item (and preset) that says it. A session is told those for session_start when it begins. Params: for (where: session_start, working_rules, tool:<name>; session_start unless said), about (a repository: what is said to a session there).',
+    run: async (l, input) => ({ said: await instructionsFor(l, typeof input.for === 'string' ? input.for : 'session_start', { ...(typeof input.about === 'string' && { about: input.about }) }) }),
   },
 };

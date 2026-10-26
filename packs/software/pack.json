@@ -97,6 +97,16 @@
       }
     },
     {
+      "id": "software.commit",
+      "extends": "record",
+      "capabilities": { "accounts": { "field": "sha" } },
+      "title": "Commit",
+      "description": "A commit accounted for: made by its session or a person, it says which items the commit settles, each by a settles link, and none when it has none. A commit with no such item is unaccounted for, and the check on the main branch stays red.",
+      "fields": {
+        "sha": { "type": "string", "description": "The commit's full id (40 hex characters)." }
+      }
+    },
+    {
       "id": "software.pull_request",
       "extends": "work",
       "title": "Pull request",
@@ -156,6 +166,17 @@
       }
     }
   ],
+  "rules": [
+    {
+      "id": "account_commits",
+      "on": "reply_ended",
+      "when": { "reply": { "unaccounted": true } },
+      "then": "ask",
+      "say": "This reply committed or pushed commits the map does not account for. In one change, give each a software.commit (full sha) with a software.settles link to each item it settles, or none.",
+      "record": { "type": "software.commit", "field": "sha" },
+      "lifted": "reply_account_commits"
+    }
+  ],
   "links": [
     {
       "id": "software.lives_in",
@@ -201,6 +222,15 @@
       "from": ["software.release"],
       "to": ["*"],
       "description": "What a release contains."
+    },
+    {
+      "id": "software.settles",
+      "extends": "relates_to",
+      "title": "settles",
+      "inverse": "is settled by",
+      "from": ["software.commit"],
+      "to": ["*"],
+      "description": "The commit finished or changed this item: a task it did, a bug it fixed, a decision it carried out."
     }
   ],
   "views": [

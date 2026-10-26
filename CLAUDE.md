@@ -33,6 +33,9 @@ where, and how that server is run.
 
 ## Rules
 
+How an agent is told, checked and reconciled (instructions, rules on a
+reply ending, commits accounted for) is `docs/agents.md`.
+
 - **You are an agent, not the owner.** Changes you make go through `change`.
   Under `npm start` they wait as proposals; under `npm run dev` they apply at
   once, so check them before you send them. Either way, never approve, reject,

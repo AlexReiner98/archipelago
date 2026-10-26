@@ -2,5 +2,6 @@
 // the host it declares and the kernel for its acts; it never sees a secret and reads no map.
 
 import { created, events, installed, manifest, refresh, start, status } from './app.js';
+import { recheck } from './checks.js';
 
-export default { status, start, manifest, created, installed, events, refresh };
+export default { status, start, manifest, created, installed, events, refresh, recheck };

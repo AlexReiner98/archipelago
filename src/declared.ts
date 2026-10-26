@@ -159,7 +159,10 @@ export interface PieceDef {
  */
 export interface StyleDef {
   id: string;
+  /** The system type it is a preset of: a style unless it says, or an instruction (what agents are told, in body). */
+  type?: string;
   title: string;
+  body?: string;
   on?: string[];
   /** "workspace": on nothing, it lies over the workspace's own style kept about nothing, and under every nearer one. */
   over?: 'workspace';
@@ -202,7 +205,9 @@ export const PAGES = ['time'];
 /** Every screen the packs declare, in the order the packs load. */
 export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => parts(pack).screens.map((s) => ({ ...s, pack: pack.id })));
 /** Every style preset the packs ship, in the order the packs load. */
-export const stylesOf = (packs: PackFile[]) => packs.flatMap((pack) => (pack.styles ?? []).map((s) => ({ ...s, pack: pack.id })));
+/** The presets the packs ship of one system type, each with its pack: styles unless another type is asked for. */
+export const presetsOf = (packs: PackFile[], type = 'style') => packs.flatMap((pack) => (pack.styles ?? []).filter((s) => (s.type ?? 'style') === type).map((s) => ({ ...s, pack: pack.id })));
+export const stylesOf = (packs: PackFile[]) => presetsOf(packs);
 
 /**
  * The kernel's own actions, each under one of the six verbs: an agent calls one as the verb's tool with its name
@@ -287,9 +292,11 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     }
   }
   // A preset says only what a style can say, and carries no code: code runs only from a style kept on the map, where a person approves it.
-  const styleFields = types.get('style')?.fields ?? {};
   for (const style of pack.styles ?? []) {
-    const at = `style "${style.id}"`;
+    const at = `${style.type ?? 'style'} "${style.id}"`;
+    const styleFields = types.get(style.type ?? 'style')?.fields ?? {};
+    if (style.type !== undefined && !['style', 'instruction'].includes(style.type)) problems.push(`${at}: a preset is a style or an instruction`);
+    if (style.type === 'instruction' ? typeof style.body !== 'string' || !style.body.trim() : style.body !== undefined) problems.push(`${at}: an instruction says its words in body, and only an instruction has one`);
     if (!own(style.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
     if (!style.title || !style.props || typeof style.props !== 'object') problems.push(`${at} needs a title and its props`);
     for (const t of style.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);

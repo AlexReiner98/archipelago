@@ -10,6 +10,7 @@ import type { Q } from './db.ts';
 import type { Registry } from './packs.ts';
 import { checkRetention, type Keep } from './retention.ts';
 import { fieldInReach, inReach } from './reach.ts';
+import { checkReplyRule, onReply } from './reply-rules.ts';
 
 type OneOrMany = string | string[];
 
@@ -33,6 +34,8 @@ export const DEFAULT_AGENT_POLICY: Policy = {
 export interface RuleDef {
   /** A name for it, used in what a refusal says and in what a held change is held by. */
   id?: string;
+  /** The event it decides about when that is not a change: "reply_ended", a session's reply ending (src/replies.ts). */
+  on?: string;
   when?: {
     /** Who makes the change: an agent (any actor not a person) or a human. */
     actor?: 'agent' | 'human';
@@ -64,8 +67,12 @@ export interface RuleDef {
     pack?: boolean;
     /** "outside": it writes a type, a link type or a field outside the reach of the pack that makes it (src/manifest.ts). */
     reach?: 'outside';
+    /** For a rule on a reply's end: what the reply did (true) or did not (false), as its hook read it. */
+    reply?: Record<string, boolean>;
   };
-  then?: 'hold' | 'refuse' | { require: string[] };
+  then?: 'hold' | 'refuse' | 'ask' | { require: string[] };
+  /** For a rule on a reply's end that reads unaccounted: what accounts for a commit, a type and its field holding the full sha. */
+  record?: { type: string; field: string };
   /** Fields whose values together may belong to one item of the type only. */
   unique?: string[];
   /** For unique: the type it holds within, flavours included. */
@@ -139,6 +146,10 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
   const known = (t: string) => reg.types.has(t);
   for (const [i, rule] of rules.entries()) {
     const at = `rule ${rule.id ?? i + 1}`;
+    if (rule.on !== undefined) {
+      problems.push(...checkReplyRule(rule, at, known));
+      continue;
+    }
     if (rule.stream !== undefined || rule.keep !== undefined) {
       problems.push(...checkRetention(rule, at));
       continue;
@@ -149,7 +160,7 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
       continue;
     }
     const then = rule.then;
-    if (then !== 'hold' && then !== 'refuse' && !(then && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse or { require: [fields] }`);
+    if (then !== 'hold' && then !== 'refuse' && !(typeof then === 'object' && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse or { require: [fields] }`);
     for (const t of [...(list(rule.when?.type) ?? []), ...(list(rule.when?.kind) ?? [])]) if (!known(t)) problems.push(`${at}: no type "${t}"`);
     if (rule.when?.compare !== undefined && !COMPARE.test(rule.when.compare)) problems.push(`${at}: compare reads like "total > 500"`);
     if (rule.when?.reach !== undefined && rule.when.reach !== 'outside') problems.push(`${at}: reach is "outside", for what a pack writes outside its reach`);
@@ -235,7 +246,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
   for (const rule of order) {
-    if (rule.unique || rule.stream || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
+    if (rule.unique || rule.stream || onReply(rule) || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
     if (rule.lifted && lifted(rule, w.op)) {
       spared.push(ruled(rule));
       continue;
@@ -243,7 +254,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
     if (rule.then === 'hold') {
       if (!who.human) held.push(ruled(rule));
     } else if (rule.then === 'refuse') refused.push(said(rule, `"${title}": refused by ${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`));
-    else if (rule.then) {
+    else if (typeof rule.then === 'object') {
       const props = { ...targets[0]?.props, ...w.props };
       const missing = rule.then.require.filter((f) => props[f] == null || props[f] === '');
       if (missing.length) refused.push(said(rule, `"${title}": needs ${missing.join(', ')}`));

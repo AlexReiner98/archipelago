@@ -11,8 +11,11 @@
 //   3. GitHub delivers everything to one address, signed with the secret the kernel keeps. The installation says
 //      whose workspace it is for, and a push is handed to the GitHub pack there (workspace.deliver).
 //
-// What the app may do on GitHub is read: the repositories' contents and metadata. It runs in the kernel's sandbox:
+// What the app may do on GitHub is read the repositories' contents, metadata and pull requests, and write one thing:
+// the check on the main branch that every commit is accounted for (checks.js). It runs in the kernel's sandbox:
 // it asks GitHub through the host it declares (ctx.request), and the kernel signs as the app or as an installation.
+
+import { CHECK, postCheck, rerun } from './checks.js';
 
 /** Back to the Workspace page, once done on GitHub. */
 const BACK = { redirect: '/#/workspace' };
@@ -78,8 +81,9 @@ export async function manifest(input, ctx) {
         setup_on_update: true,
         // Only its owner's account can install it until they choose otherwise on GitHub.
         public: false,
-        default_permissions: { contents: 'read', metadata: 'read' },
-        default_events: ['push'],
+        // Checks to post the one on the main branch (checks.js); pull requests to read the commits of one into it.
+        default_permissions: { contents: 'read', metadata: 'read', checks: 'write', pull_requests: 'read' },
+        default_events: ['push', 'pull_request', 'check_run'],
       },
     },
   };
@@ -150,10 +154,13 @@ export async function events(input, ctx) {
   const connection = installation && (await ctx.act('connection.get', { id: installation }));
   if (!connection) return { answer: { recorded: false, reason: 'No workspace here has connected this installation. Connect GitHub from the Workspace screen.' } };
   if (event === 'installation_repositories') return { answer: await addRepositories(ctx, installation, (payload.repositories_added ?? []).map((r) => r.full_name), payload.installation?.account?.login ?? '') };
-  if (event !== 'push') return { answer: { recorded: false, reason: `Only pushes are taken in, not "${event}".` } };
-  // The push is the GitHub pack's to take in there, as from its own webhook: this delivery is already checked.
+  if (event === 'check_run' && payload.action === 'rerequested' && payload.check_run?.name === CHECK) return { answer: await rerun(ctx, payload) };
+  if (event !== 'push' && event !== 'pull_request') return { answer: { recorded: false, reason: `Only pushes and pull requests are taken in, not "${event}".` } };
+  // The push is the GitHub pack's to take in there, as from its own webhook: this delivery is already checked. What
+  // it answers may be the check on the main branch, which is posted here.
   const delivery = input.headers?.['x-github-delivery'];
-  return { answer: await ctx.act('workspace.deliver', { connection: installation, event: 'repo.push', payload, headers: { 'x-github-event': 'push', ...(delivery && { 'x-github-delivery': delivery }) } }) };
+  const answer = await ctx.act('workspace.deliver', { connection: installation, event: 'repo.push', payload, headers: { 'x-github-event': event, ...(delivery && { 'x-github-delivery': delivery }) } });
+  return { answer: await postCheck(ctx, installation, payload, answer) };
 }
 
 /** The app's owner can rename it on GitHub, and the address a workspace is sent to follows its name: asked every hour. */

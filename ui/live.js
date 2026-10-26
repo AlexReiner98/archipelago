@@ -95,6 +95,9 @@ let readAt = 0;
 for (const name of ['scroll', 'wheel', 'pointermove', 'pointerdown', 'keydown']) addEventListener(name, () => (readAt = Date.now()), { passive: true, capture: true });
 const reading = () => Date.now() - readAt < 20_000 || Boolean(getSelection()?.toString());
 export let followedTimer;
+/** This page, among the owner's open pages: the server counts those that follow, so an agent's show says whether it landed. */
+const pageId = Math.random().toString(36).slice(2, 14);
+const thisPage = () => ({ page: pageId, on: following.on && chosen.kinds.has('show'), muted: [...chosen.muted] });
 /** Where each agent that tells a story tells it: following it goes there, not from item to item. */
 export const storyOf = new Map();
 
@@ -108,26 +111,27 @@ export function follow(steps = []) {
   }
   following.working = new Set(steps.filter((s) => Date.now() - s.at < 600_000).map((s) => s.actor)).size;
   followBox.checked = following.on;
-  if (!following.on) return;
-  const wanted = fresh.filter((s) => chosen.kinds.has(s.kind) && !chosen.muted.has(s.actor));
+  // A page not following still offers what an agent showed: the line, and the way there.
+  const wanted = fresh.filter((s) => (following.on ? chosen.kinds.has(s.kind) : s.kind === 'show') && !chosen.muted.has(s.actor));
   // The line says the last thing done; the page goes to the last that has a place. A step may have none: then the page stays.
   const to = wanted.at(-1);
   if (!to) return;
   const place = wanted.findLast((s) => s.hash || storyOf.has(s.actor));
   const there = place && `#/${storyOf.get(place.actor) ?? place.hash}`;
-  const busy = state.dirty || document.querySelector('dialog[open]') || reading();
+  const busy = !following.on || state.dirty || document.querySelector('dialog[open]') || reading();
   followed.replaceChildren(
     ...[
       // One line: who, and the first few words of why. The whole reason is on the page it brought you to.
       h('strong', {}, to.actor.split('/').at(-1)),
       h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : busy ? 'is working somewhere else' : 'brought you here'),
       busy && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
-      h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
+      following.on && h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
     ].filter(Boolean),
   );
   followed.hidden = false;
   clearTimeout(followedTimer);
-  followedTimer = setTimeout(() => (followed.hidden = true), 12000);
+  // A show offered to a page not following stays longer: it is the only way the reader hears of it.
+  followedTimer = setTimeout(() => (followed.hidden = true), following.on ? 12000 : 60000);
   if (!busy && there && location.hash !== there) location.hash = there;
 }
 
@@ -212,7 +216,7 @@ export async function checkTail() {
     const at = [state.pos, ...stores.map((s) => s.pos)].filter((pos) => pos !== undefined);
     const from = at.length ? Math.min(...at) : undefined;
     const ids = [...new Set([...shownIds(), ...stores.flatMap((s) => s.ids())])];
-    const beat = await api('tail', from === undefined ? {} : { after: from, seq: state.seq, ids });
+    const beat = await api('tail', from === undefined ? { page: thisPage() } : { after: from, seq: state.seq, ids, page: thisPage() });
     // Only an answer that read the facts moves a store: one that says only where the log stands would skip them.
     if (beat.entries) for (const store of stores) {
       try {

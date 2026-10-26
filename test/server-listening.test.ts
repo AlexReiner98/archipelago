@@ -19,9 +19,9 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   assert.match((await call('/agent/show', undefined, { lens: { filter: { ids: ['e_nothing0'] } } })).error, /No item/);
   assert.match((await call('/agent/show', undefined, { lens: { filter: { text: 'x' }, walk: { over: ['nope'] } } })).error, /unknown link type/);
 
-  await call('/agent/show', undefined, { actor: 'robot', screen: 'roadmap', of: 'e_x', note: 'Look here' });
+  await call('/agent/show', undefined, { actor: 'robot', screen: 'workspace', note: 'Look here' });
   const shown = (await call('/api/tail')).result.focus;
-  assert.deepEqual([shown.hash, shown.actor, shown.note], ['roadmap/e_x', 'robot', 'Look here']);
+  assert.deepEqual([shown.hash, shown.actor, shown.note], ['workspace', 'robot', 'Look here']);
 
   await call('/agent/change', undefined, { actor: 'robot', reason: 'A note', ops: [{ op: 'create', type: 'work.note', title: 'N' }] });
   const proposed = (await call('/api/tail')).result.focus;
@@ -35,7 +35,7 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   const last = async () => (await call('/api/tail')).result.steps.at(-1);
   const sofar = (await call('/api/tail')).result.steps.slice(-4);
   assert.deepEqual(sofar.map((s: any) => s.kind), ['show', 'show', 'show', 'change'], 'a show and an agent\'s change are steps; a refused call and the human\'s change are not');
-  assert.deepEqual([sofar[2].did, sofar[2].hash, sofar[3].did], ['Look here', 'roadmap/e_x', 'A note']);
+  assert.deepEqual([sofar[2].did, sofar[2].hash, sofar[3].did], ['Look here', 'workspace', 'A note']);
   await call('/agent/search', undefined, { actor: 'robot', q: 'N' });
   const searched = await last();
   assert.deepEqual([searched.kind, searched.actor, searched.did, searched.hash], ['search', 'robot', 'searched for "N"', undefined]);

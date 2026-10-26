@@ -35,22 +35,7 @@ actions; `query` with name `actions` gives their inputs whole.
   about, and the ties between them you want seen. The owner reads the beats
   on your session's page beside a drawing of those items. Tell what matters,
   not every step; take a beat back with `replaces` when you change your mind.
-- **Change the map when the work changes it.** A task done, a decision made
-  in practice, a problem found: change its status with what happened and the
-  evidence. Do not leave it open with a note.
-- **Say on whose authority.** Every `change` takes `authority`: `of: "human"`
-  with what the owner said and where, or `of: "agent"` for your own reading.
-- **A name is a few words.** A title is 60 characters at most; the rest goes
-  in the first line of the note. Lead a note with the point, and give each
-  further part a short title on a line of its own.
-- **Search before you create.** `query` with name `search` first, so nothing is made twice.
-- **Say who is waited on with a relation.** Other work is `depends_on`; a
-  person who has to answer or act is `waits_on` (what for in `props.for`),
-  removed once they have; a resource is `needs`, and an exclusive one is
-  taken with `assign` action `claim` and given back with `revise` action
-  `release`.
-- **Name what a change makes by its ref.** `{ref}` in a title or note becomes
-  the id of the item the same change makes.
+<!-- working_rules: the setup puts the instruction presets said here, one bullet each -->
 - **Give a hub its views.** An item that holds a lot is the hub of its
   problem, and the owner reads it through its views: each a `lens` item
   linked `about` it, named for the question it answers (`place` for its
@@ -60,8 +45,6 @@ actions; `query` with name `actions` gives their inputs whole.
   says what they want to see; the session start and `query` `hubs` name the
   hubs that have none. While a project is still being shaped, set its
   `hub_at` to 1: nearly everything in it is then a hub.
-- **Correct a refused change, do not resend it.** The refusal gives a name:
-  send `change` with `retry` and `fixes` for the ops that were wrong.
 - **If a pelago tool answers with a web page or "502",** the server is
   restarting. Do not send the call again through MCP: each such answer is a
   whole page in your context. Wait until `GET /health` on the server answers,

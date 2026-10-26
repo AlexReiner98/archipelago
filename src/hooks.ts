@@ -63,6 +63,11 @@ export function runHook(l: Archipelago, pack: string, id: string, input: { paylo
   return hostFor(l.registry).act(l, asPack(pack), pack, id, input, undefined, 'webhook');
 }
 
+/** Ask a pack's webhook entry what it makes of a delivery, as the pack: it writes nothing and records nothing. */
+export async function askHook(l: Archipelago, pack: string, id: string, input: { payload: unknown; headers: Record<string, unknown> }) {
+  return (await hostFor(l.registry).call(l, asPack(pack), pack, 'webhook', id, input)).answer ?? null;
+}
+
 /** The pack that records a kind of event from a webhook of its own, and that webhook: who takes it in, where the kernel hears of it first. */
 export function hookFor(l: Archipelago, event: string): { pack: string; hook: string; secret: string } | undefined {
   const file = l.registry.packs.find((p) => parts(p).events.includes(event) && parts(p).webhooks.length);

@@ -138,6 +138,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }) as string;
   const asked: string[] = [];
+  const checks: { method: string; url: string; body: any }[] = [];
   let renamed = false;
   const hub = createServer((req, res) => {
     const say = (status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
@@ -153,6 +154,12 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
     if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
     if (req.url?.startsWith('/repos/Acme/Tools/commits/')) return say(200, { sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools. The whetstone still needs oiling.' }, files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1, patch: '+  oil()' }] });
     if (req.url?.startsWith('/repos/Acme/Tools/compare/')) return bearer === 'ghs_forty-two' ? say(200, { commits: [{ sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools\n\nThe whetstone still needs oiling.', author: { name: 'sam' } } }], files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1 }] }) : say(401, { message: 'Bad credentials' });
+    if (req.url?.startsWith('/repos/Acme/Tools/check-runs')) {
+      if (bearer !== 'ghs_forty-two') return say(401, { message: 'Bad credentials' });
+      let text = '';
+      req.on('data', (d) => (text += d)).on('end', () => (checks.push({ method: req.method!, url: req.url!, body: JSON.parse(text) }), say(201, { id: 900 })));
+      return;
+    }
     if (req.url === '/repos/Acme/Tools') return say(200, { default_branch: 'main' });
     if (req.url?.startsWith('/installation/repositories')) return bearer === 'ghs_forty-two' ? say(200, { repositories: [{ full_name: 'Acme/Site' }, { full_name: 'Acme/Tools' }] }) : say(401, { message: 'Bad credentials' });
     say(404, { message: 'Not Found' });
@@ -188,7 +195,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   const handed = (await call('/x/github_app/manifest', undefined, { state })).result;
   assert.equal(handed.action, `https://github.test/settings/apps/new?state=${state}`);
   const { manifest } = handed;
-  assert.deepEqual([manifest.hook_attributes.url, manifest.setup_url, manifest.redirect_url, manifest.default_permissions, manifest.default_events], [`${base}/x/github_app/hook/events`, `${base}/x/github_app/installed`, `${base}/x/github_app/created`, { contents: 'read', metadata: 'read' }, ['push']]);
+  assert.deepEqual([manifest.hook_attributes.url, manifest.setup_url, manifest.redirect_url, manifest.default_permissions, manifest.default_events], [`${base}/x/github_app/hook/events`, `${base}/x/github_app/installed`, `${base}/x/github_app/created`, { contents: 'read', metadata: 'read', checks: 'write', pull_requests: 'read' }, ['push', 'pull_request', 'check_run']]);
   assert.match((await call('/x/github_app/manifest', undefined, { state: 'default.guessed' })).error, /not started from Archipelago/);
   assert.equal((await page('/x/github_app/created?code=thecode&state=not-ours')).status, 400, 'a code is taken only from someone who started here');
   const made = await page(`/x/github_app/created?code=thecode&state=${state}`);
@@ -228,6 +235,21 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   const heard = (await deliver('push', push(42), 'whsec', '/github/app/hook')).result;
   assert.deepEqual([heard.recorded, heard.repo.title, heard.commits], [true, 'Tools repo', 1]);
   assert.equal((await deliver('push', push(99))).result.recorded, false, 'an installation no workspace connected is not anyone\'s');
+  // A push to main is checked: no commit item names its commit yet, so the app posts the check red, as the installation.
+  assert.deepEqual(heard.check, { conclusion: 'failure', title: '1 of 1 commit not accounted for', posted: true, id: 900 });
+  assert.deepEqual([checks[0].method, checks[0].url, checks[0].body.name, checks[0].body.head_sha, checks[0].body.conclusion], ['POST', '/repos/Acme/Tools/check-runs', 'Every commit accounted for', 'a'.repeat(40), 'failure']);
+  // Asked again each minute, it stays as it is, and asking writes nothing to the workspace's log.
+  const recheck = () => serverPacksOf(workspaces).call('github_app', 'schedule', 'recheck', {});
+  const logged = async () => (await db.query<{ n: number }>(`select count(*)::int as n from event where action = 'server.workspace.deliver'`)).rows[0].n;
+  const was = await logged();
+  assert.deepEqual(await recheck(), { asked: 1, green: [] });
+  assert.equal(await logged(), was);
+  assert.equal(checks.length, 1);
+  // Its session accounts for the commit on the map (it settles none): the check turns green on GitHub by itself.
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'software.commit', title: 'Sharpen the tools', props: { sha: 'a'.repeat(40) } }] });
+  assert.deepEqual(await recheck(), { asked: 1, green: ['Acme/Tools@aaaaaaa'] });
+  assert.deepEqual([checks[1].method, checks[1].url, checks[1].body.conclusion, checks[1].body.output.title], ['PATCH', '/repos/Acme/Tools/check-runs/900', 'success', 'All one commit accounted for']);
+  assert.deepEqual(await recheck(), { asked: 0, green: [] }, 'and let go');
   // 4. With a model account, the reader pack reads the push: it hears what the GitHub pack recorded, looks at the commits
   // through the app, and the kernel runs the model over its tools. Here the model is a script, so what is tried is everything around it.
   const runsOn = async () => (await call('/api/model_account', admin)).result.runs_on;

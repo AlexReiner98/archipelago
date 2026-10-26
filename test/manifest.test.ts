@@ -85,7 +85,7 @@ test('a server pack is a pack that asks for server reach: never a workspace pack
   assert.ok(!reg.found.some((p) => p.id === 'github_app'), "a workspace's registry leaves it out");
   const { packs } = loadServerPacks([OWN_PACKS]);
   assert.deepEqual(packs.map((p) => [p.file.id, Boolean(p.file.reach.server)]), [['github_app', true]]);
-  assert.deepEqual(parts(packs[0].file).schedules.map((s) => s.id), ['refresh'], 'its schedule is a handler like any pack’s');
+  assert.deepEqual(parts(packs[0].file).schedules.map((s) => s.id), ['refresh', 'recheck'], 'its schedules are handlers like any pack’s');
 });
 
 test('a pack waits while what it requires is missing, and what names a pack it uses registers only while that one is active', async () => {

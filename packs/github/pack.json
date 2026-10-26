@@ -1,11 +1,12 @@
 {
   "id": "github",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "GitHub",
-  "description": "Pushes keep the map current: each push to a repository is recorded against it, and a commit on any branch that says it closes something proposes exactly that.",
+  "description": "Pushes keep the map current: each push to a repository is recorded against it, a commit on any branch that says it closes something proposes exactly that, and a push to the main branch or a pull request into it is checked: every commit accounted for.",
   "requires": ["core", "software"],
   "handlers": [{ "webhook": "github.push", "records": ["repo.push"] }],
   "reach": {
-    "webhooks": [{ "id": "github.push", "secret": "webhook", "header": "x-hub-signature-256", "headers": ["x-github-event", "x-github-delivery"] }]
+    "webhooks": [{ "id": "github.push", "secret": "webhook", "header": "x-hub-signature-256", "headers": ["x-github-event", "x-github-delivery"] }],
+    "via": [{ "pack": "github_app", "host": "api" }]
   }
 }

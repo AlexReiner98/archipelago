@@ -242,6 +242,30 @@ export function codeCard() {
   );
 }
 
+/** The rules that ask an agent at its reply's end, each with how often it asked this week and a switch. Nothing when no pack has one. */
+export function replyRulesCard() {
+  const card = h('section', { class: 'card wide', hidden: true });
+  const row = (r) => {
+    const on = h('input', { type: 'checkbox', checked: !r.off, title: 'On: it asks an agent whose reply did what it names' });
+    const note = h('span', { class: 'muted small' });
+    on.onchange = () => api('workspace_set', { lifted: { [r.lifted]: !on.checked } }).then(() => (note.textContent = ''), (err) => ((on.checked = !on.checked), (note.textContent = err.message)));
+    return h(
+      'li',
+      { class: 'row-top tie-row' },
+      h('span', { class: 'grow', title: `${r.rule}\n${r.say}` }, r.rule.split('.').pop().replaceAll('_', ' ')),
+      note,
+      h('span', { class: 'pill', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)),
+      on,
+    );
+  };
+  api('workspace_info').then(({ reply_rules }) => {
+    if (!reply_rules?.length) return;
+    card.replaceChildren(h('header', {}, h('h2', { class: 'hinted', title: 'Rules that ask an agent, once a turn, when its reply ends having done what they name' }, 'Checks')), h('ul', { class: 'rows' }, reply_rules.map(row)));
+    card.hidden = false;
+  }, () => null);
+  return card;
+}
+
 /** The whole map as a file, for the owner to keep, whether agents may have one too, and a file brought in. */
 export function backupCard(done) {
   const note = h('span', { class: 'muted small grow' });

@@ -44,7 +44,7 @@ export const STORES: Record<string, string> = {
   act: 'A request a pack made outside the map: one that cannot be taken back waits for a person; once made it is logged, never undone.',
   type_def: "Every type and relation the packs declare, dormant ones included: written when a workspace opens, never by a change.",
   local_type: "A workspace's own types, kept beside the workspaces so the server can read them: written when one is defined.",
-  transient: 'Short-lived keys and values with an expiry: gone when they lapse, never part of a backup or the log; unlogged on a Postgres server.',
+  transient: "Short-lived keys and values with an expiry: gone when they lapse, never part of a backup or the log; unlogged on a Postgres server. Among them the set of items each session touched (src/touched.ts), kept by run until a week after it was last heard from or ended.",
   pack_store: 'Keys and values a server pack keeps, each pack its own: written through the pack host only.',
   control_workspace: 'The workspaces this server holds: written when one is made.',
   control_value: "The server's own keys and values, across workspaces.",
@@ -68,6 +68,7 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',
   style: 'How a page looks: the styles the packs ship and the map keeps, merged; the system tier, not the work.',
   saved_views: 'The views kept on the map, each named by the style that draws it: the system tier, not the work.',
+  instructions: 'What agents are told: the instructions the packs ship and the map keeps, merged; the system tier, not the work.',
 };
 
 /** Restoring a backup writes the map's rows as they were, in src/pelago.ts (restoreRows): never re-applied as changes. */

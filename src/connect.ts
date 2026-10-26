@@ -18,19 +18,23 @@ import { serveServerPack } from './server-routes.ts';
 import { pollSignup, receiveLemon, signedByLemon, signupOffer, startSignup } from './signup.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
+import { workingRules } from './working-rules.ts';
 import type { Workspaces } from './workspaces.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
+/** The working rules as handed out: the file with the packs' instructions said in it, read once. */
+const RULES = workingRules();
 
 /**
  * Which hand-out this server gives: a mark that moves when any file the setup
- * writes does (the hook, the rules, the skill, the setup itself and so the
- * hooks it registers). The setup writes it into the project's hook, which
- * says it with every call, so a session can be told its project is behind.
+ * writes does (the hook, the rules with the instructions said in them, the
+ * skill, the setup itself and so the hooks it registers). The setup writes it
+ * into the project's hook, which says it with every call, so a session can be
+ * told its project is behind.
  */
 export const SETUP_VERSION = createHash('sha256')
-  .update(['scripts/pelago-hook.mjs', '.claude/skills/pelago-bump/SKILL.md', 'examples/working-rules.md', 'scripts/pelago-setup.mjs'].map(read).join('\n'))
+  .update([read('scripts/pelago-hook.mjs'), read('.claude/skills/pelago-bump/SKILL.md'), RULES, read('scripts/pelago-setup.mjs')].join('\n'))
   .digest('hex')
   .slice(0, 12);
 
@@ -44,7 +48,7 @@ export function setupScript(origin: string, tokens = true): string {
     hook: read('scripts/pelago-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin)).replace(`const SETUP = '';`, `const SETUP = '${SETUP_VERSION}';`),
     skill: read('.claude/skills/pelago-bump/SKILL.md'),
     home: `# Where bumps live\n\nWorkspace: ${origin}.\n\nFind the feature that gathers friction with Archipelago by search (type \`software.feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,
-    rules: read('examples/working-rules.md'),
+    rules: RULES,
   };
   return `const ORIGIN = ${JSON.stringify(origin)};\nconst TOKENS = ${tokens};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-setup.mjs')}`;
 }

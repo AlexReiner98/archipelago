@@ -11,6 +11,9 @@
 //   .claude/skills/pelago-bump/      how to record friction with Archipelago
 //   .claude/pelago.md                how to work with the map, read through CLAUDE.md
 //   .claude/pelago-setup.json        what the setup wrote, so it can be taken out again
+//   .worktreeinclude                 the ignored files above, which Claude Code then copies into each worktree it makes
+//   .git/hooks/commit-msg            names, in a commit a session makes, the session's run (not where the project has
+//                                    a commit-msg hook of its own, or its hooks are another tool's: core.hooksPath)
 //
 // It shows what it will change and asks before it writes. Options go after "--" at the end of the command:
 //
@@ -28,9 +31,9 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
 const OPTIONS = ['--dry-run', '--yes', '--remove', '--machine'];
@@ -59,6 +62,35 @@ const section = `## Archipelago\n\nThis project's work is kept in Archipelago ($
 // The same things as a setup wrote them while this was called Lattice.
 const OLD = { hook: '.claude/lattice-hook.mjs', manifest: '.claude/lattice-setup.json', rules: '.claude/lattice.md', skill: ['.claude/skills/lattice-bump/SKILL.md', '.claude/skills/lattice-bump/references/home.md'] };
 const ourHook = /(pelago|lattice)-hook\.mjs/;
+// The git hook that names the run of the session making a commit. The hook script keeps each session's run in the
+// checkout's git folder (pelago-runs/<session id>, shared by its worktrees); Claude Code gives every command a
+// session runs its id (CLAUDE_CODE_SESSION_ID). A commit made by a person has no session, and one made by a session
+// Archipelago does not know has no run kept: either is left as it is. It is plain sh and git, so it works in a
+// worktree that has none of the project's ignored files, and never stops a commit.
+const COMMIT_MARK = '# Archipelago: names the run';
+const COMMIT_HOOK = `#!/bin/sh
+${COMMIT_MARK} of the Claude Code session making this commit. Written by Archipelago's setup, which takes it out again.
+id="$CLAUDE_CODE_SESSION_ID"
+case "$id" in ''|*[!A-Za-z0-9_-]*) exit 0 ;; esac
+run=$(cat "$(git rev-parse --git-common-dir)/pelago-runs/$id" 2>/dev/null) || exit 0
+case "$run" in ''|*[!A-Za-z0-9_-]*) exit 0 ;; esac
+git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Archipelago-Run: $run" "$1" || true
+exit 0
+`;
+// Claude Code copies into a worktree it makes (the desktop app's, --worktree, a subagent's) only the ignored files
+// .worktreeinclude names. Without them a session there has no hooks, so no run, and its commits name none.
+const INCLUDE = '.worktreeinclude';
+const INCLUDE_MARK = "# Archipelago's setup: what it wrote, for each worktree Claude Code makes";
+const CARRIED = ['.mcp.json', '.claude/settings.json', HOOK, RULES, '.claude/skills/pelago-bump/references/home.md'];
+/** A .worktreeinclude without the setup's lines in it. */
+const withoutCarried = (text) => {
+  const lines = text.split('\n');
+  const at = lines.indexOf(INCLUDE_MARK);
+  if (at < 0) return text.trim();
+  let end = at + 1;
+  while (end < lines.length && CARRIED.includes(lines[end])) end++;
+  return [...lines.slice(0, at), ...lines.slice(end)].join('\n').replace(/\n{3,}/g, '\n\n').trim();
+};
 const reads = (text) => /@\.claude\/(pelago|lattice)\.md/.test(text ?? '');
 
 // Every change is worked out first and made only once all of them are known: a file that cannot be read stops
@@ -103,6 +135,21 @@ function take(path, text, note = '', own = false) {
   const file = abs(path);
   if (text === null) plan.push({ will: `delete     ${path}${note && `  ${note}`}`, say: `deleted    ${path}`, path, own, make: () => rmSync(file) });
   else plan.push({ will: `change     ${path}${note && `  ${note}`}`, say: `changed    ${path}`, path, own, make: () => writeFileSync(file, text) });
+}
+
+/** Where git looks for this checkout's hooks and keeps its runs, relative to here; null outside a checkout, and other when another tool keeps its hooks (core.hooksPath). */
+function gitFolder() {
+  const git = (...args) => execFileSync('git', args, { cwd: here, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  try {
+    const at = (path) => relative(here, resolve(here, path)).replace(/\\/g, '/');
+    const found = { hook: at(join(git('rev-parse', '--git-path', 'hooks'), 'commit-msg')), runs: at(join(git('rev-parse', '--git-common-dir'), 'pelago-runs')) };
+    try {
+      if (git('config', '--get', 'core.hooksPath')) return { ...found, other: true };
+    } catch { /* not set */ }
+    return found;
+  } catch {
+    return null;
+  }
 }
 
 const json = (value) => JSON.stringify(value, null, 2) + '\n';
@@ -153,6 +200,29 @@ function connect() {
   put('.claude/settings.json', json(settings), { own: settingsOwn, note: settingsOwn ? '' : '(adds four hooks that run the script above)' });
 
   for (const [path, text] of Object.entries(OWN)) if (path !== HOOK) put(path, text, { own: true });
+
+  const git = gitFolder();
+  const commit = git && read(abs(git.hook));
+  if (git?.other) plan.push({ say: `left       the commit-msg hook  (this checkout's git hooks are another tool's, core.hooksPath: commits do not name their run)`, make: null });
+  else if (commit === COMMIT_HOOK) plan.push({ say: `as it was  ${git.hook}`, make: null });
+  else if (commit != null && !commit.includes(COMMIT_MARK)) plan.push({ say: `kept       ${git.hook}  (the project's own commit-msg hook: commits do not name their run)`, make: null });
+  else if (git)
+    plan.push({
+      will: `${commit == null ? 'write    ' : 'change   '}  ${git.hook}  (names the session's run in a commit a session makes)`,
+      say: `written    ${git.hook}`,
+      path: git.hook,
+      own: true,
+      make: () => {
+        mkdirSync(dirname(abs(git.hook)), { recursive: true });
+        writeFileSync(abs(git.hook), COMMIT_HOOK);
+        chmodSync(abs(git.hook), 0o755);
+      },
+    });
+  const include = read(abs(INCLUDE));
+  const rest = withoutCarried(include ?? '');
+  // Its own lines, alone in a file of their own or kept before, are the setup's to renew with nobody to ask.
+  const includeOwn = include === null || include.includes(INCLUDE_MARK);
+  put(INCLUDE, `${rest ? `${rest}\n\n` : ''}${[INCLUDE_MARK, ...CARRIED].join('\n')}\n`, { own: includeOwn, verb: include ? 'added to ' : 'written  ', note: include?.includes(INCLUDE_MARK) ? '' : '(so a worktree Claude Code makes has the hooks)' });
   put(MANIFEST, json({ files: Object.fromEntries(Object.entries(OWN).map(([path, text]) => [path, sha(text)])) }), { own: true });
   for (const path of [...OLD.skill, OLD.rules, OLD.manifest]) if (existsSync(abs(path))) take(path, null, '(it has a new name, above)', true);
 
@@ -252,6 +322,15 @@ function remove() {
     else plan.push({ say: `kept       ${path}  (changed since the setup wrote it)`, make: null });
   }
   if (existsSync(abs(MANIFEST))) take(MANIFEST, null);
+  const include = read(abs(INCLUDE));
+  if (include?.includes(INCLUDE_MARK)) {
+    const rest = withoutCarried(include);
+    take(INCLUDE, rest ? `${rest}\n` : null, rest ? "(takes the setup's lines out)" : '(it holds nothing else)', true);
+  }
+  // The commit-msg hook goes only when it is the setup's, and the runs kept for it with it.
+  const git = gitFolder();
+  if (git && read(abs(git.hook))?.includes(COMMIT_MARK)) take(git.hook, null);
+  if (git && existsSync(abs(git.runs))) plan.push({ will: `delete     ${git.runs}/  (the runs kept for the commit-msg hook)`, say: `deleted    ${git.runs}/`, path: git.runs, make: () => rmSync(abs(git.runs), { recursive: true, force: true }) });
   // What a setup wrote under the old name left no list, or one of files nobody is handed any more: all of it goes.
   for (const path of [OLD.hook, ...OLD.skill, OLD.rules, OLD.manifest]) if (existsSync(abs(path))) take(path, null);
 
