@@ -3,6 +3,7 @@
 // is credited under it, and used only to read its colours). The hand-picked ones follow, to compare.
 
 import { CANADA } from './canada.js';
+import { MORE, NEW } from './canada-more.js';
 
 const commons = (file, by, license) => ({ page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file.replaceAll(' ', '_'))}`, by, license });
 
@@ -160,6 +161,8 @@ export function fromPixels(data, k = 9, seed = 1, only = null) {
   // Land and water can be drawn apart, so the sea and sky do not crowd the land out of its own palette.
   if (only === 'land') px.splice(0, px.length, ...px.filter((p) => !isBlue(p)));
   if (only === 'sea') px.splice(0, px.length, ...px.filter(isBlue));
+  // Vivid: only the colourful, non-water pixels, for a species' accent (a puffin's beak, not the sky behind it).
+  if (only === 'vivid') px.splice(0, px.length, ...px.filter((p) => !isBlue(p) && Math.hypot(p[1], p[2]) > 0.06));
   const weight = (p) => 1 + 6 * Math.hypot(p[1], p[2]);
   let s = seed;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -236,6 +239,17 @@ const FORMS = {
 // Canada's archipelagos join the places, with Haida Gwaii, for the study.
 Object.assign(PLACES, CANADA);
 PLACES.haidaGwaii.region = 'canada';
+// Seven more of them, and every Canadian place's accents from its flora and fauna. An accent joins the palette in
+// lightness order at a modest weight, and is marked (accent) so the drawing can keep it for the smaller shapes.
+const credit = ([file, by, license]) => commons(file, by, license);
+for (const [k, more] of Object.entries(MORE)) {
+  const p = (PLACES[k] ??= { ...NEW[k], region: 'canada', paper: more.paper, ink: more.ink, colours: more.colours, weights: more.weights, sea: more.sea, photos: more.photos.map(credit) });
+  p.flora = more.flora.map(credit);
+  const small = Math.min(...p.weights) * 0.6;
+  const all = [...p.colours.map((c, i) => [c, p.weights[i], false]), ...more.accents.map((c) => [c, small, true])];
+  all.sort((a, b) => oklab(...[1, 3, 5].map((i) => parseInt(a[0].slice(i, i + 2), 16)))[0] - oklab(...[1, 3, 5].map((i) => parseInt(b[0].slice(i, i + 2), 16)))[0]);
+  [p.colours, p.weights, p.accent] = [all.map((x) => x[0]), all.map((x) => +x[1].toFixed(3)), all.map((x) => x[2])];
+}
 for (const [k, p] of Object.entries(PLACES)) p.form ??= FORMS[k.replace(/Hand$/, '')];
 
 // How mountainous each place really is: its highest point above the sea, in metres, rounded. From general reference
@@ -254,7 +268,7 @@ export const riseOf = (metres) => {
   return +(0.12 + 1.6 * r ** 2.5).toFixed(3);
 };
 for (const [k, p] of Object.entries(PLACES)) {
-  const metres = PEAKS[k.replace(/Hand$/, '')];
+  const metres = PEAKS[k.replace(/Hand$/, '')] ?? p.peak;
   if (metres !== undefined) (p.peak = metres), (p.form = { ...p.form, rise: riseOf(metres) });
 }
 
@@ -269,10 +283,10 @@ const isBlue = ([, a, b]) => {
 };
 
 /** A palette's land colours: its colours and weights without the blues (all of them, if it is nothing but blue). */
-export function landOf({ colours, weights }) {
+export function landOf({ colours, weights, accent }) {
   const keep = colours.map((h) => !isBlue(oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)))));
-  if (!keep.some(Boolean)) return { colours, weights };
-  return { colours: colours.filter((_, i) => keep[i]), weights: weights?.filter((_, i) => keep[i]) };
+  if (!keep.some(Boolean)) return { colours, weights, accent };
+  return { colours: colours.filter((_, i) => keep[i]), weights: weights?.filter((_, i) => keep[i]), accent: accent?.filter((_, i) => keep[i]) };
 }
 
 /**

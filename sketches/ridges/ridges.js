@@ -63,6 +63,8 @@ export const DEFAULTS = {
   shallows: 0.4,   // how wide the pale shallow water round the land reaches
   relief: 0.6,     // height variety within an archipelago: even (0) to massifs among low islands (1)
   edges: 0.5,      // a calm border of open water round the islands: none (0) to wide (1)
+  foothills: 0.6,  // smaller hills in front of each range, overlapping it: none (0) to many (1)
+  peaks: 0.6,      // ranges in bands (0) to distinct summits, each row its own (1)
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   anchors: null,   // [[x, y], ...] in page units: put archipelago i at anchor i (one per anchor), as on a map
   line: 1.2,       // outline weight
@@ -209,6 +211,14 @@ export function ridges(dials) {
     return smooth(reach * 1.25, reach * 0.7, Math.sqrt(near));
   };
 
+  // A land shape, marked small when its area is under about five rows squared: the species' accents go there.
+  const small = gap * gap * 5;
+  const put = (shape) => {
+    let area = 0;
+    shape.points.forEach(([x0, y0], n) => { const [x1, y1] = shape.points[(n + 1) % shape.points.length]; area += x0 * y1 - x1 * y0; });
+    shapes.push({ ...shape, small: Math.abs(area) / 2 < small });
+  };
+
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
     const h = [], shelf = [], gs = [], ts = [], steps = [];
@@ -228,13 +238,15 @@ export function ridges(dials) {
       if (f.cliff) mask = smooth(0, 1 - 0.85 * f.cliff, mask);
       if (!mask) { h.push(0); continue; }
       // Height: the place's own, lower for a lesser island and for an older one; with diffusion, rising to the heart.
-      const c = crest(toCell(x) * 3, r * 0.12);
+      // Peaks: each row its own summits (the row index moves the noise faster), set apart from each other, so a
+      // row's mountains stand clear of the row behind rather than lining up into bands.
+      const c = crest(toCell(x) * (3 + 1.2 * d.peaks), r * (0.12 + 0.55 * d.peaks));
       const rugged = Math.max(0, Math.min(1, d.rugged + f.rugged - age * 0.5));
       const peak = (rd ? 0.4 * c + 0.6 * smooth(rd.level, 1, L.u) : c) ** (1 + rugged * 2.5);
       // Height variety: a slow swell over the page lifts some islands into massifs and keeps others low.
       const massif = 1 + d.relief * (1.5 * land(toCell(x) * 0.6 + 11, yc * 0.6 + 5) - 0.75) * 1.6;
       const tall = rise * f.rise * Math.max(0.15, massif) * (1 - 0.8 * age) * (1 - d.hierarchy * 0.6 * (1 - L.rank));
-      let raw = mask * tall * (0.25 + 0.75 * peak);
+      let raw = mask * tall * (0.25 - 0.2 * d.peaks + (0.75 + 0.2 * d.peaks) * peak ** (1 + 0.3 * d.peaks));
       if (f.top) raw = Math.min(raw, tall * (1 - 0.65 * f.top));
       // No peak rises past the top of the frame: heights near it are eased under the room left, not sliced off.
       if (band) {
@@ -264,6 +276,7 @@ export function ridges(dials) {
       let j = i;
       while (j < xs.length && h[j] >= 0.5) j++;
       const mid = (i + j) >> 1, group = gs[mid], start = Math.floor(rnd() * 1000), stp = steps[mid];
+      let hills = 0;
       // Along an aged chain, colour follows age: the young end in the palette's dark colours, the old in its light.
       const tone = chains.length && d.age > 0 ? 0.1 + 0.8 * ts[mid] : null;
       for (let b = 0; b < d.bands; b++) {
@@ -277,10 +290,27 @@ export function ridges(dials) {
           const pts = [];
           for (let q = Math.max(0, k - 1); q <= Math.min(xs.length - 1, e); q++) pts.push([xs[q], y - Math.max(0, h[q] - lift)]);
           // Down to the floor at both ends, even where the page edge cuts the island off mid-slope.
-          if (pts.length >= 3) shapes.push({ fill: start + b, group, tone, points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] }), (any = true);
+          // Each hill a band splits into takes its own colour, so a range breaks into smaller regions.
+          if (pts.length >= 3) put({ fill: start + b * 13 + hills++ * 7, group, tone, points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] }), (any = true);
           k = e;
         }
         if (!any) break;
+      }
+      // Foothills: smaller hills standing in front of the range, overlapping it, so front shapes pass over back ones
+      // and cut them into smaller regions. Terraced like the range; never taller than the land they stand on.
+      const soft = Math.max(0.02, Math.min(1, d.soft + formAt(xs[mid], y, at(xs[mid], y, yc)).soft));
+      const terrace = (raw) => { const q = raw / stp, n = Math.floor(q); return stp * (n + smooth(1 - soft, 1, q - n)); };
+      const count = Math.round(d.foothills * ((j - i) * dx) / (gap * 7) + rnd() * d.foothills);
+      for (let n = 0; n < count; n++) {
+        const c = i + Math.floor(rnd() * (j - i)), half = Math.max(3, Math.round(((1.2 + 3 * rnd()) * gap) / dx));
+        const top = h[c] * (0.3 + 0.4 * rnd());
+        if (top < stp * 0.8) continue;
+        const pts = [];
+        for (let q = Math.max(i, c - half); q <= Math.min(j - 1, c + half); q++) {
+          const t = (q - c) / half, lift = terrace(top * Math.max(0, 1 - t * t) ** 0.8);
+          pts.push([xs[q], y - Math.min(lift, h[q])]);
+        }
+        if (pts.length >= 3) put({ fill: start + 101 + n * 17, group, tone, points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] });
       }
       i = j;
     }
