@@ -9,7 +9,7 @@
       "id": "canvas.house",
       "title": "Canvas",
       "over": "workspace",
-      "props": { "shape": "flow" }
+      "props": { "shape": "flow", "hover_only": ["part_of"] }
     }
   ]
 }

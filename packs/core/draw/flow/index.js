@@ -97,7 +97,10 @@ export function picture({ answer, style, reduced }, tools) {
   // Ties under everything, then wires, then the breaks cut across them, then the steps over all, then what each choice is.
   const drawIn = story ? { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 } : {};
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
-  const tieLayer = g.ties.map((t, n) => m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${pend(t.pending)}`, ...drawIn, ...hidden }));
+  // A tie of a link type the style draws only on hover (hover_only: the canvas pack's, part_of) shows while one of its
+  // ends is hovered, lit as every tie is; one held for a person shows always.
+  const onHover = new Set(Array.isArray(style.hover_only) ? style.hover_only : []);
+  const tieLayer = g.ties.map((t, n) => m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${onHover.has(t.type) && !t.pending ? ' on-hover' : ''}${pend(t.pending)}`, ...drawIn, ...hidden }));
   const wireLayer = g.chains.map((c, n) => {
     const [ex, ey] = c.points.at(-1);
     return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(ex, ey), class: `lf-head${pend(c.pending)}`, ...hidden })];
