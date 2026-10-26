@@ -1,8 +1,12 @@
 // A backup as the log and a snapshot (docs/log.md, section 7): a file carries the log's rows whole and a snapshot of
 // the projections at its head. The items, links and review queue are read from it as a rebuild reads them: the
-// snapshot when it is this code's and anchored to the file's own chain, with what the log says after it projected on;
-// else the log from its start, in tables that live for one transaction. What has no key in the vault it is read with
-// (forgotten since) is left out, as from any backup.
+// snapshot when it is anchored to the file's own chain, with what the log says after it projected on; else the log
+// from its start, in tables that live for one transaction. What has no key in the vault it is read with (forgotten
+// since) is left out, as from any backup, and so is a link whose end is not there.
+//
+// Whichever projector made the snapshot, it is taken: it is the map's rows as they stood, which hold what the log
+// alone does not make (items from before the log, rows a merge wrote). Refused for other code, a copy made where the
+// projector has moved on read only what the log says, and on 25 Oct 2026 that was 137 of 2619 items.
 
 import type { Q } from './db.ts';
 import type { Entry, Fact } from './log.ts';
@@ -51,7 +55,7 @@ export async function projectBackup(tx: Q, tables: Record<string, Row[]>, snapsh
     const s = fromBackup(snapshot);
     const anchor = s.positions.facts === 0 ? '' : all.find((e) => e.stream === 'facts' && e.pos === s.positions.facts)?.hash;
     const ws = (all[0]?.ws as string | undefined) ?? 'default';
-    if (!check(ws, s, anchor).length) {
+    if (!check(ws, s, anchor, true).length) {
       const { tables: opened, left_out } = await openTables(tx, sealedRows(s), vault);
       start = { rows: { entity: opened.entity ?? [], relation: opened.relation ?? [], proposal: opened.proposal ?? [] }, at: s.positions, id: s.id, left_out };
     }
@@ -64,9 +68,11 @@ export async function projectBackup(tx: Q, tables: Record<string, Row[]>, snapsh
     const after = all.filter((e) => !start || e.pos > start.at[e.stream as 'facts' | 'pending']);
     for (let i = 0; i < after.length; i += 2000) for (const e of await openAll(tx, after.slice(i, i + 2000), vault)) await projectEntry(tx, kinds, e);
     const rows = await projectedRows(tx);
-    // An item whose key the vault no longer holds reads as digests: it was forgotten, and stays out with its links.
+    // An item whose key the vault no longer holds reads as digests: it was forgotten, and stays out with its links. So
+    // does a link to an item the file does not make at all (left out of its snapshot for want of a key).
     const gone = new Set(rows.entity.filter((r) => isDigest(r.title)).map((r) => r.id as string));
-    const kept = (id: unknown) => !gone.has(id as string);
+    const here = new Set(rows.entity.map((r) => r.id as string).filter((id) => !gone.has(id)));
+    const kept = (id: unknown) => here.has(id as string);
     return {
       from: start?.id ?? 'start',
       left_out: gone.size + (start?.left_out ?? 0),
