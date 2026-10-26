@@ -46,20 +46,38 @@ test('the session-start text is read from the instructions on the map', async ()
   const run = /as run (\S+)\./.exec(text)?.[1];
   assert.match(text, /give it one: how many tokens/);
   assert.ok(text.includes(`report, action tell (run ${run})`), 'the run is filled in');
-  assert.match(text, /Keep the map true: when/);
+  assert.doesNotMatch(text, /Keep the map true|Search before you create/, 'the working rules are said in the rules file, not again here');
   const repo = /Repository: Apex repo \((e_\w+)\)/.exec(text)![1];
   // The owner's version of one, kept about this repository; another retired for the whole workspace.
   const made = await make(l, [
-    { op: 'create', ref: 'v', type: 'instruction', title: 'Map true here', body: 'Here, keep the map truer than true.', props: { preset: 'core.map_true' } },
+    { op: 'create', ref: 'v', type: 'instruction', title: 'Estimate here', body: 'Here, estimate in hours.', props: { preset: 'core.estimate' } },
     { op: 'link', type: 'about', from: 'v', to: repo },
     { op: 'create', ref: 'off', type: 'instruction', title: 'No bumps', status: 'retired', props: { preset: 'core.bumps' } },
   ]);
   const again = await hookSessionStart(l, { session_id: 'i1', cwd: 'C:\\code\\Apex' });
-  assert.match(again, /Here, keep the map truer than true\./);
-  assert.doesNotMatch(again, /Keep the map true: when|gets in your way/);
+  assert.match(again, /Here, estimate in hours\./);
+  assert.doesNotMatch(again, /how many tokens|gets in your way/);
   const far = await hookSessionStart(l, { session_id: 'i2', cwd: 'C:\\elsewhere' });
-  assert.match(far, /Keep the map true: when/, 'elsewhere the preset is said');
+  assert.match(far, /how many tokens/, 'elsewhere the preset is said');
   const view = (await VIEWS.instructions.run(l, { about: repo })) as { said: { id: string; preset?: string }[] };
-  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'core.map_true']);
-  assert.equal(view.said.at(-1)!.id, made.v);
+  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in']);
+  assert.equal(view.said[0].id, made.v);
+});
+
+test('each working rule is said once: in the rules file a project is handed, from its preset, and nowhere else', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { presetsOf } = await import('../src/declared.ts');
+  const { checkoutPacks, workingRules } = await import('../src/working-rules.ts');
+  const { WRITE_TOOLS } = await import('../src/tool-change.ts');
+  const presets = presetsOf(checkoutPacks(), 'instruction');
+  const rules = presets.filter((p) => (p.props.for as string[]).includes('working_rules'));
+  assert.deepEqual(rules.map((p) => p.id), ['core.map_true', 'core.authority', 'core.names', 'core.search_first', 'core.waits_on']);
+  assert.deepEqual(presets.filter((p) => (p.props.for as string[]).length !== 1).map((p) => p.id), [], 'an instruction is said in one place');
+  const file = workingRules();
+  for (const p of rules) assert.equal(file.split(p.body!).length, 2, `${p.id} is said once in the rules file`);
+  assert.doesNotMatch(file, /<!-- working_rules/, 'the marker is replaced');
+  const template = readFileSync(join(import.meta.dirname, '..', 'examples/working-rules.md'), 'utf8');
+  for (const p of rules) assert.ok(!template.includes(p.title), `the template does not word "${p.title}" itself`);
+  assert.doesNotMatch(WRITE_TOOLS.change.description, /Keep the map true|Settle what/, 'change says what it does, not the rule');
 });

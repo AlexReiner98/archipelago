@@ -108,8 +108,9 @@ test('an agent’s instructions name only the surface: every other action by its
   // An action is named as code (`tell`) or by a name no sentence has (session_update): then the word before it is action.
   const named = new RegExp(`\`(${actions.join('|')})\`|\\b(${actions.filter((a) => a.includes('_')).join('|')})\\b`, 'g');
   const wrong: string[] = [];
-  for (const file of files) {
-    const text = readFileSync(join(root, file), 'utf8');
+  const { workingRules } = await import('../src/working-rules.ts');
+  const texts = new Map([...files.map((file) => [file, readFileSync(join(root, file), 'utf8')] as const), ['the rules as handed out', workingRules()]]);
+  for (const [file, text] of texts) {
     for (const [, tool] of text.matchAll(/mcp__pelago__([a-z_]+)/g)) if (!SURFACE.includes(tool)) wrong.push(`${file}: mcp__pelago__${tool}`);
     for (const [, tool] of text.matchAll(/`([a-z_]+)` tool\b/g)) if (!SURFACE.includes(tool)) wrong.push(`${file}: the ${tool} tool`);
     for (const m of text.matchAll(named)) if (!/action[:"`,\s]*$/.test(text.slice(Math.max(0, m.index - 12), m.index)) && !text.startsWith(' in `', m.index + m[0].length)) wrong.push(`${file}: ${m[1] ?? m[2]} without its verb`);
