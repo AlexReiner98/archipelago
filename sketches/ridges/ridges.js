@@ -262,6 +262,18 @@ export function ridges(dials) {
     return (at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx) * (1 - ty) + (at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx) * ty;
   };
 
+  // Under a clearing, how much room there is up to it: by grid column, the height of the clearing's lowest point
+  // above each cell, so land below a name keeps its ground and only its peaks are eased under the water there.
+  const above = d.clear && (() => {
+    const { nx, ny, v } = d.clear, out = new Float32Array(nx * ny).fill(-Infinity);
+    for (let i = 0; i < nx; i++) for (let j = 0, last = -Infinity; j < ny; j++) (out[j * nx + i] = last), v[j * nx + i] > 0.3 && (last = ((j + 1) / ny) * H);
+    return out;
+  })();
+  const roomUnder = (x, y) => {
+    const { nx, ny } = d.clear, i = Math.min(nx - 1, Math.max(0, Math.floor((x / W) * nx))), j = Math.min(ny - 1, Math.max(0, Math.floor((y / H) * ny)));
+    return y - above[j * nx + i];
+  };
+
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
     const h = [], shelf = [], gs = [], ts = [], steps = [], raws = [], terraces = [];
@@ -284,6 +296,11 @@ export function ridges(dials) {
         const room = Math.max(1, y - M - gap);
         stands = room * Math.tanh(stands / room);
       }
+      const under = d.clear ? roomUnder(x, y) : Infinity;
+      if (under < Infinity) {
+        const room = Math.max(gap, under - gap);
+        stands = room * Math.tanh(stands / room);
+      }
       // The border reckoned from part way up the land that would stand here (the coast's mask, the slope limit and
       // the terraces bring it lower than this), so a tall peak keeps about as clear of the top as the coast does of
       // the bottom.
@@ -294,11 +311,10 @@ export function ridges(dials) {
         const g = gridAt(d.shape, x, y);
         L.u += d.shapeStrength * (g * (L.hi - L.lo) * 4 - (1 - g) * 1.5);
       }
-      // A clearing: open water where a name is set, read from part way up what would stand here (as the border is),
-      // its edge wobbling with noise so the islands part round the name rather than tracing its letters.
+      // A clearing: open water where a name is set (what stands below it was eased under it above), its edge wobbling with noise so the islands part round the name rather than tracing its letters.
       if (d.clear) {
         const wobble = (seam(land, x, 1.7, 33, yc * 1.7 + 3) - 0.5) * 0.6;
-        L.u -= smooth(0.1, 0.55, gridAt(d.clear, x, y - stands * 0.4) + wobble) * 1.5;
+        L.u -= smooth(0.1, 0.55, gridAt(d.clear, x, y) + wobble) * 1.5;
       }
       gs.push(L.g), ts.push(L.t), steps.push(Math.min(step * f.step, Math.max(1, rise * f.rise * 0.6)));
       // Shallows: a reach of pale sea round the land, wider as the dial turns.
