@@ -236,14 +236,14 @@
   // every dial stays live, and unticking puts them back as they were.
   const START = { clouds: 0, rows: 12, line: 6 };
   const bare = (pic) => ({ ...pic, shapes: pic.shapes.filter((s) => !s.line) });
-  /** Paint the emblem into a square of px: the page fitted and centred on the ground, the ink at least about a pixel. */
+  /** Paint the emblem into a square of px: the page fitted and centred on the ground, every setting as drawn full size. */
   function icon(g, pic, px, dpr, opts) {
     const k = px / Math.max(pic.width, pic.height);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = opts.background;
     g.fillRect(0, 0, px, px);
     g.setTransform(k * dpr, 0, 0, k * dpr, ((px - pic.width * k) / 2) * dpr, ((px - pic.height * k) / 2) * dpr);
-    paint(g, { ...bare(pic), line: Math.max(pic.line, 0.9 / k) }, opts);
+    paint(g, bare(pic), { ...opts, cloudOpacity: +$('cloudOpacity').value });
   }
   let before = null;
   function toggleEmblem() {
@@ -297,8 +297,7 @@
   }
 
   // The emblem at icon sizes, drawn again at each (not scaled down): the dark palette on its own sea and on the app's
-  // neutral dark, the light palette on the app's paper. The ink is kept at least about a pixel wide, as an icon drawn
-  // for that size would be.
+  // neutral dark, the light palette on the app's paper. Each is the full drawing scaled down, its ink included.
   const SIZES = [16, 24, 32, 48, 64, 128];
   const AT = [0, 128, 64, 48, 32, 24, 16];
   function sizes(pic, p) {
