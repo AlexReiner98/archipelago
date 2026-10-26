@@ -2,6 +2,8 @@
 // The first four were drawn by fromPixels from photos of each place on Wikimedia Commons (25 Oct 2026; each photo
 // is credited under it, and used only to read its colours). The hand-picked ones follow, to compare.
 
+import { CANADA } from './canada.js';
+
 const commons = (file, by, license) => ({ page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file.replaceAll(' ', '_'))}`, by, license });
 
 export const PLACES = {
@@ -152,9 +154,12 @@ export function coverage(data, colours, soften = 0.6) {
  * different colours look. Chroma is weighted up, so a small bright flower is not lost in a large grey sea.
  * The lightest cluster becomes the paper, the darkest the ink, the rest the colours.
  */
-export function fromPixels(data, k = 9, seed = 1) {
+export function fromPixels(data, k = 9, seed = 1, only = null) {
   const px = [];
   for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 200) px.push(oklab(data[i], data[i + 1], data[i + 2]));
+  // Land and water can be drawn apart, so the sea and sky do not crowd the land out of its own palette.
+  if (only === 'land') px.splice(0, px.length, ...px.filter((p) => !isBlue(p)));
+  if (only === 'sea') px.splice(0, px.length, ...px.filter(isBlue));
   const weight = (p) => 1 + 6 * Math.hypot(p[1], p[2]);
   let s = seed;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -228,7 +233,10 @@ const FORMS = {
   cyclades: { rise: 0.8, rugged: 0.1, step: 1, soft: 0, top: 0, cliff: 0.45 },           // dry hills, caldera walls
   haidaGwaii: { rise: 0.8, rugged: 0, step: 1, soft: 0.1, top: 0, cliff: 0.2 },          // forested, rolling
 };
-for (const [k, p] of Object.entries(PLACES)) p.form = FORMS[k.replace(/Hand$/, '')];
+// Canada's archipelagos join the places, with Haida Gwaii, for the study.
+Object.assign(PLACES, CANADA);
+PLACES.haidaGwaii.region = 'canada';
+for (const [k, p] of Object.entries(PLACES)) p.form ??= FORMS[k.replace(/Hand$/, '')];
 
 /** A blue, in OKLab: toward blue, not toward red. Blues are the water's; the land is everything else. */
 const isBlue = ([, a, b]) => b < -0.03 && a < 0.03;
@@ -245,10 +253,11 @@ export function landOf({ colours, weights }) {
  * offshore to the coast (its blues, dark to light, kept clear of the deep). A palette with too few blues has them
  * made from its most sea-like colour.
  */
-export function waterOf({ colours }) {
+export function waterOf({ colours, sea }) {
   const lab = colours.map((h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))));
   const seaLike = ([L, a, b]) => -b * 2 - Math.max(0, a) * 2 + Math.min(L, 0.7) - Math.abs(a + 0.03) * 0.5;
-  const blues = lab.filter(isBlue).sort((p, q) => p[0] - q[0]);
+  // A palette may carry its water apart (sea), drawn from the photos' blue pixels; else its own blues.
+  const blues = (sea ? sea.map((h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)))) : lab.filter(isBlue)).sort((p, q) => p[0] - q[0]);
   const base = blues[0] ?? lab.reduce((best, c) => (seaLike(c) > seaLike(best) ? c : best));
   // Hue of the place's sea, at least a little blue, for the deep and for any shade a palette lacks.
   const hue = [Math.min(base[1], 0), Math.min(base[2], -0.05)];

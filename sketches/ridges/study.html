@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canada's archipelagos</title>
+<style>
+  :root { --ink: #1d2428; --paper: #f4f2ec; --line: #0002; font: 13px/1.45 system-ui, sans-serif; color: var(--ink); }
+  body { margin: 0; background: var(--paper); }
+  header, main { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+  header { padding-top: 24px; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; font-weight: 600; }
+  header p { margin: 0; opacity: .65; }
+  header a { color: inherit; }
+  .hero { margin: 16px 0 6px; }
+  .hero canvas { width: 100%; display: block; border-radius: 4px; }
+  .key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; opacity: .75; margin-bottom: 26px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 22px; padding-bottom: 40px; }
+  .card canvas { width: 100%; display: block; border-radius: 3px; }
+  .card h2 { font-size: 15px; margin: 10px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .what { margin: 0 0 8px; opacity: .65; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .strip { display: flex; height: 34px; align-items: flex-end; gap: 1px; }
+  .strip span { flex: 1; border-radius: 1px; }
+  .water { display: flex; height: 12px; margin-top: 3px; gap: 1px; }
+  .water span { flex: 1; }
+  .water span:first-child { flex: 2; }
+  .photos { display: flex; gap: 3px; margin-top: 8px; }
+  .photos a { flex: 1; min-width: 0; }
+  .photos img { width: 100%; height: 42px; object-fit: cover; display: block; border-radius: 2px; background: #0001; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Canada's archipelagos</h1>
+  <p>Nine palettes drawn from photographs, land and water apart · <a href="./">open the tool</a></p>
+</header>
+<main>
+  <div class="hero"><canvas id="hero" title="All nine as one sea: each archipelago in its own colours and landform"></canvas></div>
+  <div class="key" id="key"></div>
+  <div class="grid" id="grid"></div>
+</main>
+<script type="module">
+  import { ridges } from './ridges.js';
+  import { PLACES, signature } from './palettes.js';
+  import { paint } from './paint.js';
+
+  // West to east, then north.
+  const ORDER = ['haidaGwaii', 'brokenGroup', 'gulfIslands', 'thirtyThousand', 'thousandIslands', 'mingan', 'magdalen', 'fundyIsles', 'arctic'];
+  const WHAT = {
+    haidaGwaii: 'Pacific · rainforest, moss and cedar',
+    brokenGroup: 'Pacific · low rock islets in grey water',
+    gulfIslands: 'Salish Sea · arbutus, sandstone, dry meadow',
+    thirtyThousand: 'Georgian Bay · glaciated granite and pine',
+    thousandIslands: 'St. Lawrence · small wooded granite isles',
+    mingan: 'Gulf of St. Lawrence · limestone monoliths',
+    magdalen: 'Gulf of St. Lawrence · red sandstone and dunes',
+    fundyIsles: 'Bay of Fundy · basalt headlands',
+    arctic: 'Arctic · fjords, tundra, glaciers',
+  };
+  const places = ORDER.map((k) => [k, PLACES[k]]);
+
+  function render(canvas, width, height, dials, base, palOf) {
+    const pic = ridges({ width, height, margin: 0, ...dials });
+    const dpr = devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    const g = canvas.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    paint(g, pic, { base, palOf: palOf ?? (() => base) });
+    return pic;
+  }
+
+  // The hero: all nine as archipelagos in one sea, neighbours given contrasting palettes.
+  let given = [];
+  // Each archipelago in turn takes the unused place whose cast differs most from those already given.
+  const assign = (groups) => {
+    const sig = Object.fromEntries(places.map(([k, p]) => [k, signature(p)]));
+    const dist = (a, b) => Math.hypot(...sig[a].map((v, j) => v - sig[b][j]));
+    const out = [];
+    for (let i = 0; i < groups.length; i++) {
+      const pool = ORDER.filter((k) => !out.includes(k));
+      const score = (k) => (out.length ? Math.min(...out.map((u) => dist(k, u))) : 0);
+      out.push((pool.length ? pool : ORDER).sort((a, b) => score(b) - score(a))[0]);
+    }
+    given = out;
+    return given.map((k) => PLACES[k].form);
+  };
+  render($('hero'), 1200, 560, { source: 'diffusion', chains: 9, pattern: 0.35, scale: 0.55, variety: 0.5, warp: 0.4, mix: 0.2, land: 0.55, rows: 110, hierarchy: 0.5, shallows: 0.5, seed: 3, forms: assign }, PLACES.haidaGwaii, (g) => PLACES[given[g]] ?? PLACES.haidaGwaii);
+  $('key').innerHTML = [...new Set(given)].map((k) => `<span>${PLACES[k].title}</span>`).join('');
+
+  // One card per place: its land on its own water, its colours as much as they cover, its water, its photos.
+  $('grid').innerHTML = places.map(([k, p]) => `
+    <section class="card">
+      <canvas data-k="${k}"></canvas>
+      <h2>${p.title}</h2>
+      <p class="what" title="${WHAT[k]}">${WHAT[k]}</p>
+      <div class="strip" title="Land colours, each as tall as it covers the photos">${landStrip(p)}</div>
+      <div class="water" title="Water: the deep, then the shallows offshore to the coast"></div>
+      <div class="photos" data-photos="${k}"></div>
+    </section>`).join('');
+  function landStrip(p) {
+    const max = Math.max(...p.weights);
+    return p.colours.map((c, i) => `<span style="background:${c};height:${Math.round(30 + 70 * (p.weights[i] / max))}%" title="${c}"></span>`).join('');
+  }
+  for (const canvas of document.querySelectorAll('canvas[data-k]')) {
+    const p = PLACES[canvas.dataset.k];
+    render(canvas, 480, 300, { source: 'diffusion', chains: 1, pattern: 0.3, scale: 0.7, variety: 0.3, warp: 0.35, mix: 0.25, land: 0.55, rows: 60, shallows: 0.5, seed: 5, forms: () => [p.form] }, p);
+    const water = canvas.parentElement.querySelector('.water');
+    import('./palettes.js').then(({ waterOf }) => {
+      const w = waterOf(p);
+      water.innerHTML = [w.deep, ...w.shallows].map((c) => `<span style="background:${c}" title="${c}"></span>`).join('');
+    });
+  }
+
+  // The photos each palette was read from, as thumbnails from Commons, each linked to its page and credit.
+  for (const el of document.querySelectorAll('[data-photos]')) {
+    const p = PLACES[el.dataset.photos];
+    const titles = p.photos.map((s) => 'File:' + decodeURIComponent(s.page.split('/File:')[1]).replaceAll('_', ' '));
+    const url = 'https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({ action: 'query', titles: titles.join('|'), prop: 'imageinfo', iiprop: 'url', iiurlwidth: '160', format: 'json', origin: '*' });
+    fetch(url).then((r) => r.json()).then((j) => {
+      const thumb = Object.fromEntries(Object.values(j.query?.pages ?? {}).map((pg) => [pg.title, pg.imageinfo?.[0]?.thumburl]));
+      el.innerHTML = p.photos.map((s, i) => `<a href="${s.page}" target="_blank" rel="noopener" title="${s.by}, ${s.license}"><img src="${thumb[titles[i]] ?? ''}" alt="" loading="lazy"></a>`).join('');
+    }).catch(() => (el.innerHTML = p.photos.map((s, i) => `<a href="${s.page}" target="_blank" rel="noopener" title="${s.by}, ${s.license}">${i + 1}</a>`).join(' ')));
+  }
+  function $(id) { return document.getElementById(id); }
+</script>
+</body>
+</html>
