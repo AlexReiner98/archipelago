@@ -230,6 +230,16 @@ const FORMS = {
 };
 for (const [k, p] of Object.entries(PLACES)) p.form = FORMS[k.replace(/Hand$/, '')];
 
+/** A blue, in OKLab: toward blue, not toward red. Blues are the water's; the land is everything else. */
+const isBlue = ([, a, b]) => b < -0.03 && a < 0.03;
+
+/** A palette's land colours: its colours and weights without the blues (all of them, if it is nothing but blue). */
+export function landOf({ colours, weights }) {
+  const keep = colours.map((h) => !isBlue(oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)))));
+  if (!keep.some(Boolean)) return { colours, weights };
+  return { colours: colours.filter((_, i) => keep[i]), weights: weights?.filter((_, i) => keep[i]) };
+}
+
 /**
  * A place's water, from its own blues: the deep sea (its darkest blue, taken deeper still) and three shallows from
  * offshore to the coast (its blues, dark to light, kept clear of the deep). A palette with too few blues has them
@@ -238,7 +248,7 @@ for (const [k, p] of Object.entries(PLACES)) p.form = FORMS[k.replace(/Hand$/, '
 export function waterOf({ colours }) {
   const lab = colours.map((h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))));
   const seaLike = ([L, a, b]) => -b * 2 - Math.max(0, a) * 2 + Math.min(L, 0.7) - Math.abs(a + 0.03) * 0.5;
-  const blues = lab.filter(([, a, b]) => b < -0.03 && a < 0.03).sort((p, q) => p[0] - q[0]);
+  const blues = lab.filter(isBlue).sort((p, q) => p[0] - q[0]);
   const base = blues[0] ?? lab.reduce((best, c) => (seaLike(c) > seaLike(best) ? c : best));
   // Hue of the place's sea, at least a little blue, for the deep and for any shade a palette lacks.
   const hue = [Math.min(base[1], 0), Math.min(base[2], -0.05)];

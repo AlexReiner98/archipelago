@@ -86,7 +86,7 @@
 <main><canvas id="view"></canvas></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
-  import { PLACES, fromPixels, signature, waterOf } from './palettes.js';
+  import { PLACES, fromPixels, signature, waterOf, landOf } from './palettes.js';
 
   const $ = (id) => document.getElementById(id);
   const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows'];
@@ -136,7 +136,7 @@
     for (let k = 0; k < n; k++) if ((t -= w[k]) < 0) return p.colours[k];
     return p.colours[n - 1];
   };
-  const fillOf = (s) => ('sea' in s ? waterOf(palOf(s.group)).shallows[s.sea] : colourOf(palOf(s.group), s.fill, s.tone));
+  const fillOf = (s) => ('sea' in s ? waterOf(palOf(s.group)).shallows[s.sea] : colourOf(landOf(palOf(s.group)), s.fill, s.tone));
   // The row lines on the deep water: the paper's colour, faint, so they read as swell, not as ink.
   const swell = (p) => p.paper + '4d';
   // The background: the palette's deep water, until a colour is picked; then that, whatever the palette.
