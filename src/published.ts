@@ -52,6 +52,31 @@ export function freezeLens(answer: Answer, bodies: Map<string, string>, partOf: 
 }
 
 /**
+ * The picture of each view kept on the map among a document's sections, as a page draws it, and the title of each
+ * type they hold. `shared` keeps to what the whole workspace may see, as anything public must; without it, to what
+ * the one asking may see, for a draft read before it is published.
+ */
+export async function picturesOf(l: Archipelago, sections: { id: string; type: string }[], shared: boolean) {
+  const lenses: Record<string, ReturnType<typeof freezeLens>> = {};
+  const types: Record<string, string> = {};
+  for (const section of sections.filter((s) => isKept(l, s.type))) {
+    const answer = await keptPicture(l, section.id).catch(() => null);
+    if (!answer) continue;
+    const { rows } = await l.db.query<{ id: string; body: string }>(
+      `select id, body from entity where id = any($1::text[])${shared ? ` and visibility <> 'private' and private_to is null` : ''}`,
+      [answer.items.map((i) => i.id)],
+    );
+    const shown = new Map(rows.map((r) => [r.id, r.body]));
+    const kept = { ...answer, items: answer.items.filter((i) => shown.has(i.id)), links: answer.links.filter((k) => shown.has(k.from) && shown.has(k.to)) };
+    lenses[section.id] = freezeLens(kept, shown, l.registry.relationFamily('part_of'));
+    for (const i of kept.items) types[i.type] = l.registry.type(i.type)?.title ?? i.type;
+  }
+  // Each picture's first frame, so a reader's page has it on screen with the text.
+  await framesFor(l, lenses);
+  return { lenses, types };
+}
+
+/**
  * What a reader would be given of a public document now: what the public read gives (src/public-document.ts: the
  * sections it holds that are shared, the rest only by name and state), and for each lens among them its picture,
  * with nothing private in it.
@@ -66,22 +91,7 @@ async function freeze(l: Archipelago, id: string) {
   const reader = await publicDocument(l, id, new Map(others.map((o) => [o.id, o.title])));
   if (!reader) throw new Error(`"${id}" is not a public document.`);
   const sections = reader.parts.flatMap((part) => ('section' in part ? [part.section] : []));
-  const lenses: Record<string, ReturnType<typeof freezeLens>> = {};
-  const types: Record<string, string> = {};
-  for (const section of sections.filter((s) => isKept(l, s.type))) {
-    const answer = await keptPicture(l, section.id).catch(() => null);
-    if (!answer) continue;
-    const { rows } = await l.db.query<{ id: string; body: string }>(
-      `select id, body from entity where id = any($1::text[]) and visibility <> 'private' and private_to is null`,
-      [answer.items.map((i) => i.id)],
-    );
-    const shown = new Map(rows.map((r) => [r.id, r.body]));
-    const kept = { ...answer, items: answer.items.filter((i) => shown.has(i.id)), links: answer.links.filter((k) => shown.has(k.from) && shown.has(k.to)) };
-    lenses[section.id] = freezeLens(kept, shown, l.registry.relationFamily('part_of'));
-    for (const i of kept.items) types[i.type] = l.registry.type(i.type)?.title ?? i.type;
-  }
-  // Each picture's first frame, so a reader's page has it on screen with the text.
-  await framesFor(l, lenses);
+  const { lenses, types } = await picturesOf(l, sections, true);
   // Its own address word and place in the header, and the address word of each document it links to.
   const props = (await l.entity(id))?.props ?? {};
   const paths = Object.fromEntries(others.filter((o) => o.path && reader.links?.[o.id]).map((o) => [o.id, o.path]));

@@ -183,7 +183,7 @@ function draw(d) {
           'section',
           { id: p.section.id },
           h('h2', {}, p.section.title),
-          // A lens published with the document is its picture, drawn from what was frozen; otherwise a section shows its figure.
+          // A lens is its picture, drawn from what was frozen when it was published (or, for a draft read with a sign-in, now); otherwise a section shows its figure.
           d.lenses?.[p.section.id]
             ? h('div', { class: lensClass(p.section.id), 'data-lens': p.section.id })
             : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
@@ -216,7 +216,7 @@ if (!given) warmDrawings();
 (given
   ? Promise.resolve(JSON.parse(given.textContent))
   : own
-  ? Promise.all([api('document', { id: own }), api('view', { name: 'style', params: {} }), api('view', { name: 'style', params: { of: own } })]).then(([d, s, mine]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths, head: mine.style.page?.head }))
+  ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: {} }), api('view', { name: 'style', params: { of: own } })]).then(([d, s, mine]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths, head: mine.style.page?.head }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');

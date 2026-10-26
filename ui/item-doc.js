@@ -1,10 +1,7 @@
-// An item read whole, as its reader meets it: its text with the items it brings in, in their places; a view kept on
-// the map brought in is its picture, drawn from its flat lens. And the links that let someone read it with no login, and its shares with other workspaces.
+// An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and the links that let someone
+// read it with no login, and its shares with other workspaces.
 
 import { api, ask, h, tell } from './base.js';
-import { renderBody } from './body.js';
-import { keptView } from './canvases.js';
-import { isA } from './words.js';
 import { secretBox } from './workspace-cards.js';
 
 /** The item as a reader meets it, and the links to it that still work. */
@@ -20,33 +17,6 @@ export const figureOf = (s, cls = 'doc-figure') => {
   (s.via ? api('share_figure', { via: s.via, id: s.id }) : api('picture', { result: s.id })).then((p) => (p ? (img.src = `data:${p.content_type};base64,${p.data}`) : img.remove()), () => img.remove());
   return img;
 };
-
-/**
- * The text, each part where it falls, read through as one piece: a section brought in is its title as a heading
- * (the way to its own page) and its note as the page's style reads it; a lens is its picture, its note the caption.
- * `here` is an item to mark in the pictures it brings in; `style` is the page's, which says how its notes read.
- */
-export function documentNote(doc, id, here, style) {
-  // A section read through a share is another workspace's item: it has no page here, and its lens is not drawn.
-  const head = (s) => h('h3', { class: 'doc-head' }, s.via ? s.title : h('a', { href: `#/e/${s.id}`, title: `Open "${s.title}"` }, s.title));
-  const lensPart = (s) =>
-    h(
-      'figure',
-      { class: 'doc-lens' },
-      head(s),
-      h('div', { class: 'lens-card' }, keptView(s.id, { key: `doc:${id}:${s.id}`, style: here ? { here } : {} })),
-      s.body && h('figcaption', {}, renderBody(s.body, { style })),
-    );
-  const part = (p) =>
-    p.section && !p.section.via && isA(p.section.type, 'lens')
-      ? lensPart(p.section)
-      : p.section
-        ? h('section', { class: 'doc-part' }, head(p.section), p.section.picture && figureOf(p.section), p.section.body && renderBody(p.section.body, { style }))
-        : p.missing
-          ? h('div', { class: 'error' }, `${p.missing}: not found, archived or not yours to see`)
-          : renderBody(p.text.replace(/^#{1,3}\s+/gm, ''), { style }); // a heading for the reader is a section title here
-  return h('section', { class: 'card wide note doc' }, doc.parts.length ? doc.parts.map(part) : h('div', { class: 'empty' }, 'Nothing written yet.'));
-}
 
 /** What the item's menu offers for reading it: print it, make a link to it, share it with a workspace, stop sharing. */
 export function documentMenu(e, links, page, redraw, doc) {
