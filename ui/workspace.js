@@ -10,7 +10,7 @@ import { membersCard } from './members-card.js';
 import { planCard } from './plan-card.js';
 import { modelCard } from './model-card.js';
 import { connectionsCard } from './connections-card.js';
-import { backupCard, codeCard, connectBox, githubCard, ownerCard, publishCard, secretBox, serverPacksCard } from './workspace-cards.js';
+import { backupCard, codeCard, connectBox, githubCard, ownerCard, publishCard, replyRulesCard, secretBox, serverPacksCard } from './workspace-cards.js';
 
 /** A card a step of Start here (ui/start.js) leads to, as #/workspace?at=<step>. */
 const at = (step, card) => (card && (card.dataset.at = step), card);
@@ -31,7 +31,7 @@ export async function workspace() {
     const { owner } = await api('workspace_info');
     return main.replaceChildren(
       head,
-      h('div', { class: 'grid' }, ownerCard(owner, workspace), modelCard(), backupCard(workspace), publishCard(), codeCard(), packsCard({ h, api, ask, tell, then: workspace }), serverPacksCard(), screensCard(workspace), stylesCard(workspace)),
+      h('div', { class: 'grid' }, ownerCard(owner, workspace), modelCard(), backupCard(workspace), publishCard(), codeCard(), replyRulesCard(), packsCard({ h, api, ask, tell, then: workspace }), serverPacksCard(), screensCard(workspace), stylesCard(workspace)),
     );
   }
   const [info, tokens, people, members] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 }), me.actor.admin ? api('member_list') : []]);
@@ -85,6 +85,7 @@ export async function workspace() {
       me.actor.admin && at('backup', backupCard(workspace)),
       me.actor.admin && publishCard(),
       me.actor.admin && codeCard(),
+      me.actor.admin && replyRulesCard(),
       me.actor.admin && me.workspace.id === 'default' && serverPacksCard(),
       me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
       me.actor.admin && screensCard(workspace),
