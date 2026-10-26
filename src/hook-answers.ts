@@ -16,6 +16,8 @@ export interface HookBody {
   session_id?: string;
   cwd?: string;
   remote?: string;
+  /** At the start: the checkout's newest commits (id and message), which the session is asked to account for. */
+  commits?: unknown;
   reason?: string;
   tokens?: number;
   /** The items the session's calls to the map have named so far, read from its transcript (src/touched.ts). */

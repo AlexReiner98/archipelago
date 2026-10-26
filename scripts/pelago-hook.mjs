@@ -108,6 +108,16 @@ function readTranscript(text) {
   return { tokens, touched: [...touched], ...(turn && { turn, reply }) };
 }
 
+/** The checkout's newest commits, each its id and message, for the server to say which are not accounted for. */
+function recentCommits(cwd) {
+  try {
+    const out = execFileSync('git', ['-C', cwd, 'log', '-40', '--format=%H%x1f%B%x1e'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 });
+    return out.split('\x1e').map((one) => one.trim()).filter(Boolean).map((one) => ({ id: one.split('\x1f')[0], message: one.slice(one.indexOf('\x1f') + 1).trim() }));
+  } catch {
+    return [];
+  }
+}
+
 /** The file in the checkout's git folder (shared by its worktrees) that holds a session's run, or null outside a checkout. */
 function runFile(said) {
   if (typeof said.session_id !== 'string' || !/^[\w-]+$/.test(said.session_id)) return null;
@@ -127,7 +137,7 @@ if (name === 'session-start') {
     const said = JSON.parse(body);
     const remote = execFileSync('git', ['-C', said.cwd || '.', 'config', '--get', 'remote.origin.url'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim();
     // An address can carry a name and a password for the host (https://name:secret@host/...): those stay here.
-    if (remote) body = JSON.stringify({ ...said, remote: remote.replace(/^([a-z][a-z0-9+.-]*:[/][/])[^/@]*@/i, '$1') });
+    if (remote) body = JSON.stringify({ ...said, remote: remote.replace(/^([a-z][a-z0-9+.-]*:[/][/])[^/@]*@/i, '$1'), commits: recentCommits(said.cwd || '.') });
   } catch {
     // Not a checkout, or no git here: the folder is all there is to go on.
   }

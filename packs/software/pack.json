@@ -99,6 +99,7 @@
     {
       "id": "software.commit",
       "extends": "record",
+      "capabilities": { "accounts": { "field": "sha" } },
       "title": "Commit",
       "description": "A commit accounted for: made by its session or a person, it says which items the commit settles, each by a settles link, and none when it has none. A commit with no such item is unaccounted for, and the check on the main branch stays red.",
       "fields": {
