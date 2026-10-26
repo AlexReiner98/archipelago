@@ -8,7 +8,9 @@ import type { Archipelago, Entity } from './pelago.ts';
 import { blockGraph } from './blocking.ts';
 import { readEvents } from './eventlog.ts';
 import { askPackView, VIEWS } from './views.ts';
-import { lensRead } from './lens-scan.ts';
+import { scanAround } from './region.ts';
+import { placeAll, readAxis, zoneOf } from './timeaxis.ts';
+import { LENS_LIMIT } from './lens-flat.ts';
 
 /** The most items one read gives back. */
 const READ_LIMIT = 500;
@@ -35,8 +37,10 @@ export type Read = {
   since?: string;
   /** Everything part of any of these items, and the items themselves, in one read. */
   parts_of?: string[];
-  /** What a lens from an item reads (src/lens-scan.ts), in one read: the items around it and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
-  lens?: { from: string; over?: string[]; above?: boolean };
+  /** What is around an item (src/region.ts), in one read: what is inside it, what it is tied to and what is inside that, and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
+  around?: { from: string; over?: string[]; above?: boolean };
+  /** Items of these types placed in a window of time (src/timeaxis.ts): each with where it falls (time), by its when (a repeat's days) or bound, a session where it was at work. Only what falls in it; what is closed, only if it changed in or after the window. */
+  placed?: { types: string[]; from: string; to: string; by?: ('when' | 'bound')[] };
   /** Which of these items have a picture kept for them. */
   pictures?: string[];
   /** Events of a kind, about one item, since a moment, newest first. */
@@ -115,14 +119,26 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     );
     return rows.map(typed);
   }
-  if (q.lens !== undefined) {
-    const read = await lensRead(l, { from: String(q.lens.from) }, { over: q.lens.over ?? 'all', fold: [] }, { above: Boolean(q.lens.above), made: true });
+  if (q.around !== undefined) {
+    const over = q.around.over ?? 'all';
+    if (over !== 'all' && (!Array.isArray(over) || over.some((kind) => !l.registry.relations.has(kind)))) throw new Error(`around.over: a list of kinds of link. Known: ${[...l.registry.relations.keys()].join(', ')}`);
+    const reg = l.registry;
+    const read = await scanAround(l, { starts: [String(q.around.from)], by: reg.relationFamily('part_of'), over: over === 'all' ? null : reg.relationFamily(...over), waits: [], above: Boolean(q.around.above), made: true });
     // What a link is: its kind and those it extends, as an item says what it is.
     const lineage = (type: string): string[] => [type, ...(l.registry.relations.get(type)?.extends ? lineage(l.registry.relations.get(type)!.extends!) : [])];
     return {
       items: read.entities.map(({ body: _body, ...e }) => typed({ ...e, ...(!open && { owner: null }) })),
       links: read.relations.map((r) => ({ ...(open && { id: r.id }), type: r.type, from: r.from_id, to: r.to_id, is: lineage(r.type) })),
     };
+  }
+  if (q.placed !== undefined) {
+    const axis = readAxis(q.placed);
+    const { rows } = await l.db.query<Entity>(
+      `select ${cols('e')} from entity e where e.type = any($1::text[]) and e.archived_at is null and (e.is_open or e.updated_at >= $2::timestamptz) order by e.updated_at desc limit ${LENS_LIMIT} -- index entity_type`,
+      [family(q.placed.types) ?? [], axis.from],
+    );
+    const spans = await placeAll(l, rows, axis, await zoneOf(l));
+    return rows.filter((e) => spans.get(e.id)?.length).map((e) => ({ ...typed(e), open: e.is_open, time: spans.get(e.id) }));
   }
   if (q.events) {
     const { action, target, since, limit } = q.events;
@@ -156,5 +172,5 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, lens, events, pictures, blocked, view, type_info, me, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, view, type_info, me, proposed.');
 }

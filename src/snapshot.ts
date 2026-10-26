@@ -63,7 +63,7 @@ export interface Snapshot {
 
 const sha256 = (data: string | Buffer) => createHash('sha256').update(data).digest('hex');
 /** A snapshot's hash: its header canonical, then its rows by the digest of the bytes kept (sealed, so a forget changes none of them). */
-const hashOf = (head: Omit<Snapshot, 'hash' | 'id'>, rows: Buffer) => sha256(`pelago-snapshot\n${jcs(head)}\n${sha256(rows)}`);
+export const hashOf = (head: Omit<Snapshot, 'hash' | 'id'>, rows: Buffer) => sha256(`pelago-snapshot\n${jcs(head)}\n${sha256(rows)}`);
 
 /** The hash of the fact entry at a position: the genesis has none. */
 async function anchorAt(q: Q, pos: number): Promise<string | undefined> {
@@ -117,12 +117,13 @@ const SELECT = `select id, projection, projection_version, code, positions, enco
 
 /**
  * What is wrong with a snapshot, for this code and a chain whose fact entry at its position has the hash `anchor`
- * (undefined when there is no such entry): nothing when it can be built on.
+ * (undefined when there is no such entry): nothing when it can be built on. `anyCode`: whichever projector made it, as
+ * for a backup's, which is the map's rows as they stood and not a projection to build on (src/backup-log.ts).
  */
-export function check(ws: string, s: Stored, anchor: string | undefined): string[] {
+export function check(ws: string, s: Stored, anchor: string | undefined, anyCode = false): string[] {
   const out: string[] = [];
-  if (s.projection_version !== PROJECTION_VERSION) out.push(`made by projection version ${s.projection_version}, this code is ${PROJECTION_VERSION}`);
-  if (s.code !== CODE) out.push(`made by other projector code (${s.code}, this is ${CODE})`);
+  if (!anyCode && s.projection_version !== PROJECTION_VERSION) out.push(`made by projection version ${s.projection_version}, this code is ${PROJECTION_VERSION}`);
+  if (!anyCode && s.code !== CODE) out.push(`made by other projector code (${s.code}, this is ${CODE})`);
   if (anchor === undefined) out.push(`the fact stream has no entry ${s.positions.facts}`);
   else if (anchor !== s.fact_hash) out.push(`fact entry ${s.positions.facts} is not the one it was taken at`);
   const head = { v: 1 as const, ws, projection: s.projection, projection_version: s.projection_version, code: s.code, positions: s.positions, fact_hash: s.fact_hash, taken_at: new Date(s.taken_at).toISOString() };

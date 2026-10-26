@@ -14,11 +14,11 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `uses` | Packs it works with when they are active. |
 | `types` | Its types. An entry with `of` and `fields` adds fields to another pack's type. |
 | `links` | Its link types, each extending a root. |
-| `rules` | What decides a write (`src/rules.ts`). |
-| `views` | Reads (a `shape` or a `lens`), trees (`form: "tree"`) and screens on an item's page (`form: "screen"`). |
+| `rules` | What decides a write (`src/rules.ts`), and what asks an agent to go on when its reply ends (`on: "reply_ended"`, `src/reply-rules.ts`). |
+| `views` | Reads (a `shape` or a `lens`), trees (`form: "tree"`), screens on an item's page (`form: "screen"`), and reasons attention gives (`form: "attention"`: items `of` a type whose fields hold `where`'s values, weighed with the kernel's reason it `joins`). |
 | `actions` | What people and agents can do through it, each under a verb. Core's six verbs are its actions marked `kernel`. |
 | `handlers` | Code run by itself: `{ event }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`. |
-| `drawings`, `styles` | The code views are drawn by, and how things look. |
+| `drawings`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`src/instructions.ts`). |
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, `runs`, and `server`. |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
@@ -63,3 +63,13 @@ pack out is the owner's, and is refused while another active pack requires
 it; the kernel's packs are never taken out. Everything a pack registers is
 derived from the set of packs, so taking one out unwinds it: its tools,
 screens, rules and handlers go, and its items stay, their types dormant.
+
+## Not yet
+
+- A manifest is named in the log by its hash; the manifest itself is not
+  kept beside the log yet, so the registry as of an old position reads the
+  pack files the server has now.
+- A pack the log says is present but whose code the server lacks is not yet
+  listed as waiting.
+- Taking out a pack together with the packs that require it, in one change,
+  is not offered yet.

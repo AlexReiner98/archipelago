@@ -1,0 +1,150 @@
+/* The two surfaces (ui/app.js): the canvas across the whole page, and the sheet that opens over it from the side. A
+   thin bar floats over the canvas's top and the find bar over its foot; nothing else is on screen. Every length is
+   the house style's (--*), every colour the theme's. */
+html, body { height: 100%; }
+body { overflow: hidden; }
+
+/* The canvas: the view drawn edge to edge, its frame the whole page. */
+#canvas { position: fixed; inset: 0; background: var(--ln-sea, var(--bg)); }
+#canvas > .lens-wrap, #canvas .lens-view { height: 100%; }
+/* The safe zone: the bar and the query bar above, the find bar below. A drawing that does not pan (a list, a grid)
+   is laid out between them and scrolls there; one on the plane keeps the whole page and is fitted inside them. */
+#canvas { --safe-top: calc(2 * var(--box-9) + var(--space-8) + var(--space-6)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
+#canvas .lens-view { position: relative; box-sizing: border-box; padding: var(--safe-top) 0 var(--safe-bottom); overflow: auto; }
+#canvas .lens-view:has(.lf-stage) { padding: 0; overflow: hidden; }
+#canvas .lf-stage { height: 100%; }
+/* The key is shown when the reader turns it on in the settings menu (ui/canvas.js); the drawing's own controls are not drawn. */
+/* The key, always in sight on the canvas: in the safe zone, under the query bar, scrolled when it is longer than the room. */
+#canvas .lf-legend { top: var(--safe-top); bottom: auto; max-height: calc(100% - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; pointer-events: auto; }
+#canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
+#canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
+#canvas .lens-view > .toolbar { display: none; }
+#canvas .lens-view > .empty, #canvas .lens-view > .error, #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
+
+/* The bar: where the canvas stands, what waits for you, and the menu. */
+#nav { position: fixed; z-index: 3; top: var(--space-7); left: var(--space-9); right: var(--space-9); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
+#nav > * { pointer-events: auto; }
+/* With the sheet open, the bar keeps to the canvas left of it. */
+body[data-sheet="open"] #nav { right: calc(min(var(--sheet), 50%) + var(--space-9)); }
+#nav > .grow { flex: 1; pointer-events: none; }
+#nav .brand { flex: none; font-weight: 700; font-size: var(--text-7); color: var(--text); text-decoration: none; padding: var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
+#nav .brand .workspace-name { display: none; }
+/* The query bar (ui/query-bar.js): the canvas's lens on one line under the top bar, its terms as chips; what does not fit scrolls along it. */
+#query { position: fixed; z-index: 2; top: calc(var(--box-9) + var(--space-8)); left: var(--space-9); right: var(--space-9); display: flex; align-items: stretch; gap: var(--space-6); overflow-x: auto; white-space: nowrap; scrollbar-width: none; pointer-events: none; }
+#query[hidden] { display: none; }
+body[data-sheet="open"] #query { right: calc(min(var(--sheet), 50%) + var(--space-9)); }
+#query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); pointer-events: auto; }
+#query .q-filter { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+#query .q-sum { flex: 0 1 auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-4); font-size: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+#query .q-sum:hover, #query .q-fold:hover { color: var(--accent); }
+#query .q-fold { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
+#query .q-group { display: inline-flex; align-items: center; gap: var(--space-2); }
+#query .q-group-word { color: var(--muted); font-size: var(--text-3); padding-left: var(--space-3); }
+#query .q-term { display: inline-flex; align-items: center; border-radius: var(--radius-pill); background: var(--accent-soft); font-size: var(--text-3); }
+#query .q-term.q-out { background: none; border: var(--border-1) dashed var(--line); color: var(--muted); }
+#query .q-term.q-narrow { background: none; border: var(--border-1) solid var(--accent); }
+#query .q-term.q-walk { background: none; border: var(--border-1) solid var(--line); }
+#query .q-term button, #query .q-term .q-said { border: 0; background: none; padding: var(--space-2) var(--space-4); font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
+#query .q-term .q-x { padding-left: 0; color: var(--muted); }
+#query .q-term .q-x:hover { color: var(--text); }
+#query .q-box { border: 0; background: none; padding: var(--space-2) var(--space-3); font-size: var(--text-3); min-width: var(--space-8); outline: none; }
+#query .q-box.wrong { text-decoration: underline wavy var(--accent); }
+#query .q-add { border: 0; background: none; color: var(--muted); font-size: var(--text-3); max-width: var(--space-10); }
+#query .q-steps button { padding: var(--space-2) var(--space-4); font-size: var(--text-3); }
+#query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-3); font-size: var(--text-3); text-align: right; }
+#query .q-count { color: var(--muted); font-size: var(--text-3); padding-right: var(--space-3); }
+#query .q-count.cut { color: var(--accent); }
+#query .q-canvas { flex: 0 1 auto; min-width: 0; }
+#query .q-pick { min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
+#query .q-save { border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
+#query .q-save:hover { color: var(--accent); }
+#marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
+#marks .count.held { background: var(--warn); }
+#new-item { display: inline-flex; align-items: center; justify-content: center; width: var(--box-8); height: var(--box-8); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); color: var(--text); font-size: var(--text-8); line-height: 1; text-decoration: none; }
+#new-item:hover { border-color: var(--accent); }
+#listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
+#listening::before { content: "● "; }
+#listening[hidden] { display: none; }
+#more > summary { background: var(--panel); border-radius: var(--radius-pill); }
+#more > .menu-items { min-width: var(--menu-least); }
+#menu-pages { display: grid; }
+#menu-pages > a { padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; }
+#menu-pages > a:hover { background: var(--accent-soft); }
+#menu-pages > a.active { color: var(--accent); font-weight: 600; }
+#canvas-settings { display: grid; padding: var(--space-3) 0; border-top: var(--border-1) solid var(--line); }
+#canvas-settings > label { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); color: var(--text); font-size: var(--text-4); cursor: pointer; }
+#canvas-settings > label:hover { background: var(--accent-soft); }
+#canvas-settings > button { margin: var(--space-3) var(--space-6); justify-self: start; }
+#follow { padding: var(--space-5) var(--space-6); display: flex; gap: var(--space-4); align-items: center; color: var(--muted); font-size: var(--text-3); border-top: var(--border-1) solid var(--line); }
+#whoami { padding: var(--space-6); border-top: var(--border-1) solid var(--line); display: grid; gap: var(--space-2); }
+#whoami:empty { display: none; }
+#whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }
+
+/* Find: one bar at the canvas's foot; what its words would find is said in one line above it. */
+#find { position: fixed; z-index: 3; left: 50%; bottom: var(--space-9); transform: translateX(-50%); width: min(var(--find-most), calc(100% - 2 * var(--space-9))); margin: 0; }
+body[data-sheet="open"] #find { left: calc((100% - min(var(--sheet), 50%)) / 2); width: min(var(--find-most), calc(100% - min(var(--sheet), 50%) - 2 * var(--space-9))); }
+#find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
+#find input[type=search] { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-4) var(--space-7); font-size: var(--text-6); outline: none; }
+#find .find-peek { display: flex; gap: var(--space-5); align-items: center; min-width: 0; margin: 0 0 var(--space-4); padding: var(--space-4) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; }
+#find .find-peek[hidden] { display: none; }
+#find .find-peek .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#find .find-peek > .quiet-button { flex: none; }
+
+/* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
+   (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */
+#sheet { position: fixed; z-index: 4; top: 0; right: 0; bottom: 0; width: min(var(--sheet), 50%); overflow: auto; background: var(--bg); border-left: var(--border-1) solid var(--line); box-shadow: 0 0 var(--space-13) rgb(0 0 0 / 0.14); transform: translateX(100%); visibility: hidden; transition: transform 0.18s ease, visibility 0s 0.18s; }
+body[data-sheet="open"] #sheet { transform: none; visibility: visible; transition: transform 0.18s ease; }
+@media (prefers-reduced-motion: reduce) { #sheet, body[data-sheet="open"] #sheet { transition: none; } }
+#sheet-close { position: sticky; z-index: 1; top: var(--space-6); float: right; margin: var(--space-6) var(--space-6) 0 0; width: var(--box-8); height: var(--box-8); padding: 0; border-radius: var(--radius-pill); font-size: var(--text-8); line-height: 1; }
+#main { padding: var(--space-11) var(--space-11) var(--space-14); }
+/* The sheet reads as a document: a title, one quiet line of marks, the note, and what a pack adds as plain sections
+   under small headings. No cards, no borders between parts: space and type set them apart. */
+#sheet .page-head { margin-bottom: var(--space-9); }
+#sheet .draft-title { font-size: var(--text-9); line-height: 1.2; margin: 0 0 var(--space-5); padding-right: var(--box-8); outline: none; overflow-wrap: anywhere; }
+#sheet .draft-title:empty::before { content: attr(data-placeholder); color: var(--muted); }
+#sheet .sheet-marks { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-4); }
+#sheet .sheet-marks > .grow { flex: 1; }
+#sheet .mark-type { color: var(--muted); }
+#sheet .sheet-marks select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
+#sheet .sheet-marks details.menu > summary { border: 0; padding: var(--space-2) var(--space-5); font-size: var(--text-7); line-height: 1; color: var(--muted); }
+#sheet .note { margin-bottom: var(--space-10); }
+#sheet .note > .fields { padding: 0; margin: 0 0 var(--space-8); }
+#sheet .draft-read { cursor: text; }
+#sheet .draft-read .body-text, #sheet .note.doc .body-text { padding-left: 0; padding-right: 0; }
+#sheet .note.doc h3.doc-head, #sheet .note > img.figure { margin-left: 0; margin-right: 0; }
+#sheet .draft-body { display: block; width: 100%; min-height: var(--box-10); padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: var(--text-6); line-height: 1.6; resize: none; outline: none; overflow: hidden; }
+#sheet .draft-body::placeholder { color: var(--muted); }
+#sheet .draft-body[hidden] { display: none; }
+#sheet .draft-bar { position: sticky; z-index: 1; bottom: 0; display: flex; align-items: center; gap: var(--space-5); margin: 0 calc(-1 * var(--space-11)) var(--space-10); padding: var(--space-6) var(--space-11); background: var(--bg); border-top: var(--border-1) solid var(--line); }
+#sheet .draft-bar[hidden] { display: none; }
+#sheet .draft-said { color: var(--muted); font-size: var(--text-4); }
+#sheet .draft-bar > .grow { flex: 1; }
+#sheet .grid { display: block; }
+#sheet .card { margin: 0 0 var(--space-10); background: none; border: 0; border-radius: 0; overflow: visible; }
+#sheet .card > header, #sheet details.fold > summary { padding: 0 0 var(--space-4); border: 0; background: none; }
+#sheet .card > header h2, #sheet details.fold > summary h2 { font-size: var(--text-3); font-weight: 600; letter-spacing: var(--track-2); text-transform: uppercase; color: var(--muted); }
+#sheet .card .rows > li, #sheet .card .empty { padding-left: 0; padding-right: 0; }
+#sheet .part > :first-child .card:first-child > header, #sheet .part > .card:first-child > header { padding-right: calc(var(--box-8) + var(--space-5)); }
+/* The item's page: what it holds, a section each, as headings over plain rows of a name and its value, one line each. */
+#sheet .page-section { margin: 0 0 var(--space-10); }
+#sheet .page-section > h2 { display: flex; align-items: baseline; gap: var(--space-5); margin: 0 0 var(--space-5); padding-bottom: var(--space-3); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); color: var(--muted); font-weight: 600; }
+#sheet .page-section > h2 .n { font-weight: normal; }
+#sheet .page-section .note { margin: 0; }
+#sheet .page-rows { display: grid; grid-template-columns: var(--label-col) minmax(0, 1fr); gap: var(--space-3) var(--space-8); margin: 0; }
+#sheet .page-rows dt { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd > .gist { display: block; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd details > summary { cursor: pointer; list-style: none; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd details > summary::-webkit-details-marker { display: none; }
+#sheet .page-rows dd details[open] { white-space: normal; max-width: var(--measure); }
+#sheet .page-rows select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
+#sheet .page-json { margin: var(--space-3) 0 0; font-size: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+#sheet .page-lines .change.line { padding-left: 0; padding-right: 0; }
+
+/* Buying a workspace (ui/signup.js): a card in the sheet, its two fields on a row. */
+.signup-card { max-width: var(--measure); }
+.signup-row { padding: var(--space-8); }
+.signup-row.top { padding-bottom: 0; }
+.signup-name { flex: 1; min-width: var(--field-least); }
+.signup-email { flex: 2; min-width: var(--field-least); }
+.signup-error { padding: 0 var(--space-8) var(--space-8); }

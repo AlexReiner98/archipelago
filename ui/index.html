@@ -5,26 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Archipelago</title>
     <link rel="stylesheet" href="/layout.css" />
+    <link rel="stylesheet" href="/shell.css" />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/flow.css" />
     <link rel="stylesheet" href="/diagram.css" />
     <link rel="stylesheet" href="/list.css" />
+    <link rel="stylesheet" href="/notes.css" />
   </head>
   <body>
+    <div id="canvas"></div>
     <nav id="nav">
-      <div class="brand">Archipelago</div>
-      <a href="#/home" data-route="home">Home</a>
-      <a href="#/map" data-route="map">Search</a>
-      <span id="nav-screens"></span>
-      <a href="#/workspace" data-route="workspace">Workspace</a>
+      <a class="brand" href="#/" title="The whole map">Archipelago</a>
+      <span class="grow"></span>
+      <span id="marks"></span>
+      <a id="new-item" href="#/new" title="Start a new item (or double-click the canvas)">+</a>
       <div id="listening" title="An agent is waiting to hear what you do here: decisions, edits, approvals" hidden></div>
-      <div id="follow">
-        <label title="Let agents bring this page to what they are working on"><input type="checkbox" /> Follow agents</label>
-        <details class="menu" id="follow-what"><summary title="Choose what is followed: which kinds of step, and whose">What</summary><div class="menu-items"></div></details>
-      </div>
-      <div id="whoami"></div>
+      <details class="menu" id="more">
+        <summary title="Workspace, screens, settings, following agents, who you are">☰</summary>
+        <div class="menu-items">
+          <div id="menu-pages"></div>
+          <div id="canvas-settings" title="How the canvas behaves, kept in this browser">
+            <label title="Bring all of the drawing into sight on every change; off, the canvas moves only when you move it"><input type="checkbox" data-setting="fit" /> Fit</label>
+            <label title="Let what you move go on a soft grid"><input type="checkbox" data-setting="snap" /> Snap</label>
+            <button id="canvas-arrange" type="button" title="Lay this canvas out again as its drawing does, forgetting where you put things">Arrange</button>
+          </div>
+          <div id="follow">
+            <label title="Let agents bring this page to what they are working on"><input type="checkbox" /> Follow agents</label>
+            <details class="menu" id="follow-what"><summary title="Choose what is followed: which kinds of step, and whose">What</summary><div class="menu-items"></div></details>
+          </div>
+          <div id="whoami"></div>
+        </div>
+      </details>
     </nav>
-    <main id="main"></main>
+    <div id="query" role="toolbar" aria-label="The lens" hidden></div>
+    <form id="find" role="search"></form>
+    <aside id="sheet" aria-label="The item">
+      <button id="sheet-close" type="button" title="Back to the canvas (Esc)">×</button>
+      <main id="main"></main>
+    </aside>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

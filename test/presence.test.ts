@@ -46,3 +46,15 @@ test('agents listening on two servers are counted on both', async () => {
   await other.listening(db, 'default', -1);
   assert.equal((await one.presence(db, w)).listening, 0);
 });
+
+test('a show says how many of the owner\'s pages are open and how many follow it, on any server', async () => {
+  const db = await openDb();
+  const w = { workspace: 'default', viewer: 'e_owner111' };
+  assert.deepEqual(await one.watching(db, w, 'robot'), { open: 0, following: 0 });
+  await one.looked(db, w, { page: 'p1', on: false, muted: [] });
+  assert.deepEqual(await one.watching(db, w, 'robot'), { open: 1, following: 0 }, 'a page not following is open, and only offers the link');
+  await other.looked(db, w, { page: 'p2', on: true, muted: ['muted-bot'] });
+  assert.deepEqual(await one.watching(db, w, 'robot'), { open: 2, following: 1 }, 'a page on another server counts');
+  assert.deepEqual(await other.watching(db, w, 'muted-bot'), { open: 2, following: 0 }, 'a page that left an agent out does not follow it');
+  assert.deepEqual(await one.watching(db, { workspace: 'default', viewer: 'e_someone' }, 'robot'), { open: 0, following: 0 }, 'another person\'s pages are not these');
+});

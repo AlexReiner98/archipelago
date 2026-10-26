@@ -41,7 +41,7 @@
     {
       "id": "work.decision",
       "moved_from": ["decision"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options" } },
+      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
       "extends": "question",
       "title": "Decision",
       "description": "Something decided, or still open, with its reasoning. The title is the question.",
@@ -199,7 +199,7 @@
       "id": "work.reading",
       "title": "Reading a document",
       "on": ["work.document"],
-      "props": { "page": { "picture": false, "notes": "whole" } }
+      "props": { "page": { "picture": false, "notes": "whole" }, "notes": { "measure": "reader_measure" } }
     }
   ]
 }

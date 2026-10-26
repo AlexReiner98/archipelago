@@ -1,0 +1,19 @@
+{
+  "id": "docs",
+  "version": "0.1.0",
+  "title": "Docs",
+  "description": "Docs as a graph: a principle is an item with its point and intent, and what upholds it (rules, tests, parts, screens, agent actions) serves it, linked rather than written out. A page about a principle draws those links.",
+  "requires": ["core", "software"],
+  "types": [
+    {
+      "id": "docs.principle",
+      "extends": "aim",
+      "title": "Principle",
+      "description": "Something the product holds to, in a sentence or two of point and intent. What upholds it serves it; it is retired when it stops holding.",
+      "statuses": { "open": ["active"], "closed": ["retired"] },
+      "fields": {
+        "path": { "type": "string", "description": "Where its page is published, as people-decide." }
+      }
+    }
+  ]
+}

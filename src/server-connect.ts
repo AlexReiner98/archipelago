@@ -3,7 +3,8 @@
 // pack finishes it when they come back with that word, and the account they chose outside (a connection: its id
 // there and a name) is that workspace's from then on. While it is connected, and only then, the pack may ask for two
 // acts on that workspace: add items to its map (only what is not there by its address), and hand a delivery to the
-// pack in it that takes that kind of event in. Each is logged in that workspace. Disconnecting takes it all away.
+// pack in it that takes that kind of event in. Each is logged in that workspace, except a delivery handed over only
+// to ask what the pack there makes of it (ask): that pack writes nothing. Disconnecting takes it all away.
 //
 // Connections are kept in the control plane (control_value, one key each: the first server to write one has it);
 // the words begun are kept for a quarter of an hour, under a name the pack's own store cannot reach.
@@ -11,7 +12,7 @@
 import { randomBytes } from 'node:crypto';
 import { claimControlValue, controlValue, storeGet, storePut, storeTake } from './control.ts';
 import type { Q } from './db.ts';
-import { hookFor, runHook } from './hooks.ts';
+import { askHook, hookFor, runHook } from './hooks.ts';
 import type { Archipelago, Op } from './pelago.ts';
 import type { ServerPackFile } from './server-packs.ts';
 import type { Workspaces } from './workspaces.ts';
@@ -174,6 +175,8 @@ export async function connectAct(at: ConnectPlaces, control: Q, pack: ServerPack
       const takes = hookFor(pelago, event);
       if (!takes) return { recorded: false, reason: `No pack in this workspace takes "${event}" in: turn it on first.` };
       const headers = input.headers && typeof input.headers === 'object' ? (input.headers as Record<string, unknown>) : {};
+      // A question about a delivery (ask): the pack there answers it and writes nothing, so nothing is logged.
+      if (input.ask === true) return ((await askHook(pelago, takes.pack, takes.hook, { payload: input.payload, headers })) ?? {}) as Record<string, unknown>;
       await pelago.log(pelago.db, { actor: `pack:${pack.id}`, action: 'server.workspace.deliver', reason: `${pack.title} handed ${takes.pack} a ${event}`, detail: { pack: pack.id, connection: id, to: takes.pack, event } });
       // What the pack there records, the packs that hear it are told of.
       return ((await runHook(pelago, takes.pack, takes.hook, { payload: input.payload, headers })).answer ?? {}) as Record<string, unknown>;

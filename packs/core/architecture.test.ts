@@ -176,7 +176,7 @@ const marks = (m: any): any[] => (Array.isArray(m) && typeof m[0] === 'string' ?
 
 test('the drawing answers with marks only: tags, attributes and words, nothing that runs', () => {
   const { scene } = drawn(answerOf([item('a'), item('b')], [call('a', 'b', { says: 'HTTPS' })]));
-  const all = [scene.svg, scene.legend, scene.bar].flatMap(marks);
+  const all = [scene.svg, ...(scene.key ?? []).map((e: any) => e.glyph), scene.bar].flatMap(marks);
   assert.ok(all.length > 20);
   for (const [tag, attrs, ...kids] of all) {
     assert.match(tag, /^[a-zA-Z]+$/);

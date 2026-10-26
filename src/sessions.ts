@@ -4,13 +4,14 @@
 // release: they are the session's own operational state, not facts about the
 // world, and coordination that waits for approval is no coordination.
 
-import { livesIn, livesInFor, placeFor, scopeOf } from './places.ts';
+import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
-import { blockGraph, heldResources } from './blocking.ts';
+import { heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
-import { STALE_DAYS } from './attention.ts';
-import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts';
+import { sentCommits, unaccountedText } from './unaccounted.ts';
+import { STALE_DAYS } from './attention.ts'; import { instructionsFor } from './instructions.ts';
+import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
 
 const now = () => new Date().toISOString();
 
@@ -264,6 +265,8 @@ export interface Beat {
   replaced_by?: number;
   /** What the session has found, said whole: the latest that stands is what its page opens on. */
   finding?: boolean;
+  /** Set on a beat a rule on the reply's end asked with (src/replies.ts): the rule, as pack.id. */
+  asked?: string;
 }
 const BEATS_KEPT = 80;
 const SAID_MAX = 280;
@@ -283,7 +286,7 @@ const SAYS_MAX = 40;
 export async function tell(
   l: Archipelago,
   _actor: Actor,
-  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number; finding?: boolean },
+  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number; finding?: boolean; asked?: string },
 ) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
@@ -313,7 +316,7 @@ export async function tell(
     if (old.replaced_by) throw new Error(`Beat ${old.n} was already taken back by beat ${old.replaced_by}.`);
   }
   if (input.finding && !about.length) throw new Error('A finding names the items it is about (about, or the ends of links): they are its picture.');
-  const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }) };
+  const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }), ...(input.asked && { asked: input.asked }) };
   const next = [...story.map((b) => (b.n === input.replaces ? { ...b, replaced_by: beat.n } : b)), beat];
   await l.operational(run.id, { props: { story: next, last_seen: now() } });
   await touch(l, run.id);
@@ -327,40 +330,18 @@ export async function story(l: Archipelago, input: Record<string, unknown>) {
   const run = key ? await resolveRun(l, key) : undefined;
   if (!run) throw new Error(`No session "${key}": give run, a run id or a session id.`);
   const beats = Array.isArray(run.props.story) ? (run.props.story as Beat[]) : [];
-  // What the page opens on: the latest finding that stands, else the latest beat that does.
+  // What the page opens on: the latest finding that stands, else the latest beat the session said itself, not a rule.
   const standing = beats.filter((b) => !b.replaced_by);
-  const found = standing.findLast((b) => b.finding) ?? standing.at(-1);
+  const found = standing.findLast((b) => b.finding) ?? standing.findLast((b) => !b.asked) ?? standing.at(-1);
   return { run: { id: run.id, title: run.title, status: run.status, open: run.is_open }, finding: found?.n ?? null, beats };
 }
 
 // Asked like any standing question; kept here, beside what writes it.
 VIEWS.story = {
   description:
-    'The story a session told of its work (report, action tell): its beats in order (n, said, about, links; one taken back says replaced_by; a finding says finding), and which beat its page opens on (finding: the latest finding that stands, else the latest beat). The picture of it is the lens view with story: the run. Params: run (required): a run id or session id.',
+    'The story a session told of its work (report, action tell): its beats in order (n, said, about, links; one taken back says replaced_by; a finding says finding), and which beat its page opens on (finding: the latest finding that stands, else the latest beat). Its page draws what its finding is about with the flat lens. Params: run (required): a run id or session id.',
   run: story,
 };
-
-type Item = { id: string; type: string; title: string; status: string };
-
-/**
- * What a session has left unsaid: the open work of the repository it ran in
- * that nobody has changed since it began. A session that settled something
- * says so by changing it; what it leaves as it found it, it has to vouch for,
- * or say it could not tell. What waits on a person's answer is not asked
- * about: no work in the repository settles it. Nor is what has a change
- * waiting for the human: what was found has been said, and is theirs to confirm.
- */
-async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
-  const { rows: repos } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = any($2::text[]) and from_id = $1 and valid_to is null`, [run.id, livesIn(l)]);
-  if (!repos.length) return [];
-  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [[...(await scopeOf(l, repos[0].to_id, true))], [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
-  const graph = await blockGraph(l, work.map((i) => i.id));
-  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending' -- index proposal_status`);
-  const proposed = new Set(held.flatMap((p) => p.ops.flatMap((o) => ('id' in o && o.id ? [o.id] : []))));
-  const open = work.filter((i) => !graph.waitsOnSomeone(i.id) && !proposed.has(i.id));
-  const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
-  return open.filter((i) => untouched.some((u) => u.id === i.id)).map(({ id, type, title, status }) => ({ id, type, title, status }));
-}
 
 export async function sessionEnd(
   l: Archipelago,
@@ -384,26 +365,31 @@ export async function sessionEnd(
   if (!run.is_open) return { run: run.id, status: run.status, already_ended: true };
   const outcome = input.outcome ?? 'finished';
   const unsaid = outcome === 'finished' ? await unreconciled(l, run) : [];
+  // Beside them, the commits it made that the map does not account for yet (src/commits.ts).
+  const commits = outcome === 'finished' ? await unaccountedBy(l, run.id) : [];
   const vouched = unsaid.filter((i) => input.still_true?.includes(i.id));
   // "Cannot tell" is an answer too: the item is left exactly as it was, last known true when it was, and the run says so.
   const named = unsaid.filter((i) => !vouched.includes(i) && input.cannot_tell?.includes(i.id));
-  const unknown = input.cannot_tell_rest ? unsaid.filter((i) => !vouched.includes(i)) : named;
+  // What this session touched it looked at: the rest of it, unnamed, is not covered by cannot_tell_rest.
+  const unknown = input.cannot_tell_rest ? unsaid.filter((i) => !vouched.includes(i) && (!i.touched || named.includes(i))) : named;
   // The rest are counted, not listed: a session that never looked at thirty items has nothing to say of each.
   const rest = unknown.length - named.length;
   const left = unsaid.filter((i) => !vouched.includes(i) && !unknown.includes(i));
-  if (input.reconcile && left.length) {
+  if (input.reconcile && (left.length || commits.length)) {
     return {
       run: run.id,
       status: run.status,
       ended: false,
       unreconciled: left,
-      note: 'Not ended yet. These are open in the repository this session worked in, and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named), and do not vouch for what you did not look at. Then call report with action session_end again.',
+      unaccounted_commits: commits.length ? commits : undefined,
+      note: (commits.length ? 'Its commits listed in unaccounted_commits are not accounted for: for each, in one change, create its commit record (its full sha) with a settles link to each item it settles, or none. ' : '') + 'Not ended yet. These are open in the repository this session worked in or were touched by it (read, shown or changed: marked touched, and listed first), and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named and did not touch), and do not vouch for what you did not look at. Then call report with action session_end again.',
     };
   }
   const said = [
     vouched.length && `Said still true: ${vouched.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
     unknown.length && `Could not tell from here, left as found: ${[...named.map((i) => `${i.title} (${i.id})`), ...(rest ? [`${rest} ${named.length ? 'more' : rest === 1 ? 'item' : 'items'} it did not look at`] : [])].join('; ')}.`,
     // A session closed for it has said nothing of anything: past a few, the count says as much as the list.
+    commits.length && `Commits not accounted for: ${commits.map((c) => c.slice(0, 7)).join(', ')}.`,
     left.length && (left.length > 8 ? `Not reconciled: ${left.length} open items left unsaid.` : `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`),
   ].filter(Boolean);
   const summary = [input.summary, ...said].filter(Boolean).join('\n');
@@ -419,6 +405,7 @@ export async function sessionEnd(
   const { rows: held } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'holds' and from_id = $1 and valid_to is null`, [run.id]);
   for (const h of held) await l.release(actor, { resource: h.to_id, holder: run.id, reason: `Session ${outcome}` });
   await touch(l, run.id, 'close');
+  await keepTouched(l, run.id);
   const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'sys.works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
     ops: [
@@ -428,14 +415,14 @@ export async function sessionEnd(
     reason: input.summary ?? `Session ${outcome}`,
   });
   await heard(l, run, `Session "${run.title}" ended`);
-  return { run: run.id, status: outcome, released: held.length };
+  return { run: run.id, status: outcome, released: held.length, unaccounted_commits: commits.length ? commits : undefined };
 }
 
 /**
  * A Claude Code SessionStart hook: register the session and return the text
  * to put in front of the model, so it starts knowing what the map knows.
  */
-export async function hookSessionStart(l: Archipelago, input: { session_id?: string; cwd?: string; remote?: string }): Promise<string> {
+export async function hookSessionStart(l: Archipelago, input: { session_id?: string; cwd?: string; remote?: string; commits?: unknown }): Promise<string> {
   const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code' });
   const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}.`];
   const repo = 'repo' in started ? started.repo : undefined;
@@ -478,18 +465,15 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
       ...judged.map((q) => `- ${q.title}: ${q.answer} (${q.id})`),
       ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: query "attention" with person "me" and reasons ["to_confirm"].`] : []),
     );
+  // The commits in this checkout that no one has accounted for are put to the session as unconfirmed answers are.
+  if (repo) lines.push(...((u) => (u.length ? ['', ...u] : []))(await unaccountedText(l, sentCommits(input.commits), repo.id)));
   const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [l.registry.having('capacity')])]);
   for (const res of holdable.filter((one) => l.registry.capacity(one) !== Infinity)) {
     const held = heldNow.find((h) => h.resource === res.id);
     lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago assign tool, action claim (holder ${started.run}), before using it, and give it back with revise, action release, after.`);
   }
-  lines.push(
-    '',
-    'When you take on a task that has no estimate, give it one: how many tokens you expect it to take (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.',
-    `If the pelago MCP tools are available (query reads, change writes, and every other action is called under its verb by name: report with action tell): when you take on one of these, call report with action session_update and its id as task; as you reason about the work, tell its story with report, action tell (run ${started.run}): a beat for each thing you conclude, the items it is about and the ties between them, so the owner sees what you see; report session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call report with action session_end and a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.`,
-    'When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.',
-    'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm unless this workspace applies agents’ changes as made, so send the answer with what was chosen and why.',
-  );
+  // What every session is told is kept on the map as instructions (src/instructions.ts): the core pack's, under the owner's.
+  lines.push('', ...(await instructionsFor(l, 'session_start', { about: repo?.id, fill: { run: started.run } })).map((one) => one.text));
   return lines.join('\n');
 }
 

@@ -1,7 +1,7 @@
 // The map and its single write path. Every change to items and links goes through change(): it is validated, judged
 // by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
-import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts';
+import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { renamedLens } from './lens-names.ts';
 import { AGENT_CHANGES, agentChanges, decide, DEFAULT_AGENT_POLICY, type Policy, type Ruled } from './rules.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
@@ -562,8 +562,8 @@ export class Archipelago {
     return id;
   }
 
-  /** A change set the system appends when a pack moves a type or a kind: the new type or kind, and nothing else of the items moves. */
-  private async moved(tx: Q, action: string, reason: string, facts: Fact[]) {
+  /** A change set the system appends in a migration (a pack moves a type or a kind, places move to their stream): what moved, and nothing else. */
+  async moved(tx: Q, action: string, reason: string, facts: Fact[]) {
     await projectFacts(tx, this.registry, await stamp(tx), facts, true);
     await append(tx, this.workspace, 'facts', { id: newId('c'), actor: { id: 'system' }, authority: null, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts);
   }
@@ -574,7 +574,7 @@ export class Archipelago {
   /**
    * Move every item of a type (or link of a relation) no pack defines any more to the one that took it over
    * (moved_from): a one-time migration as a pack takes it out of another, logged as one event. All else stays. The
-   * lenses and screens that name the old one in their settings (kinds and on, or over) name the new one.
+   * screens (on) and the views kept on the map (their lens) that name the old one name the new one.
    */
   async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity'): Promise<number> {
     return this.db.transaction(async (tx) => {
@@ -582,18 +582,14 @@ export class Archipelago {
         what === 'entity' ? `select id from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1`,
         [from],
       );
-      const keys = what === 'entity' ? ['kinds', 'on'] : ['over'];
-      const names = `jsonb_typeof(e.props -> k) = 'array' and (e.props -> k ? $1 or e.props -> k ? ('-' || $1))`;
-      const swap = `case when x = to_jsonb($1::text) then to_jsonb($2::text) when x = to_jsonb('-' || $1) then to_jsonb('-' || $2) else x end`;
-      const { rows: named } = await tx.query<{ id: string; props: Props }>(
-        `select e.id, (select jsonb_object_agg(k, (select jsonb_agg(${swap} order by i) from jsonb_array_elements(e.props -> k) with ordinality a(x, i))) from unnest($3::text[]) k where ${names}) as props
-         from entity e where e.type = any($4::text[]) and exists (select 1 from unnest($3::text[]) k where ${names})`,
-        [from, to, keys, [...this.registry.family('lens'), ...this.registry.family('screen')]],
-      );
+      // What names it in its settings: a screen in on, a view kept on the map in its lens (src/lens-names.ts).
+      const { rows: held } = await tx.query<{ id: string; type: string; props: Props }>(`select id, type, props from entity where type = any($1::text[]) -- index entity_type`, [[...this.registry.family('screen'), ...this.registry.family('lens')]]);
+      const on = (p: Props) => (what === 'entity' && Array.isArray(p.on) && p.on.includes(from) ? { on: p.on.map((t) => (t === from ? to : t)) } : {});
+      const named = held.map((r) => ({ id: r.id, props: this.registry.isA(r.type, 'lens') ? renamedLens(r.props, from, to, what) : on(r.props) })).filter((r) => Object.keys(r.props).length);
       const settings = named.length ? { settings: named.map((r) => r.id) } : {};
       const reason = `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`;
       const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to]] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));
-      for (const r of named) for (const k of keys) if (Array.isArray(r.props[k])) facts.push(['+', r.id, k, r.props[k]]);
+      for (const r of named) for (const [k, v] of Object.entries(r.props)) facts.push(['+', r.id, k, v]);
       if (facts.length) await this.moved(tx, 'type.moved', reason, facts);
       if (rows.length || named.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason, detail: { from, to, items: rows.map((r) => r.id), ...settings } });
       return rows.length;
@@ -792,7 +788,7 @@ export class Archipelago {
     if (!trail.length) return trail;
     const { rows } = await this.db.query<{ id: string; title: string; about: string }>(
       `select v.id, v.title, a.to_id as about from entity v join relation a on a.from_id = v.id and a.type = 'about' and a.valid_to is null
-       where v.type = any($1::text[]) and v.archived_at is null and v.is_open and a.to_id = any($2::text[]) and v.props ->> 'from' is null
+       where v.type = any($1::text[]) and v.archived_at is null and v.is_open and a.to_id = any($2::text[])
        order by (v.props ->> 'place')::numeric nulls last, v.title`,
       [this.registry.family('lens'), trail.map((t) => t.id)],
     );
@@ -816,14 +812,6 @@ export class Archipelago {
 
   async events(input: EventQuery) {
     return readEvents(this.db, input);
-  }
-
-  /** A stamp that moves whenever the map or the review queue does, as this viewer sees them. */
-  async pulse() {
-    const { rows } = await this.db.query<{ stamp: string }>(
-      `select concat_ws('.', greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact)), (select count(*) from proposal where status = 'pending')) as stamp -- index log_fact_seq, proposal_status`,
-    );
-    return rows[0];
   }
 
   async proposals(input: { status?: string } = {}) {

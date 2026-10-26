@@ -121,3 +121,63 @@ test('renamed on GitHub, the app is known by its new name', async () => {
   // With no app (no key), there is nothing to ask.
   assert.deepEqual((await handler.refresh({}, ctxOver().ctx)).answer, { changed: false });
 });
+
+test('the check on main: posted as the installation, kept while red, asked again each minute until green, and on Re-run', async () => {
+  const github: Record<string, unknown> = { 'POST /repos/Acme/Site/check-runs': { id: 501 }, 'PATCH /repos/Acme/Site/check-runs/501': { id: 501 } };
+  const { ctx, acts, requests, store } = ctxOver({ github, connections: { '42': { workspace: 'acme', account: 'acme' } } });
+  const head = 'f'.repeat(40);
+  const commits = [{ id: '1'.repeat(40), message: 'One' }];
+  const red = { name: 'Every commit accounted for', head_sha: head, conclusion: 'failure', title: '1 of 1 commit not accounted for', summary: 'Not accounted for yet: ...', commits };
+  // What the workspace's GitHub pack answers, push by push and question by question.
+  let answer: Record<string, unknown> = { recorded: true, check: red };
+  ctx.act = (async (name: string, input: Record<string, any>) => {
+    acts.push([name, input]);
+    if (name === 'connection.get') return { workspace: 'acme', account: 'acme' };
+    if (name === 'workspace.deliver') return answer;
+    throw new Error(`no act ${name}`);
+  }) as typeof ctx.act;
+  const push = { ref: 'refs/heads/main', installation: { id: 42 }, repository: { full_name: 'Acme/Site' } };
+
+  const done = (await handler.events({ payload: push, headers: { 'x-github-event': 'push' } }, ctx)).answer;
+  assert.deepEqual(done.check, { conclusion: 'failure', title: '1 of 1 commit not accounted for', posted: true, id: 501 });
+  const posted = requests.find((r) => r.method === 'POST')! as any;
+  assert.deepEqual([posted.path, posted.as, posted.body.name, posted.body.head_sha, posted.body.status, posted.body.conclusion], ['/repos/Acme/Site/check-runs', '42', 'Every commit accounted for', head, 'completed', 'failure']);
+  assert.equal((store.checks as any[]).length, 1, 'kept while red');
+
+  // Still red: asked as a question (nothing written there), and GitHub is not told again.
+  answer = { recorded: false, check: red };
+  assert.deepEqual((await handler.recheck({}, ctx)).answer, { asked: 1, green: [] });
+  assert.deepEqual(acts.at(-1), ['workspace.deliver', { connection: '42', event: 'repo.push', ask: true, payload: { repository: { full_name: 'Acme/Site' }, head_sha: head, commits }, headers: { 'x-github-event': 'accounting' } }]);
+  assert.equal(requests.filter((r) => r.method === 'PATCH').length, 0);
+
+  // Accounted for on the map: the check is changed on GitHub, and let go.
+  answer = { recorded: false, check: { ...red, conclusion: 'success', title: 'All one commit accounted for' } };
+  assert.deepEqual((await handler.recheck({}, ctx)).answer, { asked: 1, green: ['Acme/Site@fffffff'] });
+  const patched = requests.find((r) => r.method === 'PATCH')! as any;
+  assert.deepEqual([patched.path, patched.as, patched.body.conclusion, patched.body.output.title], ['/repos/Acme/Site/check-runs/501', '42', 'success', 'All one commit accounted for']);
+  assert.deepEqual(store.checks, []);
+
+  // A pull request into main is handed over as what it is; Re-run of a check kept asks again at once.
+  answer = { recorded: false, check: red };
+  const pr = { action: 'opened', installation: { id: 42 }, repository: { full_name: 'Acme/Site' }, pull_request: { number: 3 } };
+  await handler.events({ payload: pr, headers: { 'x-github-event': 'pull_request' } }, ctx);
+  assert.equal((acts.at(-1)![1] as any).headers['x-github-event'], 'pull_request');
+  answer = { recorded: false, check: { ...red, conclusion: 'success', title: 'All one commit accounted for' } };
+  const rerun = (await handler.events({ payload: { action: 'rerequested', installation: { id: 42 }, repository: { full_name: 'Acme/Site' }, check_run: { id: 501, name: 'Every commit accounted for', head_sha: head } }, headers: { 'x-github-event': 'check_run' } }, ctx)).answer;
+  assert.deepEqual(rerun.check, { conclusion: 'success', title: 'All one commit accounted for' });
+  assert.deepEqual(store.checks, []);
+
+  // Without the permission to write checks, GitHub refuses and the answer says why; nothing is kept.
+  delete github['POST /repos/Acme/Site/check-runs'];
+  answer = { recorded: true, check: red };
+  const refused = (await handler.events({ payload: push, headers: { 'x-github-event': 'push' } }, ctx)).answer;
+  assert.match(refused.check.reason, /lack the permission to write checks/);
+  assert.deepEqual(store.checks, []);
+});
+
+test('the app asks GitHub for what the check needs: to write checks and read pull requests', async () => {
+  const { ctx } = ctxOver({ begun: { 'default.s': 'setup' } });
+  const { manifest } = (await handler.manifest({ state: 'default.s' }, ctx)).answer;
+  assert.deepEqual(manifest.default_permissions, { contents: 'read', metadata: 'read', checks: 'write', pull_requests: 'read' });
+  assert.deepEqual(manifest.default_events, ['push', 'pull_request', 'check_run']);
+});

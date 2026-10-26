@@ -1,7 +1,7 @@
 // Asking a standing question by its name: the kernel's operational views, and the views packs declare, by their
 // short names (a pack's software.handoff answers as handoff, core's core.attention as attention), so what agents and
-// hooks ask for does not change as views move into packs. A view a pack declares is a lens preset, answered by the
-// lens query (src/lens-presets.ts), or its own code's. A kernel view's name wins; among packs, the first to load.
+// hooks ask for does not change as views move into packs. A view a pack declares is answered by a read of the
+// kernel's that it names (src/lens-presets.ts), or by its own code. A kernel view's name wins; among packs, the first to load.
 
 import type { ViewDef } from './declared.ts';
 import { parts } from './manifest.ts';
@@ -30,9 +30,10 @@ export function viewList(l: Archipelago): Record<string, string> {
   return out;
 }
 
-/** What the view tool says it answers: the lenses the core pack declares (none without a registry), then the kernel's own views, then the packs'. */
+/** What the view tool says it answers: the views the core pack declares (none without a registry), the flat lens first, then the kernel's own views, then the packs'. */
 export function viewsSaid(reg?: Registry): string {
-  const lenses = (reg ? parts(reg.packs.find((p) => p.id === 'core')!).views : []).map((v): [string, string] => [short(v.id), v.description]);
+  const core = reg ? parts(reg.packs.find((p) => p.id === 'core')!).views : [];
+  const lenses = core.map((v): [string, string] => [short(v.id), v.description]).sort(([a], [b]) => Number(b === 'flat') - Number(a === 'flat'));
   const views = [...lenses, ...Object.entries(VIEWS).map(([name, v]): [string, string] => [name, v.description])];
   return (
     'Answer one of the standing questions. Call with no name to list them. An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ' +

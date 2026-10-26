@@ -23,6 +23,7 @@ export const ON_THE_MAP: Record<string, string> = {
   notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
   automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
   rechecks: "A project's rechecked_at: kept by operational, appended to the automations stream.",
+  places: "Where a person put an item on a canvas: one place per canvas and item (the field place:<canvas>, its value [x, y]), written in one batch by places_put and read by places (src/canvas-places.ts), appended at once to the places stream and never an item or a link; compacted to the newest per canvas and item.",
   kinds: "An item's kind column, read from its type: filled by fillKinds when a workspace opens, and by the database for a row written without it; never a fact anyone states.",
 };
 
@@ -43,7 +44,7 @@ export const STORES: Record<string, string> = {
   act: 'A request a pack made outside the map: one that cannot be taken back waits for a person; once made it is logged, never undone.',
   type_def: "Every type and relation the packs declare, dormant ones included: written when a workspace opens, never by a change.",
   local_type: "A workspace's own types, kept beside the workspaces so the server can read them: written when one is defined.",
-  transient: 'Short-lived keys and values with an expiry: gone when they lapse, never part of a backup or the log; unlogged on a Postgres server.',
+  transient: "Short-lived keys and values with an expiry: gone when they lapse, never part of a backup or the log; unlogged on a Postgres server. Among them the set of items each session touched (src/touched.ts), kept by run until a week after it was last heard from or ended.",
   pack_store: 'Keys and values a server pack keeps, each pack its own: written through the pack host only.',
   control_workspace: 'The workspaces this server holds: written when one is made.',
   control_value: "The server's own keys and values, across workspaces.",
@@ -67,6 +68,7 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',
   style: 'How a page looks: the styles the packs ship and the map keeps, merged; the system tier, not the work.',
   saved_views: 'The views kept on the map, each named by the style that draws it: the system tier, not the work.',
+  instructions: 'What agents are told: the instructions the packs ship and the map keeps, merged; the system tier, not the work.',
 };
 
 /** Restoring a backup writes the map's rows as they were, in src/pelago.ts (restoreRows): never re-applied as changes. */

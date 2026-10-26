@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from './env.ts';
@@ -80,8 +80,11 @@ export function startedFrom(): string | undefined {
   const given = env('COMMIT') ?? process.env.RENDER_GIT_COMMIT;
   if (given?.trim()) return given.trim();
   try {
-    const git = join(ROOT, '.git');
-    const head = readFileSync(join(git, 'HEAD'), 'utf8').trim();
+    let git = join(ROOT, '.git');
+    // In a worktree .git is a file naming its own folder, which holds HEAD; the refs are in the folder it shares.
+    const own = statSync(git).isFile() ? resolve(ROOT, readFileSync(git, 'utf8').trim().replace(/^gitdir: /, '')) : git;
+    if (own !== git) git = resolve(own, existsSync(join(own, 'commondir')) ? readFileSync(join(own, 'commondir'), 'utf8').trim() : '.');
+    const head = readFileSync(join(own, 'HEAD'), 'utf8').trim();
     if (!head.startsWith('ref: ')) return head;
     const ref = head.slice('ref: '.length);
     if (existsSync(join(git, ref))) return readFileSync(join(git, ref), 'utf8').trim();

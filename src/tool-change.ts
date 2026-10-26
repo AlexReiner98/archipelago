@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { bodyAfter } from './ops.ts';
-import { pictureOf } from './lens.ts';
+import { pictureOf } from './lens-kept.ts';
 import { wholeMap } from './outbox.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { type Focus, point as setFocus, took } from './presence.ts';
@@ -37,8 +37,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       'An update that changes nothing (only the id) says you checked the item and it is still true as written: it records when it was last known true. ' +
       'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
       'A change that is refused is kept for a few minutes under a name the refusal gives: correct it with retry and fixes (the ops that were wrong, by number) instead of sending it all again. ' +
-      'Keep the map true as you work: when what you did or found settles something that is still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, instead of leaving it open with a note. ' +
-      'Closing a decision or a hypothesis is held for the human to confirm, so propose the answer freely: it costs them one click. Only in a workspace set to apply agents\u2019 changes does it take effect at once: then a decision must carry what was chosen (props.outcome) and why (props.rationale), it is put to the owner by the next session they talk to (attention, reason to_confirm), and it is yours to get right. Settle what the work or the owner has in fact settled; a choice that is still the owner\u2019s to make stays open.',
+      'Closing a decision or a hypothesis is held for the human to confirm, unless the workspace applies agents\u2019 changes: then a decision must carry what was chosen (props.outcome) and why (props.rationale), and is put to the owner later (attention, reason to_confirm).',
     input: {
       ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
       reason: z.string().min(1).optional().describe('Why this change is being made. Shown in the activity log. Needed, except with retry.'),

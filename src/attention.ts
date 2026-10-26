@@ -3,10 +3,12 @@
 // no way of working is named here: what waits on someone (waits_on), what holds others up and what is blocked
 // (depends_on, waits_on, needs), what is due (bound), what is unsettled (settles), what nobody has touched, what is
 // under way (a session on it), what is ready to take up, and what an agent settled that the owner has not confirmed.
+// A pack adds reasons of its own as data (a view of form "attention"): items of a type whose fields hold some values.
 
 import { pastBounds } from './bounds.ts';
 import { BlockGraph, blockGraph, heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
+import { parts } from './manifest.ts';
 import type { Archipelago } from './pelago.ts';
 import { SYSTEM } from './head.ts';
 import { scopeOf } from './places.ts';
@@ -34,8 +36,8 @@ export interface Input {
   person?: string;
   /** Only what is this item's or place's: itself, what lives in it, and all part of that or about it. */
   within?: string;
-  /** Only these reasons. All of them when left out. */
-  reasons?: Reason[];
+  /** Only these reasons, the kernel's or a pack's. All of them when left out. */
+  reasons?: string[];
   /** What is due within this many days counts as due: 7 unless given. */
   days?: number;
   /** What nobody has changed in this many days is stale: 14 unless given. */
@@ -46,7 +48,7 @@ export interface Input {
 }
 
 /**
- * What a lens read, handed to attention as its state stage (src/lens-scan.ts): the items, with their fields, and the
+ * What a lens read, handed to attention as its state stage (src/region.ts): the items, with their fields, and the
  * links among them. Attention then reads no items or links of its own: what it answers is the state of what was read.
  */
 export interface Read {
@@ -66,8 +68,13 @@ export async function needsOf(l: Archipelago, person: string | null, read?: Read
 
 /** What deserves attention, and why: the state of what a lens read, or of the whole map. */
 export async function attention(l: Archipelago, input: Input, read?: Read) {
-  const wanted = new Set<Reason>(input.reasons?.length ? input.reasons : REASONS);
-  for (const r of wanted) if (!REASONS.includes(r)) throw new Error(`"${r}" is not a reason: one of ${REASONS.join(', ')}`);
+  // The reasons packs declare, each weighed when it is asked for or the kernel's reason it joins is.
+  const declared = l.registry.packs.flatMap((p) => parts(p).reasons);
+  const known: string[] = [...REASONS, ...declared.map((d) => d.reason)];
+  const wanted = new Set<string>(input.reasons?.length ? input.reasons : known);
+  for (const r of wanted) if (!known.includes(r)) throw new Error(`"${r}" is not a reason: one of ${known.join(', ')}`);
+  const weighed = declared.filter((d) => wanted.has(d.reason) || wanted.has(d.joins));
+  for (const d of weighed) wanted.add(d.reason);
   const owner = (await l.setting<string>('me')) || null;
   const me = input.person === undefined ? null : input.person === 'me' ? l.viewer || owner : input.person;
   if (input.person !== undefined && !me) throw new Error('No person: give an id, or set the workspace owner (pelago init "Your Name").');
@@ -76,14 +83,14 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
 
   const rows: Row[] = read
     ? read.entities.filter((e) => e.is_open).map(({ id, type, kind, title, status, owner, is_open, props, updated_at }) => ({ id, type, kind, title, status, owner, is_open, due: typeof props.due === 'string' ? props.due : props.due == null ? null : String(props.due), updated_at }))
-    : await rowsFor(l, me, me !== null && me === owner, scope, wanted);
+    : await rowsFor(l, me, me !== null && me === owner, scope, wanted, weighed.flatMap((d) => l.registry.family(d.of)));
   const reg = l.registry;
   // Only what is work or a question to someone: not people, places, records of the past, or the system's own.
   const live = new Map(rows.filter((e) => e.kind !== SYSTEM && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
   // Someone's: owned by them, or owned by nobody when they are the workspace's owner.
   const theirs = (e: Row) => me === null || e.owner === me || (e.owner === null && me === owner);
   const found = new Map<string, { row: Row; reasons: Record<string, unknown>[] }>();
-  const add = (e: Row | undefined, why: Reason, more: Record<string, unknown> = {}) => {
+  const add = (e: Row | undefined, why: string, more: Record<string, unknown> = {}) => {
     if (!e || !wanted.has(why)) return;
     const at = found.get(e.id) ?? { row: e, reasons: [] };
     at.reasons.push({ why, ...more });
@@ -148,6 +155,15 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
     if (kind === 'work' && reg.type(e.type)?.fields.tokens_estimated && !graph.isBlocked(e.id)) add(e, 'ready');
   }
 
+  // What a pack declares deserves it: its items whose fields hold the values it names, with its mark and its ask.
+  for (const d of weighed) {
+    const types = reg.family(d.of);
+    const ids = [...live.values()].filter((e) => types.includes(e.type) && theirs(e)).map((e) => e.id);
+    if (!ids.length) continue;
+    const { rows: hit } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and props @> $2::jsonb`, [ids, JSON.stringify(d.where)]);
+    for (const h of hit) add(live.get(h.id), d.reason, { mark: d.mark ?? d.reason, tip: d.description, ...(d.ask && { ask: d.ask }) });
+  }
+
   // What agents settled and the owner has not confirmed: the owner's to look at, closed though it is.
   const confirm = wanted.has('to_confirm') && (me === null || me === owner) ? await toConfirm(l, { limit: 40 }) : undefined;
   // What was settled is closed: whether it is within is asked of the whole scope, for those few.
@@ -158,7 +174,9 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
     if (!settledWithin || settledWithin.has(q.id)) add(e ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
   }
 
-  const rank = (reasons: Record<string, unknown>[]) => Math.min(...reasons.map((r) => REASONS.indexOf(r.why as Reason)));
+  // A pack's reason ranks just after the kernel's it joins.
+  const joins = new Map(declared.map((d) => [d.reason, REASONS.indexOf(d.joins as Reason) + 0.5]));
+  const rank = (reasons: Record<string, unknown>[]) => Math.min(...reasons.map((r) => joins.get(r.why as string) ?? REASONS.indexOf(r.why as Reason)));
   // What to confirm keeps the order the owner should see it in: what agents settled on their own judgment first.
   const asked = new Map((confirm?.questions ?? []).map((q, i) => [q.id, i]));
   const place = (id: string) => asked.get(id) ?? Infinity;
@@ -189,7 +207,7 @@ const EVERYONE = ['to_confirm'];
  * (within); else what is a person's (owned by them, or by nobody when they are the workspace's owner) and what waits
  * on them. For everyone across the map, only reasons the log answers: weighing every open item would read them all.
  */
-async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<Reason>): Promise<Row[]> {
+async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<string>, declared: string[]): Promise<Row[]> {
   const cols = `id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at`;
   const notSystem = `(kind is null or kind <> '${SYSTEM}')`;
   if (scope) return (await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and is_open and archived_at is null and ${notSystem}`, [[...scope]])).rows;
@@ -197,8 +215,8 @@ async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scop
     // What nobody owns is the owner's: of it, only what a reason asked for can be (work and questions; for what is
     // due, unsettled or waits on them alone, only what has a bound or settles), never every open item.
     const reg = l.registry;
-    const kept = [...reg.having('bound'), ...reg.having('settles')];
-    const broad = ['blocked', 'holding_up', 'stale', 'ready', 'under_way'].some((r) => wanted.has(r as Reason));
+    const kept = [...reg.having('bound'), ...reg.having('settles'), ...declared];
+    const broad = ['blocked', 'holding_up', 'stale', 'ready', 'under_way'].some((r) => wanted.has(r));
     const unowned = broad ? `(kind in ('work', 'question') or type = any($4::text[]))` : `type = any($4::text[])`;
     const { rows } = await l.db.query<Row>(
       `select ${cols} from entity where is_open and archived_at is null and ${notSystem} and (owner = $1 or ($2 and owner is null and ${unowned}))

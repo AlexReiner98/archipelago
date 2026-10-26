@@ -57,6 +57,9 @@ test('a capability naming a field the type lacks stops its pack from loading', (
   // A question's choices are a list: a json field.
   assert.deepEqual(checkCapabilities({ settles: { by: 'word', choices: 'options' } }, { options: { type: 'json' } }, new Set()), []);
   assert.deepEqual(checkCapabilities({ settles: { by: 'word', choices: 'options' } }, { options: { type: 'string' } }, new Set()), ['settles.choices reads "options", a string, not a json']);
+  // The day it was settled on is a day field.
+  assert.deepEqual(checkCapabilities({ settles: { by: 'word', on: 'decided_on' } }, { decided_on: { type: 'date' } }, new Set()), []);
+  assert.equal(checkCapabilities({ settles: { by: 'word', on: 'decided_on' } }, { decided_on: { type: 'string' } }, new Set()).length, 1);
 });
 
 test('every shipped deadline is a bound, and a flavour inherits its parent capabilities', async () => {

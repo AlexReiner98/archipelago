@@ -1,12 +1,9 @@
-// What a lens reads. A lens of the whole map reads the whole map (a preset's folds and links pushed into the query);
-// a lens that starts from an item reads only what is around it, so what it costs follows what it answers and not the
-// size of the map: everything inside the start (down the links that say what is inside what), what the start waits on
-// step by step, what any of those is tied to by a link the lens may send and everything inside that, the sessions at
-// work on it, and who owns it all. A lens that goes near reads what it walks to, and nothing inside it.
+// What a view reads: the region around some items, or the items of some kinds. A region reads only what is around
+// where it starts, so what it costs follows what it answers and not the size of the map: everything inside the starts
+// (down the links that say what is inside what), what they wait on step by step, what any of those is tied to by a
+// link it may send and everything inside that, the sessions at work on it, and who owns it all. One that goes near
+// reads what it walks to, and nothing inside it. Read by the brief and by a pack's read around an item.
 
-import type { Kept } from './lens-kept.ts';
-import { LENS_DEFAULT, readLens, WAITS, type Lens } from './lens-read.ts';
-import { stepIds } from './lens-steps.ts';
 import type { Archipelago } from './pelago.ts';
 
 export interface Row {
@@ -161,40 +158,4 @@ export async function scanAround(l: Archipelago, around: Around) {
   // Joined to the ids, not tested against a list of them: a planner with statistics weighs every id in a list.
   const { rows: relations } = await l.db.query<Link>(`with s(id) as (select unnest($1::text[])) select ${LINKS_AMONG} from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null order by ${around.made ? 'r.valid_from, r.ctid' : 'r.id'}`, [region]);
   return { entities, relations, unread: { closed: 0, system: 0 } };
-}
-
-/**
- * What a lens from an item reads around it: inside the item and where any view of it starts, down the links any of
- * them says what is inside what by; what the item waits on; near it, for a preset that goes near; and what a link any of them
- * may send ties to that.
- */
-export function aroundOf(l: Archipelago, hub: string, input: Record<string, unknown>, early: Lens | undefined, kept: Kept[]): Around {
-  const asked = [input, ...kept.map((one) => one.props)];
-  const named = (key: string) => asked.flatMap((x) => (typeof x[key] === 'string' ? [x[key] as string] : []));
-  const by = [...new Set([LENS_DEFAULT.by, ...(early ? [early.by] : named('by'))])].filter((kind) => l.registry.relations.has(kind));
-  const overs = early ? [early.over] : [LENS_DEFAULT.over, WAITS, ...asked.map((x) => x.over).filter((x) => x !== undefined)];
-  const over = overs.some((x) => x === 'all' || !Array.isArray(x)) ? null : l.registry.relationFamily(...new Set((overs as string[][]).flat().filter((kind) => l.registry.relations.has(kind))));
-  // A view of it that goes near, among the others to choose from: what it walks to is read too.
-  const nears = asked.map((x) => x.near).filter((n): n is number => typeof n === 'number');
-  return {
-    starts: [hub, ...named('from').filter((id) => id !== hub)],
-    by: l.registry.relationFamily(...by),
-    over,
-    // What holds an item is a view of it a page may choose; a preset is no page.
-    waits: early ? [] : l.registry.relationFamily(...WAITS),
-    near: early?.near ?? (nears.length ? Math.max(...nears) : 0),
-    wide: !early && nears.length > 0,
-    ids: kept.flatMap((one) => stepIds(one.props.steps)),
-  };
-}
-
-/**
- * The lens query of a preset, read and no more: the preset's lens under what is asked, and what that lens reads,
- * around where it starts. A preset whose answer is not a picture (a brief) answers from this; `more` is what a
- * preset reads beyond its lens (a brief, what holds its task).
- */
-export async function lensRead(l: Archipelago, input: Record<string, unknown>, preset: Record<string, unknown>, more: Partial<Around> = {}) {
-  const asked = readLens(l, input, readLens(l, preset));
-  if (!asked.from) throw new Error('A preset that answers from its lens reads from an item (from): across the whole map it would read every item.');
-  return { asked, ...(await scanAround(l, { ...aroundOf(l, asked.from, input, asked, []), ...more })) };
 }

@@ -1,0 +1,15 @@
+{
+  "id": "canvas",
+  "version": "0.1.0",
+  "title": "Canvas",
+  "description": "The canvas the app opens on: its preset draws every view as a flow unless a nearer style says otherwise. Take the pack out and views are drawn as before. A template for a pack that changes how the map looks.",
+  "requires": ["core"],
+  "styles": [
+    {
+      "id": "canvas.house",
+      "title": "Canvas",
+      "over": "workspace",
+      "props": { "shape": "flow", "hover_only": ["part_of"] }
+    }
+  ]
+}

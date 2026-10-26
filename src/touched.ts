@@ -1,28 +1,38 @@
-// What the map's changes since a page last looked touched, as that viewer may see them: the items changed and both
-// ends of each link made or ended. The page draws again only what bears on one of them (ui/live.js), so a change
-// elsewhere on the map leaves it still.
+// What a session touched: the items it read, showed or changed, as a set kept with its run. Each read is presence
+// (src/presence.ts), kept nowhere; only the set is kept, in the transient store (src/transient.ts) under the run, for
+// a week after the session was last heard from, and a week after it ends. Every agent session may share one token, so
+// the server cannot tell from a call whose session made it: the session's own hook says, at each prompt, turn and
+// end, which items its calls to the map named (scripts/pelago-hook.mjs reads them from the session's transcript).
 
 import type { Q } from './db.ts';
-import { lastSeq, readEvents } from './eventlog.ts';
+import { wholeMap } from './outbox.ts';
+import type { Archipelago } from './pelago.ts';
+import { keep, kept } from './transient.ts';
 
-/** More events than this since the last look, and the page is told only that much changed. */
-const MOST = 400;
+/** How long a run's set is kept after it was last heard from, or ended. */
+export const TOUCHED_MS = 7 * 86_400_000;
+/** The most items a run's set holds: past it, the first touched are let go. */
+export const TOUCHED_KEPT = 500;
+const ID = /^e_[a-z0-9]{8}$/;
+const key = (run: string) => `touched:${run}`;
 
-export interface Touched {
-  /** The last event the viewer can see: the next look asks from here. */
-  seq: number;
-  /** The items changed or linked since `after`; null when too much changed to say. */
-  ids: string[] | null;
-  /** How many items were made since `after`: a list may hold a new one. */
-  made: number;
+/** Add what the hook says a run touched to its set, and keep the set a week from now. */
+export async function addTouched(db: Q, run: string, said: unknown): Promise<string[]> {
+  const ids = Array.isArray(said) ? said.filter((v): v is string => typeof v === 'string' && ID.test(v)) : [];
+  const had = (await kept<string[]>(db, key(run))) ?? [];
+  const all = [...new Set([...had, ...ids])].slice(-TOUCHED_KEPT);
+  await keep(db, key(run), all, TOUCHED_MS);
+  return all;
 }
 
-/** What changed after the event `after`, read through the viewer's own rows. Without `after`, only where things stand. */
-export async function touched(db: Q, after?: number): Promise<Touched> {
-  if (after === undefined) return { seq: await lastSeq(db), ids: [], made: 0 };
-  const rows = await readEvents(db, { after, oldest: true, limit: MOST + 1 });
-  if (rows.length > MOST) return { seq: await lastSeq(db), ids: null, made: 0 };
-  const ids = new Set<string>();
-  for (const r of rows) for (const id of [r.target_id, r.detail?.to]) if (typeof id === 'string') ids.add(id);
-  return { seq: rows.length ? rows.at(-1)!.seq : after, ids: [...ids], made: rows.filter((r) => r.action === 'entity.create').length };
+/** The items a run touched, in the order it first touched them. */
+export async function touchedBy(l: Archipelago, run: string): Promise<string[]> {
+  return (await kept<string[]>((await wholeMap(l)).db, key(run))) ?? [];
+}
+
+/** A run has ended: its set is kept a week from now. */
+export async function keepTouched(l: Archipelago, run: string): Promise<void> {
+  const { db } = await wholeMap(l);
+  const had = await kept<string[]>(db, key(run));
+  if (had) await keep(db, key(run), had, TOUCHED_MS);
 }

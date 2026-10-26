@@ -262,8 +262,15 @@ say({ type: 'ready' });
         };
       };
       let ready = Promise.resolve();
+      // What is in view comes as often as the plane moves: the drawing is told only the latest, once it is free.
+      let view = null;
       port.onmessage = (ev) => {
         const said = ev.data ?? {};
+        if (said.type === 'viewport') {
+          const told = view;
+          view = Object.fromEntries(['x', 'y', 'width', 'height', 'scale'].map((k) => [k, Number(said.view?.[k]) || 0]));
+          if (told) return;
+        }
         ready = ready.then(async () => {
           const t0 = performance.now();
           try {
@@ -273,7 +280,11 @@ say({ type: 'ready' });
               send({ type: 'scene', scene: drawn?.scene ?? {}, took: performance.now() - t0 });
             } else if (said.type === 'event' && drawn?.on) send({ type: 'patch', list: (await drawn.on(said.event)) ?? [] });
             else if (said.type === 'restyle' && drawn?.restyle) send({ type: 'patch', list: (await drawn.restyle(said.style)) ?? [] });
-            else if (said.type === 'frame') waiting.splice(0).forEach((resolve) => resolve(said.t));
+            else if (said.type === 'viewport') {
+              const now = view;
+              view = null;
+              if (drawn?.viewport) send({ type: 'patch', list: (await drawn.viewport(now)) ?? [] });
+            } else if (said.type === 'frame') waiting.splice(0).forEach((resolve) => resolve(said.t));
             else if (said.type === 'surface') gotSurface?.(said.none ? null : paintable(said));
             else if (said.type === 'surface-size') sized.forEach((fn) => fn({ ...said.size }));
             else if (said.type === 'end') (drawn?.end?.(), (ended = true), port.close());

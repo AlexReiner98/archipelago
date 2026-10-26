@@ -3,9 +3,12 @@
 // answered as well by a server it has not spoken to before.
 
 import { SETUP_VERSION, setupCommand } from './connect.ts';
+import { addCommits } from './commits.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
-import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, sessionBegan, sessionHeard } from './sessions.ts';
+import { askOnReply } from './replies.ts';
+import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard } from './sessions.ts';
+import { addTouched } from './touched.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { summed } from './summary.ts';
 import { keep, kept } from './transient.ts';
@@ -16,6 +19,19 @@ export interface HookBody {
   remote?: string;
   reason?: string;
   tokens?: number;
+  /** The items the session's calls to the map have named so far, read from its transcript (src/touched.ts). */
+  touched?: unknown;
+  /**
+   * At the start: the checkout's newest commits (id and message), which the session is asked to account for. After
+   * it: the commits the session has made so far, by full sha, and those its reply made or pushed (src/commits.ts).
+   */
+  commits?: unknown;
+  turn_commits?: unknown;
+  /** At a turn's end: what the reply did since the owner's last message (src/reply-rules.ts), and that message's id. */
+  reply?: unknown;
+  turn?: unknown;
+  /** Claude Code's: the agent is going on because a Stop hook asked it to. */
+  stop_hook_active?: unknown;
   setup?: string;
 }
 
@@ -33,6 +49,8 @@ export interface HookCall {
   running: { commit?: string; started: string };
   /** The address the hook called, for the setup command. */
   origin: string;
+  /** Says the run a session is registered as beside the answer (a header), for the hook to keep: Claude Code reads only the answer. */
+  ran?: (run: string) => void;
 }
 
 /** How long a session's place is kept after it was last heard from. */
@@ -57,6 +75,10 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);
   // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
   if (event !== 'session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
+  // And what it touched, so that report, action session_end, asks about those when it ends.
+  const run = event !== 'session-start' && body.session_id && (Array.isArray(body.touched) || Array.isArray(body.commits)) ? await resolveRun(pelago, body.session_id, true) : undefined;
+  if (run) await addTouched(whole, run.id, body.touched).catch((err) => console.error(`hook touched: ${(err as Error).message}`));
+  if (run) await addCommits(whole, run.id, body.commits).catch((err) => console.error(`hook commits: ${(err as Error).message}`));
   if (event === 'prompt') {
     // Each time the owner sends a session a message, the session is told what the owner has done in the map since
     // it last heard: a decision made in the UI reaches the session with the next thing they say.
@@ -80,6 +102,9 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   if (event === 'session-start') {
     await keep(whole, heardKey(body.session_id), await latestSeq(pelago), HEARD_MS);
     let additionalContext = await hookSessionStart(pelago, body);
+    // The hook keeps it in the checkout, where the commit-msg hook the setup installs finds it to name the run in a commit.
+    const run = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
+    if (run) call.ran?.(run.id);
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
     if (body.setup !== SETUP_VERSION)
@@ -90,11 +115,12 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     await hookSessionEnd(pelago, body);
     return {};
   }
-  // The end of a turn: nothing to say back, but the session was heard from and its count (taken above) is
-  // up to date, so one long turn does not go a whole session without its tokens.
+  // The end of a turn: the session was heard from and its count (taken above) is up to date, so one long turn does
+  // not go a whole session without its tokens. A rule on the reply's end may ask the agent to go on, once.
   if (event === 'stop') {
     await sessionHeard(pelago, body.session_id, 'until').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
-    return {};
+    const asking = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
+    return (await askOnReply(whole, pelago, asking, body).catch((err) => console.error(`hook reply rules: ${(err as Error).message}`))) ?? {};
   }
   return undefined;
 }

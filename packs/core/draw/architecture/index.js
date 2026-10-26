@@ -137,18 +137,16 @@ export function picture({ answer, style, reduced }, tools) {
   });
   const svg = m('svg', { viewBox: `0 0 ${g.width} ${g.height}`, role: 'img', 'aria-label': `A system of ${parts.length} parts in ${g.boxes.length} places` }, boxLayer, wireLayer, breakLayer, labelLayer, nameLayer, partLayer);
 
-  // The key: only the marks this picture uses, one to a line.
-  const key = (inner, label) => m('span', {}, m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label);
+  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/drawings.md).
+  const key = (inner, label) => ({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label });
   const healths = new Set([...parts, ...g.boxes].map((n) => n.health)), states = new Set(g.chains.map((c) => c.state));
-  const legend = m(
-    'div',
-    { class: 'lf-legend ar-legend' },
+  const entries = [
     [['box', 'Part'], ['store', 'Store'], ['pill', 'Client'], ['diamond', 'Question']].filter(([shape]) => parts.some((n) => n.shape === shape)).map(([shape, label]) => key(m('g', { class: 'ar-part' }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 13, CORNER, 3)), label)),
     g.boxes.length > 0 && key(m('rect', { x: 1, y: 1, width: 20, height: 12, rx: 3, class: 'ar-place-box' }), 'Where it runs'),
     HEALTHS.filter(([k]) => healths.has(k)).map(([k, label]) => key(m('circle', { cx: 11, cy: 7, r: 4, class: `ar-dot ${k}` }), label)),
     WIRES.filter(([k]) => states.has(k)).map(([k, label]) => key(m('path', { d: 'M1 7H21', class: `ar-wire ${k}` }), label)),
     g.breaks.length > 0 && key(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'ar-wire wired' }), 'Passes under'),
-  );
+  ].flat().filter(Boolean);
 
   // The bar: how many parts are in each health, and how many wires are wired, as marks to be read at a glance.
   const count = (k) => parts.filter((n) => n.health === k).length;
@@ -168,7 +166,7 @@ export function picture({ answer, style, reduced }, tools) {
   const light = (id) => wires.map((c, n) => [`w:${n}`, `h:${n}`].map((key) => ({ key, toggle: { lit: Boolean(id) && (c.a === id || c.b === id) } }))).flat();
   const here = g.nodes.has(style.here) ? [g.x.get(style.here), g.y.get(style.here)] : undefined;
   return {
-    scene: { css, svg, legend, bar, size: { width: g.width, height: g.height }, start: here },
+    scene: { css, svg, key: entries, bar, size: { width: g.width, height: g.height }, start: here },
     on({ name, key }) {
       const [kind, rest] = [key.slice(0, 1), key.slice(2)];
       if (name === 'leave') return light(null);

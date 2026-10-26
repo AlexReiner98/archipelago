@@ -33,6 +33,9 @@ where, and how that server is run.
 
 ## Rules
 
+How an agent is told, checked and reconciled (instructions, rules on a
+reply ending, commits accounted for) is `docs/agents.md`.
+
 - **You are an agent, not the owner.** Changes you make go through `change`.
   Under `npm start` they wait as proposals; under `npm run dev` they apply at
   once, so check them before you send them. Either way, never approve, reject,
@@ -99,12 +102,26 @@ where, and how that server is run.
   point a second server at `data/`; the lock refuses it.
 - **Before changing the database schema, take a backup** with `capture` action `backup`
   (the server also writes one every 6 hours, to `backups/default/`), then
-  confirm the item and event counts are unchanged after the restart. Never copy `data/` while the
-  server runs and call it a backup.
-- **One write path.** Every change to items and links goes through
-  `Archipelago.change` / `apply`. What skips approval is operational state,
-  and every store of it is named in `src/operational.ts` with its rule: add a
-  new one there, or the structure test refuses it.
+  confirm the item count and the log's entries are unchanged after the restart. Never copy `data/` while the
+  server runs and call it a backup. A schema change never rewrites the log: an
+  entry is kept as it was appended, and a new form is read through an
+  upcaster (`docs/log.md`, section 6).
+- **The log is the truth; the tables are its projections.** Every change to
+  items and links goes through `Archipelago.change` / `apply`, which appends
+  it to the workspace's log (`log_entry`, `log_fact`; `docs/log.md`) and
+  projects its facts into `entity`, `relation`, `proposal`, the part_of
+  closure and mentions in the same transaction (`src/replay.ts`). Never write
+  a projection any other way, and never treat one as the record: a rebuild
+  from the log replaces it. What skips approval is operational state, kept in
+  the operational streams (`log_op`) by its pack's retention rules, and every
+  store of it is named in `src/operational.ts` with its rule: add a new one
+  there, or the structure test refuses it. Free text in the log is sealed
+  with its item's key (`src/seal.ts`): a read of `log_fact` opens it with
+  `openSaid`, never reads the bytes as words.
+- **A forget cannot be undone.** It destroys the item's key, so its words
+  leave the log, the projections and every backup that needs that key. An
+  agent's forget waits for the owner (core's rule `forget`); never send one
+  on the owner's map to test something.
 - **Visibility is enforced by the database** (row level security in
   `src/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
@@ -142,25 +159,56 @@ where, and how that server is run.
 
 ## UI rules
 
-What each screen is for (one level of the hierarchy per screen, a bounded
-Home, named views kept on the map) is in `docs/ui-strategy.md`; read it before
-adding or changing a screen.
+The page is one flat canvas with a sheet over it. Its principles, and the
+modules they lead to, are `docs/canvas.md`; what each surface is for is
+`docs/ui-strategy.md`. Read both before adding or changing a screen. How a
+pack sets how the canvas looks is `packs/canvas/README.md`.
+
+The canvas keeps to these (the flat canvas, 25 Oct 2026: document
+"Rework: the canvas as a flat graph"):
+
+- **Depth is never drawn.** Every item is a node on one plane and every
+  link a wire; `part_of` is a quiet tie, never a box inside a box. Zoom is
+  scale and how much text shows, never structure.
+- **Lens and style are the whole surface.** What a canvas shows is a flat
+  lens (a filter of terms that add seeds and terms that must all hold of
+  them, a walk, a limit), always in sight in the query bar; how it
+  looks is a style. A click adds to the filter and a search sets its text:
+  growing a canvas is editing its lens. A person and an agent read the same
+  lens (`query` name `flat`), and the page calls no tool an agent lacks for
+  it; `npm test` freezes the names the page calls through `/api`.
+- **Home is the saved canvases.** A canvas kept on the map is a lens and a
+  style (core's `lens` type); Home lists them, and the bar switches between
+  them. There is no other list of views.
+- **Places never carry meaning.** Where a person puts a node is kept in the
+  places stream, one place per canvas and item, read only to draw it there.
+  A grouping that matters is made as a link.
+- **Every gesture is a change.** A wire drawn, a status, Save in the sheet:
+  each is `change` on the person's authority, through the one write path, and
+  a held change is drawn as a ghost where it would land. Moves are the one
+  batch that is not, written to the places stream before the next action.
+- **The page is a replica of the log.** It holds a lens's answer as items
+  and links by id and keeps it current from the facts after its position
+  (`tail`), with the projector the server runs; it never polls for a picture.
 
 The UI is for a person glancing at it, and most of what it shows was written
-by agents, who write paragraphs. Every screen keeps to these (the owner's
+by agents, who write paragraphs. Every screen keeps to these too (the owner's
 goal, 8 Oct 2026: minimal, no walls of text, text never stacking vertically,
 spatial where it can be):
 
-- **One thing, one page.** An item has a single page, and every way to it
-  (Home, a search, a link, an agent's show) leads to that same page, so a
-  person always lands somewhere they recognise. A list or dashboard points at
+- **One thing, one page.** An item has a single page, the sheet that opens
+  over the canvas where it stands, and every way to it (the canvas, find, a
+  link, an agent's show) leads to that same page, so a person always lands
+  somewhere they recognise. A list or dashboard points at
   the page; it never draws its own version of the item. What one kind of item
   needs beyond the common page (a project's roadmap) is a part of that page,
   not a second screen. Before adding a screen, ask whose page it belongs on.
 - **No wall of text, anywhere.** A screen never opens on more than one short
-  paragraph of prose (about four lines). A note shows its first paragraph and
-  the titles of its sections, each one click away (`renderBody` does this:
-  keep to it, and never print a body, a reason or a field whole). If you find
+  paragraph of prose (about four lines). A note is drawn by `renderBody`: its
+  sections under short titles, each folding with a click; whether they open
+  folded or open is the style's `page.notes` (the house style opens them: the
+  owner, 26 Oct 2026). Keep to it, and never print a reason or a field
+  whole. If you find
   a screen that shows a block of text, that is a bug: fold it. When you write
   a note, lead with the point in two or three sentences and give every further
   part a short title on a line of its own, so it folds.
@@ -179,9 +227,9 @@ spatial where it can be):
 - **A mark for a state.** Status, age, authority and counts are pills, marks
   and numbers, not sentences.
 - **One or two actions in sight.** What is done rarely goes in a `menu`.
-- **Draw it when it has a shape.** Structure, order and neighbourhood are
-  drawn (the roadmap, the graph, an item's links), with the list as
-  the second view.
+- **Connections are drawn, never listed.** What an item is tied to is a
+  wire on the canvas (the flow, by the canvas pack's preset, or a view's own
+  drawing), and no page lists an item's links (the owner, 24 Oct 2026).
 - **A name is a few words.** An item's title is read in a row, in a box on a
   chart and in a tooltip: name the thing, in 60 characters at most (the
   server refuses longer from an agent), and say the rest in the first line
@@ -204,8 +252,13 @@ else a pack"). These rules keep it composable while that happens, and
 - **The kernel names no pack.** No pack's type or link type by name in `src/`
   or `ui/`: ask the registry for a kind or a capability.
 - **One write path, checked.** Items and links are written only in
-  `src/pelago.ts`: through `change`, or through the operational writes and the
-  restore path `src/operational.ts` names.
+  `src/pelago.ts` and the projector it runs (`src/replay.ts`): through
+  `change`, or through the operational writes and the restore path
+  `src/operational.ts` names.
+- **No read of the whole map.** Every SQL read of items, links, the log or
+  the review queue is bounded (an id or set of ids, a subtree, a person, a
+  cursor, a limit) or names an index the schema makes (`-- index <name>`).
+  A view that needs everything inside an item reads the part_of closure.
 - **A pack's code imports nothing of the kernel.** It is handed what it reads
   and answers with ops and requests.
 - **A pack's code comes with its tests,** run without a database: input in,

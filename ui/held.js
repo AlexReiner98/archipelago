@@ -6,7 +6,7 @@ import { api, ask, h, tell } from './base.js';
 import { ago, chip, gist, link, loadSchema, relations, statusesOf, typeTitle, who } from './words.js';
 
 /** What a held change does, in a few words: the one thing it does, when it does one; else why it was asked for. */
-function said(p, names) {
+export function said(p, names) {
   if (p.ops.length !== 1) return gist(p.reason);
   const [o] = p.ops;
   const name = (id) => names.get(id)?.title ?? 'an item';

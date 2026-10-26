@@ -2,7 +2,7 @@
 // draws by comes from here; the kernel keeps none of its own ("Where does style live?", decided 20 Oct 2026).
 //
 // Layers, the nearest last, each field of a nearer one over the same field of those before it:
-//   a preset on nothing (the workspace's), a style kept about nothing,
+//   a preset on nothing (the workspace's), a style kept about nothing, a preset on nothing that says it lies over it,
 //   a preset on the item's kind or type, a style kept on it,
 //   a style kept about the item, one about the view drawn, one named outright.
 // A style kept with a preset's id (preset) is the owner's version of that preset: its fields over the preset's, in
@@ -57,7 +57,7 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk): Pro
     const mine = versions.find((v) => v.props.preset === p.id);
     if (mine && !mine.is_open) continue;
     const on = mine && listed(mine.props.on).length ? listed(mine.props.on) : (p.on ?? []);
-    const weight = !on.length ? 0 : onIt(on) ? 2 : -1;
+    const weight = !on.length ? (p.over === 'workspace' ? 1.5 : 0) : onIt(on) ? 2 : -1;
     if (weight < 0) continue;
     layers.push({ weight, id: mine?.id ?? p.id, title: mine?.title || p.title, preset: p.id, props: mine ? over(p.props, fields(mine.props)) : p.props });
   }
@@ -91,12 +91,22 @@ export async function withStyles<T extends { styles: Preset[] }>(l: Archipelago,
   };
 }
 
-/** The style a page is drawn in: of one item (its kind's, then its own), or the workspace's. What the item page and the pages that are not pictures read. */
-export async function pageStyle(l: Archipelago, input: { of?: unknown }) {
+/**
+ * The style a page is drawn in: of one item (its kind's, then its own), or the workspace's, under a style kept on the
+ * map when one is named (`style`), and a style kept about a view kept on the map when it is drawn (`view`). What the item page, the pages that are not pictures and the canvas read; asked
+ * with `have` (the drawings' hashes the page holds), with the drawing it names, as a lens answer's style is.
+ */
+export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; view?: unknown; have?: unknown }) {
   const of = typeof input.of === 'string' ? input.of : undefined;
+  const named = typeof input.style === 'string' ? input.style : undefined;
   const item = of === undefined ? undefined : (await l.db.query<{ id: string; type: string }>('select id, type from entity where id = $1', [of])).rows[0];
   if (of !== undefined && !item) throw new Error(`No item "${of}"`);
-  return styleFor(l, await keptOf(l, 'style', undefined), item ? { hub: item } : {});
+  const view = typeof input.view === 'string' ? input.view : undefined;
+  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(named && { named }) });
+  // A view kept on the map draws in the shape it keeps, and lights what it says, over every style.
+  const own = view === undefined ? undefined : ((await l.entity(view))?.props.style as Record<string, unknown> | undefined);
+  for (const key of ['shape', 'lit']) if (typeof own?.[key] === 'string') read.style[key] = own[key];
+  return input.have === undefined ? read : { ...read, style: await drawn(l, read.style, input.have) };
 }
 
 /**

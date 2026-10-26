@@ -64,7 +64,7 @@ export function drawDiagram(host, data, { download } = {}) {
   host.classList.add('lens-view');
   dress(host, state.style);
   host.replaceChildren(stage);
-  const moves = panZoom(stage, picture, { width: data.width, height: data.height });
+  const moves = panZoom(stage, picture, { width: data.width, height: data.height, style: state.style });
   const zoom = h(
     'span',
     { class: 'switch' },

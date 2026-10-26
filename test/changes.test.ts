@@ -100,9 +100,12 @@ test('an agent change becomes a proposal; a human approves it, minus exclusions'
   await assert.rejects(l.decide(human, { proposal: id, approve: true }), /already approved/);
 });
 
-test('the pulse moves when a change is proposed, decided or applied, and not otherwise', async () => {
+test('what the page follows moves when a change is proposed, decided or applied, and not otherwise', async () => {
   const l = await fresh();
-  const stamp = async () => (await l.pulse()).stamp;
+  const stamp = async () => {
+    const t = (await callTool(l, human, 'tail', {})) as { pos: number; queue: string };
+    return `${t.pos}.${t.queue}`;
+  };
   const seen = [await stamp()];
   assert.equal(await stamp(), seen[0], 'reading does not move it');
 

@@ -1,4 +1,4 @@
-// The human's own tools, for the CLI and the web UI: never offered to agents. What the page watches to redraw,
+// The human's own tools, for the CLI and the web UI: never offered to agents. What the page follows of the log,
 // merging a backup in, starting a session, GitHub's secret, the mark that a person looked, deciding a held change.
 
 import { readdirSync, statSync } from 'node:fs';
@@ -10,24 +10,39 @@ import { launch } from './launcher.ts';
 import { notifyWorkspace, wholeMap } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
 import { actorId } from './pelago.ts';
-import { presence } from './presence.ts';
+import { looked, presence } from './presence.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { touched } from './touched.ts';
+import { eventsAfter, factsAfter, HELD_MOST, headPos } from './tail.ts';
 
-/** Moves when any file of the web UI is saved, so an open page knows to load itself again. */
+/** Moves when any file of the web UI is saved (the projector it runs too), so an open page knows to load itself again. */
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
-const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(join(UI_DIR, file)).mtimeMs));
+const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(join(UI_DIR, file)).mtimeMs), statSync(join(import.meta.dirname, 'project.ts')).mtimeMs);
 
 export const HUMAN_TOOLS: Record<string, Tool> = {
-  pulse: {
-    description: 'A stamp that moves whenever the map or the review queue changes, and what the changes since `since` (an event seq) touched. The web UI watches it to know what to redraw.',
+  tail: {
+    description:
+      'What the page follows: the facts after `after` (a position in the fact stream) on the `ids` it holds, as the viewer may see them, for it to project (src/tail.ts); ' +
+      'which of them other events touched after `seq` (an event number); and the review queue, the agents and the UI as they stand. Without `after`, only where things stand.',
     humanOnly: true,
-    input: { since: z.number().int().nonnegative().optional().describe('The `touched.seq` of the last answer: what changed after it is said.') },
-    run: async (l, _actor, { since }) => {
-      const [p, { told, ...seen }, changed] = await Promise.all([l.pulse(), presence((await wholeMap(l)).db, l), touched(l.db, since)]);
-      return { stamp: `${p.stamp}.${told}`, ...seen, ui: uiStamp(), touched: changed };
+    input: {
+      after: z.number().int().nonnegative().optional().describe('The `pos` of the last answer: the facts after it are said.'),
+      seq: z.number().int().nonnegative().optional().describe('The `seq` of the last answer: what other events after it touched is said.'),
+      ids: z.array(z.string()).max(HELD_MOST).optional().describe('The items and links the page holds. Facts are read only on these, the links made touching them, and what those bring.'),
+      page: z
+        .object({ page: z.string().max(40), on: z.boolean(), muted: z.array(z.string().max(200)).max(50) })
+        .optional()
+        .describe('The page asking, and what it follows: whether a show moves it, and whose steps it leaves out. An agent’s show says how many pages follow it.'),
+    },
+    run: async (l, _actor, { after, seq, ids = [], page }) => {
+      if (page) await looked((await wholeMap(l)).db, l, page);
+      const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), presence((await wholeMap(l)).db, l), headPos(l.db)]);
+      const stand = { queue: `${queue.rows[0].n}.${told}`, ...seen, ui: uiStamp() };
+      const events = await eventsAfter(l.db, { seq, ids });
+      if (after === undefined) return { ...stand, pos, seq: events.seq };
+      const facts = ids.length ? await factsAfter(l.db, { after, ids }) : { pos, entries: [], gone: [], made: 0 };
+      return { ...stand, ...facts, seq: events.seq, events: events.ids };
     },
   },
   import_backup: {

@@ -3,7 +3,7 @@
 
 import { applyTheme } from './theme.js';
 
-export const state = { schema: undefined, pulse: undefined, seq: undefined, dirty: false, selfDrawn: false };
+export const state = { schema: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false };
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
 
@@ -34,8 +34,9 @@ export function h(tag, attrs, ...kids) {
 
 // Questions are asked in the page rather than with confirm() and prompt(), so
 // they can be styled and browser automation can answer them. Resolves to null
-// when dismissed; otherwise true, or the text typed when `input` is given.
-export function ask({ title, message, input, action = 'OK', cancel = 'Cancel', danger = false }) {
+// when dismissed; otherwise true, or the text typed when `input` is given, or,
+// given `choices` ([value, label, title?] each, a short list), the value chosen.
+export function ask({ title, message, input, choices, action = 'OK', cancel = 'Cancel', danger = false }) {
   return new Promise((resolve) => {
     // A secret is typed into a field that does not show it, and that the browser is asked not to remember.
     const field = input && (input.secret ? h('input', { type: 'password', autocomplete: 'off', spellcheck: false, placeholder: input.placeholder ?? '', style: 'width: 100%' }) : h('textarea', { rows: 3, placeholder: input.placeholder ?? '' }));
@@ -48,7 +49,8 @@ export function ask({ title, message, input, action = 'OK', cancel = 'Cancel', d
         h('h2', {}, title),
         message && h('p', { class: 'ask-message' }, message),
         field,
-        h('div', { class: 'toolbar' }, cancel && h('button', { value: 'cancel' }, cancel), h('button', { value: 'ok', class: danger ? 'danger' : 'primary' }, action)),
+        choices && h('div', { class: 'ask-choices', style: 'display: flex; flex-direction: column; gap: var(--space-3)' }, choices.map(([value, label, hint], n) => h('button', { value: `choice:${n}`, title: hint ?? label, class: n === 0 ? 'primary' : '', style: 'text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis' }, label))),
+        h('div', { class: 'toolbar' }, cancel && h('button', { value: 'cancel' }, cancel), !choices && h('button', { value: 'ok', class: danger ? 'danger' : 'primary' }, action)),
       ),
     );
     // Answered on the button press itself: the browser holds the dialog's close
@@ -57,7 +59,12 @@ export function ask({ title, message, input, action = 'OK', cancel = 'Cancel', d
       dialog.remove();
       resolve(ok ? (field ? field.value.trim() : true) : null);
     };
-    dialog.firstChild.addEventListener('submit', (e) => answer(e.submitter?.value === 'ok'));
+    dialog.firstChild.addEventListener('submit', (e) => {
+      const chose = /^choice:(\d+)$/.exec(e.submitter?.value ?? '')?.[1];
+      if (chose === undefined) return answer(e.submitter?.value === 'ok');
+      dialog.remove();
+      resolve(choices[Number(chose)][0]);
+    });
     dialog.addEventListener('cancel', () => answer(false));
     document.body.append(dialog);
     dialog.showModal();
@@ -128,7 +135,8 @@ export const known = {
 export function enter(token) {
   store.token = token;
   state.schema = undefined;
-  state.pulse = undefined;
+  // Where the page stood in the log was the other workspace's.
+  state.stamp = state.pos = state.seq = undefined;
   // A sign-in opens on Home, as the app does: a new workspace's first steps are there.
   if (location.hash && location.hash !== '#/home') location.hash = '#/home';
   else route();
@@ -136,7 +144,12 @@ export function enter(token) {
 
 export class SignInNeeded extends Error {}
 
+/** The tools that act on the map, as a person does: before each, what was batched on the page is written (hooks.act). */
+const ACTS = new Set(['change', 'decide', 'undo', 'session_end', 'publish', 'publish_all', 'unpublish', 'launch']);
+
 export async function api(tool, input = {}) {
+  // What waits to be written in one batch (where things were put on the canvas) goes first, in a call of its own.
+  if (ACTS.has(tool)) await hooks.act?.();
   const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() }, body: JSON.stringify(input) });
   const body = await res.json();
   if (res.status === 401) throw new SignInNeeded(body.error);

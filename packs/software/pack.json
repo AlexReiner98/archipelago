@@ -76,7 +76,36 @@
       "fields": {
         "compares": { "type": "string", "description": "What is compared with what, in one line a user can read: the position of the sun against the NOAA calculator in six cities." },
         "tolerance": { "type": "string", "description": "How close it must be to pass, e.g. within 0.01 degrees." },
-        "environment": { "type": "string", "description": "Where it runs and draws its picture: outside any host, or inside the program it extends." }
+        "environment": { "type": "string", "description": "Where it runs and draws its picture: outside any host, or inside the program it extends." },
+        "key": { "type": "string", "shown": true, "description": "Where it lives in the code, for one read in by npm run principles: its file and its name." },
+        "digest": { "type": "string", "shown": true, "description": "A hash of what npm run principles last read of it, so it is changed only when the code is." }
+      }
+    },
+    {
+      "id": "software.rule",
+      "extends": "record",
+      "title": "Rule",
+      "description": "A rule a pack keeps as data: when a change applies, waits for a person or is refused, or what a reply is asked. Read in from the pack file by npm run principles, never typed; it serves the principles it upholds.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "key": { "type": "string", "shown": true, "description": "Where it lives: its pack and its id, as core/forget." },
+        "pack": { "type": "string", "shown": true, "description": "The pack that declares it." },
+        "then": { "type": "string", "shown": true, "description": "What it does when it matches: hold, refuse, apply, or what it asks of a reply." },
+        "lifted": { "type": "string", "description": "The workspace setting that lifts it, when its pack lets one." },
+        "digest": { "type": "string", "shown": true, "description": "A hash of what npm run principles last read of it." }
+      }
+    },
+    {
+      "id": "software.action",
+      "extends": "record",
+      "title": "Agent action",
+      "description": "One thing an agent can do, called under one of the six verbs: the kernel's own or a pack's. Read in from the code by npm run principles, never typed; it serves the principles it upholds.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "key": { "type": "string", "shown": true, "description": "Its verb and name, as report/tell." },
+        "verb": { "type": "string", "shown": true, "description": "The verb it is called under." },
+        "pack": { "type": "string", "shown": true, "description": "The pack that declares it, or kernel." },
+        "digest": { "type": "string", "shown": true, "description": "A hash of what npm run principles last read of it." }
       }
     },
     {
@@ -94,6 +123,17 @@
         "build": { "type": "string", "description": "The version or commit the test ran on." },
         "passed": { "type": "boolean" },
         "picture": { "type": "string", "description": "Where the picture the test drew is: a path in the repository it ran in, under its .proof folder, which git ignores. The file itself is sent to Archipelago (picture_put) only when the result is shown in public." }
+      }
+    },
+    {
+      "id": "software.commit",
+      "extends": "record",
+      "capabilities": { "accounts": { "field": "sha", "accounted": "accounted" } },
+      "title": "Commit",
+      "description": "A commit accounted for: made by its session or a person, it says which items the commit settles, each by a settles link, and none when it has none. A commit with no such item is unaccounted for, and the check on the main branch stays red. One heard from a push that nobody accounted for in time is made with accounted false: accounting for it is setting accounted true, with its links.",
+      "fields": {
+        "sha": { "type": "string", "description": "The commit's full id (40 hex characters)." },
+        "accounted": { "type": "boolean", "description": "false while the commit was only heard from a push and nobody has said what it settles; true, or left out, once someone has." }
       }
     },
     {
@@ -129,6 +169,17 @@
       }
     },
     {
+      "id": "software.part",
+      "extends": "place",
+      "title": "Part",
+      "description": "A part of a mechanism: a rule, a hook, a tool, a step of how something works. Its status says whether it does its job (sketched, works, partly, broken), not whether it answers: what runs and is watched is a component. Part of the mechanism or place it belongs to; it calls (software.calls) what it hands on to. Drawn by the same shapes as a component.",
+      "statuses": { "open": ["sketched", "works", "partly", "broken"], "closed": ["retired"] },
+      "fields": {
+        "role": { "type": "enum", "values": ["client", "edge", "app", "data", "storage", "model", "monitor", "network", "tool", "service"], "shown": true, "description": "What it does in the mechanism, as a component's role: data and storage are drawn as a cylinder, client as a pill." },
+        "layer": { "type": "enum", "values": ["kernel", "type_pack", "server_pack", "store", "outside", "yours"], "shown": true, "description": "What it is, in a system of a kernel and packs, as a component's layer. A style may colour a part's dot by it (dots)." }
+      }
+    },
+    {
       "id": "software.spec",
       "extends": "work.file",
       "title": "Spec",
@@ -154,6 +205,17 @@
       "fields": {
         "diagram": { "type": "json", "description": "The page as data: its boxes with where each is, its wires, the draw.io file and page it is (key), the commit it was drawn from, and that file at the commit (drawio) when it was committed as drawn.", "system": true }
       }
+    }
+  ],
+  "rules": [
+    {
+      "id": "account_commits",
+      "on": "reply_ended",
+      "when": { "reply": { "unaccounted": true } },
+      "then": "ask",
+      "say": "This reply made commits the map does not account for. In one change: a software.commit (full sha) each, a software.settles link per item it settles, or none; one heard from a push: accounted true.",
+      "record": { "type": "software.commit", "field": "sha" },
+      "lifted": "reply_account_commits"
     }
   ],
   "links": [
@@ -201,9 +263,29 @@
       "from": ["software.release"],
       "to": ["*"],
       "description": "What a release contains."
+    },
+    {
+      "id": "software.settles",
+      "extends": "relates_to",
+      "title": "settles",
+      "inverse": "is settled by",
+      "from": ["software.commit"],
+      "to": ["*"],
+      "description": "The commit finished or changed this item: a task it did, a bug it fixed, a decision it carried out."
     }
   ],
   "views": [
+    {
+      "form": "attention",
+      "id": "software.unaccounted",
+      "reason": "unaccounted",
+      "description": "Pushed, and nobody has said what it settles: account for it with its settles links, and accounted true.",
+      "of": "software.commit",
+      "where": { "accounted": false },
+      "joins": "waits_on",
+      "mark": "not accounted for",
+      "ask": "Account for"
+    },
     {
       "id": "software.handoff",
       "shape": "data",
@@ -298,7 +380,7 @@
       "id": "software.releases",
       "title": "Releases",
       "at": "home",
-      "pieces": [{ "piece": "picture", "lens": { "kinds": ["software.release"], "fold": ["closed", "system"] }, "style": { "shape": "list" } }]
+      "pieces": [{ "piece": "picture", "lens": { "filter": { "types": ["software.release"], "exclude": ["closed", "system"] } }, "style": { "shape": "list" } }]
     },
     { "form": "screen", "id": "software.gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
     {

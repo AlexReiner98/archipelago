@@ -3,9 +3,11 @@
 // `npm run pull -- <name>` copies another map this machine is connected to instead: the MCP server of that name, as
 // Claude Code reaches it from here (.mcp.json, this project's servers in ~/.claude.json, then the user's).
 //
-// The copy acts on nothing outside: its automations are paused, and the secrets in it were sealed with the
-// hosted server's key, so here they read as not set. What was in the data folder is kept beside it, as
-// data-backup-<time>. The hosted workspace must let agents download backups (Workspace page, Backups).
+// The copy is the whole workspace, private items included, as the owner lets agents download it (Workspace page,
+// Backups): every item and link at the head of its log, with its keys wrapped again under this machine's sealing key so
+// it opens here as it did there, and no link to an item the copy does not hold. It acts on nothing outside: its
+// automations are paused and its secrets left behind (those in its settings were sealed with the hosted server's key,
+// so here they read as not set). What was in the data folder is kept beside it, as data-backup-<time>.
 //
 // With the local server stopped, the copy goes in place at once. Under `npm run dev` the server is asked to
 // restart, and the copy goes in place while it is down. Under `npm start`, stop it first.
@@ -14,10 +16,11 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { parseBackup, parseVault, readable, restore } from './backup.ts';
-import { rewrap } from './vault.ts';
+import { parseBackup, parseVault, readable, restore, type Dump } from './backup.ts';
+import { rewrap, type VaultDump } from './vault.ts';
 import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
+import { configureSecrets } from './secrets.ts';
 
 /** Where a pulled copy waits until the data folder can be swapped for it. */
 export const pulledDir = (dataDir: string) => `${dataDir}.pulled`;
@@ -30,6 +33,29 @@ export function takePulled(dataDir: string): string | undefined {
   if (existsSync(dataDir)) renameSync(dataDir, kept);
   renameSync(pulled, dataDir);
   return kept;
+}
+
+/**
+ * A downloaded backup made a data folder beside `dataDir`, to go in place of it: its keys, sent wrapped under `keys.key`,
+ * wrapped again under the sealing key of the server on `dataDir`, kept where that server keeps it (src/server.ts).
+ * Under a key of this process only, the copy's keys would open nothing once it ends. Its secrets stay behind and its
+ * automations are paused, so the copy acts on nothing outside.
+ */
+export async function takeIn(dataDir: string, backup: Dump, keys?: { vault: VaultDump; key: Buffer }) {
+  configureSecrets(join(dataDir, '..', 'workspaces'));
+  if (keys) backup.vault = { ...rewrap(keys.vault, keys.key), secrets: [] };
+  const target = pulledDir(dataDir);
+  rmSync(target, { recursive: true, force: true });
+  const db = await openDb(target);
+  try {
+    // Its items as the file's log makes them, read before they go in, so its automations can be paused on the way.
+    const clear = await readable(db, backup);
+    let paused = 0;
+    for (const row of clear.tables.entity ?? []) if (row.type === 'sys.automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
+    return { counts: await restore(db, clear, 'default'), paused, vault: backup.vault };
+  } finally {
+    await db.close();
+  }
 }
 
 type Server = { url?: string; headers?: Record<string, string> };
@@ -83,24 +109,17 @@ async function pull() {
   mkdirSync(dirname(saved), { recursive: true });
   writeFileSync(saved, file);
 
-  const backup = parseBackup(file);
   // A sealed backup's keys, under the key the answer gave, wrapped again under this machine's own and kept beside it.
+  let keys: { vault: VaultDump; key: Buffer } | undefined;
   if (answer.result.vault_path && answer.result.vault_key) {
-    const keys = await fetch(url + answer.result.vault_path);
-    if (!keys.ok) return fail(`The link to its keys gave HTTP ${keys.status}: ask again.`);
-    backup.vault = rewrap(parseVault(Buffer.from(await keys.arrayBuffer())), Buffer.from(answer.result.vault_key, 'base64url'));
-    writeFileSync(saved.replace('.json.gz', '.vault.json.gz'), gzipSync(JSON.stringify(backup.vault)));
+    const got = await fetch(url + answer.result.vault_path);
+    if (!got.ok) return fail(`The link to its keys gave HTTP ${got.status}: ask again.`);
+    keys = { vault: parseVault(Buffer.from(await got.arrayBuffer())), key: Buffer.from(answer.result.vault_key, 'base64url') };
   }
   const target = pulledDir(dataDir);
-  rmSync(target, { recursive: true, force: true });
-  const db = await openDb(target);
-  // Its items as the file's log makes them, read before they go in, so its automations can be paused on the way.
-  const clear = await readable(db, backup);
-  let paused = 0;
-  for (const row of clear.tables.entity ?? []) if (row.type === 'sys.automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
-  const counts = await restore(db, clear, 'default');
-  await db.close();
-  console.log(`Pulled ${url} as of ${answer.result.taken}: ${counts.entity} items, ${counts.event} events; ${paused} automations paused. Kept as ${saved}`);
+  const { counts, paused, vault } = await takeIn(dataDir, parseBackup(file), keys);
+  if (vault) writeFileSync(saved.replace('.json.gz', '.vault.json.gz'), gzipSync(JSON.stringify(vault)));
+  console.log(`Pulled ${url} as of ${answer.result.taken}: ${counts.entity} items, ${counts.relation} links, ${counts.event} events; ${paused} automations paused. Kept as ${saved}`);
 
   const health = () => fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json() as Promise<{ started: string }>, () => undefined);
   const before = await health();

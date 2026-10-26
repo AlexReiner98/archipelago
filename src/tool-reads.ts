@@ -6,7 +6,8 @@ import { NEWEST, summed } from './summary.ts';
 import { lastSeq, readEvents } from './eventlog.ts';
 import { listening } from './presence.ts';
 import { askView, viewList, viewsSaid } from './askview.ts';
-import { shownIn } from './lens.ts';
+import { placesOn } from './canvas-places.ts';
+import { shownIn } from './lens-saved.ts';
 import { wholeMap } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
 import { getPicture } from './pictures.ts';
@@ -139,7 +140,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => input.type ? schemaOf(l.registry.describe(), input.type) : actor.kind === 'human' || input.full ? withStyles(l, await withScreens(l, l.registry.describe())) : schemaBrief(l.registry),
   },
   search: {
-    description: 'Find items by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. Always search before creating, to avoid duplicates.',
+    description: 'Find items by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. The flat lens (query flat) takes the same search as its filter’s text, so what is found can be read with what it is tied to. Always search before creating, to avoid duplicates.',
     input: {
       q: z.string().optional().describe('Matches title and body.'),
       type: z.string().optional(),
@@ -237,5 +238,10 @@ export const READ_TOOLS: Record<string, Tool> = {
     description: 'The image kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; query document, which sections have a figure).',
     input: { result: z.string().describe('The id of the test result, note or file.') },
     run: async (l, _actor, input) => getPicture(l, input),
+  },
+  places: {
+    description: 'Where each thing stands on one canvas, as a person put it there: by item, the middle of each as [x, y] in the picture’s own units. Read beside the lens of that canvas; what is not here is where the drawing lays it.',
+    input: { canvas: z.string().optional().describe("The canvas: the id of the item it is drawn from; the workspace's (or nothing) for the whole map.") },
+    run: async (l, _actor, input) => placesOn(l, input.canvas),
   },
 };

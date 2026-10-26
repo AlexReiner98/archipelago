@@ -17,7 +17,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   ]);
   const of = async (id?: string) => (await VIEWS.style.run(l, id ? { of: id } : {})) as { style: any; used: { id: string; preset?: string }[] };
   const workspace = await of();
-  assert.deepEqual([workspace.style.page.picture, workspace.style.page.notes, typeof workspace.style.numbers.note_opening_most], [true, 'folded', 'number']);
+  assert.deepEqual([workspace.style.page.picture, workspace.style.page.notes, typeof workspace.style.numbers.note_opening_most], [true, 'open', 'number']);
   // The page's colours are the house style's theme, light and dark alike, every name in both.
   const { light, dark } = workspace.style.theme;
   assert.deepEqual([typeof light.bg, typeof dark.bg, Object.keys(light).sort()], ['string', 'string', Object.keys(dark).sort()]);
@@ -34,13 +34,29 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   }
   assert.match(sheet, /--space-5: 8px;/);
   const project = await of(made.p);
-  assert.deepEqual([project.style.page.picture, project.style.page.notes], [true, 'folded'], 'a project has the house style');
+  assert.deepEqual([project.style.page.picture, project.style.page.notes], [true, 'open'], 'a project has the house style');
   const doc = await of(made.d);
   assert.deepEqual([doc.style.page.picture, doc.style.page.notes, doc.style.page.ties], [false, 'whole', 'open'], 'a document reads through, the rest of its page the house style\'s');
-  assert.deepEqual(doc.used.map((u) => u.preset), ['core.house', 'work.reading']);
+  assert.deepEqual(doc.used.map((u) => u.preset), ['core.house', 'canvas.house', 'work.reading']);
   // The owner's version of the reading preset: documents fold again, the picture still left out.
   await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Mine', props: { preset: 'work.reading', page: { notes: 'folded' } } }]);
   const mine = await of(made.d);
   assert.deepEqual([mine.style.page.picture, mine.style.page.notes], [false, 'folded']);
   await assert.rejects(of('e_nothing0'), /No item/);
+});
+
+test("the canvas pack's flow lies over a workspace style that says list, and under a view's own", async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'ws', type: 'style', title: 'House style', props: { shape: 'list' } },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
+  ]);
+  const of = async (id?: string) => (await VIEWS.style.run(l, id ? { of: id } : {})) as { style: any; used: { id: string; preset?: string }[] };
+  // A workspace style kept from before the canvas does not turn the canvas back into lists.
+  const page = await of(made.p);
+  assert.equal(page.style.shape, 'flow');
+  assert.deepEqual(page.used.map((u) => u.preset ?? u.id), ['core.house', made.ws, 'canvas.house']);
+  // A style kept about the item is nearer, and wins.
+  await make(l, [{ op: 'create', ref: 'own', type: 'style', title: 'P as a list', props: { shape: 'list' } }, { op: 'link', type: 'about', from: 'own', to: made.p }]);
+  assert.equal((await of(made.p)).style.shape, 'list');
 });

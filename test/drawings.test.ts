@@ -9,13 +9,15 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { architectureCases, flowCases } from './drawing-cases.ts';
+import { architectureCases, flowCases, house } from './drawing-cases.ts';
 import { readSteps, stepsShown } from '../src/lens-steps.ts';
 import { serve } from './serve.ts';
+import { keptPicture } from '../src/lens-saved.ts';
+import { fresh, make } from './map.ts';
 
-/** A small system on the map, its picture kept as a lens drawn as architecture. */
+/** A small system on the map, its picture kept as a view drawn as architecture. */
 async function system(call: (path: string, token?: string, body?: unknown) => Promise<any>) {
-  const made = await call('/api/change', undefined, {
+  const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
       { op: 'create', ref: 'p', type: 'work.project', title: 'A system' },
@@ -26,33 +28,38 @@ async function system(call: (path: string, token?: string, body?: unknown) => Pr
       { op: 'link', type: 'part_of', from: 'a', to: 'e' },
       { op: 'link', type: 'part_of', from: 'b', to: 'e' },
       { op: 'link', type: 'software.calls', from: 'a', to: 'b' },
-      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { over: ['software.calls'] } },
-      { op: 'link', type: 'about', from: 'l', to: 'p' },
+    ],
+  })).result.created as Record<string, string>;
+  const kept = await call('/api/change', undefined, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { ids: [made.p] }, walk: { over: ['part_of', 'software.calls'], steps: 3 } } },
+      { op: 'link', type: 'about', from: 'l', to: made.p },
       { op: 'create', ref: 's', type: 'style', title: 'As architecture', status: 'current', props: { shape: 'architecture' } },
       { op: 'link', type: 'about', from: 's', to: 'l' },
     ],
   });
-  return made.result.created as Record<string, string>;
+  return { ...made, ...kept.result.created } as Record<string, string>;
 }
 
 test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€™s version stands in module by module', async () => {
   const { call } = await serve('off');
-  const { p, l } = await system(call);
-  const first = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).result.style.drawing;
+  const { p, s } = await system(call);
+  const first = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [] } })).result.style.drawing;
   assert.equal(first.id, 'core.architecture');
   assert.deepEqual(Object.keys(first.modules).sort(), ['boards.js', 'boats.js', 'deep.js', 'index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'moves.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js']);
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
-  const again = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
+  const again = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [first.hash] } })).result.style.drawing;
   assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', shape: 'architecture', hash: first.hash });
-  // What holds an item is drawn as a flow, by the core pack's flow drawing.
-  const holding = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: 'holding' } })).result.style;
+  // With nothing kept for it, a picture is drawn as a flow, by the core pack's flow drawing.
+  const holding = (await call('/api/view', undefined, { name: 'style', params: { have: [] } })).result.style;
   assert.equal(holding.drawing.id, 'core.flow');
 
   // The owner's version changes one module; the rest are the pack's.
   const look = 'export const css = `.ar-part { cursor: help; }`;\n';
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'Architecture, mine', status: 'current', props: { preset: 'core.architecture', modules: { 'look.js': look } } }] });
-  const mine = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l, have: [first.hash] } })).result.style.drawing;
+  const mine = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [first.hash] } })).result.style.drawing;
   assert.notEqual(mine.hash, first.hash);
   assert.equal(mine.modules['look.js'], look);
   assert.equal(mine.modules['index.js'], first.modules['index.js']);
@@ -69,19 +76,25 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   assert.equal(shown.result.status, 'proposed');
 });
 
-test('a picture with steps is sent them, and the finished parts they name, whatever it folds away', async () => {
-  const { call } = await serve('off');
-  const { p, l, e, a } = await system(call);
-  const old = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'software.component', title: 'Old backups', status: 'retired' }, { op: 'link', type: 'part_of', from: 'o', to: e }, { op: 'link', type: 'software.calls', from: a, to: 'o' }] })).result.created.o;
-  const steps = [{ chapter: { name: 'Then', when: '7 Oct', count: 1 }, add: [a, old], titles: { [a]: 'Old doors' }, lines: [{ by: 'Alex', text: 'Back it up.' }] }, { remove: [old], lines: [{ by: 'Agent', text: 'It is gone.' }] }];
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: l, props: { steps } }] });
-  const answer = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).result;
+test('a picture with steps is sent them, and the finished parts they name, whatever it leaves out', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'work.project', title: 'A system' },
+    { op: 'create', ref: 'a', type: 'software.component', title: 'Doors', status: 'up' },
+    { op: 'create', ref: 'o', type: 'software.component', title: 'Old backups', status: 'retired' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'o', to: 'p' },
+    { op: 'link', type: 'software.calls', from: 'a', to: 'o' },
+  ]);
+  const steps = [{ chapter: { name: 'Then', when: '7 Oct', count: 1 }, add: [made.a, made.o], titles: { [made.a]: 'Old doors' }, lines: [{ by: 'Alex', text: 'Back it up.' }] }, { remove: [made.o], lines: [{ by: 'Agent', text: 'It is gone.' }] }];
+  Object.assign(made, await make(l, [{ op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { links: [`part_of ${made.p}`], exclude: ['closed', 'system'] }, steps } }]));
+  const answer = await keptPicture(l, made.l);
   assert.deepEqual(answer.steps, steps);
-  assert.ok(answer.items.some((i: any) => i.id === old && !i.open), 'the retired part is sent');
-  assert.ok(answer.links.some((k: any) => k.from === a && k.to === old), 'and its wire');
+  assert.ok(answer.items.some((i) => i.id === made.o && !i.open), 'the retired part is sent');
+  assert.ok(answer.links.some((k) => k.from === made.a && k.to === made.o), 'and its wire');
   // Steps that cannot be read say why.
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: l, props: { steps: [{ add: 'all of it' }] } }] });
-  assert.match((await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).error ?? '', /add and remove are lists of ids/);
+  await make(l, [{ op: 'update', id: made.l, props: { steps: [{ add: 'all of it' }] } }]);
+  await assert.rejects(keptPicture(l, made.l), /add and remove are lists of ids/);
 });
 
 test('a published picture keeps its steps, naming only what it shows', () => {
@@ -109,9 +122,8 @@ const FLOW_GOLDEN = join(import.meta.dirname, 'fixtures', 'drawings', `flow.gold
 
 test('in a browser, the flow drawing draws what the kernel drew: the same marks, looks, hovering, lighting and key', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
-  const { p } = await system(call);
-  // The pack's flow drawing, as a picture of what holds an item is sent it.
-  const { drawing } = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: 'holding' } })).result.style;
+  // The pack's flow drawing, as a picture with nothing kept for it is sent it.
+  const { drawing } = (await call('/api/view', undefined, { name: 'style', params: { have: [] } })).result.style;
   const page = await open(`${base}/`);
   try {
     await page.evaluate(readFileSync(join(import.meta.dirname, 'drawing-capture.js'), 'utf8'));
@@ -137,8 +149,8 @@ test('in a browser, the flow drawing draws what the kernel drew: the same marks,
 
 test('in a browser, the architecture drawing draws what the kernel drew: the same marks, looks, hovering, lighting and key', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
-  const { p, l } = await system(call);
-  const { drawing } = (await call('/api/view', undefined, { name: 'lens', params: { from: p, lens: l } })).result.style;
+  const { l, s } = await system(call);
+  const { drawing } = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [] } })).result.style;
   const page = await open(`${base}/`);
   try {
     await page.evaluate(readFileSync(join(import.meta.dirname, 'drawing-capture.js'), 'utf8'));
@@ -157,10 +169,10 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
         for (const k of ['hover', 'after_hover', 'dim', 'key']) assert.deepEqual(b[k], a[k], `${name}: ${k}`);
       }
     }
-    // And in the app: the lens view draws it, and asks for no drawing it has.
+    // And in the app: the view kept on the map draws it, as a document or a screen brings it in.
     const parts = await page.evaluate(`(async () => {
-      const { lensView } = await import('/lens.js');
-      const view = lensView({ lens: { from: ${JSON.stringify(p)}, lens: ${JSON.stringify(l)} } });
+      const { keptView } = await import('/canvases.js');
+      const view = keptView(${JSON.stringify(l)});
       document.body.append(view);
       await view.ready;
       for (let n = 0; n < 200 && !view.querySelector('.lf-stage a.ar-part'); n++) await new Promise((r) => setTimeout(r, 25));
@@ -182,6 +194,8 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
   }
 });
 
+/** The house style's numbers, which the frame a picture moves in is moved by (ui/pan-zoom.js). */
+const numbers = JSON.stringify(house('flow').numbers);
 /** A drawing's index.js that answers with this scene, after what `before` runs. */
 const hostile = (scene: string, before = '') => `export async function picture(input, tools) { ${before}; return { scene: ${scene} }; }`;
 
@@ -199,6 +213,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       escape: hostile(`{ css: '} body { display: none } x {', svg: ['svg', {}] }`),
       sibling: hostile(`{ css: '~ * { display: none }', svg: ['svg', {}] }`),
       fetch: hostile(`{ css: 'x { background: url(https://example.com/) }', svg: ['svg', {}] }`),
+      viewport: `export async function picture() { return { scene: { svg: ['svg', { key: 'x' }], size: { width: 100, height: 100 } }, viewport: () => [{ key: 'x', mark: ['script', {}, 'parent.document.body.remove()'] }] }; }`,
       tip: hostile(`{ svg: ['svg', { key: 'x' }] }`, `setTimeout(() => tools.patch([{ tip: { key: 'x', mark: ['script', {}, 'parent.document.body.remove()'] } }]), 50)`),
     };
     const body = await page.evaluate('getComputedStyle(document.body).display');
@@ -208,7 +223,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       for (const [name, code] of Object.entries(${JSON.stringify(tries)})) {
         const host = document.createElement('div');
         document.body.append(host);
-        drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
+        drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
         // What it sends after its scene (a tip) is checked when it comes: wait for what it says then.
         for (let n = 0; n < 200 && !host.textContent.startsWith('This drawing stopped'); n++) await new Promise((r) => setTimeout(r, 25));
         out[name] = host.textContent;
@@ -227,7 +242,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       const { drawWith } = await import('/drawing.js');
       const host = document.createElement('div');
       document.body.append(host);
-      drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: 'reach'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(reach)} } } }, () => {});
+      drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: 'reach'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(reach)} } } }, () => {});
       for (let n = 0; n < 200 && !host.textContent; n++) await new Promise((r) => setTimeout(r, 25));
       return host.textContent;
     })()`);
@@ -239,7 +254,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       const { drawWith } = await import('/drawing.js');
       const host = document.createElement('div');
       document.body.append(host);
-      drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: 'stuck'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(stuck)} } } }, () => {});
+      drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: 'stuck'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(stuck)} } } }, () => {});
       for (let n = 0; n < 800 && !host.textContent; n++) await new Promise((r) => setTimeout(r, 25));
       return host.textContent;
     })()`);
@@ -270,7 +285,7 @@ test('in a browser, a drawing that asks for a surface paints pixels over its pic
       const draw = async (name, code, done) => {
         const host = document.createElement('div');
         document.body.append(host);
-        drawWith(host, { items: [], links: [], lens: {} }, { drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
+        drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: name.padEnd(64, '0'), modules: { 'index.js': code } } }, () => {});
         for (let n = 0; n < 400 && !done(host); n++) await new Promise((r) => setTimeout(r, 25));
         return host;
       };
