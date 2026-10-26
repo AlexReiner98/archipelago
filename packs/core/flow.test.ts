@@ -112,7 +112,9 @@ test('two thousand steps in wide layers are laid out in a few seconds', () => {
   const started = performance.now();
   const g = run(items, links);
   const took = performance.now() - started;
-  assert.ok(took < 4000, `laid out in ${Math.round(took)} ms`);
+  // About 1.3 s alone (26 Oct 2026); the whole suite runs files side by side and slows it twice or three times over, so
+  // the bound is set well clear of that and still far under what it guards against.
+  assert.ok(took < 8000, `laid out in ${Math.round(took)} ms`);
   assert.equal(g.all.filter((n: any) => !n.dummy).length, 2001);
 });
 
