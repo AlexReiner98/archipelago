@@ -175,12 +175,10 @@ export function picture({ answer, style, reduced }, tools) {
   });
   const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, breakLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
-  // The legend: only the marks this picture uses, one to a line.
-  const mark = (inner, label) => m('span', {}, m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label);
+  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/drawings.md).
+  const mark = (inner, label) => ({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label });
   const uses = (test) => steps.some(test);
-  const legend = m(
-    'div',
-    { class: 'lf-legend' },
+  const key = [
     [['box', 'Work'], ['diamond', 'Question'], ['pill', 'Event'], ['sheet', 'Record'], ['end', 'Possible end']].filter(([shape]) => uses((n) => n.shape === shape)).map(([shape, label]) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 11, CORNER)), label)),
     [['done', 'Done'], ['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way'], ['', 'Not started']].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)).map(([dot, label]) => mark(m('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
     g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
@@ -188,7 +186,7 @@ export function picture({ answer, style, reduced }, tools) {
     g.breaks.length > 0 && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
     [...new Set(g.ties.map((t) => t.type))].sort().map((type) => mark(m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${kind(type)}` }), linkName(type))),
     (stepBadges.size > 0 || linkBadges.length > 0) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
-  );
+  ].flat().filter(Boolean);
 
   // What stays lit, as the style says: the rest dimmed.
   const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now));
@@ -243,7 +241,7 @@ export function picture({ answer, style, reduced }, tools) {
     return patches;
   };
   return {
-    scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, legend, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
+    scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
     end: player?.end,
     on(event) {
       const { name, key } = event;

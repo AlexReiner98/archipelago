@@ -352,7 +352,6 @@ button.quiet-button { padding: var(--space-2) var(--space-6); font-size: var(--t
   #query { top: calc(var(--box-9) + var(--space-5)); left: var(--space-5); right: var(--space-5); }
   #main { padding: var(--space-9) var(--space-8) var(--space-14); }
   #find { bottom: var(--space-5); }
-  #canvas .lf-legend { bottom: calc(var(--box-10) + var(--space-5)); }
 }
 
 /* Forms */

@@ -205,6 +205,7 @@
         "undrawn": { "type": "json", "description": "The link types drawn as no wire, as a list, e.g. [\"tagged\"]: the items are still drawn and still filtered by them. An empty list draws every link the drawing draws." },
         "link_colours": { "type": "json", "description": "A colour for each link type, by its name, as hex colours: the flow draws each wire and tie in its own, and a type not named here takes one of link_hues, the same each time unless another type in the picture has it." },
         "link_hues": { "type": "json", "description": "The colours a link type not named in link_colours takes, as hex colours: by its name, stepping past one another type in the same picture has. hues when not set." },
+        "key": { "type": "enum", "values": ["shown", "hidden"], "description": "Whether a picture's key is drawn: what each mark it uses means, as its drawing says (the scene's key), always in sight on the canvas. shown unless said." },
         "hover_only": { "type": "json", "description": "The link types whose wires are drawn only while one of their ends is hovered, as a list, e.g. [\"part_of\"]: still laid out by, and drawn always when held for a person." },
         "layout": { "type": "enum", "values": ["calendar", "bars"], "description": "time: a calendar of days, hours running down (calendar), or each lane a row of bars across the days (bars, a Gantt chart). calendar unless said." },
         "hours": { "type": "json", "description": "time, calendar: the hours of the day shown, as [from, to], e.g. [6, 22]. The whole day unless said." },
@@ -804,6 +805,7 @@
       "props": {
         "shape": "list",
         "undrawn": ["tagged"],
+        "key": "shown",
         "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#b23a48", "relates_to": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
         "lit": "all",
         "open": 1,

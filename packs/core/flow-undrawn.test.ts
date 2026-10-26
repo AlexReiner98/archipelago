@@ -45,3 +45,15 @@ test('a link type the style draws only on hover is laid out, and its tie shows o
   assert.equal((svg.match(/lf-tie near[^"]* on-hover/g) ?? []).length, 2, 'each part_of tie waits for a hover');
   assert.ok(!drawn(house).includes('on-hover'), 'a style that names none draws every tie as it is');
 });
+
+test("the key is data the page draws: a row for every link type drawn, in its colour, and no legend of the drawing's own", () => {
+  const scene = picture({ answer, style: { ...house, undrawn: [] }, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene;
+  assert.equal(scene.legend, undefined, 'the page draws the key');
+  assert.ok(Array.isArray(scene.key) && scene.key.every((e: any) => typeof e.label === 'string' && e.glyph?.[0] === 'svg'), 'each row a glyph and its words');
+  const labels = scene.key.map((e: any) => e.label);
+  for (const label of ['Work', 'Leads to', 'Part of', 'Tagged']) assert.ok(labels.includes(label), `the key says ${label}: ${labels.join(', ')}`);
+  // Each link type's row carries the class its wires are drawn in, so the key and the picture cannot disagree.
+  const tagged = scene.key.find((e: any) => e.label === 'Tagged');
+  const cls = JSON.stringify(tagged.glyph).match(/lf-k-[0-9a-f]+/)?.[0];
+  assert.ok(cls && JSON.stringify(scene.svg).includes(cls), 'the tagged tie is drawn in the colour its row shows');
+});

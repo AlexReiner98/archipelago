@@ -216,13 +216,26 @@ ${JSON.stringify(input)}`;
     (err) => !ended && failed(err.message),
   );
 
+  /**
+   * The key, in the frame every key has: a scene says what its marks mean (`key`: each { glyph, label, item }, a glyph
+   * a small mark checked as every mark is, a label in words, an item its row opens), and the page draws it, shown
+   * unless the style says `key: "hidden"`. A scene from before the key was data gives `legend`, marks it drew itself.
+   */
+  function keyOf(scene, style, keys, tell) {
+    if (style.key === 'hidden') return null;
+    if (!Array.isArray(scene.key)) return scene.legend ? build(scene.legend, keys, tell) : null;
+    const rows = scene.key.filter((e) => e && typeof e.label === 'string' && e.label);
+    if (!rows.length) return null;
+    return h('div', { class: 'lf-legend', role: 'list', 'aria-label': 'What the marks mean' }, ...rows.map((e) => h('span', { role: 'listitem' }, ...(e.glyph ? [build(e.glyph, keys, tell)] : []), /^e_[a-z0-9]{8}$/.test(String(e.item)) ? h('a', { href: `#/e/${e.item}`, title: e.label }, e.label) : h('span', { title: e.label }, e.label))));
+  }
+
   // The marks, in the frame every picture has.
   function mount(scene) {
     if (scene.message) return host.replaceChildren(h('div', { class: 'empty' }, String(scene.message)));
     adopt(id, scene.css);
     host.dataset.drawing = id;
     const picture = build(scene.svg, keys, tell);
-    const legend = scene.legend ? build(scene.legend, keys, tell) : null;
+    const legend = keyOf(scene, style, keys, tell);
     const bar = scene.bar ? build(scene.bar, keys, tell) : null;
     // What goes above the picture, beside it and below it (a rail of chapters, what was said), drawn and checked as the
     // rest is. What is beside it shares a row with it, and goes under it where the row has no room for both.
@@ -238,6 +251,7 @@ ${JSON.stringify(input)}`;
     // A picture the page lays out (HTML, a grid of cards; or one drawn to the page's width, `flat`) is not panned or zoomed: it is as wide as it needs, scrolled
     // across where the page is narrower, its key below it, brought to what it was opened from (`focus`, a mark's key).
     if (!(picture instanceof SVGElement) || scene.flat) {
+      legend?.classList.add('still');
       host.replaceChildren(...[before, beside(picture), legend, after].filter(Boolean));
       const focus = keys.get(String(scene.focus));
       if (focus) requestAnimationFrame(() => focus.scrollIntoView({ block: 'center', inline: 'center' }));
@@ -256,9 +270,7 @@ ${JSON.stringify(input)}`;
     const lit = litSwitch(answer.viewer, style, keep, redraw);
     const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, over, legend);
     host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
-    if (legend) legend.hidden = stage.clientWidth > 0 && stage.clientWidth < sizeOf(style, 'flow_legend_from');
     const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, told: (view) => !ended && port.postMessage({ type: 'viewport', view }) }));
-    const key = legend && h('button', { class: legend.hidden ? '' : 'on', title: 'What the marks mean', onclick: (ev) => ((legend.hidden = !legend.hidden), ev.currentTarget.classList.toggle('on', !legend.hidden)) }, 'Key');
     const zoom = h(
       'span',
       { class: 'switch' },
@@ -266,6 +278,6 @@ ${JSON.stringify(input)}`;
       h('button', { title: 'All of it in sight', onclick: () => moves.fit() }, 'Fit'),
       h('button', { title: 'Zoom in', onclick: () => moves.zoomBy(numberOf(style, 'zoom_step')) }, '+'),
     );
-    host.prepend(h('div', { class: 'toolbar fold-bar' }, bar, h('span', { class: 'grow' }), lit, key, zoom));
+    host.prepend(h('div', { class: 'toolbar fold-bar' }, bar, h('span', { class: 'grow' }), lit, zoom));
   }
 }

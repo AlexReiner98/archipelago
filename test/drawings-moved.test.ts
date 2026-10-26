@@ -37,6 +37,19 @@ async function drawn(shape: string, cases: DrawingCase[]) {
 function same(now: Record<string, any>, kernel: string, own: RegExp, extra: string[] = [], html = (text: string) => text) {
   if (!existsSync(kernel)) return;
   const was = JSON.parse(readFileSync(kernel, 'utf8'));
+  // The key is the page's now, drawn from the scene's key (docs/drawings.md), not the drawing's own marks: what is
+  // compared is the picture, so each record is cut where its key starts (the last thing in a picture the page lays out).
+  const keyless = (r: any) => {
+    // A key the kernel drew bare (the time axis's: a div with no class) is what follows the picture's svg.
+    const named = r.html.search(/<div class="([^"]* )?(lg-legend|t-key|lf-legend)[ "]/), after = r.html.indexOf('</svg><div');
+    const start = named >= 0 ? named : after >= 0 ? after + '</svg>'.length : -1;
+    if (start < 0) return r;
+    // The elements before it, in the order the records list them (each opening tag is one).
+    const at = (r.html.slice(0, start).match(/<[a-zA-Z]/g) ?? []).length;
+    const cut = (list: any[] | undefined) => list?.slice(0, at);
+    return { ...r, html: r.html.slice(0, start), ...(r.classes && { classes: cut(r.classes) }), boxes: cut(r.boxes), styles: cut(r.styles) };
+  };
+  for (const name of Object.keys(was)) (was[name] = keyless(was[name])), now[name] && (now[name] = keyless(now[name]));
   const marks = (text: string) =>
     html(text)
       .replace(/ style="[^"]*"/g, '')

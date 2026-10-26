@@ -153,7 +153,8 @@ export function picture({ answer, style, fields = {}, relations = {}, reduced },
     lanes.forEach((value, k) => cells.push(m('div', { ...(story && { key: `x:${r}:${k}` }), class: `lg-cell${off}` }, row.cards.filter((n) => (n.lane ?? null) === value).sort((a, b) => a.place - b.place || a.title.localeCompare(b.title)).map((n) => card(n, row.head, r)))));
   });
   const grid = m('div', { class: 'lg-stage' }, m('div', { class: `lg-grid ${columnsClass(lanes.length, head, lane, gap)}` }, cells));
-  const legend = field && declared.length ? m('div', { class: 'lg-legend' }, declared.map((value) => m('span', { class: `lg-swatch ${hueOf(value)}` }, m('span', { class: 'lg-chip' }), name(value)))) : null;
+  // The key: what each colour is, one to a row (the page draws it, docs/drawings.md).
+  const key = field ? declared.map((value) => ({ glyph: m('svg', { width: 12, height: 12, viewBox: '0 0 12 12', class: 'lg-key-chip' }, m('rect', { x: 1, y: 1, width: 10, height: 10, rx: 3, class: hueOf(value) })), label: name(value) })) : [];
 
   // Told as a story: each card, row and lane shown as the story's steps bring what it is of, on the stage of story.js.
   let player = null;
@@ -168,7 +169,7 @@ export function picture({ answer, style, fields = {}, relations = {}, reduced },
   }
   const look = [css, ...rules, story ? storyCss : ''].join('\n');
   return {
-    scene: { css: look, svg: grid, legend, ...(player && { before: player.before, aside: player.after }), ...(cards.has(style.here) && { focus: cards.get(style.here)[0].key }) },
+    scene: { css: look, svg: grid, key, ...(player && { before: player.before, aside: player.after }), ...(cards.has(style.here) && { focus: cards.get(style.here)[0].key }) },
     end: player?.end,
     on(event) {
       if (player && (event.key === 'play' || event.key === 'chat' || event.key.startsWith('c:'))) return player.on(event);
