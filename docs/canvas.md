@@ -98,6 +98,21 @@ the places stream just before the person's next action.
 - `test/canvas-drag.test.ts`: "in a browser, a step dragged on the canvas is
   kept in the places stream and drawn there again".
 
+### 8. An item reads the same everywhere
+Rule 11 of the target model (decided 26 Oct 2026, e_bed3aj7d). An item's page
+is its head, its fields and its note. A field is drawn by the kind its type
+declares it as (`ui/fields.js`), and by its shape where the kind does not say,
+so a field a pack adds that no one foresaw is still read; never by its name.
+What a field means beyond its kind comes from capabilities: a question whose
+type declares `settles.choices` (and `chosen`, `why`) is settled by picking
+one, as one change. A note is written in one dialect (`ui/text.js`: titles,
+lists, checklists, callouts, tables, code, emphasis, links, items by id),
+read the same by the sheet and the published reader; ticking a checklist is a
+change to that line. How it looks is the style's `notes` (callout colours, the
+measure it reads at), shipped by the house style and a pack's presets.
+- `test/text.test.ts`: "a note reads as titles, lists, checklists, callouts,
+  code and tables"; "the item page and the published reader read one dialect".
+
 ## The modules
 
 ### In `ui/`
@@ -114,6 +129,8 @@ the places stream just before the person's next action.
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
 | `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
 | `item.js` and the sheet's parts | the item's page (being settled) |
+| `fields.js` | a field's value by its kind, else by its shape; the choices a question settles by |
+| `text.js`, `body.js` | the one dialect a note is written in, and the note drawn from it, folded |
 
 ### In `src/` and `packs/`
 | Module | What it is |

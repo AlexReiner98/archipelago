@@ -5,6 +5,7 @@
 import { drawFrozen } from './doc-lens.js';
 import { warmDrawings } from './drawing.js';
 import { checkedCss } from './marks.js';
+import { readSpans, readText } from './text.js';
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
@@ -49,39 +50,21 @@ let paths = {};
 let onSite = false;
 const pageOf = (id) => (own ? `/read/${id}` : onSite && paths[id] ? (paths[id] === 'home' ? '/' : `/${paths[id]}`) : here.replace(/[^/]+$/, id));
 
-/** A line's words, with addresses on the web as links, **strong** as strong, and a section's or another published document's id as a way to it. */
+/** A line's words, read in the one dialect (ui/text.js): addresses on the web as links, a section's or another published document's id as a way to it. */
 function inline(text, titles) {
-  const out = [];
-  const pattern = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s)]+[^\s).,;:])|\*\*([^*]+)\*\*|\b(e_[a-z0-9]{8})\b/g;
-  let at = 0;
-  for (const m of text.matchAll(pattern)) {
-    out.push(text.slice(at, m.index));
-    if (m[1]) out.push(h('a', { href: m[2], rel: 'noopener noreferrer', target: '_blank' }, m[1]));
-    else if (m[3]) out.push(h('a', { href: m[3], rel: 'noopener noreferrer', target: '_blank' }, m[3].replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')));
-    else if (m[4]) out.push(h('strong', {}, m[4]));
-    else out.push(titles.has(m[5]) ? h('a', { href: `#${m[5]}` }, titles.get(m[5])) : away.has(m[5]) ? h('a', { href: pageOf(m[5]) }, away.get(m[5])) : '');
-    at = m.index + m[0].length;
-  }
-  out.push(text.slice(at));
-  return out;
+  const draw = (spans) =>
+    spans.map((s) => {
+      if (s.t === 'text') return s.text;
+      if (s.t === 'strong') return h('strong', {}, draw(s.spans));
+      if (s.t === 'em') return h('em', {}, draw(s.spans));
+      if (s.t === 'code') return h('code', {}, s.text);
+      if (s.t === 'link') return h('a', { href: s.href, rel: 'noopener noreferrer', target: '_blank' }, s.text ?? s.href.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''));
+      return titles.has(s.id) ? h('a', { href: `#${s.id}` }, s.text ?? titles.get(s.id)) : away.has(s.id) ? h('a', { href: pageOf(s.id) }, s.text ?? away.get(s.id)) : (s.text ?? '');
+    });
+  return draw(readSpans(text));
 }
 
-/**
- * A table, written as lines of | cells |, with a rule of dashes under its head (| --- | --: |): a colon on the right
- * of a rule's cell sets that column to the right, on both sides to the centre. A head with no words is not drawn.
- * Read from lines[at]; null when no table starts there.
- */
-const TABLE_ROW = /^\s*\|.*\|\s*$/;
-const TABLE_RULE = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/;
-function readTable(lines, at) {
-  if (!TABLE_ROW.test(lines[at] ?? '') || !TABLE_RULE.test(lines[at + 1] ?? '')) return null;
-  const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
-  const aligns = cells(lines[at + 1]).map((c) => (c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : 'left'));
-  let end = at + 2;
-  while (end < lines.length && TABLE_ROW.test(lines[end])) end++;
-  return { end, head: cells(lines[at]), aligns, rows: lines.slice(at + 2, end).map(cells) };
-}
-/** A table read by readTable, each cell drawn by `cell`. */
+/** A table read by ui/text.js, each cell drawn by `cell`. */
 function drawTable(t, cell) {
   // The page's policy allows no inline style: a column's side is a class.
   const td = (tag, text, i) => h(tag, { class: `align-${t.aligns[i] ?? 'left'}` }, cell(text));
@@ -93,58 +76,19 @@ function drawTable(t, cell) {
   );
 }
 
-/**
- * Text as blocks: "# " and "## " lines are headings; a short line on its own above a paragraph, not ending as a
- * sentence, is that paragraph's title (as notes on the map are written); "- ", "1. " lines are lists.
- */
+/** Text as blocks, read in the one dialect (ui/text.js): a title is a heading at `depth`, deeper for each further #. */
 function blocks(text, titles, depth) {
-  const lines = text.split('\n');
-  const out = [];
-  let para = [];
-  let list;
-  const item = (line) => /^\s*(-|\*|\d+\.)\s+/.exec(line);
-  const flush = () => {
-    if (para.length) out.push(h('p', {}, inline(para.join(' '), titles)));
-    para = [];
-  };
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const table = readTable(lines, i);
-    if (table) {
-      flush();
-      list = undefined;
-      out.push(drawTable(table, (text) => inline(text, titles)));
-      i = table.end - 1;
-      continue;
-    }
-    const trimmed = line.trim();
-    const mark = item(line);
-    const heading = /^(#{1,3})\s+(.*)$/.exec(trimmed);
-    if (!trimmed) {
-      flush();
-      list = undefined;
-    } else if (heading) {
-      flush();
-      list = undefined;
-      out.push(h(`h${Math.min(depth + heading[1].length - 1, 4)}`, {}, inline(heading[2], titles)));
-    } else if (mark) {
-      flush();
-      const ordered = /\d/.test(mark[1]);
-      if (!list || list.tagName !== (ordered ? 'OL' : 'UL')) out.push((list = h(ordered ? 'ol' : 'ul', {})));
-      list.append(h('li', {}, inline(line.slice(mark[0].length), titles)));
-    } else if (list && /^\s{2,}/.test(line)) {
-      list.lastChild.append(...inline(` ${trimmed}`, titles));
-    } else if (!lines[i - 1]?.trim() && lines[i + 1]?.trim() && trimmed.length <= 90 && !/[.;,:!?|]$/.test(trimmed)) {
-      flush();
-      list = undefined;
-      out.push(h(`h${Math.min(depth + 1, 4)}`, {}, inline(trimmed, titles)));
-    } else {
-      list = undefined;
-      para.push(trimmed);
-    }
-  }
-  flush();
-  return out;
+  const draw = (list) =>
+    list.map((b) => {
+      if (b.kind === 'para') return h('p', {}, inline(b.text, titles));
+      if (b.kind === 'title') return h(`h${Math.min(depth + (b.level || 2) - 1, 4)}`, {}, inline(b.text, titles));
+      if (b.kind === 'table') return drawTable(b, (text) => inline(text, titles));
+      if (b.kind === 'code') return h('pre', {}, h('code', {}, b.text));
+      if (b.kind === 'callout') return h('aside', { class: b.tone ? `callout ${b.tone}` : 'callout quote' }, draw(b.blocks));
+      if (b.items.some((it) => it.check !== null)) return h('ul', { class: 'checklist' }, b.items.map((it) => h('li', { class: it.check ? 'done' : '' }, h('span', { class: 'tick' }, it.check ? '☑ ' : '☐ '), inline(it.text, titles))));
+      return h(b.ordered ? 'ol' : 'ul', {}, b.items.map((it) => h('li', {}, inline(it.text, titles))));
+    });
+  return draw(readText(text));
 }
 
 /** The site's header: its name, a way home, and its main pages, the one open marked. */

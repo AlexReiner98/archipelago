@@ -276,3 +276,31 @@ body.invoice table.text-table:first-of-type td {
 .align-center {
   text-align: center;
 }
+/* The one dialect's callouts, checklists and code (ui/text.js), in the reader's own colours. */
+aside.callout {
+  margin: 0 0 var(--rhythm-4);
+  padding: var(--rhythm-2) var(--rhythm-4);
+  border-left: var(--border-4) solid var(--reader-line);
+}
+aside.callout.quote {
+  color: var(--reader-muted);
+}
+aside.callout > :last-child {
+  margin-bottom: 0;
+}
+ul.checklist {
+  list-style: none;
+  padding-left: 0;
+}
+ul.checklist li.done {
+  color: var(--reader-muted);
+}
+code,
+pre {
+  font-family: ui-monospace, monospace;
+  font-size: var(--reader-small);
+}
+pre {
+  margin: 0 0 var(--rhythm-4);
+  overflow-x: auto;
+}

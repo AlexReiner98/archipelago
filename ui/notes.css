@@ -1,0 +1,36 @@
+/* A note as the item page reads it (ui/body.js), its fields by their kind (ui/fields.js), and the choices a question
+   settles by. Every value is a variable the style gives: a callout's colour is the one the style names for its tone
+   (notes.callouts), set on it as --callout. */
+
+.body-text { max-width: var(--note-measure, var(--measure)); }
+.body-text em { font-style: italic; }
+.body-text code.note-code { font-family: ui-monospace, monospace; font-size: var(--text-3); padding: 0 var(--space-2); border-radius: var(--radius-1); background: var(--closed-soft); }
+.body-text pre.note-block { font-family: ui-monospace, monospace; font-size: var(--text-3); margin: 0 0 var(--space-6); padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); background: var(--closed-soft); overflow-x: auto; white-space: pre; }
+.body-text a.note-item { text-decoration: none; border-bottom: var(--border-1) solid var(--accent-soft); }
+.body-text a.note-item:hover { border-bottom-color: var(--accent); }
+.body-text h4.part-title { margin: var(--space-8) 0 var(--space-3); font-size: var(--text-5); }
+
+.body-text aside.callout { margin: 0 0 var(--space-6); padding: var(--space-4) var(--space-6); border-left: var(--border-4) solid var(--callout, var(--line)); border-radius: var(--radius-1); background: var(--callout-soft, var(--panel)); }
+.body-text aside.callout.quote { background: none; color: var(--muted); }
+.body-text aside.callout > :last-child { margin-bottom: 0; }
+
+.body-text ul.checklist { padding-left: 0; }
+.body-text ul.checklist li.check { display: flex; gap: var(--space-4); align-items: baseline; }
+.body-text ul.checklist li.check input { margin: 0; flex: none; cursor: pointer; }
+.body-text ul.checklist li.check input:disabled { cursor: default; }
+.body-text ul.checklist li.done > span { color: var(--muted); text-decoration: line-through; }
+
+#sheet .page-rows dd .field-parts { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sheet .page-rows dd .field-part + .field-part::before { content: " · "; color: var(--muted); }
+#sheet .page-rows dd .field-pill { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+#sheet .page-rows dd .num { font-variant-numeric: tabular-nums; }
+#sheet .page-rows dd table.field-table { white-space: nowrap; margin: var(--space-3) 0; }
+#sheet .page-rows dd table.field-table td, #sheet .page-rows dd table.field-table th { max-width: var(--chip-most); overflow: hidden; text-overflow: ellipsis; }
+
+#sheet ol.choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); max-width: var(--measure); }
+#sheet ol.choices li.choice { display: flex; align-items: center; gap: var(--space-5); min-width: 0; }
+#sheet ol.choices li.choice > .gist, #sheet ol.choices .choice-pick { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sheet ol.choices .choice-pick { text-align: left; font: inherit; color: var(--text); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); padding: var(--space-4) var(--space-6); cursor: pointer; }
+#sheet ol.choices .choice-pick:hover { border-color: var(--accent); background: var(--accent-soft); }
+#sheet ol.choices .choice-pick > .gist { display: block; overflow: hidden; text-overflow: ellipsis; }
+#sheet ol.choices li.chosen > .gist { font-weight: 600; }

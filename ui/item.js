@@ -6,7 +6,8 @@ import { api, ask, h, part, tell } from './base.js';
 import { draftOf } from './draft.js';
 import { entityForm } from './forms.js';
 import { documentMenu, figureOf, readDocument } from './item-doc.js';
-import { fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
+import { choicesOf } from './fields.js';
+import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { relationEditor } from './item-links.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, keepsFigure, readWhole } from './screens.js';
@@ -84,6 +85,15 @@ export async function entity(id, here) {
     });
     page.querySelector('.note').replaceWith(form);
     form.scrollIntoView({ block: 'nearest' });
+  };
+  // Settling a question by picking one of its choices: what was chosen, and why if it is said, and its first closed
+  // status, as one change on the person's word. Whether it applies or waits is the rules' to say.
+  const pick = async (choice) => {
+    const c = choicesOf(e, type);
+    const why = await ask({ title: `Settle "${e.title}"?`, message: choice, input: c.why ? { placeholder: 'Why? (optional)' } : undefined, action: 'Settle it' });
+    if (why === null || why === false) return;
+    const props = { ...(c.chosen && { [c.chosen]: choice }), ...(c.why && typeof why === 'string' && why.trim() && { [c.why]: why.trim() }) };
+    change([{ op: 'update', id, status: type.statuses.closed[0], props }], `Settled in the UI: ${choice}`);
   };
   // A pack's action on this kind of item opens its form under the page's head.
   const acting = h('div');
@@ -167,6 +177,7 @@ export async function entity(id, here) {
     acting,
     headSection(e, owner, (st) => change([{ op: 'update', id, status: st }], `Status set to ${st} in the UI`)),
     note,
+    choicesSection(e, pick),
     fieldsSection(e, looks),
     sourceSection(data.source),
     history,
