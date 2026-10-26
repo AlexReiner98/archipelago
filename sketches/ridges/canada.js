@@ -52,16 +52,27 @@ export const CANADA = {
     ],
   },
   thirtyThousand: {
-    title: 'Thirty Thousand Islands', region: 'canada', paper: '#e9e4de', ink: '#000000',
-    colours: ['#0a1c21', '#192a0f', '#132d30', '#213a3c', '#4e5f60', '#5f7072', '#728687', '#93a6af', '#cbd5e3'],
-    weights: [0.203, 0.129, 0.222, 0.227, 0.239, 0.226, 0.187, 0.166, 0.19],
-    sea: ['#1c3546', '#576d88', '#90aac6', '#b1c6e3'],
+    // Georgian Bay, with Tobermory and the Bruce Peninsula (Flowerpot Island, the Grotto, Indian Head Cove) for its
+    // turquoise water: the deep from the bay, the shallows from Tobermory's photos alone, so the averaging with the
+    // darker bay does not grey them. Boosted brighter than the rest (boost), at the owner's asking.
+    title: 'Thirty Thousand Islands', region: 'canada', paper: '#eae6e1', ink: '#040605',
+    colours: ['#283434', '#38471d', '#525a58', '#536329', '#676f6c', '#76803d', '#7d8682', '#949e96', '#c5caca'],
+    weights: [0.234, 0.155, 0.224, 0.156, 0.211, 0.128, 0.198, 0.215, 0.229],
+    sea: ['#1b3547', '#2f6a73', '#5c9fa3', '#89c2ce'],
+    boost: { chroma: 1.35, sea: 1.3, lift: 0.05 },
     form: { rise: 0.25, rugged: -0.2, step: 0.7, soft: 0.35, top: 0.3, cliff: 0.1 }, // low glaciated granite whalebacks
     photos: [
       commons('20150705 - 58 - Carling, Ont. - Nias Islands (I think?).jpg', 'Andre Carrotflower', 'CC BY-SA 4.0'),
       commons('20150705 - 60 - The Archipelago, Ont. - Georgian Bay Horizon.jpg', 'Andre Carrotflower', 'CC BY-SA 4.0'),
       commons('20150705 - 72 - The Archipelago, Ont. - Cottage Life in the Thirty Thousand Islands.jpg', 'Andre Carrotflower', 'CC BY-SA 4.0'),
       commons('Georgian Bay Littoral from water pine tree.jpg', 'Oaktree b', 'CC BY-SA 4.0'),
+      commons('Flowerpot Island 13.jpg', 'MBi', 'CC BY-SA 4.0'),
+      commons('20150704 - 013 - Tobermory, Ont. - Big Tub Harbour looking east.jpg', 'Andre Carrotflower', 'CC BY-SA 4.0'),
+      commons('Bruce peninsula national park 4.JPG', 'see Commons page', 'Public domain'),
+      commons('The Grotto, Bruce Peninsula National Park, Ontario - panoramio.jpg', 'A J Butler', 'CC BY 3.0'),
+      commons('Indian Head Cove.jpg', 'Óðinn', 'CC BY-SA 2.5 ca'),
+      commons('Indian Head Cove, Bruce National Park, May 2018.jpg', 'Jaimie Snelgrove', 'CC BY-SA 4.0'),
+      commons('Indian Head Cove 2, Bruce National Park, May 2018.jpg', 'Jaimie Snelgrove', 'CC BY-SA 4.0'),
     ],
   },
   thousandIslands: {

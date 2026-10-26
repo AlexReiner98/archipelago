@@ -148,7 +148,10 @@ export function ridges(dials) {
   // archipelago's form (the nearest's, at sea), and the values are blurred across the grid.
   const KEYS = Object.keys(BASE_FORM), numbers = new Map();
   const asNumbers = (g) => numbers.get(g) ?? numbers.set(g, KEYS.map((k) => +formOf(g)[k])).get(g);
-  const formField = rd && !chains.length ? blurredForms(rd, asNumbers, KEYS.length) : null;
+  // The blurred grid is kept while the field, its archipelagos and their landforms hold: building it is the slow part.
+  const formKey = rd && !chains.length ? `${grown.key}|${grown.akey}|${JSON.stringify(groups.map((_, g) => asNumbers(g)))}` : null;
+  if (formKey && blurred.key !== formKey) blurred = { key: formKey, field: blurredForms(rd, asNumbers, KEYS.length) };
+  const formField = formKey ? blurred.field : null;
   const formAt = (x, y, L) => {
     let v;
     if (formField) v = formField.map((field) => sample(field, ...cellOf(x, y)));
@@ -195,12 +198,23 @@ export function ridges(dials) {
     return smooth(0.1, 1, (e + wobble) / band) * smooth(0, 0.3 * band, e);
   };
 
+  // On a map, each place holds only so much sea: about the usual gap between places. Beyond it land sinks, so a
+  // place far from the rest (the Arctic) does not claim half the page.
+  const gaps = (d.anchors ?? []).map((a, i) => Math.min(...d.anchors.filter((_, j) => j !== i).map((b) => Math.hypot(a[0] - b[0], a[1] - b[1]))));
+  const reach = gaps.length > 1 ? [...gaps].sort((a, b) => a - b)[gaps.length >> 1] * 1.35 : Infinity;
+  const territory = (x, y) => {
+    if (reach === Infinity) return 1;
+    let near = Infinity;
+    for (const [ax, ay] of d.anchors) near = Math.min(near, (x - ax) ** 2 + (y - ay) ** 2);
+    return smooth(reach * 1.25, reach * 0.7, Math.sqrt(near));
+  };
+
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
     const h = [], shelf = [], gs = [], ts = [], steps = [];
     for (const x of xs) {
       const L = at(x, y, yc), f = formAt(x, y, L), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
-      const calm = shore(x, y, yc);
+      const calm = shore(x, y, yc) * territory(x, y);
       if (calm < 1) L.u -= (1 - calm) * 1.5;
       gs.push(L.g), ts.push(L.t), steps.push(step * f.step);
       // Shallows: a reach of pale sea round the land, wider as the dial turns.
@@ -288,6 +302,8 @@ function diffusionFor(d, W, H) {
   if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, starts?.length ?? Math.max(1, d.chains), d.seed, starts) });
   return { field: grown.field, arch: grown.arch, level };
 }
+
+let blurred = {};
 
 /** Each landform value laid on the diffusion grid by archipelago (the nearest, at sea), then box-blurred, wrapping. */
 function blurredForms(rd, asNumbers, n) {

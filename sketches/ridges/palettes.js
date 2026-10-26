@@ -258,8 +258,15 @@ for (const [k, p] of Object.entries(PLACES)) {
   if (metres !== undefined) (p.peak = metres), (p.form = { ...p.form, rise: riseOf(metres) });
 }
 
-/** A blue, in OKLab: toward blue, not toward red. Blues are the water's; the land is everything else. */
-const isBlue = ([, a, b]) => b < -0.03 && a < 0.03;
+/**
+ * Water's colour, in OKLab: a blue (toward blue, not toward red), or a clear cyan to turquoise (hue from about 175° round
+ * to 265°, with real colour in it, so grey-teal rock stays land). Water colours are the sea's; the land is the rest.
+ */
+const isBlue = ([, a, b]) => {
+  if (b < -0.03 && a < 0.03) return true;
+  const hue = (Math.atan2(b, a) * 180) / Math.PI, chroma = Math.hypot(a, b);
+  return chroma > 0.05 && (hue >= 175 || hue <= -95);
+};
 
 /** A palette's land colours: its colours and weights without the blues (all of them, if it is nothing but blue). */
 export function landOf({ colours, weights }) {
@@ -285,7 +292,9 @@ export function waterOf({ colours, sea }) {
   // Three shallows, darkest offshore: the place's blues where it has them, spread from L 0.5 up to the light.
   const want = [0.52, 0.66, 0.8];
   const shallows = want.map((L, i) => {
-    const pick = blues.length ? blues[Math.min(blues.length - 1, Math.round((i * (blues.length - 1)) / 2))] : [L, ...hue];
+    // The darkest blue is the deep's; with enough blues, the shallows come from the rest.
+    const from = blues.length > 3 ? blues.slice(1) : blues;
+    const pick = from.length ? from[Math.min(from.length - 1, Math.round((i * (from.length - 1)) / 2))] : [L, ...hue];
     return hex([Math.max(pick[0], L), pick[1], pick[2]]);
   });
   return { deep: hex(deep), shallows };
@@ -302,10 +311,10 @@ for (const [k, p] of Object.entries(PLACES)) p.where ??= WHERE[k.replace(/Hand$/
 
 /**
  * Places laid out on a page by where they are: west to east across, north at the top (relative, not to scale). Each
- * axis is half true distance and half even spacing by rank (spread), so the order holds everywhere but a far place
+ * axis is part true distance and mostly even spacing by rank (spread), so the order holds everywhere but a far place
  * (the Arctic) does not crowd the rest into a corner. Answers [x, y] in page units for each, or null if unknown.
  */
-export function layout(places, width, height, margin = 0.14, spread = 0.5) {
+export function layout(places, width, height, margin = 0.14, spread = 0.7) {
   const known = places.filter((p) => p.where);
   const axis = (i, flip) => {
     const vs = known.map((p) => p.where[i]), lo = Math.min(...vs), hi = Math.max(...vs), sorted = [...vs].sort((a, b) => a - b);
@@ -330,12 +339,18 @@ function inGamut([L, a, b]) {
  * grey), held inside what a screen can show by easing the chroma back, never by shifting the hue; its lightness is
  * spread from the palette's weighted middle (darks darker, lights lighter, the order kept). The water too, gentler.
  */
-export function enrich(p, { chroma = 1.4, contrast = 1.18, sea = 1.25, ceiling = 0.15 } = {}) {
+export function enrich(p, { chroma = 1.4, contrast = 1.18, sea = 1.25, ceiling = 0.15, lift = 0 } = {}) {
+  // A place can ask for more than the rest (boost): more chroma, livelier water, a little more light.
+  const boost = p.boost ?? {};
+  chroma *= boost.chroma ?? 1;
+  sea *= boost.sea ?? 1;
+  lift += boost.lift ?? 0;
+  ceiling *= boost.chroma ?? 1;
   const lab = (h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
   const w = p.weights ?? p.colours.map(() => 1), total = w.reduce((a, b) => a + b, 0);
   const mid = p.colours.reduce((s, h, i) => s + (lab(h)[0] * w[i]) / total, 0);
   const richer = (h, k, spread) => {
-    const [L, a, b] = lab(h), L2 = Math.min(0.95, Math.max(0.12, mid + (L - mid) * spread)), C = Math.hypot(a, b);
+    const [L, a, b] = lab(h), L2 = Math.min(0.95, Math.max(0.12, mid + (L - mid) * spread + lift * (spread > 1 ? 1 : 0))), C = Math.hypot(a, b);
     // The boost fades toward the lightest colours, where more chroma turns a pale moss to neon; and no colour passes
     // the ceiling, so earth stays earth.
     let c = 1 + (k - 1) * (1 - Math.max(0, Math.min(1, (L2 - 0.72) / 0.2)));
