@@ -96,7 +96,7 @@ export function ridges(dials) {
   });
   /** Which chain claims a point most, how strongly (1 on its line, 0 a width away), and how far along it (0 to 1). */
   const claim = (x, y) => {
-    let best = { c: 0, g: 0, t: 0 };
+    let best = { c: 0, g: 0, t: 0, all: [] };
     chains.forEach(({ pts, width }, g) => {
       let near = Infinity, along = 0;
       pts.forEach(([px, py], i) => {
@@ -106,7 +106,8 @@ export function ridges(dials) {
         if (dd < near) (near = dd), (along = i);
       });
       const c = 1 - smooth(0, width, Math.sqrt(near));
-      if (c > best.c) best = { c, g, t: along / (pts.length - 1) };
+      best.all[g] = c;
+      if (c > best.c) best = { ...best, c, g, t: along / (pts.length - 1) };
     });
     return best;
   };
@@ -136,6 +137,21 @@ export function ridges(dials) {
     : chains.map((c) => c.pts);
   const forms = d.forms ? d.forms(groups) : [];
   const formOf = (g) => ({ ...BASE_FORM, ...(forms[g] ?? forms[0] ?? {}) });
+  // Landforms blend where archipelagos meet, so one landmass shared by two changes character gradually, not at a
+  // seam. On chains, each chain's form counts by how strongly it claims the point. On diffusion, each cell takes its
+  // archipelago's form (the nearest's, at sea), and the values are blurred across the grid.
+  const KEYS = Object.keys(BASE_FORM), numbers = new Map();
+  const asNumbers = (g) => numbers.get(g) ?? numbers.set(g, KEYS.map((k) => +formOf(g)[k])).get(g);
+  const formField = rd && !chains.length ? blurredForms(rd, asNumbers, KEYS.length) : null;
+  const formAt = (x, y, L) => {
+    let v;
+    if (formField) v = formField.map((field) => sample(field, ...cellOf(x, y)));
+    else if (chains.length && L.all) {
+      const w = L.all.map((c) => (c ?? 0) ** 4), total = w.reduce((a, b) => a + b, 0);
+      v = total ? KEYS.map((_, k) => w.reduce((sum, wi, g) => sum + wi * asNumbers(g)[k], 0) / total) : asNumbers(L.g);
+    } else v = asNumbers(L.g);
+    return Object.fromEntries(KEYS.map((k, i) => [k, v[i]]));
+  };
 
   /**
    * Land at a point: how far into land it is (u, against the band lo to hi, times gate), whose it is (g), how far
@@ -143,15 +159,15 @@ export function ridges(dials) {
    */
   const at = (x, y, yc) => {
     if (chains.length) {
-      const { c, g, t } = claim(x, y);
+      const { c, g, t, all } = claim(x, y);
       // The main island stands near the young end of a chain; the islands thin away toward the old end.
       const rank = 1 - d.hierarchy * 0.75 * (1 - Math.exp(-(((t - 0.12) / 0.25) ** 2)));
       if (rd) {
         const lo = rd.level + d.hierarchy * 0.15 * (1 - rank);
-        return { u: field(x, y, yc), lo, hi: lo + 0.12, gate: smooth(0.02, 0.35, c), g, t, rank };
+        return { u: field(x, y, yc), lo, hi: lo + 0.12, gate: smooth(0.02, 0.35, c), g, t, rank, all };
       }
       const lo = 0.78 - d.land * 0.6;
-      return { u: c * rank * (0.2 + 1.3 * land(toCell(x) * 2.5, yc * 2.5)), lo, hi: lo + 0.14, gate: 1, g, t, rank };
+      return { u: c * rank * (0.2 + 1.3 * land(toCell(x) * 2.5, yc * 2.5)), lo, hi: lo + 0.14, gate: 1, g, t, rank, all };
     }
     if (rd) {
       // A smaller island in its archipelago is cut lower into the sea, so a few large islands lead many small ones.
@@ -164,16 +180,16 @@ export function ridges(dials) {
 
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
-    const h = [], shelf = [], gs = [], ts = [];
+    const h = [], shelf = [], gs = [], ts = [], steps = [];
     for (const x of xs) {
-      const L = at(x, y, yc), f = formOf(L.g), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
-      gs.push(L.g), ts.push(L.t);
+      const L = at(x, y, yc), f = formAt(x, y, L), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
+      gs.push(L.g), ts.push(L.t), steps.push(step * f.step);
       // Shallows: a reach of pale sea round the land, wider as the dial turns.
       const sea = smooth(L.lo - span * (0.25 + 1.5 * d.shallows), L.lo, L.u) * L.gate * (d.shallows > 0 ? 1 : 0);
       shelf.push(sea);
       let mask = smooth(L.lo, L.hi, L.u) * L.gate;
       // An atoll, or an old island sinking at the far end of its chain: only a ring of land, its heart a lagoon.
-      const sinking = Math.max(f.atoll ? 1 : 0, chains.length ? smooth(1 - d.age * 0.4, 1, L.t) * (d.age > 0 ? 1 : 0) : 0);
+      const sinking = Math.max(f.atoll, chains.length ? smooth(1 - d.age * 0.4, 1, L.t) * (d.age > 0 ? 1 : 0) : 0);
       if (sinking) mask *= 1 - sinking * smooth(L.hi + span * 0.6, L.hi + span * 1.4, L.u);
       // Sheer sides: the land reaches its full height almost at once.
       if (f.cliff) mask = smooth(0, 1 - 0.85 * f.cliff, mask);
@@ -207,7 +223,7 @@ export function ridges(dials) {
       if (h[i] < 0.5) { i++; continue; }
       let j = i;
       while (j < xs.length && h[j] >= 0.5) j++;
-      const mid = (i + j) >> 1, group = gs[mid], start = Math.floor(rnd() * 1000), stp = step * formOf(group).step;
+      const mid = (i + j) >> 1, group = gs[mid], start = Math.floor(rnd() * 1000), stp = steps[mid];
       // Along an aged chain, colour follows age: the young end in the palette's dark colours, the old in its light.
       const tone = chains.length && d.age > 0 ? 0.1 + 0.8 * ts[mid] : null;
       for (let b = 0; b < d.bands; b++) {
@@ -243,4 +259,32 @@ function diffusionFor(d, W, H) {
   const akey = `${level}|${d.chains}`;
   if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, Math.max(1, d.chains), d.seed) });
   return { field: grown.field, arch: grown.arch, level };
+}
+
+/** Each landform value laid on the diffusion grid by archipelago (the nearest, at sea), then box-blurred, wrapping. */
+function blurredForms(rd, asNumbers, n) {
+  const { nx, ny } = rd.field, size = nx * ny;
+  const far = (x, y, c) => Math.hypot(Math.min(Math.abs(x - c.x), nx - Math.abs(x - c.x)), Math.min(Math.abs(y - c.y), ny - Math.abs(y - c.y)));
+  const groupAt = new Int32Array(size);
+  for (let i = 0; i < size; i++) {
+    const g = rd.arch.group[i], x = i % nx, y = (i - x) / nx;
+    groupAt[i] = g >= 0 ? g : rd.arch.centres.map((c, k) => [far(x, y, c), k]).sort((a, b) => a[0] - b[0])[0]?.[1] ?? 0;
+  }
+  const values = new Map();
+  const fields = Array.from({ length: n }, (_, k) => Float32Array.from(groupAt, (g) => (values.get(g) ?? values.set(g, asNumbers(g)).get(g))[k]));
+  const r = Math.max(2, Math.round(nx / 18));
+  for (const v of fields) for (let pass = 0; pass < 3; pass++) {
+    const t = new Float32Array(size);
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      let s = 0;
+      for (let d = -r; d <= r; d++) s += v[y * nx + ((x + d + nx) % nx)];
+      t[y * nx + x] = s / (2 * r + 1);
+    }
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      let s = 0;
+      for (let d = -r; d <= r; d++) s += t[((y + d + ny) % ny) * nx + x];
+      v[y * nx + x] = s / (2 * r + 1);
+    }
+  }
+  return fields.map((v) => ({ nx, ny, v }));
 }
