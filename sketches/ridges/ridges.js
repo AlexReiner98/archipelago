@@ -65,6 +65,7 @@ export const DEFAULTS = {
   edges: 0.5,      // a calm border of open water round the islands: none (0) to wide (1)
   foothills: 0.6,  // smaller hills in front of each range, overlapping it: none (0) to many (1)
   peaks: 0.6,      // ranges in bands (0) to distinct summits, each row its own (1)
+  undulate: 0.6,   // slope variety: steady climbs (0) to dips, plateaus and changing steepness (1 and up)
   slope: 2,        // max slope from the nearest water, height per unit across: steep (high) to gentle (low); 0 for none
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   anchors: null,   // [[x, y], ...] in page units: put archipelago i at anchor i (one per anchor), as on a map
@@ -255,6 +256,14 @@ export function ridges(dials) {
       const tall = rise * f.rise * Math.max(0.15, massif) * Math.max(0.05, 1 - 0.8 * age) * Math.max(0.05, 1 - d.hierarchy * 0.6 * (1 - L.rank));
       let raw = mask * tall * (0.25 - 0.2 * d.peaks + (0.75 + 0.2 * d.peaks) * peak ** (1 + 0.3 * d.peaks));
       if (f.top) raw = Math.min(raw, tall * (1 - 0.65 * f.top));
+      // Slope variety: broad dips and saddles along the climb, and here and there a plateau where the land levels
+      // off partway up (a bench or a mesa top), each set by its own slow noise.
+      if (d.undulate) {
+        const u = Math.min(1, d.undulate);
+        raw *= 1 - 0.5 * u * smooth(0.35, 0.75, land(toCell(x) * 2.6 + 41, yc * 2.6 + 17));
+        const flat = smooth(0.55, 0.7, land(toCell(x) * 1.4 + 57, yc * 1.4 + 23)) * Math.min(1, d.undulate);
+        if (flat) raw = Math.min(raw, raw * (1 - flat) + tall * (0.3 + 0.45 * land(toCell(x) * 0.9 + 3, yc * 0.9 + 71)) * flat);
+      }
       // No peak rises past the top of the frame: heights near it are eased under the room left, not sliced off.
       if (band) {
         const room = Math.max(1, y - M - gap);
@@ -267,10 +276,11 @@ export function ridges(dials) {
     // Max slope: no land rises faster than the slope from the nearest water in its row, so a narrow island stays low
     // and only a wide one can stand tall. Two sweeps, each carrying the limit in from a coast; then the terraces.
     if (d.slope > 0) {
-      const lim = d.slope * dx;
-      for (let i = 1; i < raws.length; i++) raws[i] = Math.min(raws[i], raws[i - 1] + lim);
-      for (let i = raws.length - 2; i >= 0; i--) raws[i] = Math.min(raws[i], raws[i + 1] + lim);
-      if (!d.wrap) (raws[0] = Math.min(raws[0], lim)), (raws[raws.length - 1] = Math.min(raws[raws.length - 1], lim));
+      // The slope allowed varies along the row (steep stretches, gentle shelves), never past the max.
+      const lim = xs.map((x) => d.slope * dx * (1 - 0.85 * Math.min(1, d.undulate) * smooth(0.3, 0.7, land(toCell(x) * 3.1 + 29, yc * 3.1 + 7))));
+      for (let i = 1; i < raws.length; i++) raws[i] = Math.min(raws[i], raws[i - 1] + lim[i]);
+      for (let i = raws.length - 2; i >= 0; i--) raws[i] = Math.min(raws[i], raws[i + 1] + lim[i]);
+      if (!d.wrap) (raws[0] = Math.min(raws[0], lim[0])), (raws[raws.length - 1] = Math.min(raws[raws.length - 1], lim[raws.length - 1]));
     }
     // A step is never more than most of its island's height as it now stands, so every island keeps a terrace.
     for (let i = 0; i < raws.length; ) {

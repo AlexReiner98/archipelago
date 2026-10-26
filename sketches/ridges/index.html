@@ -72,6 +72,7 @@
   <label>Islands <small>few, large · many, small</small><input id="islands" type="range" min="0" max="3" step="0.01"></label>
   <label>Height <small>low · tall</small><input id="rise" type="range" min="0" max="3" step="0.01"></label>
   <label title="How steeply land may rise from the nearest water: a wide island can stand tall, a narrow one stays low. 0 for no limit">Max slope <output id="slopeOut"></output><input id="slope" type="range" min="0" max="5" step="0.05"></label>
+  <label title="Steady climbs, or dips, plateaus and changing steepness, never past the max slope">Slope variety <small>steady · varied</small><input id="undulate" type="range" min="0" max="2" step="0.01"></label>
   <label title="Ranges lining up into bands, or distinct summits, each row its own">Peaks <small>bands · summits</small><input id="peaks" type="range" min="0" max="2" step="0.01"></label>
   <label>Rugged <small>hills · peaks</small><input id="rugged" type="range" min="0" max="2" step="0.01"></label>
   <h2>Terraces</h2>
@@ -105,7 +106,7 @@
   import { paint, fillOf as fillWith, swell } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope'];
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   // Palettes are kept as photographed (a palette shipped enriched is taken back to its raw colours); Richness enriches
   // them as they are drawn, so the swatches always show and edit the colours the photos gave.
