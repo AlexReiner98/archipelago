@@ -204,9 +204,11 @@ spatial where it can be):
   needs beyond the common page (a project's roadmap) is a part of that page,
   not a second screen. Before adding a screen, ask whose page it belongs on.
 - **No wall of text, anywhere.** A screen never opens on more than one short
-  paragraph of prose (about four lines). A note shows its first paragraph and
-  the titles of its sections, each one click away (`renderBody` does this:
-  keep to it, and never print a body, a reason or a field whole). If you find
+  paragraph of prose (about four lines). A note is drawn by `renderBody`: its
+  sections under short titles, each folding with a click; whether they open
+  folded or open is the style's `page.notes` (the house style opens them: the
+  owner, 26 Oct 2026). Keep to it, and never print a reason or a field
+  whole. If you find
   a screen that shows a block of text, that is a bug: fold it. When you write
   a note, lead with the point in two or three sentences and give every further
   part a short title on a line of its own, so it folds.

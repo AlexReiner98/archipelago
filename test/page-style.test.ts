@@ -17,7 +17,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   ]);
   const of = async (id?: string) => (await VIEWS.style.run(l, id ? { of: id } : {})) as { style: any; used: { id: string; preset?: string }[] };
   const workspace = await of();
-  assert.deepEqual([workspace.style.page.picture, workspace.style.page.notes, typeof workspace.style.numbers.note_opening_most], [true, 'folded', 'number']);
+  assert.deepEqual([workspace.style.page.picture, workspace.style.page.notes, typeof workspace.style.numbers.note_opening_most], [true, 'open', 'number']);
   // The page's colours are the house style's theme, light and dark alike, every name in both.
   const { light, dark } = workspace.style.theme;
   assert.deepEqual([typeof light.bg, typeof dark.bg, Object.keys(light).sort()], ['string', 'string', Object.keys(dark).sort()]);
@@ -34,7 +34,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   }
   assert.match(sheet, /--space-5: 8px;/);
   const project = await of(made.p);
-  assert.deepEqual([project.style.page.picture, project.style.page.notes], [true, 'folded'], 'a project has the house style');
+  assert.deepEqual([project.style.page.picture, project.style.page.notes], [true, 'open'], 'a project has the house style');
   const doc = await of(made.d);
   assert.deepEqual([doc.style.page.picture, doc.style.page.notes, doc.style.page.ties], [false, 'whole', 'open'], 'a document reads through, the rest of its page the house style\'s');
   assert.deepEqual(doc.used.map((u) => u.preset), ['core.house', 'canvas.house', 'work.reading']);

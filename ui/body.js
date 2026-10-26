@@ -78,12 +78,14 @@ const sentence = (title) => (/[a-z]/.test(title) ? title : title.charAt(0) + tit
 /**
  * A body as a page, not a block, and never a wall of text. A note opens as its first paragraph and the titles of what
  * else it holds: every section, and the rest of the opening, is one click away. How a note reads is its page's style
- * (page.notes: folded, or whole as a document is read through) and how much of it opens is the style's numbers
+ * (page.notes: folded; open, each section open and still folded with a click; or whole, read through as a document
+ * is) and how much of a folded note opens is the style's numbers
  * (note_*): the house style says, a kind's or an item's may say otherwise. Without a page's own, the workspace's.
  * `tick(line, done)`, where the note may be changed here, ticks a checklist item.
  */
 export function renderBody(text, { style = state.style, tick } = {}) {
   const whole = style.page?.notes === 'whole';
+  const open = style.page?.notes === 'open';
   const n = (name) => {
     if (typeof style.numbers?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every number a note is read by`);
     return style.numbers[name];
@@ -98,6 +100,7 @@ export function renderBody(text, { style = state.style, tick } = {}) {
   const opening = (list) => {
     const [first, ...more] = blocks(list);
     if (!first) return [];
+    if (open) return [first, ...more];
     // A table that opens a note is shown whole: cut short, its cells would run together as words.
     if (first.tagName === 'TABLE') return [first, more.length > 0 && h('details', { class: 'section' }, h('summary', {}, 'More'), more)];
     // A first paragraph that is itself long is shown as its first sentences, and whole with the rest.
@@ -112,7 +115,7 @@ export function renderBody(text, { style = state.style, tick } = {}) {
     whole
       ? [sec.title && h('h4', { class: 'part-title' }, drawSpans(sentence(sec.title))), blocks(sec.blocks)]
       : sec.title
-        ? h('details', { class: 'section' }, h('summary', { title: sec.title }, drawSpans(sentence(sec.title))), blocks(sec.blocks))
+        ? h('details', { class: 'section', open }, h('summary', { title: sec.title }, drawSpans(sentence(sec.title))), blocks(sec.blocks))
         : opening(sec.blocks);
   const page = h('div', { class: whole ? 'body-text whole' : 'body-text' }, sections.filter((sec) => sec.title || sec.blocks.length).map(part));
   // The width it is read at is one of the page's lengths, named by the style.
