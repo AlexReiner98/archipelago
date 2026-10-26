@@ -40,6 +40,7 @@
   <select id="place" aria-label="Palette"></select>
   <div class="swatches" id="swatches" title="Paper and ink first, then the island colours. Click one to change it."></div>
   <div id="sources"></div>
+  <div class="row" title="The colour of the open water behind everything"><label class="check">Background <input id="bg" type="color"></label><button id="bgReset" title="Back to this palette's deep water">From palette</button></div>
   <div class="row"><button id="shuffle" title="Same colours, another order">Shuffle colours</button><label class="check" title="Use each colour as much as it covers the photos"><input id="weighted" type="checkbox" checked> As in the photos</label></div>
   <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
   <img id="photo" alt="">
@@ -138,6 +139,9 @@
   const fillOf = (s) => ('sea' in s ? waterOf(palOf(s.group)).shallows[s.sea] : colourOf(palOf(s.group), s.fill, s.tone));
   // The row lines on the deep water: the paper's colour, faint, so they read as swell, not as ink.
   const swell = (p) => p.paper + '4d';
+  // The background: the palette's deep water, until a colour is picked; then that, whatever the palette.
+  let bgPicked = null;
+  const background = (p) => bgPicked ?? waterOf(p).deep;
 
   function draw() {
     const t0 = performance.now(), p = pal();
@@ -147,7 +151,8 @@
     cv.style.aspectRatio = `${pic.width} / ${pic.height}`;
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = waterOf(p).deep; g.fillRect(0, 0, pic.width, pic.height);
+    g.fillStyle = background(p); g.fillRect(0, 0, pic.width, pic.height);
+    $('bg').value = background(p);
     g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = p.ink; g.lineWidth = pic.line;
     for (const s of pic.shapes) {
       g.beginPath();
@@ -206,6 +211,8 @@
   };
   $('reseed').onclick = () => ((seed += 1), draw());
   $('place').onchange = () => (swatches(), draw());
+  $('bg').addEventListener('input', () => ((bgPicked = $('bg').value), draw()));
+  $('bgReset').onclick = () => ((bgPicked = null), draw());
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
   for (const k of [...DIALS, 'wrap', 'weighted', 'forms']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
   const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
@@ -219,7 +226,7 @@
     const p = pal(), pic = ridges(dials()), f = (v) => +v.toFixed(1);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
     const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p)}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
-    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${waterOf(p).deep}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
+    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
   };
 
   swatches();
