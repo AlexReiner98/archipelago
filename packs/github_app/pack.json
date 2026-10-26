@@ -2,8 +2,11 @@
   "id": "github_app",
   "version": "0.1.0",
   "title": "GitHub App",
-  "description": "One GitHub App for the whole server, so connecting a repository is choosing it on GitHub and nothing else: the server's owner creates it once, a workspace's admin chooses repositories, each is put in that map, and every push is handed to its GitHub pack.",
-  "handlers": [{ "schedule": "refresh", "every_minutes": 60 }],
+  "description": "One GitHub App for the whole server, so connecting a repository is choosing it on GitHub and nothing else: the server's owner creates it once, a workspace's admin chooses repositories, each is put in that map, and every push is handed to its GitHub pack. It posts the check on each main branch that every commit is accounted for.",
+  "handlers": [
+    { "schedule": "refresh", "every_minutes": 60 },
+    { "schedule": "recheck", "every_minutes": 1, "limit_ms": 50000 }
+  ],
   "reach": {
     "hosts": [
       {
