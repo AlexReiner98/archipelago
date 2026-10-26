@@ -6,6 +6,8 @@
 
 import type { Archipelago } from './pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
+import { movePlaces } from './canvas-places.ts';
+import { moveLenses } from './lens-saved.ts';
 
 interface Row {
   id: string;
@@ -82,6 +84,8 @@ export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; 
   for (const t of reg.types.values()) for (const old of t.dormant ? [] : (t.movedFrom ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, t.id)) === 0) delete moved[old];
   for (const r of reg.relations.values()) for (const old of r.dormant ? [] : (r.moved_from ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, r.id, 'relation')) === 0) delete moved[old];
   await l.fillKinds(); // each item's kind in its row, now the type table is whole
+  await movePlaces(l); // places a style kept, moved into their stream (a migration, run once)
+  await moveLenses(l); // views kept before the flat lens, translated into flat lenses (a migration, run once)
   const asleep = rows.filter((r) => !now.has(r.id));
   reg.keep({
     types: asleep.filter((r) => r.what === 'type').map((r) => r.def as ResolvedType),

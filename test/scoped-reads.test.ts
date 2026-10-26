@@ -1,4 +1,4 @@
-// No request reads the whole map: a lens of the whole map reads the kinds it names (its top when it names none), a
+// No request reads the whole map: a lens reads what its filter includes (and refuses a filter of nothing), a
 // graph with no focus the newest links, attention what is a person's or inside an item, and an agent is told what
 // changed as counts and the newest few. The structure test keeps the queries bounded; this keeps the answers.
 
@@ -9,9 +9,9 @@ import { agent, fresh, human, make } from './map.ts';
 
 const view = (l: Awaited<ReturnType<typeof fresh>>, who: typeof human, name: string, params: Record<string, unknown> = {}) => callTool(l, who, 'view', { name, params }) as Promise<any>;
 
-test('a lens of the whole map opens on its top, and reads only the kinds it names', async () => {
+test('a lens reads only what its filter includes: one that includes nothing is refused', async () => {
   const l = await fresh();
-  const made = await make(l, [
+  await make(l, [
     { op: 'create', ref: 'p', type: 'work.project', title: 'House' },
     { op: 'create', ref: 'f', type: 'software.feature', title: 'Roof' },
     { op: 'create', ref: 't', type: 'work.task', title: 'Tiles' },
@@ -20,13 +20,11 @@ test('a lens of the whole map opens on its top, and reads only the kinds it name
     { op: 'link', type: 'part_of', from: 't', to: 'f' },
     { op: 'link', type: 'part_of', from: 'q', to: 't' },
   ]);
-  const top = await view(l, human, 'lens');
-  assert.deepEqual(top.items.map((i: any) => i.title).sort(), ['Garden', 'House'], 'naming no kinds, the projects');
-  assert.equal(top.items.find((i: any) => i.title === 'Garden').inside, made.p, 'held through what was not read, by the part_of closure');
-  const tasks = await view(l, human, 'lens', { kinds: ['work.task'] });
+  await assert.rejects(view(l, human, 'flat'), /includes something/, 'never the whole map');
+  const top = await view(l, human, 'flat', { filter: { types: ['work.project'] } });
+  assert.deepEqual(top.items.map((i: any) => i.title).sort(), ['Garden', 'House'], 'the types it names');
+  const tasks = await view(l, human, 'flat', { filter: { types: ['work.task'] } });
   assert.deepEqual(tasks.items.map((i: any) => i.title), ['Tiles']);
-  // Only kinds to leave out read everything else: that is the top, less them.
-  assert.deepEqual((await view(l, human, 'lens', { kinds: ['-work.task'] })).items.map((i: any) => i.title).sort(), ['Garden', 'House']);
 });
 
 test('a graph with no focus is drawn from the newest links of each kind', async () => {

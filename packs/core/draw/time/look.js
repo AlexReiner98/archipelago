@@ -11,8 +11,7 @@ export const css = `
 .t-lane { stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-time-lane-dash); }
 .t-block { cursor: pointer; }
 .timeline .t-block .dot.t-hued { fill: var(--t-hue); }
-.t-key { display: flex; flex-wrap: wrap; gap: var(--ln-time-key-gap); padding: var(--ln-grid-legend-pad-y) var(--ln-grid-legend-pad-x); font-size: var(--ln-legend-text); color: var(--ln-muted); }
-.t-key a { color: inherit; text-decoration: none; white-space: nowrap; max-width: var(--ln-time-key-most); overflow: hidden; text-overflow: ellipsis; border-left: var(--ln-time-key-stripe) solid var(--t-hue); padding-left: var(--ln-time-key-pad); }
+.t-key-chip rect { fill: var(--t-hue); }
 .t-h-none { --t-hue: var(--ln-muted); }
 `;
 

@@ -27,8 +27,13 @@ you choose that.
 - **GitHub:** every push is read against the open work.
 - **Time:** a calendar of your hours beside the agents' sessions, and
   invoices from it.
-- **Your own kinds of thing:** types are plain files ("packs"), and one type
-  can be a flavour of another.
+- **A log, not a table:** every change is one entry in an append-only,
+  hash-chained log, and everything you see is read from it. Any item can be
+  read as it was at any moment, and forgetting one takes its words out of the
+  log and every backup with them.
+- **Your own kinds of thing:** types and ways of working are plain files
+  ("packs"), and one type can be a flavour of another. Which packs a
+  workspace has is in its log too.
 
 ## Start in five minutes
 
@@ -72,13 +77,18 @@ Its change is on the map at once, and on **Changes** with Undo; under
 ## Host your own
 
 One Node server with a persistent disk. Set `PELAGO_HOST=0.0.0.0`, `PELAGO_AUTH=tokens` and
-`PELAGO_PUBLIC_HOST`; see [Hosting](docs/reference.md#hosting).
+`PELAGO_PUBLIC_HOST`; see [Hosting](docs/reference.md#hosting). For a team,
+keep the maps on a Postgres server instead; `node src/cli.ts move` carries a
+map between the two by replaying its log.
 
 ## More
 
 - [Reference](docs/reference.md): every screen, tool, view, setting and
   limit.
 - [Glossary](docs/glossary.md): the one word for each idea.
+- [The log](docs/log.md): what is stored, and how everything else is read
+  from it.
+- [Packs](docs/packs.md): the fifteen keys of a pack file.
 - [CONTRIBUTING.md](CONTRIBUTING.md) to work on Archipelago itself. It is
   published as it is, with no promise of answers or fixes.
 - [SECURITY.md](SECURITY.md) to report a security problem in private.

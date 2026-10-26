@@ -29,7 +29,7 @@ export interface Retention {
 }
 
 /** The streams the kernel appends to, besides the fact stream; a pack's own is `pack:<id>`. */
-export const STREAMS = ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations'] as const;
+export const STREAMS = ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'places'] as const;
 const PACK_STREAM = /^pack:([a-z][a-z0-9_]*|\*)$/;
 export const isStream = (s: string) => (STREAMS as readonly string[]).includes(s) || PACK_STREAM.test(s);
 

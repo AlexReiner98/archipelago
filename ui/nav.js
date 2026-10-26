@@ -1,5 +1,5 @@
-// The nav and the screens in it. The kernel's own pages (Home, Search, Changes, Workspace) are always there; between
-// them come the screens the owner has given a place, each a page of its own drawn from its pieces. Packs offer
+// The menu and the screens in it. What waits for you and the Workspace page are always there; between them come
+// the screens the owner has given a place, each a page of its own drawn from its pieces, opened in the sheet. Packs offer
 // screens as presets; the owner adds one, takes it out and puts it back on the Workspace page, where what each
 // screen is (a page in the nav, or a part of every item of a kind) is listed with its switch.
 
@@ -11,11 +11,16 @@ const byPlace = (a, b) => a.nav - b.nav;
 /** The screens in the nav, in their places. */
 const inNav = () => (state.schema?.screens ?? []).filter((s) => typeof s.nav === 'number').sort(byPlace);
 
-/** The screens' links, between Search and Changes, the one open marked. */
+/** The menu's pages: the workspace, then the screens the owner has given a place, the one open marked. */
 export function drawNav(open) {
-  const host = document.getElementById('nav-screens');
+  const host = document.getElementById('menu-pages');
   if (!host) return;
-  host.replaceChildren(...inNav().map((s) => h('a', { href: `#/s/${s.id}`, 'data-route': `s/${s.id}`, class: open === s.id ? 'active' : '' }, s.title)));
+  const at = location.hash.split('?')[0];
+  host.replaceChildren(
+    h('a', { href: '#/you', class: at === '#/you' ? 'active' : '' }, 'For you'),
+    ...inNav().map((s) => h('a', { href: `#/s/${s.id}`, class: open === s.id || at === `#/s/${s.id}` ? 'active' : '' }, s.title)),
+    h('a', { href: '#/workspace', class: at === '#/workspace' ? 'active' : '' }, 'Workspace'),
+  );
 }
 
 /** The screen that draws one of the kernel's own pages, for an old address of it. */

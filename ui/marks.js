@@ -10,8 +10,9 @@ const SVG = 'http://www.w3.org/2000/svg';
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'a', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
 const HTML_TAGS = new Set(['div', 'span', 'p', 'b', 'strong', 'em', 'i', 'small', 'ul', 'ol', 'li', 'br', 'a', 'button']);
 const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
-/** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight. */
-const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen' };
+/** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight;
+ * `drag` hands the page the press that starts a drag, which the page follows and tells the drawing of (ui/drawing.js). */
+const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen', drag: 'pointerdown' };
 const seen = (el, fn) => {
   const sight = new IntersectionObserver((all) => all.some((e) => e.isIntersecting) && (sight.disconnect(), fn()), { threshold: 0.5 });
   sight.observe(el);
@@ -46,7 +47,7 @@ export function build(mark, keys, tell, svg = false, count = { n: 0 }) {
   const el = inSvg ? document.createElementNS(SVG, tag) : document.createElement(tag);
   for (const [name, value] of Object.entries(attrs ?? {})) {
     if (name === 'key') keys.set(String(value), el);
-    else if (name === 'on') for (const e of Array.isArray(value) ? value : []) !EVENTS[e] ? fail(`the event "${e}"`) : e === 'seen' ? seen(el, () => tell(String(attrs.key), e)) : el.addEventListener(EVENTS[e], () => tell(String(attrs.key), e));
+    else if (name === 'on') for (const e of Array.isArray(value) ? value : []) !EVENTS[e] ? fail(`the event "${e}"`) : e === 'seen' ? seen(el, () => tell(String(attrs.key), e)) : el.addEventListener(EVENTS[e], (ev) => tell(String(attrs.key), e, ev));
     else attribute(el, name, value);
   }
   if (attrs?.on && attrs.key === undefined) fail('an event on a mark with no key');

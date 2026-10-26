@@ -148,12 +148,12 @@ test('views of the work leave the system kind out by default', async () => {
     ],
   });
   const { p, t, v } = (made as { created: Record<string, string> }).created;
-  // Of the whole map, a lens says the kinds it is of.
-  const kinds = ['work.task', 'lens'];
-  const answer = (await ask(l, 'lens', { kinds, fold: [] })) as { items: { id: string }[] };
+  // Of the whole map, a lens says the types it finds.
+  const types = ['work.task', 'lens'];
+  const answer = (await ask(l, 'flat', { filter: { types, exclude: [] } })) as { items: { id: string }[] };
   assert.ok(answer.items.some((x) => x.id === v), 'asked to, a view shows the system kind');
-  const folded = (await ask(l, 'lens', { kinds })) as { items: { id: string }[] };
+  const folded = (await ask(l, 'flat', { filter: { types } })) as { items: { id: string }[] };
   assert.ok(folded.items.some((x) => x.id === t) && !folded.items.some((x) => x.id === v));
-  const within = (await ask(l, 'lens', { from: p, kinds })) as { items: { id: string }[]; rest: { system: number } };
-  assert.ok(!within.items.some((x) => x.id === v));
+  const within = (await ask(l, 'flat', { filter: { ids: [p] }, walk: { over: 'all', steps: 2 } })) as { items: { id: string }[] };
+  assert.ok(within.items.some((x) => x.id === t) && !within.items.some((x) => x.id === v));
 });

@@ -27,7 +27,7 @@ export async function gate(input, ctx) {
   }
   // Everything around the event in one read: what it waits for, goes ahead without and ships, all that is inside
   // those, and what holds them, with the links among it all.
-  const { items: around, links } = await ctx.read({ lens: { from: input.event, over: ['depends_on', 'defers', 'ships'], above: true } });
+  const { items: around, links } = await ctx.read({ around: { from: input.event, over: ['depends_on', 'defers', 'ships'], above: true } });
   const byId = new Map(around.map((e) => [e.id, e]));
   const event = byId.get(input.event);
   if (!event) throw new Error(`No item "${input.event}"`);

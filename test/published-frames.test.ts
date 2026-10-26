@@ -24,7 +24,7 @@ async function published(call: (path: string, token?: string, body?: unknown) =>
         { op: 'link', type: 'part_of', from: 'a', to: 'e' },
         { op: 'link', type: 'part_of', from: 'b', to: 'e' },
         { op: 'link', type: 'software.calls', from: 'a', to: 'b' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', status: 'current', props: { over: ['software.calls'] } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', status: 'current', props: { filter: { types: ['work.project', 'software.environment', 'software.component'] } } },
         { op: 'link', type: 'about', from: 'l', to: 'p' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
         { op: 'create', ref: 's', type: 'style', title: 'As architecture', status: 'current', props: { shape: 'architecture' } },

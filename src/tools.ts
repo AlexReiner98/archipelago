@@ -64,7 +64,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
           ? `asked ${input.name ? `for ${String(input.name).replaceAll('_', ' ')}` : 'what can be asked'}`
           : name.replaceAll('_', ' ');
   const kind = name === 'view' || name === 'search' ? name : READS.has(name) ? 'read' : 'other';
-  await took((await wholeMap(l)).db, l, { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'lens' ? 'graph?lens' : undefined });
+  await took((await wholeMap(l)).db, l, { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'flat' ? 'graph?lens' : undefined });
 }
 
 export const TOOLS: Record<string, Tool> = {

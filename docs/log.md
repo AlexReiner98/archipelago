@@ -4,10 +4,12 @@ Archipelago's stored state is one append-only log per workspace; everything read
 is a projection of it (the owner's decision of 24 Oct 2026, `e_d2p6ejz3`; the
 design is `e_76ds7tkm`). This is the spec of what an entry in that log is: its
 fields, how it is hashed, how facts say what changed, how proposals, retention,
-per-item keys, versions, snapshots and packs meet it. It is written before any
-code. The questions it raised were answered by the owner on 24 Oct 2026; the
-answers are stated below as settled, and listed at the end with their
-decisions on the task (`e_j8df78ar`).
+per-item keys, versions, snapshots and packs meet it. It was written before
+the code, and is now built (PRs 93 to 104, together on PR 105): where the build
+had to choose, an **As built** part says how. The questions the spec raised
+were answered by the owner on 24 Oct 2026, stated below as settled and listed
+in section 11 with their decisions (`e_j8df78ar`). The questions the build
+raised are in section 13, each with the path built while the owner decides.
 
 ## In one paragraph
 
@@ -540,6 +542,7 @@ kept forever as facts instead: a run's start, end and the task it is on
 | `access` | a token's last use (at most hourly), backup downloads (the grants themselves are facts) | `latest`, `history: P365D` |
 | `pack:<id>` | a pack's own keys and values (today's `pack_store`), read only while the pack is active | `latest`; the pack may declare more |
 | `observations` | readings from monitors and reports, connection reachability, imported external tool calls (`audit.import`), a test's picture (as a blob's hash) | `latest`, `thin: [["P1D", "PT1H"], ["P30D", "P1D"]]`; pictures `latest` only |
+| `places` | where a person put an item on a canvas: the field `place:<canvas>` on the item, its value `[x, y]`, one entry per item so a member reads only what they may see (decision `e_n2825x2w`; written by `places_put`, read by `places`) | `latest` |
 
 ### Blobs
 
@@ -556,7 +559,7 @@ last one; a forget deletes the blobs of the item forgotten. Pack manifests
 ### What is never stored
 
 In memory only, gone on restart, never in a backup: presence, a run's
-heartbeat (`last_seen`, `active`, `busy`), the pulse pages listen to, live
+heartbeat (`last_seen`, `active`, `busy`), where a page stands in the log (`tail`), live
 cursors, the throttle state of `src/limit.ts`.
 
 ### The transient table
@@ -598,9 +601,11 @@ live in one partition, and reading one reads only it.
 
 ### Where this stands (24 Oct 2026)
 
-Each write the table of section 10 sends to a compacted stream appends there
-as it is made, beside today's tables, which are still written and read until
-the projections read the streams: `operational`, `claim`, `release` and
+The compacted streams are sealed, guarded by row security, reached by a
+forget, carried in backups and by a move, and partitioned by year, as the
+fact stream is. Each write the table of section 10 sends to a compacted
+stream appends there as it is made, beside today's tables, which are still
+written and read until the projections read the streams: `operational`, `claim`, `release` and
 `checkConnections` in `src/pelago.ts`, settings and secrets by name, the
 event and audit cursors, `run_once` marks, a token's use (hourly), backup
 downloads, audit imports and a picture's hash. Not yet: the notification item
@@ -721,12 +726,17 @@ The vault is `src/vault.ts`, sealing `src/seal.ts`, the forget `src/forget.ts`
   their own, `<p_…>/ops`, beside the one for its reason: forgetting an item
   it touches takes what it asked and leaves why, which goes only if chosen.
   The proposal leaves the queue as superseded.
-- Backups are format 2 (`src/backup-seal.ts`): the rows of today's tables
-  sealed as the log is, keyed the same way, with the log's tables in the
-  file. A restore opens them with the vault as it is then, or with a vault
-  backup given beside the file, on a server with the same sealing key; a
-  row with no key stays out. Vault backups are written to
-  `backups/<ws>/vault/`, deleted after 30 days, and never sent off the server.
+- Backups are sealed as the log is (format 2 at first, `src/backup-seal.ts`;
+  format 3 now, the log and a snapshot, section 7). A restore opens them with
+  the vault as it is then, or with a vault backup given beside the file, on a
+  server with the same sealing key; a row with no key stays out. Vault
+  backups are written to `backups/<ws>/vault/`, deleted after 30 days, and
+  never sent off the server.
+- An operational entry is sealed the same way (`src/opseal.ts`): a value
+  about an item or link with that item's key, the entry's reason with the
+  key of the first item it names, else its stream's own (`op:<stream>`;
+  `e_jax9w54n`). A forget turns them into digests through the compaction
+  role.
 - A download (`backup_download`, and so `npm run pull`) carries the vault
   beside the file, its keys wrapped under a one-time key that only the
   download's answer holds; the server that takes it in wraps them under its
@@ -797,16 +807,20 @@ never sees the log ahead of them.
   title then from the history index. Facts are numbered from the event
   table's sequence (`log_fact.seq`, not hashed), so one cursor runs over
   both. `event` keeps only what is not yet a fact. A backup carries the
-  change sets as the events they read as, until it carries the log itself.
+  log itself; a merge of one still brings the other map's change sets in as
+  the events they read as.
 - **The review queue** (`proposal`) is projected: a pending record makes its
   row, the entry that decides it says what became of it.
 - **The search index** is the indexes on `entity` (`src/search.ts`), kept
-  current by the projector's writes. The part_of closure, blocking roots and
-  the counts are not kept: measured on 20,000 items, the block graph of the
-  whole map takes 36 ms, the open and blocked counts 48 ms and a hub's
-  part_of closure 1 ms, while attention takes 345 ms, nearly all of it the
-  lens read that none of them would save (the task records the numbers).
-  They wait for the 10-million-event benchmark (section 9) to show a need.
+  current by the projector's writes.
+- **The part_of closure and mentions** are projections too (`src/closure.ts`,
+  `src/mentions.ts`, step 25), kept in the append's transaction through
+  definer functions, since the closure must hold links a member cannot see.
+  They were added when the 10-million-event benchmark showed every
+  whole-map read too slow, and every view now reads a subtree through the
+  closure instead (no read of the whole map is the structure test's rule 15).
+  Blocking roots and the counts are still read each time: bounded to a
+  person or a subtree, they stay inside their budget.
 
 ### What a snapshot records
 
@@ -1077,7 +1091,9 @@ streams in the mix above (and the hosted Postgres as well as PGlite):
 ## 10. Every write today, and where it goes
 
 Every write in `src/pelago.ts` and every store `src/operational.ts` names,
-with the entry or stream it becomes. Nothing else writes the map today
+with the entry or stream it becomes: the plan, as written before the build.
+What is built is in each section's As built; what has not moved yet is in
+section 4, Where this stands. Nothing else writes the map today
 (`test/structure.test.ts` checks it).
 
 ### Writes in `src/pelago.ts`
@@ -1225,3 +1241,22 @@ do not open with the key it is given.
 Every hosted workspace is its own database on the server (`databaseFor` in
 src/pg.ts), so a workspace is the unit that is sharded: placed on another
 server by moving that one database, with nothing joined across workspaces.
+
+---
+
+## 13. Questions the build raised
+
+Each was recorded as a decision for the owner and built as recommended, so
+nothing waits on it. All were open on 24 Oct 2026; an answer that differs
+changes the part named.
+
+| Question | Built | Where |
+| --- | --- | --- |
+| How a downloaded backup carries its keys (`e_98ddd7ha`) | beside the file, wrapped under a one-time key only the download's answer holds; `npm run pull` wraps them again under the local key | section 5, As built |
+| Is an item's kind a fact? (`e_w6dnyqd7`) | no: read from its type, as `is_open` is, so a pack's own field named `kind` is its own | section 7, As built |
+| What a backup carries of the log (`e_z2kv3ejs`) | the log's rows, a snapshot of the live projections at its head, and the other tables; a merge of one joins no chains | section 7, As built |
+| Where a map moves between PGlite and Postgres (`e_fcusktmz`) | `move`, either way, by replaying the log; a hosted workspace is one database, the unit that moves | section 12 |
+| Partitions by year or by month (`e_wrhzwk2g`) | a year: planning across months cost more than it saved | section 4, Partitions by time |
+| Which key seals an operational entry's reason (`e_jax9w54n`) | the first item it names, else its stream's own | section 5, As built |
+| A whole-map lens that names no kinds (`e_gdqccqcr`) | shown the map's top, its projects, not refused | the reference, Views |
+| Is every unowned item the workspace owner's? (`e_779ncz2m`) | yes, so the owner's attention can still be large | `attention` |

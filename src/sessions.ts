@@ -336,7 +336,7 @@ export async function story(l: Archipelago, input: Record<string, unknown>) {
 // Asked like any standing question; kept here, beside what writes it.
 VIEWS.story = {
   description:
-    'The story a session told of its work (report, action tell): its beats in order (n, said, about, links; one taken back says replaced_by; a finding says finding), and which beat its page opens on (finding: the latest finding that stands, else the latest beat). The picture of it is the lens view with story: the run. Params: run (required): a run id or session id.',
+    'The story a session told of its work (report, action tell): its beats in order (n, said, about, links; one taken back says replaced_by; a finding says finding), and which beat its page opens on (finding: the latest finding that stands, else the latest beat). Its page draws what its finding is about with the flat lens. Params: run (required): a run id or session id.',
   run: story,
 };
 

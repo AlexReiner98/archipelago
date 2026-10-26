@@ -20,8 +20,7 @@ a.lg-row:hover { text-decoration: underline; }
 .lg-detail { color: var(--ln-muted); font-size: var(--ln-grid-detail-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lg-marks { display: flex; gap: var(--ln-grid-mark-gap); flex-wrap: wrap; margin-top: var(--ln-grid-card-gap); }
 .lg-due { padding: 0 var(--ln-pill-pad-x); border-radius: 999px; background: var(--ln-blocked); color: var(--on-mark); font-size: var(--ln-grid-mark-text); font-weight: 600; white-space: nowrap; }
-.lg-legend { display: flex; gap: var(--ln-grid-legend-gap); flex-wrap: wrap; padding: var(--ln-grid-legend-pad-y) var(--ln-grid-legend-pad-x); font-size: var(--ln-legend-text); color: var(--ln-muted); }
-.lg-chip { display: inline-block; box-sizing: content-box; width: var(--ln-swatch); height: var(--ln-swatch); margin-right: var(--ln-grid-gap); vertical-align: middle; border-radius: var(--ln-swatch-radius); background: color-mix(in srgb, var(--lg-hue) var(--ln-grid-swatch-mix), var(--ln-land)); border: var(--ln-rule) solid var(--lg-hue); }
+.lg-key-chip rect { fill: color-mix(in srgb, var(--lg-hue) var(--ln-grid-swatch-mix), var(--ln-land)); stroke: var(--lg-hue); stroke-width: var(--ln-rule); }
 .lg-card.dim { opacity: var(--ln-dim); }
 .lg-h-none { --lg-hue: var(--ln-line); }
 `;

@@ -180,7 +180,7 @@ function calendar(answer, style, c) {
   }
   // The key: what the colours count toward this week, each a link to its page.
   const used = streams.filter((st) => all.some((b) => b.stream === st.key));
-  const key = used.length ? m('div', { class: 't-key' }, used.map((st) => m('a', { href: `#/e/${st.key}`, title: st.title, class: c.hued(hueOf.get(st.key)) }, st.title))) : null;
+  const key = used.map((st) => ({ glyph: m('svg', { width: 12, height: 12, viewBox: '0 0 12 12', class: 't-key-chip' }, m('rect', { x: 1, y: 1, width: 10, height: 10, rx: 2, class: c.hued(hueOf.get(st.key)) })), label: st.title, item: st.key }));
   return { svg: m('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` }, marks), key };
 }
 
@@ -230,7 +230,7 @@ export function picture({ answer, style, width, reduced }, tools) {
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks: c.shown, ...ctx }) } });
   }
   return {
-    scene: { css: [css, ...c.rules, story ? storyCss : ''].join('\n'), svg, legend: key, flat: true, ...(player && { before: player.before, aside: player.after }) },
+    scene: { css: [css, ...c.rules, story ? storyCss : ''].join('\n'), svg, key, flat: true, ...(player && { before: player.before, aside: player.after }) },
     end: player?.end,
     on(event) {
       if (player && (event.key === 'play' || event.key === 'chat' || event.key.startsWith('c:'))) return player.on(event);

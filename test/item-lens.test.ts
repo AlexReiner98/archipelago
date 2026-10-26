@@ -5,71 +5,25 @@ import { sessionStart } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { human, agent, fresh, make } from './map.ts';
 
-test('a lens files items by a field, sends the fields their pack shows, and says what a link says', async () => {
+test('a view kept on the map is drawn from its flat lens, with its pins, and can keep a still', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'p', type: 'work.project', title: 'Research project' },
-    { op: 'create', ref: 'ops', type: 'work.project', title: 'Business and operations' },
-    { op: 'create', ref: 'irap', type: 'funding.program', title: 'NRC IRAP', status: 'open', props: { kind: 'grant', phase: 'research', amount: 'salaries ~80%', run_by: 'NRC' } },
-    { op: 'create', ref: 'sred', type: 'funding.program', title: 'SR&ED', status: 'open', props: { kind: 'tax_credit', phase: 'prove', deadline: '2027-06-30', deadline_note: 'file by' } },
-    { op: 'create', ref: 'lift', type: 'funding.program', title: 'BDC LIFT', status: 'open', props: { kind: 'loan', phase: 'build' } },
-    { op: 'link', type: 'part_of', from: 'ops', to: 'p' },
-    { op: 'link', type: 'part_of', from: 'irap', to: 'ops' },
-    { op: 'link', type: 'part_of', from: 'sred', to: 'p' },
-    { op: 'link', type: 'part_of', from: 'lift', to: 'ops' },
-    { op: 'link', type: 'funding.reduces', from: 'sred', to: 'irap', props: { says: 'IRAP money is subtracted first' } },
-  ]);
-  await assert.rejects(callTool(l, human, 'view', { name: 'lens', params: { from: made.p, lanes: 'field:nothing_like_it' } }), /no type has a field "nothing_like_it"/);
-  const answer = (await callTool(l, human, 'view', { name: 'lens', params: { from: made.p, lanes: 'field:phase', over: ['funding.reduces'] } })) as {
-    said: string;
-    lanes: string[];
-    items: { id: string; lane?: string | null; fields?: Record<string, unknown>; inside: string | null }[];
-    links: { kind: string; from: string; to: string; says?: string }[];
-  };
-  const item = (id: string) => answer.items.find((i) => i.id === id)!;
-  assert.deepEqual(answer.lanes, ['set_up', 'research', 'build', 'prove']);
-  assert.match(answer.said, /filed by its phase/);
-  assert.deepEqual([item(made.irap).lane, item(made.lift).lane, item(made.sred).lane, item(made.ops).lane], ['research', 'build', 'prove', null]);
-  assert.deepEqual(item(made.irap).fields, { kind: 'grant', phase: 'research', amount: 'salaries ~80%' }, 'run_by is not shown');
-  assert.deepEqual(item(made.sred).fields, { kind: 'tax_credit', phase: 'prove', deadline: '2027-06-30', deadline_note: 'file by' });
-  assert.equal(item(made.ops).fields, undefined);
-  assert.equal(item(made.irap).inside, made.ops);
-  assert.deepEqual(answer.links, [{ kind: 'funding.reduces', from: made.sred, to: made.irap, n: 1, says: 'IRAP money is subtracted first' }]);
-});
-
-test('a lens asked for by its id alone starts from what it is kept about, and can keep a still', async () => {
-  const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Research project' },
-    { op: 'create', ref: 'q', type: 'work.project', title: 'Something else' },
     { op: 'create', ref: 'irap', type: 'funding.program', title: 'NRC IRAP', status: 'open', props: { kind: 'grant', phase: 'research' } },
     { op: 'create', ref: 'other', type: 'work.task', title: 'Elsewhere' },
-    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { kinds: ['work.project', 'funding.program'], lanes: 'field:phase' } },
     { op: 'link', type: 'part_of', from: 'irap', to: 'p' },
-    { op: 'link', type: 'part_of', from: 'other', to: 'q' },
-    { op: 'link', type: 'about', from: 'v', to: 'p' },
   ]);
-  const answer = (await callTool(l, human, 'view', { name: 'lens', params: { lens: made.v } })) as { view: string; items: { id: string }[] };
-  assert.equal(answer.view, made.v);
-  assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.p, made.irap].sort());
+  Object.assign(made, await make(l, [
+    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { ids: [made.p] }, walk: { over: ['part_of'], steps: 1 }, pins: [made.other], style: { shape: 'list' } } },
+    { op: 'link', type: 'about', from: 'v', to: made.p },
+  ]));
+  const { keptPicture } = await import('../src/lens-saved.ts');
+  const answer = await keptPicture(l, made.v);
+  assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.p, made.irap, made.other].sort());
+  assert.equal(answer.style.shape, 'list', 'drawn in the shape it keeps');
+  await assert.rejects(keptPicture(l, made.p), /not a view kept on the map/);
   const png = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');
   assert.equal(((await callTool(l, human, 'picture_put', { result: made.v, data: png, content_type: 'image/png' })) as { size: number }).size, 8);
-});
-
-test('a thing part of both a feature and the feature’s project is inside the feature', async () => {
-  const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'top', type: 'work.project', title: 'Everything' },
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Business' },
-    { op: 'create', ref: 'f', type: 'software.feature', title: 'A feature' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'A step' },
-    { op: 'link', type: 'part_of', from: 'p', to: 'top' },
-    { op: 'link', type: 'part_of', from: 'f', to: 'p' },
-    { op: 'link', type: 'part_of', from: 't', to: 'p' },
-    { op: 'link', type: 'part_of', from: 't', to: 'f' },
-  ]);
-  const answer = (await callTool(l, human, 'view', { name: 'lens', params: { from: made.f } })) as { items: { id: string; inside?: string }[] };
-  assert.equal(answer.items.find((i) => i.id === made.t)?.inside, made.f);
 });
 
 test('an item says where it sits: what it is part of, outermost first, with the views kept about each', async () => {
@@ -79,14 +33,12 @@ test('an item says where it sits: what it is part of, outermost first, with the 
     { op: 'create', ref: 'area', type: 'work.project', title: 'Simulation tools' },
     { op: 'create', ref: 'prog', type: 'funding.program', title: 'Mitacs AI Advantage', status: 'upcoming' },
     { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { place: 1 } },
-    { op: 'create', ref: 'cut', type: 'lens', title: 'Shortcut', props: { from: 'e_elsewhere' } },
     { op: 'link', type: 'part_of', from: 'area', to: 'p' },
     { op: 'link', type: 'part_of', from: 'prog', to: 'area' },
     { op: 'link', type: 'about', from: 'map', to: 'p' },
-    { op: 'link', type: 'about', from: 'cut', to: 'p' },
   ]);
   const { trail } = (await callTool(l, human, 'get', { id: made.prog })) as { trail: { id: string; title: string; views: { title: string }[] }[] };
-  assert.deepEqual(trail.map((t) => [t.title, t.views.map((v) => v.title)]), [['Research project', ['Funding map']], ['Simulation tools', []]], 'a shortcut is not a view of it');
+  assert.deepEqual(trail.map((t) => [t.title, t.views.map((v) => v.title)]), [['Research project', ['Funding map']], ['Simulation tools', []]]);
   assert.deepEqual(((await callTool(l, human, 'get', { id: made.p })) as { trail: unknown[] }).trail, []);
 });
 
@@ -116,7 +68,7 @@ test('an item knows the pictures it is drawn in, and the documents that show the
     { op: 'create', ref: 'p', type: 'work.project', title: 'Research project' },
     { op: 'create', ref: 'in', type: 'funding.program', title: 'Mitacs Accelerate', status: 'open', props: { kind: 'wage_subsidy', phase: 'research' } },
     { op: 'create', ref: 'out', type: 'work.task', title: 'Call IRAP' },
-    { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { kinds: ['work.project', 'funding.program'] } },
+    { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { filter: { types: ['funding.program'] } } },
     { op: 'create', ref: 'd', type: 'work.document', title: 'Funding document', body: 'Intro\n{map}' },
     { op: 'link', type: 'part_of', from: 'in', to: 'p' },
     { op: 'link', type: 'part_of', from: 'out', to: 'p' },

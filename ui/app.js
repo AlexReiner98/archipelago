@@ -1,96 +1,107 @@
 // The pelago web UI. No framework and no build step: it calls the same tools as the CLI through /api/<tool>.
-// Each page part is its own module; this one routes between them.
+// Two surfaces: the canvas (canvas.js), the map drawn across the page, which is where everything is; and the sheet,
+// which opens from the side over it to read and act on one thing: an item read as a document, a new item, the
+// workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
-import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
-import { newEntity } from './forms.js';
+import { SignInNeeded, api, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
+import { canvasHas, canvasHref, focusOn, lensNow, mark, refreshCanvas, showCanvas } from './canvas.js';
+import { openCanvas } from './canvases.js';
+import { mayLeave, newItem } from './draft.js';
+import { drawFind } from './find.js';
+import { signupPage, welcome } from './signup.js';
 import { home } from './home.js';
 import { entity } from './item.js';
-import { graph } from './saved-views.js';
+import { readFlatLens } from './lens.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
-import { map, mapState, searchBar } from './search.js';
-import { loadSchema } from './words.js';
+import { loadSchema, typeChoice, types, workType } from './words.js';
 import { workspace } from './workspace.js';
 
-// ---- routing -------------------------------------------------------------
+/** The pages the sheet holds, by the name in their address. */
+const SHEET = { e: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
+const sheet = document.getElementById('sheet');
+const close = () => (location.hash = canvasHref());
+document.getElementById('sheet-close').addEventListener('click', close);
+addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset.sheet && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') && close());
 
-// Each page in the menu is its parts, one under the other. What used to be a
-// page of its own (a project's roadmap, the list of automations) is on the
-// page of the thing it is about or in the search, and its old address leads
-// there. Search is one thing at a time under its search box: the search, an
-// item, or a graph.
-const PAGES = { home: ['home'], map: ['map', 'item', 'graph'], screen: ['screen'], workspace: ['workspace'] };
-const UNDER = { e: 'map', new: 'map', graph: 'map', s: 'screen' };
-/** The part an address names, where that is not the address's own name. */
-const PART = { e: 'item', new: 'item', s: 'screen' };
+/** How many things wait for you: changes held for your word, and what only you can move. A mark in the bar, opening them. */
+async function drawMarks() {
+  const [held, mine] = await Promise.all([api('proposals').catch(() => []), api('view', { name: 'attention', params: { person: 'me', reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 50 } }).catch(() => ({ items: [] }))]);
+  const n = held.length + mine.items.length;
+  document.getElementById('marks').replaceChildren(n ? h('a', { class: `count${held.length ? ' held' : ''}`, href: '#/you', title: [held.length && `${held.length} held for your word`, mine.items.length && `${mine.items.length} your move`].filter(Boolean).join(', ') }, String(n)) : '');
+}
+
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
 async function route(pulse = false) {
   // What follows a ? says how the page is to be drawn (a lens and a style), not which page it is.
   const [where, query = ''] = location.hash.split('?');
-  const [, name = 'home', arg] = where.split('/');
-  // Addresses that have been folded into another screen still lead somewhere.
-  // Changes is gone: what is held for the owner is on Home; what changed is each item's history.
+  const [, name = '', arg] = where.split('/');
+  // Addresses from before the canvas still lead somewhere.
   if (name === 'join' && arg) return join(arg);
-  if (name === 'activity' || name === 'review') return void (location.hash = '#/home');
-  // The app opens on Home: each project's questions and its next release.
-  if (name === 'projects' || name === 'today') return void (location.hash = '#/home');
-  // Automations are found like any other kind of item.
-  // The graph around an item is its relations, drawn further out, on its own page.
-  if (name === 'graph' && arg) return void (location.hash = `#/graph?from=${arg}`);
-  if (name === 'automations') return void ((mapState.type = 'sys.automation'), (location.hash = '#/map'));
-  // A project's roadmap and its questions are on the project's own page.
-  if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/map');
+  // Buying a workspace, and the page a buyer comes back to: in the sheet, before anything is read of a map.
+  if (name === 'signup' || name === 'welcome') return void ((document.body.dataset.sheet = 'open'), name === 'signup' ? signupPage() : welcome());
+  if (['home', 'activity', 'review', 'projects', 'today', 'map', 'automations'].includes(name)) return void (location.hash = '#/');
+  if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
+  if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
   try {
     if (!state.schema) await loadSchema();
   } catch (err) {
+    document.body.dataset.sheet = 'open';
     if (err instanceof SignInNeeded) return signIn(store.token ? 'Your token is no longer accepted.' : '');
     return main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
-  // The Time page is a screen now, wherever the owner keeps it.
   if (name === 'time') return void (location.hash = screenOfPage('time') ? `#/s/${screenOfPage('time').id}` : '#/workspace');
-  const page = PAGES[UNDER[name] ?? name] ? (UNDER[name] ?? name) : 'map';
+  drawFind();
+  drawNav();
+  const params = new URLSearchParams(query);
+  // The canvas: the lens the address says (ui/query-bar.js shows it); an item's page with none keeps what is up when
+  // it draws the item, and else opens on the item. An address from before the flat lens (?in=) opens on what it names.
+  const asked = readFlatLens(params.has('in') ? `from=${params.get('in')}` : query);
+  // A saved canvas named alone opens with its lens and style put in the address.
+  if (name === 'v' && !asked.lens && asked.style.canvas) return void openCanvas(asked.style.canvas);
+  if (pulse) refreshCanvas(true);
+  else if (name === 'v') showCanvas(asked.lens, params.get('here') ?? undefined, asked.style);
+  else if (name === 'e' && arg) {
+    if (asked.lens) showCanvas(asked.lens, arg, asked.style);
+    else if (lensNow() && canvasHas(arg)) mark(arg);
+    else showCanvas(focusOn(arg), arg);
+  } else if (!SHEET[name] || !document.querySelector('#canvas .lens-wrap')) showCanvas(null);
+  if (name !== 'e') mark(undefined);
+  // The sheet: open over the canvas for what it holds, else shut.
+  const page = SHEET[name];
+  document.body.dataset.sheet = page ? 'open' : '';
   state.dirty = false;
   stale.hidden = true;
-  drawNav(page === 'screen' ? decodeURIComponent(arg ?? '') : undefined);
-  for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('active', a.dataset.route === (page === 'screen' ? `s/${decodeURIComponent(arg ?? '')}` : page));
+  drawMarks();
+  if (!page) return showIdentity();
+  if (main.firstElementChild?.dataset.part !== page) main.replaceChildren(h('div', { class: 'part', 'data-part': page }));
   const draw = {
-    home,
-    map: name === 'map' || page !== 'map' ? map : searchBar,
-    // The graph around an item is drawn on that item's page, under it.
-    item: name === 'e' && arg ? () => entity(arg, new URLSearchParams(query).get('here') ?? undefined) : name === 'new' && (() => newEntity(arg)),
-    graph: name === 'graph' && (() => graph(query)),
-    screen: name === 's' && arg && (() => screenPage(decodeURIComponent(arg))),
+    item: () =>
+      name === 'e'
+        ? entity(arg, params.get('here') ?? undefined)
+        : newItem(part('item'), { type: arg ?? workType(), title: params.get('title') ?? '', types, choices: [types.get(workType()), ...state.schema.types.filter((t) => t.id !== workType())].filter((t) => t && !t.dormant && !t.system && t.kind !== 'system' && !t.id.startsWith('sys.')).map((t) => ({ id: t.id, label: typeChoice(t) })) }),
+    screen: () => screenPage(decodeURIComponent(arg ?? '')),
     workspace,
-  };
-  const wanted = PAGES[page];
-  if ([...main.children].map((c) => c.dataset.part).join() !== wanted.join()) main.replaceChildren(...wanted.map((p) => h('div', { class: 'part', 'data-part': p })));
-  const named = PART[name] ?? name;
-  let signedOut;
-  await Promise.all(
-    wanted.map(async (p) => {
-      const el = part(p);
-      el.hidden = !draw[p];
-      if (!draw[p]) return el.replaceChildren();
-      // The graph is as someone has arranged it: a change elsewhere does not draw it again; nor the search box over an item.
-      // The whole map is as someone has arranged it: a change elsewhere does not draw it again.
-      if (pulse && el.childElementCount && ((p === 'graph' && !query) || draw[p] === searchBar)) return;
-      try {
-        await draw[p]();
-      } catch (err) {
-        if (err instanceof SignInNeeded) signedOut = true;
-        else el.replaceChildren(h('div', { class: 'error' }, err.message));
-      }
-      if (!pulse && p === named && el.isConnected) p === wanted[0] || page === 'map' ? scrollTo(0, 0) : el.scrollIntoView();
-    }),
-  );
-  if (signedOut) return signIn(store.token ? 'Your token is no longer accepted.' : '');
-  // The parts above the one asked for have their final height only now, and a list in them a moment later.
-  const settle = () => location.hash.split('/')[1] === name && part(named).scrollIntoView();
-  if (!pulse && named !== wanted[0] && page !== 'map' && part(named) !== main) (settle(), setTimeout(settle, 700));
+    you: home,
+  }[page];
+  try {
+    await draw();
+  } catch (err) {
+    if (err instanceof SignInNeeded) return signIn(store.token ? 'Your token is no longer accepted.' : '');
+    part(page).replaceChildren(h('div', { class: 'error' }, err.message));
+  }
+  if (!pulse) sheet.scrollTop = 0;
   showIdentity();
 }
 
 hooks.route = route;
-window.addEventListener('hashchange', () => route());
+// Words written in the sheet and not saved are not left behind without asking (ui/draft.js).
+let at = location.hash, back = false;
+window.addEventListener('hashchange', async () => {
+  if (back) return void (back = false);
+  if (!(await mayLeave())) return void ((back = true), (location.hash = at));
+  at = location.hash;
+  route();
+});
 
 route();

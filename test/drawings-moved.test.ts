@@ -16,10 +16,10 @@ const browser = chrome();
 const fixture = (name: string) => join(import.meta.dirname, 'fixtures', 'drawings', `${name}.kernel.${process.platform}.json`);
 
 /** The drawing a picture kept in this shape is sent, and what it draws of each case, captured in the page. */
-async function drawn(shape: string, cases: DrawingCase[], lens: Record<string, unknown> = {}) {
+async function drawn(shape: string, cases: DrawingCase[]) {
   const { call, base } = await serve('off');
-  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'p', type: 'work.project', title: 'A plan' }, { op: 'create', ref: 'l', type: 'lens', title: `As ${shape}`, status: 'current', props: lens }, { op: 'link', type: 'about', from: 'l', to: 'p' }, { op: 'create', ref: 's', type: 'style', title: shape, status: 'current', props: { shape } }, { op: 'link', type: 'about', from: 's', to: 'l' }] })).result.created;
-  const { drawing } = (await call('/api/view', undefined, { name: 'lens', params: { from: made.p, lens: made.l } })).result.style;
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'style', title: shape, status: 'current', props: { shape } }] })).result.created;
+  const { drawing } = (await call('/api/view', undefined, { name: 'style', params: { style: made.s, have: [] } })).result.style;
   assert.equal(drawing.id, `core.${shape}`);
   const page = await open(`${base}/`);
   try {
@@ -37,6 +37,19 @@ async function drawn(shape: string, cases: DrawingCase[], lens: Record<string, u
 function same(now: Record<string, any>, kernel: string, own: RegExp, extra: string[] = [], html = (text: string) => text) {
   if (!existsSync(kernel)) return;
   const was = JSON.parse(readFileSync(kernel, 'utf8'));
+  // The key is the page's now, drawn from the scene's key (docs/drawings.md), not the drawing's own marks: what is
+  // compared is the picture, so each record is cut where its key starts (the last thing in a picture the page lays out).
+  const keyless = (r: any) => {
+    // A key the kernel drew bare (the time axis's: a div with no class) is what follows the picture's svg.
+    const named = r.html.search(/<div class="([^"]* )?(lg-legend|t-key|lf-legend)[ "]/), after = r.html.indexOf('</svg><div');
+    const start = named >= 0 ? named : after >= 0 ? after + '</svg>'.length : -1;
+    if (start < 0) return r;
+    // The elements before it, in the order the records list them (each opening tag is one).
+    const at = (r.html.slice(0, start).match(/<[a-zA-Z]/g) ?? []).length;
+    const cut = (list: any[] | undefined) => list?.slice(0, at);
+    return { ...r, html: r.html.slice(0, start), ...(r.classes && { classes: cut(r.classes) }), boxes: cut(r.boxes), styles: cut(r.styles) };
+  };
+  for (const name of Object.keys(was)) (was[name] = keyless(was[name])), now[name] && (now[name] = keyless(now[name]));
   const marks = (text: string) =>
     html(text)
       .replace(/ style="[^"]*"/g, '')
@@ -49,7 +62,9 @@ function same(now: Record<string, any>, kernel: string, own: RegExp, extra: stri
     const [a, b] = [was[name], now[name]];
     assert.ok(b, `${name} is drawn`);
     assert.equal(marks(b.html), marks(a.html), `${name}: the marks`);
-    assert.deepEqual(kept(b).map((k: number) => b.boxes[k]), kept(a).map((k: number) => a.boxes[k]), `${name}: where each is`);
+    // An element with no size (a title, what is hidden) is nowhere: where the page puts the host says where it is reported.
+    const at = (r: any, k: number) => (/ 0 0$/.test(r.boxes[k]) ? 'no size' : r.boxes[k]);
+    assert.deepEqual(kept(b).map((k: number) => at(b, k)), kept(a).map((k: number) => at(a, k)), `${name}: where each is`);
     assert.deepEqual(kept(b).map((k: number) => b.looks[b.styles[k]]), kept(a).map((k: number) => a.looks[a.styles[k]]), `${name}: the looks`);
   }
 }
@@ -62,5 +77,5 @@ test('in a browser, the grid drawing draws what the kernel drew: the same cards,
 test('in a browser, the time drawing draws what the kernel drew: the same days, hours, lanes, blocks, places and looks', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   // A colour and the key are classes; a block opens its item through the drawing, so it is not a tab stop of its own;
   // and the kernel left the word "false" after its last hour line, as text an SVG does not draw.
-  same(await drawn('time', timeCases(), { time: { from: '2026-11-02', to: '2026-11-08' } }), fixture('time'), /^t-(key|hued|h-)/, [], (text) => text.replaceAll(' tabindex="0"', '').replaceAll('></line>false<', '></line><'));
+  same(await drawn('time', timeCases()), fixture('time'), /^t-(key|hued|h-)/, [], (text) => text.replaceAll(' tabindex="0"', '').replaceAll('></line>false<', '></line><'));
 });

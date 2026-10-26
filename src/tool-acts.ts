@@ -1,13 +1,15 @@
 // The kernel's actions: what an agent does besides changing facts, each one of the six verbs (KERNEL_VERBS in
 // src/declared.ts): a session registered, reporting in and ending, the story it tells, a resource taken and given
-// back, the owner's screen pointed, a notification sent, the owner's word recorded, a backup taken.
+// back, things put where they stand on a canvas, the owner's screen pointed, a notification sent, the owner's word
+// recorded, a backup taken.
 
 import { z } from 'zod';
 import { askView } from './askview.ts';
+import { putPlaces } from './canvas-places.ts';
 import { importAudit } from './audit.ts';
 import { toConfirm } from './confirm.ts';
 import { stopLaunched } from './launcher.ts';
-import { readLens } from './lens.ts';
+import { readFlat } from './lens-flat.ts';
 import { notify } from './notify.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
@@ -31,17 +33,17 @@ export const ACT_TOOLS: Record<string, Tool> = {
   },
   show: {
     description:
-      'Point the human\'s web UI at something, so they can follow what you are doing: an item, a screen (optionally "of" one item: the graph around it, or a project\'s roadmap), or a view of the map (a lens, with a style). ' +
+      'Point the human\'s web UI at something, so they can follow what you are doing: an item, a screen (optionally "of" one item: the graph around it, or a project\'s roadmap), or what their canvas draws (a flat lens, the one query flat reads, with a style). ' +
       'Their page goes there within a couple of seconds if they have "Follow agents" on. Add a short note saying what they are looking at. ' +
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
     input: {
-      entity: z.string().optional().describe('An item id: open its page.'),
+      entity: z.string().optional().describe('An item id: open its page; a view kept on the map (type lens, a saved canvas) is opened as their canvas, its lens in their query bar.'),
       screen: z.enum(['today', 'review', 'map', 'graph', 'roadmap', 'questions', 'automations', 'activity', 'workspace']).optional(),
       of: z.string().optional().describe('With screen graph, roadmap or questions: the item (for the last two, a project) it is drawn for.'),
       lens: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('A view of the map, drawn on the graph screen for this one look: the params of the lens view (from, story, kinds, by, over, far, lanes, order, measure, fold). {} is the whole map as it opens; story: a run id draws what that session told of.'),
+        .describe('What their canvas draws: a flat lens, as query flat takes it ({ filter: { text, types, ids, links, only, within, exclude }, walk: { over, steps }, limit }), shown in their query bar as if they had written it. With entity, under that item\'s page. {} is the canvas as it opens.'),
       style: z
         .object({
           lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
@@ -53,17 +55,33 @@ export const ACT_TOOLS: Record<string, Tool> = {
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
     },
     run: async (l, actor, input) => {
+      // A saved canvas is opened as what their canvas draws: the page reads its lens and style from the map.
+      const kept = input.entity && (await l.entity(input.entity));
+      if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return point(l, actor, 'show', `v?canvas=${input.entity}`, input.note);
       if (input.lens || input.style) {
-        // Read as the lens view reads it, so a lens the page could not draw is refused here and not on the owner's screen.
-        const asked = readLens(l, input.lens ?? {});
-        if (asked.from && !(await l.entity(asked.from))) throw new Error(`No item "${asked.from}"`);
+        // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on the owner's screen.
+        const asked = (input.lens ?? {}) as { filter?: { exclude?: unknown }; limit?: unknown };
+        const lens = Object.keys(asked).length ? readFlat(l, asked) : undefined;
+        for (const id of [...(lens?.include.ids ?? []), ...(input.entity ? [input.entity] : [])]) if (!(await l.entity(id))) throw new Error(`No item "${id}"`);
+        // The address says the lens as the page reads it (ui/lens.js, readFlatLens): each term of the filter, the walk, the limit.
         const query = new URLSearchParams();
-        for (const [key, value] of Object.entries(input.lens ?? {})) if (key in asked || key === 'lens') query.set(key, Array.isArray(value) ? value.join(',') : String(value));
+        if (lens) {
+          const { text, types, ids, links } = lens.include;
+          const walked = lens.walk.over === 'all' || lens.walk.over.length > 0;
+          if (text) query.set('text', text);
+          if (types?.length) query.set('types', types.join(','));
+          if (ids?.length) query.set('ids', ids.join(','));
+          for (const t of links ?? []) query.append('link', `${t.link} ${t.to ?? t.from}`);
+          if (asked.filter?.exclude !== undefined) query.set('exclude', lens.exclude.join(','));
+          if (walked) query.set('over', lens.walk.over === 'all' ? 'all' : (lens.walk.over as string[]).join(','));
+          if (walked) query.set('steps', String(lens.walk.steps));
+          if (asked.limit !== undefined) query.set('limit', String(lens.limit));
+        }
         if (input.style?.lit) query.set('lit', input.style.lit);
         if (input.style?.shape) query.set('shape', input.style.shape);
         if (input.style?.id) query.set('style', input.style.id);
-        // The address always says it is a lens: the graph screen without one is still the old drawing.
-        return point(l, actor, 'show', `graph?${query.size ? query : 'lens'}`, input.note);
+        // Their canvas draws it, under the item's page when one is named.
+        return point(l, actor, 'show', `${input.entity ? `e/${input.entity}` : 'v'}${query.size ? `?${query}` : ''}`, input.note);
       }
       if (!input.entity && !input.screen) throw new Error('show needs "entity", "screen" or "lens".');
       return point(l, actor, 'show', input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);
@@ -88,6 +106,15 @@ export const ACT_TOOLS: Record<string, Tool> = {
       reason: z.string().min(1),
     },
     run: async (l, actor, input) => l.release(actor, input),
+  },
+  places_put: {
+    description: 'Put things where they stand on one canvas, a batch of moves in one call: each item’s middle as [x, y] in the picture’s own units, or null to let the drawing lay it again; clear: true forgets every place on the canvas first. Never a fact about the work: kept in the places stream, newest per canvas and item. Takes effect at once.',
+    input: {
+      canvas: z.string().optional().describe("The canvas: the id of the item it is drawn from; the workspace's (or nothing) for the whole map."),
+      moves: z.record(z.string(), z.tuple([z.number(), z.number()]).nullable()).optional().describe('By item id: where its middle now is, or null.'),
+      clear: z.boolean().optional().describe('Forget every place on this canvas first: it is laid out again.'),
+    },
+    run: async (l, actor, input) => putPlaces(l, actor, input),
   },
   session_start: {
     description: 'Register this agent session in the map so the human can see it. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',

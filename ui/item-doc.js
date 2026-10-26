@@ -1,9 +1,9 @@
-// An item read whole, as its reader meets it: its text with the items it brings in, in their places; a lens brought
-// in is its picture. And the links that let someone read it with no login, and its shares with other workspaces.
+// An item read whole, as its reader meets it: its text with the items it brings in, in their places; a view kept on
+// the map brought in is its picture, drawn from its flat lens. And the links that let someone read it with no login, and its shares with other workspaces.
 
 import { api, ask, h, tell } from './base.js';
 import { renderBody } from './body.js';
-import { lensView } from './lens.js';
+import { keptView } from './canvases.js';
 import { isA } from './words.js';
 import { secretBox } from './workspace-cards.js';
 
@@ -34,7 +34,7 @@ export function documentNote(doc, id, here, style) {
       'figure',
       { class: 'doc-lens' },
       head(s),
-      h('div', { class: 'lens-card' }, lensView({ lens: { lens: s.id }, key: `doc:${id}:${s.id}`, bare: true, style: here ? { here } : {} })),
+      h('div', { class: 'lens-card' }, keptView(s.id, { key: `doc:${id}:${s.id}`, style: here ? { here } : {} })),
       s.body && h('figcaption', {}, renderBody(s.body, { style })),
     );
   const part = (p) =>

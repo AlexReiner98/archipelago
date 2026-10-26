@@ -298,7 +298,7 @@
       "id": "software.releases",
       "title": "Releases",
       "at": "home",
-      "pieces": [{ "piece": "picture", "lens": { "kinds": ["software.release"], "fold": ["closed", "system"] }, "style": { "shape": "list" } }]
+      "pieces": [{ "piece": "picture", "lens": { "filter": { "types": ["software.release"], "exclude": ["closed", "system"] } }, "style": { "shape": "list" } }]
     },
     { "form": "screen", "id": "software.gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
     {

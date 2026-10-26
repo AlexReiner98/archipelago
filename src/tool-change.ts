@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { bodyAfter } from './ops.ts';
-import { pictureOf } from './lens.ts';
+import { pictureOf } from './lens-kept.ts';
 import { wholeMap } from './outbox.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { type Focus, point as setFocus, took } from './presence.ts';

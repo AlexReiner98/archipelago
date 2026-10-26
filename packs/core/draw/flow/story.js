@@ -55,10 +55,11 @@ export function reveal({ frames, marks, t, send, later }) {
         else if (then || !dur) for (const key of [...w.keys, marks.says.get(n)].filter(Boolean)) list.push({ key, toggle: { 'sp-off': false }, set: { opacity: 1, 'stroke-dashoffset': 0 } });
         else {
           // Drawn in from what leads to what needs it, once the steps at both ends have come in.
+          // A tie has no head.
           const [path, head] = w.keys;
-          list.push({ key: path, set: { opacity: 0, 'stroke-dashoffset': 1 } }, { key: head, set: { opacity: 0 } });
-          later(dur * 0.6, () => send([{ key: path, toggle: { 'sp-off': false, 'sp-new': true }, set: { opacity: 1 } }, { key: path, set: { 'stroke-dashoffset': 0 }, over: t('draw') }, { key: head, toggle: { 'sp-off': false, 'sp-new': true }, set: { opacity: 1 }, over: t('draw') }, ...(marks.says.get(n) ? [{ key: marks.says.get(n), toggle: { 'sp-off': false }, set: { opacity: 1 }, over: t('draw') }] : [])]));
-          fresh.push(path, head);
+          list.push({ key: path, set: { opacity: 0, 'stroke-dashoffset': 1 } }, ...(head ? [{ key: head, set: { opacity: 0 } }] : []));
+          later(dur * 0.6, () => send([{ key: path, toggle: { 'sp-off': false, 'sp-new': true }, set: { opacity: 1 } }, { key: path, set: { 'stroke-dashoffset': 0 }, over: t('draw') }, ...(head ? [{ key: head, toggle: { 'sp-off': false, 'sp-new': true }, set: { opacity: 1 }, over: t('draw') }] : []), ...(marks.says.get(n) ? [{ key: marks.says.get(n), toggle: { 'sp-off': false }, set: { opacity: 1 }, over: t('draw') }] : [])]));
+          fresh.push(...w.keys);
         }
       });
       // What a step brings is in the accent a while.
