@@ -6,12 +6,19 @@ import { endedOf } from './ended.ts';
 import { limitOf } from './members.ts';
 import { acceptedSenders } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
+import { onReply } from './reply-rules.ts';
 import { liftsOn } from './rules.ts';
 import type { Tool } from './tools.ts';
 
+/** The settings that turn off a rule on a reply's end, one for each such rule the packs here declare. */
+const replyLifts = (l: Archipelago) => [...new Set(l.registry.rules.filter(onReply).map((r) => r.lifted!))];
+
 const settings = async (l: Archipelago) => {
   const { agent_backups, agent_publish, agent_code } = await liftsOn(l.db);
-  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code };
+  const names = replyLifts(l);
+  const { rows } = names.length ? await l.db.query<{ key: string; value: unknown }>(`select key, value from setting where key = any($1::text[])`, [names]) : { rows: [] };
+  const lifted = Object.fromEntries(names.map((name) => [name, rows.some((r) => r.key === name && r.value === true)]));
+  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code, ...(names.length && { lifted }) };
 };
 
 export const WORKSPACE_TOOLS: Record<string, Tool> = {
@@ -34,10 +41,14 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       agent_backups: z.boolean().optional().describe('Whether agents may download the whole workspace as a backup file (backup_download), private items included.'),
       agent_publish: z.boolean().optional().describe('Whether agents may publish documents here (publish, publish_all), each publish logged with its authority. Taking one down stays a human’s.'),
       agent_code: z.boolean().optional().describe('Whether agents’ changes to the code a drawing or a style runs (modules, code) take effect as they make them, instead of waiting for a human. That code runs only in the sandbox; each change is logged and undoable.'),
+      lifted: z.record(z.string(), z.boolean()).optional().describe('Turn a rule on a session’s reply ending off (true) or on again (false), by the setting it names (its lifted, such as reply_draw): workspace_info lists them.'),
     },
     run: async (l, actor, input) => {
       if (!actor.admin) throw new Error('Only a workspace admin can change workspace settings.');
-      for (const [key, value] of Object.entries(input)) {
+      const { lifted, ...rest } = input as Record<string, unknown> & { lifted?: Record<string, boolean> };
+      const known = replyLifts(l);
+      for (const name of Object.keys(lifted ?? {})) if (!known.includes(name)) throw new Error(`No rule here is turned off by "${name}": ${known.length ? `these are, ${known.join(', ')}` : 'no pack here declares a rule on a reply ending'}.`);
+      for (const [key, value] of [...Object.entries(rest), ...Object.entries(lifted ?? {})]) {
         await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
         await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${key} set to ${JSON.stringify(value)}` });
         await l.record('settings', actorId(actor), [['+', 'setting', key, value]]);

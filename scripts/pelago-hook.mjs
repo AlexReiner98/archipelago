@@ -18,6 +18,8 @@
 // session is on. From the same record it says which items the session's calls
 // to the map named (read, shown or changed), so the session's end asks about
 // what it touched: the server cannot tell apart sessions that share a token.
+// And what the reply did since the owner's last message (the turn): how many times it read the map, showed the owner
+// something, changed the map, committed and pushed, so that a rule on a reply's end can ask the agent to go on.
 //
 // It also keeps the run the session is registered as (the server says it beside its answer to session-start) in
 // the checkout's git folder, one file per session (pelago-runs/<session id>), and takes it out at the end. The
@@ -45,6 +47,18 @@ for await (const chunk of process.stdin) input += chunk;
 // The map's tools, as the setup names their server (pelago; lattice before it), and an item's id.
 const MAP_TOOL = /^mcp__(pelago|lattice)__/;
 const ITEM = /\be_[a-z0-9]{8}\b/g;
+// A git command, past the options that come before its subcommand (git -C dir commit, git -c a=b push).
+const GIT = (sub) => new RegExp(String.raw`(^|[\s;&|(])git(\s+(-[Cc]\s+("[^"]*"|'[^']*'|\S+)|--?[\w-]+(=\S+)?))*\s+` + sub + String.raw`(?![\w-])`);
+const COMMIT = GIT('commit');
+const PUSH = GIT('push');
+
+/** Whether a transcript entry is a message the owner wrote: not a tool's answer, nor what Claude Code put in. */
+const prompted = (entry) =>
+  entry.type === 'user' &&
+  !entry.isMeta &&
+  !entry.isCompactSummary &&
+  (typeof entry.message?.content === 'string' ||
+    (Array.isArray(entry.message?.content) && entry.message.content.some((p) => p.type === 'text') && !entry.message.content.some((p) => p.type === 'tool_result')));
 
 /**
  * From a transcript: the tokens used so far, each answer counted once however many lines it was written as, and the
@@ -54,21 +68,34 @@ function readTranscript(text) {
   const answers = new Map();
   const touched = new Set();
   const changes = new Set();
+  let turn;
+  let reply = {};
   const named = (said) => {
     for (const id of JSON.stringify(said ?? '').match(ITEM) ?? []) touched.add(id);
   };
   for (const line of text.split('\n')) {
     const calls = line.includes('"mcp__pelago__') || line.includes('"mcp__lattice__');
     const answered = changes.size > 0 && line.includes('"tool_result"');
-    if (!line.includes('"usage"') && !calls && !answered) continue;
+    const asked = line.includes('"user"') && !line.includes('"tool_result"');
+    if (!line.includes('"usage"') && !calls && !answered && !asked && !line.includes('"Bash"')) continue;
     try {
       const entry = JSON.parse(line);
+      if (prompted(entry)) {
+        turn = entry.uuid;
+        reply = { read: 0, showed: 0, changed: 0, committed: 0, pushed: 0 };
+      }
       const usage = entry.message?.usage;
       if (entry.type === 'assistant' && usage) answers.set(entry.message.id ?? entry.uuid, (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0));
       for (const part of Array.isArray(entry.message?.content) ? entry.message.content : []) {
         if (part.type === 'tool_use' && MAP_TOOL.test(part.name ?? '')) {
           named(part.input);
           if (part.name.endsWith('__change')) changes.add(part.id);
+          const did = part.name.endsWith('__query') ? 'read' : part.name.endsWith('__change') ? 'changed' : part.name.endsWith('__report') && part.input?.action === 'show' ? 'showed' : undefined;
+          if (did) reply[did] = (reply[did] ?? 0) + 1;
+        }
+        if (part.type === 'tool_use' && part.name === 'Bash' && typeof part.input?.command === 'string') {
+          if (COMMIT.test(part.input.command)) reply.committed = (reply.committed ?? 0) + 1;
+          if (PUSH.test(part.input.command)) reply.pushed = (reply.pushed ?? 0) + 1;
         }
         if (part.type === 'tool_result' && changes.has(part.tool_use_id)) named(part.content);
       }
@@ -78,7 +105,7 @@ function readTranscript(text) {
   }
   let tokens = 0;
   for (const n of answers.values()) tokens += n;
-  return { tokens, touched: [...touched] };
+  return { tokens, touched: [...touched], ...(turn && { turn, reply }) };
 }
 
 /** The file in the checkout's git folder (shared by its worktrees) that holds a session's run, or null outside a checkout. */

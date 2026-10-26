@@ -264,6 +264,8 @@ export interface Beat {
   replaced_by?: number;
   /** What the session has found, said whole: the latest that stands is what its page opens on. */
   finding?: boolean;
+  /** Set on a beat a rule on the reply's end asked with (src/replies.ts): the rule, as pack.id. */
+  asked?: string;
 }
 const BEATS_KEPT = 80;
 const SAID_MAX = 280;
@@ -283,7 +285,7 @@ const SAYS_MAX = 40;
 export async function tell(
   l: Archipelago,
   _actor: Actor,
-  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number; finding?: boolean },
+  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number; finding?: boolean; asked?: string },
 ) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
@@ -313,7 +315,7 @@ export async function tell(
     if (old.replaced_by) throw new Error(`Beat ${old.n} was already taken back by beat ${old.replaced_by}.`);
   }
   if (input.finding && !about.length) throw new Error('A finding names the items it is about (about, or the ends of links): they are its picture.');
-  const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }) };
+  const beat: Beat = { n: story.length + 1, at: now(), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }), ...(input.asked && { asked: input.asked }) };
   const next = [...story.map((b) => (b.n === input.replaces ? { ...b, replaced_by: beat.n } : b)), beat];
   await l.operational(run.id, { props: { story: next, last_seen: now() } });
   await touch(l, run.id);
@@ -327,9 +329,9 @@ export async function story(l: Archipelago, input: Record<string, unknown>) {
   const run = key ? await resolveRun(l, key) : undefined;
   if (!run) throw new Error(`No session "${key}": give run, a run id or a session id.`);
   const beats = Array.isArray(run.props.story) ? (run.props.story as Beat[]) : [];
-  // What the page opens on: the latest finding that stands, else the latest beat that does.
+  // What the page opens on: the latest finding that stands, else the latest beat the session said itself, not a rule.
   const standing = beats.filter((b) => !b.replaced_by);
-  const found = standing.findLast((b) => b.finding) ?? standing.at(-1);
+  const found = standing.findLast((b) => b.finding) ?? standing.findLast((b) => !b.asked) ?? standing.at(-1);
   return { run: { id: run.id, title: run.title, status: run.status, open: run.is_open }, finding: found?.n ?? null, beats };
 }
 

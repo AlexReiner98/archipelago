@@ -5,6 +5,7 @@
 import { SETUP_VERSION, setupCommand } from './connect.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
+import { askOnReply } from './replies.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard } from './sessions.ts';
 import { addTouched } from './touched.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
@@ -19,6 +20,11 @@ export interface HookBody {
   tokens?: number;
   /** The items the session's calls to the map have named so far, read from its transcript (src/touched.ts). */
   touched?: unknown;
+  /** At a turn's end: what the reply did since the owner's last message (src/reply-rules.ts), and that message's id. */
+  reply?: unknown;
+  turn?: unknown;
+  /** Claude Code's: the agent is going on because a Stop hook asked it to. */
+  stop_hook_active?: unknown;
   setup?: string;
 }
 
@@ -101,11 +107,12 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     await hookSessionEnd(pelago, body);
     return {};
   }
-  // The end of a turn: nothing to say back, but the session was heard from and its count (taken above) is
-  // up to date, so one long turn does not go a whole session without its tokens.
+  // The end of a turn: the session was heard from and its count (taken above) is up to date, so one long turn does
+  // not go a whole session without its tokens. A rule on the reply's end may ask the agent to go on, once.
   if (event === 'stop') {
     await sessionHeard(pelago, body.session_id, 'until').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
-    return {};
+    const asking = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
+    return (await askOnReply(whole, pelago, asking, body).catch((err) => console.error(`hook reply rules: ${(err as Error).message}`))) ?? {};
   }
   return undefined;
 }
