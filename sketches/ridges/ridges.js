@@ -86,6 +86,14 @@ export function ridges(dials) {
   const land = fbm(noise2(d.seed, d.wrap ? Math.round(cells) : 0), 3);
   const crest = fbm(noise2(d.seed + 1, d.wrap ? Math.round(cells * 3) : 0), 3);
   const toCell = (x) => (x / W) * (d.wrap ? Math.round(cells) : cells);
+  // Noise read at x on its own scale k: with repeat on, blended with its value a tile-width over, so whatever the
+  // scale, the right edge comes back to exactly what the left edge has and the tile joins without a seam.
+  const seam = (fn, x, k, off, b) => {
+    const v = fn(toCell(x) * k + off, b);
+    if (!d.wrap) return v;
+    const t = x / W;
+    return v * (1 - t) + fn(toCell(x - W) * k + off, b) * t;
+  };
   const rise = d.rise * 16 * gap, step = Math.max(1, d.step * gap * 1.6), dx = 2;
   const xs = Array.from({ length: Math.floor((W - (d.wrap ? 0 : 2 * M)) / dx) + 1 }, (_, i) => (d.wrap ? 0 : M) + i * dx);
   const shapes = [];
@@ -127,8 +135,8 @@ export function ridges(dials) {
   // The field as read here: through a noise warp, with some of the noise field blended in.
   const field = (x, y, yc) => {
     const w = d.warp * 0.12 * W;
-    const wx = x + (land(toCell(x) * 2 + 7, yc * 2) - 0.5) * 2 * w, wy = y + (land(toCell(x) * 2, yc * 2 + 7) - 0.5) * 2 * w;
-    const n = Math.max(0, Math.min(1, (land(toCell(x), yc) - 0.5) * 2.2 + 0.5));
+    const wx = x + (seam(land, x, 2, 7, yc * 2) - 0.5) * 2 * w, wy = y + (seam(land, x, 2, 0, yc * 2 + 7) - 0.5) * 2 * w;
+    const n = Math.max(0, Math.min(1, (seam(land, x, 1, 0, yc) - 0.5) * 2.2 + 0.5));
     return (1 - d.mix) * sample(rd.field, ...cellOf(wx, wy)) + d.mix * n;
   };
   /** The diffusion archipelago a point is in (or the nearest), and the rank of the island it stands on. */
@@ -180,7 +188,7 @@ export function ridges(dials) {
         return { u: field(x, y, yc), lo, hi: lo + 0.12, gate: smooth(0.02, 0.35, c), g, t, rank, all };
       }
       const lo = 0.78 - d.land * 0.6;
-      return { u: c * rank * (0.2 + 1.3 * land(toCell(x) * 2.5, yc * 2.5)), lo, hi: lo + 0.14, gate: 1, g, t, rank, all };
+      return { u: c * rank * (0.2 + 1.3 * seam(land, x, 2.5, 0, yc * 2.5)), lo, hi: lo + 0.14, gate: 1, g, t, rank, all };
     }
     if (rd) {
       // A smaller island in its archipelago is cut lower into the sea, so a few large islands lead many small ones.
@@ -188,7 +196,7 @@ export function ridges(dials) {
       return { u: field(x, y, yc), lo, hi: lo + 0.12, gate: 1, g, t: 0, rank };
     }
     const lo = 1 - d.land - 0.05;
-    return { u: land(toCell(x), yc), lo, hi: lo + 0.17, gate: 1, g: 0, t: 0, rank: 1 };
+    return { u: seam(land, x, 1, 0, yc), lo, hi: lo + 0.17, gate: 1, g: 0, t: 0, rank: 1 };
   };
 
   // The border: land sinks into the sea toward the frame, along an edge that wobbles with noise so it never runs as
@@ -204,7 +212,7 @@ export function ridges(dials) {
       const qx = Math.abs(x - W / 2) - hx + round, qy = Math.abs(y - H / 2) - hy + round;
       e = -(Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - round);
     }
-    const wobble = (land(toCell(x) * 1.7 + 21, yc * 1.7 + 9) - 0.5) * band * 1.3;
+    const wobble = (seam(land, x, 1.7, 21, yc * 1.7 + 9) - 0.5) * band * 1.3;
     return smooth(0.1, 1, (e + wobble) / band) * smooth(0, 0.3 * band, e);
   };
 
@@ -230,6 +238,7 @@ export function ridges(dials) {
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
     const h = [], shelf = [], gs = [], ts = [], steps = [], raws = [], terraces = [];
+    let seamStart = null;
     for (const x of xs) {
       const L = at(x, y, yc), f = formAt(x, y, L), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
       const calm = shore(x, y, yc) * territory(x, y);
@@ -248,11 +257,11 @@ export function ridges(dials) {
       // Height: the place's own, lower for a lesser island and for an older one; with diffusion, rising to the heart.
       // Peaks: each row its own summits (the row index moves the noise faster), set apart from each other, so a
       // row's mountains stand clear of the row behind rather than lining up into bands.
-      const c = crest(toCell(x) * (3 + 1.2 * d.peaks), r * (0.12 + 0.55 * d.peaks));
+      const c = seam(crest, x, 3 + 1.2 * d.peaks, 0, r * (0.12 + 0.55 * d.peaks));
       const rugged = Math.max(0, Math.min(2, d.rugged + f.rugged - age * 0.5));
       const peak = (rd ? 0.4 * c + 0.6 * smooth(rd.level, 1, L.u) : c) ** (1 + rugged * 2.5);
       // Height variety: a slow swell over the page lifts some islands into massifs and keeps others low.
-      const massif = 1 + d.relief * (1.5 * land(toCell(x) * 0.6 + 11, yc * 0.6 + 5) - 0.75) * 1.6;
+      const massif = 1 + d.relief * (1.5 * seam(land, x, 0.6, 11, yc * 0.6 + 5) - 0.75) * 1.6;
       const tall = rise * f.rise * Math.max(0.15, massif) * Math.max(0.05, 1 - 0.8 * age) * Math.max(0.05, 1 - d.hierarchy * 0.6 * (1 - L.rank));
       let raw = mask * tall * (0.25 - 0.2 * d.peaks + (0.75 + 0.2 * d.peaks) * peak ** (1 + 0.3 * d.peaks));
       if (f.top) raw = Math.min(raw, tall * (1 - 0.65 * f.top));
@@ -291,15 +300,21 @@ export function ridges(dials) {
       const idx = raws.map((_, i) => i), round = d.wrap ? [...idx, ...idx] : idx;
       walk(round);
       walk([...round].reverse());
+      // The row's two ends are one place when it repeats: they must stand alike.
+      if (d.wrap) raws[0] = raws[raws.length - 1] = Math.min(raws[0], raws[raws.length - 1]);
     }
     // A step is never more than most of its island's height as it now stands, so every island keeps a terrace.
+    // With repeat on, an island across the seam is one island: its two ends share one height for this.
+    const runs = [];
     for (let i = 0; i < raws.length; ) {
       if (raws[i] <= 0) { i++; continue; }
       let j = i, top = 0;
       while (j < raws.length && raws[j] > 0) top = Math.max(top, raws[j++]);
-      for (let k = i; k < j; k++) terraces[k][0] = Math.min(terraces[k][0], Math.max(1, top * 0.6));
+      runs.push([i, j, top]);
       i = j;
     }
+    if (d.wrap && runs.length > 1 && runs[0][0] === 0 && runs[runs.length - 1][1] === raws.length) runs[0][2] = runs[runs.length - 1][2] = Math.max(runs[0][2], runs[runs.length - 1][2]);
+    for (const [i, j, top] of runs) for (let k = i; k < j; k++) terraces[k][0] = Math.min(terraces[k][0], Math.max(1, top * 0.6));
     raws.forEach((raw, i) => {
       const [stp, soft] = terraces[i], q = raw / stp, k = Math.floor(q);
       h.push(raw > 0 ? stp * (k + smooth(1 - soft, 1, q - k)) : 0);
@@ -322,8 +337,11 @@ export function ridges(dials) {
       if (h[i] < 0.5) { i++; continue; }
       let j = i;
       while (j < xs.length && h[j] >= 0.5) j++;
-      const mid = (i + j) >> 1, group = gs[mid], start = Math.floor(rnd() * 1000), stp = steps[mid];
-      let hills = 0;
+      const mid = (i + j) >> 1, group = gs[mid], stp = steps[mid];
+      let start = Math.floor(rnd() * 1000), hills = 0;
+      // With repeat on, an island's two halves either side of the seam take the same colours.
+      if (d.wrap && i === 0) seamStart = start;
+      if (d.wrap && j === xs.length && seamStart !== null) start = seamStart;
       // Along an aged chain, colour follows age: the young end in the palette's dark colours, the old in its light.
       const tone = chains.length && d.age > 0 ? 0.1 + 0.8 * ts[mid] : null;
       for (let b = 0; b < d.bands; b++) {
@@ -357,7 +375,7 @@ export function ridges(dials) {
           const t = (q - c) / half, lift = terrace(top * Math.max(0, 1 - t * t) ** 0.8);
           pts.push([xs[q], y - Math.min(lift, h[q])]);
         }
-        if (pts.length >= 3) put({ fill: start + 101 + n * 17, group, tone, points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] });
+        if (pts.length >= 3) put({ foot: true, fill: start + 101 + n * 17, group, tone, points: [[pts[0][0], y], ...pts, [pts[pts.length - 1][0], y]] });
       }
       i = j;
     }
