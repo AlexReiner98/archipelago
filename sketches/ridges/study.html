@@ -34,7 +34,7 @@
 <body>
 <header>
   <h1>Canada's archipelagos</h1>
-  <p>Sixteen palettes drawn from photographs, accents from each place's flora and fauna, land and water apart, enriched (the thin strip is as photographed) · <a href="./">open the tool</a></p>
+  <p>Seven palettes drawn from photographs, accents from each place's flora and fauna, land and water apart, enriched (the thin strip is as photographed) · <a href="./">open the tool</a></p>
 </header>
 <main>
   <div class="hero"><canvas id="hero" title="All nine as one sea: each archipelago in its own colours and landform"></canvas></div>
@@ -47,7 +47,8 @@
   import { paint } from './paint.js';
 
   // West to east, then north.
-  const ORDER = ['haidaGwaii', 'discovery', 'brokenGroup', 'gulfIslands', 'greatSlave', 'lakeOfTheWoods', 'superior', 'thirtyThousand', 'thousandIslands', 'belcher', 'mingan', 'magdalen', 'fundyIsles', 'mahone', 'notreDame', 'arctic'];
+  // The core seven, west to east, then north (the nine set aside stay in the tool).
+  const ORDER = ['haidaGwaii', 'brokenGroup', 'thirtyThousand', 'thousandIslands', 'magdalen', 'mahone', 'arctic'];
   const WHAT = {
     haidaGwaii: 'Pacific · rainforest, moss and cedar',
     brokenGroup: 'Pacific · low rock islets in grey water',
@@ -94,7 +95,7 @@
     given = out;
     return given.map((k) => PLACES[k].form);
   };
-  render($('hero'), 1200, 560, { source: 'diffusion', chains: 16, pattern: 0.35, scale: 0.55, variety: 0.5, warp: 0.4, mix: 0.2, land: 0.55, rows: 110, hierarchy: 0.5, shallows: 0.5, seed: 3, forms: assign }, PLACES.haidaGwaii, (g) => PLACES[given[g]] ?? PLACES.haidaGwaii);
+  render($('hero'), 1200, 560, { source: 'diffusion', chains: 7, pattern: 0.35, scale: 0.55, variety: 0.5, warp: 0.4, mix: 0.2, land: 0.55, rows: 110, hierarchy: 0.5, shallows: 0.5, seed: 3, forms: assign }, PLACES.haidaGwaii, (g) => PLACES[given[g]] ?? PLACES.haidaGwaii);
   $('key').innerHTML = [...new Set(given)].map((k) => `<span>${PLACES[k].title}</span>`).join('');
 
   // One card per place: its land on its own water, its colours as much as they cover, its water, its photos.

@@ -3,7 +3,7 @@
 // is credited under it, and used only to read its colours). The hand-picked ones follow, to compare.
 
 import { CANADA } from './canada.js';
-import { MORE, NEW } from './canada-more.js';
+import { MORE, NEW, MORE_ACCENTS, ASIDE } from './canada-more.js';
 
 const commons = (file, by, license) => ({ page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file.replaceAll(' ', '_'))}`, by, license });
 
@@ -242,6 +242,7 @@ PLACES.haidaGwaii.region = 'canada';
 // Seven more of them, and every Canadian place's accents from its flora and fauna. An accent joins the palette in
 // lightness order at a modest weight, and is marked (accent) so the drawing can keep it for the smaller shapes.
 const credit = ([file, by, license]) => commons(file, by, license);
+for (const [k, extra] of Object.entries(MORE_ACCENTS)) (MORE[k].accents = [...MORE[k].accents, ...extra.add]), (MORE[k].flora = [...MORE[k].flora, ...extra.flora]);
 for (const [k, more] of Object.entries(MORE)) {
   const p = (PLACES[k] ??= { ...NEW[k], region: 'canada', paper: more.paper, ink: more.ink, colours: more.colours, weights: more.weights, sea: more.sea, photos: more.photos.map(credit) });
   p.flora = more.flora.map(credit);
@@ -377,4 +378,5 @@ export function enrich(p, { chroma = 1.4, contrast = 1.18, sea = 1.25, ceiling =
 
 // Canada's palettes, enriched: more saturation and contrast, each colour's hue kept. The palettes as photographed
 // stay on each as raw, for comparison (the study shows both).
-for (const [k, p] of Object.entries(PLACES)) if (p.region === 'canada') PLACES[k] = enrich(p);
+for (const k of ASIDE) PLACES[k].region = 'canada-aside';
+for (const [k, p] of Object.entries(PLACES)) if (p.region?.startsWith('canada')) PLACES[k] = enrich(p);

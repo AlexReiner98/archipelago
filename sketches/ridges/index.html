@@ -121,7 +121,7 @@
     return richer.get(key);
   };
   // The menu by where: Canada's archipelagos, those elsewhere, and the hand-picked palettes.
-  const kinds = [['Canada', (p) => p.region === 'canada'], ['Elsewhere', (p) => p.photos && p.region !== 'canada'], ['By hand', (p) => !p.photos]];
+  const kinds = [['Canada', (p) => p.region === 'canada'], ['Elsewhere', (p) => p.photos && !p.region?.startsWith('canada')], ['Canada, set aside', (p) => p.region === 'canada-aside'], ['By hand', (p) => !p.photos]];
   $('place').innerHTML = kinds.map(([label, is]) => `<optgroup label="${label}">${Object.entries(palettes).filter(([, p]) => is(p)).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('')}</optgroup>`).join('');
   $('mix').innerHTML = Object.entries(palettes).filter(([, p]) => p.photos).map(([k, p]) => `<label><input type="checkbox" value="${k}" checked> ${p.title}</label>`).join('');
   let seed = 1;
@@ -236,7 +236,9 @@
   $('mix').addEventListener('change', draw);
   $('richness').addEventListener('input', draw);
   for (const b of document.querySelectorAll('[data-mix]')) b.onclick = () => {
-    for (const c of $('mix').querySelectorAll('input')) c.checked = b.dataset.mix === 'all' || (palettes[c.value].region === 'canada') === (b.dataset.mix === 'canada');
+    // The set-aside places are ticked only by All.
+    const region = (k) => palettes[k].region ?? '';
+    for (const c of $('mix').querySelectorAll('input')) c.checked = b.dataset.mix === 'all' || (b.dataset.mix === 'canada' ? region(c.value) === 'canada' : !region(c.value).startsWith('canada'));
     draw();
   };
 
