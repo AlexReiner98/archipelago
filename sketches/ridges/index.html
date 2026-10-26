@@ -91,6 +91,9 @@
   <label title="Cloud cover: none, to overcast">Clouds <small>none · overcast</small><input id="clouds" type="range" min="0" max="1" step="0.01" value="0"></label>
   <label class="only-clouds" title="Small, many cloud banks or large, few">Cloud size <small>small · large</small><input id="cloudSize" type="range" min="0.2" max="3" step="0.01" value="1"></label>
   <label class="only-clouds" title="How high the cloud tops billow">Billow <small>flat · towering</small><input id="cloudPuff" type="range" min="0" max="6" step="0.05" value="1"></label>
+  <label class="only-clouds" title="Where cloud comes from: free in the sky, or made by the mountains (caps on the summits that reach the cloud level, windward slopes, banners and lee waves downwind)">From peaks <small>sky · mountains</small><input id="cloudPeaks" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+  <label class="only-clouds" title="Wind strength: still air gives caps on the summits only; a strong wind trails banners and lines of lee-wave clouds downwind">Wind <small>still · gale</small><input id="wind" type="range" min="0" max="2" step="0.01" value="0.6"></label>
+  <label class="only-clouds" title="Where the wind blows: right, out of the page (towards the nearer rows), left, or into it">Wind direction <svg id="windArrow" viewBox="-10 -10 20 20" width="14" height="14" style="vertical-align:middle"><path d="M-7 0H6M2-4L6 0 2 4" stroke="currentColor" stroke-width="2" fill="none"/></svg><input id="windDir" type="range" min="0" max="360" step="1" value="0"></label>
   <label class="only-clouds" title="How solid the clouds are">Opacity <small>veil · solid</small><input id="cloudOpacity" type="range" min="0.2" max="1" step="0.01" value="0.92"></label>
   <label class="only-clouds" title="The shadow a cloud casts on the water beneath it">Shadow <small>none · dark</small><input id="cloudShadow" type="range" min="0" max="1" step="0.01" value="0.5"></label>
   <h2>Geography</h2>
@@ -118,7 +121,7 @@
   import { paint, fillOf as fillWith, swell } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudShadow'];
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudShadow', 'cloudPeaks', 'wind', 'windDir'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   // Palettes are kept as photographed (a palette shipped enriched is taken back to its raw colours); Richness enriches
   // them as they are drawn, so the swatches always show and edit the colours the photos gave.
@@ -276,7 +279,8 @@
   $('source').addEventListener('change', () => (showSource(), draw()));
   showSource();
   $('mix').addEventListener('change', draw);
-  const showClouds = () => document.body.classList.toggle('clouds', +$('clouds').value > 0);
+  const showClouds = () => { document.body.classList.toggle('clouds', +$('clouds').value > 0); $('windArrow').style.transform = 'rotate(' + $('windDir').value + 'deg)'; };
+  $('windDir').addEventListener('input', showClouds);
   $('clouds').addEventListener('input', showClouds);
   $('cloudOpacity').addEventListener('input', draw);
   showClouds();
@@ -325,7 +329,7 @@
     if (palettes[s.place]) $('place').value = s.place;
     for (const c of $('mix').querySelectorAll('input')) c.checked = (s.mix ?? []).includes(c.value);
     $('source').value = s.source ?? 'chains';
-    for (const k of DIALS) if (s.dials?.[k] !== undefined) $(k).value = s.dials[k];
+    for (const k of DIALS) $(k).value = s.dials?.[k] ?? DEFAULTS[k];
     $('weighted').checked = s.weighted ?? true; $('forms').checked = s.forms ?? true; $('wrap').checked = !!s.wrap; $('geo').checked = s.geo ?? false;
     seed = s.seed ?? 1; bgPicked = s.bg ?? null; $('richness').value = s.richness ?? 1; $('cloudOpacity').value = s.cloudOpacity ?? 0.92;
     const l = s.letter ?? {};

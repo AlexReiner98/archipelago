@@ -3,6 +3,7 @@
 // Dials in, shapes out ({ fill, points } and { line, points }); no page.
 
 import { grow, sample, archipelagos } from './diffusion.js';
+import { clouds } from './clouds.js';
 
 export const random = (seed) => () => {
   seed = (seed + 0x6d2b79f5) | 0;
@@ -72,6 +73,9 @@ export const DEFAULTS = {
   cloudSize: 1,    // cloud banks small and many (low) to large and few (high)
   cloudPuff: 1,    // how high cloud tops billow, in rows
   cloudShadow: 0.5, // how dark the shadow a cloud casts on the water beneath it
+  cloudPeaks: 0.8, // where cloud comes from: free in the sky (0) to made by the mountains (1)
+  wind: 0.6,       // wind strength: still air, caps only (0) to long banners and lee-wave clouds (2)
+  windDir: 0,      // where the wind blows, in degrees: 0 right, 90 out of the page, 180 left, 270 into it
   slope: 2,        // max slope from the nearest water, height per unit across: steep (high) to gentle (low); 0 for none
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   anchors: null,   // [[x, y], ...] in page units: put archipelago i at anchor i (one per anchor), as on a map
@@ -91,7 +95,7 @@ export function ridges(dials) {
   const cells = 2 + d.islands * 10;                         // land field cells across the width
   const land = fbm(noise2(d.seed, d.wrap ? Math.round(cells) : 0), 3);
   const crest = fbm(noise2(d.seed + 1, d.wrap ? Math.round(cells * 3) : 0), 3);
-  const sky = fbm(noise2(d.seed + 5, d.wrap ? Math.round(cells) : 0), 3), puff = fbm(noise2(d.seed + 6, d.wrap ? Math.round(cells * 4) : 0), 2);
+  const skyNoise = fbm(noise2(d.seed + 5, d.wrap ? Math.round(cells) : 0), 3), puff = fbm(noise2(d.seed + 6, d.wrap ? Math.round(cells * 4) : 0), 2);
   const toCell = (x) => (x / W) * (d.wrap ? Math.round(cells) : cells);
   // Noise read at x on its own scale k: with repeat on, blended with its value a tile-width over, so whatever the
   // scale, the right edge comes back to exactly what the left edge has and the tile joins without a seam.
@@ -103,7 +107,7 @@ export function ridges(dials) {
   };
   const rise = d.rise * 16 * gap, step = Math.max(1, d.step * gap * 1.6), dx = 2;
   const xs = Array.from({ length: Math.floor((W - (d.wrap ? 0 : 2 * M)) / dx) + 1 }, (_, i) => (d.wrap ? 0 : M) + i * dx);
-  const shapes = [];
+  const shapes = [], sky = [];
 
   // Island chains: each a gentle curve across the page that land gathers along. With none, land is wherever
   // the noise says, as one archipelago.
@@ -400,31 +404,12 @@ export function ridges(dials) {
     }
     // The row's floor: a line across the water.
     shapes.push({ line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] });
-    // Clouds: pale bands floating just above the row, their tops billowing in soft rounded steps, from their own
-    // slow noise, inside the border. Each sits at its row's depth, so nearer land passes in front of farther cloud.
-    // Their shadows lie on the water of the row beneath them (the land of the row drawn already covers it).
-    if (d.clouds > 0) {
-      const k = 0.9 / Math.max(0.1, d.cloudSize), edge = 1 - d.clouds * 0.6;
-      const amount = xs.map((x) => smooth(edge, edge + 0.09, seam(sky, x, k, 3, yc * k + 11)) * shore(x, y, yc));
-      const base = y - gap * 0.55, cstep = gap * 0.9;
-      for (let i = 0; i < xs.length; ) {
-        if (amount[i] < 0.05) { i++; continue; }
-        let j = i;
-        while (j < xs.length && amount[j] >= 0.05) j++;
-        if (j - i >= 3) {
-          const top = [];
-          for (let q = i; q < j; q++) {
-            // A dome (the square root of cover) with broad, slow billows, so tops round like cumulus, not peaks.
-            const raw = Math.sqrt(amount[q]) * gap * d.cloudPuff * (0.9 + 0.9 * seam(puff, xs[q], k * 1.6, 7, yc * k)), n = Math.floor(raw / cstep);
-            top.push([xs[q], base - cstep * (n + smooth(0.05, 1, raw / cstep - n)) - gap * 0.15]);
-          }
-          if (d.cloudShadow > 0) shapes.push({ shadow: d.cloudShadow, points: [[xs[i], y - gap * 0.12], [xs[j - 1], y - gap * 0.12], [xs[j - 1], y + gap * 0.12], [xs[i], y + gap * 0.12]] });
-          shapes.push({ cloud: true, points: [[xs[i], base], ...top, [xs[j - 1], base]] });
-        }
-        i = j;
-      }
-    }
+    sky.push({ y, yc, h, at: shapes.length });
   }
+  // Clouds, from the mountains and the wind (clouds.js): each row's go in just after its land, so nearer land passes
+  // in front of farther cloud. Last row first, so the earlier places stay where they were.
+  const made = clouds({ d, rows: sky, xs, dx, gap, sky: skyNoise, puff, seam, shore, smooth });
+  for (let r = sky.length - 1; r >= 0; r--) shapes.splice(sky[r].at, 0, ...made[r]);
   return { width: W, height: H, shapes, line: d.line, chains: groups };
 }
 
