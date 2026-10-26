@@ -9,7 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ActionDef, DrawingDef, HearDef, HostDef, ScheduleDef, ScreenDef, StyleDef, TreeDef, VerbDef, ViaDef, ViewDef, WebhookDef } from './declared.ts';
+import type { ActionDef, DrawingDef, HearDef, HostDef, ReasonDef, ScheduleDef, ScreenDef, StyleDef, TreeDef, VerbDef, ViaDef, ViewDef, WebhookDef } from './declared.ts';
 import type { FieldDef, RelationDef, TypeDef } from './packs.ts';
 import type { RuleDef } from './rules.ts';
 import type { ServerHost, ServerReach } from './server-packs.ts';
@@ -20,8 +20,8 @@ export interface TypeAdd {
   fields: Record<string, FieldDef>;
 }
 
-/** A view: a read (today's ViewDef), a tree over "is part of", or a screen on the page of items of a kind or type. */
-export type ViewEntry = (ViewDef & { form?: undefined }) | (TreeDef & { form: 'tree' }) | (ScreenDef & { form: 'screen' });
+/** A view: a read (today's ViewDef), a tree over "is part of", a screen on the page of items of a kind or type, or a reason attention gives. */
+export type ViewEntry = (ViewDef & { form?: undefined }) | (TreeDef & { form: 'tree' }) | (ScreenDef & { form: 'screen' }) | (ReasonDef & { form: 'attention' });
 
 /** An action, or one of the kernel's six verbs (core's own, with no input and no handler). */
 export type ActionEntry = ActionDef | (VerbDef & { kernel: true });
@@ -149,7 +149,7 @@ function keyProblems(m: Raw): string[] {
     if (on.length !== 1) problems.push(`a handler runs on one of an event, a schedule or a webhook, named: ${JSON.stringify(h)}`);
     if (h.records !== undefined && !h.webhook) problems.push('only a webhook\'s handler says what it records');
   }
-  for (const v of arr<Raw>(m.views)) if (v.form !== undefined && v.form !== 'tree' && v.form !== 'screen') problems.push(`view "${String(v.id)}": form is tree or screen, or left out for a read`);
+  for (const v of arr<Raw>(m.views)) if (v.form !== undefined && v.form !== 'tree' && v.form !== 'screen' && v.form !== 'attention') problems.push(`view "${String(v.id)}": form is tree, screen or attention, or left out for a read`);
   for (const t of arr<Raw>(m.types)) if (t.of !== undefined && (t.id !== undefined || typeof t.fields !== 'object')) problems.push(`type entry of "${String(t.of)}" adds fields to another pack's type: of and fields only`);
   return problems;
 }
@@ -178,6 +178,7 @@ export interface Parts {
   views: ViewDef[];
   trees: TreeDef[];
   screens: ScreenDef[];
+  reasons: ReasonDef[];
   verbs: VerbDef[];
   actions: ActionDef[];
   schedules: ScheduleDef[];
@@ -211,6 +212,7 @@ export function parts(m: Manifest): Parts {
     views: views.filter((v): v is ViewDef & { form?: undefined } => v.form === undefined),
     trees: views.filter((v): v is TreeDef & { form: 'tree' } => v.form === 'tree').map(strip),
     screens: views.filter((v): v is ScreenDef & { form: 'screen' } => v.form === 'screen').map(strip),
+    reasons: views.filter((v): v is ReasonDef & { form: 'attention' } => v.form === 'attention').map(strip),
     verbs: actions.filter((a): a is VerbDef & { kernel: true } => 'kernel' in a && a.kernel).map(({ kernel: _k, ...v }) => v),
     actions: actions.filter((a): a is ActionDef => !('kernel' in a && a.kernel)),
     schedules: handlers.flatMap((h) => ('schedule' in h ? [{ id: h.schedule, every_minutes: h.every_minutes, at_start: h.at_start, limit_ms: h.limit_ms }] : [])),
@@ -253,6 +255,7 @@ export function withoutAbsent(m: Manifest, active: (pack: string) => boolean): M
       return emptied(v.on, on) && !v.nav && !v.at ? [] : [{ ...v, on }];
     }
     if (v.form === 'tree') return [...v.roots, ...v.branches, ...v.work].some(gone) ? [] : [v];
+    if (v.form === 'attention') return gone(v.of) ? [] : [v];
     return [v];
   });
   const actions = (m.actions ?? []).flatMap((a): ActionEntry[] => {

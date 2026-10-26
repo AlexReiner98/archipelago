@@ -36,12 +36,15 @@ export function attentionRow(item, latest = false) {
     h('span', { class: 'grow gist', title: item.title, style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, link(item)),
     item.top && h('a', { class: 'gist muted small', href: `#/e/${item.top.id}`, title: item.top.title, style: 'min-width: 0; max-width: 25%; flex-shrink: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, item.top.title),
     item.reasons.map((r) => {
-      const [said, tone, tip] = MARKS[r.why]?.(r) ?? [r.why, '', ''];
+      const [said, tone, tip] = mark(r);
       return h('span', { class: `pill ${tone}`.trim(), title: tip, style: 'flex: none' }, said);
     }),
     latest && item.changed && h('span', { class: 'muted small nowrap' }, ago(item.changed)),
   );
 }
+
+/** A reason's mark: the kernel's by MARKS, a pack's by its own words. */
+const mark = (r) => MARKS[r.why]?.(r) ?? [r.mark ?? r.why, 'warn', r.tip ?? ''];
 
 /** What is asked of you by each reason, strongest first: the verb, and what it is you do, when the map says. */
 const ASKS = [
@@ -56,7 +59,9 @@ const sentence = (text) => text && text.charAt(0).toUpperCase() + text.slice(1);
 
 /** A row of what is yours to do, read as the thing to do: its verb, what is asked (or the item, when nothing more is said), then the item and where it sits, muted. */
 export function moveRow(item, latest = false) {
-  const [why, ask] = ASKS.find(([w]) => item.reasons.some((r) => r.why === w)) ?? [];
+  // A pack's reason says its own verb (ask) when no reason of the kernel's asks first.
+  const own = item.reasons.find((r) => r.ask && !MARKS[r.why]);
+  const [why, ask] = ASKS.find(([w]) => item.reasons.some((r) => r.why === w)) ?? (own ? [own.why, (r) => [r.ask]] : []);
   const [verb, said] = ask ? ask(item.reasons.find((r) => r.why === why)) : ['Look', undefined];
   const cut = 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis';
   // Beside it, muted: the item, when the ask is not its title; else what it waits on you for.
@@ -64,7 +69,7 @@ export function moveRow(item, latest = false) {
   return h(
     'li',
     { class: 'row-top', style: 'flex-wrap: nowrap' },
-    h('span', { class: `pill ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => MARKS[r.why]?.(r)[2]).filter(Boolean).join('\n') }, verb),
+    h('span', { class: `pill ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => mark(r)[2]).filter(Boolean).join('\n') }, verb),
     h('a', { class: 'grow', href: `#/e/${item.id}`, title: said ? `${sentence(said)}\n${item.title}` : item.title, style: cut }, sentence(said) || item.title),
     aside && h('span', { class: 'muted small', title: aside, style: `${cut}; max-width: 35%; flex-shrink: 2` }, aside),
     item.top && h('a', { class: 'muted small', href: `#/e/${item.top.id}`, title: item.top.title, style: `${cut}; max-width: 20%; flex-shrink: 3` }, item.top.title),

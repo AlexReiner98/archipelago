@@ -68,6 +68,22 @@ rule `account_commits`, lifted by `reply_account_commits`); an agent's
 the next session in the checkout is told of any left over. The check "Every
 commit accounted for" on a push to main or a pull request into it is red
 until every commit is, and turns green by itself.
+
+What nobody accounts for reaches the owner, whoever made it (the owner, 26
+Oct 2026: held to account in the loop, nothing to set up on GitHub). Each
+push the GitHub App hears keeps its commits; an hour on, the GitHub pack's
+schedule `github.commits` makes a `software.commit` with `accounted: false`
+for each that still has none, and the software pack's attention reason
+`unaccounted` (joining `waits_on`) puts it before the owner. An hour, because
+a session that pushes partway through a reply accounts at the reply's end:
+the owner hears only of what nobody did. Accounting for one is setting
+`accounted` true with its links; one with settles links, or beside another
+item for the same sha, is tidied by the schedule.
+- `packs/github/heard.test.ts`: "a commit pushed past the grace period with
+  no item is made one, accounted false, in its repository".
+- `test/pushed-commits.test.ts`: "a pushed commit nobody accounted for is
+  the owner’s attention, by the reason its pack declares, until it is
+  accounted for".
 - `test/commit-run.test.ts`: "a commit a session makes names its run, and
   one made by anybody else does not; the setup puts the hook in and takes it
   out".

@@ -68,9 +68,13 @@ export interface Watch {
   commit?: string;
 }
 
-/** Each item of this type accounts for one commit of a repository: the field holds the commit's full id. */
+/**
+ * Each item of this type accounts for one commit of a repository: the field holds the commit's full id. An item
+ * whose boolean field `accounted` (when named) is false was only heard of, from a push: it accounts for nothing yet.
+ */
 export interface Accounts {
   field: string;
+  accounted?: string;
 }
 
 export interface Capabilities {
@@ -145,6 +149,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     has('watch.commit', watch.commit, ['string']);
   }
   if (accounts) has('accounts', accounts.field, ['string']);
+  if (accounts?.accounted) has('accounts.accounted', accounts.accounted, ['boolean']);
   return problems;
 }
 

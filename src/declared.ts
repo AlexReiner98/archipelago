@@ -120,6 +120,27 @@ export interface TreeDef {
   active: string[];
 }
 
+/**
+ * A reason attention gives that a pack declares: items of a type whose fields hold these values deserve it. It is
+ * weighed whenever the reason it joins is asked for, and ranked just after it; an item nobody owns is the owner's.
+ */
+export interface ReasonDef {
+  id: string;
+  /** Its name, as attention answers it (why). */
+  reason: string;
+  description: string;
+  /** The type of the items it is given to, flavours included. */
+  of: string;
+  /** The fields each must hold, and the values. */
+  where: Record<string, string | number | boolean>;
+  /** The kernel's reason it is weighed with: asked for that one, this one is too. */
+  joins: string;
+  /** Its mark, in a few words; the reason's name unless given. */
+  mark?: string;
+  /** What it asks of a person, as a verb. */
+  ask?: string;
+}
+
 /** One piece of a screen, drawn by the kernel: what it draws and from what. */
 export interface PieceDef {
   piece: keyof typeof PIECES;
@@ -271,6 +292,15 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
         for (const act of action.acts ?? []) if (!parts(pack).hosts.some((h) => h.id === act.host)) problems.push(`${at}: act "${act.id}" goes to undeclared host "${act.host}"`);
       } else if (!['rows', 'data'].includes((def as ViewDef).shape)) problems.push(`${at}: \`shape\` is rows or data`);
     }
+  }
+  for (const r of parts(pack).reasons) {
+    const at = `attention reason "${r.id}"`;
+    if (!own(r.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
+    if (!/^[a-z][a-z0-9_]*$/.test(r.reason ?? '') || (REASONS as readonly string[]).includes(r.reason)) problems.push(`${at}: reason is a name of its own, not one of ${REASONS.join(', ')}`);
+    if (!types.has(r.of)) problems.push(`${at} is of unknown type "${r.of}"`);
+    if (!r.where || typeof r.where !== 'object' || !Object.keys(r.where).length) problems.push(`${at}: where names the fields its items hold`);
+    else for (const f of Object.keys(r.where)) if (types.has(r.of) && !types.get(r.of)!.fields[f]) problems.push(`${at}: "${r.of}" has no field "${f}"`);
+    if (!(REASONS as readonly string[]).includes(r.joins)) problems.push(`${at}: joins one of ${REASONS.join(', ')}`);
   }
   for (const screen of parts(pack).screens) {
     const at = `screen "${screen.id}"`;
