@@ -68,6 +68,7 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',
   style: 'How a page looks: the styles the packs ship and the map keeps, merged; the system tier, not the work.',
   saved_views: 'The views kept on the map, each named by the style that draws it: the system tier, not the work.',
+  instructions: 'What agents are told: the instructions the packs ship and the map keeps, merged; the system tier, not the work.',
 };
 
 /** Restoring a backup writes the map's rows as they were, in src/pelago.ts (restoreRows): never re-applied as changes. */

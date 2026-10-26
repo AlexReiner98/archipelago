@@ -18,7 +18,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `views` | Reads (a `shape` or a `lens`), trees (`form: "tree"`) and screens on an item's page (`form: "screen"`). |
 | `actions` | What people and agents can do through it, each under a verb. Core's six verbs are its actions marked `kernel`. |
 | `handlers` | Code run by itself: `{ event }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`. |
-| `drawings`, `styles` | The code views are drawn by, and how things look. |
+| `drawings`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`src/instructions.ts`). |
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, `runs`, and `server`. |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,

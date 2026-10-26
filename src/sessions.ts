@@ -9,7 +9,7 @@ import { actorId, type Actor, type Entity, type Archipelago, type Op } from './p
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { blockGraph, heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
-import { STALE_DAYS } from './attention.ts';
+import { STALE_DAYS } from './attention.ts'; import { instructionsFor } from './instructions.ts';
 import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts';
 
 const now = () => new Date().toISOString();
@@ -483,13 +483,8 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
     const held = heldNow.find((h) => h.resource === res.id);
     lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago assign tool, action claim (holder ${started.run}), before using it, and give it back with revise, action release, after.`);
   }
-  lines.push(
-    '',
-    'When you take on a task that has no estimate, give it one: how many tokens you expect it to take (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.',
-    `If the pelago MCP tools are available (query reads, change writes, and every other action is called under its verb by name: report with action tell): when you take on one of these, call report with action session_update and its id as task; as you reason about the work, tell its story with report, action tell (run ${started.run}): a beat for each thing you conclude, the items it is about and the ties between them, so the owner sees what you see; report session_update with a note for anything the owner should know; propose changes to the map with change. Before you finish, call report with action session_end and a summary: it shows you what is still open here that nobody has changed since you began, and asks you to change each, say it is still true, or say you cannot tell from here. A session that ends without it is closed for you and recorded as not reconciled.`,
-    'When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.',
-    'Keep the map true: when what you do or find settles something still open here (a task done, an experiment run, a decision made in practice), change its status with the outcome and the evidence rather than leaving a note. Closing a decision or hypothesis waits for the owner to confirm unless this workspace applies agents’ changes as made, so send the answer with what was chosen and why.',
-  );
+  // What every session is told is kept on the map as instructions (src/instructions.ts): the core pack's, under the owner's.
+  lines.push('', ...(await instructionsFor(l, 'session_start', { about: repo?.id, fill: { run: started.run } })).map((one) => one.text));
   return lines.join('\n');
 }
 
