@@ -21,14 +21,17 @@ export function colourOf(p, i, tone = null, weighted = true, small = false) {
 /** A shape's fill: shallows in its archipelago's water, land in its land colours (never its blues). */
 export const fillOf = (s, palOf, weighted = true) => ('sea' in s ? waterOf(palOf(s.group)).shallows[s.sea] : colourOf(landOf(palOf(s.group)), s.fill, s.tone, weighted, s.small));
 
-/** The row lines on the deep water: the paper's colour, faint, so they read as swell, not as ink. */
-export const swell = (p) => p.paper + '4d';
+/** Whether a ground is light (a paper ground) rather than dark (deep water, neutral dark). */
+export const isLight = (hex) => [0.299, 0.587, 0.114].reduce((s, w, k) => s + w * parseInt(hex.slice(1 + 2 * k, 3 + 2 * k), 16), 0) > 140;
+
+/** The row lines on the ground: faint, so they read as swell, not as ink. The paper's colour on a dark ground, ink on a light one. */
+export const swell = (p, ground = null) => (ground && isLight(ground) ? p.ink + '2e' : p.paper + '4d');
 
 /**
  * Paint a picture: the background, then every shape in order. base is the palette that gives ink, paper and the
  * deep water (unless background is given); palOf gives each archipelago's palette.
  */
-export function paint(g, pic, { base, palOf = () => base, background = waterOf(base).deep, weighted = true, cloudOpacity = 0.92 }) {
+export function paint(g, pic, { base, palOf = () => base, background = waterOf(base).deep, weighted = true, cloudOpacity = 0.92, swellWidth = null }) {
   g.fillStyle = background;
   g.fillRect(0, 0, pic.width, pic.height);
   g.lineJoin = 'round';
@@ -37,8 +40,8 @@ export function paint(g, pic, { base, palOf = () => base, background = waterOf(b
     g.beginPath();
     s.points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
     if (s.line) {
-      g.strokeStyle = swell(base);
-      g.lineWidth = Math.max(0.6, pic.line * 0.8);
+      g.strokeStyle = swell(base, background);
+      g.lineWidth = swellWidth ?? Math.max(0.6, pic.line * 0.8);
       g.stroke();
       continue;
     }

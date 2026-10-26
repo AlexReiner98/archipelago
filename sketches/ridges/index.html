@@ -25,7 +25,11 @@
   #photo { display: none; max-width: 100%; border-radius: 4px; margin-top: 6px; }
   main { display: grid; place-items: center; overflow: auto; padding: 20px; }
   canvas { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
-  body:not(.clouds) .only-clouds, body:not(.letter) .only-letter, body:not(.diffusion) .only-diffusion, body.noise .not-noise, body.noise .mix { display: none; }
+  body.emblem canvas#view { max-height: calc(100vh - 340px); }
+  body.emblem #sizes { display: grid; gap: 8px; margin-top: 14px; }
+  #sizes div { display: flex; gap: 10px; align-items: flex-end; padding: 8px 10px; border-radius: 6px; }
+  #sizes canvas { box-shadow: none; }
+  body:not(.emblem) .only-emblem, body.emblem .not-emblem, body:not(.clouds) .only-clouds, body:not(.letter) .only-letter, body:not(.diffusion) .only-diffusion, body.noise .not-noise, body.noise .mix { display: none; }
   .mix { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; font-size: 12px; }
   .mix label { margin: 0; display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -49,6 +53,7 @@
   <div class="swatches" id="swatches" title="Paper and ink first, then the island colours. Click one to change it."></div>
   <div id="sources"></div>
   <div class="row" title="The colour of the open water behind everything"><label class="check">Background <input id="bg" type="color"></label><button id="bgReset" title="Back to this palette's deep water">From palette</button></div>
+  <div class="row" title="Grounds the brand uses: the app's neutral dark, or its paper"><button data-ground="#161614">Neutral dark</button><button data-ground="#f6f5f2">Paper</button></div>
   <label title="As photographed (0), enriched (1), or richer still (2): more colour and contrast, every hue kept">Richness <output id="richnessOut"></output><input id="richness" type="range" min="0" max="3" step="0.05" value="1"></label>
   <div class="row"><button id="shuffle" title="Same colours, another order">Shuffle colours</button><label class="check" title="Use each colour as much as it covers the photos"><input id="weighted" type="checkbox" checked> As in the photos</label></div>
   <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
@@ -98,6 +103,12 @@
   <label class="only-clouds" title="Where the wind blows: right, out of the page (towards the nearer rows), left, or into it">Wind direction <svg id="windArrow" viewBox="-10 -10 20 20" width="14" height="14" style="vertical-align:middle"><path d="M-7 0H6M2-4L6 0 2 4" stroke="currentColor" stroke-width="2" fill="none"/></svg><input id="windDir" type="range" min="0" max="360" step="1" value="0"></label>
   <label class="only-clouds" title="How solid the clouds are">Opacity <small>veil · solid</small><input id="cloudOpacity" type="range" min="0.2" max="1" step="0.01" value="0.92"></label>
   <label class="only-clouds" title="The shadow a cloud casts on the water beneath it">Shadow <small>none · dark</small><input id="cloudShadow" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+  <h2>Emblem</h2>
+  <label class="check" title="The mark: a small fixed cluster of islands, square, few rows, heavy ink, few colours, no clouds; shown below at icon sizes"><input id="emblem" type="checkbox"> Emblem</label>
+  <label class="only-emblem" title="How many islands make the cluster">Islands <output id="emIslandsOut"></output><input id="emIslands" type="range" min="1" max="6" step="1" value="3"></label>
+  <label class="only-emblem" title="Fewer rows read at smaller sizes">Rows <output id="emRowsOut"></output><input id="emRows" type="range" min="4" max="30" step="1" value="12"></label>
+  <label class="only-emblem" title="Outline weight, kept at least about a pixel at every size shown">Ink <small>fine · heavy</small><input id="emLine" type="range" min="1" max="20" step="0.5" value="6"></label>
+  <label class="only-emblem" title="How many of the palette's land colours it uses, most covered first">Colours <output id="emColoursOut"></output><input id="emColours" type="range" min="1" max="5" step="1" value="3"></label>
   <h2>Geography</h2>
   <label class="check" title="Each place's own landforms: fjord cliffs, karst towers, shield volcanoes, low reef islets"><input id="forms" type="checkbox" checked> Landforms by place</label>
   <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1.3" step="0.01"></label>
@@ -115,7 +126,7 @@
   </div>
   <div id="note"></div>
 </aside>
-<main><canvas id="view"></canvas></main>
+<main><canvas id="view"></canvas><div id="sizes" class="only-emblem" title="The emblem drawn again at each size: on the palette's sea, the neutral dark, the neutral dark with paper ink, and paper"></div></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
   import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
@@ -205,10 +216,63 @@
     return glyph.shape;
   }
 
+  // The emblem: a small fixed cluster of islands, one main and smaller ones trailing off in an arc, blurred so the
+  // land eases into it, on a square page. The seed moves the islands; the dial says how many.
+  let cluster = { key: '', shape: null };
+  function clusterShape() {
+    const n = +$('emIslands').value, key = [n, seed].join('|');
+    if (cluster.key === key) return cluster.shape;
+    const nx = 200, ny = 200, c = document.createElement('canvas');
+    [c.width, c.height] = [nx, ny];
+    const g = c.getContext('2d');
+    let s = (seed * 2654435761) >>> 0;
+    const rnd = () => ((s = (Math.imul(s ^ (s >>> 15), 2246822507) + 0x6d2b79f5) >>> 0) / 4294967296);
+    g.filter = 'blur(4px)';
+    g.fillStyle = '#000';
+    // Along an arc from the main island: each next one smaller, with open water between, then the whole cluster
+    // scaled to fit and centred (a little low, since the land rises up the page from its rows).
+    const turn = (rnd() - 0.5) * 1.2, bend = (rnd() - 0.5) * 1.4, isles = [];
+    let [x, y] = [0, 0];
+    for (let i = 0; i < n; i++) {
+      const r = (i ? 0.62 * 0.78 ** i : 1) * (0.85 + 0.3 * rnd());
+      if (i) {
+        const a = turn + bend * i + (i % 2 ? 0.5 : -0.5), apart = isles[i - 1].r * 1.1 + r * 1.1 + 0.32;
+        (x += Math.cos(a) * apart), (y += Math.sin(a) * apart * 0.7);
+      }
+      isles.push({ x, y, r, w: 1.15 + 0.3 * rnd(), tilt: (rnd() - 0.5) * 0.5 });
+    }
+    const box = [Math.min(...isles.map((i) => i.x - i.r * i.w)), Math.max(...isles.map((i) => i.x + i.r * i.w)), Math.min(...isles.map((i) => i.y - i.r)), Math.max(...isles.map((i) => i.y + i.r))];
+    const k = Math.min((nx * 0.78) / (box[1] - box[0]), (ny * 0.62) / (box[3] - box[2]));
+    const [cx, cy] = [(box[0] + box[1]) / 2, (box[2] + box[3]) / 2];
+    for (const i of isles) {
+      g.beginPath();
+      g.ellipse(nx / 2 + (i.x - cx) * k, ny * 0.58 + (i.y - cy) * k, i.r * i.w * k, i.r * k, i.tilt, 0, Math.PI * 2);
+      g.fill();
+    }
+    const data = g.getImageData(0, 0, nx, ny).data, v = new Float32Array(nx * ny);
+    for (let i = 0; i < v.length; i++) v[i] = data[i * 4 + 3] / 255;
+    cluster = { key, shape: { nx, ny, v } };
+    return cluster.shape;
+  }
+  const emblem = () => $('emblem').checked;
+  // The emblem's palette: the chosen place's water as it is, and only its few most covered land colours.
+  function trimmed(p) {
+    const land = landOf(p), blues = p.colours.filter((c) => !land.colours.includes(c));
+    const order = land.colours.map((c, i) => [c, land.weights?.[i] ?? 1, land.accent?.[i]]).filter(([, , a]) => !a).sort((a, b) => b[1] - a[1]).slice(0, +$('emColours').value);
+    return { ...p, colours: order.map(([c]) => c), weights: order.map(([, w]) => w), accent: undefined, sea: p.sea ?? (blues.length ? blues : undefined) };
+  }
+  const EMBLEM = { width: 800, height: 800, margin: 40, clouds: 0, edges: 0.15, foothills: 0, bands: 2, shallows: 0.5, land: 0.32, islands: 0.6, rise: 1.4, peaks: 1.1, hierarchy: 0, relief: 0, age: 0 };
+
   // The archipelagos' palettes are given as the land is laid out, so each can also set how its land stands.
   const forms = (groups) => (assign(groups, 800), groups.length ? given.map((k) => palettes[k].form) : [pal().form]);
-  const dials = () => ({ ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed, shape: letterShape(), shapeStrength: +$('letterStrength').value, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), DEFAULTS.width, DEFAULTS.height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) });
-  const fillOf = (s) => fillWith(s, palOf, $('weighted').checked);
+  const dials = () => {
+    const d = { ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed, shape: letterShape(), shapeStrength: +$('letterStrength').value, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), DEFAULTS.width, DEFAULTS.height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) };
+    if (!emblem()) return d;
+    given = [];
+    return { ...d, ...EMBLEM, source: 'noise', wrap: false, anchors: null, rows: +$('emRows').value, line: +$('emLine').value, shape: clusterShape(), shapeStrength: 1.4, forms: () => (given = [], []) };
+  };
+  const palNow = (group) => (emblem() ? trimmed(richOf(pal())) : palOf(group));
+  const fillOf = (s) => fillWith(s, palNow, $('weighted').checked);
   // The background: the palette's deep water, until a colour is picked; then that, whatever the palette.
   let bgPicked = null;
   const background = (p) => bgPicked ?? waterOf(p).deep;
@@ -221,14 +285,41 @@
     cv.style.aspectRatio = `${pic.width} / ${pic.height}`;
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    paint(g, pic, { base: p, palOf, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value });
+    paint(g, pic, { base: p, palOf: palNow, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value, swellWidth: emblem() ? 2 : null });
     $('bg').value = background(p);
+    if (emblem()) sizes(pic, p);
+    for (const k of ['emIslands', 'emRows', 'emColours']) $(k + 'Out').textContent = $(k).value;
     $('bandsOut').textContent = $('bands').value;
     $('slopeOut').textContent = +$('slope').value ? (+$('slope').value).toFixed(2) : 'none';
     $('richnessOut').textContent = +$('richness').value ? `×${(+$('richness').value).toFixed(2)}` : 'as photographed';
     $('rowsOut').textContent = $('rows').value;
     $('chainsOut').textContent = geo() ? `${given.length}, one per place` : $('chains').value;
     $('note').textContent = `${given.length ? given.map((k) => palettes[k].title).join(', ') + ' · ' : ''}${pic.shapes.length} shapes · ${(performance.now() - t0).toFixed(0)} ms`;
+  }
+
+  // The emblem at icon sizes, drawn again at each (not scaled down), on the place's sea, the app's neutral dark (with
+  // the ink, then with paper for ink: a dark ink is lost on a dark ground) and its paper. The ink is kept at least
+  // about a pixel wide, as an icon drawn for that size would be.
+  const SIZES = [16, 24, 32, 48, 64, 128];
+  function sizes(pic, p) {
+    const dpr = devicePixelRatio || 1;
+    $('sizes').replaceChildren(...[[waterOf(p).deep], ['#161614'], ['#161614', p.paper], ['#f6f5f2']].map(([ground, ink]) => {
+      const base = ink ? { ...p, ink } : p;
+      const row = document.createElement('div');
+      row.style.background = ground;
+      for (const px of SIZES) {
+        const c = document.createElement('canvas'), k = px / pic.width;
+        c.width = c.height = Math.round(px * dpr);
+        c.style.width = c.style.height = px + 'px';
+        const g = c.getContext('2d');
+        g.setTransform(k * dpr, 0, 0, k * dpr, 0, 0);
+        // Below 48 px the swell lines are left out: there they are only noise.
+        const shapes = px < 48 ? pic.shapes.filter((s) => !s.line) : pic.shapes;
+        paint(g, { ...pic, shapes, line: Math.max(pic.line, 0.9 / k) }, { base, palOf: palNow, background: ground, weighted: $('weighted').checked, swellWidth: 0.6 / k });
+        row.append(c);
+      }
+      return row;
+    }));
   }
 
   function swatches() {
@@ -275,6 +366,9 @@
   $('place').onchange = () => (swatches(), draw());
   $('bg').addEventListener('input', () => ((bgPicked = $('bg').value), draw()));
   $('bgReset').onclick = () => ((bgPicked = null), draw());
+  for (const b of document.querySelectorAll('[data-ground]')) b.onclick = () => ((bgPicked = b.dataset.ground), draw());
+  const showEmblem = () => document.body.classList.toggle('emblem', emblem());
+  for (const k of ['emblem', 'emIslands', 'emRows', 'emLine', 'emColours']) $(k).addEventListener('input', () => (showEmblem(), draw()));
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
   for (const k of [...DIALS, 'wrap', 'weighted', 'forms', 'geo']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
   const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
@@ -303,7 +397,7 @@
   $('svg').onclick = () => {
     const p = richOf(pal()), pic = ridges(dials()), f = (v) => +v.toFixed(1);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
-    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p)}"/>` : s.shadow ? `<path d="${d(s)}" fill="#000" fill-opacity="${(0.35 * s.shadow).toFixed(3)}" stroke="none"/>` : s.cloud ? `<path d="${d(s)}" fill="${p.paper}" fill-opacity="${$('cloudOpacity').value}" stroke-width="${pic.line * 0.6}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
+    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p, background(p))}"/>` : s.shadow ? `<path d="${d(s)}" fill="#000" fill-opacity="${(0.35 * s.shadow).toFixed(3)}" stroke="none"/>` : s.cloud ? `<path d="${d(s)}" fill="${p.paper}" fill-opacity="${$('cloudOpacity').value}" stroke-width="${pic.line * 0.6}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
   };
 
@@ -319,6 +413,7 @@
     weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked, geo: $('geo').checked,
     seed, bg: bgPicked, richness: +$('richness').value, cloudOpacity: +$('cloudOpacity').value,
     letter: { on: $('letter').checked, text: $('letterText').value, font: $('letterFont').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
+    emblem: { on: emblem(), islands: +$('emIslands').value, rows: +$('emRows').value, line: +$('emLine').value, colours: +$('emColours').value },
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
   });
@@ -336,7 +431,9 @@
     seed = s.seed ?? 1; bgPicked = s.bg ?? null; $('richness').value = s.richness ?? 1; $('cloudOpacity').value = s.cloudOpacity ?? 0.92;
     const l = s.letter ?? {};
     $('letter').checked = !!l.on; $('letterText').value = l.text ?? 'A'; $('letterFont').value = l.font ?? $('letterFont').options[0].value; $('letterSize').value = l.size ?? 0.85; $('letterStrength').value = l.strength ?? 1;
-    showLetter(); showClouds();
+    const e = s.emblem ?? {};
+    $('emblem').checked = !!e.on; $('emIslands').value = e.islands ?? 3; $('emRows').value = e.rows ?? 12; $('emLine').value = e.line ?? 6; $('emColours').value = e.colours ?? 3;
+    showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
   function listPresets(chosen = '') {
