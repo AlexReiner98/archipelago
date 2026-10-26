@@ -215,18 +215,18 @@ export function ridges(dials) {
   // The border: land sinks into the sea toward the frame, along an edge that wobbles with noise so it never runs as
   // a line. At the frame itself nothing stands (shallows included). With repeat on, only top and bottom have one.
   const band = d.edges * 0.2 * Math.min(W - 2 * M, H - 2 * M);
-  const lift = Math.min(rise * 0.15, band * 2);
-  const shore = (x, y, yc) => {
+  // up: how far what stands at this point rises above its row (a mountain, a cloud). The border keeps the same
+  // water between the frame and what is drawn on both sides: at the bottom that is the row itself, at the top the
+  // tops of what stands on it, so the top is measured from those (fully at the top edge, not at all at the bottom).
+  const shore = (x, y, yc, up = 0) => {
     if (!band) return 1;
+    const v = y - up * Math.max(0, Math.min(1, (H - M - y) / (H - 2 * M)));
     // How far in from the frame: to a rounded frame, so the border bends round each corner in an arc instead of
     // meeting there at a right angle (the sides' distances taken apart). With repeat on, top and bottom only.
-    // Land stands up from its row, so at the top it reaches into the border and at the bottom it does not: the
-    // border's top is measured that much lower, so the land keeps the same water above it as below.
-    const top = M + lift;
-    let e = Math.min(y - top, H - M - y);
+    let e = Math.min(v - M, H - M - v);
     if (!d.wrap) {
-      const hx = (W - 2 * M) / 2, hy = (H - M - top) / 2, round = Math.min(band * 1.6, hx, hy);
-      const qx = Math.abs(x - W / 2) - hx + round, qy = Math.abs(y - (top + H - M) / 2) - hy + round;
+      const hx = (W - 2 * M) / 2, hy = (H - 2 * M) / 2, round = Math.min(band * 1.6, hx, hy);
+      const qx = Math.abs(x - W / 2) - hx + round, qy = Math.abs(v - H / 2) - hy + round;
       e = -(Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - round);
     }
     const wobble = (seam(land, x, 1.7, 21, yc * 1.7 + 9) - 0.5) * band * 1.3;
@@ -265,7 +265,26 @@ export function ridges(dials) {
     let seamStart = null;
     for (const x of xs) {
       const L = at(x, y, yc), f = formAt(x, y, L), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
-      const calm = shore(x, y, yc) * territory(x, y);
+      // Height: the place's own, lower for a lesser island and for an older one; with diffusion, rising to the heart.
+      // Peaks: each row its own summits (the row index moves the noise faster), set apart from each other, so a
+      // row's mountains stand clear of the row behind rather than lining up into bands.
+      const c = seam(crest, x, 3 + 1.2 * d.peaks, 0, r * (0.12 + 0.55 * d.peaks));
+      const rugged = Math.max(0, Math.min(2, d.rugged + f.rugged - age * 0.5));
+      const peak = (rd ? 0.4 * c + 0.6 * smooth(rd.level, 1, L.u) : c) ** (1 + rugged * 2.5);
+      // Height variety: a slow swell over the page lifts some islands into massifs and keeps others low.
+      const massif = 1 + d.relief * (1.5 * seam(land, x, 0.6, 11, yc * 0.6 + 5) - 0.75) * 1.6;
+      const tall = rise * f.rise * Math.max(0.15, massif) * Math.max(0.05, 1 - 0.8 * age) * Math.max(0.05, 1 - d.hierarchy * 0.6 * (1 - L.rank));
+      let stands = tall * (0.25 - 0.2 * d.peaks + (0.75 + 0.2 * d.peaks) * peak ** (1 + 0.3 * d.peaks));
+      if (f.top) stands = Math.min(stands, tall * (1 - 0.65 * f.top));
+      // No peak rises past the top of the frame: heights near it are eased under the room left, not sliced off.
+      if (band) {
+        const room = Math.max(1, y - M - gap);
+        stands = room * Math.tanh(stands / room);
+      }
+      // The border reckoned from near the top of the land that would stand here (most of its height: the slope
+      // limit and the terraces take some off later), so a tall peak keeps as clear of the top as the coast does of
+      // the bottom.
+      const calm = shore(x, y, yc, stands * 0.75) * territory(x, y);
       if (calm < 1) L.u -= (1 - calm) * 1.5;
       // A seeding shape (a letter): land rises inside it and sinks outside, so the archipelago takes its form.
       if (d.shape && d.shapeStrength > 0) {
@@ -283,22 +302,8 @@ export function ridges(dials) {
       // Sheer sides: the land reaches its full height almost at once.
       if (f.cliff) mask = smooth(0, 1 - 0.85 * f.cliff, mask);
       if (!mask) { raws.push(0), terraces.push([1, 0.3]); continue; }
-      // Height: the place's own, lower for a lesser island and for an older one; with diffusion, rising to the heart.
-      // Peaks: each row its own summits (the row index moves the noise faster), set apart from each other, so a
-      // row's mountains stand clear of the row behind rather than lining up into bands.
-      const c = seam(crest, x, 3 + 1.2 * d.peaks, 0, r * (0.12 + 0.55 * d.peaks));
-      const rugged = Math.max(0, Math.min(2, d.rugged + f.rugged - age * 0.5));
-      const peak = (rd ? 0.4 * c + 0.6 * smooth(rd.level, 1, L.u) : c) ** (1 + rugged * 2.5);
-      // Height variety: a slow swell over the page lifts some islands into massifs and keeps others low.
-      const massif = 1 + d.relief * (1.5 * seam(land, x, 0.6, 11, yc * 0.6 + 5) - 0.75) * 1.6;
-      const tall = rise * f.rise * Math.max(0.15, massif) * Math.max(0.05, 1 - 0.8 * age) * Math.max(0.05, 1 - d.hierarchy * 0.6 * (1 - L.rank));
-      let raw = mask * tall * (0.25 - 0.2 * d.peaks + (0.75 + 0.2 * d.peaks) * peak ** (1 + 0.3 * d.peaks));
-      if (f.top) raw = Math.min(raw, tall * (1 - 0.65 * f.top));
-      // No peak rises past the top of the frame: heights near it are eased under the room left, not sliced off.
-      if (band) {
-        const room = Math.max(1, y - M - gap);
-        raw = room * Math.tanh(raw / room);
-      }
+      // The land as it stands where the mask lets it.
+      const raw = mask * stands;
       // A coarse step never passes most of the land's own height, so even the coarsest leaves one terrace.
       const stp = Math.min(step * f.step, Math.max(1, tall * 0.6)), soft = Math.max(0.02, Math.min(1, d.soft + f.soft));
       raws.push(raw), terraces.push([stp, soft]);
