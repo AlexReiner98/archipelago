@@ -7,7 +7,11 @@ body { overflow: hidden; }
 /* The canvas: the view drawn edge to edge, its frame the whole page. */
 #canvas { position: fixed; inset: 0; background: var(--ln-sea, var(--bg)); }
 #canvas > .lens-wrap, #canvas .lens-view { height: 100%; }
-#canvas .lens-view { position: relative; }
+/* The safe zone: the bar and the query bar above, the find bar below. A drawing that does not pan (a list, a grid)
+   is laid out between them and scrolls there; one on the plane keeps the whole page and is fitted inside them. */
+#canvas { --safe-top: calc(2 * var(--box-9) + var(--space-8) + var(--space-6)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
+#canvas .lens-view { position: relative; box-sizing: border-box; padding: var(--safe-top) 0 var(--safe-bottom); overflow: auto; }
+#canvas .lens-view:has(.lf-stage) { padding: 0; overflow: hidden; }
 #canvas .lf-stage { height: 100%; }
 /* The key is shown when the reader turns it on in the settings menu (ui/canvas.js); the drawing's own controls are not drawn. */
 #canvas .lf-legend { top: auto; bottom: calc(var(--box-10) + var(--space-9)); display: none; }
