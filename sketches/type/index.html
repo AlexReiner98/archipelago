@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archipelago type</title>
+<style>
+  /* The house colours, as the core pack ships them. */
+  :root { --bg: #f6f5f2; --panel: #ffffff; --text: #1f1e1b; --muted: #6d6a62; --line: #e3e0d9; --accent: #2f5fd0; --accent-soft: #e6edfb; }
+  :root.dark { --bg: #161614; --panel: #1f1f1c; --text: #ecebe6; --muted: #a09d94; --line: #34332e; --accent: #8fb0ff; --accent-soft: #232c45; }
+
+  /* Proposed: three voices and one scale. Land (the work: what you read and act on) upright in the text face; water
+     (what connects: links, what flows) in the chart face's italic; regions (what holds: projects, groups, places, and the
+     wordmark) in the chart face's spaced capitals. */
+  :root {
+    --face-text: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --face-chart: Georgia, 'Times New Roman', serif;
+    --face-mono: ui-monospace, Consolas, monospace;
+    --size-label: 11px; --size-small: 12.5px; --size-ui: 15px; --size-read: 17px; --size-heading: 20px; --size-title: 24px; --size-display: 35px;
+    --weight-normal: 400; --weight-strong: 600;
+    --leading-tight: 1.25; --leading-ui: 1.45; --leading-read: 1.6;
+    --track-label: 0.04em; --track-region: 0.14em; --track-wordmark: 0.33em;
+    --region-face: var(--face-chart); --region-weight: 400; --region-track: var(--track-region);
+    --water-face: var(--face-chart); --water-style: italic;
+    --wordmark-face: var(--face-chart); --wordmark-weight: 400; --wordmark-track: var(--track-wordmark); --wordmark-case: uppercase;
+  }
+  /* Now: what the app has today, for comparison (text_1 to text_9, regions in system-ui 600 caps, links upright). */
+  :root.now {
+    --face-chart: var(--face-text);
+    --size-label: 11px; --size-small: 12px; --size-ui: 15px; --size-read: 17px; --size-heading: 20px; --size-title: 24px; --size-display: 35px;
+    --region-weight: 600; --region-track: 0.04em; --water-style: normal;
+    --wordmark-weight: 700; --wordmark-track: 0; --wordmark-case: none;
+  }
+
+  body { margin: 0; background: var(--bg); color: var(--text); font: var(--weight-normal) var(--size-ui)/var(--leading-ui) var(--face-text); }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+  .bar { display: flex; gap: 8px; align-items: center; position: sticky; top: 0; background: var(--bg); padding: 10px 0; z-index: 1; border-bottom: 1px solid var(--line); }
+  .bar .spacer { flex: 1; }
+  button { font: inherit; font-size: var(--size-small); padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); cursor: pointer; }
+  button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  section { margin-top: 40px; }
+
+  /* The roles. */
+  .wordmark { font-family: var(--wordmark-face); font-weight: var(--wordmark-weight); letter-spacing: var(--wordmark-track); text-transform: var(--wordmark-case); }
+  .region { font: var(--region-weight) var(--size-label)/var(--leading-tight) var(--region-face); letter-spacing: var(--region-track); text-transform: uppercase; color: var(--muted); }
+  .water { font-family: var(--water-face); font-style: var(--water-style); color: var(--muted); }
+  .title { font: var(--weight-strong) var(--size-title)/var(--leading-tight) var(--face-text); margin: 0; }
+  .heading { font: var(--weight-strong) var(--size-heading)/var(--leading-tight) var(--face-text); margin: 0; }
+  .ui { font: var(--weight-normal) var(--size-ui)/var(--leading-ui) var(--face-text); }
+  .strong { font-weight: var(--weight-strong); }
+  .read { font: var(--weight-normal) var(--size-read)/var(--leading-read) var(--face-text); max-width: 44rem; }
+  .small { font-size: var(--size-small); color: var(--muted); }
+  .label { font: var(--weight-strong) var(--size-label)/var(--leading-tight) var(--face-text); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--muted); }
+  .mono { font: var(--size-small)/var(--leading-ui) var(--face-mono); }
+  .display { font: var(--weight-normal) var(--size-display)/var(--leading-tight) var(--face-chart); }
+
+  /* The three voices. */
+  .voices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .voice { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  .voice .say { font-size: 26px; margin: 8px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .voice .say.region { font-size: 15px; color: var(--text); }
+
+  /* The roles, each a row. */
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: baseline; white-space: nowrap; }
+  td:first-child { width: 7em; }
+  td.spec { font: var(--size-small)/1.3 var(--face-mono); color: var(--muted); width: 1%; }
+  td.sample { overflow: hidden; text-overflow: ellipsis; max-width: 0; width: 100%; }
+
+  /* A page of the app. */
+  .app { display: grid; grid-template-columns: 200px 1fr; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .nav { border-right: 1px solid var(--line); padding: 16px; }
+  .nav .wordmark { font-size: 15px; display: block; margin-bottom: 18px; }
+  .nav a { display: block; color: var(--text); text-decoration: none; padding: 4px 0; }
+  .nav .region { margin: 16px 0 4px; }
+  .page { padding: 20px 24px; min-width: 0; }
+  .trail { font-size: var(--size-small); color: var(--muted); margin-bottom: 4px; }
+  .rows { margin-top: 16px; }
+  .rows .region { margin: 18px 0 6px; }
+  .row { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); white-space: nowrap; }
+  .row .name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .row .water { font-size: var(--size-small); flex: none; }
+  .row .pill { margin-left: auto; flex: none; }
+  .pill { font: var(--weight-strong) var(--size-label)/1.6 var(--face-text); padding: 0 7px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+  .note { margin-top: 24px; }
+  .note h3 { margin: 18px 0 4px; }
+
+  /* A drawing. */
+  svg { width: 100%; height: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  svg .box { fill: var(--bg); stroke: var(--line); }
+  svg .edge { stroke: var(--muted); fill: none; }
+  svg .place { fill: none; stroke: var(--line); stroke-dasharray: 6 4; }
+  svg text { fill: var(--text); font: var(--size-small) var(--face-text); }
+  svg text.region { fill: var(--muted); font: var(--region-weight) var(--size-label) var(--region-face); letter-spacing: var(--region-track); }
+  svg text.water { fill: var(--muted); font-family: var(--water-face); font-style: var(--water-style); font-size: var(--size-small); }
+
+  @media (max-width: 720px) { .voices { grid-template-columns: 1fr; } .app { grid-template-columns: 1fr; } .nav { border-right: 0; border-bottom: 1px solid var(--line); } td.spec { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="wordmark" style="font-size: 15px">Archipelago</span><span class="small">type</span>
+    <span class="spacer"></span>
+    <button id="proposed" aria-pressed="true" title="The type proposed here">Proposed</button>
+    <button id="now" aria-pressed="false" title="The app as it is today">Now</button>
+    <button id="theme" aria-pressed="false" title="Light or dark ground">Dark</button>
+  </div>
+
+  <section>
+    <div class="label">Three voices</div>
+    <div class="voices">
+      <div class="voice"><div class="label">Land · the work</div><div class="say">Ship the hero image</div><div class="small">Upright, the text face. Items, notes, everything read and acted on.</div></div>
+      <div class="voice"><div class="label">Water · what connects</div><div class="say water">waits on Alex</div><div class="small">Italic, the chart face. Links, and what flows between items.</div></div>
+      <div class="voice"><div class="label">Region · what holds</div><div class="say region">Visual identity</div><div class="small">Spaced capitals, the chart face. Projects, groups, places, the wordmark.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">Roles</div>
+    <table>
+      <tr><td class="label">Wordmark</td><td class="sample"><span class="wordmark" style="font-size: 28px">Archipelago</span></td><td class="spec">chart 400 caps +0.33em</td></tr>
+      <tr><td class="label">Display</td><td class="sample display">Knowledge is power</td><td class="spec">chart 400 35/1.25</td></tr>
+      <tr><td class="label">Title</td><td class="sample"><h1 class="title">A visual identity grown from real archipelagos</h1></td><td class="spec">text 600 24/1.25</td></tr>
+      <tr><td class="label">Heading</td><td class="sample"><h2 class="heading">Where the ridges meet the brand</h2></td><td class="spec">text 600 20/1.25</td></tr>
+      <tr><td class="label">Reading</td><td class="sample read">The ridges already share the app's paper, ink and sea, so they can be the brand's pictures.</td><td class="spec">text 400 17/1.6</td></tr>
+      <tr><td class="label">UI</td><td class="sample ui">Small, light and share versions of the ridges</td><td class="spec">text 400 15/1.45</td></tr>
+      <tr><td class="label">Small</td><td class="sample small">Alex · 2 h ago · from the ridges sketch</td><td class="spec">text 400 12.5/1.45</td></tr>
+      <tr><td class="label">Label</td><td class="sample label">Status · Owner · Due</td><td class="spec">text 600 11 caps +0.04em</td></tr>
+      <tr><td class="label">Region</td><td class="sample"><span class="region">Open work</span></td><td class="spec">chart 400 11 caps +0.14em</td></tr>
+      <tr><td class="label">Water</td><td class="sample"><span class="water">depends on · waits on Alex · part of</span></td><td class="spec">chart italic, the size it sits in</td></tr>
+      <tr><td class="label">Mono</td><td class="sample mono">e_b2kqhz5p · 9e52a6a</td><td class="spec">mono 12.5/1.45</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <div class="label">A page</div>
+    <div class="app">
+      <div class="nav">
+        <span class="wordmark">Archipelago</span>
+        <a href="#">Home</a><a href="#">Search</a>
+        <div class="region">Projects</div>
+        <a href="#">Archipelago</a><a href="#">Archipelago business</a><a href="#">A visual identity</a>
+      </div>
+      <div class="page">
+        <div class="trail">Archipelago › Archipelago business</div>
+        <h1 class="title">A visual identity grown from real archipelagos</h1>
+        <p class="read">Archipelago's look is generated, not drawn: patterns of geometry, texture and palette grown from the ecologies of real archipelagos, each one a point on a few clean parametric spectrums. Many places, one system.</p>
+        <div class="rows">
+          <div class="region">Open work</div>
+          <div class="row"><span class="name">Small, light and share versions of the ridges</span><span class="water">depends on What is the mark?</span><span class="pill">doing</span></div>
+          <div class="row"><span class="name">A ridges picture across the top of the front page</span><span class="water">depends on Ridges as the site's hero picture?</span><span class="pill">to do</span></div>
+          <div class="row"><span class="name">A themes pack, first themes from the Canadian palettes</span><span class="water">depends on Where do the UI colours come from?</span><span class="pill">to do</span></div>
+          <div class="row"><span class="name">Brand marks from the generator</span><span class="water">depends on 4</span><span class="pill">to do</span></div>
+          <div class="row"><span class="name">Name the dials and how places blend</span><span class="pill">to do</span></div>
+          <div class="region">Open questions</div>
+          <div class="row"><span class="name">Which generator: rules, learned, or both?</span><span class="water">depends on 5</span><span class="pill">open</span></div>
+          <div class="row"><span class="name">Where does the generated look show?</span><span class="pill">open</span></div>
+          <div class="region">Settled</div>
+          <div class="row"><span class="name">Does the brand get its own typeface?</span><span class="water">decided by Alex</span><span class="pill">decided</span></div>
+          <div class="row"><span class="name">Dark ground: navy sea or the app's neutral dark?</span><span class="water">decided by Alex</span><span class="pill">decided</span></div>
+        </div>
+        <div class="note">
+          <div class="label">Note</div>
+          <h3 class="heading" style="font-size: var(--size-ui)">Where the ridges meet the brand system</h3>
+          <p class="read">The ridges already share the app's paper, ink and "sea is blue" idea, so they can be the brand's pictures without new colour tokens. They are not yet a mark: nothing works below about 200 px, nothing is drawn on a light ground.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">A drawing</div>
+    <svg viewBox="0 0 760 300" role="img" aria-label="Open work in the visual identity project and what it depends on">
+      <rect class="place" x="16" y="20" width="728" height="264" rx="12"/><text class="region" x="34" y="46">A VISUAL IDENTITY</text>
+      <rect class="box" x="40" y="70" width="250" height="34" rx="6"/><text x="54" y="92">Small, light and share versions</text>
+      <rect class="box" x="40" y="150" width="250" height="34" rx="6"/><text x="54" y="172">A ridges picture across the top</text>
+      <rect class="box" x="40" y="230" width="250" height="34" rx="6"/><text x="54" y="252">A themes pack</text>
+      <rect class="box" x="470" y="60" width="250" height="34" rx="6"/><text x="484" y="82">What is the mark?</text>
+      <rect class="box" x="470" y="110" width="250" height="34" rx="6"/><text x="484" y="132">Dark ground: navy or neutral?</text>
+      <rect class="box" x="470" y="170" width="250" height="34" rx="6"/><text x="484" y="192">Ridges as the site's hero?</text>
+      <rect class="box" x="470" y="230" width="250" height="34" rx="6"/><text x="484" y="252">Where do the UI colours come from?</text>
+      <path class="edge" d="M290 82 C380 82 380 77 470 77"/><text class="water" x="338" y="74">depends on</text>
+      <path class="edge" d="M290 92 C380 92 380 127 470 127"/>
+      <path class="edge" d="M290 167 C380 167 380 187 470 187"/><text class="water" x="338" y="170">depends on</text>
+      <path class="edge" d="M290 247 L470 247"/><text class="water" x="338" y="240">depends on</text>
+    </svg>
+  </section>
+</main>
+<script>
+  const root = document.documentElement, $ = (id) => document.getElementById(id);
+  const mode = (now) => { root.classList.toggle('now', now); $('now').setAttribute('aria-pressed', now); $('proposed').setAttribute('aria-pressed', !now); };
+  $('now').onclick = () => mode(true);
+  $('proposed').onclick = () => mode(false);
+  $('theme').onclick = () => $('theme').setAttribute('aria-pressed', root.classList.toggle('dark'));
+</script>
+</body>
+</html>
