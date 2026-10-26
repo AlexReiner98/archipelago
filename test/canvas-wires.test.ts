@@ -38,6 +38,11 @@ test('in a browser, a wire drawn by hand becomes a link, and a held change is dr
   /** Press the dialog's button whose words match. */
   const choose = (words: RegExp) => page.evaluate<boolean>(`(() => { const b = [...document.querySelectorAll('dialog.ask button')].find((b) => ${words}.test(b.textContent)); b?.click(); return Boolean(b); })()`);
   const links = async (id: string) => (await call('/api/get', undefined, { id })).result.outgoing.map((r: { type: string; id: string }) => `${r.type} ${r.id}`) as string[];
+  /** Whether the map has this link within a few seconds: the page draws a wire as pending before its change has answered. */
+  const linked = async (id: string, link: string) => {
+    for (const end = Date.now() + 5000; Date.now() < end; await wait(150)) if ((await links(id)).includes(link)) return true;
+    return false;
+  };
   const probe = () => page.evaluate<string>(`JSON.stringify({ wires: [...document.querySelectorAll('#canvas svg[role=img] .lf-wire, #canvas svg[role=img] .lf-tie')].map((p) => p.getAttribute('class')), ghosts: document.querySelectorAll('#canvas .lf-step.ghost').length, badges: document.querySelectorAll('#canvas .lf-held').length, dialog: document.querySelector('dialog.ask')?.textContent })`);
   try {
     assert.ok(await until(`Boolean(${step(made.a)}) && Boolean(${step(made.b)})`), `the steps are drawn: ${await page.evaluate("document.querySelector('#canvas')?.innerText.slice(0, 600)")} ${page.logs().join('\n')}`);
@@ -64,7 +69,7 @@ test('in a browser, a wire drawn by hand becomes a link, and a held change is dr
     assert.ok(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1, 'a wire does not move the step it starts on');
     assert.ok(await choose(/^depends on$/), `"depends on" is offered: ${await probe()}`);
     assert.ok(await until(`Boolean(document.querySelector('#canvas svg[role=img] .lf-wire.held.mine'))`, 3000), `drawn at once as pending: ${await probe()}`);
-    assert.ok((await links(made.a)).includes(`depends_on ${made.b}`), 'a link, made through change');
+    assert.ok(await linked(made.a, `depends_on ${made.b}`), 'a link, made through change');
     assert.ok(await until(`document.querySelectorAll('#canvas svg[role=img] .lf-wire').length === 1 && !document.querySelector('#canvas svg[role=img] .held')`), `drawn as it is once its fact arrives: ${await probe()}`);
 
     // ---- One refused is taken back.
