@@ -60,10 +60,8 @@
   <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
   <img id="photo" alt="">
   <h2>Emblem</h2>
-  <label class="check" title="The mark: this drawing's islands, grown as they are, with no swell lines, few rows, heavy ink and few colours, fitted into a square; shown below at icon sizes"><input id="emblem" type="checkbox"> Emblem</label>
-  <label class="only-emblem" title="The place the emblem takes its colours from on a dark ground (its lightest well-covered colours); on a light ground it takes the palette above">On dark <select id="emDark" style="grid-column: 1 / -1"></select></label>
+  <label class="check" title="This drawing as an icon: fitted into a square, shown at a chosen size and below at icon sizes"><input id="emblem" type="checkbox"> Emblem</label>
   <label class="only-emblem" title="Draw the emblem above at an icon's size, magnified so each pixel shows: tune it as it will be seen">Draw at <output id="emAtOut"></output><input id="emAt" type="range" min="0" max="6" step="1" value="0"></label>
-  <label class="only-emblem" title="How many of the palette's land colours it uses, most covered first">Colours <output id="emColoursOut"></output><input id="emColours" type="range" min="1" max="5" step="1" value="3"></label>
   <h2>Archipelagos</h2>
   <select id="source" aria-label="Land source" title="Where land comes from">
     <option value="noise">Land from noise: one field</option>
@@ -98,6 +96,7 @@
   <label>Bands <output id="bandsOut"></output><input id="bands" type="range" min="1" max="20" step="1"></label>
   <h2>Rows</h2>
   <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="6" max="400" step="1"></label>
+  <label class="check" title="The faint lines along each row, on the water"><input id="swell" type="checkbox" checked> Swell lines</label>
   <h2>Sky</h2>
   <label title="Cloud cover: none, to overcast">Clouds <small>none · overcast</small><input id="clouds" type="range" min="0" max="1" step="0.01" value="0"></label>
   <label class="only-clouds" title="Small, many cloud banks or large, few">Cloud size <small>small · large</small><input id="cloudSize" type="range" min="0.2" max="3" step="0.01" value="1"></label>
@@ -126,12 +125,12 @@
   </div>
   <div id="note"></div>
 </aside>
-<main><canvas id="view"></canvas><div id="sizes" class="only-emblem" title="The emblem drawn again at each size: the dark palette on its sea and on the neutral dark, the light palette on paper"></div></main>
+<main><canvas id="view"></canvas><div id="sizes" class="only-emblem" title="The drawing at 16, 24, 32, 48, 64 and 128 px"></div></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
   import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
   import * as presets from './presets.js';
-  import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
+  import { paint, fillOf as fillWith, swell } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
   const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
@@ -151,8 +150,6 @@
   // The menu by where: Canada's archipelagos, those elsewhere, and the hand-picked palettes.
   const kinds = [['Canada', (p) => p.region === 'canada'], ['Elsewhere', (p) => p.photos && !p.region?.startsWith('canada')], ['Canada, set aside', (p) => p.region === 'canada-aside'], ['By hand', (p) => !p.photos]];
   $('place').innerHTML = kinds.map(([label, is]) => `<optgroup label="${label}">${Object.entries(palettes).filter(([, p]) => is(p)).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('')}</optgroup>`).join('');
-  $('emDark').innerHTML = $('place').innerHTML;
-  $('emDark').value = 'arctic';
   $('mix').innerHTML = Object.entries(palettes).filter(([, p]) => p.photos).map(([k, p]) => `<label><input type="checkbox" value="${k}" checked> ${p.title}</label>`).join('');
   let seed = 1;
   const pal = () => palettes[$('place').value];
@@ -219,36 +216,16 @@
   }
 
   const emblem = () => $('emblem').checked;
-  // The emblem's palettes: one place for light grounds (the palette above) and another for dark ones (On dark), each
-  // with its water as it is and only a few land colours. On a light ground, its most covered colours; on a dark one,
-  // the lightest of its well-covered colours, so the islands stand out from the ground.
-  const luma = (hex) => [0.299, 0.587, 0.114].reduce((s, w, k) => s + w * parseInt(hex.slice(1 + 2 * k, 3 + 2 * k), 16), 0);
-  function trimmed(p, dark = false) {
-    const land = landOf(p), blues = p.colours.filter((c) => !land.colours.includes(c)), n = +$('emColours').value;
-    let order = land.colours.map((c, i) => [c, land.weights?.[i] ?? 1, land.accent?.[i]]).filter(([, , a]) => !a).sort((a, b) => b[1] - a[1]);
-    order = dark ? order.slice(0, Math.max(n, 6)).sort((a, b) => luma(b[0]) - luma(a[0])).slice(0, n) : order.slice(0, n);
-    return { ...p, colours: order.map(([c]) => c), weights: order.map(([, w]) => w), accent: undefined, sea: p.sea ?? (blues.length ? blues : undefined) };
-  }
-  const emblemPlace = (dark) => richOf(dark ? palettes[$('emDark').value] : pal());
-  const emblemPal = (dark) => { const p = trimmed(emblemPlace(dark), dark); return () => p; };
-  // The emblem is the drawing itself, its islands grown just as they are (same page, seed, land source, letter),
-  // with no swell lines, in the emblem's palettes, fitted into a square. Ticking it only sets where a few dials start;
-  // every dial stays live, and unticking puts them back as they were.
-  const START = { clouds: 0, rows: 12, line: 6 };
-  const bare = (pic) => ({ ...pic, shapes: pic.shapes.filter((s) => !s.line) });
-  /** Paint the emblem into a square of px: the page fitted and centred on the ground, every setting as drawn full size. */
+  // The drawing as it is shown: with or without the swell lines on the water.
+  const shown = (pic) => ($('swell').checked ? pic : { ...pic, shapes: pic.shapes.filter((s) => !s.line) });
+  /** Paint the drawing into a square of px: the page fitted and centred on its ground, every setting as at full size. */
   function icon(g, pic, px, dpr, opts) {
     const k = px / Math.max(pic.width, pic.height);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = opts.background;
     g.fillRect(0, 0, px, px);
     g.setTransform(k * dpr, 0, 0, k * dpr, ((px - pic.width * k) / 2) * dpr, ((px - pic.height * k) / 2) * dpr);
-    paint(g, bare(pic), { ...opts, cloudOpacity: +$('cloudOpacity').value });
-  }
-  let before = null;
-  function toggleEmblem() {
-    if (emblem()) (before = Object.fromEntries(DIALS.map((k) => [k, $(k).value]))), Object.entries(START).forEach(([k, v]) => ($(k).value = v));
-    else if (before) Object.entries(before).forEach(([k, v]) => ($(k).value = v)), (before = null);
+    paint(g, shown(pic), opts);
   }
 
   // The archipelagos' palettes are given as the land is laid out, so each can also set how its land stands.
@@ -257,10 +234,7 @@
     const d = { ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), source: $('source').value, wrap: $('wrap').checked, seed, shape: letterShape(), shapeStrength: +$('letterStrength').value, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), DEFAULTS.width, DEFAULTS.height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) };
     return d;
   };
-  // In the emblem, the picture above takes the light or the dark palette by its ground.
-  const emblemDark = () => !isLight(background(richOf(pal())));
-  const palNow = (group) => (emblem() ? trimmed(emblemPlace(emblemDark()), emblemDark()) : palOf(group));
-  const fillOf = (s) => fillWith(s, palNow, $('weighted').checked);
+  const fillOf = (s) => fillWith(s, palOf, $('weighted').checked);
   // The background: the palette's deep water, until a colour is picked; then that, whatever the palette.
   let bgPicked = null;
   const background = (p) => bgPicked ?? waterOf(p).deep;
@@ -273,21 +247,19 @@
     cv.style.aspectRatio = `${pic.width} / ${pic.height}`;
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // The emblem on a dark ground takes the dark palette whole: its ink, paper and (unless a ground is picked) its sea.
-    const dark = emblem() && emblemDark(), base = dark ? emblemPlace(true) : p, ground = dark && !bgPicked ? waterOf(base).deep : background(p);
-    // Drawn at an icon's size, the emblem is painted as small as that and shown magnified, pixels kept square.
+    const opts = { base: p, palOf, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value };
+    // With Emblem ticked, the drawing can be shown at an icon's size: painted that small, shown magnified, pixels square.
     const at = emblem() ? AT[+$('emAt').value] : 0;
     cv.classList.toggle('at', !!at);
     cv.style.width = at ? 'min(100%, calc(100vh - 340px))' : '';
     if (at) {
       cv.width = cv.height = Math.round(at * dpr);
       cv.style.aspectRatio = '1';
-      icon(g, pic, at, dpr, { base, palOf: palNow, background: ground, weighted: $('weighted').checked });
-    } else paint(g, emblem() ? bare(pic) : pic, { base, palOf: palNow, background: ground, weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value });
+      icon(g, pic, at, dpr, opts);
+    } else paint(g, shown(pic), opts);
     $('emAtOut').textContent = AT[+$('emAt').value] ? AT[+$('emAt').value] + ' px' : 'full';
     $('bg').value = background(p);
-    if (emblem()) sizes(pic, p);
-    $('emColoursOut').textContent = $('emColours').value;
+    if (emblem()) sizes(pic, opts);
     $('bandsOut').textContent = $('bands').value;
     $('slopeOut').textContent = +$('slope').value ? (+$('slope').value).toFixed(2) : 'none';
     $('richnessOut').textContent = +$('richness').value ? `×${(+$('richness').value).toFixed(2)}` : 'as photographed';
@@ -296,26 +268,19 @@
     $('note').textContent = `${given.length ? given.map((k) => palettes[k].title).join(', ') + ' · ' : ''}${pic.shapes.length} shapes · ${(performance.now() - t0).toFixed(0)} ms`;
   }
 
-  // The emblem at icon sizes, drawn again at each (not scaled down): the dark palette on its own sea and on the app's
-  // neutral dark, the light palette on the app's paper. Each is the full drawing scaled down, its ink included.
+  // With Emblem ticked, the drawing at icon sizes, each the full drawing scaled down, every setting as it is.
   const SIZES = [16, 24, 32, 48, 64, 128];
   const AT = [0, 128, 64, 48, 32, 24, 16];
-  function sizes(pic, p) {
-    const dpr = devicePixelRatio || 1;
-    const dark = emblemPlace(true);
-    $('sizes').replaceChildren(...[[waterOf(dark).deep, true], ['#161614', true], ['#f6f5f2', false]].map(([ground, isDark]) => {
-      const base = isDark ? dark : p, palOf = emblemPal(isDark);
-      const row = document.createElement('div');
-      row.style.background = ground;
-      for (const px of SIZES) {
-        const c = document.createElement('canvas');
-        c.width = c.height = Math.round(px * dpr);
-        c.style.width = c.style.height = px + 'px';
-        icon(c.getContext('2d'), pic, px, dpr, { base, palOf, background: ground, weighted: $('weighted').checked });
-        row.append(c);
-      }
-      return row;
-    }));
+  function sizes(pic, opts) {
+    const dpr = devicePixelRatio || 1, row = document.createElement('div');
+    for (const px of SIZES) {
+      const c = document.createElement('canvas');
+      c.width = c.height = Math.round(px * dpr);
+      c.style.width = c.style.height = px + 'px';
+      icon(c.getContext('2d'), pic, px, dpr, opts);
+      row.append(c);
+    }
+    $('sizes').replaceChildren(row);
   }
 
   function swatches() {
@@ -364,8 +329,8 @@
   $('bgReset').onclick = () => ((bgPicked = null), draw());
   for (const b of document.querySelectorAll('[data-ground]')) b.onclick = () => ((bgPicked = b.dataset.ground), draw());
   const showEmblem = () => document.body.classList.toggle('emblem', emblem());
-  $('emblem').addEventListener('input', () => (toggleEmblem(), showEmblem(), showClouds(), draw()));
-  for (const k of ['emColours', 'emDark', 'emAt']) $(k).addEventListener('input', draw);
+  $('emblem').addEventListener('input', () => (showEmblem(), draw()));
+  for (const k of ['emAt', 'swell']) $(k).addEventListener('input', draw);
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
   for (const k of [...DIALS, 'wrap', 'weighted', 'forms', 'geo']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
   const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
@@ -392,7 +357,7 @@
   const save = (name, blob) => Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name }).click();
   $('png').onclick = () => $('view').toBlob((b) => save(`archipelago-${$('place').value}-${seed}.png`, b));
   $('svg').onclick = () => {
-    const p = richOf(pal()), pic = emblem() ? bare(ridges(dials())) : ridges(dials()), f = (v) => +v.toFixed(1);
+    const p = richOf(pal()), pic = shown(ridges(dials())), f = (v) => +v.toFixed(1);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
     const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p, background(p))}"/>` : s.shadow ? `<path d="${d(s)}" fill="#000" fill-opacity="${(0.35 * s.shadow).toFixed(3)}" stroke="none"/>` : s.cloud ? `<path d="${d(s)}" fill="${p.paper}" fill-opacity="${$('cloudOpacity').value}" stroke-width="${pic.line * 0.6}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
@@ -410,7 +375,7 @@
     weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked, geo: $('geo').checked,
     seed, bg: bgPicked, richness: +$('richness').value, cloudOpacity: +$('cloudOpacity').value,
     letter: { on: $('letter').checked, text: $('letterText').value, font: $('letterFont').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
-    emblem: { on: emblem(), colours: +$('emColours').value, at: +$('emAt').value, dark: $('emDark').value },
+    emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked,
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
   });
@@ -429,7 +394,7 @@
     const l = s.letter ?? {};
     $('letter').checked = !!l.on; $('letterText').value = l.text ?? 'A'; $('letterFont').value = l.font ?? $('letterFont').options[0].value; $('letterSize').value = l.size ?? 0.85; $('letterStrength').value = l.strength ?? 1;
     const e = s.emblem ?? {};
-    $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; before = null; $('emColours').value = e.colours ?? 3; $('emDark').value = palettes[e.dark] ? e.dark : 'arctic';
+    $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true;
     showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
