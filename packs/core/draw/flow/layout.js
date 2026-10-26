@@ -17,6 +17,8 @@ import { acyclic, flatten, grouped, highest, lowest, NEAR, ORDER, QUIET, reduced
 export const LARGE = 60;
 /** More than this many steps part of one, tied to nothing else and in no order, are wrapped in rows under it. */
 export const ACROSS = 6;
+/** The shape a large picture is wrapped toward, as wide as tall times this: about a page's. */
+export const ASPECT = 1.6;
 
 /**
  * The steps (each with its place x, y and size w, h), the wires of the order (`chains`, each with its points), the
@@ -123,6 +125,31 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
     for (const id of ids) {
       const leaves = (near.get(id) ?? []).filter((t) => t.rel === 'child' && !flows(t.id) && near.get(t.id).length === 1 && asap.get(t.id) === asap.get(id) + 1);
       if (leaves.length > ACROSS) leaves.forEach((t, k) => asap.set(t.id, asap.get(id) + 1 + Math.floor(k / ACROSS)));
+    }
+    // In a large cluster, a layer wider than the picture should be wraps into rows, each a layer of its own, and pushes
+    // what is under it down: the order still reads from the top down, and a large map comes out about the page's
+    // shape, not one band. The width is the one that makes the whole about ASPECT times as wide as tall; what is part
+    // of one thing stays together in a row. Only steps in no order wrap: a step of the order keeps its layer, so the
+    // order's wires gain no waypoints from the rows.
+    const wide = (id) => nodes.get(id).w + NODE_GAP;
+    const across = Math.max(highest(ids.map(wide)), Math.sqrt(ASPECT * (BOX_H + LAYER_GAP) * ids.reduce((s, id) => s + wide(id), 0)));
+    const byLayer = grouped(ids, (id) => asap.get(id));
+    const parentOf = (id) => (near.get(id) ?? []).find((t) => t.rel === 'parent')?.id ?? '';
+    let added = 0;
+    if (large) for (const k of [...byLayer.keys()].sort((p, q) => p - q)) {
+      const list = byLayer.get(k).sort((p, q) => Number(!flows(p)) - Number(!flows(q)) || (parentOf(p) < parentOf(q) ? -1 : parentOf(p) > parentOf(q) ? 1 : 0));
+      let row = 0, run = 0;
+      for (const id of list) {
+        if (flows(id)) {
+          asap.set(id, k + added);
+          run += wide(id);
+          continue;
+        }
+        if (run > 0 && run + wide(id) > across) (row++, (run = 0));
+        asap.set(id, k + added + row);
+        run += wide(id);
+      }
+      added += row;
     }
     const least = lowest([...asap.values()]);
     for (const [id, k] of asap) asap.set(id, k - least);
@@ -443,7 +470,7 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
   });
   // The rest in rows, as wide as the widest of it or of what is placed, and about as wide as tall.
   const area = lone.reduce((s, c) => s + (c.width + GAP) * (c.height + GAP), 0);
-  const most = highest([...lone.map((c) => c.width), ...boxes.map((b) => b.r - MARGIN), Math.sqrt(area) * 1.6]);
+  const most = highest([...lone.map((c) => c.width), ...boxes.map((b) => b.r - MARGIN), Math.sqrt(area) * ASPECT]);
   const shelf = { x: MARGIN, y: boxes.length ? highest(boxes.map((b) => b.b)) + LAYER_GAP : MARGIN, row: 0 };
   for (const c of lone) {
     if (shelf.x > MARGIN && shelf.x + c.width > MARGIN + most) Object.assign(shelf, { x: MARGIN, y: shelf.y + shelf.row + GAP, row: 0 });

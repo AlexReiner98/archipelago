@@ -82,14 +82,18 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   /** Drawn now, not at the next frame: a control's answer, or a frame first given a size. */
   const now = () => (queued && cancelAnimationFrame(queued), draw());
 
-  /** All of it in sight, centred in the room beside what floats on the left and what covers the frame's right (`right`). */
-  const fit = (right = 0) => {
+  /**
+   * All of it in sight, centred in the room beside what floats on the left and what covers the frame's right (`right`),
+   * and between what floats over its top and its foot (`top`, `bottom`: the bars).
+   */
+  const fit = (right = 0, top = 0, bottom = 0) => {
     const [W, H] = size();
     const room = Math.max(1, W - aside - right);
-    fitted = Math.min(1, (room - plane.fit_pad) / width, (H - plane.fit_pad) / height);
+    const tall = Math.max(1, H - top - bottom);
+    fitted = Math.min(1, (room - plane.fit_pad) / width, (tall - plane.fit_pad) / height);
     view.s = fitted;
     view.x = -(aside + (room - width * view.s) / 2) / view.s;
-    view.y = -((H - height * view.s) / 2) / view.s;
+    view.y = -(top + (tall - height * view.s) / 2) / view.s;
     now();
   };
   const open = () => {

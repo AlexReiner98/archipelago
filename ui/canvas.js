@@ -188,7 +188,13 @@ const moves = () => at?.view.querySelector('.lens-view')?.moves;
 /** What the sheet covers on the right of the canvas; a sheet as wide as the page leaves nothing beside it. */
 const covered = () => (document.body.dataset.sheet === 'open' && sheet.offsetWidth < innerWidth * 0.8 ? sheet.offsetWidth : 0);
 /** All of it in sight, beside the sheet, when the reader asked for that. */
-const fitNow = () => settings.fit && moves()?.fit(covered());
+/** What the bars cover of the canvas above and below: the query bar's foot, and the find bar's top. */
+const bars = () => {
+  const edge = (id, side) => { const el = document.getElementById(id); return el && !el.hidden ? el.getBoundingClientRect()[side] : undefined; };
+  const foot = edge('query', 'bottom') ?? edge('nav', 'bottom') ?? 0, find = edge('find', 'top');
+  return [foot, find === undefined ? 0 : innerHeight - find];
+};
+const fitNow = () => settings.fit && moves()?.fit(covered(), ...bars());
 function apply() {
   document.body.classList.toggle('canvas-key', Boolean(settings.key));
   if (at?.style) at.style.snap = Boolean(settings.snap);

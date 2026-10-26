@@ -193,3 +193,18 @@ test('a step put by hand is wired live at right angles, round the steps in the w
   assert.deepEqual(placesOf({ lens: { from: 'p' } }, { placed: { x: [1, 2], z: [0, 0] }, moved: { z: [5, 6] } }), { x: [1, 2], z: [5, 6] }, "this canvas's places, as the page read them, with what was moved over them");
   assert.deepEqual(placesOf({ lens: {} }, {}), {}, 'nothing placed: the drawing lays every step');
 });
+
+test('a large map wraps its wide layers into rows: it comes out about the page\'s shape, not one band', () => {
+  // Twenty projects, each with nine parts: one cluster of two hundred steps, every layer far wider than tall.
+  const items = [flat('top')];
+  const links = [];
+  for (let p = 0; p < 20; p++) {
+    items.push(flat(`p${p}`));
+    links.push(link('part_of', `p${p}`, 'top'));
+    for (let k = 0; k < 9; k++) (items.push(flat(`p${p}.${k}`)), links.push(link('part_of', `p${p}.${k}`, `p${p}`)));
+  }
+  assert.ok(items.length > LARGE);
+  const g = layout({ items, links, measure, sizes: house.sizes });
+  assert.ok(g.width / g.height < 4, `${Math.round(g.width)} wide by ${Math.round(g.height)} tall`);
+  assert.ok(g.y.get('p0.0') > g.y.get('p0') && g.y.get('p0') > g.y.get('top'), 'what is part of something still sits under it');
+});
