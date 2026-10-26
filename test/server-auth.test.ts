@@ -281,7 +281,9 @@ test('a workspace receives notifications only from workspaces its admin accepts'
   assert.match((await call('/api/notify_workspace', agent, { workspace: 'acme', title: 'x' })).error, /humans only/);
 
   const set = await call('/api/workspace_set', theirs, { accepts_from: ['default'] });
-  assert.deepEqual(set.result, { id: 'acme', default_visibility: 'private', agent_changes: 'hold', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, lifted: { reply_account_commits: false } });
+  const { reply_rules, ...settings } = set.result;
+  assert.deepEqual(settings, { id: 'acme', default_visibility: 'private', agent_changes: 'hold', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, lifted: { reply_account_commits: false, reply_draw_answers: false } });
+  assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['core.draw_answers', false], ['software.account_commits', false]]);
   assert.deepEqual((await send(mine, 'acme')).result, { delivered_to: 'acme' });
 
   const inbox = (await call('/api/view', theirs, { name: 'notifications' })).result as any[];
