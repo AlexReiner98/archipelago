@@ -1,6 +1,7 @@
 // A session's reply ended: the rules on it (src/reply-rules.ts) that hold ask the agent, once a turn, and each time
 // one does is kept as a beat of the session's story, where the owner sees it.
 
+import { shas, unaccounted } from './commits.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { tellStamp } from './presence.ts';
@@ -24,12 +25,15 @@ async function liftedHere(whole: Q, rules: Rule[]): Promise<Set<string>> {
  * The answer to a reply's end: the rules whose when holds and that have not asked this turn ask, once, as a block
  * with their reasons, each kept as a beat of the run's story. Undefined when none does.
  */
-export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefined, body: { session_id?: string; turn?: unknown; reply?: unknown; stop_hook_active?: unknown }) {
+export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefined, body: { session_id?: string; turn?: unknown; reply?: unknown; turn_commits?: unknown; stop_hook_active?: unknown }) {
   const facts = replyFacts(body.reply);
   const turn = typeof body.turn === 'string' && body.turn ? body.turn : undefined;
   if (body.stop_hook_active === true || !facts || !turn || !run?.is_open) return undefined;
   const rules = l.registry.rules.filter(onReply);
   const off = await liftedHere(whole, rules);
+  // The one fact read of the map: which of the commits the reply made or pushed nothing accounts for yet.
+  const open = rules.some((r) => !off.has(r.lifted!) && r.when?.reply && 'unaccounted' in r.when.reply) ? await unaccounted(l, shas(body.turn_commits)) : [];
+  facts.unaccounted = open.length;
   const asking: Rule[] = [];
   for (const rule of rules) {
     if (off.has(rule.lifted!) || !holds(rule, facts)) continue;
@@ -45,5 +49,7 @@ export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefin
     );
   }
   await tellStamp(whole, l.workspace);
-  return { decision: 'block', reason: asking.map((r) => r.say).join('\n') };
+  // A rule on unaccounted commits names them, so they are accounted for in one change.
+  const said = (r: Rule) => (r.when?.reply && 'unaccounted' in r.when.reply && open.length ? `${r.say} Not accounted for: ${open.join(', ')}.` : r.say);
+  return { decision: 'block', reason: asking.map(said).join('\n') };
 }

@@ -10,7 +10,7 @@ import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './w
 import { heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
 import { STALE_DAYS } from './attention.ts'; import { instructionsFor } from './instructions.ts';
-import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts';
+import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
 
 const now = () => new Date().toISOString();
 
@@ -364,6 +364,8 @@ export async function sessionEnd(
   if (!run.is_open) return { run: run.id, status: run.status, already_ended: true };
   const outcome = input.outcome ?? 'finished';
   const unsaid = outcome === 'finished' ? await unreconciled(l, run) : [];
+  // Beside them, the commits it made that the map does not account for yet (src/commits.ts).
+  const commits = outcome === 'finished' ? await unaccountedBy(l, run.id) : [];
   const vouched = unsaid.filter((i) => input.still_true?.includes(i.id));
   // "Cannot tell" is an answer too: the item is left exactly as it was, last known true when it was, and the run says so.
   const named = unsaid.filter((i) => !vouched.includes(i) && input.cannot_tell?.includes(i.id));
@@ -372,19 +374,21 @@ export async function sessionEnd(
   // The rest are counted, not listed: a session that never looked at thirty items has nothing to say of each.
   const rest = unknown.length - named.length;
   const left = unsaid.filter((i) => !vouched.includes(i) && !unknown.includes(i));
-  if (input.reconcile && left.length) {
+  if (input.reconcile && (left.length || commits.length)) {
     return {
       run: run.id,
       status: run.status,
       ended: false,
       unreconciled: left,
-      note: 'Not ended yet. These are open in the repository this session worked in or were touched by it (read, shown or changed: marked touched, and listed first), and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named and did not touch), and do not vouch for what you did not look at. Then call report with action session_end again.',
+      unaccounted_commits: commits.length ? commits : undefined,
+      note: (commits.length ? 'Its commits listed in unaccounted_commits are not accounted for: for each, in one change, create its commit record (its full sha) with a settles link to each item it settles, or none. ' : '') + 'Not ended yet. These are open in the repository this session worked in or were touched by it (read, shown or changed: marked touched, and listed first), and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named and did not touch), and do not vouch for what you did not look at. Then call report with action session_end again.',
     };
   }
   const said = [
     vouched.length && `Said still true: ${vouched.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
     unknown.length && `Could not tell from here, left as found: ${[...named.map((i) => `${i.title} (${i.id})`), ...(rest ? [`${rest} ${named.length ? 'more' : rest === 1 ? 'item' : 'items'} it did not look at`] : [])].join('; ')}.`,
     // A session closed for it has said nothing of anything: past a few, the count says as much as the list.
+    commits.length && `Commits not accounted for: ${commits.map((c) => c.slice(0, 7)).join(', ')}.`,
     left.length && (left.length > 8 ? `Not reconciled: ${left.length} open items left unsaid.` : `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`),
   ].filter(Boolean);
   const summary = [input.summary, ...said].filter(Boolean).join('\n');
@@ -410,7 +414,7 @@ export async function sessionEnd(
     reason: input.summary ?? `Session ${outcome}`,
   });
   await heard(l, run, `Session "${run.title}" ended`);
-  return { run: run.id, status: outcome, released: held.length };
+  return { run: run.id, status: outcome, released: held.length, unaccounted_commits: commits.length ? commits : undefined };
 }
 
 /**

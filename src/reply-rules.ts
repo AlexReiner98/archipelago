@@ -4,14 +4,16 @@
 // agent once, with its one-line say, to go on before it stops. It asks never while the agent is already going on
 // because a hook asked (stop_hook_active), never twice in one turn, and only of a registered session, whose story
 // keeps each time it asked as a step. Every such rule names the setting the owner turns it off by (lifted).
-// What such a rule is and when it holds is read here, with nothing of the map; src/replies.ts asks.
+// What such a rule is and when it holds is read here, with nothing of the map; src/replies.ts asks. One fact is read
+// of the map, there: unaccounted, the commits the reply made or pushed that no record the rule names (its record: a
+// type and the field holding a commit's full sha) accounts for (src/commits.ts).
 
 import type { RuleDef } from './rules.ts';
 
 /** The event a reply rule is on. */
 export const REPLY_ENDED = 'reply_ended';
 /** What a reply did, as the hook counts it since the owner's last message. */
-export const REPLY_FACTS = ['read', 'showed', 'changed', 'committed', 'pushed'] as const;
+export const REPLY_FACTS = ['read', 'showed', 'changed', 'committed', 'pushed', 'unaccounted'] as const;
 export type ReplyFacts = Partial<Record<(typeof REPLY_FACTS)[number], number>>;
 
 /** A reply rule's setting: what the owner turns it off by. */
@@ -23,7 +25,7 @@ const SAY_MAX = 200;
 export const onReply = (rule: RuleDef) => rule.on === REPLY_ENDED;
 
 /** Problems with a reply rule, as checkRules reports them. */
-export function checkReplyRule(rule: RuleDef, at: string): string[] {
+export function checkReplyRule(rule: RuleDef, at: string, known: (type: string) => boolean = () => true): string[] {
   const problems: string[] = [];
   if (!rule.id) problems.push(`${at}: a rule on a reply ending has an id, so it asks once a turn`);
   if (rule.on !== REPLY_ENDED) problems.push(`${at}: on is "${REPLY_ENDED}"`);
@@ -38,14 +40,16 @@ export function checkReplyRule(rule: RuleDef, at: string): string[] {
   }
   if (!rule.say || rule.say.length > SAY_MAX || /\n/.test(rule.say)) problems.push(`${at}: say is the one line it asks with, ${SAY_MAX} characters at most`);
   if (!rule.lifted || !REPLY_LIFT.test(rule.lifted)) problems.push(`${at}: lifted names the setting that turns it off, reply_<name>`);
+  if ('unaccounted' in reply && (!rule.record?.type || !rule.record.field)) problems.push(`${at}: a rule on unaccounted commits names their record: { type, field }, the field holding the full sha`);
+  else if (rule.record?.type && !known(rule.record.type)) problems.push(`${at}: its record is of type "${rule.record.type}", which is not known`);
   return problems;
 }
 
-/** The facts a hook sent, as counts: anything else in them is dropped. */
+/** The facts a hook sent, as counts: anything else in them is dropped, and unaccounted, which is read of the map. */
 export function replyFacts(said: unknown): ReplyFacts | undefined {
   if (!said || typeof said !== 'object') return undefined;
   const facts: ReplyFacts = {};
-  for (const fact of REPLY_FACTS) {
+  for (const fact of REPLY_FACTS.filter((f) => f !== 'unaccounted')) {
     const n = (said as Record<string, unknown>)[fact];
     if (Number.isInteger(n) && (n as number) >= 0) facts[fact] = n as number;
   }

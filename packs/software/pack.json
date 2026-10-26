@@ -165,6 +165,17 @@
       }
     }
   ],
+  "rules": [
+    {
+      "id": "account_commits",
+      "on": "reply_ended",
+      "when": { "reply": { "unaccounted": true } },
+      "then": "ask",
+      "say": "This reply committed or pushed commits the map does not account for. In one change, give each a software.commit (full sha) with a software.settles link to each item it settles, or none.",
+      "record": { "type": "software.commit", "field": "sha" },
+      "lifted": "reply_account_commits"
+    }
+  ],
   "links": [
     {
       "id": "software.lives_in",
