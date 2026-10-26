@@ -62,6 +62,7 @@ export const DEFAULTS = {
   age: 0.6,        // along a chain, young tall dark islands (one end) to old low sinking atolls (the other)
   shallows: 0.4,   // how wide the pale shallow water round the land reaches
   relief: 0.6,     // height variety within an archipelago: even (0) to massifs among low islands (1)
+  edges: 0.5,      // a calm border of open water round the islands: none (0) to wide (1)
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   anchors: null,   // [[x, y], ...] in page units: put archipelago i at anchor i (one per anchor), as on a map
   line: 1.2,       // outline weight
@@ -183,11 +184,24 @@ export function ridges(dials) {
     return { u: land(toCell(x), yc), lo, hi: lo + 0.17, gate: 1, g: 0, t: 0, rank: 1 };
   };
 
+  // The border: land sinks into the sea toward the frame, along an edge that wobbles with noise so it never runs as
+  // a line. At the frame itself nothing stands (shallows included). With repeat on, only top and bottom have one.
+  const band = d.edges * 0.2 * Math.min(W - 2 * M, H - 2 * M);
+  const shore = (x, y, yc) => {
+    if (!band) return 1;
+    let e = Math.min(y - M, H - M - y);
+    if (!d.wrap) e = Math.min(e, x - M, W - M - x);
+    const wobble = (land(toCell(x) * 1.7 + 21, yc * 1.7 + 9) - 0.5) * band * 1.3;
+    return smooth(0.1, 1, (e + wobble) / band) * smooth(0, 0.3 * band, e);
+  };
+
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
     const h = [], shelf = [], gs = [], ts = [], steps = [];
     for (const x of xs) {
       const L = at(x, y, yc), f = formAt(x, y, L), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
+      const calm = shore(x, y, yc);
+      if (calm < 1) L.u -= (1 - calm) * 1.5;
       gs.push(L.g), ts.push(L.t), steps.push(step * f.step);
       // Shallows: a reach of pale sea round the land, wider as the dial turns.
       const sea = smooth(L.lo - span * (0.25 + 1.5 * d.shallows), L.lo, L.u) * L.gate * (d.shallows > 0 ? 1 : 0);
@@ -208,6 +222,11 @@ export function ridges(dials) {
       const tall = rise * f.rise * Math.max(0.15, massif) * (1 - 0.8 * age) * (1 - d.hierarchy * 0.6 * (1 - L.rank));
       let raw = mask * tall * (0.25 + 0.75 * peak);
       if (f.top) raw = Math.min(raw, tall * (1 - 0.65 * f.top));
+      // No peak rises past the top of the frame: heights near it are eased under the room left, not sliced off.
+      if (band) {
+        const room = Math.max(1, y - M - gap);
+        raw = room * Math.tanh(raw / room);
+      }
       const stp = step * f.step, soft = Math.max(0.02, Math.min(1, d.soft + f.soft));
       const q = raw / stp, k = Math.floor(q);
       h.push(stp * (k + smooth(1 - soft, 1, q - k)));

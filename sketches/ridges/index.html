@@ -83,6 +83,7 @@
   <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1" step="0.01"></label>
   <label class="not-noise" title="Along a chain: young, tall, dark islands at one end; old, low, sinking atolls at the other">Age <small>none · strong</small><input id="age" type="range" min="0" max="1" step="0.01"></label>
   <label title="Some islands lifted into massifs, others kept low">Relief <small>even · varied</small><input id="relief" type="range" min="0" max="1" step="0.01"></label>
+  <label title="A calm border of open water, its edge wobbling: islands float free of the frame">Edges <small>none · wide</small><input id="edges" type="range" min="0" max="1" step="0.01"></label>
   <label title="Pale shallow water round the land">Shallows <small>none · wide</small><input id="shallows" type="range" min="0" max="1" step="0.01"></label>
   <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="3" step="0.05"></label>
   <label class="check"><input id="wrap" type="checkbox"> Repeat left to right</label>
@@ -101,7 +102,7 @@
   import { paint, fillOf as fillWith, swell } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief'];
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   // Palettes are kept as photographed (a palette shipped enriched is taken back to its raw colours); Richness enriches
   // them as they are drawn, so the swatches always show and edit the colours the photos gave.
