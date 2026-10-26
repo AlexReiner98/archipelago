@@ -144,9 +144,11 @@ description). In the code: core's `instruction` type, `src/instructions.ts`,
 stops: how many times it read and surveyed the map, showed the owner
 something, changed the map, edited a file, committed and pushed, as its
 session's hook counts them from the transcript. A rule with `on:
-"reply_ended"` reads those and asks the agent, once a turn, to go on before
-it stops; it never decides a change. In the code: `src/reply-rules.ts`,
-`src/replies.ts`.
+"reply_ended"` reads those (and one fact of the map, which of the reply's
+commits are unaccounted for) and asks the agent, once a turn, to go on
+before it stops; it never decides a change. The owner turns one off with
+its switch on the Workspace page's Checks card. In the code:
+`src/reply-rules.ts`, `src/replies.ts`, `src/commits.ts`.
 
 **run trailer.** The line `Archipelago-Run: <run>` at the end of a commit a
 session makes, naming the run it is registered as, so the commit can be
@@ -156,7 +158,8 @@ the code: `scripts/pelago-setup.mjs`, read by `packs/github/account.js`.
 **accounted for.** A commit is accounted for once the map holds a commit item
 for its full sha, with a settles link to each item it settles, or none. The
 check "Every commit accounted for" on the main branch is red until every
-commit in a push or pull request is. In the code: `software.commit` and
+commit in a push or pull request is; a session is asked to account for
+its own commits before its reply and its run end. In the code: `software.commit` and
 `software.settles` (`packs/software/pack.json`), `packs/github/account.js`.
 
 ## Retired words
