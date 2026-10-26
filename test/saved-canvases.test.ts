@@ -81,7 +81,8 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
 
       // Home: one line each, opening in one click.
       await page.evaluate(`location.hash = '#/you'`);
-      assert.ok(await until(`document.querySelectorAll('.canvases > .rows > li').length >= 1`), 'listed on Home');
+      // Waited for by its name: the canvas saved on the pass before is listed already.
+      assert.ok(await until(`[...document.querySelectorAll('.canvases > .rows > li a')].some((a) => a.textContent === ${JSON.stringify(name)})`), 'listed on Home');
       const rows = await page.evaluate<{ title: string; tall: number; line: number; wide: boolean }[]>(
         `[...document.querySelectorAll('.canvases > .rows > li')].map((li) => ({ title: li.querySelector('a').textContent, tall: li.getBoundingClientRect().height, line: parseFloat(getComputedStyle(li).lineHeight) || 20, wide: li.scrollWidth > li.clientWidth + 1 }))`,
       );
