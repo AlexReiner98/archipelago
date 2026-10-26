@@ -34,3 +34,24 @@
 #sheet ol.choices .choice-pick:hover { border-color: var(--accent); background: var(--accent-soft); }
 #sheet ol.choices .choice-pick > .gist { display: block; overflow: hidden; text-overflow: ellipsis; }
 #sheet ol.choices li.chosen > .gist { font-weight: 600; }
+
+/* A field changed where it stands (ui/field-edit.js): picks are the browser's own controls, words read until clicked. */
+#sheet .page-rows dd .field-pick { max-width: 100%; font: inherit; }
+#sheet .page-rows dd .field-switch { margin: 0; cursor: pointer; }
+#sheet .page-rows dd .field-read { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; border-radius: var(--radius-1); }
+#sheet .page-rows dd .field-read:hover { background: var(--accent-soft); }
+#sheet .field-write { box-sizing: border-box; width: 100%; min-width: 0; font: inherit; }
+#sheet textarea.field-write { resize: vertical; }
+#sheet textarea.field-json { font-family: ui-monospace, monospace; font-size: var(--text-3); }
+#sheet .field-write.bad { border-color: var(--bad); }
+#sheet .field-list, #sheet .field-names { display: flex; flex-direction: column; gap: var(--space-2); max-width: var(--measure); }
+#sheet .field-line { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+#sheet .field-line > .field-name { flex: 0 0 auto; max-width: var(--chip-most); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sheet .field-rows { overflow-x: auto; }
+#sheet .field-rows table.field-table td { padding: 0 var(--space-2); }
+#sheet .field-add { align-self: flex-start; }
+#sheet .field-item { display: flex; align-items: center; gap: var(--space-3); min-width: 0; white-space: nowrap; }
+#sheet .field-item > a, #sheet .field-item > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#sheet .field-find { flex: 0 1 auto; min-width: 0; font: inherit; }
+#sheet .field-hits { display: flex; gap: var(--space-2); min-width: 0; overflow: hidden; }
+#sheet .field-hit { flex: 0 1 auto; min-width: 0; max-width: var(--chip-most); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; }

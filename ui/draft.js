@@ -47,15 +47,20 @@ export function draftOf({ base, style, editable = true, note = true, saved }) {
   const discard = h('button', { class: 'quiet-button', type: 'button' }, 'Discard');
   const bar = h('div', { class: 'draft-bar', hidden: true }, said, h('span', { class: 'grow' }), discard, save);
   const box = h('div', { class: 'draft' }, bar);
+  // Fields written in place wait here for the same Save (ui/field-edit.js): a name, what it held, what it holds now.
+  const fields = new Map();
+  const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const props = () => Object.fromEntries([...fields].filter(([, f]) => !same(f.now, f.was)).map(([k, f]) => [k, f.now ?? null]));
+  const bad = () => [...fields.values()].find((f) => f.bad)?.bad;
   const now = () => ({ title: title.textContent.replace(/\s+/g, ' ').trim(), body: area.value });
-  const changed = () => now().title !== (base.title ?? '').trim() || now().body !== (base.body ?? '');
+  const changed = () => now().title !== (base.title ?? '').trim() || now().body !== (base.body ?? '') || Object.keys(props()).length > 0;
   const grow = () => ((area.style.height = 'auto'), (area.style.height = `${area.scrollHeight}px`));
   const update = () => {
     const open = isNew || changed();
     bar.hidden = !open;
     box.dataset.draft = changed() ? 'unsaved' : '';
-    save.disabled = !now().title || !changed();
-    said.textContent = !now().title ? 'A title first' : changed() ? 'Not saved' : '';
+    save.disabled = !now().title || !changed() || Boolean(bad());
+    said.textContent = !now().title ? 'A title first' : bad() ?? (changed() ? 'Not saved' : '');
   };
   const write = () => {
     if (read) read.hidden = true;
@@ -71,8 +76,12 @@ export function draftOf({ base, style, editable = true, note = true, saved }) {
     title.textContent = base.title ?? '';
     area.value = base.body ?? '';
     if (read) (read.hidden = false), (area.hidden = true);
+    const written = fields.size > 0;
+    fields.clear();
     update();
     if (isNew) history.back();
+    // Fields written in place are drawn again as they read.
+    else if (written) saved(base.id);
   });
   save.addEventListener('click', async () => {
     const next = now();
@@ -89,13 +98,15 @@ export function draftOf({ base, style, editable = true, note = true, saved }) {
       }
       // Someone else's words since the sheet opened are not written over unseen.
       const live = (await api('get', { id: base.id })).entity;
-      const moved = live.updated_at !== base.updated_at && (live.title !== base.title || (live.body ?? '') !== (base.body ?? ''));
-      if (moved && !(await ask({ title: 'Changed since you opened it', message: 'Someone changed its title or note while you were writing. Save yours over theirs?', action: 'Save mine', danger: true }))) return update();
-      const ops = [{ op: 'update', id: base.id, ...(next.title !== (base.title ?? '').trim() && { title: next.title }), ...(next.body !== (base.body ?? '') && { body: next.body }) }];
+      const fresh = props();
+      const moved = live.updated_at !== base.updated_at && (live.title !== base.title || (live.body ?? '') !== (base.body ?? '') || Object.keys(fresh).some((k) => !same(live.props[k], fields.get(k).was)));
+      if (moved && !(await ask({ title: 'Changed since you opened it', message: 'Someone changed what you are writing while you were. Save yours over theirs?', action: 'Save mine', danger: true }))) return update();
+      const ops = [{ op: 'update', id: base.id, ...(next.title !== (base.title ?? '').trim() && { title: next.title }), ...(next.body !== (base.body ?? '') && { body: next.body }), ...(Object.keys(fresh).length && { props: fresh }) }];
       const done = await api('change', { ops, reason: 'Written in the sheet' });
       // Held for someone's word by a rule: it is on the map as a proposal, not yet applied.
       if (done.status && done.status !== 'applied') await tell('Saved as a proposal', 'A rule holds this change for a person to approve before it applies.');
       box.dataset.draft = '';
+      fields.clear();
       state.selfDrawn = done.status === 'applied';
       saved(base.id);
     } catch (err) {
@@ -106,7 +117,12 @@ export function draftOf({ base, style, editable = true, note = true, saved }) {
   update();
   // A new item opens with its title ready to be typed.
   if (isNew) requestAnimationFrame(() => title.focus());
-  return { title, note: note ? [read, area].filter(Boolean) : [], bar: box };
+  /** A field written in place: `keep(value, bad)` holds what it says now for Save; `bad` says why it cannot be saved yet. */
+  const field = (name, was) => (value, why) => {
+    fields.set(name, { was, now: value === undefined ? fields.get(name)?.now : value, bad: why });
+    update();
+  };
+  return { title, note: note ? [read, area].filter(Boolean) : [], bar: box, field, save: () => save.click(), unsaved: () => changed() };
 }
 
 /** A new item as a draft in the sheet: its type (a task unless chosen), a title to type and a note. Saved, it is a loose

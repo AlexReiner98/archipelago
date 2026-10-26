@@ -82,5 +82,5 @@ export function choicesOf(e, type) {
   const settles = type?.capabilities?.settles;
   const list = settles?.choices ? e.props[settles.choices] : undefined;
   if (!Array.isArray(list) || !list.length || !list.every((x) => typeof x === 'string')) return null;
-  return { field: settles.choices, chosen: settles.chosen, why: settles.why, list, picked: settles.chosen ? e.props[settles.chosen] : undefined };
+  return { field: settles.choices, chosen: settles.chosen, why: settles.why, on: settles.on, list, picked: settles.chosen ? e.props[settles.chosen] : undefined };
 }

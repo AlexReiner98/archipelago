@@ -103,9 +103,13 @@ Rule 11 of the target model (decided 26 Oct 2026, e_bed3aj7d). An item's page
 is its head, its fields and its note. A field is drawn by the kind its type
 declares it as (`ui/fields.js`), and by its shape where the kind does not say,
 so a field a pack adds that no one foresaw is still read; never by its name.
-What a field means beyond its kind comes from capabilities: a question whose
-type declares `settles.choices` (and `chosen`, `why`) is settled by picking
-one, as one change. A note is written in one dialect (`ui/text.js`: titles,
+It is changed where it stands the same way (`ui/field-edit.js`): a pick (a
+value from a menu, a day, yes or no, an item) is a change at once, and words
+(text, numbers, lists, rows, a set of names, JSON) wait with the note for the
+page's one Save (decided 26 Oct 2026, e_mvzugyga). System fields are only
+read. What a field means beyond its kind comes from capabilities: a question
+whose type declares `settles.choices` (and `chosen`, `why`, `on`) is settled
+by picking one, as one change (e_xyxct9nq). A note is written in one dialect (`ui/text.js`: titles,
 lists, checklists, callouts, tables, code, emphasis, links, items by id),
 read the same by the sheet and the published reader; ticking a checklist is a
 change to that line. How it looks is the style's `notes` (callout colours, the

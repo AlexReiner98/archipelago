@@ -48,7 +48,8 @@ export type Capacity = number | { field: string };
 
 /**
  * A question settled by someone's word or by evidence, whose word it is, the field that lists the choices weighed,
- * the field that says which was chosen, and the field that says why: so a page settles it by picking one (Rule 11).
+ * the field that says which was chosen, the field that says why and the day field it was settled on: so a page settles
+ * it by picking one (Rule 11).
  */
 export interface Settles {
   by: 'word' | 'evidence';
@@ -56,6 +57,7 @@ export interface Settles {
   choices?: string;
   chosen?: string;
   why?: string;
+  on?: string;
 }
 
 /**
@@ -144,6 +146,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     has('settles.choices', settles.choices, ['json']);
     has('settles.chosen', settles.chosen, ['string']);
     has('settles.why', settles.why, ['string']);
+    has('settles.on', settles.on, ['date']);
     if (settles.chosen && !settles.choices) problems.push('settles.chosen says which of the choices was chosen: name the choices too');
   }
   if (watch) {
