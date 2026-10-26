@@ -195,8 +195,14 @@ export function ridges(dials) {
   const band = d.edges * 0.2 * Math.min(W - 2 * M, H - 2 * M);
   const shore = (x, y, yc) => {
     if (!band) return 1;
+    // How far in from the frame: to a rounded frame, so the border bends round each corner in an arc instead of
+    // meeting there at a right angle (the sides' distances taken apart). With repeat on, top and bottom only.
     let e = Math.min(y - M, H - M - y);
-    if (!d.wrap) e = Math.min(e, x - M, W - M - x);
+    if (!d.wrap) {
+      const hx = (W - 2 * M) / 2, hy = (H - 2 * M) / 2, round = Math.min(band * 1.6, hx, hy);
+      const qx = Math.abs(x - W / 2) - hx + round, qy = Math.abs(y - H / 2) - hy + round;
+      e = -(Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - round);
+    }
     const wobble = (land(toCell(x) * 1.7 + 21, yc * 1.7 + 9) - 0.5) * band * 1.3;
     return smooth(0.1, 1, (e + wobble) / band) * smooth(0, 0.3 * band, e);
   };
