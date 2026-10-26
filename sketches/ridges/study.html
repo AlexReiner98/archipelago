@@ -93,7 +93,7 @@
     <section class="card">
       <canvas data-k="${k}"></canvas>
       <h2>${p.title}</h2>
-      <p class="what" title="${WHAT[k]}">${WHAT[k]}</p>
+      <p class="what" title="${WHAT[k]} · highest point about ${p.peak.toLocaleString()} m">${WHAT[k]} · ${p.peak.toLocaleString()} m</p>
       <div class="strip" title="Land colours, each as tall as it covers the photos">${landStrip(p)}</div>
       <div class="water" title="Water: the deep, then the shallows offshore to the coast"></div>
       <div class="photos" data-photos="${k}"></div>

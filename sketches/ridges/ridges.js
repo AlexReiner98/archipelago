@@ -61,6 +61,7 @@ export const DEFAULTS = {
   hierarchy: 0.6,  // islands all alike (0) to a few large leading many small (1)
   age: 0.6,        // along a chain, young tall dark islands (one end) to old low sinking atolls (the other)
   shallows: 0.4,   // how wide the pale shallow water round the land reaches
+  relief: 0.6,     // height variety within an archipelago: even (0) to massifs among low islands (1)
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   line: 1.2,       // outline weight
   seed: 1,
@@ -198,7 +199,9 @@ export function ridges(dials) {
       const c = crest(toCell(x) * 3, r * 0.12);
       const rugged = Math.max(0, Math.min(1, d.rugged + f.rugged - age * 0.5));
       const peak = (rd ? 0.4 * c + 0.6 * smooth(rd.level, 1, L.u) : c) ** (1 + rugged * 2.5);
-      const tall = rise * f.rise * (1 - 0.8 * age) * (1 - d.hierarchy * 0.6 * (1 - L.rank));
+      // Height variety: a slow swell over the page lifts some islands into massifs and keeps others low.
+      const massif = 1 + d.relief * (1.5 * land(toCell(x) * 0.6 + 11, yc * 0.6 + 5) - 0.75) * 1.6;
+      const tall = rise * f.rise * Math.max(0.15, massif) * (1 - 0.8 * age) * (1 - d.hierarchy * 0.6 * (1 - L.rank));
       let raw = mask * tall * (0.25 + 0.75 * peak);
       if (f.top) raw = Math.min(raw, tall * (1 - 0.65 * f.top));
       const stp = step * f.step, soft = Math.max(0.02, Math.min(1, d.soft + f.soft));

@@ -80,6 +80,7 @@
   <label class="check" title="Each place's own landforms: fjord cliffs, karst towers, shield volcanoes, low reef islets"><input id="forms" type="checkbox" checked> Landforms by place</label>
   <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1" step="0.01"></label>
   <label class="not-noise" title="Along a chain: young, tall, dark islands at one end; old, low, sinking atolls at the other">Age <small>none · strong</small><input id="age" type="range" min="0" max="1" step="0.01"></label>
+  <label title="Some islands lifted into massifs, others kept low">Relief <small>even · varied</small><input id="relief" type="range" min="0" max="1" step="0.01"></label>
   <label title="Pale shallow water round the land">Shallows <small>none · wide</small><input id="shallows" type="range" min="0" max="1" step="0.01"></label>
   <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="3" step="0.05"></label>
   <label class="check"><input id="wrap" type="checkbox"> Repeat left to right</label>
@@ -98,7 +99,7 @@
   import { paint, fillOf as fillWith, swell } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows'];
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   const palettes = Object.fromEntries(Object.entries(PLACES).map(([k, p]) => [k, structuredClone(p)]));
   // The menu by where: Canada's archipelagos, those elsewhere, and the hand-picked palettes.

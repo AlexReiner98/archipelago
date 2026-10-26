@@ -238,6 +238,26 @@ Object.assign(PLACES, CANADA);
 PLACES.haidaGwaii.region = 'canada';
 for (const [k, p] of Object.entries(PLACES)) p.form ??= FORMS[k.replace(/Hand$/, '')];
 
+// How mountainous each place really is: its highest point above the sea, in metres, rounded. From general reference
+// knowledge, not checked against a survey; the low ones (Broken Group, Mingan, the two Ontario groups) are rough.
+export const PEAKS = {
+  hawaii: 4207, arctic: 2616, svalbard: 1713, galapagos: 1707, haidaGwaii: 1150, cyclades: 1004, rajaAmpat: 1000,
+  faroe: 882, gulfIslands: 709, magdalen: 174, fundyIsles: 125, brokenGroup: 120, mingan: 50, thousandIslands: 30,
+  thirtyThousand: 25, maldives: 2,
+};
+/**
+ * How tall a place's islands stand, from its peak: on a log scale (a few metres to Mauna Kea), then stretched, so a
+ * reef atoll barely clears the water and a volcano towers. Replaces the hand-set height in its landform.
+ */
+export const riseOf = (metres) => {
+  const r = Math.log10(Math.max(1, metres)) / Math.log10(4207);
+  return +(0.12 + 1.6 * r ** 2.5).toFixed(3);
+};
+for (const [k, p] of Object.entries(PLACES)) {
+  const metres = PEAKS[k.replace(/Hand$/, '')];
+  if (metres !== undefined) (p.peak = metres), (p.form = { ...p.form, rise: riseOf(metres) });
+}
+
 /** A blue, in OKLab: toward blue, not toward red. Blues are the water's; the land is everything else. */
 const isBlue = ([, a, b]) => b < -0.03 && a < 0.03;
 
