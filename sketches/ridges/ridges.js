@@ -65,6 +65,7 @@ export const DEFAULTS = {
   edges: 0.5,      // a calm border of open water round the islands: none (0) to wide (1)
   foothills: 0.6,  // smaller hills in front of each range, overlapping it: none (0) to many (1)
   peaks: 0.6,      // ranges in bands (0) to distinct summits, each row its own (1)
+  slope: 2,        // max slope from the nearest water, height per unit across: steep (high) to gentle (low); 0 for none
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   anchors: null,   // [[x, y], ...] in page units: put archipelago i at anchor i (one per anchor), as on a map
   line: 1.2,       // outline weight
@@ -221,7 +222,7 @@ export function ridges(dials) {
 
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
-    const h = [], shelf = [], gs = [], ts = [], steps = [];
+    const h = [], shelf = [], gs = [], ts = [], steps = [], raws = [], terraces = [];
     for (const x of xs) {
       const L = at(x, y, yc), f = formAt(x, y, L), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
       const calm = shore(x, y, yc) * territory(x, y);
@@ -236,7 +237,7 @@ export function ridges(dials) {
       if (sinking) mask *= 1 - sinking * smooth(L.hi + span * 0.6, L.hi + span * 1.4, L.u);
       // Sheer sides: the land reaches its full height almost at once.
       if (f.cliff) mask = smooth(0, 1 - 0.85 * f.cliff, mask);
-      if (!mask) { h.push(0); continue; }
+      if (!mask) { raws.push(0), terraces.push([1, 0.3]); continue; }
       // Height: the place's own, lower for a lesser island and for an older one; with diffusion, rising to the heart.
       // Peaks: each row its own summits (the row index moves the noise faster), set apart from each other, so a
       // row's mountains stand clear of the row behind rather than lining up into bands.
@@ -255,9 +256,28 @@ export function ridges(dials) {
       }
       // A coarse step never passes most of the land's own height, so even the coarsest leaves one terrace.
       const stp = Math.min(step * f.step, Math.max(1, tall * 0.6)), soft = Math.max(0.02, Math.min(1, d.soft + f.soft));
-      const q = raw / stp, k = Math.floor(q);
-      h.push(stp * (k + smooth(1 - soft, 1, q - k)));
+      raws.push(raw), terraces.push([stp, soft]);
     }
+    // Max slope: no land rises faster than the slope from the nearest water in its row, so a narrow island stays low
+    // and only a wide one can stand tall. Two sweeps, each carrying the limit in from a coast; then the terraces.
+    if (d.slope > 0) {
+      const lim = d.slope * dx;
+      for (let i = 1; i < raws.length; i++) raws[i] = Math.min(raws[i], raws[i - 1] + lim);
+      for (let i = raws.length - 2; i >= 0; i--) raws[i] = Math.min(raws[i], raws[i + 1] + lim);
+      if (!d.wrap) (raws[0] = Math.min(raws[0], lim)), (raws[raws.length - 1] = Math.min(raws[raws.length - 1], lim));
+    }
+    // A step is never more than most of its island's height as it now stands, so every island keeps a terrace.
+    for (let i = 0; i < raws.length; ) {
+      if (raws[i] <= 0) { i++; continue; }
+      let j = i, top = 0;
+      while (j < raws.length && raws[j] > 0) top = Math.max(top, raws[j++]);
+      for (let k = i; k < j; k++) terraces[k][0] = Math.min(terraces[k][0], Math.max(1, top * 0.6));
+      i = j;
+    }
+    raws.forEach((raw, i) => {
+      const [stp, soft] = terraces[i], q = raw / stp, k = Math.floor(q);
+      h.push(raw > 0 ? stp * (k + smooth(1 - soft, 1, q - k)) : 0);
+    });
     // The shallows first, so the land stands in them: three depths, offshore to the coast (sea 0, 1, 2), each
     // narrower than the last, all one gently rising profile.
     [0.02, 0.4, 0.75].forEach((from, depth) => {
