@@ -30,12 +30,18 @@
   .mix label { margin: 0; display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources a { color: inherit; }
+  #preset, #presetName { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; }
+  #presetNote { font-size: 11px; opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #note { opacity: .6; font-variant-numeric: tabular-nums; font-size: 12px; }
 </style>
 </head>
 <body>
 <aside>
   <h1>Archipelago ridges</h1>
+  <h2>Presets</h2>
+  <div class="row"><select id="preset" aria-label="Saved presets" title="Load a saved setup"></select><button id="presetDelete" title="Forget the chosen preset">Delete</button></div>
+  <div class="row"><input id="presetName" placeholder="Name this setup" aria-label="Preset name"><button id="presetSave" title="Save everything as it is now: dials, palettes, colours, background, seed">Save</button></div>
+  <div class="row"><button id="presetExport" title="Download all presets as a file">Export</button><button id="presetImport" title="Add presets from a file">Import</button><input id="presetFile" type="file" accept="application/json,.json" hidden><span id="presetNote"></span></div>
   <h2>Palette</h2>
   <select id="place" aria-label="Palette"></select>
   <div class="swatches" id="swatches" title="Paper and ink first, then the island colours. Click one to change it."></div>
@@ -87,6 +93,7 @@
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
   import { PLACES, fromPixels, signature, waterOf, landOf } from './palettes.js';
+  import * as presets from './presets.js';
 
   const $ = (id) => document.getElementById(id);
   const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows'];
@@ -229,6 +236,71 @@
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
   };
 
+  // Presets: everything that makes this picture, so it can be had again.
+  const paletteOf = (p) => ({ title: p.title, paper: p.paper, ink: p.ink, colours: [...p.colours], weights: p.weights ? [...p.weights] : undefined });
+  const changed = (k, p) => !PLACES[k] || JSON.stringify(paletteOf(p)) !== JSON.stringify(paletteOf(PLACES[k]));
+  const capture = () => ({
+    v: 1,
+    place: $('place').value,
+    mix: [...$('mix').querySelectorAll('input:checked')].map((c) => c.value),
+    source: $('source').value,
+    dials: Object.fromEntries(DIALS.map((k) => [k, +$(k).value])),
+    weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked,
+    seed, bg: bgPicked,
+    // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
+    palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
+  });
+  function apply(s) {
+    for (const [k, p] of Object.entries(PLACES)) palettes[k] = structuredClone(p);
+    for (const [k, p] of Object.entries(s.palettes ?? {})) {
+      palettes[k] = { ...(palettes[k] ?? {}), ...structuredClone(p) };
+      if (![...$('place').options].some((o) => o.value === k)) $('place').insertAdjacentHTML('beforeend', `<option value="${k}">${p.title ?? k}</option>`);
+    }
+    if (palettes[s.place]) $('place').value = s.place;
+    for (const c of $('mix').querySelectorAll('input')) c.checked = (s.mix ?? []).includes(c.value);
+    $('source').value = s.source ?? 'chains';
+    for (const k of DIALS) if (s.dials?.[k] !== undefined) $(k).value = s.dials[k];
+    $('weighted').checked = s.weighted ?? true; $('forms').checked = s.forms ?? true; $('wrap').checked = !!s.wrap;
+    seed = s.seed ?? 1; bgPicked = s.bg ?? null;
+    showSource(); swatches(); draw();
+  }
+  function listPresets(chosen = '') {
+    const names = Object.keys(presets.all()).sort((a, b) => a.localeCompare(b));
+    $('preset').innerHTML = `<option value="">${names.length ? 'Load a preset…' : 'No presets yet'}</option>` + names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
+    $('preset').value = chosen;
+  }
+  const tellPreset = (text) => ($('presetNote').textContent = text);
+  $('preset').onchange = () => {
+    const s = presets.all()[$('preset').value];
+    if (s) apply(s), ($('presetName').value = $('preset').value), tellPreset(`Loaded`);
+  };
+  $('presetSave').onclick = () => {
+    const name = $('presetName').value.trim() || `${pal().title} ${seed}`;
+    tellPreset(presets.keep(name, capture()) ? `Saved “${name}”` : 'This browser would not keep it: export instead');
+    listPresets(name);
+  };
+  $('presetDelete').onclick = () => {
+    const name = $('preset').value;
+    if (!name) return;
+    presets.remove(name);
+    tellPreset(`Deleted “${name}”`);
+    listPresets();
+  };
+  $('presetExport').onclick = () => save('archipelago-presets.json', new Blob([presets.exported()], { type: 'application/json' }));
+  $('presetImport').onclick = () => $('presetFile').click();
+  $('presetFile').onchange = async () => {
+    const file = $('presetFile').files[0];
+    if (!file) return;
+    try {
+      tellPreset(`Imported ${presets.imported(await file.text())}`);
+    } catch (err) {
+      tellPreset(err.message);
+    }
+    $('presetFile').value = '';
+    listPresets();
+  };
+
+  listPresets();
   swatches();
   draw();
 </script>
