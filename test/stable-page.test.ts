@@ -45,7 +45,7 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     return res.result.created as Record<string, string>;
   };
   const made = await change('agent:setup', [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Read here' },
+    { op: 'create', ref: 'p', type: 'work.project', title: 'Read here', body: 'What it is.\n\nA part of it\nFolded until it is asked for.' },
     { op: 'create', ref: 't', type: 'work.task', title: 'On the page' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'create', ref: 'q', type: 'work.project', title: 'Elsewhere' },
@@ -65,8 +65,8 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
       window.stillMark = 1;
       window.swaps = 0;
       new MutationObserver((list) => (window.swaps += list.reduce((n, m) => n + m.addedNodes.length, 0))).observe(document.querySelector('.part[data-part="item"]'), { childList: true });
-      const history = [...document.querySelectorAll('details.fold')].at(-1);
-      history.open = true;
+      const part = [...document.querySelectorAll('.part[data-part="item"] details.section')].at(-1);
+      part.open = true;
     })()`);
     // Three agents at once, each changing what is not on the page, for a few pulses.
     for (let n = 1; n <= 4; n++) {
@@ -79,7 +79,7 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     // A change to what is on the page shows on it, in place.
     await change('agent:a', [{ op: 'update', id: made.t, title: 'Renamed on the page' }]);
     assert.ok(await until(`document.querySelector('main').textContent.includes('Renamed on the page')`), 'the change shows');
-    const after = await page.evaluate<{ mark: number; open: boolean }>(`({ mark: window.stillMark, open: [...document.querySelectorAll('details.fold')].at(-1).open })`);
+    const after = await page.evaluate<{ mark: number; open: boolean }>(`({ mark: window.stillMark, open: [...document.querySelectorAll('.part[data-part="item"] details.section')].at(-1).open })`);
     assert.deepEqual(after, { mark: 1, open: true }, 'not reloaded, the open fold still open');
   } finally {
     page.close();

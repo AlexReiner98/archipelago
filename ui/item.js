@@ -1,24 +1,19 @@
-// The page every item lands on, in the sheet that opens from the side of the canvas: the item read as a document.
-// Its title, one line of marks (its type, status, owner and short fields), its note or its text with what it brings
-// in, and what its pack adds for its kind or type (ui/screens.js) under that. What it is tied to is not listed here:
-// the canvas behind draws it, with this item lit. Rare actions are in one menu; the page names no pack's type.
+// The page every item lands on, in the sheet that opens from the side of the canvas: a bare page of what the item
+// holds, a section for each (ui/item-sections.js), under its title. What it is tied to is not on it: the canvas
+// behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
 import { api, ask, h, part, tell } from './base.js';
 import { draftOf } from './draft.js';
-import { automationDoes, entityForm } from './forms.js';
-import { documentMenu, documentNote, figureOf, readDocument } from './item-doc.js';
+import { entityForm } from './forms.js';
+import { documentMenu, figureOf, readDocument } from './item-doc.js';
+import { fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { relationEditor } from './item-links.js';
-import { storyPart } from './lens.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
-import { actionForm, actionsFor, drawScreens, fold, keepsFigure, readWhole } from './screens.js';
-import { RAN, ago, changeRow, eventLine, gist, idsAsLinks, idsIn, isA, link, menu, relations, statusesOf, titles, tokensText, typeTitle, types, when } from './words.js';
+import { actionForm, actionsFor, keepsFigure, readWhole } from './screens.js';
+import { idsIn, isA, menu, relations, titles, types } from './words.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
 const rootOf = (type) => relations.get(type)?.root ?? type;
-/** A session's own record (where it ran, its ids, when it was heard from, what it used): said as marks, not as fields. */
-const RUN_OWN = ['story', 'session_id', 'cwd', 'last_seen', 'tokens_used', 'surface'];
-/** A field that holds an item's id. */
-const ID = /^e_[a-z0-9]{8}$/;
 
 export async function entity(id, here) {
   const page = part('item');
@@ -45,13 +40,10 @@ export async function entity(id, here) {
     }
   };
   const owner = e.owner ? await api('get', { id: e.owner }).then((r) => r.entity, () => null) : null;
-  // The kernel's own records: a session and an automation.
+  // The kernel's own record of a session at work.
   const run = isA(e.type, 'sys.run');
   const session = run && e.is_open && !e.archived_at;
-  const automation = isA(e.type, 'sys.automation');
-  // A session that told the story of its work is that story first.
-  const story = run && e.props.story?.length ? await api('view', { name: 'story', params: { run: id } }).catch(() => null) : null;
-  // An item a screen reads whole is met as its reader meets it: its text with the items it brings in, in their places.
+  // An item a screen reads whole can be printed and shared: its text with the items it brings in, in their places.
   const { doc, links } = readWhole(e.type) ? await readDocument(id) : { doc: null, links: [] };
   // A document is read in public as it was last published: whether it is, and whether its draft says something else now.
   const shown = doc && !doc.from && type?.public ? await api('published', { id }).catch(() => null) : null;
@@ -66,14 +58,6 @@ export async function entity(id, here) {
   // Work an agent can take on: what can be estimated.
   const workish = !e.archived_at && e.kind === 'work' && Boolean(type?.fields.tokens_estimated);
   const ties = relationEditor(e, data, change, again);
-  // What happened to it, as the same lines Changes shows.
-  const sets = [];
-  for (const ev of past) {
-    const last = sets.at(-1);
-    if (ev.changeset && last?.changeset === ev.changeset) last.events.push(ev);
-    else sets.push({ changeset: ev.changeset, events: [ev] });
-  }
-  const lines = sets.flatMap((g) => (g.changeset ? changeRow(g, { here: id }) : g.events.map(eventLine)));
   const endSession = async () => {
     if (!(await ask({ title: `End "${e.title}"?`, message: 'Anything it holds is released.', action: 'End session', danger: true }))) return;
     try {
@@ -83,25 +67,10 @@ export async function entity(id, here) {
     }
     again();
   };
-  // A short value is a fact to glance at; a long one (a decision's outcome, its rationale) is text to read.
-  // A whole object (a diagram's boxes, who started a run) is data drawn where it belongs, never a fact to print.
-  const fields = Object.entries(e.props).filter(([k, v]) => v !== null && v !== '' && k !== 'story' && !(v && typeof v === 'object' && !Array.isArray(v)) && !(run && RUN_OWN.includes(k)) && !(/^[a-z]_[a-z0-9]{8}$/.test(String(v)) && !ID.test(String(v)))); // an id that names no item is to copy, not to read
-  const runFacts = run && [
-    e.props.surface && h('span', { class: 'fact', title: e.props.cwd ?? '' }, e.props.surface === 'claude-code' ? 'Claude Code' : (RAN[e.props.surface] ?? e.props.surface)),
-    e.props.last_seen && h('span', { class: 'fact' }, h('span', { class: 'muted' }, 'heard from '), ago(e.props.last_seen)),
-    e.props.tokens_used > 0 && h('span', { class: 'fact', title: `${e.props.tokens_used} tokens, input and output, not counting cached re-reads` }, h('span', { class: 'muted' }, 'used '), tokensText(e.props.tokens_used)),
-    // Started by someone other than the owner, it only proposes.
-    e.props.started_by?.name && h('span', { class: 'fact', title: 'Not started by the owner: what it changes waits for them' }, h('span', { class: 'muted' }, 'started by '), e.props.started_by.name),
-  ];
-  const short = fields.filter(([, v]) => String(v).length <= looks.numbers.fact_most);
-  // A field that holds an item's id says that item's name, as a way to it.
-  await Promise.all(short.filter(([, v]) => ID.test(String(v)) && !titles.has(String(v))).map(([, v]) => api('get', { id: String(v) }).then((r) => titles.set(r.entity.id, r.entity.title), () => null)));
-  // So does an item its note names by id ("Read next"): its neighbours' names are already here; the rest are asked for.
+  // Ids in its fields and its note are said by the names of what they name: its neighbours' are already here.
   for (const r of [...data.outgoing, ...data.incoming, ...(data.mentioned_in ?? [])]) titles.set(r.id, r.title);
-  const noted = idsIn([e.body ?? '', ...(doc?.parts ?? []).map((p) => p.section?.body ?? '')].join('\n')).filter((n) => !titles.has(n));
+  const noted = idsIn([e.body ?? '', ...Object.values(e.props).map((v) => (typeof v === 'string' ? v : ''))].join(' ')).filter((n) => !titles.has(n));
   await Promise.all(noted.map((n) => api('get', { id: n }).then((r) => titles.set(r.entity.id, r.entity.title), () => null)));
-  const value = (v) => (ID.test(String(v)) ? idsAsLinks(String(v)) : String(v));
-  const long = fields.filter(([, v]) => String(v).length > looks.numbers.fact_most);
   const edit = () => {
     const form = entityForm(e.type, e, {
       submitLabel: 'Save',
@@ -140,58 +109,28 @@ export async function entity(id, here) {
   };
 
   redraw.inPlace = inPlace;
-  // Its title and note, written in place and saved as one change (ui/draft.js); a document's text is read whole.
-  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, note: !doc, saved: again });
-  const note = doc
-    ? documentNote(doc, id, here, looks)
-    : h(
-        'section',
-        { class: 'note' },
-        keepsFigure(e.type) && figureOf(e, 'figure'),
-        long.length > 0 && h('dl', { class: 'fields' }, long.map(([k, v]) => [h('dt', {}, k.replaceAll('_', ' ')), h('dd', {}, String(v).length > looks.numbers.field_fold_at ? h('details', { class: 'long' }, h('summary', { title: String(v) }, gist(String(v))), String(v)) : String(v))])),
-        draft.note,
-      );
-  const screens = drawScreens({ e, data, id, redraw: again });
-
-  const history = fold(id, 'history', 'History', lines.length, looks.page.history === 'open', lines);
+  // Its title and note, written in place and saved as one change (ui/draft.js).
+  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, saved: again });
+  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, draft.note), draft.bar);
+  const history = historySection(id, past);
   const kids = [
     h(
       'div',
       { class: 'page-head' },
       draft.title,
-      // One quiet line: what it is, its status (changing it is an action of its own), who has it, its short fields;
-      // a mark only for a state that matters (archived, private, public, shared); everything rare in one menu.
       h(
         'div',
         { class: 'sheet-marks' },
-        h('span', { class: 'mark-type', title: e.type }, typeTitle(e.type)),
-        h('select', { class: 'mark-status', title: 'Status', disabled: Boolean(e.archived_at), onchange: (ev) => change([{ op: 'update', id, status: ev.target.value }], `Status set to ${ev.target.value} in the UI`) }, statusesOf(e.type).map((st) => h('option', { value: st, selected: st === e.status }, st))),
-        h('span', { class: 'fact' }, owner ? link(owner) : h('span', { class: 'muted' }, 'no owner')),
-        short.map(([k, v]) => h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${k.replaceAll('_', ' ')} `), value(v))),
-        runFacts,
-        automation && h('span', { class: 'fact' }, automationDoes(e.props)),
-        automation && e.props.last_fired && h('span', { class: `fact${String(e.props.last_result).startsWith('failed') ? ' error' : ''}`, title: String(e.props.last_result) }, `last fired ${when(e.props.last_fired)}`),
-        // Tied to nothing: started on the canvas, for an agent to propose its links; the canvas draws it once it is tied.
-        !data.incoming.length && !data.outgoing.length && !e.archived_at && h('span', { class: 'fact', title: 'An agent will propose how it is tied; the canvas draws it then' }, 'tied to nothing yet'),
-        e.archived_at && h('span', { class: 'pill closed' }, 'archived'),
-        e.confidence < 1 && h('span', { class: 'pill warn' }, `confidence ${e.confidence}`),
-        e.private_to && h('span', { class: 'pill closed', title: 'Other members of the workspace cannot see this' }, 'private'),
-        shown?.published ? h('span', { class: `pill ${shown.changed ? 'warn' : 'ok'}`, title: shown.changed ? 'Its draft says something other than what anyone reads: publish it again to show them' : 'Anyone reads it as it is now, at its own address' }, shown.changed ? 'draft changed' : 'published') : e.visibility === 'public' && h('span', { class: 'pill ok', title: 'Anyone can see its name and state, with no login' }, 'public'),
-        links.length > 0 && h('span', { class: 'pill warn', title: links.map((s) => (s.to_workspace ? `Shared with the workspace "${s.to_workspace}"` : 'Readable with no login by whoever holds the link')).join(', ') }, 'shared'),
-        doc?.from && h('span', { class: 'pill', title: `Read from the workspace "${doc.from}", which shares it` }, `from ${doc.from}`),
-        plan?.to_publish > 0 && h('span', { class: 'pill warn', title: `Not published as they are now: ${plan.documents.filter((d) => d.changed).map((d) => d.title).join(', ')}` }, `${plan.to_publish} to publish`),
         h('span', { class: 'grow' }),
         session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
       menu('⋯', [
         !e.archived_at && ['Edit its fields', edit],
         !e.archived_at && ties.any && ['Edit links', ties.open],
-        ['History', () => ((history.open = true), history.scrollIntoView({ block: 'start' }))],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.
         ...(e.archived_at ? [] : actionsFor(e.type).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),
         // Only an address on the web: what an agent wrote there is opened by the owner's click.
         /^https?:[/][/]/i.test(e.props.link ?? '') && ['Open where it ran', () => window.open(e.props.link, '_blank', 'noopener')],
-        data.source && [`Source: ${data.source.title.replace(/\b[a-z]_[a-z0-9]{8}\b/g, (found) => titles.get(found) ?? 'a session')}`, () => (location.hash = `#/e/${data.source.id}`)],
         workish && ['Copy session brief', copyBrief],
         workish && ['Launch a session: investigate only', () => launch('plan')],
         workish && ['Launch a session: may edit files', () => launch('acceptEdits')],
@@ -226,16 +165,13 @@ export async function entity(id, here) {
     ),
     ties.editor,
     acting,
-    ...(story ? [storyPart(story)].flat() : []),
-    // What it is comes before what its screens draw of it: said under a chart, it reads as a caption to it.
-    // A session that tells its story keeps its log of notes behind a fold: the story is what it says.
-    story ? fold(id, 'log', 'Log', 0, false, note) : note,
-    draft.bar,
-    screens.column,
+    headSection(e, owner, (st) => change([{ op: 'update', id, status: st }], `Status set to ${st} in the UI`)),
+    note,
+    fieldsSection(e, looks),
+    sourceSection(data.source),
     history,
-  ].map((k) => (k?.nodeType ? k : document.createTextNode(String(k))));
+  ].filter(Boolean);
   redraw.inPlace = false;
-  if (inPlace) return settleWhenFilled(page, kids, screens.after);
+  if (inPlace) return settleWhenFilled(page, kids, async () => {});
   page.replaceChildren(...kids);
-  screens.after();
 }
