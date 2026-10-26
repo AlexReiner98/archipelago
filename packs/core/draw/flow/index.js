@@ -8,7 +8,8 @@
 // draws, what each item is `inside` read as part_of. The layout is ./layout.js; this answers with the marks to draw
 // (SVG and HTML as data), which the page checks and mounts, so every name is in the page and every step a link. Its
 // look is ./look.js, in the lens's colours. A lens with steps tells the process as it happens (./story.js), the
-// conversation beside it. What is `pending` is a ghost: a change held for the owner, drawn where it would land (an
+// conversation beside it. A place that holds parts may be a colour on them instead of a step (./places.js), as the
+// style says (place_hues). What is `pending` is a ghost: a change held for the owner, drawn where it would land (an
 // item faint, a link dashed, an edit marked on its step), each with a badge keyed `held:<proposal>` that the page
 // answers a click on by putting the change to the person; a link the person just drew (`mine`) is dashed until it is.
 
@@ -16,6 +17,7 @@ import { placesOf, route, tieRoute } from './free.js';
 import { layout } from './layout.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
+import { placesAsColours } from './places.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 
@@ -57,6 +59,11 @@ export function picture({ answer, style, reduced }, tools) {
     answer = { ...answer, items: answer.items.filter((i) => named.has(i.id) || i.id === answer.lens?.from) };
   }
   const hidden = story ? { opacity: 0 } : {};
+  // A place that holds parts is a colour on them, not a step, where the style gives places colours (place_hues).
+  const placeHues = !story && Array.isArray(style.place_hues) ? style.place_hues.filter((h) => HEX.test(String(h))) : [];
+  const shownAs = placesAsColours(answer, placeHues, new Set([style.here, answer.lens?.from].filter(Boolean)));
+  answer = { ...answer, items: shownAs.items };
+  const hexOf = new Map(shownAs.places.map((p) => [p.id, p.hex]));
   // Every length is the style's (sizes, flow_*), named by the house style; so is the typeface.
   const z = (name) => {
     const v = style.sizes?.[`flow_${name}`];
@@ -141,6 +148,13 @@ export function picture({ answer, style, reduced }, tools) {
     colourRules.add(`.${cls} { --lf-link: ${hex}; }`);
     return ` ${cls}`;
   };
+  // A part in its place's colour: a class with a rule of its own, as a link's colour is.
+  const placeClass = (hex) => {
+    const cls = `lf-p-${hex.slice(1).toLowerCase()}`;
+    colourRules.add(`.${cls} { --lf-place: ${hex}; }`);
+    return cls;
+  };
+  const partOf = (id) => (hexOf.has(shownAs.of.get(id)) ? placeClass(hexOf.get(shownAs.of.get(id))) : '');
   const tieLayer = g.ties.map((t, n) => {
     const cls = `${kind(t.type)}${onHover.has(t.type) && !t.pending ? ' on-hover' : ''}${pend(t.pending)}`;
     const path = m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
@@ -160,7 +174,7 @@ export function picture({ answer, style, reduced }, tools) {
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + (n.stub ? z('stub_text_x') : z('text_x'));
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held'].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held'].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER),
       !n.stub && m('circle', { cx: left - z('dot_gap'), cy: Y, r: z('dot'), class: `lf-dot ${dotOf(i)}` }),
@@ -199,6 +213,7 @@ export function picture({ answer, style, reduced }, tools) {
   const key = [
     [['box', 'Work'], ['diamond', 'Question'], ['pill', 'Event'], ['sheet', 'Record'], ['end', 'Possible end']].filter(([shape]) => uses((n) => n.shape === shape)).map(([shape, label]) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 11, CORNER)), label)),
     [['done', 'Done'], ['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way'], ['', restWords()]].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)).map(([dot, label]) => mark(m('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
+    shownAs.places.filter((p) => steps.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', 11, 7, 20, 11, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
     g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
     g.chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
     g.breaks.length > 0 && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),

@@ -5,6 +5,8 @@ export const css = `
 .lf-step { cursor: pointer; }
 .lf-step.dragging { cursor: grabbing; }
 .lf-step .lf-shape { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
+/* A part outlined in the colour of the place it is part of (place_hues): the place is not drawn, the key names it. */
+.lf-step.placed .lf-shape { stroke: var(--lf-place); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-step.scenario .lf-shape { stroke: var(--ln-muted); stroke-dasharray: var(--ln-flow-dash-scenario); }
 .lf-step.you .lf-shape { stroke: var(--ln-you); }
 .lf-step.here .lf-shape, .lf-step:hover .lf-shape, .lf-step:focus .lf-shape { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
