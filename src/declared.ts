@@ -161,6 +161,8 @@ export interface StyleDef {
   id: string;
   title: string;
   on?: string[];
+  /** "workspace": on nothing, it lies over the workspace's own style kept about nothing, and under every nearer one. */
+  over?: 'workspace';
   props: Record<string, unknown>;
 }
 

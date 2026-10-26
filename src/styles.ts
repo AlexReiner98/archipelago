@@ -2,7 +2,7 @@
 // draws by comes from here; the kernel keeps none of its own ("Where does style live?", decided 20 Oct 2026).
 //
 // Layers, the nearest last, each field of a nearer one over the same field of those before it:
-//   a preset on nothing (the workspace's), a style kept about nothing,
+//   a preset on nothing (the workspace's), a style kept about nothing, a preset on nothing that says it lies over it,
 //   a preset on the item's kind or type, a style kept on it,
 //   a style kept about the item, one about the view drawn, one named outright.
 // A style kept with a preset's id (preset) is the owner's version of that preset: its fields over the preset's, in
@@ -57,7 +57,7 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk): Pro
     const mine = versions.find((v) => v.props.preset === p.id);
     if (mine && !mine.is_open) continue;
     const on = mine && listed(mine.props.on).length ? listed(mine.props.on) : (p.on ?? []);
-    const weight = !on.length ? 0 : onIt(on) ? 2 : -1;
+    const weight = !on.length ? (p.over === 'workspace' ? 1.5 : 0) : onIt(on) ? 2 : -1;
     if (weight < 0) continue;
     layers.push({ weight, id: mine?.id ?? p.id, title: mine?.title || p.title, preset: p.id, props: mine ? over(p.props, fields(mine.props)) : p.props });
   }

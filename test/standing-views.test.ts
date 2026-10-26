@@ -123,14 +123,14 @@ async function answers() {
 
 const TIME = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/;
 
-/** Ids named, times dropped, as JSON. */
+/** Ids named, times dropped (and the days counted to now, which move with the date), as JSON. */
 function normalise(value: unknown, names: Map<string, string>): unknown {
   const rename = (s: string) => s.replace(/\b[er]_[a-z0-9]{8}\b/g, (id) => (names.has(id) ? `<${names.get(id)}>` : id.startsWith('r_') ? '<link>' : `<${id}>`));
   const walk = (v: unknown): unknown => {
     if (v instanceof Date) return '<time>';
     if (typeof v === 'string') return TIME.test(v) ? '<time>' : rename(v);
     if (Array.isArray(v)) return v.map(walk);
-    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [rename(k), walk(x)]));
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [rename(k), k === 'days' && typeof x === 'number' ? '<days>' : walk(x)]));
     return v;
   };
   return JSON.parse(JSON.stringify(walk(value), (_k, v) => (v instanceof Date ? '<time>' : v)), (_k, v) => (typeof v === 'string' && TIME.test(v) ? '<time>' : v));

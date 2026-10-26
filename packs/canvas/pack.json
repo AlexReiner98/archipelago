@@ -8,6 +8,7 @@
     {
       "id": "canvas.house",
       "title": "Canvas",
+      "over": "workspace",
       "props": { "shape": "flow" }
     }
   ]

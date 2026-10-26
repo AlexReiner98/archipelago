@@ -44,19 +44,20 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
     { op: 'link', type: 'about', from: 'ps', to: made.p },
   ]);
   const opened = await run();
-  assert.deepEqual([opened.style.shape, opened.style.open, opened.style.colors], ['list', 1, { sea: '#f0f4f5' }], 'the workspace’s own');
+  // The canvas pack's preset lies over the workspace's own style (over: workspace): its flow is the default for now.
+  assert.deepEqual([opened.style.shape, opened.style.open, opened.style.colors], ['flow', 1, { sea: '#f0f4f5' }], 'the workspace’s own, under the canvas');
   // A named set (sizes, colours) is merged name by name: a style that sets one size keeps the house style's others.
   assert.equal(typeof opened.style.sizes.flow_layer_gap, 'number');
-  assert.deepEqual(opened.used, [house, canvas, { id: drawn.ws, title: 'House style' }]);
+  assert.deepEqual(opened.used, [house, { id: drawn.ws, title: 'House style' }, canvas]);
   const ofP = await run({ of: made.p });
-  assert.deepEqual([ofP.style.open, ofP.style.shape], [2, 'list'], 'a field the nearer one names replaces it; one it does not falls through');
-  assert.deepEqual(ofP.used.map((k: any) => k.title), ['House style', 'Canvas', 'House style', 'P opened']);
+  assert.deepEqual([ofP.style.open, ofP.style.shape], [2, 'flow'], 'a field the nearer one names replaces it; one it does not falls through');
+  assert.deepEqual(ofP.used.map((k: any) => k.title), ['House style', 'House style', 'Canvas', 'P opened']);
   // The owner's version of a preset: its fields over the preset's, in its place; retired, the preset is not used.
   const mine = await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Mine', props: { preset: 'core.house', lit: 'blocked' } }]);
   const versioned = await run();
-  assert.deepEqual([versioned.style.lit, versioned.style.shape, versioned.used[0]], ['blocked', 'list', { id: mine.v, title: 'Mine', preset: 'core.house' }]);
+  assert.deepEqual([versioned.style.lit, versioned.style.shape, versioned.used[0]], ['blocked', 'flow', { id: mine.v, title: 'Mine', preset: 'core.house' }]);
   await make(l, [{ op: 'update', id: mine.v, status: 'retired' }]);
-  assert.deepEqual((await run()).used.map((k: any) => k.title), ['Canvas', 'House style'], 'retired, the preset is not used');
+  assert.deepEqual((await run()).used.map((k: any) => k.title), ['House style', 'Canvas'], 'retired, the preset is not used');
   await make(l, [{ op: 'update', id: mine.v, status: 'current' }, { op: 'update', id: mine.v, props: { lit: null } }]);
   // A style kept on a kind is how every such item's pictures look: over the workspace's, under the item's own.
   const onKind = await make(l, [{ op: 'create', ref: 'k', type: 'style', title: 'Projects', props: { on: ['work.project'], open: 3, radius: 4, sizes: { list_row: 40 } } }]);

@@ -45,7 +45,7 @@
        "why": "under_way"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -74,7 +74,7 @@
        "why": "unsettled"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -99,7 +99,7 @@
        "why": "unsettled"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -126,7 +126,7 @@
        "why": "blocked"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -153,7 +153,7 @@
        "why": "blocked"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -174,7 +174,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -198,7 +198,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -222,7 +222,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -246,7 +246,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -270,7 +270,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -294,7 +294,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -312,7 +312,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -368,7 +368,7 @@
        "why": "unsettled"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -397,7 +397,7 @@
        "why": "unsettled"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -422,7 +422,7 @@
        "why": "holding_up"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -450,7 +450,7 @@
        "why": "unsettled"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -498,7 +498,7 @@
        "why": "blocked"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -525,7 +525,7 @@
        "why": "blocked"
       },
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -546,7 +546,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -570,7 +570,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -594,7 +594,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -618,7 +618,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -642,7 +642,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -666,7 +666,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
@@ -690,7 +690,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -708,7 +708,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       }
      ],
@@ -726,7 +726,7 @@
      "owner": null,
      "reasons": [
       {
-       "days": 24,
+       "days": "<days>",
        "why": "stale"
       },
       {
