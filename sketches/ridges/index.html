@@ -47,6 +47,7 @@
   <div class="swatches" id="swatches" title="Paper and ink first, then the island colours. Click one to change it."></div>
   <div id="sources"></div>
   <div class="row" title="The colour of the open water behind everything"><label class="check">Background <input id="bg" type="color"></label><button id="bgReset" title="Back to this palette's deep water">From palette</button></div>
+  <label title="As photographed (0), enriched (1), or richer still (2): more colour and contrast, every hue kept">Richness <output id="richnessOut"></output><input id="richness" type="range" min="0" max="2" step="0.05" value="1"></label>
   <div class="row"><button id="shuffle" title="Same colours, another order">Shuffle colours</button><label class="check" title="Use each colour as much as it covers the photos"><input id="weighted" type="checkbox" checked> As in the photos</label></div>
   <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
   <img id="photo" alt="">
@@ -95,14 +96,25 @@
 <main><canvas id="view"></canvas></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
-  import { PLACES, fromPixels, signature, waterOf, landOf, layout } from './palettes.js';
+  import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
   import * as presets from './presets.js';
   import { paint, fillOf as fillWith, swell } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
   const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
-  const palettes = Object.fromEntries(Object.entries(PLACES).map(([k, p]) => [k, structuredClone(p)]));
+  // Palettes are kept as photographed (a palette shipped enriched is taken back to its raw colours); Richness enriches
+  // them as they are drawn, so the swatches always show and edit the colours the photos gave.
+  const baseOf = (p) => (p.raw ? { ...structuredClone({ ...p, raw: undefined }), colours: [...p.raw.colours], sea: p.raw.sea && [...p.raw.sea] } : structuredClone(p));
+  const palettes = Object.fromEntries(Object.entries(PLACES).map(([k, p]) => [k, baseOf(p)]));
+  const richer = new Map();
+  const richOf = (p) => {
+    const r = +$('richness').value;
+    if (!p || !r) return p;
+    const key = JSON.stringify([p.colours, p.sea, p.weights, r]);
+    if (!richer.has(key)) richer.set(key, enrich(p, { chroma: 1 + 0.4 * r, contrast: 1 + 0.18 * r, sea: 1 + 0.25 * r, ceiling: 0.11 + 0.04 * r }));
+    return richer.get(key);
+  };
   // The menu by where: Canada's archipelagos, those elsewhere, and the hand-picked palettes.
   const kinds = [['Canada', (p) => p.region === 'canada'], ['Elsewhere', (p) => p.photos && p.region !== 'canada'], ['By hand', (p) => !p.photos]];
   $('place').innerHTML = kinds.map(([label, is]) => `<optgroup label="${label}">${Object.entries(palettes).filter(([, p]) => is(p)).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('')}</optgroup>`).join('');
@@ -113,7 +125,7 @@
   // already given first, takes the ticked place whose cast differs most from its neighbours', a neighbour counting
   // less the further off it is; no place is used twice until every ticked one is used.
   let given = [];
-  const palOf = (group) => palettes[given[group]] ?? pal();
+  const palOf = (group) => richOf(palettes[given[group]] ?? pal());
   // On a map: the place chosen above and every ticked place that has a position, each one archipelago.
   const geo = () => $('geo').checked && $('source').value !== 'noise';
   const geoPlaces = () => [...new Set([$('place').value, ...[...$('mix').querySelectorAll('input:checked')].map((c) => c.value)])].filter((k) => palettes[k].where);
@@ -150,7 +162,7 @@
   const background = (p) => bgPicked ?? waterOf(p).deep;
 
   function draw() {
-    const t0 = performance.now(), p = pal();
+    const t0 = performance.now(), p = richOf(pal());
     const pic = ridges(dials());
     const cv = $('view'), dpr = devicePixelRatio || 1;
     cv.width = pic.width * dpr; cv.height = pic.height * dpr;
@@ -160,6 +172,7 @@
     paint(g, pic, { base: p, palOf, background: background(p), weighted: $('weighted').checked });
     $('bg').value = background(p);
     $('bandsOut').textContent = $('bands').value;
+    $('richnessOut').textContent = +$('richness').value ? `×${(+$('richness').value).toFixed(2)}` : 'as photographed';
     $('rowsOut').textContent = $('rows').value;
     $('chainsOut').textContent = geo() ? `${given.length}, one per place` : $('chains').value;
     $('note').textContent = `${given.length ? given.map((k) => palettes[k].title).join(', ') + ' · ' : ''}${pic.shapes.length} shapes · ${(performance.now() - t0).toFixed(0)} ms`;
@@ -215,6 +228,7 @@
   $('source').addEventListener('change', () => (showSource(), draw()));
   showSource();
   $('mix').addEventListener('change', draw);
+  $('richness').addEventListener('input', draw);
   for (const b of document.querySelectorAll('[data-mix]')) b.onclick = () => {
     for (const c of $('mix').querySelectorAll('input')) c.checked = b.dataset.mix === 'all' || (palettes[c.value].region === 'canada') === (b.dataset.mix === 'canada');
     draw();
@@ -223,7 +237,7 @@
   const save = (name, blob) => Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name }).click();
   $('png').onclick = () => $('view').toBlob((b) => save(`archipelago-${$('place').value}-${seed}.png`, b));
   $('svg').onclick = () => {
-    const p = pal(), pic = ridges(dials()), f = (v) => +v.toFixed(1);
+    const p = richOf(pal()), pic = ridges(dials()), f = (v) => +v.toFixed(1);
     const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
     const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p)}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`], { type: 'image/svg+xml' }));
@@ -231,7 +245,7 @@
 
   // Presets: everything that makes this picture, so it can be had again.
   const paletteOf = (p) => ({ title: p.title, paper: p.paper, ink: p.ink, colours: [...p.colours], weights: p.weights ? [...p.weights] : undefined });
-  const changed = (k, p) => !PLACES[k] || JSON.stringify(paletteOf(p)) !== JSON.stringify(paletteOf(PLACES[k]));
+  const changed = (k, p) => !PLACES[k] || JSON.stringify(paletteOf(p)) !== JSON.stringify(paletteOf(baseOf(PLACES[k])));
   const capture = () => ({
     v: 1,
     place: $('place').value,
@@ -239,12 +253,12 @@
     source: $('source').value,
     dials: Object.fromEntries(DIALS.map((k) => [k, +$(k).value])),
     weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked, geo: $('geo').checked,
-    seed, bg: bgPicked,
+    seed, bg: bgPicked, richness: +$('richness').value,
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
   });
   function apply(s) {
-    for (const [k, p] of Object.entries(PLACES)) palettes[k] = structuredClone(p);
+    for (const [k, p] of Object.entries(PLACES)) palettes[k] = baseOf(p);
     for (const [k, p] of Object.entries(s.palettes ?? {})) {
       palettes[k] = { ...(palettes[k] ?? {}), ...structuredClone(p) };
       if (![...$('place').options].some((o) => o.value === k)) $('place').insertAdjacentHTML('beforeend', `<option value="${k}">${p.title ?? k}</option>`);
@@ -254,7 +268,7 @@
     $('source').value = s.source ?? 'chains';
     for (const k of DIALS) if (s.dials?.[k] !== undefined) $(k).value = s.dials[k];
     $('weighted').checked = s.weighted ?? true; $('forms').checked = s.forms ?? true; $('wrap').checked = !!s.wrap; $('geo').checked = s.geo ?? false;
-    seed = s.seed ?? 1; bgPicked = s.bg ?? null;
+    seed = s.seed ?? 1; bgPicked = s.bg ?? null; $('richness').value = s.richness ?? 1;
     showSource(); swatches(); draw();
   }
   function listPresets(chosen = '') {
