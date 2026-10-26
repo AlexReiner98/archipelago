@@ -66,6 +66,8 @@ export const DEFAULTS = {
   foothills: 0.6,  // smaller hills in front of each range, overlapping it: none (0) to many (1)
   peaks: 0.6,      // ranges in bands (0) to distinct summits, each row its own (1)
   undulate: 0.6,   // slope variety: each section of a climb a random check, up or level (0: always up at the max)
+  shape: null,     // a seeding shape { nx, ny, v } over the page, 0 to 1 (a letter, rendered by the page)
+  shapeStrength: 0.8, // how firmly land keeps to the shape: a hint (low) to the shape clearly read (1)
   slope: 2,        // max slope from the nearest water, height per unit across: steep (high) to gentle (low); 0 for none
   forms: null,     // (groups) => each archipelago's landform (see FORMS in palettes.js)
   anchors: null,   // [[x, y], ...] in page units: put archipelago i at anchor i (one per anchor), as on a map
@@ -235,6 +237,13 @@ export function ridges(dials) {
     shapes.push({ ...shape, small: Math.abs(area) / 2 < small });
   };
 
+  /** The seeding shape at a point, 0 outside to 1 inside, smooth; a grid over the whole page, not wrapping. */
+  const shapeAt = (x, y) => {
+    const { nx, ny, v } = d.shape, fx = Math.max(0, Math.min(nx - 1.001, (x / W) * nx - 0.5)), fy = Math.max(0, Math.min(ny - 1.001, (y / H) * ny - 0.5));
+    const x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0, at = (i, j) => v[j * nx + i];
+    return (at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx) * (1 - ty) + (at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx) * ty;
+  };
+
   for (let r = 0; r < d.rows; r++) {
     const y = M + (r + 1) * gap, yc = (y / H) * cells * (H / W);
     const h = [], shelf = [], gs = [], ts = [], steps = [], raws = [], terraces = [];
@@ -243,6 +252,11 @@ export function ridges(dials) {
       const L = at(x, y, yc), f = formAt(x, y, L), span = L.hi - L.lo, age = chains.length ? d.age * L.t : 0;
       const calm = shore(x, y, yc) * territory(x, y);
       if (calm < 1) L.u -= (1 - calm) * 1.5;
+      // A seeding shape (a letter): land rises inside it and sinks outside, so the archipelago takes its form.
+      if (d.shape && d.shapeStrength > 0) {
+        const g = shapeAt(x, y);
+        L.u += d.shapeStrength * (g * (L.hi - L.lo) * 4 - (1 - g) * 1.5);
+      }
       gs.push(L.g), ts.push(L.t), steps.push(Math.min(step * f.step, Math.max(1, rise * f.rise * 0.6)));
       // Shallows: a reach of pale sea round the land, wider as the dial turns.
       const sea = smooth(L.lo - span * (0.25 + 1.5 * d.shallows), L.lo, L.u) * L.gate * (d.shallows > 0 ? 1 : 0);
