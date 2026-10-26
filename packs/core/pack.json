@@ -732,7 +732,7 @@
     {
       "id": "report",
       "title": "Report",
-      "description": "Say that something happened or is so: progress, a result, a payment received, a check that it is still true.",
+      "description": "Say that something happened or is so: progress, a result, a payment received, a check that it is still true. Also answers the owner with a drawing: show, with a kept view or an ad-hoc lens and style.",
       "kernel": true
     },
     { "id": "ask", "title": "Ask", "description": "Put a question to someone and wait for the answer.", "kernel": true },

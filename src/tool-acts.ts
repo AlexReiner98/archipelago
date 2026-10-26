@@ -33,13 +33,12 @@ export const ACT_TOOLS: Record<string, Tool> = {
   },
   show: {
     description:
-      'Point the human\'s web UI at something, so they can follow what you are doing: an item, a screen (optionally "of" one item: the graph around it, or a project\'s roadmap), or what their canvas draws (a flat lens, the one query flat reads, with a style). ' +
+      'Answer the human with a drawing on their canvas: a kept view (entity: a lens item, a saved canvas) or a lens and style of your own, or open an item\'s page or the workspace. ' +
       'Their page goes there within a couple of seconds if it follows agents; one that does not offers the link instead. The answer says how many of their pages are open and how many follow you (pages). Add a short note saying what they are looking at. ' +
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
     input: {
       entity: z.string().optional().describe('An item id: open its page; a view kept on the map (type lens, a saved canvas) is opened as their canvas, its lens in their query bar.'),
-      screen: z.enum(['today', 'review', 'map', 'graph', 'roadmap', 'questions', 'automations', 'activity', 'workspace']).optional(),
-      of: z.string().optional().describe('With screen graph, roadmap or questions: the item (for the last two, a project) it is drawn for.'),
+      screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
       lens: z
         .record(z.string(), z.unknown())
         .optional()
@@ -86,7 +85,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
         return shown(`${input.entity ? `e/${input.entity}` : 'v'}${query.size ? `?${query}` : ''}`, input.note);
       }
       if (!input.entity && !input.screen) throw new Error('show needs "entity", "screen" or "lens".');
-      return shown(input.entity ? `e/${input.entity}` : input.of ? `${input.screen}/${input.of}` : input.screen, input.note);
+      return shown(input.entity ? `e/${input.entity}` : input.screen, input.note);
     },
   },
   claim: {
