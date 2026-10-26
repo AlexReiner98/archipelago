@@ -76,7 +76,36 @@
       "fields": {
         "compares": { "type": "string", "description": "What is compared with what, in one line a user can read: the position of the sun against the NOAA calculator in six cities." },
         "tolerance": { "type": "string", "description": "How close it must be to pass, e.g. within 0.01 degrees." },
-        "environment": { "type": "string", "description": "Where it runs and draws its picture: outside any host, or inside the program it extends." }
+        "environment": { "type": "string", "description": "Where it runs and draws its picture: outside any host, or inside the program it extends." },
+        "key": { "type": "string", "shown": true, "description": "Where it lives in the code, for one read in by npm run principles: its file and its name." },
+        "digest": { "type": "string", "shown": true, "description": "A hash of what npm run principles last read of it, so it is changed only when the code is." }
+      }
+    },
+    {
+      "id": "software.rule",
+      "extends": "record",
+      "title": "Rule",
+      "description": "A rule a pack keeps as data: when a change applies, waits for a person or is refused, or what a reply is asked. Read in from the pack file by npm run principles, never typed; it serves the principles it upholds.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "key": { "type": "string", "shown": true, "description": "Where it lives: its pack and its id, as core/forget." },
+        "pack": { "type": "string", "shown": true, "description": "The pack that declares it." },
+        "then": { "type": "string", "shown": true, "description": "What it does when it matches: hold, refuse, apply, or what it asks of a reply." },
+        "lifted": { "type": "string", "description": "The workspace setting that lifts it, when its pack lets one." },
+        "digest": { "type": "string", "shown": true, "description": "A hash of what npm run principles last read of it." }
+      }
+    },
+    {
+      "id": "software.action",
+      "extends": "record",
+      "title": "Agent action",
+      "description": "One thing an agent can do, called under one of the six verbs: the kernel's own or a pack's. Read in from the code by npm run principles, never typed; it serves the principles it upholds.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "key": { "type": "string", "shown": true, "description": "Its verb and name, as report/tell." },
+        "verb": { "type": "string", "shown": true, "description": "The verb it is called under." },
+        "pack": { "type": "string", "shown": true, "description": "The pack that declares it, or kernel." },
+        "digest": { "type": "string", "shown": true, "description": "A hash of what npm run principles last read of it." }
       }
     },
     {
