@@ -318,3 +318,34 @@ export function layout(places, width, height, margin = 0.14, spread = 0.5) {
   const ax = axis(1, false), ay = axis(0, true);
   return places.map((p) => p.where && [width * ax(p.where[1]), height * ay(p.where[0])]);
 }
+
+/** Whether OKLab falls inside the screen's colours (sRGB), with a hair of room. */
+function inGamut([L, a, b]) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3, m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3, s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s].every((v) => v >= -0.0005 && v <= 1.0005);
+}
+
+/**
+ * A palette made richer and its character kept: every colour keeps its hue; its chroma is multiplied (greys stay
+ * grey), held inside what a screen can show by easing the chroma back, never by shifting the hue; its lightness is
+ * spread from the palette's weighted middle (darks darker, lights lighter, the order kept). The water too, gentler.
+ */
+export function enrich(p, { chroma = 1.4, contrast = 1.18, sea = 1.25, ceiling = 0.15 } = {}) {
+  const lab = (h) => oklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+  const w = p.weights ?? p.colours.map(() => 1), total = w.reduce((a, b) => a + b, 0);
+  const mid = p.colours.reduce((s, h, i) => s + (lab(h)[0] * w[i]) / total, 0);
+  const richer = (h, k, spread) => {
+    const [L, a, b] = lab(h), L2 = Math.min(0.95, Math.max(0.12, mid + (L - mid) * spread)), C = Math.hypot(a, b);
+    // The boost fades toward the lightest colours, where more chroma turns a pale moss to neon; and no colour passes
+    // the ceiling, so earth stays earth.
+    let c = 1 + (k - 1) * (1 - Math.max(0, Math.min(1, (L2 - 0.72) / 0.2)));
+    if (C * c > ceiling) c = Math.max(1, ceiling / Math.max(C, 1e-6));
+    while (c > 1 && !inGamut([L2, a * c, b * c])) c -= 0.02;
+    return hex([L2, a * Math.max(c, 1), b * Math.max(c, 1)]);
+  };
+  return { ...p, colours: p.colours.map((h) => richer(h, chroma, contrast)), sea: p.sea?.map((h) => richer(h, sea, 1)), raw: { colours: p.colours, sea: p.sea } };
+}
+
+// Canada's palettes, enriched: more saturation and contrast, each colour's hue kept. The palettes as photographed
+// stay on each as raw, for comparison (the study shows both).
+for (const [k, p] of Object.entries(PLACES)) if (p.region === 'canada') PLACES[k] = enrich(p);

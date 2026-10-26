@@ -21,6 +21,8 @@
   .card .what { margin: 0 0 8px; opacity: .65; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .strip { display: flex; height: 34px; align-items: flex-end; gap: 1px; }
   .strip span { flex: 1; border-radius: 1px; }
+  .raw { display: flex; height: 7px; margin-top: 2px; gap: 1px; opacity: .9; }
+  .raw span { flex: 1; }
   .water { display: flex; height: 12px; margin-top: 3px; gap: 1px; }
   .water span { flex: 1; }
   .water span:first-child { flex: 2; }
@@ -32,7 +34,7 @@
 <body>
 <header>
   <h1>Canada's archipelagos</h1>
-  <p>Nine palettes drawn from photographs, land and water apart · <a href="./">open the tool</a></p>
+  <p>Nine palettes drawn from photographs, land and water apart, enriched (the thin strip is as photographed) · <a href="./">open the tool</a></p>
 </header>
 <main>
   <div class="hero"><canvas id="hero" title="All nine as one sea: each archipelago in its own colours and landform"></canvas></div>
@@ -94,7 +96,8 @@
       <canvas data-k="${k}"></canvas>
       <h2>${p.title}</h2>
       <p class="what" title="${WHAT[k]} · highest point about ${p.peak.toLocaleString()} m">${WHAT[k]} · ${p.peak.toLocaleString()} m</p>
-      <div class="strip" title="Land colours, each as tall as it covers the photos">${landStrip(p)}</div>
+      <div class="strip" title="Land colours, enriched: each as tall as it covers the photos">${landStrip(p)}</div>
+      <div class="raw" title="The same colours as photographed, before enriching">${(p.raw?.colours ?? []).map((c) => `<span style="background:${c}" title="${c}"></span>`).join('')}</div>
       <div class="water" title="Water: the deep, then the shallows offshore to the coast"></div>
       <div class="photos" data-photos="${k}"></div>
     </section>`).join('');
