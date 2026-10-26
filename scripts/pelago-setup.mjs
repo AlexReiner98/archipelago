@@ -11,6 +11,7 @@
 //   .claude/skills/pelago-bump/      how to record friction with Archipelago
 //   .claude/pelago.md                how to work with the map, read through CLAUDE.md
 //   .claude/pelago-setup.json        what the setup wrote, so it can be taken out again
+//   .worktreeinclude                 the ignored files above, which Claude Code then copies into each worktree it makes
 //   .git/hooks/commit-msg            names, in a commit a session makes, the session's run (not where the project has
 //                                    a commit-msg hook of its own, or its hooks are another tool's: core.hooksPath)
 //
@@ -76,6 +77,20 @@ case "$run" in ''|*[!A-Za-z0-9_-]*) exit 0 ;; esac
 git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Archipelago-Run: $run" "$1" || true
 exit 0
 `;
+// Claude Code copies into a worktree it makes (the desktop app's, --worktree, a subagent's) only the ignored files
+// .worktreeinclude names. Without them a session there has no hooks, so no run, and its commits name none.
+const INCLUDE = '.worktreeinclude';
+const INCLUDE_MARK = "# Archipelago's setup: what it wrote, for each worktree Claude Code makes";
+const CARRIED = ['.mcp.json', '.claude/settings.json', HOOK, RULES, '.claude/skills/pelago-bump/references/home.md'];
+/** A .worktreeinclude without the setup's lines in it. */
+const withoutCarried = (text) => {
+  const lines = text.split('\n');
+  const at = lines.indexOf(INCLUDE_MARK);
+  if (at < 0) return text.trim();
+  let end = at + 1;
+  while (end < lines.length && CARRIED.includes(lines[end])) end++;
+  return [...lines.slice(0, at), ...lines.slice(end)].join('\n').replace(/\n{3,}/g, '\n\n').trim();
+};
 const reads = (text) => /@\.claude\/(pelago|lattice)\.md/.test(text ?? '');
 
 // Every change is worked out first and made only once all of them are known: a file that cannot be read stops
@@ -203,6 +218,10 @@ function connect() {
         chmodSync(abs(git.hook), 0o755);
       },
     });
+  const include = read(abs(INCLUDE));
+  const rest = withoutCarried(include ?? '');
+  const includeOwn = Boolean(include?.includes(INCLUDE_MARK));
+  put(INCLUDE, `${rest ? `${rest}\n\n` : ''}${[INCLUDE_MARK, ...CARRIED].join('\n')}\n`, { own: includeOwn, verb: include ? 'added to ' : 'written  ', note: includeOwn ? '' : '(so a worktree Claude Code makes has the hooks)' });
   put(MANIFEST, json({ files: Object.fromEntries(Object.entries(OWN).map(([path, text]) => [path, sha(text)])) }), { own: true });
   for (const path of [...OLD.skill, OLD.rules, OLD.manifest]) if (existsSync(abs(path))) take(path, null, '(it has a new name, above)', true);
 
@@ -302,6 +321,11 @@ function remove() {
     else plan.push({ say: `kept       ${path}  (changed since the setup wrote it)`, make: null });
   }
   if (existsSync(abs(MANIFEST))) take(MANIFEST, null);
+  const include = read(abs(INCLUDE));
+  if (include?.includes(INCLUDE_MARK)) {
+    const rest = withoutCarried(include);
+    take(INCLUDE, rest ? `${rest}\n` : null, rest ? "(takes the setup's lines out)" : '(it holds nothing else)', true);
+  }
   // The commit-msg hook goes only when it is the setup's, and the runs kept for it with it.
   const git = gitFolder();
   if (git && read(abs(git.hook))?.includes(COMMIT_MARK)) take(git.hook, null);
