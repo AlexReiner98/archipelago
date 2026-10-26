@@ -4,8 +4,9 @@
 import { z } from 'zod';
 import { endedOf } from './ended.ts';
 import { limitOf } from './members.ts';
-import { acceptedSenders } from './outbox.ts';
+import { acceptedSenders, wholeMap } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
+import { askedLately } from './replies.ts';
 import { onReply } from './reply-rules.ts';
 import { liftsOn } from './rules.ts';
 import type { Tool } from './tools.ts';
@@ -18,8 +19,17 @@ const settings = async (l: Archipelago) => {
   const names = replyLifts(l);
   const { rows } = names.length ? await l.db.query<{ key: string; value: unknown }>(`select key, value from setting where key = any($1::text[])`, [names]) : { rows: [] };
   const lifted = Object.fromEntries(names.map((name) => [name, rows.some((r) => r.key === name && r.value === true)]));
-  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code, ...(names.length && { lifted }) };
+  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code, ...(names.length && { lifted, reply_rules: await replyRules(l, lifted) }) };
 };
+
+/** Each rule on a reply's end, for the owner's switch: what it says, the setting that turns it off, and how often it asked this week. */
+async function replyRules(l: Archipelago, lifted: Record<string, boolean>) {
+  const asked = await askedLately((await wholeMap(l)).db, l);
+  return l.registry.rules.filter(onReply).map((r) => {
+    const rule = `${r.pack}.${r.id ?? ''}`;
+    return { rule, say: r.say ?? '', lifted: r.lifted!, off: lifted[r.lifted!], asked: asked.get(rule) ?? 0 };
+  });
+}
 
 export const WORKSPACE_TOOLS: Record<string, Tool> = {
   workspace_info: {

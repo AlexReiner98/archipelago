@@ -21,6 +21,23 @@ async function liftedHere(whole: Q, rules: Rule[]): Promise<Set<string>> {
   return new Set(rows.filter((r) => r.value === true).map((r) => r.key));
 }
 
+/** How far back a rule's askings are counted for the owner: a week. */
+const LATELY_MS = 7 * 86_400_000;
+/** The newest sessions whose stories are read for them: one that asked this week is among these. */
+const RUNS_READ = 500;
+
+/** How often each reply rule asked in the last week, by pack.id, read from the steps the sessions kept. */
+export async function askedLately(whole: Q, l: Archipelago): Promise<Map<string, number>> {
+  const { rows } = await whole.query<{ rule: string; n: number }>(
+    `select b->>'asked' as rule, count(*)::int as n
+     from (select props from entity where type = any($1::text[]) and archived_at is null order by created_at desc limit ${RUNS_READ}) e
+     cross join lateral jsonb_array_elements(case when jsonb_typeof(e.props->'story') = 'array' then e.props->'story' else '[]'::jsonb end) b
+     where b ? 'asked' and b->>'at' > $2 group by 1`,
+    [l.registry.family('sys.run'), new Date(Date.now() - LATELY_MS).toISOString()],
+  );
+  return new Map(rows.map((r) => [r.rule, r.n]));
+}
+
 /**
  * The answer to a reply's end: the rules whose when holds and that have not asked this turn ask, once, as a block
  * with their reasons, each kept as a beat of the run's story. Undefined when none does.
