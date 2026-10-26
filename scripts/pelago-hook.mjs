@@ -20,6 +20,9 @@
 // what it touched: the server cannot tell apart sessions that share a token.
 // And what the reply did since the owner's last message (the turn): how many times it read the map (and of those,
 // surveyed it: read about several items), showed the owner something, changed the map, edited a file, committed and pushed, so that a rule on a reply's end can ask the agent to go on.
+// And the commits the session made, by their full ids (what git answered each commit with, looked up in the
+// checkout, and what the checkout's HEAD log records while each commit command ran, for one that answered nothing),
+// with those the reply made or, when it pushed, all of them: the map asks about those it does not account for.
 //
 // It also keeps the run the session is registered as (the server says it beside its answer to session-start) in
 // the checkout's git folder, one file per session (pelago-runs/<session id>), and takes it out at the end. The
@@ -55,6 +58,9 @@ const PUSH = GIT('push');
 const NOT_SURVEYS = new Set(['get', 'document', 'actions', 'schema', 'watch', 'picture', 'packs', 'places', 'style', 'story', 'published', 'publish_plan', 'backup_download', 'share_figure', 'brief', 'handoff']);
 // The tools that write a file.
 const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
+// What git answers a commit with: [branch 1a2b3c4] Subject, or [main (root-commit) 1a2b3c4], or [detached HEAD 1a2b3c4].
+const MADE = /^\[[^\]\n]*? ([0-9a-f]{7,40})\] /gm;
+const textOf = (content) => (typeof content === 'string' ? content : Array.isArray(content) ? content.map((p) => p.text ?? '').join('\n') : '');
 
 /** Whether a transcript entry is a message the owner wrote: not a tool's answer, nor what Claude Code put in. */
 const prompted = (entry) =>
@@ -72,6 +78,12 @@ function readTranscript(text) {
   const answers = new Map();
   const touched = new Set();
   const changes = new Set();
+  const committing = new Set();
+  const made = [];
+  let turnMade = [];
+  // When each commit command ran, and in which turn, to find in the HEAD log what it made.
+  const running = new Map();
+  let turns = 0;
   let turn;
   let reply = {};
   const named = (said) => {
@@ -79,7 +91,7 @@ function readTranscript(text) {
   };
   for (const line of text.split('\n')) {
     const calls = line.includes('"mcp__pelago__') || line.includes('"mcp__lattice__');
-    const answered = changes.size > 0 && line.includes('"tool_result"');
+    const answered = (changes.size > 0 || committing.size > 0) && line.includes('"tool_result"');
     const asked = line.includes('"user"') && !line.includes('"tool_result"');
     if (!line.includes('"usage"') && !calls && !answered && !asked && !line.includes('"Bash"') && !/"(Edit|Write|MultiEdit|NotebookEdit)"/.test(line)) continue;
     try {
@@ -87,6 +99,8 @@ function readTranscript(text) {
       if (prompted(entry)) {
         turn = entry.uuid;
         reply = { read: 0, surveyed: 0, showed: 0, changed: 0, edited: 0, committed: 0, pushed: 0 };
+        turnMade = [];
+        turns++;
       }
       const usage = entry.message?.usage;
       if (entry.type === 'assistant' && usage) answers.set(entry.message.id ?? entry.uuid, (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0));
@@ -100,10 +114,13 @@ function readTranscript(text) {
         }
         if (part.type === 'tool_use' && EDITS.has(part.name)) reply.edited = (reply.edited ?? 0) + 1;
         if (part.type === 'tool_use' && part.name === 'Bash' && typeof part.input?.command === 'string') {
-          if (COMMIT.test(part.input.command)) reply.committed = (reply.committed ?? 0) + 1;
+          if (COMMIT.test(part.input.command)) (reply.committed = (reply.committed ?? 0) + 1), committing.add(part.id), running.set(part.id, { from: Date.parse(entry.timestamp), turn: turns });
           if (PUSH.test(part.input.command)) reply.pushed = (reply.pushed ?? 0) + 1;
         }
         if (part.type === 'tool_result' && changes.has(part.tool_use_id)) named(part.content);
+        if (part.type === 'tool_result' && running.has(part.tool_use_id)) running.get(part.tool_use_id).to = Date.parse(entry.timestamp);
+        if (part.type === 'tool_result' && committing.has(part.tool_use_id))
+          for (const [, sha] of textOf(part.content).matchAll(MADE)) made.push(sha), turnMade.push(sha);
       }
     } catch {
       // A line that is not whole yet: the next count has it.
@@ -111,7 +128,35 @@ function readTranscript(text) {
   }
   let tokens = 0;
   for (const n of answers.values()) tokens += n;
-  return { tokens, touched: [...touched], ...(turn && { turn, reply }) };
+  const ran = [...running.values()].map((r) => ({ ...r, mine: Boolean(turn) && r.turn === turns }));
+  return { tokens, touched: [...touched], made, ran, ...(turn && { turn, reply, turnMade }) };
+}
+
+/** Commits by their full ids, looked up in the checkout: what it does not hold (gone, or another folder's) is left out. */
+function fullIds(cwd, shorts) {
+  if (!shorts.length) return [];
+  try {
+    const out = execFileSync('git', ['-C', cwd || '.', 'cat-file', '--batch-check'], { input: shorts.map((s) => `${s}^{commit}`).join('\n') + '\n', encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 3000 });
+    return [...new Set(out.split('\n').flatMap((l) => /^([0-9a-f]{40}) commit /.exec(l)?.slice(1) ?? []))];
+  } catch {
+    return [];
+  }
+}
+
+/** The commits the checkout's HEAD log records while the session's commit commands ran (a second's slack), and whether the reply's. */
+function logged(cwd, ran) {
+  const times = ran.filter((r) => Number.isFinite(r.from));
+  if (!times.length) return [];
+  try {
+    const out = execFileSync('git', ['-C', cwd || '.', 'log', '-g', '-n', '500', '--date=unix', '--format=%H %gd %gs', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 });
+    return out.split('\n').flatMap((l) => {
+      const [, sha, at] = /^([0-9a-f]{40}) \S*@\{(\d+)\} commit/.exec(l) ?? [];
+      const r = sha && times.find((r) => at * 1000 >= r.from - 1000 && at * 1000 <= (r.to ?? Date.now()) + 1000);
+      return r ? [{ sha, mine: r.mine }] : [];
+    }).reverse();
+  } catch {
+    return [];
+  }
 }
 
 /** The checkout's newest commits, each its id and message, for the server to say which are not accounted for. */
@@ -150,7 +195,13 @@ if (name === 'session-start') {
 } else {
   try {
     const said = JSON.parse(body);
-    if (said.transcript_path) body = JSON.stringify({ ...said, ...readTranscript(readFileSync(said.transcript_path, 'utf8')) });
+    if (said.transcript_path) {
+      const { made, turnMade, ran, ...read } = readTranscript(readFileSync(said.transcript_path, 'utf8'));
+      const log = logged(said.cwd, ran);
+      const commits = [...new Set([...fullIds(said.cwd, made), ...log.map((c) => c.sha)])];
+      const turnCommits = read.reply?.pushed ? commits : [...new Set([...fullIds(said.cwd, turnMade ?? []), ...log.filter((c) => c.mine).map((c) => c.sha)])];
+      body = JSON.stringify({ ...said, ...read, commits, ...(read.turn && { turn_commits: turnCommits }) });
+    }
   } catch {
     // No count this time; what the hook is for still goes through.
   }

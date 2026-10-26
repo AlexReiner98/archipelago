@@ -75,7 +75,7 @@ test('a reply that did what a rule names is asked once a turn, the asking kept i
 
   await assert.rejects(callTool(l, owner, 'workspace_set', { lifted: { reply_nothing: true } }), /No rule here is turned off by "reply_nothing"/);
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
-  assert.deepEqual(((await callTool(l, owner, 'workspace_info', {})) as any).lifted, { reply_draw_answers: false, reply_show_changes: true });
+  assert.deepEqual(((await callTool(l, owner, 'workspace_info', {})) as any).lifted, { reply_draw_answers: false, reply_show_changes: true, reply_account_commits: false });
   assert.deepEqual(await stop(l, { session_id: 's1', turn: 'u4', reply: changed }), {}, 'turned off');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: false } });
   assert.equal(((await stop(l, { session_id: 's1', turn: 'u5', reply: changed })) as any).decision, 'block', 'and on again');

@@ -3,6 +3,7 @@
 // answered as well by a server it has not spoken to before.
 
 import { SETUP_VERSION, setupCommand } from './connect.ts';
+import { addCommits } from './commits.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
@@ -16,12 +17,16 @@ export interface HookBody {
   session_id?: string;
   cwd?: string;
   remote?: string;
-  /** At the start: the checkout's newest commits (id and message), which the session is asked to account for. */
-  commits?: unknown;
   reason?: string;
   tokens?: number;
   /** The items the session's calls to the map have named so far, read from its transcript (src/touched.ts). */
   touched?: unknown;
+  /**
+   * At the start: the checkout's newest commits (id and message), which the session is asked to account for. After
+   * it: the commits the session has made so far, by full sha, and those its reply made or pushed (src/commits.ts).
+   */
+  commits?: unknown;
+  turn_commits?: unknown;
   /** At a turn's end: what the reply did since the owner's last message (src/reply-rules.ts), and that message's id. */
   reply?: unknown;
   turn?: unknown;
@@ -71,8 +76,9 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
   if (event !== 'session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
   // And what it touched, so that report, action session_end, asks about those when it ends.
-  const run = event !== 'session-start' && body.session_id && Array.isArray(body.touched) ? await resolveRun(pelago, body.session_id, true) : undefined;
+  const run = event !== 'session-start' && body.session_id && (Array.isArray(body.touched) || Array.isArray(body.commits)) ? await resolveRun(pelago, body.session_id, true) : undefined;
   if (run) await addTouched(whole, run.id, body.touched).catch((err) => console.error(`hook touched: ${(err as Error).message}`));
+  if (run) await addCommits(whole, run.id, body.commits).catch((err) => console.error(`hook commits: ${(err as Error).message}`));
   if (event === 'prompt') {
     // Each time the owner sends a session a message, the session is told what the owner has done in the map since
     // it last heard: a decision made in the UI reaches the session with the next thing they say.
