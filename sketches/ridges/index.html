@@ -153,7 +153,7 @@
   const kinds = [['Canada', (p) => p.region === 'canada'], ['Elsewhere', (p) => p.photos && !p.region?.startsWith('canada')], ['Canada, set aside', (p) => p.region === 'canada-aside'], ['By hand', (p) => !p.photos]];
   $('place').innerHTML = kinds.map(([label, is]) => `<optgroup label="${label}">${Object.entries(palettes).filter(([, p]) => is(p)).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('')}</optgroup>`).join('');
   $('emDark').innerHTML = $('place').innerHTML;
-  $('emDark').value = 'cyclades';
+  $('emDark').value = 'arctic';
   $('mix').innerHTML = Object.entries(palettes).filter(([, p]) => p.photos).map(([k, p]) => `<label><input type="checkbox" value="${k}" checked> ${p.title}</label>`).join('');
   let seed = 1;
   const pal = () => palettes[$('place').value];
@@ -446,7 +446,7 @@
     const l = s.letter ?? {};
     $('letter').checked = !!l.on; $('letterText').value = l.text ?? 'A'; $('letterFont').value = l.font ?? $('letterFont').options[0].value; $('letterSize').value = l.size ?? 0.85; $('letterStrength').value = l.strength ?? 1;
     const e = s.emblem ?? {};
-    $('emblem').checked = !!e.on; $('emIslands').value = e.islands ?? 3; $('emRows').value = e.rows ?? 12; $('emLine').value = e.line ?? 6; $('emColours').value = e.colours ?? 3; $('emDark').value = palettes[e.dark] ? e.dark : 'cyclades';
+    $('emblem').checked = !!e.on; $('emIslands').value = e.islands ?? 3; $('emRows').value = e.rows ?? 12; $('emLine').value = e.line ?? 6; $('emColours').value = e.colours ?? 3; $('emDark').value = palettes[e.dark] ? e.dark : 'arctic';
     showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
