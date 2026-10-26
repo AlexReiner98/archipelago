@@ -2,6 +2,9 @@
 // the work and whether or not an agent session was open, so it is what keeps the map from going stale. Each push is
 // recorded against its repository, and a commit that says it closes something proposes exactly that, on any branch
 // (the owner, 22 Oct 2026: a branch closes only what a commit names). Reading the commits for what else they settle is the reader's work, on the same push.
+// A push to the main branch, and a pull request into it, is also checked: every commit in it accounted for (account.js).
+
+import { account, commitsOf, pullCommits, pushCommits } from './account.js';
 
 /**
  * "owner/name" from any way of writing a GitHub repository's address, or from the name itself. An address copied
@@ -68,9 +71,12 @@ export async function push(input, ctx) {
   const headers = input.headers ?? {};
   const event = headers['x-github-event'];
   if (event === 'ping') return { answer: { recorded: false, reason: 'pong' } };
-  if (event !== undefined && event !== 'push') return { answer: { recorded: false, reason: `Only pushes are taken in, not "${event}".` } };
+  if (event !== undefined && !['push', 'pull_request', 'accounting'].includes(event)) return { answer: { recorded: false, reason: `Only pushes are taken in, not "${event}".` } };
   const payload = deliveryPayload(input.payload, headers['content-type']);
   if (!payload) return { answer: { recorded: false, reason: 'The delivery is not JSON, nor a form with JSON in its "payload" field. Set the webhook\'s content type to application/json.' } };
+  if (event === 'pull_request') return { answer: await pullRequest(payload, ctx) };
+  // The GitHub App asking again, while its check is red, whether the commits it read are accounted for now.
+  if (event === 'accounting') return { answer: { recorded: false, check: await account(ctx, payload.head_sha, commitsOf(payload.commits), payload.whole !== false) } };
   const delivery = typeof headers['x-github-delivery'] === 'string' ? headers['x-github-delivery'] : undefined;
 
   const name = payload.repository?.full_name?.toLowerCase();
@@ -141,5 +147,19 @@ export async function push(input, ctx) {
       }
     }
   }
-  return { log, notify, changes, answer: { recorded: true, repo: { id: repo.id, title: repo.title }, branch, tag, deleted, missed, commits: commits.length, settled } };
+  // A push to the main branch is checked: every commit in it accounted for.
+  const read = main && !zero(payload.after) ? await pushCommits(ctx, payload.repository.full_name, payload) : undefined;
+  const check = read && (await account(ctx, payload.after, read.commits, read.whole));
+  return { log, notify, changes, answer: { recorded: true, repo: { id: repo.id, title: repo.title }, branch, tag, deleted, missed, commits: commits.length, settled, ...(check && { check }) } };
+}
+
+/** A pull request into the main branch, opened or moved: its commits are checked, as a push to main would be. */
+async function pullRequest(payload, ctx) {
+  const pr = payload.pull_request;
+  const name = payload.repository?.full_name;
+  if (!pr || !name || !['opened', 'reopened', 'synchronize'].includes(payload.action)) return { recorded: false, reason: 'Only a pull request opened or moved is checked.' };
+  if (pr.base?.ref !== payload.repository.default_branch) return { recorded: false, reason: `Only a pull request into ${payload.repository.default_branch} is checked.` };
+  const read = await pullCommits(ctx, name, pr.number);
+  if (!read) return { recorded: false, reason: "GitHub did not give the pull request's commits: the GitHub App is not connected here." };
+  return { recorded: false, check: await account(ctx, pr.head?.sha, read.commits, read.whole) };
 }

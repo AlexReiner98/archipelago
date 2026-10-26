@@ -220,8 +220,9 @@ function connect() {
     });
   const include = read(abs(INCLUDE));
   const rest = withoutCarried(include ?? '');
-  const includeOwn = Boolean(include?.includes(INCLUDE_MARK));
-  put(INCLUDE, `${rest ? `${rest}\n\n` : ''}${[INCLUDE_MARK, ...CARRIED].join('\n')}\n`, { own: includeOwn, verb: include ? 'added to ' : 'written  ', note: includeOwn ? '' : '(so a worktree Claude Code makes has the hooks)' });
+  // Its own lines, alone in a file of their own or kept before, are the setup's to renew with nobody to ask.
+  const includeOwn = include === null || include.includes(INCLUDE_MARK);
+  put(INCLUDE, `${rest ? `${rest}\n\n` : ''}${[INCLUDE_MARK, ...CARRIED].join('\n')}\n`, { own: includeOwn, verb: include ? 'added to ' : 'written  ', note: include?.includes(INCLUDE_MARK) ? '' : '(so a worktree Claude Code makes has the hooks)' });
   put(MANIFEST, json({ files: Object.fromEntries(Object.entries(OWN).map(([path, text]) => [path, sha(text)])) }), { own: true });
   for (const path of [...OLD.skill, OLD.rules, OLD.manifest]) if (existsSync(abs(path))) take(path, null, '(it has a new name, above)', true);
 
