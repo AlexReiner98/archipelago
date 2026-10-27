@@ -873,6 +873,8 @@ on your own laptop.
 ## Tests
 
 ```bash
-npm test
+npm test            # the fast set: all but the slow files test/sets.ts names
+npm run test:full   # every file, as CI runs them
+npm run test:changed  # what this branch's changes can reach
 npm run typecheck
 ```

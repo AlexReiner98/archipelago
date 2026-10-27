@@ -36,7 +36,7 @@ jobs:
 
       - run: npm run typecheck
 
-      - run: npm test
+      - run: npm run test:full # every file, the browser tests and the approvals table with them (test/sets.ts)
 
   postgres:
     # The engine that runs live. Each test gets a database copied from a
@@ -78,7 +78,7 @@ jobs:
           -c "alter system set full_page_writes = off"
           -c "select pg_reload_conf()"
 
-      - run: npm test
+      - run: npm run test:full # every file, the browser tests and the approvals table with them (test/sets.ts)
 
       # The log's triggers refuse everyone, but a superuser could drop them: a server should not log in as one. The
       # log, its lock and the move again as a role that may make databases and roles, and nothing more. The roles the

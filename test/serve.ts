@@ -1,5 +1,5 @@
 // What the server's tests share: a server on its own port, with in-memory workspaces, closed when the file ends.
-import { cpSync, mkdtempSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,11 +24,10 @@ after(async () => {
   for (const close of closers) await close();
 });
 
-/** A server on its own port with in-memory databases and its own copy of the packs. */
+/** A server on its own port with in-memory databases and the repository's packs, read in place (test/map.ts). */
 export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }, sites?: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), 'pelago-platform-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
-  const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
+  const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
   // The server checks the Host header against its port, so the port must be known first.
   const probe = createHttpServer(workspaces, 0);
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));

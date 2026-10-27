@@ -56,11 +56,11 @@ reply ending, commits accounted for) is `docs/agents.md`.
   declared liftable (`lifted`); the server's policy (`pelago.config.json`)
   only lifts `agent_changes` where the workspace has not chosen, or forbids
   an op. Never decide an approval anywhere else: `test/structure.test.ts`
-  refuses it, and `test/approvals.test.ts` keeps the table of what becomes
-  of each change.
+  refuses it, and `test/approvals.ts` keeps the table of what becomes of
+  each change (checked a server policy per file, in the full run).
 - **Restart the local server yourself in dev mode.** After changing anything
-  under `src/` or `packs/`, run `npm test` and `npm run typecheck`, then
-  restart it and wait for `GET /health`: with `revise` action `restart` if your
+  under `src/` or `packs/`, run `npm test` (the fast set) and
+  `npm run typecheck`, then restart it and wait for `GET /health`: with `revise` action `restart` if your
   pelago tools are the local server's, otherwise
   `curl -X POST http://127.0.0.1:3100/agent/revise -H "content-type: application/json" -d "{\"action\":\"restart\"}"`. `/health` says which commit the
   server was started from and when (`commit`, `started`): any server runs
@@ -289,10 +289,31 @@ down, lower it in the test, in the same commit. Never raise one.
 
 ## Checks before committing
 
+While you work, after each change:
+
 ```bash
 npm test
 npm run typecheck
 ```
+
+`npm test` is the fast set: every test file but the browser tests, the
+approvals table and the tests that move, back up, restore, migrate or pull
+a whole map (`SLOW` in `test/sets.ts`, each with why). The structure
+test is always in it. `npm run test:changed` runs only the files your
+branch's changes can reach (with the slow ones they reach); `npm test --
+test/a.test.ts` runs just those files.
+
+Before committing to main or opening a pull request, and after any change
+to the rules, a drawing, the canvas, a page the browser tests load, the
+schema, backups or the log's storage, run every file:
+
+```bash
+npm run test:full
+```
+
+CI runs `test:full` on every pull request. A new test that starts a
+browser or takes more than a few seconds of one process goes in `SLOW`,
+with why; never move the structure test there.
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
