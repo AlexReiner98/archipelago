@@ -145,6 +145,54 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .card > header h2, #sheet details.fold > summary h2 { font-size: var(--text-3); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); color: var(--muted); }
 #sheet .card .rows > li, #sheet .card .empty { padding-left: 0; padding-right: 0; }
 #sheet .part > :first-child .card:first-child > header, #sheet .part > .card:first-child > header { padding-right: calc(var(--box-8) + var(--space-5)); }
+/* A row that never wraps: its name cut with an ellipsis, its marks and one action at the end, rare ones in a menu. */
+.rows > li.one { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--space-5); white-space: nowrap; min-width: 0; }
+.rows > li.one > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rows > li.one > * { flex: none; }
+.rows > li.one > .grow, .rows > li.one > input[type='text'] { flex: 1 1 0; }
+.rows > li.one .menu-room { width: var(--box-7); }
+/* The Workspace page: its sections, one shown at a time; the theme as swatches, each painted in its own colours. */
+#sheet .ws-sections { margin: 0 0 var(--space-10); }
+#sheet .ws-notice:not(:empty) { margin: 0 0 var(--space-8); }
+.card > .rows + .rows:not(:empty) { border-top: var(--border-1) solid var(--line); }
+/* Plates: a grid of small cards, each a thing with what it holds set in it, drawn like the theme swatches but larger.
+   A plate's head is its name, its marks and one action; its rows are the controls of what it holds; its foot is counts. */
+.plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--side-least), 1fr)); gap: var(--space-7); padding: var(--space-4) 0 var(--space-6); }
+.plate { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding: var(--space-7) var(--space-8); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); background: var(--panel); }
+.plate:hover { border-color: var(--edge); }
+.plate.off { background: none; border-style: dashed; }
+.plate.off .plate-name { color: var(--muted); }
+.plate-head { display: flex; align-items: center; gap: var(--space-5); min-width: 0; white-space: nowrap; }
+.plate-head > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.plate-name { font-size: var(--text-5); font-weight: 600; }
+.plate-says, .plate-foot { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--text-2); }
+.plate-foot { margin-top: auto; padding-top: var(--space-4); border-top: var(--border-1) solid var(--line); }
+.plate > .rows > li { padding: var(--space-3) 0; gap: var(--space-4); }
+/* What a pack touches: a cell for each group of its manifest, its count over its name; a group changed here is pressed. */
+.plate > .rows > li.touches { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--count-col), 1fr)); gap: var(--space-3); padding: var(--space-2) 0 var(--space-4); }
+.touch { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; padding: var(--space-3) var(--space-4); border: var(--border-1) solid transparent; border-radius: var(--radius-2); background: var(--bg); color: var(--muted); font: inherit; font-size: var(--text-1); text-align: left; }
+.touch > strong { color: var(--text); font-size: var(--text-4); }
+.touch > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate > .rows button.touch { padding: var(--space-3) var(--space-4); font-size: var(--text-1); cursor: pointer; border-color: var(--line); }
+.touch.can > strong { color: var(--accent); }
+.touch.can:hover { border-color: var(--accent); }
+.touch.on { border-color: var(--accent); background: var(--accent-soft); }
+/* A switch: a checkbox drawn as a sliding knob. */
+.switch-toggle { appearance: none; flex: none; position: relative; width: var(--box-7); height: var(--box-5); margin: 0; border-radius: var(--radius-pill); background: var(--line); cursor: pointer; transition: background 0.15s; }
+.switch-toggle::before { content: ""; position: absolute; top: var(--space-1); left: var(--space-1); width: calc(var(--box-5) - 2 * var(--space-1)); height: calc(var(--box-5) - 2 * var(--space-1)); border-radius: 50%; background: var(--panel); transition: transform 0.15s; }
+.switch-toggle:checked { background: var(--accent); }
+.switch-toggle:checked::before { transform: translateX(calc(var(--box-7) - var(--box-5))); }
+.plate > .rows button, .plate-head button, .plate details.menu > summary { padding: var(--space-2) var(--space-5); font-size: var(--text-2); }
+.plate > .rows > li:last-child { border-bottom: 0; }
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--count-col), 1fr)); gap: var(--space-6); padding: var(--space-4) 0 var(--space-6); }
+.theme-tile { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
+.theme-tile .paint { position: relative; height: var(--box-9); padding: var(--space-3) var(--space-4); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); background: var(--bg); text-align: left; font-weight: 600; }
+.theme-tile .sea { position: absolute; left: var(--space-4); right: var(--space-4); bottom: var(--space-4); height: var(--box-1); border-radius: var(--radius-1); background: var(--accent); }
+.theme-tile .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2); color: var(--muted); }
+.theme-tile:hover .paint { border-color: var(--edge-strong); }
+.theme-tile.kept .paint { outline: var(--border-3) solid var(--accent); outline-offset: var(--border-2); }
+.theme-tile.trying .paint { outline: var(--border-3) dashed var(--accent); outline-offset: var(--border-2); }
+.theme-tile.kept .name, .theme-tile.trying .name { color: var(--text); }
 /* The item's page: what it holds, a section each, as headings over plain rows of a name and its value, one line each. */
 #sheet .page-section { margin: 0 0 var(--space-10); }
 #sheet .page-section > h2 { display: flex; align-items: baseline; gap: var(--space-5); margin: 0 0 var(--space-5); padding-bottom: var(--space-3); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-2); color: var(--muted); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); }
