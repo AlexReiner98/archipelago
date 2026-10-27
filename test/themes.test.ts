@@ -1,4 +1,4 @@
-// A style's colours worked out from a few (src/colours.ts), and the themes pack's three checked for contrast: run
+// A style's colours worked out from a few (src/colours.ts), and each of the themes pack's checked for contrast: run
 // without a database, each theme's preset in over the house style, ratios out.
 
 import assert from 'node:assert/strict';
@@ -55,7 +55,7 @@ test('the colours packs add are worked out from the page\'s own, in every theme'
 });
 
 test('each theme is chosen, and holds its contrast: text, muted, accent and status on both grounds', () => {
-  assert.deepEqual(themes.map((t) => t.over), ['chosen', 'chosen', 'chosen'], 'none is used until the owner keeps a version of it');
+  assert.ok(themes.length > 0 && themes.every((t) => t.over === 'chosen'), 'none is used until the owner keeps a version of it');
   const least = { text: { light: 12, dark: 12 }, muted: { light: 4.5, dark: 4.5 }, accent: { light: 4.5, dark: 4.5 }, ok: { light: 4.5, dark: 4.5 }, warn: { light: 4.5, dark: 4.5 }, bad: { light: 4.5, dark: 4.5 } };
   for (const theme of themes) {
     const t = painted(theme.props.theme);
@@ -66,8 +66,9 @@ test('each theme is chosen, and holds its contrast: text, muted, accent and stat
           assert.ok(ratio >= at[s], `${theme.title} ${s}: ${name} ${t[s][name]} on ${ground} ${t[s][ground]} is ${ratio.toFixed(2)}:1, under ${at[s]}:1`);
         }
     assert.ok(contrast(t.dark.accent, t.dark.bg) >= 7, `${theme.title}'s dark accent holds 7:1 on its ground`);
-    // The theme's sea is what its accent is made from, and the brand's colours for it already hold: kept as they are.
-    const { light, dark } = (theme.props.theme as { light: { sea: string }; dark: { sea: string } });
-    assert.deepEqual([t.light.accent, t.dark.accent], [light.sea, dark.sea], `${theme.title}'s accent is its sea`);
+    // A theme of one sea makes its accent from it, and the brand's colours for it already hold: kept as they are. One
+    // with a mark of its own (a place's moss, lava or lupin) makes it from that, as much darker or lighter as it must.
+    const { light, dark } = (theme.props.theme as { light: { sea: string; mark?: string }; dark: { sea: string } });
+    if (!light.mark) assert.deepEqual([t.light.accent, t.dark.accent], [light.sea, dark.sea], `${theme.title}'s accent is its sea`);
   }
 });
