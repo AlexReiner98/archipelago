@@ -130,7 +130,7 @@ export interface ChangeInput {
   /** The pack action that made it, named on every event it logs ("time.log made this"). */
   action?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string; /** From the page: the style whose code asked for it (src/drawing-changes.ts). */ drawing?: string;
   /** The change set this one reverses: undo's own. */
-  undoes?: string;
+  undoes?: string; /** The session it was made in (a run's id), kept in the log's entry: where it came from, never on whose authority. */ run?: string;
 }
 
 export interface Entity {
@@ -276,7 +276,7 @@ export class Archipelago {
       const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say };
       // The queue is a projection of the pending stream: the record makes its row (src/replay.ts).
       await this.db.transaction(async (tx) =>
-        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),
+        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),
       );
       await this.log(this.db, { actor: actorId(actor), action: 'proposal.create', reason: input.reason, detail: { proposal: id, ops: input.ops.length, held_by: verdict.by?.rule } });
       return {
@@ -527,7 +527,7 @@ export class Archipelago {
       if (opts.dry) throw DRY;
       const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
       const by = { id: actor, ...(opts.token && { token: opts.token }) };
-      const done = await append(tx, this.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [], ...(input.pack && { pack: { id: input.pack, manifest: this.registry.hashes.get(input.pack) ?? null, action: input.action ?? null } }) }, facts);
+      const done = await append(tx, this.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [], ...(input.run && { run: input.run }), ...(input.pack && { pack: { id: input.pack, manifest: this.registry.hashes.get(input.pack) ?? null, action: input.action ?? null } }) }, facts);
       if (done.at !== when) throw new Error(`The log's time moved under its lock (${when}, then ${done.at})`);
       await projectDecision(tx, done);
     }).catch((err) => { if (err !== DRY) throw err; });

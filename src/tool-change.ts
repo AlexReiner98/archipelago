@@ -11,6 +11,7 @@ import { op, source, TITLE_MAX } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
 import { undo } from './undo.ts';
+import { resolveRun } from './sessions.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
 export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string): Promise<Focus> {
@@ -56,6 +57,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         .describe('On whose authority this change is made. Kept on every event it logs. Left out, it is recorded as your own judgment; settling a decision or hypothesis needs it said.'),
       hold: z.boolean().optional().describe('true to have this change wait for the human even where agents\u2019 changes are applied as made: for something you want looked at before it takes effect.'),
       drawing: z.string().optional().describe('Sent by the page alone: the style whose code asked for this change, as the person looking.'),
+      run: z.string().optional().describe('The session making it: the run id from session_start (or the session id). Kept in the log, so the change reads as that session’s.'),
     },
     run: async (l, actor, { retry, fixes, ...given }) => {
       // Whose it is: the token's, not the name a session gives itself, which it may leave out the second time.
@@ -105,6 +107,12 @@ export const WRITE_TOOLS: Record<string, Tool> = {
           }
           if (long.length) throw new Error(`Change rejected:\n- ${long.join('\n- ')}`);
         }
+        if (input.run) {
+          const run = await resolveRun(l, input.run, true);
+          if (!run) throw new Error(`Change rejected:
+- run: no open session "${input.run}". Send the run id session_start gave, or leave it out.`);
+          input = { ...input, run: run.id };
+        }
         result = await l.change(actor, input);
       } catch (err) {
         const message = (err as Error).message;
@@ -127,7 +135,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         const target = made ?? touched;
         // A lens or a style that was changed is seen in the picture it changes, not on its own page.
         const picture = result.status !== 'proposed' && target ? await pictureOf(l, target) : undefined;
-        await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason).catch(() => {});
+        await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason, undefined, input.run).catch(() => {});
       }
       return result;
     },

@@ -206,7 +206,16 @@ export const READ_TOOLS: Record<string, Tool> = {
     description:
       'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so). Agents can read these but only a human can decide them.',
     input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded']).optional() },
-    run: async (l, _actor, input) => l.proposals(input),
+    run: async (l, _actor, input) => {
+      const held = await l.proposals(input);
+      // The session each was proposed in, named by its name, as everywhere a session is (the held entry says which).
+      const { rows } = await l.db.query<{ id: string; run_name: string }>(
+        `select p.id, r.title as run_name from log_entry p join entity r on r.id = p.head->>'run' where p.stream = 'pending' and p.id = any($1::text[])`,
+        [held.map((p) => p.id)],
+      );
+      const named = new Map(rows.map((r) => [r.id, r.run_name]));
+      return held.map((p) => (named.has(p.id) ? { ...p, run_name: named.get(p.id) } : p));
+    },
   },
   watch: {
     description:
