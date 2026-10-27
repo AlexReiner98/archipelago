@@ -84,7 +84,11 @@ test("a pack turned off and on again on a running server: a connected agent's to
 
   const hearing = told();
   const off = await api('pack_set', { pack: 'time', on: false });
-  assert.deepEqual(off.result.packs.find((p: { id: string }) => p.id === 'time'), { id: 'time', title: 'Time', version: '0.1.0', state: 'off', why: 'turned off here' });
+  const time = off.result.packs.find((p: { id: string }) => p.id === 'time');
+  assert.deepEqual({ id: time.id, title: time.title, version: time.version, state: time.state, why: time.why }, { id: 'time', title: 'Time', version: '0.1.0', state: 'off', why: 'turned off here' });
+  // What it touches is read from its manifest, grouped as the Workspace page shows it, its names in words.
+  const types = time.touches.find((t: { key: string }) => t.key === 'types');
+  assert.ok(types.n > 0 && types.names.includes('Time entry'));
   assert.ok(off.result.dormant.includes('time_entry'));
   await hearing;
   assert.ok(!(await names()).includes('time_log'), 'the tool left the list');

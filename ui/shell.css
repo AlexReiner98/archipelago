@@ -156,6 +156,20 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 .plate-says, .plate-foot { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--text-2); }
 .plate-foot { margin-top: auto; padding-top: var(--space-4); border-top: var(--border-1) solid var(--line); }
 .plate > .rows > li { padding: var(--space-3) 0; gap: var(--space-4); }
+/* What a pack touches: a cell for each group of its manifest, its count over its name; a group changed here is pressed. */
+.plate > .rows > li.touches { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--count-col), 1fr)); gap: var(--space-3); padding: var(--space-2) 0 var(--space-4); }
+.touch { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; padding: var(--space-3) var(--space-4); border: var(--border-1) solid transparent; border-radius: var(--radius-2); background: var(--bg); color: var(--muted); font: inherit; font-size: var(--text-1); text-align: left; }
+.touch > strong { color: var(--text); font-size: var(--text-4); }
+.touch > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate > .rows button.touch { padding: var(--space-3) var(--space-4); font-size: var(--text-1); cursor: pointer; border-color: var(--line); }
+.touch.can > strong { color: var(--accent); }
+.touch.can:hover { border-color: var(--accent); }
+.touch.on { border-color: var(--accent); background: var(--accent-soft); }
+/* A switch: a checkbox drawn as a sliding knob. */
+.switch-toggle { appearance: none; flex: none; position: relative; width: var(--box-7); height: var(--box-5); margin: 0; border-radius: var(--radius-pill); background: var(--line); cursor: pointer; transition: background 0.15s; }
+.switch-toggle::before { content: ""; position: absolute; top: var(--space-1); left: var(--space-1); width: calc(var(--box-5) - 2 * var(--space-1)); height: calc(var(--box-5) - 2 * var(--space-1)); border-radius: 50%; background: var(--panel); transition: transform 0.15s; }
+.switch-toggle:checked { background: var(--accent); }
+.switch-toggle:checked::before { transform: translateX(calc(var(--box-7) - var(--box-5))); }
 .plate > .rows button, .plate-head button, .plate details.menu > summary { padding: var(--space-2) var(--space-5); font-size: var(--text-2); }
 .plate > .rows > li:last-child { border-bottom: 0; }
 .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--count-col), 1fr)); gap: var(--space-6); padding: var(--space-4) 0 var(--space-6); }

@@ -65,9 +65,11 @@ The web UI has five places, and one page for each thing.
   (`#/workspace?at=<section>`): **People** (the owner, members, the plan),
   **Agents** (agent tokens, what agents may do, the model account they run
   on), **Map** (the theme as swatches, tried on your screen and then kept;
-  whether new things start private; the backup), **Packs** (each pack a card,
-  open, controlling everything it offers: its styles, screens and checks,
-  with its types, links and actions counted at its foot), and **Connections** (the
+  whether new things start private; the backup), **Packs** (each pack a card with
+  its on/off switch and what it touches, its manifest's keys grouped as types,
+  links, views, styles, instructions, rules, actions, runs and reach, each
+  counted; a group changed here, such as its styles, screens or checks, opens
+  in the card on a click), and **Connections** (the
   GitHub App, pushes and the webhook, the other workspaces that may notify
   this one). Each setting is one row; what is done rarely is in its ⋯ menu.
 

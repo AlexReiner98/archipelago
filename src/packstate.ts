@@ -15,7 +15,7 @@ import { env } from './env.ts';
 import { append, type Fact } from './log.ts';
 import { decideAct, listActs, setPackSecret } from './outside.ts';
 import { KERNEL_PACKS } from './packorder.ts';
-import { LOCAL_PACK } from './packs.ts';
+import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
@@ -107,9 +107,38 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   return facts;
 }
 
-/** Every pack on this server, with its state in this workspace and why. */
+/**
+ * What a pack touches, read from its manifest's keys and grouped as a person reads them: what it adds to the map
+ * (types, links), what it shows (views), how things look and what agents are told (styles, instructions), what decides
+ * a write or asks an agent (rules), what can be done through it (actions), what runs by itself (runs), and what it
+ * reaches beyond the map (reach). Each with how many, and their names for a tooltip.
+ */
+export function packTouches(p: PackFile) {
+  const name = (e: unknown) => {
+    const o = (e ?? {}) as Record<string, unknown>;
+    // A name, not an identifier: an id without a title is read as its last part, in words.
+    return o.title ? String(o.title) : String(o.id ?? o.of ?? o.name ?? o.event ?? o.schedule ?? o.webhook ?? o.host ?? '').split('.').pop()!.replaceAll('_', ' ');
+  };
+  const styles = p.styles ?? [];
+  const told = styles.filter((s) => (s as { type?: string }).type === 'instruction');
+  const reach = p.reach ?? {};
+  const groups: [string, unknown[]][] = [
+    ['types', p.types ?? []],
+    ['links', p.links ?? []],
+    ['views', p.views ?? []],
+    ['styles', [...(p.drawings ?? []), ...styles.filter((s) => !told.includes(s))]],
+    ['instructions', told],
+    ['rules', p.rules ?? []],
+    ['actions', (p.actions ?? []).filter((a) => !(a as { kernel?: boolean }).kernel)],
+    ['runs', p.handlers ?? []],
+    ['reach', [...(reach.hosts ?? []), ...(reach.secrets ?? []), ...(reach.webhooks ?? []), ...(reach.server ? [{ title: 'the server' }] : [])]],
+  ];
+  return groups.map(([key, list]) => ({ key, n: list.length, names: list.map(name).filter(Boolean) }));
+}
+
+/** Every pack on this server, with its state in this workspace and why, what it needs, and what it touches. */
 export function packStates(l: Archipelago) {
-  return l.registry.found.map((p) => ({ id: p.id, title: p.title, version: p.version, ...l.registry.states.get(p.id)! }));
+  return l.registry.found.map((p) => ({ id: p.id, title: p.title, version: p.version, description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...l.registry.states.get(p.id)! }));
 }
 
 /** Turn a pack off or on in this workspace. */
