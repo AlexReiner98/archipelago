@@ -8,7 +8,9 @@
 # Each engine runs the full set as shards side by side (shard in test/sets.ts):
 # a push to main deploys once the whole workflow passes, so it waits for the
 # slowest shard, not for every file in turn. Every file runs in one shard;
-# test/sets.test.ts checks the matrices below name every shard.
+# test/sets.test.ts checks the matrices below name every shard. The checks
+# main's ruleset requires are pglite and postgres: each passes when every
+# shard of its engine has.
 
 name: Tests
 
@@ -26,7 +28,7 @@ permissions:
   contents: read
 
 jobs:
-  pglite:
+  pglite-shard:
     name: pglite (${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -49,7 +51,7 @@ jobs:
 
       - run: node scripts/test.ts shard ${{ matrix.shard }}
 
-  postgres:
+  postgres-shard:
     # The engine that runs live. Each test gets a database copied from a
     # template the run builds once (scratchPg in src/pg.ts).
     name: postgres (${{ matrix.shard }})
@@ -104,3 +106,17 @@ jobs:
         run: |
           psql "$PELAGO_TEST_DATABASE_URL" -c "create role pelago_app login password 'app' createdb createrole" -c "create database pelago_app owner pelago_app" -c "grant pelago_member, pelago_public, pelago_compactor to pelago_app with admin option"
           PELAGO_TEST_DATABASE_URL=postgres://pelago_app:app@127.0.0.1:5432/pelago_app node --test --test-force-exit --test-global-setup=./test/global.ts --import ./test/each.ts test/log.test.ts test/connections.test.ts test/move.test.ts test/streams.test.ts test/keys.test.ts
+
+  pglite:
+    needs: pglite-shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.pglite-shard.result }}" = success
+
+  postgres:
+    needs: postgres-shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.postgres-shard.result }}" = success
