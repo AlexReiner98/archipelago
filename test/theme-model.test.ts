@@ -8,7 +8,7 @@ import { pageLook, pageStyle } from '../src/styles.ts';
 import { fresh, human, make } from './map.ts';
 
 const OPEN_WATER = { light: '#216bc0', dark: '#70a4e6' };
-const ICE = { light: '#4666c3', dark: '#83a1ea' };
+const BAY = { light: '#077783', dark: '#28b1c3' };
 
 test('a theme is used once the owner keeps a version of it, and every page and agent reads its finished colours', async () => {
   const l = await fresh();
@@ -29,11 +29,11 @@ test('a theme is used once the owner keeps a version of it, and every page and a
 
 test('a theme is tried on one read: drawn as if kept, over the one kept, and nothing is kept', async () => {
   const l = await fresh();
-  const tried = await pageStyle(l, { try: 'themes.ice' });
-  assert.equal((tried.style.theme as any).light.accent, ICE.light);
-  assert.ok(!(await pageStyle(l, {})).used.some((u) => u.preset === 'themes.ice'), 'trying keeps nothing');
+  const tried = await pageStyle(l, { try: 'themes.bay' });
+  assert.equal((tried.style.theme as any).light.accent, BAY.light);
+  assert.ok(!(await pageStyle(l, {})).used.some((u) => u.preset === 'themes.bay'), 'trying keeps nothing');
   await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Open water', props: { preset: 'themes.open_water' } }]);
-  assert.equal(((await pageStyle(l, { try: 'themes.ice' })).style.theme as any).light.accent, ICE.light, 'the one tried lies over the one kept');
+  assert.equal(((await pageStyle(l, { try: 'themes.bay' })).style.theme as any).light.accent, BAY.light, 'the one tried lies over the one kept');
   assert.equal(((await pageStyle(l, {})).style.theme as any).light.accent, OPEN_WATER.light);
   assert.equal(((await pageLook(l)).theme as any).light.accent, OPEN_WATER.light, 'a page read with no login never sees it');
 });
@@ -43,12 +43,12 @@ test("a person's own theme lies over the workspace's on the pages they see, and 
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Me' },
     { op: 'create', ref: 'v', type: 'style', title: 'Open water', props: { preset: 'themes.open_water' } },
-    { op: 'create', ref: 'mine', type: 'style', title: 'My colours', props: { theme: { light: { sea: ICE.light }, dark: { sea: ICE.dark } } } },
+    { op: 'create', ref: 'mine', type: 'style', title: 'My colours', props: { theme: { light: { sea: BAY.light }, dark: { sea: BAY.dark } } } },
     { op: 'link', type: 'about', from: 'mine', to: 'me' },
   ]);
   await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(made.me)]);
   const theirs = (await pageStyle(l, {})).style.theme as any;
-  assert.deepEqual([theirs.light.accent, theirs.dark.accent], [ICE.light, ICE.dark], 'their sea, worked out by the workspace theme\'s rules');
+  assert.deepEqual([theirs.light.accent, theirs.dark.accent], [BAY.light, BAY.dark], 'their sea, worked out by the workspace theme\'s rules');
   assert.equal(theirs.light.bg, '#f5f6f0', 'the rest is the workspace\'s');
   assert.equal(((await pageStyle(l, {}, false)).style.theme as any).light.accent, OPEN_WATER.light, 'a page before sign-in reads no one\'s own');
   assert.equal(((await pageLook(l)).theme as any).light.accent, OPEN_WATER.light, 'a page read with no login reads no one\'s own');
@@ -66,8 +66,8 @@ test("a published page keeps the colours it was published with, its own style's 
   const then = await read();
   assert.equal(then.light.muted, '#555555', "the document's own style is over the workspace's");
   // The workspace chooses a theme after: what is published keeps its colours until it is published again.
-  await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Ice', props: { preset: 'themes.ice' } }]);
+  await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Bay', props: { preset: 'themes.bay' } }]);
   assert.equal((await read()).light.accent, then.light.accent);
   await publish(l, human, made.d);
-  assert.equal((await read()).light.accent, ICE.light);
+  assert.equal((await read()).light.accent, BAY.light);
 });
