@@ -20,14 +20,17 @@ let words = '';
 let unfolded = false;
 /** Items the bar has asked the names of, so each is asked once. */
 const asking = new Set();
-/** What is used one step around the canvas, asked once for each answer (`key`, its items), and the bar drawn last. */
+/** What is used one step around the canvas, asked once for each lens (`key`), and the bar drawn last. */
 let near = { key: '', uses: null };
 let last = null;
 
-/** Ask what is used one step around what the canvas draws, and draw the bar again with it. */
+/**
+ * Ask what is used one step around what the canvas draws, and draw the bar again with it: once for each lens, so what
+ * the log brings to the canvas later is never a read of its own (the page is a replica, docs/canvas.md).
+ */
 function lookAround(lens, answer) {
   const ids = answer.items.map((i) => i.id).slice(0, numberOf(state.style, 'picker_around_from'));
-  const key = ids.join(',');
+  const key = JSON.stringify([lens.filter, lens.walk, lens.limit]);
   if (!ids.length || key === near.key) return;
   near = { key, uses: null };
   const exclude = lens.filter.exclude;
