@@ -44,6 +44,8 @@ export function drawCode(host, answer, style, keep, _place, coder) {
     try {
       const made = await api('change', { ops, reason: String(said.reason || 'Asked for by a drawing').slice(0, 300), drawing: coder });
       answerIt({ status: made.status, created: made.created ?? {}, ...(made.proposal && { proposal: made.proposal, held: made.held_by?.say ?? '' }) });
+      // What it made is not yet in the answer the page keeps (that follows only what it holds): the lens is read again.
+      if (Object.keys(made.created ?? {}).length) host.dispatchEvent(new CustomEvent('lens-read', { bubbles: true }));
     } catch (err) {
       answerIt({ error: String(err.message).slice(0, 300) });
     }
