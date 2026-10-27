@@ -48,6 +48,23 @@ export const allTests = () => [...walk('test').filter((f) => /^test\/[^/]+\.test
 
 export const fastTests = () => allTests().filter((f) => !(f in SLOW));
 
+/**
+ * CI runs the full set as shards side by side (.github/workflows/tests.yml), so a push waits as long as its slowest
+ * shard rather than for every file in turn: one for the fast set ("rest"), one for each reason in SLOW (its words
+ * joined by "-"), and a shard split further as "browser 1/2", "browser 2/2", the files dealt in turn. Every file is in
+ * exactly one shard; sets.test.ts checks the workflow names them all.
+ */
+export function shard(name: string, part = '1/1'): string[] {
+  const [k, n] = part.split('/').map(Number);
+  if (!(n >= 1 && k >= 1 && k <= n)) throw new Error(`No part ${part}: say k/n`);
+  const files = allTests().filter((f) => (f in SLOW ? SLOW[f].replaceAll(' ', '-') : 'rest') === name);
+  if (!files.length) throw new Error(`No shard ${name}`);
+  return files.filter((_, i) => i % n === k - 1);
+}
+
+/** The names of the shards. */
+export const shardNames = () => ['rest', ...new Set(Object.values(SLOW).map((r) => r.replaceAll(' ', '-')))];
+
 const SPECIFIER = /(?:^|[\s;])(?:import|export)\s[^'"]*?from\s*['"](\.{1,2}\/[^'"]+)['"]|import\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)|^import\s*['"](\.{1,2}\/[^'"]+)['"]/gm;
 
 const direct = new Map<string, string[]>();
