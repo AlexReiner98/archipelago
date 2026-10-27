@@ -55,6 +55,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         .optional()
         .describe('On whose authority this change is made. Kept on every event it logs. Left out, it is recorded as your own judgment; settling a decision or hypothesis needs it said.'),
       hold: z.boolean().optional().describe('true to have this change wait for the human even where agents\u2019 changes are applied as made: for something you want looked at before it takes effect.'),
+      drawing: z.string().optional().describe('Sent by the page alone: the style whose code asked for this change, as the person looking.'),
     },
     run: async (l, actor, { retry, fixes, ...given }) => {
       // Whose it is: the token's, not the name a session gives itself, which it may leave out the second time.

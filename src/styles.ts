@@ -48,7 +48,7 @@ const fields = (props: Record<string, unknown>) => Object.fromEntries(Object.ent
 const listed = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
 
 /** The style a picture or page is drawn in, and what went into it, the nearest last. `kept` is every open style on the map, with what each is about. */
-export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, given?: Version[]): Promise<{ style: Record<string, unknown>; used: { id: string; title: string; preset?: string }[] }> {
+export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, given?: Version[]): Promise<{ style: Record<string, unknown>; used: { id: string; title: string; preset?: string }[]; coder?: string }> {
   const presets: Preset[] = stylesOf(l.registry.packs);
   const versions = given ?? (await versionsOf(l));
   // A field that names things (sizes, numbers, colours, a page) is merged name by name: a nearer style that sets one keeps the rest.
@@ -79,7 +79,9 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
   let style: Record<string, unknown> = {};
   for (const layer of layers) style = over(style, fields(layer.props));
   if (style.theme != null) style.theme = finishTheme(style.theme);
-  return { style, used: layers.map(({ id, title, preset }) => ({ id, title, ...(preset && { preset }) })) };
+  // The style whose code draws, when one has code: what a change its drawing asks for names (src/drawing-changes.ts).
+  const coder = [...layers].reverse().find((layer) => typeof layer.props.code === 'string' && layer.id !== layer.preset)?.id;
+  return { style, used: layers.map(({ id, title, preset }) => ({ id, title, ...(preset && { preset }) })), ...(coder && { coder }) };
 }
 
 /** A picture's style with the drawing it is drawn by, if a pack draws its shape: its modules left out when the page has them (`have`, hashes). */

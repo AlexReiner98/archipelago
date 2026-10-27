@@ -9,9 +9,13 @@
 // handed to it. A worker has no page: no elements, no frames or windows to
 // make, no WebRTC, nothing typed can reach it. It is told what to draw (a
 // lens answer, the style's fields, the page's colours) and where the pointer
-// is, and it can say four things back: open this item, show these words by
-// the pointer, use this cursor, and what went wrong. If it stops answering
-// it is ended. Each picture gets a new frame, so nothing is left running.
+// is, and it can say these things back: open this item, show these words by
+// the pointer, use this cursor, put a text field here, change the map, and
+// what went wrong. A field is this page's own: what is typed in it stays here,
+// and the code is told only the field's value. A change goes to the page, which
+// sends it as the person looking and the rules judge (src/drawing-changes.ts);
+// the code is told what came of it. If it stops answering it is ended. Each
+// picture gets a new frame, so nothing is left running.
 //
 // A drawing a pack ships (or the owner's version of one) runs here too, but
 // differently: one frame serves every picture on the page, and the drawing
@@ -46,12 +50,21 @@ function inside(home) {
     return { me, byId, root };
   };
   const heard = {};
+  const asking = new Map();
+  let asked = 0;
   const size = { width: 0, height: 0, dpr: 1 };
   self.onmessage = async (ev) => {
     const said = ev.data;
     if (said.type === 'ping') return post({ type: 'pong' });
     if (said.type === 'event') {
       if (said.name === 'resize') Object.assign(size, said.event);
+      // A new answer, to code that does not listen for one, is drawn again from the start, in a new frame.
+      if (said.name === 'answer' && !heard.answer?.length) return post({ type: 'stale' });
+      if (said.name === 'changed') {
+        const resolve = asking.get(said.event.asked);
+        asking.delete(said.event.asked);
+        return resolve?.(said.event);
+      }
       for (const fn of heard[said.name] ?? []) {
         try {
           fn(said.event);
@@ -66,7 +79,7 @@ function inside(home) {
     try {
       // The code is a module of its own, loaded from its text: by a blob's address where the browser allows that here, else as a data address.
       const made = await import(URL.createObjectURL(new Blob([said.code], { type: 'text/javascript' }))).catch(() => import(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(said.code)))}`));
-      if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor }) { … }');
+      if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change }) { … }');
       await made.default({
         canvas: said.canvas,
         answer: said.answer,
@@ -79,6 +92,10 @@ function inside(home) {
         open: (id) => post({ type: 'open', id: String(id) }),
         tip: (text, x, y) => post({ type: 'tip', text: text == null ? null : String(text), x: Number(x), y: Number(y) }),
         cursor: (name) => post({ type: 'cursor', name: String(name) }),
+        // A text field this page draws over the canvas at { x, y, width, height }, with { value, placeholder, title }; null takes it away. on('field') hears { key, value, done }.
+        field: (key, at) => post({ type: 'field', key: String(key), at: at == null ? null : { x: Number(at.x), y: Number(at.y), width: Number(at.width), height: Number(at.height), value: String(at.value ?? ''), placeholder: String(at.placeholder ?? ''), title: String(at.title ?? '') } }),
+        // Ops for the page to send as the person looking: resolves to { status, created, proposal, held } or { error }.
+        change: (ops, reason) => new Promise((resolve) => (asking.set(++asked, resolve), post({ type: 'change', asked, ops, reason: String(reason ?? '') }))),
       });
       // Its code has returned: once two frames have been painted after it, the view has drawn (ui/look.js).
       const frame = () => new Promise((r) => (self.requestAnimationFrame ? self.requestAnimationFrame(r) : setTimeout(r, 16)));
@@ -97,11 +114,41 @@ tip.className = 'tip';
 tip.hidden = true;
 document.body.append(canvas, tip);
 const CURSORS = ['default', 'pointer', 'grab', 'grabbing', 'crosshair', 'move'];
+const mostFields = 24;
+const fields = new Map();
 const EVENTS = ['pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'wheel'];
 
 let worker;
+let heldTell = () => undefined;
+
+/** A text field the code asked for, drawn by this page over the canvas: the code hears its value, never a key. */
+function place(key, at, theme) {
+  let input = fields.get(key);
+  if (!at || ![at.x, at.y, at.width, at.height].every(Number.isFinite)) return void (input?.remove(), fields.delete(key));
+  if (!input) {
+    if (fields.size >= mostFields) return;
+    input = document.createElement('input');
+    input.className = 'tip field';
+    Object.assign(input.style, { background: theme.inner || theme.land, color: theme.text, borderColor: theme.line });
+    const said = (done) => heldTell('field', { key, value: input.value.slice(0, 500), done });
+    input.addEventListener('input', () => said(false));
+    input.addEventListener('change', () => said(true));
+    input.addEventListener('keydown', (e) => e.key === 'Enter' && input.blur());
+    fields.set(key, input);
+    document.body.append(input);
+  }
+  // What the person is typing is theirs: the code's value is put in only while the field is not being typed in.
+  if (document.activeElement !== input) input.value = at.value.slice(0, 500);
+  Object.assign(input, { placeholder: at.placeholder.slice(0, 100), title: at.title.slice(0, 200) });
+  Object.assign(input.style, { left: `${at.x}px`, top: `${at.y}px`, width: `${Math.max(0, at.width)}px`, height: `${Math.max(0, at.height)}px` });
+}
+
 addEventListener('message', (ev) => {
-  if (ev.source !== parent || ev.data?.type !== 'draw' || worker) return;
+  if (ev.source !== parent) return;
+  // After the picture starts, the page says only these: a new answer, and what came of a change asked for.
+  if (worker && worker !== true && ev.data?.type === 'answer') return void worker.postMessage({ type: 'event', name: 'answer', event: ev.data.answer });
+  if (worker && worker !== true && ev.data?.type === 'changed') return void worker.postMessage({ type: 'event', name: 'changed', event: ev.data });
+  if (ev.data?.type !== 'draw' || worker) return;
   const { code, answer, style, theme } = ev.data;
   document.body.style.background = theme.sea;
   Object.assign(tip.style, { background: theme.land, color: theme.text, borderColor: theme.line });
@@ -127,6 +174,8 @@ addEventListener('message', (ev) => {
     else if (said?.type === 'drew') say({ type: 'drew' });
     else if (said?.type === 'error') fail(said.message);
     else if (said?.type === 'cursor' && CURSORS.includes(said.name)) canvas.style.cursor = said.name;
+    else if (said?.type === 'field' && typeof said.key === 'string') place(said.key, said.at, theme);
+    else if (said?.type === 'change' && Number.isInteger(said.asked)) say({ type: 'change', asked: said.asked, ops: said.ops, reason: String(said.reason).slice(0, 300) });
     else if (said?.type === 'tip') {
       tip.hidden = said.text == null || !Number.isFinite(said.x) || !Number.isFinite(said.y);
       if (tip.hidden) return;
@@ -162,8 +211,9 @@ addEventListener('message', (ev) => {
   worker = true;
   begin(0);
 
-  // Where the pointer is and what it does are told to the code; nothing typed ever is.
+  // Where the pointer is and what it does are told to the code; nothing typed ever is, only what a field holds.
   const tell = (name, event) => started && worker.postMessage({ type: 'event', name, event });
+  heldTell = tell;
   for (const name of EVENTS) {
     canvas.addEventListener(
       name,
