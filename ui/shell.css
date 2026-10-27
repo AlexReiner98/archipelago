@@ -3,6 +3,8 @@
    the house style's (--*), every colour the theme's. */
 html, body { height: 100%; }
 body { overflow: hidden; }
+/* A select's open list in the theme, also where the select itself is drawn bare (the query bar, the sheet's marks). */
+option, optgroup { background: var(--panel); color: var(--text); }
 
 /* The canvas: the view drawn edge to edge, its frame the whole page. */
 #canvas { position: fixed; inset: 0; background: var(--ln-sea, var(--bg)); }
