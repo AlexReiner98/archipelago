@@ -129,7 +129,7 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
 /**
  * What a page read by no login is drawn in: the colours (theme), lengths, typefaces (faces) and text roles (type) of
  * the workspace's style, and of a document, its own style over the workspace's, with the head it gives its page
- * (page.head: an invoice's). Never a viewer's own. A published document is drawn as the map stood at the position
+ * (page.head: an invoice's) and the section whose figure is shown where a link to it is posted (page.share). Never a viewer's own. A published document is drawn as the map stood at the position
  * it was published at (`at`, kept with it), so its colours change only when a person publishes it again.
  */
 export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
@@ -138,15 +138,23 @@ export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
   const key = at === undefined ? '' : `${l.workspace} ${at} ${String(doc?.id)}`;
   if (key && looks.has(key)) return looks.get(key)!;
   const { kept, versions } = at === undefined ? { kept: await keptOf(l, 'style', undefined), versions: undefined } : await stylesAt(l, at);
-  const style = (await styleFor(l, kept, hub, versions)).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown; page?: { head?: unknown } };
+  const style = (await styleFor(l, kept, hub, versions)).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown; page?: { head?: unknown; share?: unknown } };
   const { theme, lengths, faces, type, page_css, page } = style;
-  const look = { theme, lengths, faces, type, ...(typeof page_css === 'string' && page_css.trim() && { page_css }), ...(typeof page?.head === 'string' && { head: page.head }) };
+  const look = {
+    theme, lengths, faces, type,
+    ...(typeof page_css === 'string' && page_css.trim() && { page_css }),
+    ...(typeof page?.head === 'string' && { head: page.head }),
+    ...(typeof page?.share === 'string' && SECTION.test(page.share) && { share: page.share }),
+  };
   if (key) {
     looks.set(key, look);
     if (looks.size > LOOKS_KEPT) looks.delete(looks.keys().next().value!);
   }
   return look;
 }
+
+/** An item's id, as a style names the section whose figure is a page's link picture (page.share). */
+const SECTION = /^e_[a-z0-9]{8}$/;
 
 /** Published looks already read, by workspace, position and document: what stood then does not change. */
 const looks = new Map<string, Record<string, unknown>>();

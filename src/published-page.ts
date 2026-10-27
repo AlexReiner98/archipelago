@@ -12,6 +12,13 @@ const HASH = /^[0-9a-f]{64}$/;
 type Lens = { style?: { drawing?: { id: string; title: string; hash: string; modules?: Record<string, string> } } } & Record<string, unknown>;
 type Doc = { title: string; parts: Part[]; lenses?: Record<string, Lens> } & Record<string, unknown>;
 
+/** The section a page's style names for its link picture (page.share), when the page holds it with a figure. */
+export const shareOf = (doc: { parts: Part[] }, share: unknown) =>
+  typeof share === 'string' && doc.parts.some((p) => 'section' in p && p.section.id === share && p.section.picture) ? share : undefined;
+
+/** Where a page's section's figure is read, below the page's own address. */
+export const pictureAt = (page: string, section: string) => `${page.replace(/\/$/, '')}/picture/${section}`;
+
 /** The data a published page draws from, with each drawing's code left at the address it is fetched from by its hash. */
 export function pageData(doc: Doc, here: string) {
   const lenses = Object.fromEntries(
@@ -36,8 +43,8 @@ const inPage = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c'
 
 /** The page sent for a published document: its head, its files named as ui-files.ts names them, its data in it, after
  * its script so the browser asks for the script first. `data` is what /data answers. */
-export async function publishedPage(doc: Doc, canonical: string, site: string | undefined, data: unknown) {
-  const html = publicHead(await uiPage('doc.html'), doc, canonical, site);
+export async function publishedPage(doc: Doc, canonical: string, site: string | undefined, data: unknown, image?: string) {
+  const html = publicHead(await uiPage('doc.html'), doc, canonical, site, image);
   // Put in by functions, so nothing in the data is read as a replacement pattern ($&, $').
   return html
     .replace(/<main id="main">[\s\S]*?<\/main>/, () => '<main id="main"></main>')

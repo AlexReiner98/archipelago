@@ -7,7 +7,7 @@ import type { ServerResponse } from 'node:http';
 import type { Part } from './documents.ts';
 import { GUARD, POLICY } from './public-document.ts';
 import { listen } from './published-live.ts';
-import { drawingCode, pageData, publishedPage } from './published-page.ts';
+import { drawingCode, pageData, pictureAt, publishedPage, shareOf } from './published-page.ts';
 import { publishedAt, publishedPicture, sitePages } from './published.ts';
 import { pageLook } from './styles.ts';
 import type { Workspaces } from './workspaces.ts';
@@ -81,8 +81,13 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
     return code ? send(200, 'application/json', JSON.stringify(code), { 'cache-control': 'public, max-age=31536000, immutable' }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));
   }
   const site = { ...(await siteNav(at.workspaces, at.workspace, (page) => (page.path ? siteHref(page.path) : null))), host: at.host };
-  const data = pageData({ ...doc, ...(await pageLook(pelago, doc)), site }, siteHref(doc.path));
+  const look = await pageLook(pelago, doc);
+  const data = pageData({ ...doc, ...look, site }, siteHref(doc.path));
   if (what === 'data') return send(200, 'application/json', JSON.stringify(data), { 'cache-control': 'no-cache' });
-  const page = await publishedPage(doc, origin + siteHref(doc.path), site.name, data);
+  // Where a link to it is posted, it shows the figure its style names (page.share): its own, else the front page's.
+  const own = shareOf(doc, look.share);
+  const front = own || doc.path === HOME || typeof look.share !== 'string' ? undefined : shareOf(((await publishedAt(pelago, HOME)) as { parts: Part[] } | null) ?? { parts: [] }, look.share);
+  const image = own ? pictureAt(origin + siteHref(doc.path), own) : front && pictureAt(origin, front);
+  const page = await publishedPage(doc, origin + siteHref(doc.path), site.name, data, image);
   return send(200, 'text/html; charset=utf-8', page, { 'cache-control': 'no-store', 'content-security-policy': POLICY });
 }
