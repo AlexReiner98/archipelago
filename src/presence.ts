@@ -36,8 +36,10 @@ export interface Step {
   did?: string;
   /** The UI address of what it did it to, when that is one item or one picture. */
   hash?: string;
-  /** For a show: the pane of the owner's page it goes to (ui/panes.js): a side of the main canvas, the main one, or the main one alone. */
+  /** For a show: the pane of the owner's page it goes to (ui/panes.js): a side of the main canvas, the main one, the main one alone, or a pane of the session's own by the name it gives. */
   pane?: string;
+  /** The session it was taken in, as the agent said it or last said it: a pane can follow one session. */
+  run?: string;
 }
 
 /** How many steps are kept for a page to catch up on between two looks. */
@@ -58,6 +60,9 @@ export const whose = (w: Whose) => `${w.workspace}:${w.viewer ?? ''}`;
 
 // This process's own steps, per screen, and those not yet kept.
 const mine = new Map<string, Step[]>();
+// The session each agent last named on this screen, for its steps that name none (a change, a read): sessions of one
+// agent that each give a name of their own are told apart; two that go by one name are as one, but for what they name.
+const runs = new Map<string, string>();
 const unkept = new Map<string, Q>();
 let timer: NodeJS.Timeout | undefined;
 
@@ -70,8 +75,11 @@ export async function point(db: Q, w: Whose, focus: Focus): Promise<void> {
 export async function took(db: Q, w: Whose, step: Omit<Step, 'at'>, now = false): Promise<void> {
   const key = whose(w);
   const list = mine.get(key) ?? [];
+  const named = `${key}|${step.actor}`;
+  if (step.run) runs.set(named, step.run);
+  const run = step.run ?? runs.get(named);
   // Two steps in one millisecond are still two.
-  list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step });
+  list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step, ...(run && { run }) });
   mine.set(key, list.slice(-STEPS_KEPT));
   unkept.set(key, db);
   if (now) return flush(key);
