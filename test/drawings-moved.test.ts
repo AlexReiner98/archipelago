@@ -5,7 +5,7 @@
 // and the kernel's style attributes are left out of the comparison, and what they drew is compared as looks.
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
@@ -33,8 +33,11 @@ async function drawn(shape: string, cases: DrawingCase[]) {
   }
 }
 
-/** Each case drawn now against what the kernel drew. `own` matches the drawing's own classes, `extra` its own marks. */
+/** Each case drawn now against what the kernel drew, or what was last kept as the drawing's own. `own` matches the drawing's own classes, `extra` its own marks. */
 function same(now: Record<string, any>, kernel: string, own: RegExp, extra: string[] = [], html = (text: string) => text) {
+  // A change meant to draw otherwise (the house style's text, 27 Oct 2026) keeps what it now draws, with GOLDEN_WRITE=1.
+  if (process.env.GOLDEN_WRITE) return void writeFileSync(kernel, `${JSON.stringify(now)}
+`);
   if (!existsSync(kernel)) return;
   const was = JSON.parse(readFileSync(kernel, 'utf8'));
   // The key is the page's now, drawn from the scene's key (docs/drawings.md), not the drawing's own marks: what is

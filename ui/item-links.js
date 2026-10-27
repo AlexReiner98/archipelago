@@ -15,7 +15,7 @@ export function relationEditor(e, data, change, redraw) {
       return h(
         'tr',
         {},
-        h('td', { class: 'nowrap muted' }, phrase),
+        h('td', { class: 'nowrap muted water' }, phrase),
         h('td', {}, chip(r.entity_type), ' ', link(r)),
         h('td', {}, pill(r.entity_type, r.status)),
         h(

@@ -170,7 +170,7 @@ export function routeSpots({ labels, chains, radii, x, y, measure, z }) {
     return !placed.some(([px, py, pw]) => Math.abs(px - lx) < (pw + w) / 2 + 4 && Math.abs(py - ly) < HIGH + 2);
   };
   return labels.flatMap(({ c, text }) => {
-    const w = measure(text, SAYS_TEXT) + 2 * PAD, p = c.points;
+    const w = measure(text, SAYS_TEXT, 'water') + 2 * PAD, p = c.points;
     // On the route near its middle, else beside it, either side.
     const spots = [0.5, 0.4, 0.6, 0.3, 0.7].flatMap((t) => {
       const [mx, my] = along(p, t), [ax, ay] = along(p, t - 0.02), [bx, by] = along(p, t + 0.02);

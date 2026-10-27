@@ -110,28 +110,53 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
 }
 
 /**
- * What the page itself is drawn in: the colours (theme) and lengths of the workspace's style. Sent with a page read by
+ * What the page itself is drawn in: the colours (theme), lengths, typefaces (faces) and text roles (type) of the workspace's style. Sent with a page read by
  * no login. Of a document, also the head its own style gives its page (page.head), when one does: an invoice's.
  */
 export async function pageLook(l: Archipelago, doc?: { id?: unknown; type: string }) {
-  const { theme, lengths, page_css } = (await pageStyle(l, {})).style as { theme: unknown; lengths: unknown; page_css?: unknown };
+  const { theme, lengths, faces, type, page_css } = (await pageStyle(l, {})).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown };
   const page = doc && ((await styleFor(l, await keptOf(l, 'style', undefined), { hub: { id: String(doc.id ?? ''), type: doc.type } })).style.page as { head?: unknown } | undefined);
-  return { theme, lengths, ...(typeof page_css === 'string' && page_css.trim() && { page_css }), ...(typeof page?.head === 'string' && { head: page.head }) };
+  return { theme, lengths, faces, type, ...(typeof page_css === 'string' && page_css.trim() && { page_css }), ...(typeof page?.head === 'string' && { head: page.head }) };
 }
 
 /** A length as a style may give it: a number of pixels, or numbers with one of these units. */
 const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?)*$/;
 
+/** A typeface as a style may give it: font family names, quoted or not, and commas; nothing that ends a rule. */
+const FACE = /^[A-Za-z0-9 ,'"-]+$/;
+const NAME = /^[a-z][a-z0-9_]*$/;
+
+/** A style's faces and text roles as the variables every stylesheet reads, as ui/theme.js sets them (typeVars there). */
+function typeVars(type: unknown, faces: unknown): [string, string][] {
+  const out: [string, string][] = [], fs = (faces && typeof faces === 'object' ? faces : {}) as Record<string, unknown>;
+  const face = (name: unknown) => (NAME.test(String(name)) && typeof fs[String(name)] === 'string' && FACE.test(fs[String(name)] as string) ? `var(--face-${String(name).replaceAll('_', '-')})` : 'var(--face-text)');
+  for (const [name, value] of Object.entries(fs)) if (NAME.test(name) && typeof value === 'string' && FACE.test(value)) out.push([`--face-${name.replaceAll('_', '-')}`, value]);
+  for (const [role, t] of Object.entries((type && typeof type === 'object' ? type : {}) as Record<string, any>)) {
+    if (!NAME.test(role) || !t || typeof t !== 'object') continue;
+    const at = `--type-${role.replaceAll('_', '-')}`;
+    out.push([`${at}-family`, face(t.face)], [`${at}-weight`, [400, 600].includes(t.weight) ? String(t.weight) : '400'], [`${at}-style`, t.style === 'italic' ? 'italic' : 'normal']);
+    out.push([`${at}-case`, t.case === 'upper' ? 'uppercase' : 'none'], [`${at}-track`, typeof t.track === 'string' && /^-?\d+(\.\d+)?em$/.test(t.track) ? t.track : '0em']);
+  }
+  return out;
+}
+
 /**
- * The page's lengths as the presets on nothing give them, as a stylesheet: what the page is laid out by until the
- * workspace's own style is read (ui/theme.js paints that over it). Only a plain name and a length go in.
+ * The page's lengths, typefaces and text roles as the presets on nothing give them, as a stylesheet: what the page is laid out by
+ * until the workspace's own style is read (ui/theme.js paints that over it). Only a plain name and a length, or a
+ * plain list of families, go in.
  */
 export function lengthsSheet(packs: Parameters<typeof stylesOf>[0]): string {
-  const lengths: Record<string, unknown> = {};
-  for (const preset of stylesOf(packs)) if (!preset.on?.length && preset.props.lengths && typeof preset.props.lengths === 'object') Object.assign(lengths, preset.props.lengths);
+  const lengths: Record<string, unknown> = {}, faces: Record<string, unknown> = {}, type: Record<string, unknown> = {};
+  for (const preset of stylesOf(packs)) {
+    if (preset.on?.length) continue;
+    if (preset.props.lengths && typeof preset.props.lengths === 'object') Object.assign(lengths, preset.props.lengths);
+    if (preset.props.faces && typeof preset.props.faces === 'object') Object.assign(faces, preset.props.faces);
+    if (preset.props.type && typeof preset.props.type === 'object') Object.assign(type, preset.props.type);
+  }
   const lines = Object.entries(lengths).flatMap(([name, value]) => {
     const length = typeof value === 'number' && value >= 0 ? `${value}px` : typeof value === 'string' && LENGTH.test(value) ? value : null;
     return /^[a-z][a-z0-9_]*$/.test(name) && length ? [`  --${name.replaceAll('_', '-')}: ${length};`] : [];
   });
+  for (const [name, value] of typeVars(type, faces)) lines.push(`  ${name}: ${value};`);
   return `:root {\n${lines.join('\n')}\n}\n`;
 }

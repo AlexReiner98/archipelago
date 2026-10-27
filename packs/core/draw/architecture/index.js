@@ -55,7 +55,7 @@ function outline(shape, x, y, w, hgt, rx, lid) {
 
 /**
  * The system: its parts, the places they run and the wires between them, with how each is. `input` is what the page
- * gives every drawing (the answer, the style); `tools.measure(text, px, font)` is how wide a text is drawn.
+ * gives every drawing (the answer, the style); `tools.measure(text, px, font, role)` is how wide a text is drawn, as one of the style's text roles when one is given.
  */
 export function picture({ answer, style, reduced }, tools) {
   // A picture with steps plays how it came to be, and ends on the map as it is.
@@ -68,11 +68,16 @@ export function picture({ answer, style, reduced }, tools) {
     return v;
   };
   const [TEXT, PLACE_TEXT, SAYS_TEXT, CORNER, LID] = ['text', 'place_text', 'says_text', 'corner', 'lid'].map(z);
-  const measure = (text, px) => tools.measure(text, px, style.font);
-  const fit = (text, width, px) => {
-    if (measure(text, px) <= width) return text;
+  // A text is measured as it is drawn: in the plain face, or as one of the style's text roles (type): a place's name
+  // as a region, what a link says as water.
+  const measure = (text, px, role) => {
+    const as = role && style.type?.[role];
+    return tools.measure(text, px, (as && style.faces?.[as.face]) || style.font, as);
+  };
+  const fit = (text, width, px, role) => {
+    if (measure(text, px, role) <= width) return text;
     let t = text;
-    while (t.length > 1 && measure(`${t}…`, px) > width) t = t.slice(0, -1);
+    while (t.length > 1 && measure(`${t}…`, px, role) > width) t = t.slice(0, -1);
     return `${t}…`;
   };
   const g = layout({ items: answer.items, links: answer.links, rootId: answer.lens.from, measure, sizes: style.sizes });
@@ -87,9 +92,9 @@ export function picture({ answer, style, reduced }, tools) {
   // The places first, under everything: a box each. Its name and its own dot go over the wires, on its top edge.
   const boxLayer = g.boxes.map((b) => m('rect', { x: b.x, y: b.y, width: b.w, height: b.h, rx: z('place_corner'), class: `ar-place-box ${b.health}` }));
   const nameLayer = g.boxes.map((b) => {
-    const text = fit(b.item.title, b.w - z('place_name_room'), PLACE_TEXT);
+    const text = fit(b.item.title, b.w - z('place_name_room'), PLACE_TEXT, 'region');
     const mark = titled(
-      m('a', { key: `b:${b.id}`, href: `#/e/${b.id}`, class: `ar-place ${b.health}` }, m('rect', { x: b.x + z('place_name_inset'), y: b.y + z('place_name_inset'), width: measure(text, PLACE_TEXT) + z('place_name_room') - z('place_name_inset'), height: z('place_name_height'), rx: CORNER, class: 'ar-place-name' }), m('circle', { cx: b.x + z('place_dot_x'), cy: b.y + z('place_name_inset') + z('place_name_height') / 2, r: z('dot_small'), class: `ar-dot ${b.health}` }), m('text', { x: b.x + z('place_text_x'), y: b.y + z('place_name_inset') + z('place_name_height') / 2 }, text)),
+      m('a', { key: `b:${b.id}`, href: `#/e/${b.id}`, class: `ar-place ${b.health}` }, m('rect', { x: b.x + z('place_name_inset'), y: b.y + z('place_name_inset'), width: measure(text, PLACE_TEXT, 'region') + z('place_name_room') - z('place_name_inset'), height: z('place_name_height'), rx: CORNER, class: 'ar-place-name' }), m('circle', { cx: b.x + z('place_dot_x'), cy: b.y + z('place_name_inset') + z('place_name_height') / 2, r: z('dot_small'), class: `ar-dot ${b.health}` }), m('text', { x: b.x + z('place_text_x'), y: b.y + z('place_name_inset') + z('place_name_height') / 2 }, text)),
       [b.item.title, `${said(HEALTHS, b.health)} (${b.item.status})`].join('\n'),
     );
     dims.set(b.id, mark);
