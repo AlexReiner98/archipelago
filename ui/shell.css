@@ -9,9 +9,8 @@ body { overflow: hidden; }
 #canvas > .lens-wrap, #canvas .lens-view { height: 100%; }
 /* The safe zone: the bar and the query bar above, the find bar below. A drawing that does not pan (a list, a grid)
    is laid out between them and scrolls there; one on the plane starts under the bars, so they never cover it, and is
-   fitted above find. A main canvas the bar does not act on keeps room for the top bar alone. */
+   fitted above find. */
 #canvas { --safe-top: calc(2 * var(--box-9) + var(--space-8) + var(--space-6)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
-body[data-active="pane"] #canvas { --safe-top: calc(var(--box-9) + var(--space-7) + var(--space-5)); --safe-bottom: 0; }
 #canvas .lens-view { position: relative; box-sizing: border-box; padding: var(--safe-top) 0 var(--safe-bottom); overflow: auto; }
 #canvas .lens-view:has(.lf-stage) { padding: var(--safe-top) 0 0; overflow: hidden; }
 #canvas .lf-stage { height: 100%; }
@@ -185,6 +184,16 @@ body[data-dragging="pane"] { cursor: grabbing; }
 #canvas.pane-active::before { content: ''; position: absolute; z-index: 4; top: 0; left: 0; right: 0; height: var(--border-2, var(--border-1)); background: var(--accent); pointer-events: none; }
 /* A pane not in focus takes the first press on a style's frame itself (a frame keeps its presses), and is then in focus. */
 #panes > .pane:not(.pane-active) > .pane-canvas:has(iframe)::after, body[data-active="pane"] #canvas:has(iframe)::after { content: ''; position: absolute; inset: 0; z-index: 3; cursor: pointer; }
-/* A docked pane the bar acts on: the query bar sits in a strip of its own under the pane's names, over nothing drawn. */
-body[data-active="pane"] #query { top: calc(var(--active-top, 0%) + var(--active-bar, 0%) + var(--space-3)); }
-#panes > .pane.pane-active > .pane-canvas { box-sizing: border-box; padding-top: calc(var(--query-tall, 0%) + 2 * var(--space-3)); }
+/* Several panes: the top bar runs in a band across the page and over the sheet, the panes and the sheet under it.
+   Every pane keeps a strip of one height at its top, in or out of focus, so nothing moves when focus does: the query
+   bar fills the strip of the pane it acts on, and the others show their names there (the main one in #main-name). */
+body[data-panes]:not([data-panes="1"]) { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
+body[data-panes]:not([data-panes="1"]) #nav, body[data-panes]:not([data-panes="1"])[data-sheet="open"] #nav { top: var(--space-4); left: var(--space-9); right: var(--space-9); }
+body[data-panes]:not([data-panes="1"]) #sheet { top: var(--band); }
+body[data-panes]:not([data-panes="1"]) #canvas { --safe-top: var(--strip); --safe-bottom: 0; }
+body[data-panes]:not([data-panes="1"]) #query { top: calc(var(--active-top, 0%) + var(--space-3)); height: var(--box-9); }
+body[data-panes]:not([data-panes="1"]) #panes .pane-bar { box-sizing: border-box; height: var(--strip); padding-top: 0; padding-bottom: 0; }
+#panes > .pane.pane-active > .pane-bar > * { visibility: hidden; }
+#panes > .pane-sash.row { top: var(--band, 0%); }
+#main-name { position: fixed; z-index: 2; top: var(--main-top, 0%); left: var(--main-left, 0%); right: var(--main-right, 0%); height: var(--strip); box-sizing: border-box; display: flex; align-items: center; padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); color: var(--muted); font-size: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+#main-name[hidden] { display: none; }
