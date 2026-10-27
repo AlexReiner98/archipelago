@@ -17,7 +17,7 @@ export const DOCUMENT = 'Architecture diagrams';
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
 const sorted = (v: unknown): unknown =>
   Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted((v as Record<string, unknown>)[k])])) : v;
-const TYPE = 'software.diagram';
+const TYPE = 'diagram';
 
 interface Kept {
   id: string;
@@ -62,7 +62,7 @@ export function diagramChange(drawn: Drawn[], kept: Kept[], doc: { id: string; b
   const sections = [...new Set(drawn.map((d) => d.file))].map((file) => [file.replace(/\.drawio$/, '').replace(/^./, (c) => c.toUpperCase()), ...drawn.filter((d) => d.file === file).map((d) => idOf.get(`${d.file}#${d.page.id}`)!)].join('\n'));
   const body = ['The code drawn: its modules, what uses what, and its types down to the seven kinds. Made by npm run diagrams at each push to main; open a page to move about in it.', ...sections].join('\n\n');
   if (!doc) {
-    ops.unshift({ op: 'create', ref: 'doc', type: 'work.document', title: DOCUMENT, status: 'ready', visibility: 'shared', body });
+    ops.unshift({ op: 'create', ref: 'doc', type: 'document', title: DOCUMENT, status: 'ready', visibility: 'shared', body });
     if (into) ops.splice(1, 0, { op: 'link', type: 'part_of', from: 'doc', to: into });
   } else if (doc.body !== body) ops.push({ op: 'update', id: doc.id, body });
   return { ops, reason: `Diagrams drawn at ${commit.slice(0, 7)}` };
@@ -99,7 +99,7 @@ if (import.meta.main) {
     return answer.result;
   };
   const kept = (await call('search', { type: TYPE, limit: 500, include_archived: false })) as Kept[];
-  const docs = (await call('search', { type: 'work.document', q: DOCUMENT, limit: 20 })) as { id: string; title: string }[];
+  const docs = (await call('search', { type: 'document', q: DOCUMENT, limit: 20 })) as { id: string; title: string }[];
   const found = docs.find((d) => d.title === DOCUMENT);
   const doc = found && ((await call('get', { id: found.id, full: true })) as { entity: { id: string; body: string } }).entity;
   const change = diagramChange(drawnHere(root, commit), kept, doc, commit, into);

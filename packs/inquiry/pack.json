@@ -6,8 +6,8 @@
   "requires": ["core", "work"],
   "types": [
     {
-      "id": "inquiry.hypothesis",
-      "moved_from": ["hypothesis"],
+      "id": "hypothesis",
+      "moved_from": ["inquiry.hypothesis"],
       "capabilities": { "settles": { "by": "evidence", "whose": "owner" } },
       "extends": "question",
       "title": "Hypothesis",
@@ -15,15 +15,15 @@
       "statuses": { "open": ["untested", "testing"], "closed": ["supported", "refuted"] }
     },
     {
-      "id": "inquiry.experiment",
-      "moved_from": ["experiment"],
-      "extends": "work.task",
+      "id": "experiment",
+      "moved_from": ["inquiry.experiment"],
+      "extends": "task",
       "title": "Experiment",
       "description": "A task that tests a hypothesis and produces a result."
     },
     {
-      "id": "inquiry.result",
-      "moved_from": ["result"],
+      "id": "result",
+      "moved_from": ["inquiry.result"],
       "extends": "record",
       "title": "Result",
       "description": "A recorded outcome with its evidence: a measurement, a test run, a reply.",
@@ -37,53 +37,53 @@
   ],
   "links": [
     {
-      "id": "inquiry.tests",
-      "moved_from": ["tests"],
+      "id": "tests",
+      "moved_from": ["inquiry.tests"],
       "extends": "bears_on",
       "title": "tests",
       "inverse": "is tested by",
-      "from": ["work.task"],
-      "to": ["inquiry.hypothesis"],
+      "from": ["task"],
+      "to": ["hypothesis"],
       "description": "The work that will settle the hypothesis."
     },
     {
-      "id": "inquiry.supports",
-      "moved_from": ["supports"],
+      "id": "supports",
+      "moved_from": ["inquiry.supports"],
       "extends": "bears_on",
       "title": "supports",
       "inverse": "is supported by",
-      "from": ["inquiry.result"],
-      "to": ["inquiry.hypothesis"],
+      "from": ["result"],
+      "to": ["hypothesis"],
       "description": "Evidence for."
     },
     {
-      "id": "inquiry.refutes",
-      "moved_from": ["refutes"],
+      "id": "refutes",
+      "moved_from": ["inquiry.refutes"],
       "extends": "bears_on",
       "title": "refutes",
       "inverse": "is refuted by",
-      "from": ["inquiry.result"],
-      "to": ["inquiry.hypothesis"],
+      "from": ["result"],
+      "to": ["hypothesis"],
       "description": "Evidence against."
     },
     {
-      "id": "inquiry.assumes",
-      "moved_from": ["assumes"],
+      "id": "assumes",
+      "moved_from": ["inquiry.assumes"],
       "extends": "bears_on",
       "title": "assumes",
       "inverse": "is assumed by",
       "from": ["*"],
-      "to": ["inquiry.hypothesis"],
+      "to": ["hypothesis"],
       "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted."
     },
     {
-      "id": "inquiry.explains",
-      "moved_from": ["explains"],
+      "id": "explains",
+      "moved_from": ["inquiry.explains"],
       "extends": "about",
       "title": "would explain",
       "inverse": "may be explained by",
-      "from": ["inquiry.hypothesis"],
-      "to": ["work.issue"],
+      "from": ["hypothesis"],
+      "to": ["issue"],
       "description": "A suspected cause."
     }
   ],

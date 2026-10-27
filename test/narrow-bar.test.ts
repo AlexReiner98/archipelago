@@ -16,10 +16,10 @@ test('in a browser, the query bar shows what narrows the filter as chips of thei
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'site', type: 'work.project', title: 'Site works' },
-      { op: 'create', ref: 'roof', type: 'software.feature', title: 'Roof' },
+      { op: 'create', ref: 'site', type: 'project', title: 'Site works' },
+      { op: 'create', ref: 'roof', type: 'feature', title: 'Roof' },
       { op: 'create', ref: 'which', type: 'question', title: 'Which tiles?' },
-      { op: 'create', ref: 'gutter', type: 'work.task', title: 'Gutters' },
+      { op: 'create', ref: 'gutter', type: 'task', title: 'Gutters' },
       { op: 'create', ref: 'away', type: 'question', title: 'Elsewhere?' },
       { op: 'link', type: 'part_of', from: 'roof', to: 'site' },
       { op: 'link', type: 'part_of', from: 'which', to: 'roof' },
@@ -50,10 +50,10 @@ test('in a browser, the query bar shows what narrows the filter as chips of thei
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
     // The box narrows: more types found, then only one of them.
-    await box('work.task');
+    await box('task');
     assert.ok(await until(`${has('Gutters')} && ${has('Which tiles?')}`), `a type more is found within it: ${page.logs().join('\n')}`);
     await box('only Task');
-    assert.ok(await until(`location.hash.includes('only=work.task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+    assert.ok(await until(`location.hash.includes('only=task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
     assert.ok(await until(`${chips}.join('|') === 'only Task|within Site works'`), `each narrowing a chip: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
     // Its × takes it out, and what it held back is drawn again.
     await page.evaluate(`[...document.querySelectorAll('#query .q-narrow')].find((c) => c.textContent.includes('only')).querySelector('.q-x').click()`);

@@ -20,11 +20,11 @@ const change = (actor: string, reason: string, ops: unknown[]) => call('change',
 // One item on the page (part of it), and two elsewhere, in a project of their own.
 const made = (
   await change('agent:stable-setup', 'what the writers change', [
-    { op: 'create', ref: 'on', type: 'work.task', title: 'Still page: on it 0' },
+    { op: 'create', ref: 'on', type: 'task', title: 'Still page: on it 0' },
     { op: 'link', type: 'part_of', from: 'on', to: page },
-    { op: 'create', ref: 'away', type: 'work.project', title: 'Still page: elsewhere' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Still page: away a 0' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'Still page: away b 0' },
+    { op: 'create', ref: 'away', type: 'project', title: 'Still page: elsewhere' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Still page: away a 0' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Still page: away b 0' },
     { op: 'link', type: 'part_of', from: 'a', to: 'away' },
     { op: 'link', type: 'part_of', from: 'b', to: 'away' },
   ])

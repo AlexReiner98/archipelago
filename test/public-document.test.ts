@@ -13,11 +13,11 @@ test('a document a human makes public is read by anyone at its own address, with
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'work.document', title: 'Why maps', visibility: 'shared', body: '# Why maps\n\nA map keeps **people** and work in one place, so that [anyone](https://example.com) can see it.\n\n{s}\n\n{p}\n\n{o}\n\n{q}\n\nSee {o} and {s}.' },
-        { op: 'create', ref: 's', type: 'work.note', title: 'Held section', visibility: 'shared', body: 'Held and shown.' },
-        { op: 'create', ref: 'p', type: 'work.note', title: 'Private section', visibility: 'private', body: 'Never shown.' },
-        { op: 'create', ref: 'o', type: 'work.note', title: 'Kept elsewhere', visibility: 'shared', body: 'Not public, not held.' },
-        { op: 'create', ref: 'q', type: 'work.project', title: 'Public project', visibility: 'shared', body: 'Its note is never given.' },
+        { op: 'create', ref: 'd', type: 'document', title: 'Why maps', visibility: 'shared', body: '# Why maps\n\nA map keeps **people** and work in one place, so that [anyone](https://example.com) can see it.\n\n{s}\n\n{p}\n\n{o}\n\n{q}\n\nSee {o} and {s}.' },
+        { op: 'create', ref: 's', type: 'note', title: 'Held section', visibility: 'shared', body: 'Held and shown.' },
+        { op: 'create', ref: 'p', type: 'note', title: 'Private section', visibility: 'private', body: 'Never shown.' },
+        { op: 'create', ref: 'o', type: 'note', title: 'Kept elsewhere', visibility: 'shared', body: 'Not public, not held.' },
+        { op: 'create', ref: 'q', type: 'project', title: 'Public project', visibility: 'shared', body: 'Its note is never given.' },
         { op: 'link', type: 'part_of', from: 's', to: 'd' },
         { op: 'link', type: 'part_of', from: 'p', to: 'd' },
       ],
@@ -73,7 +73,7 @@ test('a document a human makes public is read by anyone at its own address, with
   const { pelago } = await workspaces.get('default');
   assert.equal(await publicDocument(pelago, q), null);
   // An invoice is read as a document, but is never public.
-  assert.equal(pelago.registry.type('time.invoice')?.public ?? false, false);
+  assert.equal(pelago.registry.type('invoice')?.public ?? false, false);
 
   // A link to it is still kept out of search engines.
   const link = (await call('/api/share_create', undefined, { id: d })).result;
@@ -94,13 +94,13 @@ test('a published document reads as it was published until it is published again
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'work.document', title: 'How it works', visibility: 'shared', body: 'Opening words.\n\n{s}\n\n{l}' },
-        { op: 'create', ref: 's', type: 'work.note', title: 'A section', visibility: 'shared', body: 'As first written.' },
-        { op: 'create', ref: 'f', type: 'software.feature', title: 'The system', visibility: 'shared', body: 'The whole of it.' },
-        { op: 'create', ref: 'a', type: 'work.task', title: 'A part', visibility: 'shared', body: 'Does the first thing. Then more ({b}).' },
-        { op: 'create', ref: 'b', type: 'work.task', title: 'Another part', visibility: 'shared', body: 'Does the second.' },
-        { op: 'create', ref: 'x', type: 'work.task', title: 'A private part', visibility: 'private', body: 'Never shown.' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'The system, drawn', visibility: 'shared', status: 'current', props: { filter: { types: ['work.task', 'software.feature'] } } },
+        { op: 'create', ref: 'd', type: 'document', title: 'How it works', visibility: 'shared', body: 'Opening words.\n\n{s}\n\n{l}' },
+        { op: 'create', ref: 's', type: 'note', title: 'A section', visibility: 'shared', body: 'As first written.' },
+        { op: 'create', ref: 'f', type: 'feature', title: 'The system', visibility: 'shared', body: 'The whole of it.' },
+        { op: 'create', ref: 'a', type: 'task', title: 'A part', visibility: 'shared', body: 'Does the first thing. Then more ({b}).' },
+        { op: 'create', ref: 'b', type: 'task', title: 'Another part', visibility: 'shared', body: 'Does the second.' },
+        { op: 'create', ref: 'x', type: 'task', title: 'A private part', visibility: 'private', body: 'Never shown.' },
+        { op: 'create', ref: 'l', type: 'lens', title: 'The system, drawn', visibility: 'shared', status: 'current', props: { filter: { types: ['task', 'feature'] } } },
         { op: 'link', type: 'about', from: 'l', to: 'f' },
         { op: 'link', type: 'part_of', from: 'a', to: 'f' },
         { op: 'link', type: 'part_of', from: 'b', to: 'f' },
@@ -148,9 +148,9 @@ test('a published document links to the other published documents it names, and 
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'a', type: 'work.document', title: 'First steps', visibility: 'shared', body: 'Start here.' },
-        { op: 'create', ref: 'c', type: 'work.document', title: 'Not out yet', visibility: 'shared', body: 'A draft.' },
-        { op: 'create', ref: 'b', type: 'work.document', title: 'Going further', visibility: 'shared', body: 'After {a}, read on. Later: {c}.' },
+        { op: 'create', ref: 'a', type: 'document', title: 'First steps', visibility: 'shared', body: 'Start here.' },
+        { op: 'create', ref: 'c', type: 'document', title: 'Not out yet', visibility: 'shared', body: 'A draft.' },
+        { op: 'create', ref: 'b', type: 'document', title: 'Going further', visibility: 'shared', body: 'After {a}, read on. Later: {c}.' },
       ],
     })
   ).result.created;
@@ -170,7 +170,7 @@ test('a part is told by its first sentence, with no ids', () => {
 
 test('a document is described by the first paragraph it opens on, cut short', () => {
   assert.equal(describe([{ text: '# Title\n\nShort title\nThe first words, said **plainly**.\n\nThe second.' }]), 'The first words, said plainly.');
-  assert.equal(describe([{ section: { id: 'e_aaaaaaaa', type: 'work.note', title: 'A', status: 'current', body: '- one\n- two', updated_at: '' } }]), 'one two');
+  assert.equal(describe([{ section: { id: 'e_aaaaaaaa', type: 'note', title: 'A', status: 'current', body: '- one\n- two', updated_at: '' } }]), 'one two');
   const long = describe([{ text: 'word '.repeat(100) }]);
   assert.ok(long.length <= 160 && long.endsWith('…'));
   assert.equal(describe([]), '');

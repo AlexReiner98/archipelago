@@ -27,7 +27,7 @@ test('an agent is given each type and relation on a line; the whole is a quarter
   const brief = (await callTool(l, agent, 'schema', {})) as Brief;
   const whole = await callTool(l, human, 'schema', {});
   assert.ok(JSON.stringify(brief, null, 2).length * 4 < JSON.stringify(whole, null, 2).length, 'the brief is small');
-  const task = brief.types.find((t) => t.id === 'work.task')!;
+  const task = brief.types.find((t) => t.id === 'task')!;
   assert.equal(task.statuses, 'todo doing waiting / done dropped');
   assert.match(task.fields!, /priority: low\|normal\|high\|urgent/);
   assert.doesNotMatch(task.fields!, /tokens_used/, 'a field the system keeps is not one to set');
@@ -37,7 +37,7 @@ test('an agent is given each type and relation on a line; the whole is a quarter
 
 test('a type, a relation or a pack is given whole on asking, and a name that is none of them is refused', async () => {
   const l = await map();
-  const task = (await callTool(l, agent, 'schema', { type: 'work.task' })) as { types: { fields: Record<string, { description?: string }> }[] };
+  const task = (await callTool(l, agent, 'schema', { type: 'task' })) as { types: { fields: Record<string, { description?: string }> }[] };
   assert.equal(task.types.length, 1);
   assert.ok(task.types[0]!.fields.recurrence!.description, 'each field explained');
   const rel = (await callTool(l, agent, 'schema', { type: 'depends_on' })) as { relations: { description: string }[] };

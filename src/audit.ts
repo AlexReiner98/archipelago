@@ -9,7 +9,7 @@ import { actorId, type Actor, type Archipelago } from './pelago.ts';
  */
 export async function importAudit(l: Archipelago, actor: Actor, input: { connection: string }) {
   const conn = await l.entity(input.connection);
-  if (!conn || !l.registry.isA(conn.type, 'sys.connection')) throw new Error(`"${input.connection}" is not a connection`);
+  if (!conn || !l.registry.isA(conn.type, 'connection')) throw new Error(`"${input.connection}" is not a connection`);
   const path = conn.props.audit_log as string | undefined;
   if (!path) throw new Error(`"${conn.title}" has no audit_log path`);
   if (!existsSync(path)) return { imported: 0, path, note: 'Log file does not exist yet.' };

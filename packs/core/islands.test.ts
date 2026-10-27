@@ -21,20 +21,20 @@ const z = (n: string) => house.sizes[`arch_${n}`];
 const num = (n: string) => house.numbers[n];
 
 const ROOT = 'e_rootzzzz';
-const item = (id: string, title: string, extra: Record<string, unknown> = {}) => ({ id, type: 'work.task', kind: 'work', title, status: 'done', open: false, inside: ROOT, place: 0, fields: {}, size: { work: 0 }, state: { blocked: false, waits_on: [], sessions: 0, needs_you: false }, within: { items: 0 }, ...extra });
+const item = (id: string, title: string, extra: Record<string, unknown> = {}) => ({ id, type: 'task', kind: 'work', title, status: 'done', open: false, inside: ROOT, place: 0, fields: {}, size: { work: 0 }, state: { blocked: false, waits_on: [], sessions: 0, needs_you: false }, within: { items: 0 }, ...extra });
 const [SKETCH, WRITE, MARKS, TRY, SHIP, OLD] = ['e_sketchzz', 'e_writezzz', 'e_markszzz', 'e_tryzzzzz', 'e_shipzzzz', 'e_oldzzzzz'];
 const plan = [SKETCH, WRITE, MARKS, TRY, SHIP];
 const status = (o: Record<string, string>) => Object.fromEntries(Object.entries(o).map(([id, s]) => [id, { status: s }]));
 const answer = {
   lens: { from: ROOT },
   items: [
-    { ...item(ROOT, 'The whole system', { type: 'work.project', open: true, status: 'active', inside: undefined }) },
+    { ...item(ROOT, 'The whole system', { type: 'project', open: true, status: 'active', inside: undefined }) },
     item(SKETCH, 'Sketch the look'),
     item(WRITE, 'Write the drawing'),
     item(MARKS, 'Draw progress'),
     item(TRY, 'Try it in the sandbox'),
     item(SHIP, 'Ship it'),
-    item(OLD, 'An old part', { type: 'software.component', status: 'retired' }),
+    item(OLD, 'An old part', { type: 'component', status: 'retired' }),
   ],
   links: [
     { kind: 'depends_on', from: WRITE, to: SKETCH, n: 1, says: 'the sketch' },
@@ -215,7 +215,7 @@ test('as a plan, each part is a row and its work runs done, under way, to do; as
   // @ts-expect-error: a plain module of the drawing, with no types of its own.
   const { board } = await import('./draw/architecture/boards.js');
   const PROJECT = 'e_projectz', [A, B, C] = ['e_taskaaaa', 'e_taskbbbb', 'e_taskcccc'];
-  const work = { ...answer, items: [item(ROOT, 'Root', { open: true, status: 'active', inside: undefined }), item(PROJECT, 'Website', { type: 'work.project', open: true, status: 'active' }), ...[A, B, C].map((id, k) => item(id, `Task ${k}`, { inside: PROJECT, place: k }))], links: [] };
+  const work = { ...answer, items: [item(ROOT, 'Root', { open: true, status: 'active', inside: undefined }), item(PROJECT, 'Website', { type: 'project', open: true, status: 'active' }), ...[A, B, C].map((id, k) => item(id, `Task ${k}`, { inside: PROJECT, place: k }))], links: [] };
   const statuses = { [A]: 'todo', [B]: 'done', [C]: 'doing' };
   const items = work.items.map((i: any) => (statuses[i.id] ? { ...i, status: statuses[i.id], open: true } : i));
   const g = layout({ items, links: [], rootId: ROOT, measure, sizes: house.sizes });

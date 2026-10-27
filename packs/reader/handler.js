@@ -54,7 +54,7 @@ async function catchUp(_input, ctx) {
       // Newest first on this branch, back to the last one that was read.
       const pending = [];
       for (const { detail } of rows.filter((r) => r.detail.branch === branch)) {
-        if ((await ctx.read({ items: { type: 'sys.run', where: { link: commitLink(repo, detail.after) } }, fields: ['link'] })).length) break;
+        if ((await ctx.read({ items: { type: 'run', where: { link: commitLink(repo, detail.after) } }, fields: ['link'] })).length) break;
         pending.push(detail);
       }
       if (!pending.some((p) => p.commits?.length)) continue;

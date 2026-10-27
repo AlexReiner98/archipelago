@@ -7,10 +7,10 @@ import type { PackFile } from '../src/packs.ts';
 import { agent, fresh, human, make } from './map.ts';
 
 const item = (props: Record<string, unknown>, more: Partial<TypeItem> = {}): TypeItem => ({ id: 'e_1', type: 'type', title: '', body: '', is_open: true, props, ...more });
-const pack: PackFile = { id: 'work', version: '1', title: 'Work', description: '', types: [{ id: 'work.task', title: 'Task', description: 'Work.', extends: 'work', fields: { due: { type: 'date' } } }], links: [{ id: 'work.addresses', extends: 'about', title: 'Addresses', inverse: 'Addressed by', from: ['*'], to: ['*'], description: '' }] };
+const pack: PackFile = { id: 'work', version: '1', title: 'Work', description: '', types: [{ id: 'task', title: 'Task', description: 'Work.', extends: 'work', fields: { due: { type: 'date' } } }], links: [{ id: 'addresses', extends: 'about', title: 'Addresses', inverse: 'Addressed by', from: ['*'], to: ['*'], description: '' }] };
 
 test('an owner\'s version lays its title, note and fields over the pack\'s, and a retired one is marked', () => {
-  const [over] = withVersions([pack], [item({ preset: 'work.task', fields: { rate: { type: 'number' } } }, { title: 'Job', is_open: false }), item({ preset: 'work.addresses' }, { type: 'link_type', body: 'What it fixes.' })]);
+  const [over] = withVersions([pack], [item({ preset: 'task', fields: { rate: { type: 'number' } } }, { title: 'Job', is_open: false }), item({ preset: 'addresses' }, { type: 'link_type', body: 'What it fixes.' })]);
   const t = over.types![0] as { title: string; description: string; fields: Record<string, unknown>; retired?: boolean };
   assert.deepEqual([t.title, t.description, Object.keys(t.fields), t.retired], ['Job', 'Work.', ['due', 'rate'], true]);
   assert.equal(over.links![0].description, 'What it fixes.');
@@ -42,23 +42,23 @@ test('a type made on the map can gain a field, be used in the change that makes 
 
 test('the owner\'s version of a pack\'s type adds a field and renames it; a bad one is refused', async () => {
   const l = await fresh();
-  await assert.rejects(make(l, [{ op: 'create', type: 'work.task', title: 'Paint', props: { rate: 40 } }]), /no field "rate"/);
-  const made = await make(l, [{ op: 'create', ref: 'v', type: 'type', title: 'Job', props: { preset: 'work.task', fields: { rate: { type: 'number' } } } }]);
-  await make(l, [{ op: 'create', type: 'work.task', title: 'Paint', props: { rate: 40 } }]);
-  assert.equal(l.registry.type('work.task')!.title, 'Job');
+  await assert.rejects(make(l, [{ op: 'create', type: 'task', title: 'Paint', props: { rate: 40 } }]), /no field "rate"/);
+  const made = await make(l, [{ op: 'create', ref: 'v', type: 'type', title: 'Job', props: { preset: 'task', fields: { rate: { type: 'number' } } } }]);
+  await make(l, [{ op: 'create', type: 'task', title: 'Paint', props: { rate: 40 } }]);
+  assert.equal(l.registry.type('task')!.title, 'Job');
 
   await assert.rejects(make(l, [{ op: 'create', type: 'type', title: 'Bad', props: { name: 'thing', extends: 'work' } }]), /must be named "local.<name>"/);
   await assert.rejects(make(l, [{ op: 'create', type: 'type', title: 'Bad', props: { name: 'local.bad', extends: 'nothing' } }]), /types it makes or changes/);
 
   await make(l, [{ op: 'archive', id: made.v }]);
-  assert.equal(l.registry.type('work.task')!.title, 'Task', 'archived, the preset is the pack\'s again');
+  assert.equal(l.registry.type('task')!.title, 'Task', 'archived, the preset is the pack\'s again');
 });
 
 test('a retired link type makes no new link; one of the workspace\'s own can be drawn', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
     { op: 'create', type: 'link_type', title: 'Is linked to', status: 'retired', props: { preset: 'link' } },
     { op: 'create', type: 'link_type', title: 'Feeds', props: { name: 'local.feeds', extends: 'depends_on' } },
   ]);
@@ -79,6 +79,6 @@ test('an agent\'s type waits for the owner as any of its changes does', async ()
 test('nothing is a flavour of the plain link, and uses blocks nothing', async () => {
   const l = await fresh();
   await assert.rejects(make(l, [{ op: 'create', type: 'link_type', title: 'Touches', props: { name: 'local.touches', extends: 'link' } }]), /cannot be a flavour of link/);
-  assert.ok(!l.registry.relationFamily('depends_on', 'waits_on', 'needs').includes('software.calls'), 'a call is no block');
-  assert.deepEqual(l.registry.relationFamily('uses'), ['uses', 'software.calls']);
+  assert.ok(!l.registry.relationFamily('depends_on', 'waits_on', 'needs').includes('calls'), 'a call is no block');
+  assert.deepEqual(l.registry.relationFamily('uses'), ['uses', 'calls']);
 });

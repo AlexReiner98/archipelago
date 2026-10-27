@@ -14,7 +14,7 @@ const browser = chrome();
 
 test('an agent makes and changes a saved canvas through change, and report show opens it', async () => {
   const l = await fresh();
-  const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'work.project', title: 'P' }]);
+  const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'P' }]);
   const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'lens', title: 'P and its parts', props: { filter: { ids: [p] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'flow' } } }] };
   const made = (await callTool(l, agent, 'change', asked)) as { status: string; created?: Record<string, string>; proposal?: string };
   // Held for a person, as every agent's change is until the owner lets them apply: approved, it is made.
@@ -26,7 +26,7 @@ test('an agent makes and changes a saved canvas through change, and report show 
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id, props: { lens: 'x' } }] }), /lens/, 'only the fields it declares');
   const shown = (await callTool(l, agent, 'report', { action: 'show', params: { entity: id } })) as { hash: string };
   assert.equal(shown.hash, `v?canvas=${id}`, 'opened as their canvas, not as an item page');
-  const drawn = (await callTool(l, human, 'view', { name: 'flat', params: { filter: { types: ['work.project'] } } })) as { items: { id: string }[] };
+  const drawn = (await callTool(l, human, 'view', { name: 'flat', params: { filter: { types: ['project'] } } })) as { items: { id: string }[] };
   assert.ok(!drawn.items.some((i) => i.id === id), 'not drawn on a canvas of the work');
 });
 
@@ -35,10 +35,10 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'work.project', title: 'Saved here' },
-      { op: 'create', ref: 'a', type: 'work.task', title: 'A step of it' },
+      { op: 'create', ref: 'p', type: 'project', title: 'Saved here' },
+      { op: 'create', ref: 'a', type: 'task', title: 'A step of it' },
       { op: 'link', type: 'part_of', from: 'a', to: 'p' },
-      { op: 'create', ref: 'q', type: 'work.project', title: 'Another project' },
+      { op: 'create', ref: 'q', type: 'project', title: 'Another project' },
     ],
   })).result.created as Record<string, string>;
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A view of it', props: { filter: { ids: [made.p] }, walk: { over: ['part_of'], steps: 2 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] });

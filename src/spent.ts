@@ -13,7 +13,7 @@ export async function spent(l: Archipelago, input: { days?: number }) {
   const days = Math.min(Math.max(Math.round(input.days ?? 30), 1), 366);
   const since = Date.now() - days * DAY;
   const { rows: runs } = await l.db.query<Entity>(`select id, title, props, created_at from entity where type = any($1::text[]) and archived_at is null and created_at >= $2::timestamptz`, [
-    l.registry.family('sys.run'),
+    l.registry.family('run'),
     new Date(since).toISOString(),
   ]);
   const by = new Map<string, { surface: string; runs: number; tokens: number; cost_usd: number; unpriced_tokens: number }>();

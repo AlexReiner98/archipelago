@@ -33,7 +33,7 @@ async function local(file: string) {
   await new Promise<void>((r) => server.listen(port, '127.0.0.1', r));
   const base = `http://127.0.0.1:${port}`;
   const call = async (tool: string, body: unknown) => (await (await fetch(`${base}/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json()) as any;
-  const id = (await call('change', { reason: 'bench', ops: [{ op: 'create', ref: 'd', type: 'work.document', title: 'Home', visibility: 'shared', body: 'Home.' }] })).result.created.d;
+  const id = (await call('change', { reason: 'bench', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'Home', visibility: 'shared', body: 'Home.' }] })).result.created.d;
   await call('publish', { id });
   // What was published there, as this checkout publishes it: the frozen pictures kept with what it adds at publish.
   const live = JSON.parse(readFileSync(file, 'utf8'));

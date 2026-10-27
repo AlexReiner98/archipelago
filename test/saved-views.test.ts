@@ -7,12 +7,12 @@ import { fresh, human, make } from './map.ts';
 test('saved views name each kept picture by its style, says what it is of, and puts the pinned first, and names the project it is in', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'proj', type: 'work.project', title: 'Archipelago', status: 'active' },
-    { op: 'create', ref: 'stream', type: 'software.feature', title: 'A sovereign stack', status: 'planned' },
-    { op: 'create', ref: 'stack', type: 'software.component', title: 'Sovereign AI stack', status: 'wiring' },
+    { op: 'create', ref: 'proj', type: 'project', title: 'Archipelago', status: 'active' },
+    { op: 'create', ref: 'stream', type: 'feature', title: 'A sovereign stack', status: 'planned' },
+    { op: 'create', ref: 'stack', type: 'component', title: 'Sovereign AI stack', status: 'wiring' },
     { op: 'link', type: 'part_of', from: 'stream', to: 'proj' },
     { op: 'link', type: 'part_of', from: 'stack', to: 'stream' },
-    { op: 'create', ref: 'wired', type: 'lens', title: 'The stack as wired', status: 'current', props: { filter: { types: ['software.component'] } } },
+    { op: 'create', ref: 'wired', type: 'lens', title: 'The stack as wired', status: 'current', props: { filter: { types: ['component'] } } },
     { op: 'create', ref: 'arch', type: 'style', title: 'The stack as architecture', status: 'current', props: { shape: 'architecture' } },
     { op: 'link', type: 'about', from: 'wired', to: 'stack' },
     { op: 'link', type: 'about', from: 'arch', to: 'wired' },
@@ -21,7 +21,7 @@ test('saved views name each kept picture by its style, says what it is of, and p
   const { pictures, more } = (await callTool(l, human, 'view', { name: 'saved_views', params: {} })) as { pictures: Record<string, unknown>[]; more: number };
   assert.deepEqual(pictures, [
     { lens: made.board, title: 'Kanban board', pinned: true },
-    { lens: made.wired, title: 'The stack as architecture', shape: 'architecture', of: { id: made.stack, title: 'Sovereign AI stack', type: 'software.component' }, project: { id: made.proj, title: 'Archipelago' }, pinned: false },
+    { lens: made.wired, title: 'The stack as architecture', shape: 'architecture', of: { id: made.stack, title: 'Sovereign AI stack', type: 'component' }, project: { id: made.proj, title: 'Archipelago' }, pinned: false },
   ]);
   assert.equal(more, 0);
   const one = (await callTool(l, human, 'view', { name: 'saved_views', params: { limit: 1 } })) as { pictures: unknown[]; more: number };

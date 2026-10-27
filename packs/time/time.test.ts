@@ -11,20 +11,20 @@ type Link = { id: string; type: string; from: string; to: string };
 
 /** What each type is, as the kernel says it with every item read. */
 const LINEAGE: Record<string, string[]> = {
-  'work.project': ['work.project', 'work'],
-  'work.task': ['work.task', 'work'],
+  'project': ['project', 'work'],
+  'task': ['task', 'work'],
   company: ['company', 'actor'],
   person: ['person', 'actor'],
-  'software.repo': ['software.repo', 'place'],
-  'time.entry': ['time.entry', 'occurrence'],
-  'time.invoice': ['time.invoice', 'work.document', 'record'],
+  'repo': ['repo', 'place'],
+  'time_entry': ['time_entry', 'occurrence'],
+  'invoice': ['invoice', 'document', 'record'],
 };
 
 /** A context over fixtures: the reads the kernel answers (get, items, related, trail, view), at a fixed moment in Toronto. */
 function ctxOver(items: Item[], links: Link[], lens: unknown = { items: [] }, now = '2026-10-16T16:00:00Z') {
   const typed = (e: Item | undefined) => (e ? { status: 'active', props: {}, body: '', created_at: '2026-10-01T00:00:00Z', ...e, is: LINEAGE[e.type] ?? [e.type] } : null);
   const byId = new Map(items.map((e) => [e.id, e]));
-  // A kind of link reads its flavours too: lives_in is software.lives_in as well.
+  // A kind of link reads its flavours too: lives_in is lives_in as well.
   const fits = (type: string, asked: string) => type === asked || type.endsWith(`.${asked}`);
   const asked: Record<string, unknown>[] = [];
   return {
@@ -69,12 +69,12 @@ function ctxOver(items: Item[], links: Link[], lens: unknown = { items: [] }, no
 const MAP: Item[] = [
   { id: 'me', type: 'company', title: 'Apex Design Tools Inc.', props: { address: '1 King St' } },
   { id: 'nw', type: 'company', title: 'Northwind', props: { rate: 80, hst: true, terms_days: 30, billed_by: 'me' } },
-  { id: 'p', type: 'work.project', title: 'Northwind research' },
-  { id: 't', type: 'work.task', title: 'Funding research' },
-  { id: 'e1', type: 'time.entry', title: 'Read the program', status: 'logged', props: { date: '2026-10-14', hours: 3 } },
-  { id: 'e2', type: 'time.entry', title: 'Call with Sam', status: 'logged', props: { date: '2026-10-15', start: '2026-10-15T13:00:00Z', end: '2026-10-15T14:30:00Z', hours: 9 } },
-  { id: 'e3', type: 'time.entry', title: 'Internal', status: 'logged', props: { date: '2026-10-15', hours: 2, billable: false } },
-  { id: 'old', type: 'time.invoice', title: 'Invoice INV-2026-001: Northwind', status: 'paid', props: { number: 'INV-2026-001', billed_by: 'me' } },
+  { id: 'p', type: 'project', title: 'Northwind research' },
+  { id: 't', type: 'task', title: 'Funding research' },
+  { id: 'e1', type: 'time_entry', title: 'Read the program', status: 'logged', props: { date: '2026-10-14', hours: 3 } },
+  { id: 'e2', type: 'time_entry', title: 'Call with Sam', status: 'logged', props: { date: '2026-10-15', start: '2026-10-15T13:00:00Z', end: '2026-10-15T14:30:00Z', hours: 9 } },
+  { id: 'e3', type: 'time_entry', title: 'Internal', status: 'logged', props: { date: '2026-10-15', hours: 2, billable: false } },
+  { id: 'old', type: 'invoice', title: 'Invoice INV-2026-001: Northwind', status: 'paid', props: { number: 'INV-2026-001', billed_by: 'me' } },
 ];
 const LINKS: Link[] = [
   { id: 'r1', type: 'involves', from: 'p', to: 'nw' },
@@ -88,7 +88,7 @@ test('time is logged as a block or as hours, on the day it began where the work 
   const { ctx } = ctxOver(MAP, LINKS);
   const block = await handler['time.log']({ work: 't', what: 'Late call', start: '2026-10-15T23:00:00-04:00', end: '2026-10-16T00:30:00-04:00' }, ctx);
   assert.deepEqual(block.ops, [
-    { op: 'create', ref: 'e', type: 'time.entry', title: 'Late call', status: 'logged', body: '', props: { date: '2026-10-15', hours: 1.5, start: '2026-10-16T03:00:00.000Z', end: '2026-10-16T04:30:00.000Z' } },
+    { op: 'create', ref: 'e', type: 'time_entry', title: 'Late call', status: 'logged', body: '', props: { date: '2026-10-15', hours: 1.5, start: '2026-10-16T03:00:00.000Z', end: '2026-10-16T04:30:00.000Z' } },
     { op: 'link', type: 'part_of', from: 'e', to: 't' },
   ]);
   assert.equal(block.answer.client, 'Northwind', 'the company the work sits in involves');
@@ -113,11 +113,11 @@ test('an invoice takes the next number from its biller, bills its entries and ma
   const done = await handler['time.invoice_draft']({ client: 'nw' }, ctx);
   assert.deepEqual([done.answer.number, done.answer.entries, done.answer.subtotal, done.answer.tax, done.answer.total], ['INV-2026-002', 2, 360, 46.8, 406.8]);
   const [create, part, ...rest] = done.ops;
-  assert.deepEqual([create.type, create.status, create.props.due, part], ['time.invoice', 'draft', '2026-11-15', { op: 'link', type: 'part_of', from: 'inv', to: 'nw' }]);
+  assert.deepEqual([create.type, create.status, create.props.due, part], ['invoice', 'draft', '2026-11-15', { op: 'link', type: 'part_of', from: 'inv', to: 'nw' }]);
   assert.deepEqual(rest, [
-    { op: 'link', type: 'time.bills', from: 'inv', to: 'e1' },
+    { op: 'link', type: 'bills', from: 'inv', to: 'e1' },
     { op: 'update', id: 'e1', status: 'invoiced' },
-    { op: 'link', type: 'time.bills', from: 'inv', to: 'e2' },
+    { op: 'link', type: 'bills', from: 'inv', to: 'e2' },
     { op: 'update', id: 'e2', status: 'invoiced' },
   ]);
   assert.match(create.body, /\| Oct 14 \| Read the program — Funding research \| 3 \| \$80\.00 \| \$240\.00 \|/);
@@ -126,8 +126,8 @@ test('an invoice takes the next number from its biller, bills its entries and ma
 });
 
 test('a payment in part says the invoice was sent; voiding frees its entries', async () => {
-  const sent: Item = { id: 'inv', type: 'time.invoice', title: 'Invoice INV-2026-002', status: 'draft', props: { number: 'INV-2026-002', total: 565, currency: 'CAD' } };
-  const { ctx } = ctxOver([...MAP, sent], [...LINKS, { id: 'b1', type: 'time.bills', from: 'inv', to: 'e1' }]);
+  const sent: Item = { id: 'inv', type: 'invoice', title: 'Invoice INV-2026-002', status: 'draft', props: { number: 'INV-2026-002', total: 565, currency: 'CAD' } };
+  const { ctx } = ctxOver([...MAP, sent], [...LINKS, { id: 'b1', type: 'bills', from: 'inv', to: 'e1' }]);
   const part = await handler['time.invoice_paid']({ id: 'inv', amount: 200, method: 'EFT', date: '2026-10-20' }, ctx);
   assert.deepEqual(part.ops, [{ op: 'update', id: 'inv', status: 'sent', props: { paid: 200, paid_on: '2026-10-20', payments: [{ date: '2026-10-20', amount: 200, method: 'EFT' }] } }]);
   assert.deepEqual([part.answer.owing, part.answer.status], [365, 'sent']);
@@ -139,26 +139,26 @@ test('a payment in part says the invoice was sent; voiding frees its entries', a
 test('the week draws the owner’s blocks, routine days and the agents’ stretches from the kernel’s time axis', async () => {
   const items: Item[] = [
     ...MAP,
-    { id: 'ar', type: 'work.project', title: 'Archipelago' },
-    { id: 'repo', type: 'software.repo', title: 'Archipelago repo' },
-    { id: 'late', type: 'time.entry', title: 'Late night', status: 'logged', props: { date: '2026-10-16', start: '2026-10-17T03:00:00Z', end: '2026-10-17T05:00:00Z' } },
-    { id: 'plan', type: 'time.entry', title: 'Site visit', status: 'planned', props: { date: '2026-10-13', start: '2026-10-13T13:00:00Z', end: '2026-10-13T15:00:00Z' } },
+    { id: 'ar', type: 'project', title: 'Archipelago' },
+    { id: 'repo', type: 'repo', title: 'Archipelago repo' },
+    { id: 'late', type: 'time_entry', title: 'Late night', status: 'logged', props: { date: '2026-10-16', start: '2026-10-17T03:00:00Z', end: '2026-10-17T05:00:00Z' } },
+    { id: 'plan', type: 'time_entry', title: 'Site visit', status: 'planned', props: { date: '2026-10-13', start: '2026-10-13T13:00:00Z', end: '2026-10-13T15:00:00Z' } },
   ];
-  const links: Link[] = [...LINKS, { id: 'l1', type: 'software.lives_in', from: 'ar', to: 'repo' }, { id: 'l2', type: 'part_of', from: 'deep', to: 'p' }, { id: 'l3', type: 'part_of', from: 'plan', to: 'p' }, { id: 'l4', type: 'part_of', from: 'late', to: 'ar' }];
+  const links: Link[] = [...LINKS, { id: 'l1', type: 'lives_in', from: 'ar', to: 'repo' }, { id: 'l2', type: 'part_of', from: 'deep', to: 'p' }, { id: 'l3', type: 'part_of', from: 'plan', to: 'p' }, { id: 'l4', type: 'part_of', from: 'late', to: 'ar' }];
   // What the kernel's read placed answers on the time axis: a routine's days, and sessions' stretches with what each was on.
   const lens = {
     items: [
-      { id: 'deep', type: 'time.routine', title: 'Deep work', open: true, time: [{ start: '2026-10-14T13:00:00Z', end: '2026-10-14T15:00:00Z', by: 'repeat' }] },
-      { id: 'run1', type: 'sys.run', title: 'Session one', status: 'running', open: true, time: [{ start: '2026-10-14T17:00:00Z', end: '2026-10-14T19:00:00Z', by: 'when', on: 't' }] },
-      { id: 'run2', type: 'sys.run', title: 'Session two', status: 'finished', open: false, time: [{ start: '2026-10-14T17:30:00Z', end: '2026-10-14T18:00:00Z', by: 'when', on: 'repo' }] },
-      { id: 'push', type: 'sys.run', title: 'Read the push', status: 'finished', open: false, time: [{ start: '2026-10-15T13:00:00Z', end: '2026-10-15T13:00:00Z', by: 'when', on: 'repo' }] },
+      { id: 'deep', type: 'routine', title: 'Deep work', open: true, time: [{ start: '2026-10-14T13:00:00Z', end: '2026-10-14T15:00:00Z', by: 'repeat' }] },
+      { id: 'run1', type: 'run', title: 'Session one', status: 'running', open: true, time: [{ start: '2026-10-14T17:00:00Z', end: '2026-10-14T19:00:00Z', by: 'when', on: 't' }] },
+      { id: 'run2', type: 'run', title: 'Session two', status: 'finished', open: false, time: [{ start: '2026-10-14T17:30:00Z', end: '2026-10-14T18:00:00Z', by: 'when', on: 'repo' }] },
+      { id: 'push', type: 'run', title: 'Read the push', status: 'finished', open: false, time: [{ start: '2026-10-15T13:00:00Z', end: '2026-10-15T13:00:00Z', by: 'when', on: 'repo' }] },
     ],
   };
   const { ctx, asked } = ctxOver(items, links, lens);
   const { answer: wk } = await handler['time.week']({ from: '2026-10-15' }, ctx);
   assert.deepEqual([wk.from, wk.to, wk.zone], ['2026-10-12', '2026-10-18', 'America/Toronto']);
   const axis = asked.find((q) => q.placed) as { placed: { types: string[]; from: string; to: string } };
-  assert.deepEqual([axis.placed.types, axis.placed.from, axis.placed.to], [['time.routine', 'sys.run'], '2026-10-03', '2026-10-18'], 'the week and the two weeks before today');
+  assert.deepEqual([axis.placed.types, axis.placed.from, axis.placed.to], [['routine', 'run'], '2026-10-03', '2026-10-18'], 'the week and the two weeks before today');
   const wed = wk.days[2];
   assert.deepEqual(wed.owner.map((b: { what: string; from_hour: number; routine?: boolean }) => [b.what, b.from_hour, b.routine ?? false]), [['Read the program', null, false], ['Deep work', 9, true]], 'hours alone have no place in the day');
   assert.equal(wed.planned, 2, 'a routine for work is planned time');
@@ -181,10 +181,10 @@ test('sessions at work at once take as few lanes as hold them', () => {
 test('today for Home: the owner’s blocks in the order they fall, and what waits to be confirmed', async () => {
   const items: Item[] = [
     ...MAP,
-    { id: 'late', type: 'time.entry', title: 'Late call', status: 'logged', props: { date: '2026-10-16', start: '2026-10-16T19:00:00Z', end: '2026-10-16T20:30:00Z' } },
-    { id: 'plan', type: 'time.entry', title: 'Site visit', status: 'planned', props: { date: '2026-10-13', start: '2026-10-13T13:00:00Z', end: '2026-10-13T15:00:00Z' } },
+    { id: 'late', type: 'time_entry', title: 'Late call', status: 'logged', props: { date: '2026-10-16', start: '2026-10-16T19:00:00Z', end: '2026-10-16T20:30:00Z' } },
+    { id: 'plan', type: 'time_entry', title: 'Site visit', status: 'planned', props: { date: '2026-10-13', start: '2026-10-13T13:00:00Z', end: '2026-10-13T15:00:00Z' } },
   ];
-  const lens = { items: [{ id: 'deep', type: 'time.routine', title: 'Deep work', open: true, time: [{ start: '2026-10-16T13:00:00Z', end: '2026-10-16T15:00:00Z', by: 'repeat' }] }] };
+  const lens = { items: [{ id: 'deep', type: 'routine', title: 'Deep work', open: true, time: [{ start: '2026-10-16T13:00:00Z', end: '2026-10-16T15:00:00Z', by: 'repeat' }] }] };
   const { ctx } = ctxOver(items, [...LINKS], lens);
   const { answer } = await handler['time.today']({}, ctx);
   const titles = answer.map((r: { title?: string } | string) => (typeof r === 'string' ? r : r.title));

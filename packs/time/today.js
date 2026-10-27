@@ -13,7 +13,7 @@ export async function todayRows(input, ctx) {
   const blocks = [...(day?.owner ?? [])].sort((a, b) => (a.from_hour ?? 99) - (b.from_hour ?? 99));
   const rows = blocks.map((b) => ({
     id: b.id,
-    type: b.routine ? 'time.routine' : 'time.entry',
+    type: b.routine ? 'routine' : 'time_entry',
     title: `${b.from_hour === null ? `${b.hours} h` : `${clock(b.from_hour)}–${clock(b.to_hour)}`} ${b.what}${b.work && b.work !== b.what ? ` · ${b.work}` : ''}`,
     ...(!b.routine && { status: b.status }),
   }));

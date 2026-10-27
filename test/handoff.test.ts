@@ -21,13 +21,13 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   // With no note, it looks back a week, and says there is none.
   const bare = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo } })) as any;
   assert.equal(bare.note, null);
-  assert.match(bare.how, new RegExp(`^Nobody has written a handoff note for this repository\\. To write the first, create a software\\.handoff and link it software\\.lives_in to ${made.repo}`));
+  assert.match(bare.how, new RegExp(`^Nobody has written a handoff note for this repository\\. To write the first, create a handoff and link it lives_in to ${made.repo}`));
   assert.deepEqual(bare.open.ready.map((i: any) => i.title).sort(), ['Capture probe', 'Write unit tests']);
   assert.deepEqual(bare.open.blocked.map((i: any) => [i.title, i.waiting_on]), [['Tune the solver', ['Which target?']]]);
   assert.match(await hookSessionStart(l, { session_id: 'h0', cwd: 'C:\\code\\Apex' }), /Where things stand: view "handoff" with repo e_\w+\. Nobody has written a handoff note here/);
 
   const { note } = await make(l, [
-    { op: 'create', ref: 'note', type: 'software.handoff', title: 'Apex handoff', body: 'Not seen\nThe probe has not been run on a real model.' },
+    { op: 'create', ref: 'note', type: 'handoff', title: 'Apex handoff', body: 'Not seen\nThe probe has not been run on a real model.' },
     { op: 'link', type: 'part_of', from: 'note', to: made.proj },
   ]);
   // Everything from here on happened after the note was written.
@@ -36,7 +36,7 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   await l.log(l.db, { actor: 'github:someone', action: 'repo.push', target: made.repo, origin: 'github', reason: '1 commit to main: Tests for the solver', detail: { branch: 'main', after: 'abcdef0123456789' } });
   await make(l, [
     { op: 'update', id: made.offline, status: 'done' },
-    { op: 'create', ref: 'new', type: 'work.issue', title: 'The solver diverges on thin walls' },
+    { op: 'create', ref: 'new', type: 'issue', title: 'The solver diverges on thin walls' },
     { op: 'link', type: 'about', from: 'new', to: made.proj },
   ]);
   await hookSessionEnd(l, { session_id: 'h0', reason: 'exit' });
@@ -83,11 +83,11 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
 
 test('a note can name what the same change makes, and an agent can ask for its change to be held', async () => {
   const l = await fresh();
-  const { note } = await make(l, [{ op: 'create', ref: 'note', type: 'work.note', title: 'Handoff', body: 'Open: nothing.' }]);
+  const { note } = await make(l, [{ op: 'create', ref: 'note', type: 'note', title: 'Handoff', body: 'Open: nothing.' }]);
   const made = await make(l, [
     { op: 'update', id: note, append: 'Next: {t}, as {t} says. Not a ref: {x} and { t }.' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Connect the repository', body: 'Written up in {t} itself.' },
-    { op: 'create', ref: 'q', type: 'work.decision', title: 'Before {t}?' },
+    { op: 'create', ref: 't', type: 'task', title: 'Connect the repository', body: 'Written up in {t} itself.' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Before {t}?' },
   ]);
   assert.match(made.t, /^e_\w{8}$/);
   // The id is there though the note was written before the item it names, and other braces are left as they were.
@@ -95,7 +95,7 @@ test('a note can name what the same change makes, and an agent can ask for its c
   assert.equal((await l.entity(made.t))!.body, `Written up in ${made.t} itself.`);
   assert.equal((await l.entity(made.q))!.title, `Before ${made.t}?`);
   // Held, a change keeps its refs as written, and they become ids when it is applied.
-  const held = (await l.change(agent, { ops: [{ op: 'create', ref: 'n', type: 'work.note', title: 'Later', body: 'This is {n}.' }], reason: 'test' })) as any;
+  const held = (await l.change(agent, { ops: [{ op: 'create', ref: 'n', type: 'note', title: 'Later', body: 'This is {n}.' }], reason: 'test' })) as any;
   const applied = (await l.decide(human, { proposal: held.proposal, approve: true })) as any;
   assert.equal((await l.entity(applied.created.n))!.body, `This is ${applied.created.n}.`);
 
@@ -109,26 +109,26 @@ test('a note can name what the same change makes, and an agent can ask for its c
 
   // An agent names a thing in a few words: a sentence for a title is refused, on a new thing or an old one. A person names as they like.
   const sentence = 'A session finds its repository by its GitHub address, not by a folder path on one machine';
-  await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: sentence }] }), /op 1 \(create\): the title is 89 characters\. A title is a name, not a sentence: 60 at most/);
+  await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: sentence }] }), /op 1 \(create\): the title is 89 characters\. A title is a name, not a sentence: 60 at most/);
   await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: made.t, title: sentence }] }), /op 1 \(update\): the title is 89 characters/);
-  assert.equal(((await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Find a repository by its remote' }] })) as any).status, 'proposed');
+  assert.equal(((await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Find a repository by its remote' }] })) as any).status, 'proposed');
   assert.equal(((await callTool(l, human, 'change', { reason: 'test', ops: [{ op: 'update', id: made.t, title: sentence }] })) as any).status, 'applied');
 });
 
 test('a re-check takes a feature that lives in a repository on its own, at its project\'s interval, and leaves out what waits on a person', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'home', type: 'software.repo', title: 'Main repo', props: { path: 'C:\\code\\main' } },
-    { op: 'create', ref: 'side', type: 'software.repo', title: 'Add-in repo', props: { path: 'C:\\code\\addin' } },
-    { op: 'create', ref: 'proj', type: 'work.project', title: 'Product', props: { recheck_days: 3 } },
-    { op: 'create', ref: 'inside', type: 'software.feature', title: 'Core' },
-    { op: 'create', ref: 'addin', type: 'software.feature', title: 'The add-in' },
-    { op: 'create', ref: 'old', type: 'work.task', title: 'Port the ribbon' },
-    { op: 'create', ref: 'chore', type: 'work.task', title: 'Ask for the certificate' },
+    { op: 'create', ref: 'home', type: 'repo', title: 'Main repo', props: { path: 'C:\\code\\main' } },
+    { op: 'create', ref: 'side', type: 'repo', title: 'Add-in repo', props: { path: 'C:\\code\\addin' } },
+    { op: 'create', ref: 'proj', type: 'project', title: 'Product', props: { recheck_days: 3 } },
+    { op: 'create', ref: 'inside', type: 'feature', title: 'Core' },
+    { op: 'create', ref: 'addin', type: 'feature', title: 'The add-in' },
+    { op: 'create', ref: 'old', type: 'task', title: 'Port the ribbon' },
+    { op: 'create', ref: 'chore', type: 'task', title: 'Ask for the certificate' },
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
-    { op: 'link', type: 'software.lives_in', from: 'proj', to: 'home' },
-    { op: 'link', type: 'software.lives_in', from: 'inside', to: 'home' },
-    { op: 'link', type: 'software.lives_in', from: 'addin', to: 'side' },
+    { op: 'link', type: 'lives_in', from: 'proj', to: 'home' },
+    { op: 'link', type: 'lives_in', from: 'inside', to: 'home' },
+    { op: 'link', type: 'lives_in', from: 'addin', to: 'side' },
     { op: 'link', type: 'part_of', from: 'inside', to: 'proj' },
     { op: 'link', type: 'part_of', from: 'addin', to: 'proj' },
     { op: 'link', type: 'part_of', from: 'old', to: 'addin' },
@@ -203,12 +203,12 @@ test('launching runs a headless session on a task, holding the lane and recordin
   );
   configureLauncher({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), command: [process.execPath, cli] });
   const made = await make(l, [
-    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Repo', props: { path: dir } },
-    { op: 'create', ref: 'proj', type: 'work.project', title: 'Proj' },
+    { op: 'create', ref: 'repo', type: 'repo', title: 'Repo', props: { path: dir } },
+    { op: 'create', ref: 'proj', type: 'project', title: 'Proj' },
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
-    { op: 'create', ref: 'live', type: 'work.task', title: 'Capture probe' },
-    { op: 'create', ref: 'homeless', type: 'work.task', title: 'No repo' },
-    { op: 'link', type: 'software.lives_in', from: 'proj', to: 'repo' },
+    { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
+    { op: 'create', ref: 'homeless', type: 'task', title: 'No repo' },
+    { op: 'link', type: 'lives_in', from: 'proj', to: 'repo' },
     { op: 'link', type: 'part_of', from: 'live', to: 'proj' },
     { op: 'link', type: 'needs', from: 'live', to: 'lane' },
   ]);
@@ -265,11 +265,11 @@ test('launching runs a headless session on a task, holding the lane and recordin
 test('tokens: an estimate is asked for, what a session uses goes to its work, and the graph adds up what is part of what', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
-    { op: 'create', ref: 'f', type: 'software.feature', title: 'Feature', props: { tokens_estimated: 100_000 } },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Task A', props: { tokens_estimated: 80_000 } },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'Task B' },
-    { op: 'create', ref: 'n', type: 'work.note', title: 'A note' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'f', type: 'feature', title: 'Feature', props: { tokens_estimated: 100_000 } },
+    { op: 'create', ref: 'a', type: 'task', title: 'Task A', props: { tokens_estimated: 80_000 } },
+    { op: 'create', ref: 'b', type: 'task', title: 'Task B' },
+    { op: 'create', ref: 'n', type: 'note', title: 'A note' },
     { op: 'link', type: 'part_of', from: 'f', to: 'p' },
     { op: 'link', type: 'part_of', from: 'a', to: 'f' },
     { op: 'link', type: 'part_of', from: 'b', to: 'f' },
@@ -299,12 +299,12 @@ test('tokens: an estimate is asked for, what a session uses goes to its work, an
   const once = ((await ask(l, 'graph', { focus: made.p, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
   assert.deepEqual(once.find((n: any) => n.id === made.p).tokens, { estimated: 80_000, used: 40_000, partial: true });
   // What is finished counts as used: by its estimate when no session was measured on it, and its feature and project with it.
-  const { c } = await make(l, [{ op: 'create', ref: 'c', type: 'work.task', title: 'Task C', status: 'done', props: { tokens_estimated: 30_000 } }, { op: 'link', type: 'part_of', from: 'c', to: made.f }]);
+  const { c } = await make(l, [{ op: 'create', ref: 'c', type: 'task', title: 'Task C', status: 'done', props: { tokens_estimated: 30_000 } }, { op: 'link', type: 'part_of', from: 'c', to: made.f }]);
   const again = ((await ask(l, 'graph', { focus: made.f, depth: 1, relations: 'all', include_closed: true })) as any).nodes;
   assert.deepEqual(again.find((n: any) => n.id === c).tokens, { estimated: 30_000, used: 30_000, assumed: true });
   assert.deepEqual(again.find((n: any) => n.id === made.f).tokens, { estimated: 110_000, used: 70_000, assumed: true, partial: true });
   // Its own estimate stands only while none of its tasks has one.
-  const { g } = await make(l, [{ op: 'create', ref: 'g', type: 'software.feature', title: 'Bare', props: { tokens_estimated: 50_000 } }, { op: 'create', ref: 'x', type: 'work.task', title: 'Unsized' }, { op: 'link', type: 'part_of', from: 'x', to: 'g' }]);
+  const { g } = await make(l, [{ op: 'create', ref: 'g', type: 'feature', title: 'Bare', props: { tokens_estimated: 50_000 } }, { op: 'create', ref: 'x', type: 'task', title: 'Unsized' }, { op: 'link', type: 'part_of', from: 'x', to: 'g' }]);
   assert.deepEqual(((await ask(l, 'graph', { focus: g, depth: 1, relations: 'all', include_closed: true })) as any).nodes.find((n: any) => n.id === g).tokens, { estimated: 50_000, used: 0 });
   await make(l, [{ op: 'archive', id: c }]);
   await make(l, [{ op: 'update', id: made.b, props: { tokens_estimated: 70_000 } }]);
@@ -313,7 +313,7 @@ test('tokens: an estimate is asked for, what a session uses goes to its work, an
 
 test('a run in GitHub Actions reports what it used, once, and the repository adds it up by where agents ran', async () => {
   const l = await fresh();
-  const { repo } = await make(l, [{ op: 'create', ref: 'repo', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site.git', path: 'C:\\code\\site' } }]);
+  const { repo } = await make(l, [{ op: 'create', ref: 'repo', type: 'repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site.git', path: 'C:\\code\\site' } }]);
   const told = { repo: 'acme/site', title: 'Read the push to main (abc1234)', tokens: 42_000.4, cost_usd: 0.31337, turns: 9, link: 'https://github.com/acme/site/actions/runs/1', summary: 'Closed one task.' };
   const first = (await callTool(l, agent, 'run_report', told)) as any;
   assert.equal(first.recorded, true);
@@ -321,7 +321,7 @@ test('a run in GitHub Actions reports what it used, once, and the repository add
   await callTool(l, agent, 'run_report', { repo, title: 'Scheduled re-check', ok: false, tokens: 8_000, link: 'https://github.com/acme/site/actions/runs/2' });
   await assert.rejects(callTool(l, agent, 'run_report', { repo: 'acme/other', title: 'x' }), /No repository "acme\/other"/);
   const run = (await l.entity(first.run))!;
-  assert.deepEqual([run.type, run.status, run.is_open, run.props.surface, run.props.tokens_used, run.props.cost_usd, run.props.turns, run.body], ['sys.run', 'finished', false, 'github-actions', 42_000, 0.3134, 9, 'Closed one task.']);
+  assert.deepEqual([run.type, run.status, run.is_open, run.props.surface, run.props.tokens_used, run.props.cost_usd, run.props.turns, run.body], ['run', 'finished', false, 'github-actions', 42_000, 0.3134, 9, 'Closed one task.']);
   // A session on a machine in the same repository is counted beside it, apart.
   await sessionStart(l, agent, { session_id: 'local', cwd: 'C:\\code\\site', surface: 'claude-code' });
   await recordUsage(l, 'local', 100_000);

@@ -53,7 +53,7 @@ export interface TypeDef {
   capabilities?: Capabilities;
   /** How long its note may grow by an agent's hand, and what to tell one that goes over: a note every session reads whole is kept short. A flavour inherits it. */
   note_max?: NoteMax;
-  moved_from?: string[]; retired?: boolean; // Types whose items are this one's now, moved once no pack defines them (cost became money.cost); retired: the owner's version is (src/type-overlay.ts).
+  moved_from?: string[]; retired?: boolean; // Types whose items are this one's now, moved once no pack defines them (cost became cost); retired: the owner's version is (src/type-overlay.ts).
 }
 
 export type NoteMax = { chars: number; say?: string };
@@ -127,6 +127,7 @@ export class Registry {
   hashes = new Map<string, string>();
   /** The fields a pack adds to another pack's type, by type and field: the pack that added each (src/reach.ts). */
   added = new Map<string, Map<string, string>>();
+  /** A name a type or link type had before (its moved_from), by the one it is now: what an old name still reads as. */ renamed = new Map<string, string>();
   /** Warnings said once: a pack file using the keys of the shape before the manifest. */
   private warned = new Set<string>();
   /** Packs the owner turned off in this workspace. */
@@ -169,21 +170,20 @@ export class Registry {
     for (const id of this.turnedOff) off.set(id, 'turned off here');
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
     // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses).
-    const ordered = withVersions(loaded.map((pack) => withoutAbsent(pack, (id) => states.get(id)?.state === 'active')), this.items);
+    const declaredBy = new Map([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((t) => [t.id, p.id] as const)));
+    const ordered = withVersions(loaded.map((pack) => withoutAbsent(pack, (id) => states.get(id)?.state === 'active', (name) => declaredBy.get(name))), this.items);
 
     const raw = new Map<string, TypeDef & { pack: string }>();
     const relations = new Map<string, ResolvedRelation>();
     const declared = new Map<string, RelationDef>();
-    const owned = (pack: PackFile, id: string) => pack.id === 'core' || id.startsWith(pack.id + '.');
+    const owned = (pack: PackFile, id: string) => pack.id === 'core' || id.startsWith(pack.id + '.'); // a tree's name; a type is named by what it is
     for (const pack of ordered) {
       for (const type of parts(pack).types) {
-        if (!owned(pack, type.id)) throw new Error(`Type "${type.id}" in pack "${pack.id}" must be named "${pack.id}.<name>"`);
         if (raw.has(type.id)) throw new Error(`Type "${type.id}" is defined twice`);
         if (type.kind && pack.id !== 'core') throw new Error(`Type "${type.id}": only the core pack declares kinds`);
         raw.set(type.id, { ...type, pack: pack.id });
       }
       for (const rel of parts(pack).relations) {
-        if (!owned(pack, rel.id)) throw new Error(`Relation "${rel.id}" in pack "${pack.id}" must be named "${pack.id}.<name>"`);
         if (relations.has(rel.id)) throw new Error(`Relation "${rel.id}" is defined twice`);
         if (rel.root && pack.id !== 'core') throw new Error(`Relation "${rel.id}": only the core pack declares root relations`);
         declared.set(rel.id, rel);
@@ -304,9 +304,8 @@ export class Registry {
     this.found = [...found.values()];
     this.rules = ordered.flatMap((pack) => (pack.rules ?? []).map((rule) => ({ ...rule, pack: pack.id })));
     this.types = types;
-    this.relations = relations;
-    this.trees = trees;
-    this.verbs = verbs;
+    this.relations = relations; this.renamed = new Map([...[...types.values()].flatMap((t) => (t.movedFrom ?? []).map((o) => [o, t.id] as const)), ...[...relations.values()].flatMap((r) => (r.moved_from ?? []).map((o) => [o, r.id] as const))]);
+    this.trees = trees; this.verbs = verbs;
     this.tools = tools;
     this.keep(this.kept);
   }
@@ -322,6 +321,7 @@ export class Registry {
   }
 
   type(id: string): ResolvedType | undefined { return this.types.get(id); }
+  /** The name a type or link type has now, given one it had before (work.task is task). */ canonical = (id: string): string => this.renamed.get(id) ?? id;
 
   /** Turn packs off in this workspace (the rest on), and load again if that changed anything. The kernel's packs stay on. Says what was newly turned off, or undefined when nothing changed. */
   turnOff(packs: string[]): string[] | undefined {
@@ -341,11 +341,11 @@ export class Registry {
   /** A relation and every relation extending it: what the kernel computes from a root holds for all of them. */
   relationFamily(...roots: string[]): string[] {
     const family = (id: string): string[] => [id, ...[...this.relations.values()].filter((r) => r.extends === id).flatMap((r) => family(r.id))];
-    return roots.flatMap(family);
+    return roots.map(this.canonical).flatMap(family);
   }
 
   isA(typeId: string, ancestor: string): boolean {
-    return this.types.get(typeId)?.lineage.includes(ancestor) ?? false;
+    return this.types.get(this.canonical(typeId))?.lineage.includes(this.canonical(ancestor)) ?? false;
   }
 
   /** What a picture says a thing is: its type nearest the kind (root) and its kind. */
@@ -372,7 +372,7 @@ export class Registry {
 
   /** The type and every flavour of it. */
   family(typeId: string): string[] {
-    return [...this.types.values()].filter((t) => t.lineage.includes(typeId)).map((t) => t.id);
+    return [...this.types.values()].filter((t) => t.lineage.includes(this.canonical(typeId))).map((t) => t.id);
   }
 
   isOpen(typeId: string, status: string): boolean {
@@ -393,7 +393,7 @@ export class Registry {
       const field = type.fields[key];
       if (!field) {
         const known = Object.keys(type.fields).join(', ') || 'none';
-        // The field may be one a flavour of the type has: an issue has no "repro", a software.bug does.
+        // The field may be one a flavour of the type has: an issue has no "repro", a bug does.
         const flavour = [...this.types.values()].find((t) => t.id !== typeId && t.lineage.includes(typeId) && t.fields[key]);
         const instead = flavour ? `${flavour.id}, a flavour of ${typeId}, has it: make it that type, or put free-form detail in body.` : 'Put free-form detail in body.';
         problems.push(`${typeId} has no field "${key}" (fields: ${known}). ${instead}`);

@@ -56,20 +56,20 @@ test('the XML escapes what it is given and refuses an edge to nothing', () => {
 test('every type is drawn under what it extends, down to the kinds, and an unknown parent is refused', () => {
   const packs: PackFile[] = [
     { id: 'core', types: [{ id: 'work', kind: true }, { id: 'question', kind: true }, { id: 'system', kind: true }, { id: 'lens', extends: 'system' }], links: [{ id: 'relates_to', root: true }, { id: 'about', root: true }] },
-    { id: 'work', requires: ['core'], types: [{ id: 'work.task', extends: 'work', capabilities: { bound: {}, where: {} } }], links: [{ id: 'work.based_on', extends: 'relates_to', from: ['*'], to: ['work.task'] }] },
-    { id: 'lab', requires: ['core', 'work'], types: [{ id: 'lab.trial', extends: 'work.task' }, { of: 'work.task', fields: { cost: {} } }] },
+    { id: 'work', requires: ['core'], types: [{ id: 'task', extends: 'work', capabilities: { bound: {}, where: {} } }], links: [{ id: 'based_on', extends: 'relates_to', from: ['*'], to: ['task'] }] },
+    { id: 'lab', requires: ['core', 'work'], types: [{ id: 'lab.trial', extends: 'task' }, { of: 'task', fields: { cost: {} } }] },
   ];
   const [inheritance, relations, packMap] = typeDiagram(packs);
   const xml = pageXml(inheritance);
-  for (const id of ['work', 'question', 'lens', 'work.task', 'lab.trial']) assert.match(xml, new RegExp(`id="t-${id.replace('.', '-')}"`));
+  for (const id of ['work', 'question', 'lens', 'task', 'lab.trial']) assert.match(xml, new RegExp(`id="t-${id.replace('.', '-')}"`));
   assert.equal(inheritance.edges.length, 3, 'one edge for each type that extends another');
-  assert.ok(inheritance.edges.some((e) => e.from === 't-lab-trial' && e.to === 't-work-task'));
+  assert.ok(inheritance.edges.some((e) => e.from === 't-lab-trial' && e.to === 't-task'));
   const at = (id: string) => inheritance.vertices.find((v) => v.id === id)!;
-  assert.ok(at('t-work').x < at('t-work-task').x && at('t-work-task').x < at('t-lab-trial').x, 'each level a column to the right');
-  assert.match(at('t-work-task').label, /bound · where/);
-  assert.match(at('t-work-task').label, /\+ fields from lab/);
+  assert.ok(at('t-work').x < at('t-task').x && at('t-task').x < at('t-lab-trial').x, 'each level a column to the right');
+  assert.match(at('t-task').label, /bound · where/);
+  assert.match(at('t-task').label, /\+ fields from lab/);
   assert.equal(relations.edges.length, 1);
-  assert.match(relations.vertices.find((v) => v.id === 'r-work-based-on')!.label, /\* → work\.task/);
+  assert.match(relations.vertices.find((v) => v.id === 'r-based-on')!.label, /\* → task/);
   assert.equal(packMap.edges.length, 3, 'one edge for each pack a pack requires');
   assert.throws(() => typeDiagram([{ id: 'x', types: [{ id: 'x.a', extends: 'nothing' }] }]), /x\.a extends nothing/);
 });
@@ -110,7 +110,7 @@ test('a page as data: boxes placed on the page, what each is said as what it is,
 test('publishing the diagrams makes each page once, finds it again by its id, redraws only what moved, and keeps what went as removed', () => {
   const page = (id: string, label = id) => ({ id, name: `Page ${id}`, width: 10, height: 10, boxes: [{ id: 'x', x: 0, y: 0, w: 10, h: 10, kind: 'box' as const, lines: [label] }], wires: [] });
   const first = diagramChange([{ file: 'modules.drawio', page: page('a') }, { file: 'types.drawio', page: page('t'), url: 'https://github.com/o/r/blob/c1/docs/diagrams/types.drawio' }], [], undefined, 'c1'.padEnd(40, '0'), 'e_feature1');
-  assert.deepEqual(first.ops.map((o) => `${o.op} ${o.type ?? o.id ?? ''}`.trim()), ['create work.document', 'link part_of', 'create software.diagram', 'link part_of', 'create software.diagram', 'link part_of']);
+  assert.deepEqual(first.ops.map((o) => `${o.op} ${o.type ?? o.id ?? ''}`.trim()), ['create document', 'link part_of', 'create diagram', 'link part_of', 'create diagram', 'link part_of']);
   const doc = first.ops[0] as { body: string };
   assert.match(doc.body, /\n\nModules\n\{p0\}\n\nTypes\n\{p1\}$/, 'the document reads each page in, under its file');
   const made = (i: number) => (first.ops[i] as { props: { diagram: { key: string; commit: string; drawio?: string } } }).props.diagram;

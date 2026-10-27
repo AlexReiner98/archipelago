@@ -13,7 +13,7 @@ function ctxOver(items: Record<string, unknown>[]) {
     zone: 'America/Toronto',
     read: async (q: Record<string, any>) => {
       if (q.view === 'spent') return { days: q.params.days, since: '2026-09-16T12:00:00.000Z', cost_usd: 12.5, tokens: 900, unpriced_tokens: 400, by: [{ surface: 'github-actions', runs: 2, tokens: 500, cost_usd: 12.5, unpriced_tokens: 0 }] };
-      if (q.items?.type === 'money.cost') return items.map((e) => ({ status: 'paying', is_open: true, created_at: LONG_AGO, updated_at: LONG_AGO, ...e }));
+      if (q.items?.type === 'cost') return items.map((e) => ({ status: 'paying', is_open: true, created_at: LONG_AGO, updated_at: LONG_AGO, ...e }));
       throw new Error(`no read ${JSON.stringify(q)}`);
     },
   };
@@ -23,11 +23,11 @@ test('what the work costs: agents as the kernel measured them, and each regular 
   const { answer } = await handler['money.costs'](
     { days: 30 },
     ctxOver([
-      { id: 'host', type: 'money.cost', title: 'Hosting', props: { amount: 25, since: LONG_AGO, vendor: 'Render' } },
-      { id: 'domain', type: 'money.cost', title: 'Domain', props: { amount: 120, every: 'year', since: LONG_AGO } },
-      { id: 'sub', type: 'money.cost', title: 'Subscription', props: {} },
-      { id: 'euro', type: 'money.cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: LONG_AGO } },
-      { id: 'old', type: 'money.cost', title: 'Old host', status: 'ended', is_open: false, props: { amount: 50, since: LONG_AGO, until: LONG_AGO } },
+      { id: 'host', type: 'cost', title: 'Hosting', props: { amount: 25, since: LONG_AGO, vendor: 'Render' } },
+      { id: 'domain', type: 'cost', title: 'Domain', props: { amount: 120, every: 'year', since: LONG_AGO } },
+      { id: 'sub', type: 'cost', title: 'Subscription', props: {} },
+      { id: 'euro', type: 'cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: LONG_AGO } },
+      { id: 'old', type: 'cost', title: 'Old host', status: 'ended', is_open: false, props: { amount: 50, since: LONG_AGO, until: LONG_AGO } },
     ]),
   );
   assert.equal(answer.agents.cost_usd, 12.5);

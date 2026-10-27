@@ -6,14 +6,14 @@ import { test } from 'node:test';
 import handler from './handler.js';
 
 const items = [
-  { id: 'e_sun', type: 'software.test', title: 'Sun against NOAA', props: { entrypoint: 'Sun.MatchesNoaa' } },
-  { id: 'e_pole', type: 'software.test', title: 'Pole stays put', props: {} },
-  { id: 'e_old', type: 'software.test_result', title: '1.0.0: Sun against NOAA', props: { build: '1.0.0' } },
-  { id: 'e_q', type: 'software.proof', title: 'Is the sun right?', visibility: 'public', props: {} },
+  { id: 'e_sun', type: 'test', title: 'Sun against NOAA', props: { entrypoint: 'Sun.MatchesNoaa' } },
+  { id: 'e_pole', type: 'test', title: 'Pole stays put', props: {} },
+  { id: 'e_old', type: 'test_result', title: '1.0.0: Sun against NOAA', props: { build: '1.0.0' } },
+  { id: 'e_q', type: 'proof', title: 'Is the sun right?', visibility: 'public', props: {} },
 ];
 const links = [
   ['produced', 'e_sun', 'e_old'],
-  ['software.answers', 'e_sun', 'e_q'],
+  ['answers', 'e_sun', 'e_q'],
 ];
 const ctx = {
   now: '2026-10-17T12:00:00Z',
@@ -33,7 +33,7 @@ test('test_report replaces the result on the same build, makes one on a new buil
   assert.deepEqual(same.answer.send_pictures, [{ result: 'e_old', picture: '.proof/sun.png' }], 'its question is public, so the picture is owed');
 
   const fresh = await report({ build: '1.0.1', results: [{ test: 'e_pole', passed: false, value: '3 mm out' }] }, ctx);
-  assert.deepEqual(fresh.ops.map((o: { op: string; type: string }) => [o.op, o.type]), [['create', 'software.test_result'], ['link', 'produced']]);
+  assert.deepEqual(fresh.ops.map((o: { op: string; type: string }) => [o.op, o.type]), [['create', 'test_result'], ['link', 'produced']]);
   assert.deepEqual([fresh.answer.passed, fresh.answer.failed, fresh.answer.send_pictures], [0, 1, []]);
 
   await assert.rejects(report({ build: ' ', results: [{ test: 'e_pole', passed: true }] }, ctx), /needs "build"/);

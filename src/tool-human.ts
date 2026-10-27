@@ -80,7 +80,7 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       const their = theirs && mine && theirs !== mine ? file.tables.entity?.find((e) => e.id === theirs) : undefined;
       const my = their ? await whole.entity(mine!) : undefined;
       const owners = their && my && !my.archived_at ? { here: { id: my.id, title: my.title }, file: { id: theirs!, title: their.title as string }, made_one: false } : undefined;
-      const report = await merge(whole.db, file, { workspace: l.workspace, sessionTypes: whole.registry.family('sys.run'), apply: input.apply });
+      const report = await merge(whole.db, file, { workspace: l.workspace, sessionTypes: whole.registry.family('run'), apply: input.apply });
       if (input.apply && input.same_owner && owners) {
         await whole.apply(actorId(actor), { ops: [{ op: 'merge', keep: owners.file.id, drop: owners.here.id }], reason: 'The owner here and the owner in the imported backup are one person' });
         // Who they are goes with them: their tokens, what is private to them, and owning the workspace.

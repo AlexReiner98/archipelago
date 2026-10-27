@@ -21,11 +21,11 @@ test('a document is previewed as publishing it would give it, before it is publi
     await api(mine, 'change', {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'work.document', title: 'A page', visibility: 'shared', body: 'Opening words.\n\n{s}\n\n{l}\n\n{x}' },
-        { op: 'create', ref: 's', type: 'work.note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
-        { op: 'create', ref: 't', type: 'work.task', title: 'Write it', visibility: 'shared' },
-        { op: 'create', ref: 'x', type: 'work.note', title: 'Our margin', visibility: 'private', body: 'Secret.' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { types: ['work.task'] } } },
+        { op: 'create', ref: 'd', type: 'document', title: 'A page', visibility: 'shared', body: 'Opening words.\n\n{s}\n\n{l}\n\n{x}' },
+        { op: 'create', ref: 's', type: 'note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
+        { op: 'create', ref: 't', type: 'task', title: 'Write it', visibility: 'shared' },
+        { op: 'create', ref: 'x', type: 'note', title: 'Our margin', visibility: 'private', body: 'Secret.' },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { types: ['task'] } } },
         { op: 'link', type: 'part_of', from: 's', to: 'd' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
         { op: 'link', type: 'part_of', from: 'x', to: 'd' },
@@ -49,7 +49,7 @@ test('a document is previewed as publishing it would give it, before it is publi
   // The receiver's, shared to publish: as the sender gives it, its view drawn on the sender's map, in the receiver's site.
   await api(theirs, 'workspace_set', { accepts_from: ['default'] });
   await api(mine, 'share_workspace', { id: made.d, workspace: 'acme', publish: true });
-  const [offer] = await api(theirs, 'search', { type: 'sys.shared_document' });
+  const [offer] = await api(theirs, 'search', { type: 'shared_document' });
   await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: offer.id, status: 'accepted' }] });
   const there = (await preview(theirs, offer.id)).result;
   assert.deepEqual([there.title, there.from, there.site.name], ['A page', 'default', 'Acme']);
@@ -73,15 +73,15 @@ test('a document shared only to be read is previewed nowhere, and its views are 
     await api(mine, 'change', {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'work.document', title: 'A page', visibility: 'shared', body: 'Words.\n\n{l}' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { types: ['work.document'] } } },
+        { op: 'create', ref: 'd', type: 'document', title: 'A page', visibility: 'shared', body: 'Words.\n\n{l}' },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { types: ['document'] } } },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
       ],
     })
   ).created;
   await api(theirs, 'workspace_set', { accepts_from: ['default'] });
   await api(mine, 'share_workspace', { id: made.d, workspace: 'acme' });
-  const [offer] = await api(theirs, 'search', { type: 'sys.shared_document' });
+  const [offer] = await api(theirs, 'search', { type: 'shared_document' });
   await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: offer.id, status: 'accepted' }] });
   assert.match((await call(`/preview/${offer.id}/data`, theirs, {})).error, /to be read here, not published/);
   assert.equal((await api(theirs, 'document', { id: offer.id, drawn: true })).lenses, undefined);

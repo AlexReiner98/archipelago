@@ -10,7 +10,7 @@ test('an exclusive resource taken by many at once has one holder', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
-    ...[1, 2, 3, 4, 5, 6].map((n) => ({ op: 'create' as const, ref: `t${n}`, type: 'work.task', title: `Task ${n}` })),
+    ...[1, 2, 3, 4, 5, 6].map((n) => ({ op: 'create' as const, ref: `t${n}`, type: 'task', title: `Task ${n}` })),
   ]);
   // Every connection open first, so the claims run side by side rather than one per connection as each opens.
   await Promise.all([1, 2, 3, 4, 5].map(() => l.db.query(`select pg_sleep(0.05)`)));
@@ -42,8 +42,8 @@ test('an event is not seen before one numbered ahead of it that is still being w
 test('changes at once to the same items in either order all go through', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
   ]);
   await Promise.all([1, 2, 3, 4, 5].map(() => l.db.query(`select pg_sleep(0.05)`)));
   const order = (n: number) => (n % 2 ? [made.a, made.b] : [made.b, made.a]);
@@ -53,10 +53,10 @@ test('changes at once to the same items in either order all go through', async (
 
 test('writers at once append one chain: every position once, in time order, each entry the hash of the one before', async () => {
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 'a', type: 'work.task', title: 'A' }]);
+  const made = await make(l, [{ op: 'create', ref: 'a', type: 'task', title: 'A' }]);
   await Promise.all([1, 2, 3, 4, 5].map(() => l.db.query(`select pg_sleep(0.05)`)));
   const writes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) =>
-    n % 3 ? make(l, [{ op: 'create', type: 'work.task', title: `T${n}` }, { op: 'update', id: made.a, props: { priority: n % 2 ? 'high' : 'low' } }]) : l.change(agent, { reason: `held ${n}`, ops: [{ op: 'update', id: made.a, title: `A${n}` }] }),
+    n % 3 ? make(l, [{ op: 'create', type: 'task', title: `T${n}` }, { op: 'update', id: made.a, props: { priority: n % 2 ? 'high' : 'low' } }]) : l.change(agent, { reason: `held ${n}`, ops: [{ op: 'update', id: made.a, title: `A${n}` }] }),
   );
   assert.deepEqual((await Promise.allSettled(writes)).filter((r) => r.status === 'rejected').map((r) => String((r as PromiseRejectedResult).reason)), []);
   for (const stream of ['facts', 'pending'] as const) {

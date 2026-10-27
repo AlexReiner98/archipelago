@@ -7,7 +7,7 @@ create index if not exists entity_type_created on entity (type, created_at desc)
 create index if not exists entity_updated on entity (updated_at desc) where archived_at is null;
 create index if not exists entity_open_owner on entity (owner) where is_open and archived_at is null;
 create index if not exists entity_type_title on entity (type, lower(title)) where archived_at is null;
-create index if not exists entity_source_uri on entity ((props->>'uri')) where type = 'sys.source';
+create index if not exists entity_source_uri on entity ((props->>'uri')) where type = 'source';
 create index if not exists proposal_status on proposal (status, ts);
 create index if not exists event_marks on event (seq) where action in ('changes.seen', 'questions.confirmed');
 create index if not exists event_imports on event (seq) where action = 'workspace.import';

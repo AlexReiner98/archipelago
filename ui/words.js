@@ -114,7 +114,7 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   const isUndo = g.events.some((e) => e.action === 'changeset.undo');
   const approver = work.detail?.approved_by;
   // What it did, as marks: a status that moved, or how many things it touched.
-  const touched = g.events.filter((e) => (e.target_type ?? '') !== 'sys.source' && e.action !== 'changeset.undo' && !e.action.startsWith('proposal.'));
+  const touched = g.events.filter((e) => (e.target_type ?? '') !== 'source' && e.action !== 'changeset.undo' && !e.action.startsWith('proposal.'));
   const moved = touched.filter((e) => e.action === 'entity.update' && e.detail?.changes?.status);
   const effect =
     moved.length === 1

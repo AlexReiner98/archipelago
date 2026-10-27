@@ -44,7 +44,7 @@ async function fill(count: number) {
     for (let j = 0; j < batch; j++) {
       const n = done + j;
       const project = n < projects;
-      ops.push({ op: 'create', ref: `n${j}`, type: project ? 'work.project' : 'work.task', title: `${project ? 'Project' : 'Task'} ${n}: ${word(n)} ${word(n * 7)}`, status: project ? 'active' : ['todo', 'doing', 'done', 'done', 'todo'][n % 5], body: `About the ${word(n)} of ${word(n * 3)}, for the ${word(n * 11)}.` });
+      ops.push({ op: 'create', ref: `n${j}`, type: project ? 'project' : 'task', title: `${project ? 'Project' : 'Task'} ${n}: ${word(n)} ${word(n * 7)}`, status: project ? 'active' : ['todo', 'doing', 'done', 'done', 'todo'][n % 5], body: `About the ${word(n)} of ${word(n * 3)}, for the ${word(n * 11)}.` });
       // A project sits in another one a tenth of the time; a task in a project, or in a task (a subtask) a fifth of the time.
       const parent = project ? (n > 0 && n % 10 === 0 ? parents[n % parents.length] : undefined) : n % 5 === 0 && ids.length > projects ? ids[projects + ((n * 31) % (ids.length - projects))] : parents[n % parents.length];
       if (parent) ops.push({ op: 'link', type: 'part_of', from: `n${j}`, to: parent });
@@ -65,8 +65,8 @@ async function fill(count: number) {
 
 /** A repository a quarter of the projects live in, for the handoff to read. */
 async function repo(projects: string[]) {
-  const ops: Record<string, unknown>[] = [{ op: 'create', ref: 'r', type: 'software.repo', title: 'Bench repo' }];
-  for (const id of projects) ops.push({ op: 'link', type: 'software.lives_in', from: id, to: 'r' });
+  const ops: Record<string, unknown>[] = [{ op: 'create', ref: 'r', type: 'repo', title: 'Bench repo' }];
+  for (const id of projects) ops.push({ op: 'link', type: 'lives_in', from: id, to: 'r' });
   await call('change', { reason: 'bench: a repository', ops });
 }
 
@@ -115,7 +115,7 @@ let REPO = process.env.REPO;
 if (!REPO) {
   // The repository with the most on it: the one a session's handoff is heaviest for.
   let most = -1;
-  for (const { id } of (await call('search', { type: 'software.repo', limit: 20 }).catch(() => ({ result: [] }))).result as { id: string }[]) {
+  for (const { id } of (await call('search', { type: 'repo', limit: 20 }).catch(() => ({ result: [] }))).result as { id: string }[]) {
     const n = await relations(id);
     if (n > most) [most, REPO] = [n, id];
   }
@@ -123,7 +123,7 @@ if (!REPO) {
 // The hubs within the repository (since 24 Oct a server reads hubs within an item only; an older one reads them all).
 const hubs = (await call('view', { name: 'hubs', params: { ...(REPO && { within: REPO }) } })).result.hubs as { id: string; inside: number }[];
 const HUB = process.env.HUB ?? hubs[0]?.id;
-const TASK = process.env.TASK ?? (await call('search', { type: 'work.task', open: true, limit: 1 })).result[0]?.id;
+const TASK = process.env.TASK ?? (await call('search', { type: 'task', open: true, limit: 1 })).result[0]?.id;
 // A map with no owner set (a throwaway one) has no "me": one person's attention stands in.
 const PERSON = process.env.PERSON ?? (await call('view', { name: 'attention', params: { person: 'me', limit: 1 } }).then(() => 'me', async () => (await call('search', { type: 'person', limit: 1 })).result[0]?.id));
 // The kinds Home lists as your projects: the types at the altitude of a project.
@@ -185,7 +185,7 @@ rows.push(
       const out = await call('change', {
         reason: 'bench: a typical change, undone after',
         ops: [
-          { op: 'create', ref: 't', type: 'work.task', title: 'Bench task', body: 'Made by the bench, undone after.' },
+          { op: 'create', ref: 't', type: 'task', title: 'Bench task', body: 'Made by the bench, undone after.' },
           { op: 'link', type: 'part_of', from: 't', to: HUB },
           { op: 'link', type: 'depends_on', from: 't', to: TASK },
           { op: 'update', id: TASK, append: 'Bench: a line added, undone after.' },

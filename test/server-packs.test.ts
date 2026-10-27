@@ -84,7 +84,7 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   // An ended workspace: read-only, its date on its page, writable again when lifted, and deleted when its day comes.
   const ended = (await post('/x/demo/end', { workspace: 'acme', days: 30, note: 'Pay again.' })).result;
   assert.equal(ended.ended, true);
-  const write = () => call('/api/change', token, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'After the end' }] });
+  const write = () => call('/api/change', token, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'After the end' }] });
   assert.match((await write()).error, /ended on \d{4}-\d{2}-\d{2} and is read-only: it is deleted on \d{4}-\d{2}-\d{2}\. Download its backup on the Workspace page\. Pay again\./);
   assert.match((await call('/api/member_add', token, { email: 'late@acme.example' })).error, /read-only/);
   assert.equal((await call('/api/workspace_info', token)).result.ended.delete_at, ended.delete_at);
@@ -106,7 +106,7 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
     ['server.workspace.end', 'pack:demo'],
   ]);
   // The refused delivery is told to the owner, once.
-  const notes = (await call('/api/search', owner, { type: 'sys.notification' })).result as any[];
+  const notes = (await call('/api/search', owner, { type: 'notification' })).result as any[];
   assert.deepEqual(notes.map((n) => n.title), [`The demo pack's webhook "paid" refused a delivery`]);
   const listed = (await call('/api/server_packs', owner)).result;
   // Those that ship with the kernel (the GitHub App) are listed beside those the configuration names.

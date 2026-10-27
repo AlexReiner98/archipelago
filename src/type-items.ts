@@ -11,6 +11,11 @@ const KINDS = [TYPE_ITEM, LINK_ITEM];
 let typesChanged: (l: Archipelago) => Promise<unknown> = async () => {};
 export const onTypesChanged = (fn: (l: Archipelago) => Promise<unknown>) => (typesChanged = fn);
 
+/** An op naming a type or link type by a name it had before (work.task) names it as it is now (task): set in place, so a held change and its proposal read alike. */
+export function currentNames(reg: Registry, ops: Op[]): void {
+  for (const op of ops) if (op.op === 'create' || op.op === 'link') op.type = reg.canonical(op.type);
+}
+
 /** Every type and link type kept on the map, archived ones left out. */
 export async function typeItems(l: Archipelago): Promise<TypeItem[]> {
   const { rows } = await l.db.query<TypeItem>(`select id, type, title, body, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by created_at, id`, [KINDS]);
@@ -49,6 +54,9 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
   }
   // The registry leaves a workspace's own type that does not resolve to the type table (its pack turned off); one this change makes must resolve.
   const named = ops.flatMap((op, i) => (op.op === 'create' && KINDS.includes(op.type) ? [items.get(op.ref ?? `#${i + 1}`)!] : op.op === 'update' && items.has(op.id) ? [items.get(op.id)!] : []));
+  // A workspace's own is named local.<name>, so a pack added later never takes its name.
+  const misnamed = named.filter((i) => typeof i.props.name === 'string' && !i.props.preset && !/^local\.[a-z][a-z0-9_]*$/.test(i.props.name));
+  if (misnamed.length) throw new Error(`Change rejected:\n- the types it makes or changes: ${misnamed.map((i) => `"${String(i.props.name)}" must be named "local.<name>"`).join('; ')}`);
   const unresolved = named.filter((i) => typeof i.props.name === 'string' && !i.props.preset && !(i.type === LINK_ITEM ? trial.relations.has(i.props.name) : trial.type(i.props.name)));
   if (unresolved.length) throw new Error(`Change rejected:\n- the types it makes or changes: ${unresolved.map((i) => `"${String(i.props.name)}" extends no kind or type there is`).join('; ')}`);
   return trial;

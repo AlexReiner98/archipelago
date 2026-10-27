@@ -116,7 +116,7 @@ export async function repositories(ctx, installation) {
 export function addRepositories(ctx, installation, names, account) {
   return ctx.act('workspace.add', {
     connection: installation,
-    type: 'software.repo',
+    type: 'repo',
     unique: 'remote',
     items: names.map((name) => ({ title: `${name.split('/')[1]} repo`.slice(0, 60), props: { remote: `https://github.com/${name}` } })),
     reason: `Connected through the GitHub App${account ? ` on ${account}` : ''}`,

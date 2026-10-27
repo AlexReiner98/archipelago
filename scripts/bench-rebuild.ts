@@ -70,7 +70,7 @@ try {
 
   await rebuild('snapshot_from_start', () => snapshotNow(db, reg, ws));
   await rebuild('rebuild_from_start', () => rebuildProjections(db, reg, ws, { fromStart: true }));
-  const anItem = (await db.query<{ id: string }>(`select id from entity where type = 'work.task' limit 1`)).rows[0].id;
+  const anItem = (await db.query<{ id: string }>(`select id from entity where type = 'task' limit 1`)).rows[0].id;
   await appendAll(Array.from({ length: MORE }, (_, i) => ({ facts: [['+', anItem, 'body', `Step ${i}`]] as ReturnType<typeof itemFacts> })));
   await rebuild('rebuild_from_snapshot', () => rebuildProjections(db, reg, ws));
   await timed('as_of_halfway', () => asOf(db, reg, ws, Math.floor((results.entries as number) / 2)));

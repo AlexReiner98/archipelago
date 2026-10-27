@@ -19,7 +19,7 @@ const measure = (text: string, px: number) => text.length * px * 0.55;
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const run = (items: any[], links: any[], placed = {}) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, placed, measure, sizes: house.sizes });
 /** A flat lens's answer: items with no inside, place or state; links each with its type. */
-const flat = (id: string, extra: Record<string, unknown> = {}) => ({ id, kind: 'work', type: 'work.task', title: `Step ${id}`, open: true, status: 'todo', ...extra });
+const flat = (id: string, extra: Record<string, unknown> = {}) => ({ id, kind: 'work', type: 'task', title: `Step ${id}`, open: true, status: 'todo', ...extra });
 const link = (type: string, from: string, to: string) => ({ id: `r_${from}${to}`, type, from, to });
 
 function checks(g: any) {
@@ -134,7 +134,7 @@ test('the item a picture is of is a step like any other, tied to what is part of
 });
 
 test("a flat lens's answer is drawn: every item a step, part_of a tie, depends_on the order, nothing nested", () => {
-  const items = [flat('p', { type: 'work.project' }), flat('a'), flat('b'), flat('c'), flat('d'), flat('q', { kind: 'question' }), flat('t', { kind: 'aim', type: 'tag' })];
+  const items = [flat('p', { type: 'project' }), flat('a'), flat('b'), flat('c'), flat('d'), flat('q', { kind: 'question' }), flat('t', { kind: 'aim', type: 'tag' })];
   const links = [link('part_of', 'a', 'p'), link('part_of', 'b', 'p'), link('part_of', 'c', 'p'), link('depends_on', 'b', 'a'), link('depends_on', 'c', 'b'), link('link', 'q', 'c'), link('tagged', 'd', 't')];
   const g = layout({ items, links, undrawn: ['tagged'], measure, sizes: house.sizes });
   checks(g);

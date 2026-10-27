@@ -57,8 +57,8 @@ it.
   session-start text tells an agent to answer the owner with a drawing".
 
 ### 4. Every commit is accounted for before main
-A commit is accounted for once the map holds a `software.commit` item for
-its full sha, with a `software.settles` link to each item it settles (none
+A commit is accounted for once the map holds a `commit` item for
+its full sha, with a `settles` link to each item it settles (none
 when it settles nothing); a record still held for the owner counts for the
 session, and the check waits until it applies. Each commit a session makes
 names its run in an `Archipelago-Run` trailer. A reply that committed or
@@ -72,7 +72,7 @@ until every commit is, and turns green by itself.
 What nobody accounts for reaches the owner, whoever made it (the owner, 26
 Oct 2026: held to account in the loop, nothing to set up on GitHub). Each
 push the GitHub App hears keeps its commits; an hour on, the GitHub pack's
-schedule `github.commits` makes a `software.commit` with `accounted: false`
+schedule `github.commits` makes a `commit` with `accounted: false`
 for each that still has none, and the software pack's attention reason
 `unaccounted` (joining `waits_on`) puts it before the owner. An hour, because
 a session that pushes partway through a reply accounts at the reply's end:
@@ -139,7 +139,7 @@ is still true, or say it cannot tell.
 | Pack | What it adds |
 | --- | --- |
 | `core` | the `instruction` type and its presets; the reply rule `draw_answers` |
-| `software` | `software.commit` (with the `accounts` capability) and `software.settles`; the reply rule `account_commits`, naming its record |
+| `software` | `commit` (with the `accounts` capability) and `settles`; the reply rule `account_commits`, naming its record |
 | `github` | `account.js`: the check on main, answered from the map |
 | `github_app` | `checks.js`: posts the check, keeps it while red, asks again each minute |
 
@@ -173,8 +173,8 @@ is still true, or say it cannot tell.
 ## How a session is reconciled
 1. Each commit carries `Archipelago-Run: <run>`, added by the commit-msg
    hook from the session's run file.
-2. A commit is accounted for with one change: a `software.commit` with its
-   sha and `software.settles` links. The reply that made it is asked to, and
+2. A commit is accounted for with one change: a `commit` with its
+   sha and `settles` links. The reply that made it is asked to, and
    the next session in the checkout is told of any left over.
 3. `session_end` lists the run's commits not accounted for
    (`unaccounted_commits`) and does not end until they are; then what the

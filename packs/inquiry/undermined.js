@@ -4,8 +4,8 @@
 export async function undermined(ctx) {
   const rows = [];
   const seen = new Set();
-  for (const h of await ctx.read({ items: { type: 'inquiry.hypothesis', status: 'refuted' }, fields: [] })) {
-    for (const e of await ctx.read({ related: h.id, relation: 'inquiry.assumes', direction: 'in', fields: [] })) {
+  for (const h of await ctx.read({ items: { type: 'hypothesis', status: 'refuted' }, fields: [] })) {
+    for (const e of await ctx.read({ related: h.id, relation: 'assumes', direction: 'in', fields: [] })) {
       if (!e.is_open || seen.has(e.id)) continue;
       seen.add(e.id);
       rows.push({ id: e.id, type: e.type, title: `${e.title} · assumes ${h.title}`, status: e.status });

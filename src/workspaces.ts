@@ -199,7 +199,7 @@ export class Workspaces {
     if (!ws) return false;
     const { rows } = await ws.pelago.db.query<{ busy: boolean }>(
       `select exists(select 1 from entity where archived_at is null and ((type = any($1::text[]) and status = 'enabled') or (type = any($2::text[]) and is_open))) as busy`,
-      [ws.pelago.registry.family('sys.automation'), ws.pelago.registry.family('sys.run')],
+      [ws.pelago.registry.family('automation'), ws.pelago.registry.family('run')],
     );
     // Asked again after waiting: a request may have arrived meanwhile.
     if (rows[0].busy || this.held.get(id) || this.open.get(id) !== opening) return false;

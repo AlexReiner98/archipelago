@@ -29,7 +29,7 @@ test('opening a database that has every step applies none again', async () => {
 test('a database made before steps were numbered takes the first over what it has, and keeps it', async () => {
   const dir = folder();
   const made = await openDb(dir);
-  await made.exec(`drop table schema_version; insert into entity (id, type, title, status, is_open) values ('e_kept0000', 'work.task', 'Kept', 'todo', true)`);
+  await made.exec(`drop table schema_version; insert into entity (id, type, title, status, is_open) values ('e_kept0000', 'task', 'Kept', 'todo', true)`);
   await made.close();
   const db = await openDb(dir);
   assert.equal(await versionOf(db), LATEST);

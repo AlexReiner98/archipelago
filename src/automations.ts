@@ -56,7 +56,7 @@ export class Automations {
       await this.flagStaleSessions();
       const { rows: autos } = await this.l.db.query<Entity>(
         `select * from entity where type = any($1::text[]) and status = 'enabled' and archived_at is null order by created_at`,
-        [this.l.registry.family('sys.automation')],
+        [this.l.registry.family('automation')],
       );
       const events = await this.newEvents();
       const fired = [];
@@ -150,7 +150,7 @@ export class Automations {
 
   /** Tell the human, once, about each open session that has stopped reporting. */
   private async flagStaleSessions(): Promise<void> {
-    if (!this.l.registry.type('sys.notification')) return;
+    if (!this.l.registry.type('notification')) return;
     const view = (await VIEWS.sessions.run(this.l, {})) as { stale_after_minutes: number; open: { id: string; title: string; stale: boolean; last_seen: string; holds: { title: string }[] }[] };
     for (const run of view.open.filter((r) => r.stale)) {
       // Half a day without a word: its window was shut, or its machine was. It is ended for it, as its end hook

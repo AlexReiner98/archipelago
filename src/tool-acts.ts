@@ -231,7 +231,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // The notices that said each one was settled have been answered with them.
       const { rows } = await l.db.query<{ id: string }>(
         `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
-         where r.to_id = any($1::text[]) and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.title like '% settled "%'`,
+         where r.to_id = any($1::text[]) and n.type = 'notification' and n.is_open and n.archived_at is null and n.title like '% settled "%'`,
         [answered],
       );
       if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n) => ({ op: 'update' as const, id: n.id, status: 'read' })), reason: 'Put to the owner and answered in chat' });

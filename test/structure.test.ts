@@ -75,6 +75,27 @@ test('the kernel names no pack', () => {
   assert.deepEqual(ratchet(named, NAMES_PACKS), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
 
+// A type or link type is named by what it is, not by its pack (decided 27 Oct 2026), so a pack's type is caught by its
+// bare name too. What was counted on that day is words that are also some pack's type name (a capability, a view, a
+// verb's action): no new one may be added.
+const NAMES_PACK_TYPES: Record<string, number> = {
+  'src/agent-run.ts': 1, 'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/brief.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
+  'src/diagram-types.ts': 1, 'src/documents.ts': 2, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/lens-presets.ts': 1, 'src/lens-saved.ts': 1, 'src/looks.ts': 1,
+  'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
+  'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/saved-views.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
+  'src/sessions.ts': 4, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-ops.ts': 2, 'src/tool-reads.ts': 2, 'src/ui-files.ts': 2, 'src/workspace-share.ts': 1,
+  'ui/app.js': 1, 'ui/canvas.js': 1, 'ui/doc.js': 5, 'ui/draft.js': 2, 'ui/item-doc.js': 1, 'ui/item.js': 2, 'ui/proof.js': 2, 'ui/screens.js': 4, 'ui/workspace-cards.js': 1,
+};
+
+test("the kernel names no pack's type by its bare name", () => {
+  const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
+    const m = JSON.parse(read(`packs/${p}/pack.json`)) as { types?: { id?: string }[]; links?: { id: string }[] };
+    return [...(m.types ?? []), ...(m.links ?? [])].flatMap((t) => (t.id ? [t.id] : []));
+  });
+  const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'));
+  assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
+});
+
 // 3. Writes to items and relations go through the write path (src/pelago.ts): change for facts, projected by the
 // projector it runs (src/replay.ts), and the operational writes and the restore path src/operational.ts names.
 // Every other store is named there too.

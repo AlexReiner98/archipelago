@@ -33,7 +33,7 @@ export async function askedLately(whole: Q, l: Archipelago): Promise<Map<string,
      from (select props from entity where type = any($1::text[]) and archived_at is null order by created_at desc limit ${RUNS_READ}) e
      cross join lateral jsonb_array_elements(case when jsonb_typeof(e.props->'story') = 'array' then e.props->'story' else '[]'::jsonb end) b
      where b ? 'asked' and b->>'at' > $2 group by 1`,
-    [l.registry.family('sys.run'), new Date(Date.now() - LATELY_MS).toISOString()],
+    [l.registry.family('run'), new Date(Date.now() - LATELY_MS).toISOString()],
   );
   return new Map(rows.map((r) => [r.rule, r.n]));
 }

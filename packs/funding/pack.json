@@ -6,7 +6,8 @@
   "requires": ["core"],
   "types": [
     {
-      "id": "funding.program",
+      "id": "program",
+      "moved_from": ["funding.program"],
       "capabilities": { "bound": { "field": "deadline", "limit": "today" } },
       "extends": "place",
       "title": "Funding program",
@@ -25,39 +26,43 @@
   ],
   "links": [
     {
-      "id": "funding.could_fund",
+      "id": "could_fund",
+      "moved_from": ["funding.could_fund"],
       "extends": "about",
       "title": "could fund",
       "inverse": "could be funded by",
-      "from": ["funding.program"],
+      "from": ["program"],
       "to": ["*"],
       "description": "This program could pay for part of the target work. Say what it would pay for there in props.says, e.g. \"the research core: matching measured absorption\"."
     },
     {
-      "id": "funding.requires",
+      "id": "requires",
+      "moved_from": ["funding.requires"],
       "extends": "depends_on",
       "title": "requires first",
       "inverse": "comes before",
-      "from": ["funding.program"],
+      "from": ["program"],
       "to": ["*"],
       "description": "This program can only be used once the target is done or in hand, e.g. a loan that pays to carry out a plan. Say how in props.says."
     },
     {
-      "id": "funding.reduces",
+      "id": "reduces",
+      "moved_from": ["funding.reduces"],
       "extends": "about",
       "title": "is figured after",
       "inverse": "reduces",
-      "from": ["funding.program"],
-      "to": ["funding.program"],
+      "from": ["program"],
+      "to": ["program"],
       "description": "Money from the target counts as assistance against this one: it is subtracted before this is figured. Say how in props.says."
     },
     {
-      "id": "funding.earns",
+      "id": "earns",
+      "moved_from": ["funding.earns"],
       "extends": "produced",
       "title": "also earns",
       "inverse": "is earned by",
-      "from": ["funding.program"],
-      "to": ["funding.program"],
+      "from": ["program"],
+      "to": ["program"],
       "description": "Money spent under this program also earns the target, e.g. a payment to a college that earns a tax credit. Say how in props.says."
     }
   ]

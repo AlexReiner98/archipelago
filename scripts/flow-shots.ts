@@ -24,10 +24,10 @@ function big(chain: number) {
   const quiet = { blocked: false, waits_on: [] as string[], sessions: 0, needs_you: false };
   const within = { items: 0, work: 0, blocked: 0, waiting: 0, sessions: 0, tokens: { estimated: 0, used: 0 }, waits_on: {}, needs_you: 0, not_sent: 0 };
   const id = (n: number) => `e_${String(n).padStart(8, '0')}`;
-  const items: Record<string, unknown>[] = [{ id: id(0), type: 'work.project', root: 'work.project', kind: 'work', title: 'A big map', status: 'active', open: true, place: 1, size: { work: 0, tokens: { estimated: 0, used: 0 } }, state: quiet, within }];
+  const items: Record<string, unknown>[] = [{ id: id(0), type: 'project', root: 'project', kind: 'work', title: 'A big map', status: 'active', open: true, place: 1, size: { work: 0, tokens: { estimated: 0, used: 0 } }, state: quiet, within }];
   const links: Record<string, unknown>[] = [];
   for (let n = 1; n <= 2000; n++) {
-    items.push({ id: id(n), type: 'work.task', root: 'work.task', kind: 'work', title: `Task ${n} of the map, with a name of some length`, status: 'todo', open: n % 7 !== 0, inside: id(0), place: n, size: items[0].size, state: quiet, within });
+    items.push({ id: id(n), type: 'task', root: 'task', kind: 'work', title: `Task ${n} of the map, with a name of some length`, status: 'todo', open: n % 7 !== 0, inside: id(0), place: n, size: items[0].size, state: quiet, within });
     if ((n - 1) % chain) links.push({ kind: 'depends_on', from: id(n), to: id(n - 1), n: 1 });
     if (n > chain && n % 17 === 0) links.push({ kind: 'depends_on', from: id(n), to: id(n - chain + 3), n: 1 });
   }

@@ -30,8 +30,8 @@ const raw = async (l: Archipelago, id: string) => (await l.db.query<{ field: str
 async function setup(l: Archipelago) {
   const made = await make(l, [
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam Quill', body: 'Salary talks in March.' },
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Hiring' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Offer letter', body: 'For {sam}.', owner: 'sam', props: { priority: 'high' } },
+    { op: 'create', ref: 'p', type: 'project', title: 'Hiring' },
+    { op: 'create', ref: 't', type: 'task', title: 'Offer letter', body: 'For {sam}.', owner: 'sam', props: { priority: 'high' } },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'link', type: 'waits_on', from: 't', to: 'sam', props: { for: 'Quill to sign' } },
   ]);
@@ -48,7 +48,7 @@ test('every value that is words is sealed in the log with its own key, and opene
 
   // Stored: title, note and declared fields sealed; structure clear; the reason sealed with the change set's key.
   for (const field of ['title', 'body', 'priority']) assert.ok(isSealed(fact(first, made.t, field)), `${field} is sealed`);
-  for (const [field, value] of [['status', 'todo'], ['owner', made.sam], ['type', 'work.task'], ['visibility', 'private']]) assert.equal(fact(first, made.t, field), value, `${field} stays clear`);
+  for (const [field, value] of [['status', 'todo'], ['owner', made.sam], ['type', 'task'], ['visibility', 'private']]) assert.equal(fact(first, made.t, field), value, `${field} stays clear`);
   const waits = first.facts.find((f) => f[2] === 'link' && (f[3] as string[])[0] === 'waits_on')![1];
   assert.ok(isSealed(fact(first, waits, 'for')), "a link's fields with the link's own key");
   assert.ok(isSealed(first.reason) && isSealed((second.authority as { basis: unknown }).basis), 'reason and basis sealed');
@@ -68,7 +68,7 @@ test('every value that is words is sealed in the log with its own key, and opene
   assert.deepEqual((await verify(l.db)).problems, []);
 
   // Who may not see an item reads its values as digests, and the header of an entry about it only.
-  const mine = (await make(l, [{ op: 'create', ref: 'h', type: 'work.task', title: 'Kept to myself', visibility: 'private' }])).h;
+  const mine = (await make(l, [{ op: 'create', ref: 'h', type: 'task', title: 'Kept to myself', visibility: 'private' }])).h;
   await l.db.query(`update entity set private_to = 'e_owner' where id = $1`, [mine]);
   const theirs = await entries(l.as('e_other').db, 'facts', 1);
   const hidden = theirs.find((e) => e.facts.some((f) => f[1] === mine))!;

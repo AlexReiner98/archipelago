@@ -67,7 +67,7 @@ const STATUSES = ['todo', 'doing', 'done', 'blocked'];
 function factsOf(i: number): [string, string, string, unknown][] {
   if (i % 4 === 0 && i / 4 < ITEMS) {
     const id = idOf('e', i / 4);
-    return [['+', id, 'type', 'work.task'], ['+', id, 'title', `Task ${i / 4} of the bench`], ['+', id, 'status', 'todo'], ['+', id, 'visibility', 'shared']];
+    return [['+', id, 'type', 'task'], ['+', id, 'title', `Task ${i / 4} of the bench`], ['+', id, 'status', 'todo'], ['+', id, 'visibility', 'shared']];
   }
   const made = Math.max(1, Math.min(ITEMS, Math.floor(i / 4)));
   // Most changes are to recent work, some to anything.

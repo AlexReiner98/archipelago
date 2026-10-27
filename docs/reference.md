@@ -102,7 +102,7 @@ of its own, each named for the question it answers. A style may carry its own
 drawing code, which runs in a sandboxed worker with no page and no network
 (`ui/draw.html`).
 
-**Documents.** A `work.document` is made of the map: its sections can be notes or
+**Documents.** A `document` is made of the map: its sections can be notes or
 live views. It can be printed or saved as a PDF, and shared by a link that
 needs no login.
 
@@ -226,7 +226,7 @@ at once; they are the session's own state, not facts about the world.
   repository: the open work nothing blocks, the blocked work and what it waits
   on, and whether each exclusive resource is free. The repository is matched
   by the address the checkout was cloned from (the `remote` on a
-  `software.repo` item), which is the same on every machine, and failing
+  `repo` item), which is the same on every machine, and failing
   that by its `path`.
 - **A project with nothing of Archipelago's in it** is connected by one command,
   given under "Connect an agent" on the Workspace screen and run in the
@@ -366,7 +366,7 @@ are applied as made.
 A handoff is mostly read off the map, so it does not go stale between
 sessions: the last push, what is open, and what has happened since the
 handoff note was written (pushes, what was settled or opened, the sessions
-that ended and what each said). The note (`software.handoff`) is the one part
+that ended and what each said). The note (`handoff`) is the one part
 an agent writes, and holds only what the map cannot know: what nobody has
 seen working, what bites when working here, what to do next and why.
 
@@ -379,10 +379,10 @@ Types live in files under `packs/`, one folder per pack:
   system's own (lens, style, screen) and the root links, which name
   kinds at their ends.
 - `work`, on in every workspace: project, task, decision, issue, meeting,
-  idea, note, file, document and procedure, as `work.task` and so on.
+  idea, note, file, document and procedure, as `task` and so on.
 - `inquiry`: hypothesis, experiment and result, with tests, supports,
   refutes, assumes and explains.
-- `money`: what is paid regularly (`money.cost`).
+- `money`: what is paid regularly (`cost`).
 - `sys`: the system's own primitives (source, connection, run, notification,
   automation).
 - `software`: application, repo, feature, bug, release, proof question, test,
@@ -400,11 +400,13 @@ out unwinds it while its items stay. A change a pack's action or handler
 makes names the pack, and core's rule `pack_reach` refuses one that writes
 outside what the pack declares, requires or uses.
 
-A type can extend another. A `software.bug` is a flavour of `work.issue`: it
+A type can extend another. A `bug` is a flavour of `issue`: it
 inherits the parent's fields and statuses, and anything that searches or views
-issues sees bugs too. Types outside `core` are named `<pack>.<name>`. When a
-pack takes a type over (`moved_from`), its items move once, and the old name
-is refused with the new one in the message.
+issues sees bugs too. A type or link type is named by what it is (`task`,
+`commit`, `calls`), whichever pack ships it; which pack that is, the schema
+says. A workspace's own is `local.<name>`. When a type takes another's name
+over (`moved_from`), its items move once, and the old name still reads as the
+new one: in a change, a search and a lens (`work.task` is `task`).
 
 ## Not built yet
 

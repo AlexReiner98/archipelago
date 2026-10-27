@@ -219,7 +219,7 @@
         "gap": { "type": "number", "description": "The room between things, in pixels." },
         "colors": { "type": "json", "description": "Colours by name, each a hex colour: sea, land, inner, line, text, muted, blocked, you, session, done." },
         "color_by": { "type": "string", "description": "grid: the shown field each card is coloured by, e.g. kind." },
-        "rows": { "type": "string", "description": "grid: what the rows are. Left empty, what the start holds. link:<kind>, the things those links lead to, e.g. link:funding.could_fund: a thing is a card in each row its links lead to, with the link's words as its second line." },
+        "rows": { "type": "string", "description": "grid: what the rows are. Left empty, what the start holds. link:<kind>, the things those links lead to, e.g. link:could_fund: a thing is a card in each row its links lead to, with the link's words as its second line." },
         "palette": { "type": "json", "description": "grid: a hex colour for each value of color_by, e.g. {\"grant\": \"#2e7d4f\"}. A value not named takes one of the built-in colours." },
         "labels": { "type": "json", "description": "grid: what a lane or a value is called, e.g. {\"set_up\": \"Set up\"}. Not named, it is the value in words." },
         "detail": { "type": "string", "description": "grid: the shown field written on each card's second line, e.g. amount." },
@@ -261,7 +261,7 @@
       "description": "A type of item, kept on the map: as a style is how things look, a type is what an item is. A pack ships its types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's, its fields added to the preset's; retired, no new item is made of it, and those there are stay. One with a name and no preset is a type of this workspace's own, named local.<name>, extending a kind or a type of one.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
-        "preset": { "type": "string", "description": "The id of the pack's type this is the owner's version of, e.g. work.task." },
+        "preset": { "type": "string", "description": "The id of the pack's type this is the owner's version of, e.g. task." },
         "name": { "type": "string", "description": "A type of this workspace's own: its id, local.<name>." },
         "extends": { "type": "string", "description": "A type of this workspace's own: the kind or type it is a flavour of, whose fields and statuses it takes." },
         "fields": { "type": "json", "description": "Fields added, by name, each as a type declares one, e.g. {\"rate\": {\"type\": \"number\"}}." },
@@ -319,6 +319,7 @@
     },
     {
       "id": "ships",
+      "moved_from": ["software.ships"],
       "extends": "produced",
       "title": "ships",
       "inverse": "ships in",
@@ -409,6 +410,7 @@
     },
     {
       "id": "lives_in",
+      "moved_from": ["software.lives_in"],
       "root": true,
       "title": "lives in",
       "inverse": "is home to",
@@ -903,7 +905,7 @@
     { "id": "core.map_true", "type": "instruction", "title": "Keep the map true", "body": "When what you do or find settles something still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, rather than leaving it open with a note. Settle only what the work or the owner has in fact settled: closing a decision or hypothesis waits for the owner unless this workspace applies agents’ changes as made, so propose it with what was chosen (props.outcome) and why (props.rationale). A choice that is still the owner’s stays open.", "props": { "for": ["working_rules"], "order": 40 } },
     { "id": "core.authority", "type": "instruction", "title": "Say on whose authority", "body": "Every change takes authority: of \"human\" with what the owner said and where, when they told you to or decided it; of \"agent\" for your own reading of the work. Never claim the owner’s word for your own judgment.", "props": { "for": ["working_rules"], "order": 50 } },
     { "id": "core.names", "type": "instruction", "title": "A name is a few words", "body": "A title names the thing in 60 characters at most; the rest goes in the first line of its note. Lead a note with the point in two or three sentences, and give each further part a short title on a line of its own, so it folds. Write it in the map's one dialect, which every page reads alike: ## titles, - points, - [ ] and - [x] checklists, > [!NOTE] or > [!WARNING] callouts, | tables |, `code`, **strong**, and an item named by its id (e_...) or as [its name](e_...).", "props": { "for": ["working_rules"], "order": 60 } },
-    {"id":"core.unaccounted","type":"instruction","title":"Settle the commits no one has accounted for","body":"{count} commits here are not accounted for (a commit is, once the map holds a commit item for it: type software.commit, its full sha in sha, a software.settles link to each item it settles, none when it settles nothing):\n{commits}\nIn your first reply, tell the owner which these are, and make a commit item for each with change (or, where one heard from a push is there already with accounted false, set it true with its links), on the authority you have for it, as you settle what you did. If a commit is not yours to account for, say so.","props":{"for":["unaccounted_commits"],"order":40}},
+    {"id":"core.unaccounted","type":"instruction","title":"Settle the commits no one has accounted for","body":"{count} commits here are not accounted for (a commit is, once the map holds a commit item for it: type commit, its full sha in sha, a settles link to each item it settles, none when it settles nothing):\n{commits}\nIn your first reply, tell the owner which these are, and make a commit item for each with change (or, where one heard from a push is there already with accounted false, set it true with its links), on the authority you have for it, as you settle what you did. If a commit is not yours to account for, say so.","props":{"for":["unaccounted_commits"],"order":40}},
     { "id": "core.search_first", "type": "instruction", "title": "Search before you create", "body": "Query with name search first, so nothing is made twice.", "props": { "for": ["working_rules"], "order": 70 } },
     { "id": "core.waits_on", "type": "instruction", "title": "Say who is waited on with a link", "body": "A person who has to answer or act is waits_on (what for in props.for), removed once they have; other work is depends_on; a resource is needs, and an exclusive one is taken with assign, action claim, and given back with revise, action release.", "props": { "for": ["working_rules"], "order": 80 } }
   ]

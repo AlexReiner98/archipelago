@@ -22,9 +22,9 @@ test('a document shared with another workspace is read there once accepted, and 
     await api(mine, 'change', {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'work.document', title: 'Proposal for Acme', visibility: 'shared', body: 'Why us.\n\n{s}\n\nNot for them: {x}' },
-        { op: 'create', ref: 's', type: 'work.note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
-        { op: 'create', ref: 'x', type: 'work.note', title: 'Our margin', visibility: 'shared', body: 'Secret.' },
+        { op: 'create', ref: 'd', type: 'document', title: 'Proposal for Acme', visibility: 'shared', body: 'Why us.\n\n{s}\n\nNot for them: {x}' },
+        { op: 'create', ref: 's', type: 'note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
+        { op: 'create', ref: 'x', type: 'note', title: 'Our margin', visibility: 'shared', body: 'Secret.' },
         { op: 'link', type: 'part_of', from: 's', to: 'd' },
       ],
     })
@@ -47,13 +47,13 @@ test('a document shared with another workspace is read there once accepted, and 
   assert.deepEqual((await api(mine, 'share_list', { id: doc })).map((s: any) => [s.id, s.to_workspace]), [[shared.share, 'acme']]);
 
   // It arrives as an offer, with a notification about it; it cannot be read until it is accepted.
-  const [offer] = await api(theirs, 'search', { type: 'sys.shared_document' });
+  const [offer] = await api(theirs, 'search', { type: 'shared_document' });
   assert.deepEqual([offer.title, offer.status, offer.props.from_workspace], ['Proposal for Acme', 'offered', 'default']);
   assert.ok((await api(theirs, 'view', { name: 'notifications' })).some((n: any) => n.title === '"Proposal for Acme" was shared with this workspace'));
   await assert.rejects(api(theirs, 'document', { id: offer.id }), /accept it to read it here/);
   // Everyone there sees it, until someone there makes it private.
   const rosa = (await api(theirs, 'token_create', { kind: 'human', name: 'rosa' })).token;
-  assert.deepEqual((await api(rosa, 'search', { type: 'sys.shared_document' })).map((s: any) => s.id), [offer.id]);
+  assert.deepEqual((await api(rosa, 'search', { type: 'shared_document' })).map((s: any) => s.id), [offer.id]);
 
   await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: offer.id, status: 'accepted' }] });
   const read = await api(theirs, 'document', { id: offer.id });
@@ -74,7 +74,7 @@ test('a document shared with another workspace is read there once accepted, and 
   await api(elsewhere, 'workspace_set', { accepts_from: ['default'] });
   const forged = await call('/api/change', elsewhere, {
     reason: 'test',
-    ops: [{ op: 'create', ref: 'f', type: 'sys.shared_document', title: 'Forged', status: 'accepted', props: { from_workspace: 'default', share: shared.share } }],
+    ops: [{ op: 'create', ref: 'f', type: 'shared_document', title: 'Forged', status: 'accepted', props: { from_workspace: 'default', share: shared.share } }],
   });
   // Its fields can be written by hand there, but the sender's database gives a share only to the workspace it was made out to.
   await assert.rejects(api(elsewhere, 'document', { id: forged.result.created.f }), /no longer shared/);
@@ -97,10 +97,10 @@ test('the receiver ends a share on its side, and the sender can share again', as
     if (answer.error) throw new Error(answer.error);
     return answer.result;
   };
-  const doc = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'work.document', title: 'Plan', body: 'The plan.' }] })).created.d;
+  const doc = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'Plan', body: 'The plan.' }] })).created.d;
   await api(theirs, 'workspace_set', { accepts_from: ['default'] });
   await api(mine, 'share_workspace', { id: doc, workspace: 'acme' });
-  const [item] = await api(theirs, 'search', { type: 'sys.shared_document' });
+  const [item] = await api(theirs, 'search', { type: 'shared_document' });
   await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: item.id, status: 'accepted' }] });
   assert.match((await api(theirs, 'document', { id: item.id })).parts[0].text, /The plan/);
   await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: item.id, status: 'ended' }] });
@@ -121,12 +121,12 @@ test('a shared document is published where it is read only if its sender says so
     await api(mine, 'change', {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'p', type: 'work.document', title: 'A principle', visibility: 'shared', body: 'Held by what serves it.\n\n{l}' },
-        { op: 'create', ref: 'e', type: 'work.document', title: 'The principles', visibility: 'shared', body: 'Read {p} first.' },
-        { op: 'create', ref: 'f', type: 'software.feature', title: 'The rule', visibility: 'shared', body: 'Holds a change.' },
-        { op: 'create', ref: 't', type: 'work.task', title: 'A test of it', visibility: 'shared', body: 'Checks it.' },
-        { op: 'create', ref: 'x', type: 'work.task', title: 'Not for them', visibility: 'private', body: 'Secret.' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What holds it', visibility: 'shared', status: 'current', props: { filter: { types: ['work.task', 'software.feature'] } } },
+        { op: 'create', ref: 'p', type: 'document', title: 'A principle', visibility: 'shared', body: 'Held by what serves it.\n\n{l}' },
+        { op: 'create', ref: 'e', type: 'document', title: 'The principles', visibility: 'shared', body: 'Read {p} first.' },
+        { op: 'create', ref: 'f', type: 'feature', title: 'The rule', visibility: 'shared', body: 'Holds a change.' },
+        { op: 'create', ref: 't', type: 'task', title: 'A test of it', visibility: 'shared', body: 'Checks it.' },
+        { op: 'create', ref: 'x', type: 'task', title: 'Not for them', visibility: 'private', body: 'Secret.' },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What holds it', visibility: 'shared', status: 'current', props: { filter: { types: ['task', 'feature'] } } },
         { op: 'link', type: 'part_of', from: 't', to: 'f' },
         { op: 'link', type: 'part_of', from: 'x', to: 'f' },
         { op: 'link', type: 'about', from: 'l', to: 'f' },
@@ -135,7 +135,7 @@ test('a shared document is published where it is read only if its sender says so
   ).created;
   await api(theirs, 'workspace_set', { accepts_from: ['default'] });
   const accept = async (title: string) => {
-    const item = (await api(theirs, 'search', { type: 'sys.shared_document' })).find((s: any) => s.title === title && s.status === 'offered');
+    const item = (await api(theirs, 'search', { type: 'shared_document' })).find((s: any) => s.title === title && s.status === 'offered');
     await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: item.id, status: 'accepted' }] });
     return item.id as string;
   };

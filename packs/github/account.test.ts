@@ -7,7 +7,7 @@ import handler from './handler.js';
 import { kept, runOf } from './account.js';
 
 const sha = (c: string) => c.repeat(40);
-const repo = { id: 'e_repo0001', type: 'software.repo', title: 'Shop', props: { remote: 'https://github.com/Acme/Shop' } };
+const repo = { id: 'e_repo0001', type: 'repo', title: 'Shop', props: { remote: 'https://github.com/Acme/Shop' } };
 
 /** The map holds these commit items (by sha); GitHub answers `github` by path through the app, or the app is not connected. */
 function ctxOver(accounted: string[], github?: Record<string, unknown>, heard: string[] = []) {
@@ -16,10 +16,10 @@ function ctxOver(accounted: string[], github?: Record<string, unknown>, heard: s
     reads,
     read: async (q: Record<string, any>) => {
       reads.push(q);
-      if (q.items?.type === 'software.repo') return [repo];
-      if (q.items?.type === 'software.commit') {
+      if (q.items?.type === 'repo') return [repo];
+      if (q.items?.type === 'commit') {
         const s = q.items.where.sha;
-        return [...(accounted.includes(s) ? [{ id: `e_c${s.slice(0, 7)}`, type: 'software.commit', props: { sha: s } }] : []), ...(heard.includes(s) ? [{ id: `e_h${s.slice(0, 7)}`, type: 'software.commit', props: { sha: s, accounted: false } }] : [])];
+        return [...(accounted.includes(s) ? [{ id: `e_c${s.slice(0, 7)}`, type: 'commit', props: { sha: s } }] : []), ...(heard.includes(s) ? [{ id: `e_h${s.slice(0, 7)}`, type: 'commit', props: { sha: s, accounted: false } }] : [])];
       }
       if (q.events) return [];
       if (q.request) {
@@ -47,7 +47,7 @@ test('a push to main is checked: red while a commit has no commit item on the ma
   assert.equal(check.title, '1 of 2 commits not accounted for');
   assert.deepEqual(check.open, [{ sha: sha('2'), subject: 'Tidy the cart', run: 'e_run00001' }]);
   assert.match(check.summary, /`2222222` Tidy the cart \(run e_run00001\)/);
-  assert.match(check.summary, /software\.commit/);
+  assert.match(check.summary, /`commit`/);
   assert.deepEqual(check.commits, [{ id: sha('1'), message: 'Change 1' }, { id: sha('2'), message: 'Tidy the cart\n\nArchipelago-Run: e_run00001' }], 'kept short, to be asked again');
 
   const green = await handler['github.push'](push([commit('1'), commit('2')]), ctxOver([sha('1'), sha('2')]));

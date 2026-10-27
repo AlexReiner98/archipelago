@@ -8,32 +8,32 @@ import { countCalls, replay } from '../scripts/reader-eval/replay.ts';
 import { choose, judge, summarise, type Fixture, type Sent } from '../scripts/reader-eval/score.ts';
 import type { Answer, Params } from '../src/model.ts';
 
-const closed = (type: string) => (type === 'work.issue' ? ['resolved', 'wontfix'] : ['done', 'dropped']);
+const closed = (type: string) => (type === 'issue' ? ['resolved', 'wontfix'] : ['done', 'dropped']);
 const ev = (seq: number, ts: string, actor: string, action: string, target: string, detail: Record<string, unknown> = {}, reason?: string): Ev => ({ seq, ts, actor, action, target_id: target, detail, reason });
 
 test('the items as they stood: what was made since is left out, what was closed or renamed since is put back', () => {
   const now: Now[] = [
-    { id: 'e_a', type: 'work.task', title: 'Oil the hinge', status: 'done', created_at: '2026-10-01', archived: false },
-    { id: 'e_b', type: 'work.task', title: 'Later', status: 'todo', created_at: '2026-10-21T12:00', archived: false },
-    { id: 'e_c', type: 'work.issue', title: 'Squeak gone', status: 'open', created_at: '2026-10-01', archived: true },
+    { id: 'e_a', type: 'task', title: 'Oil the hinge', status: 'done', created_at: '2026-10-01', archived: false },
+    { id: 'e_b', type: 'task', title: 'Later', status: 'todo', created_at: '2026-10-21T12:00', archived: false },
+    { id: 'e_c', type: 'issue', title: 'Squeak gone', status: 'open', created_at: '2026-10-01', archived: true },
   ];
   const events = [
     ev(1, '2026-10-21T10:00', 'human:x', 'entity.update', 'e_a', { changes: { status: { from: 'todo', to: 'done' }, title: { from: 'Oil hinge', to: 'Oil the hinge' } } }),
     ev(2, '2026-10-21T11:00', 'human:x', 'entity.archive', 'e_c'),
   ];
   assert.deepEqual(rewind(now, events, '2026-10-21T09:00', closed), [
-    { id: 'e_a', type: 'work.task', title: 'Oil hinge', status: 'todo' },
-    { id: 'e_c', type: 'work.issue', title: 'Squeak gone', status: 'open' },
+    { id: 'e_a', type: 'task', title: 'Oil hinge', status: 'todo' },
+    { id: 'e_c', type: 'issue', title: 'Squeak gone', status: 'open' },
   ]);
   assert.deepEqual(rewind(now, events, '2026-10-21T13:00', closed).map((i) => i.id), ['e_b']);
 });
 
 test('labels: the owner’s word first, then what was taken back, what is a copy, and what still stands', () => {
-  const open = [{ id: 'e_a', type: 'work.task', title: 'Oil the hinge', status: 'todo' }, { id: 'e_d', type: 'work.task', title: 'Paint the door', status: 'todo' }];
+  const open = [{ id: 'e_a', type: 'task', title: 'Oil the hinge', status: 'todo' }, { id: 'e_d', type: 'task', title: 'Paint the door', status: 'todo' }];
   const now = new Map<string, Now>([
     ['e_a', { ...open[0], status: 'todo', created_at: '2026-10-01', archived: false }],
     ['e_d', { ...open[1], status: 'done', created_at: '2026-10-01', archived: false }],
-    ['e_n', { id: 'e_n', type: 'work.task', title: 'Fit a new lock', status: 'todo', created_at: '2026-10-21', archived: false }],
+    ['e_n', { id: 'e_n', type: 'task', title: 'Fit a new lock', status: 'todo', created_at: '2026-10-21', archived: false }],
   ]);
   const changes = [
     { from: 'p_1', ts: '2026-10-21T10:00', status: 'rejected' as const, ops: [{ op: 'update', id: 'e_a', status: 'doing' }] },
@@ -58,12 +58,12 @@ test('labels: the owner’s word first, then what was taken back, what is a copy
 
 const fixture: Fixture = {
   id: 'main@bbbbbbb',
-  repo: { name: 'Acme/Tools', entity: { id: 'e_repo', title: 'Tools repo', type: 'software.repo' } },
+  repo: { name: 'Acme/Tools', entity: { id: 'e_repo', title: 'Tools repo', type: 'repo' } },
   push: { branch: 'main', default_branch: 'main', before: 'a'.repeat(40), after: 'b'.repeat(40), ts: '2026-10-21T10:00:00Z' },
   commits: ['b'.repeat(40)],
   items: [
-    { id: 'e_hinge', type: 'work.task', title: 'Oil the hinge', status: 'todo' },
-    { id: 'e_door', type: 'work.task', title: 'Paint the door', status: 'todo' },
+    { id: 'e_hinge', type: 'task', title: 'Oil the hinge', status: 'todo' },
+    { id: 'e_door', type: 'task', title: 'Paint the door', status: 'todo' },
   ],
   labels: [
     { change: 'close', item: 'e_hinge', to: 'done', verdict: 'good', basis: 'approved' },
@@ -83,7 +83,7 @@ test('a push replayed on a scripted model, against the stand-in GitHub, and scor
   countCalls(() => async (params): Promise<Answer> => {
     asked.push(params);
     const brief = String(params.messages[0].content);
-    const id = (title: string) => new RegExp(`(e_\\w+) work\\.task \\[todo\\] ${title}`).exec(brief)![1];
+    const id = (title: string) => new RegExp(`(e_\\w+) task \\[todo\\] ${title}`).exec(brief)![1];
     const usage = { input_tokens: 1000, output_tokens: 100 };
     if (params.messages.length > 1) return { content: [{ type: 'text', text: 'Closed the hinge.' }], stop_reason: 'end_turn', usage };
     // A reader that closes by decide is answered with a quote from the push; one that closes by update, as it was.
@@ -94,7 +94,7 @@ test('a push replayed on a scripted model, against the stand-in GitHub, and scor
       content: [
         { type: 'tool_use', id: 't1', ...close },
         { type: 'tool_use', id: 't2', name: 'update', input: { id: id('Paint the door'), status: 'doing', why: 'near it' } },
-        { type: 'tool_use', id: 't3', name: 'create', input: { type: 'work.task', title: 'Oil the hinge', why: 'a copy' } },
+        { type: 'tool_use', id: 't3', name: 'create', input: { type: 'task', title: 'Oil the hinge', why: 'a copy' } },
       ],
       stop_reason: 'tool_use',
       usage,
@@ -148,7 +148,7 @@ test('no fallback is named that does no good: the best of the rest, or none', ()
 });
 
 test('a close the reader made that someone else later confirmed, and that still stands, is right; one nobody touched stays weak', () => {
-  const open = [{ id: 'e_a', type: 'work.task', title: 'Serve the site', status: 'doing' }, { id: 'e_b', type: 'work.task', title: 'Rank search', status: 'todo' }];
+  const open = [{ id: 'e_a', type: 'task', title: 'Serve the site', status: 'doing' }, { id: 'e_b', type: 'task', title: 'Rank search', status: 'todo' }];
   const now = new Map<string, Now>(open.map((i) => [i.id, { ...i, status: 'done', created_at: '2026-10-01', archived: false }]));
   const changes = [{ from: 'c_1', ts: '2026-10-21T10:00', status: 'applied' as const, ops: [{ op: 'update', id: 'e_a', status: 'done' }, { op: 'update', id: 'e_b', status: 'done' }] }];
   const later = [ev(9, '2026-10-21T12:00', 'agent:claude-code', 'entity.update', 'e_a', { changes: {} })];

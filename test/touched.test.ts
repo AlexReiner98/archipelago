@@ -18,8 +18,8 @@ const hook = (l: Archipelago, event: string, body: Record<string, unknown>) => a
 test('what a session touched is kept with its run, apart from another session of the same agent', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'mine', type: 'work.task', title: 'Read and left' },
-    { op: 'create', ref: 'theirs', type: 'work.task', title: 'Read by the other' },
+    { op: 'create', ref: 'mine', type: 'task', title: 'Read and left' },
+    { op: 'create', ref: 'theirs', type: 'task', title: 'Read by the other' },
   ]);
   const one = await sessionStart(l, agent, { session_id: 't1' });
   const two = await sessionStart(l, agent, { session_id: 't2' });
@@ -34,7 +34,7 @@ test('what a session touched is kept with its run, apart from another session of
   // Its end names what it touched and left as it was, though it is in no repository; one word does not answer for it.
   const asked = (await callTool(l, agent, 'session_end', { run: one.run, cannot_tell_rest: true })) as any;
   assert.equal(asked.ended, false);
-  assert.deepEqual(asked.unreconciled, [{ id: made.mine, type: 'work.task', title: 'Read and left', status: 'todo', touched: true }]);
+  assert.deepEqual(asked.unreconciled, [{ id: made.mine, type: 'task', title: 'Read and left', status: 'todo', touched: true }]);
   assert.equal(((await callTool(l, agent, 'session_end', { run: one.run, still_true: [made.mine] })) as any).status, 'finished');
 
   // The set is kept a week after the session ended, in the store that lets it go then, and no longer.
@@ -60,7 +60,7 @@ test('the hook reads from the transcript the items the session’s calls to the 
   const lines = [
     { type: 'user', message: { role: 'user', content: 'Look at e_userword please' } },
     { type: 'assistant', message: { id: 'm1', usage: { input_tokens: 10, output_tokens: 5 }, content: [{ type: 'tool_use', id: 'q1', name: 'mcp__pelago__query', input: { name: 'get', params: { id: 'e_readitem' } } }] } },
-    { type: 'assistant', message: { id: 'm2', usage: { input_tokens: 3, output_tokens: 2 }, content: [{ type: 'tool_use', id: 'c1', name: 'mcp__pelago__change', input: { reason: 'r', ops: [{ op: 'update', id: 'e_changed1' }, { op: 'create', ref: 'x', type: 'work.task', title: 't' }] } }] } },
+    { type: 'assistant', message: { id: 'm2', usage: { input_tokens: 3, output_tokens: 2 }, content: [{ type: 'tool_use', id: 'c1', name: 'mcp__pelago__change', input: { reason: 'r', ops: [{ op: 'update', id: 'e_changed1' }, { op: 'create', ref: 'x', type: 'task', title: 't' }] } }] } },
     { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'q1', content: [{ type: 'text', text: '{"outgoing":[{"id":"e_onlyseen"}]}' }] }] } },
     { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'c1', content: [{ type: 'text', text: '{"created":{"x":"e_madeitem"}}' }] }] } },
     { type: 'assistant', message: { id: 'm3', content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'echo e_notamapc' } }, { type: 'tool_use', id: 's1', name: 'mcp__pelago__report', input: { action: 'show', params: { entity: 'e_shownnow' } } }] } },

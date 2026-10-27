@@ -12,8 +12,8 @@ import { fresh, make } from './map.ts';
 test('a page is drawn by its style: the house style, a kind\'s preset over it, the owner\'s version over that', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
-    { op: 'create', ref: 'd', type: 'work.document', title: 'D' },
+    { op: 'create', ref: 'p', type: 'project', title: 'P' },
+    { op: 'create', ref: 'd', type: 'document', title: 'D' },
   ]);
   const of = async (id?: string) => (await VIEWS.style.run(l, id ? { of: id } : {})) as { style: any; used: { id: string; preset?: string }[] };
   const workspace = await of();
@@ -51,7 +51,7 @@ test("the canvas pack's flow lies over a workspace style that says list, and und
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'ws', type: 'style', title: 'House style', props: { shape: 'list' } },
-    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
+    { op: 'create', ref: 'p', type: 'project', title: 'P' },
   ]);
   const of = async (id?: string) => (await VIEWS.style.run(l, id ? { of: id } : {})) as { style: any; used: { id: string; preset?: string }[] };
   // A workspace style kept from before the canvas does not turn the canvas back into lists.

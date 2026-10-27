@@ -12,7 +12,7 @@ export async function costs(input, ctx) {
   const { days } = agents;
   const now = Date.parse(ctx.now);
   const since = now - days * DAY;
-  const paid = (await ctx.read({ items: { type: 'money.cost' } })).sort((a, b) => (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
+  const paid = (await ctx.read({ items: { type: 'cost' } })).sort((a, b) => (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
   const day = (value, fallback) => (typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? Date.parse(value) : fallback);
   const items = paid.map((e) => {
     const p = e.props ?? {};
@@ -58,7 +58,7 @@ export async function costs(input, ctx) {
     agents: { cost_usd: agents.cost_usd, tokens: agents.tokens, unpriced_tokens: agents.unpriced_tokens, by: agents.by },
     recurring,
     /** The type a new regular payment is made as. */
-    adds: 'money.cost',
+    adds: 'cost',
     how: 'A regular payment is a cost item: its amount, how often (every: month or year), since when. What agents spend is read from their runs: a run that reports cost_usd is in the dollars; one that reports only tokens is counted in tokens.',
   };
 }

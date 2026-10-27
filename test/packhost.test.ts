@@ -20,7 +20,7 @@ after(() => host.stop());
 
 test("an action reads the map and its ops are applied as one change set with the action's name", async () => {
   const l = new Archipelago(await openDb(), new Registry(dir));
-  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Survey the barn' }] })) as { created: Record<string, string> };
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Survey the barn' }] })) as { created: Record<string, string> };
   const result = (await host.act(l, human, 'demo', 'demo.plan_visit', { task: made.created.t, site: 'Barn' })) as { answer: { earlier: number; by: string }; changeset: string; created: Record<string, string> };
   assert.deepEqual(result.answer, { earlier: 0, by: 'test', visit: result.created.v }, 'a {ref} in its answer is the id of what it made');
   const visit = await l.entity(result.created.v);
@@ -45,7 +45,7 @@ test("a handler reads as the actor: another person's private item is not there f
   const l = new Archipelago(await openDb(), new Registry(dir));
   const people = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'ann', type: 'person', title: 'Ann', visibility: 'shared' }, { op: 'create', ref: 'bo', type: 'person', title: 'Bo', visibility: 'shared' }] })) as { created: Record<string, string> };
   const ann = l.as(people.created.ann);
-  const mine = (await ann.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: "Ann's own", visibility: 'private' }] })) as { created: Record<string, string> };
+  const mine = (await ann.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: "Ann's own", visibility: 'private' }] })) as { created: Record<string, string> };
   await assert.rejects(host.act(l.as(people.created.bo), human, 'demo', 'demo.plan_visit', { task: mine.created.t, site: 'Barn' }), /No task/);
   assert.equal(((await host.act(ann, human, 'demo', 'demo.plan_visit', { task: mine.created.t, site: 'Barn' })) as { status: string }).status, 'applied');
 });

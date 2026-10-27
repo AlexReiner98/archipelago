@@ -51,7 +51,7 @@ function readTerm(l: Archipelago, term: unknown): LinkTerm {
   const parsed = typeof term === 'string' ? ((([, link, to]) => ({ link, to }))(/^(\S+)\s+(.+)$/.exec(term.trim()) ?? []) as LinkTerm) : (term as LinkTerm);
   if (!parsed || typeof parsed.link !== 'string' || (typeof parsed.to === 'string') === (typeof parsed.from === 'string'))
     throw new Error(`include.links: a link term is "<link type> <id or name>", or { link, to } or { link, from }; not ${JSON.stringify(term)}`);
-  if (!l.registry.relations.has(parsed.link)) throw new Error(`include.links: unknown link type "${parsed.link}". Known: ${[...l.registry.relations.keys()].join(', ')}`);
+  if (!l.registry.relations.has(l.registry.canonical(parsed.link))) throw new Error(`include.links: unknown link type "${parsed.link}". Known: ${[...l.registry.relations.keys()].join(', ')}`);
   return parsed.to !== undefined ? { link: parsed.link, to: parsed.to } : { link: parsed.link, from: parsed.from };
 }
 
@@ -67,20 +67,20 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
     if (!Array.isArray(filter.links)) throw new Error('filter.links must be a list of link terms');
     include.links = filter.links.map((t) => readTerm(l, t));
   }
-  for (const type of include.types ?? []) if (!l.registry.types.has(type)) throw new Error(`filter.types: unknown type "${type}"`);
+  for (const type of include.types ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.types: unknown type "${type}"`);
   const narrow: FlatLens['narrow'] = {};
   if (filter.only !== undefined && (filter.only as unknown[]).length !== 0) narrow.only = names(filter.only, 'filter.only');
   if (filter.within !== undefined && (filter.within as unknown[]).length !== 0) narrow.within = names(filter.within, 'filter.within');
-  for (const type of narrow.only ?? []) if (!l.registry.types.has(type)) throw new Error(`filter.only: unknown type "${type}"`);
+  for (const type of narrow.only ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.only: unknown type "${type}"`);
   if (!include.text && !include.types?.length && !include.ids?.length && !include.links?.length)
     throw new Error(narrow.only || narrow.within
       ? 'A lens includes something (filter: text, types, ids or links) for only and within to narrow: they narrow what the filter includes, and alone would read the whole map.'
       : 'A lens includes something (filter: text, types, ids or links): a filter that includes nothing would read the whole map.');
   const exclude = filter.exclude === undefined ? EXCLUDE_DEFAULT : names(filter.exclude, 'filter.exclude');
-  for (const x of exclude) if (x !== 'closed' && x !== SYSTEM && !l.registry.types.has(x)) throw new Error(`filter.exclude: "${x}" is not closed, system or a type`);
+  for (const x of exclude) if (x !== 'closed' && x !== SYSTEM && !l.registry.types.has(l.registry.canonical(x))) throw new Error(`filter.exclude: "${x}" is not closed, system or a type`);
   const walkIn = (input.walk ?? {}) as Record<string, unknown>;
   const over = walkIn.over === undefined ? [] : walkIn.over === 'all' ? 'all' : names(walkIn.over, 'walk.over');
-  if (over !== 'all') for (const kind of over) if (!l.registry.relations.has(kind)) throw new Error(`walk.over: unknown link type "${kind}"`);
+  if (over !== 'all') for (const kind of over) if (!l.registry.relations.has(l.registry.canonical(kind))) throw new Error(`walk.over: unknown link type "${kind}"`);
   const steps = walkIn.steps ?? (over.length ? 1 : 0);
   if (!Number.isInteger(steps) || (steps as number) < 0 || (steps as number) > MAX_STEPS) throw new Error(`walk.steps must be a whole number from 0 to ${MAX_STEPS}`);
   const limit = input.limit ?? FLAT_LIMIT;

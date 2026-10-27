@@ -29,7 +29,7 @@ test('a database made while this was called Lattice is opened under the new name
   const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
   const l = new Archipelago(db, new Registry(packs));
-  await make(l, [{ op: 'create', type: 'work.task', title: 'Seen after the move' }]);
+  await make(l, [{ op: 'create', type: 'task', title: 'Seen after the move' }]);
   assert.equal((await l.as('nobody').db.query(`select 1 from entity where title = 'Seen after the move'`)).rows.length, 1);
   await db.close();
 });

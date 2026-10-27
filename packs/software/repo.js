@@ -16,7 +16,7 @@ export function repoName(remote) {
 
 /** A repository by its id, by its GitHub name, or by its title. Asked for none, or one that is not there, it says which there are. */
 export async function findRepo(ctx, key, view) {
-  const repos = (await ctx.read({ items: { type: 'software.repo' }, fields: ['remote'] })).sort((a, b) => a.title.localeCompare(b.title));
+  const repos = (await ctx.read({ items: { type: 'repo' }, fields: ['remote'] })).sort((a, b) => a.title.localeCompare(b.title));
   const wanted = key?.trim().toLowerCase();
   const name = repoName(key);
   const repo = wanted && (repos.find((r) => r.id === wanted) ?? (name && repos.find((r) => repoName(r.props.remote) === name)) ?? repos.find((r) => r.title.toLowerCase() === wanted));
@@ -39,7 +39,7 @@ export const lastPush = async (ctx, repo) => {
 /** Open tasks, decisions and issues that are the repository's, split by whether they can run now. */
 export async function repoWork(input, ctx) {
   const repo = await findRepo(ctx, input.repo, 'repo_work');
-  const rows = (await ctx.read({ scope: repo.id, types: ['work.task', 'work.decision', 'work.issue'], open: true, fields: ['due'] }))
+  const rows = (await ctx.read({ scope: repo.id, types: ['task', 'decision', 'issue'], open: true, fields: ['due'] }))
     .map((e) => ({ id: e.id, type: e.type, title: e.title, status: e.status, owner: e.owner, due: e.props.due ?? null, last_confirmed: e.updated_at }))
     .sort((a, b) => (a.due === b.due ? 0 : a.due === null ? 1 : b.due === null ? -1 : String(a.due).localeCompare(String(b.due))) || String(b.last_confirmed).localeCompare(String(a.last_confirmed)) || a.id.localeCompare(b.id));
   const state = rows.length ? await ctx.read({ blocked: rows.map((r) => r.id) }) : {};

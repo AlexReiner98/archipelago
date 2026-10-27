@@ -41,12 +41,12 @@ test('a commit pushed past the grace period with no item is made one, accounted 
   const done = await handler['github.commits']({}, ctx);
   assert.equal(done.changes.length, 1);
   const [create, link] = done.changes[0].ops;
-  assert.equal(create.type, 'software.commit');
+  assert.equal(create.type, 'commit');
   assert.equal(create.title, 'Fix the checkout');
   assert.deepEqual(create.props, { sha: sha('a'), accounted: false });
   assert.match(create.body, /by Ann, in run e_run00001/);
   assert.equal(create.source.kind, 'commit');
-  assert.deepEqual(link, { op: 'link', type: 'software.lives_in', from: create.ref, to: 'e_repo0001' });
+  assert.deepEqual(link, { op: 'link', type: 'lives_in', from: create.ref, to: 'e_repo0001' });
   assert.equal(done.changes[0].authority.of, 'agent');
   assert.equal(done.answer.made, 1);
   assert.equal(ctx.reads[0].events.action, 'repo.push');
@@ -54,7 +54,7 @@ test('a commit pushed past the grace period with no item is made one, accounted 
 
 test('a commit still in its grace period, or already accounted for, or held for a person, is left alone', async () => {
   const heard = [pushed(5, [commit('a')]), pushed(GRACE_MINUTES + 1, [commit('b'), commit('c')])];
-  const done = await handler['github.commits']({}, ctxOver(heard, [{ id: 'e_comm0001', type: 'software.commit', props: { sha: sha('b') } }], {}, [sha('c')]));
+  const done = await handler['github.commits']({}, ctxOver(heard, [{ id: 'e_comm0001', type: 'commit', props: { sha: sha('b') } }], {}, [sha('c')]));
   assert.deepEqual(done.changes, []);
   assert.equal(done.answer.made, 0);
 });
@@ -79,10 +79,10 @@ test('a long subject is cut to a title', async () => {
 
 test('a pushed commit someone has since given settles links is accounted for; one beside an accounted item is merged into it', async () => {
   const items = [
-    { id: 'e_heard001', type: 'software.commit', props: { sha: sha('a'), accounted: false } },
-    { id: 'e_heard002', type: 'software.commit', props: { sha: sha('b'), accounted: false } },
-    { id: 'e_made0001', type: 'software.commit', props: { sha: sha('b') } },
-    { id: 'e_heard003', type: 'software.commit', props: { sha: sha('c'), accounted: false } },
+    { id: 'e_heard001', type: 'commit', props: { sha: sha('a'), accounted: false } },
+    { id: 'e_heard002', type: 'commit', props: { sha: sha('b'), accounted: false } },
+    { id: 'e_made0001', type: 'commit', props: { sha: sha('b') } },
+    { id: 'e_heard003', type: 'commit', props: { sha: sha('c'), accounted: false } },
   ];
   const done = await handler['github.commits']({}, ctxOver([], items, { e_heard001: ['e_task0001'] }));
   assert.deepEqual(

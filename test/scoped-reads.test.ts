@@ -12,27 +12,27 @@ const view = (l: Awaited<ReturnType<typeof fresh>>, who: typeof human, name: str
 test('a lens reads only what its filter includes: one that includes nothing is refused', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'House' },
-    { op: 'create', ref: 'f', type: 'software.feature', title: 'Roof' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Tiles' },
-    { op: 'create', ref: 'q', type: 'work.project', title: 'Garden' },
+    { op: 'create', ref: 'p', type: 'project', title: 'House' },
+    { op: 'create', ref: 'f', type: 'feature', title: 'Roof' },
+    { op: 'create', ref: 't', type: 'task', title: 'Tiles' },
+    { op: 'create', ref: 'q', type: 'project', title: 'Garden' },
     { op: 'link', type: 'part_of', from: 'f', to: 'p' },
     { op: 'link', type: 'part_of', from: 't', to: 'f' },
     { op: 'link', type: 'part_of', from: 'q', to: 't' },
   ]);
   await assert.rejects(view(l, human, 'flat'), /includes something/, 'never the whole map');
-  const top = await view(l, human, 'flat', { filter: { types: ['work.project'] } });
+  const top = await view(l, human, 'flat', { filter: { types: ['project'] } });
   assert.deepEqual(top.items.map((i: any) => i.title).sort(), ['Garden', 'House'], 'the types it names');
-  const tasks = await view(l, human, 'flat', { filter: { types: ['work.task'] } });
+  const tasks = await view(l, human, 'flat', { filter: { types: ['task'] } });
   assert.deepEqual(tasks.items.map((i: any) => i.title), ['Tiles']);
 });
 
 test('a graph with no focus is drawn from the newest links of each kind', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
-    { op: 'create', ref: 'c', type: 'work.task', title: 'C' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
+    { op: 'create', ref: 'c', type: 'task', title: 'C' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
   ]);
   const graph = await view(l, human, 'graph');
@@ -43,7 +43,7 @@ test('a graph with no focus is drawn from the newest links of each kind', async 
 test('an agent is told what changed as counts and the newest few, not the list', async () => {
   const l = await fresh();
   const since = new Date(Date.now() - 1000).toISOString();
-  await make(l, Array.from({ length: 8 }, (_, i) => ({ op: 'create' as const, type: 'work.task', title: `Task ${i}` })));
+  await make(l, Array.from({ length: 8 }, (_, i) => ({ op: 'create' as const, type: 'task', title: `Task ${i}` })));
   const forHuman = await view(l, human, 'changed_since', { since });
   const forAgent = await view(l, agent, 'changed_since', { since });
   assert.equal(forHuman.events.length, 8);
@@ -51,7 +51,7 @@ test('an agent is told what changed as counts and the newest few, not the list',
   assert.equal((await view(l, agent, 'changed_since', { since, limit: 8 })).events.length, 8, 'more when it asks');
 
   const { latest } = (await callTool(l, agent, 'watch', {})) as { latest: number };
-  await make(l, Array.from({ length: 7 }, (_, i) => ({ op: 'create' as const, type: 'work.task', title: `More ${i}` })));
+  await make(l, Array.from({ length: 7 }, (_, i) => ({ op: 'create' as const, type: 'task', title: `More ${i}` })));
   const heard = (await callTool(l, agent, 'watch', { after: latest })) as { changes: unknown[]; counts: Record<string, number>; more: number; latest: number };
   assert.deepEqual([heard.changes.length, heard.counts['entity.create'], heard.more, heard.latest > latest], [5, 7, 2, true]);
 });

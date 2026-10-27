@@ -6,9 +6,9 @@
   "requires": ["core"],
   "types": [
     {
-      "id": "work.project",
+      "id": "project",
       "altitude": "project",
-      "moved_from": ["project"],
+      "moved_from": ["work.project"],
       "public": true,
       "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
       "extends": "work",
@@ -23,8 +23,8 @@
       }
     },
     {
-      "id": "work.task",
-      "moved_from": ["task"],
+      "id": "task",
+      "moved_from": ["work.task"],
       "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Task",
@@ -39,8 +39,8 @@
       }
     },
     {
-      "id": "work.decision",
-      "moved_from": ["decision"],
+      "id": "decision",
+      "moved_from": ["work.decision"],
       "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
       "extends": "question",
       "title": "Decision",
@@ -55,8 +55,8 @@
       }
     },
     {
-      "id": "work.issue",
-      "moved_from": ["issue"],
+      "id": "issue",
+      "moved_from": ["work.issue"],
       "capabilities": { "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Issue",
@@ -70,15 +70,15 @@
       }
     },
     {
-      "id": "work.meeting",
-      "moved_from": ["meeting"],
+      "id": "meeting",
+      "moved_from": ["work.meeting"],
       "extends": "event",
       "title": "Meeting",
       "description": "An event with participants (use the involves relation)."
     },
     {
-      "id": "work.procedure",
-      "moved_from": ["procedure"],
+      "id": "procedure",
+      "moved_from": ["work.procedure"],
       "extends": "record",
       "title": "Procedure",
       "description": "How something is done: a checklist, playbook or rule. One a machine can run is a function.",
@@ -89,8 +89,8 @@
       }
     },
     {
-      "id": "work.file",
-      "moved_from": ["file"],
+      "id": "file",
+      "moved_from": ["work.file"],
       "extends": "place",
       "title": "File",
       "deliverable": true,
@@ -99,26 +99,26 @@
       "fields": { "path": { "type": "string" }, "url": { "type": "url" } }
     },
     {
-      "id": "work.idea",
-      "moved_from": ["idea"],
+      "id": "idea",
+      "moved_from": ["work.idea"],
       "extends": "question",
       "title": "Idea",
       "description": "Something we could do.",
       "statuses": { "open": ["raw", "exploring"], "closed": ["adopted", "dropped"] }
     },
     {
-      "id": "work.note",
-      "moved_from": ["note"],
+      "id": "note",
+      "moved_from": ["work.note"],
       "extends": "record",
       "title": "Note",
       "description": "Free-form knowledge that does not fit another type.",
       "statuses": { "open": ["current"], "closed": ["stale"] }
     },
     {
-      "id": "work.document",
+      "id": "document",
       "altitude": "stream",
       "public": true,
-      "moved_from": ["document"],
+      "moved_from": ["work.document"],
       "extends": "record",
       "title": "Document",
       "deliverable": true,
@@ -133,18 +133,18 @@
   ],
   "links": [
     {
-      "id": "work.owed_to",
-      "moved_from": ["owed_to"],
+      "id": "owed_to",
+      "moved_from": ["work.owed_to"],
       "extends": "involves",
       "title": "is owed to",
       "inverse": "is owed",
-      "from": ["work.task"],
+      "from": ["task"],
       "to": ["person", "company"],
       "description": "Makes a task a commitment to someone."
     },
     {
-      "id": "work.requested_by",
-      "moved_from": ["requested_by"],
+      "id": "requested_by",
+      "moved_from": ["work.requested_by"],
       "extends": "involves",
       "title": "was requested by",
       "inverse": "requested",
@@ -153,18 +153,18 @@
       "description": "Who asked for it."
     },
     {
-      "id": "work.addresses",
-      "moved_from": ["addresses"],
+      "id": "addresses",
+      "moved_from": ["work.addresses"],
       "extends": "about",
       "title": "addresses",
       "inverse": "is addressed by",
       "from": ["*"],
-      "to": ["work.issue"],
+      "to": ["issue"],
       "description": "Work meant to fix or reduce the issue."
     },
     {
-      "id": "work.based_on",
-      "moved_from": ["based_on"],
+      "id": "based_on",
+      "moved_from": ["work.based_on"],
       "extends": "about",
       "title": "is based on",
       "inverse": "informs",
@@ -173,24 +173,24 @@
       "description": "A decision or plan rests on this result or source."
     },
     {
-      "id": "work.governed_by",
-      "moved_from": ["governed_by"],
+      "id": "governed_by",
+      "moved_from": ["work.governed_by"],
       "extends": "about",
       "title": "is governed by",
       "inverse": "governs",
       "from": ["*"],
-      "to": ["work.procedure", "work.decision"],
+      "to": ["procedure", "decision"],
       "description": "The rule or procedure that applies."
     }
   ],
   "views": [
-    { "form": "screen", "id": "work.figure", "title": "Figure", "on": ["work.note", "work.file"], "pieces": [{ "piece": "figure" }] },
-    { "form": "screen", "id": "work.reading", "title": "Reading", "on": ["work.document"], "pieces": [{ "piece": "document" }] },
+    { "form": "screen", "id": "work.figure", "title": "Figure", "on": ["note", "file"], "pieces": [{ "piece": "figure" }] },
+    { "form": "screen", "id": "work.reading", "title": "Reading", "on": ["document"], "pieces": [{ "piece": "document" }] },
     {
       "form": "screen",
       "id": "work.tokens",
       "title": "Tokens for this",
-      "on": ["work.project"],
+      "on": ["project"],
       "pieces": [{ "piece": "token_ask" }, { "piece": "token" }]
     }
   ],
@@ -198,7 +198,7 @@
     {
       "id": "work.reading",
       "title": "Reading a document",
-      "on": ["work.document"],
+      "on": ["document"],
       "props": { "page": { "picture": false, "notes": "whole" }, "notes": { "measure": "reader_measure" } }
     },
     {

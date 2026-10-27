@@ -20,8 +20,8 @@ test('the canonical form is RFC 8785, and a sealed value is hashed by its digest
 test('every change set is appended as facts, chained, in the transaction that writes it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Log' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Chain it', body: 'Part of {p}.', props: { priority: 'high' } },
+    { op: 'create', ref: 'p', type: 'project', title: 'Log' },
+    { op: 'create', ref: 't', type: 'task', title: 'Chain it', body: 'Part of {p}.', props: { priority: 'high' } },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
   const [first] = await all(l);
@@ -30,7 +30,7 @@ test('every change set is appended as facts, chained, in the transaction that wr
   assert.deepEqual(first.actor, { id: 'human:test' });
   assert.equal(first.hash, entryHash((await stored(l.db))[0]), 'the hash of the entry as stored, its words sealed');
   const t = first.facts.filter((f) => f[1] === made.t);
-  assert.deepEqual(t.map((f) => f.slice(2)), [['type', 'work.task'], ['title', 'Chain it'], ['body', `Part of ${made.p}.`], ['status', 'todo'], ['visibility', 'private'], ['priority', 'high']]);
+  assert.deepEqual(t.map((f) => f.slice(2)), [['type', 'task'], ['title', 'Chain it'], ['body', `Part of ${made.p}.`], ['status', 'todo'], ['visibility', 'private'], ['priority', 'high']]);
   assert.deepEqual(first.facts.find((f) => f[2] === 'link')!.slice(3), [['part_of', made.t, made.p]]);
 
   await make(l, [{ op: 'update', id: made.t, status: 'doing', props: { priority: null } }]);
@@ -49,7 +49,7 @@ test('every change set is appended as facts, chained, in the transaction that wr
 
 test('the log takes no update and no delete, from anyone', async () => {
   const l = await fresh();
-  await make(l, [{ op: 'create', type: 'work.task', title: 'Kept' }]);
+  await make(l, [{ op: 'create', type: 'task', title: 'Kept' }]);
   for (const sql of [`update log_entry set id = 'c_x'`, `delete from log_entry`, `update log_fact set value = '"x"'`, `delete from log_fact`, `truncate log_fact`, `truncate log_entry cascade`]) {
     await assert.rejects(l.db.query(sql), /append-only/, sql);
   }
@@ -66,8 +66,8 @@ test('the log takes no update and no delete, from anyone', async () => {
 
 test('a held change waits on a known position; approving appends what it showed, rejecting appends that', async () => {
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 'p', type: 'work.project', title: 'Log' }]);
-  const held = (await l.change(agent, { reason: 'More work', ops: [{ op: 'create', ref: 'n', type: 'work.task', title: 'New' }, { op: 'link', type: 'part_of', from: 'n', to: made.p }], source: { uri: 'docs/log.md' } })) as { proposal: string; held_by: { rule: string } };
+  const made = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'Log' }]);
+  const held = (await l.change(agent, { reason: 'More work', ops: [{ op: 'create', ref: 'n', type: 'task', title: 'New' }, { op: 'link', type: 'part_of', from: 'n', to: made.p }], source: { uri: 'docs/log.md' } })) as { proposal: string; held_by: { rule: string } };
   const record = (await entry(l.db, held.proposal))!;
   assert.deepEqual([record.stream, record.pos, record.base, (record.held_by as { rule: string }).rule], ['pending', 1, 1, held.held_by.rule]);
   assert.equal(record.facts[0][2], 'type', 'what it would do, the source first');
@@ -88,7 +88,7 @@ test('a held change waits on a known position; approving appends what it showed,
 
 test('approving after the map moved: planned again, or refused as overtaken with the three values', async () => {
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 't', type: 'work.task', title: 'Moving', body: 'First.' }]);
+  const made = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Moving', body: 'First.' }]);
   // A note added to is planned on the note as it is now.
   const add = (await l.change(agent, { reason: 'More', ops: [{ op: 'update', id: made.t, append: 'Third.' }] })) as { proposal: string };
   await make(l, [{ op: 'update', id: made.t, append: 'Second.' }]);
@@ -115,10 +115,10 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const mine = l.as(me);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Rework' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Write the spec', owner: me, props: { priority: 'high' } },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'Write the spec again' },
-    { op: 'create', ref: 'c', type: 'work.task', title: 'Build it', confidence: 0.6 },
+    { op: 'create', ref: 'p', type: 'project', title: 'Rework' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Write the spec', owner: me, props: { priority: 'high' } },
+    { op: 'create', ref: 'b', type: 'task', title: 'Write the spec again' },
+    { op: 'create', ref: 'c', type: 'task', title: 'Build it', confidence: 0.6 },
     { op: 'create', ref: 'x', type: 'person', title: 'Sam' },
     { op: 'create', ref: 'y', type: 'person', title: 'Samuel' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
@@ -129,7 +129,7 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   ]);
   await l.change(human, { reason: 'Cited', source: { uri: 'docs/log.md', title: 'The spec', excerpt: 'Section 2' }, ops: [{ op: 'update', id: made.a, body: 'Sections 1 to 3.', status: 'doing' }] });
   const edit = (await l.change(human, { reason: 'Reshape', ops: [{ op: 'update', id: made.c, title: 'Build the stream', props: { priority: 'low' }, owner: made.x }, { op: 'archive', id: made.p }] })) as { changeset: string };
-  const hidden = (await mine.change(human, { reason: 'Mine', ops: [{ op: 'create', ref: 'h', type: 'work.task', title: 'Private to me', visibility: 'private' }] })) as { created: Record<string, string> };
+  const hidden = (await mine.change(human, { reason: 'Mine', ops: [{ op: 'create', ref: 'h', type: 'task', title: 'Private to me', visibility: 'private' }] })) as { created: Record<string, string> };
   await mine.change(human, { reason: 'Share it', ops: [{ op: 'update', id: hidden.created.h, visibility: 'shared' }] });
   const waits = (await l.get(made.c)).outgoing.find((r: any) => r.type === 'waits_on') as { relation: string };
   await make(l, [{ op: 'unlink', relation: waits.relation }, { op: 'restore', id: made.p }]);
@@ -153,7 +153,7 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   await assert.rejects(undo(l, human, { changeset: edit.changeset }), /already been undone/);
 
   // Held changes approved, overtaken, declined; one approved with an op left out; a type defined.
-  const asked = (await l.change(agent, { reason: 'Next', ops: [{ op: 'create', ref: 'd', type: 'work.task', title: 'Replay it' }, { op: 'link', type: 'part_of', from: 'd', to: made.p }, { op: 'update', id: made.a, status: 'done' }] })) as { proposal: string };
+  const asked = (await l.change(agent, { reason: 'Next', ops: [{ op: 'create', ref: 'd', type: 'task', title: 'Replay it' }, { op: 'link', type: 'part_of', from: 'd', to: made.p }, { op: 'update', id: made.a, status: 'done' }] })) as { proposal: string };
   await l.decide(human, { proposal: asked.proposal, approve: true, except: ['#3'] });
   const declined = (await l.change(agent, { reason: 'No', ops: [{ op: 'archive', id: made.c }] })) as { proposal: string };
   await l.decide(human, { proposal: declined.proposal, approve: false });

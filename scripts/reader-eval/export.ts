@@ -16,7 +16,7 @@ const ROOT = join(import.meta.dirname, '..', '..');
 /** A path or ref as part of an address, as the reader writes it (packs/reader/github.js), so a recorded answer is found by the same key. */
 const within = (path: unknown) => String(path ?? '').split('/').map(encodeURIComponent).join('/');
 const registry = new Registry(join(ROOT, 'packs'));
-const WORK = ['work.task', 'work.decision', 'work.issue'].flatMap((t) => registry.family(t));
+const WORK = ['task', 'decision', 'issue'].flatMap((t) => registry.family(t));
 /** A type the packs here do not know (a workspace's own) is closed by the words most types use. */
 const CLOSED = ['done', 'dropped', 'resolved', 'wontfix', 'decided', 'cancelled', 'superseded', 'shipped', 'closed'];
 export const closedOf = (type: string): string[] => registry.type(type)?.statuses?.closed ?? CLOSED;
@@ -98,7 +98,7 @@ export async function exportFixtures(opts: { repo: string; since: string; dir: s
   // The pushes the reader read: each run names its branch and head; the push is the latest one heard like it.
   const pushes = events.filter((e) => e.action === 'repo.push' && e.target_id === repoId && e.detail?.after && e.detail?.branch);
   const runs = events
-    .filter((e) => e.actor === 'agent:reader' && e.action === 'entity.create' && e.target_type === 'sys.run')
+    .filter((e) => e.actor === 'agent:reader' && e.action === 'entity.create' && e.target_type === 'run')
     .flatMap((e) => {
       const m = /^Read the push to (.+) \(([0-9a-f]{7})\)$/.exec(e.detail?.title ?? '');
       const push = m && pushes.filter((p) => p.detail.branch === m[1] && String(p.detail.after).startsWith(m[2]) && p.ts <= e.ts).at(-1);

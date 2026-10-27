@@ -175,9 +175,9 @@ const growth = (dayIndex: number) => (0.5 + dayIndex / DAYS) * ((dayIndex + 3) %
     log(t, 'human:owner', 'entity.create', p.id, cs, 'The team', { type: 'person', title: name, status: 'active' });
   }
   for (let i = 0; i < 25; i++) {
-    const r = entity('software.repo', `${word()}-${word()}`, prose(1), 'active', true, t, { props: { remote: `github.com/team/${word()}-${i}`, default_branch: 'main' } });
+    const r = entity('repo', `${word()}-${word()}`, prose(1), 'active', true, t, { props: { remote: `github.com/team/${word()}-${i}`, default_branch: 'main' } });
     repos.push(r);
-    log(t, 'human:owner', 'entity.create', r.id, cs, 'The repositories', { type: 'software.repo', title: r.title, status: 'active' });
+    log(t, 'human:owner', 'entity.create', r.id, cs, 'The repositories', { type: 'repo', title: r.title, status: 'active' });
   }
   for (let i = 0; i < 30; i++) {
     const r = entity('resource', `The ${word()} ${pick(['licence', 'machine', 'staging site', 'render node'])} ${i}`, '', 'available', true, t, { props: { exclusive: true } });
@@ -185,35 +185,35 @@ const growth = (dayIndex: number) => (0.5 + dayIndex / DAYS) * ((dayIndex + 3) %
     log(t, 'human:owner', 'entity.create', r.id, cs, 'What is shared', { type: 'resource', title: r.title, status: 'available' });
   }
   for (const p of person.concat(person.slice(0, 2))) {
-    const c = entity('sys.connection', `${p.title.split(' ')[0]}'s Claude Code`, '', 'available', true, t, { props: { audit_log: `~/.claude/audit-${p.id}.jsonl` } });
+    const c = entity('connection', `${p.title.split(' ')[0]}'s Claude Code`, '', 'available', true, t, { props: { audit_log: `~/.claude/audit-${p.id}.jsonl` } });
     connections.push(c);
-    log(t, humanActor(p), 'entity.create', c.id, cs, 'A connection', { type: 'sys.connection', title: c.title, status: 'available' });
+    log(t, humanActor(p), 'entity.create', c.id, cs, 'A connection', { type: 'connection', title: c.title, status: 'available' });
   }
-  for (let i = 0; i < 300; i++) components.push({ id: newId('e'), type: 'software.component', title: `${word()} ${pick(['service', 'worker', 'store', 'queue', 'site'])} ${i}`, private_to: null, status: 'up', at: t });
+  for (let i = 0; i < 300; i++) components.push({ id: newId('e'), type: 'component', title: `${word()} ${pick(['service', 'worker', 'store', 'queue', 'site'])} ${i}`, private_to: null, status: 'up', at: t });
 }
 
 // ---- the facts: items made in change sets by people and agents, each with the life it will have ----
-const FACT_TYPES = { 'work.task': 600, 'work.note': 70, 'work.decision': 40, 'work.issue': 25, 'software.bug': 25, 'work.document': 30, 'software.feature': 25, 'work.idea': 20, 'work.meeting': 10, 'sys.source': 80, 'software.pull_request': 50, 'work.project': 2.4 };
+const FACT_TYPES = { 'task': 600, 'note': 70, 'decision': 40, 'issue': 25, 'bug': 25, 'document': 30, 'feature': 25, 'idea': 20, 'meeting': 10, 'source': 80, 'pull_request': 50, 'project': 2.4 };
 const LIFE: Record<string, { open: string[]; closed: string[]; updates: number; closes: number }> = {
-  'work.task': { open: ['todo', 'doing'], closed: ['done', 'done', 'done', 'dropped'], updates: 3, closes: 0.92 },
-  'work.issue': { open: ['open', 'investigating'], closed: ['resolved', 'resolved', 'wontfix'], updates: 3, closes: 0.85 },
-  'software.bug': { open: ['open', 'investigating'], closed: ['resolved', 'resolved', 'wontfix'], updates: 3, closes: 0.85 },
-  'software.feature': { open: ['planned', 'building'], closed: ['shipped', 'shipped', 'dropped'], updates: 5, closes: 0.8 },
-  'software.pull_request': { open: ['open'], closed: ['merged', 'merged', 'merged', 'closed'], updates: 2, closes: 0.97 },
-  'work.decision': { open: ['open'], closed: ['decided'], updates: 2, closes: 0.8 },
-  'work.idea': { open: ['raw', 'exploring'], closed: ['adopted', 'dropped'], updates: 1, closes: 0.5 },
-  'work.project': { open: ['planned', 'active'], closed: ['done', 'done', 'dropped'], updates: 8, closes: 0.6 },
-  'work.note': { open: ['current'], closed: ['stale'], updates: 2, closes: 0.1 },
-  'work.document': { open: ['draft', 'ready'], closed: ['superseded'], updates: 4, closes: 0.15 },
-  'work.meeting': { open: ['upcoming'], closed: ['happened'], updates: 1, closes: 0.95 },
-  'sys.source': { open: ['recorded'], closed: ['removed'], updates: 0, closes: 0 },
+  'task': { open: ['todo', 'doing'], closed: ['done', 'done', 'done', 'dropped'], updates: 3, closes: 0.92 },
+  'issue': { open: ['open', 'investigating'], closed: ['resolved', 'resolved', 'wontfix'], updates: 3, closes: 0.85 },
+  'bug': { open: ['open', 'investigating'], closed: ['resolved', 'resolved', 'wontfix'], updates: 3, closes: 0.85 },
+  'feature': { open: ['planned', 'building'], closed: ['shipped', 'shipped', 'dropped'], updates: 5, closes: 0.8 },
+  'pull_request': { open: ['open'], closed: ['merged', 'merged', 'merged', 'closed'], updates: 2, closes: 0.97 },
+  'decision': { open: ['open'], closed: ['decided'], updates: 2, closes: 0.8 },
+  'idea': { open: ['raw', 'exploring'], closed: ['adopted', 'dropped'], updates: 1, closes: 0.5 },
+  'project': { open: ['planned', 'active'], closed: ['done', 'done', 'dropped'], updates: 8, closes: 0.6 },
+  'note': { open: ['current'], closed: ['stale'], updates: 2, closes: 0.1 },
+  'document': { open: ['draft', 'ready'], closed: ['superseded'], updates: 4, closes: 0.15 },
+  'meeting': { open: ['upcoming'], closed: ['happened'], updates: 1, closes: 0.95 },
+  'source': { open: ['recorded'], closed: ['removed'], updates: 0, closes: 0 },
 };
 const authorityOf = (actor: string, p: Item) => (actor.startsWith('agent:') ? { of: 'agent', who: actor, basis: sentence() } : { of: 'human', who: actor, basis: `${p.title} in the web UI` });
 
 function makeFact(type: string, at: number, actor: string, by: Item, cs: string, reason: string, source?: Item) {
   const life = LIFE[type];
-  const isProject = type === 'work.project';
-  const body = type === 'work.document' ? sections(3 + int(5)) : type === 'work.note' ? sections(1 + int(3)) : type === 'sys.source' ? sentence() : prose(1 + int(3));
+  const isProject = type === 'project';
+  const body = type === 'document' ? sections(3 + int(5)) : type === 'note' ? sections(1 + int(3)) : type === 'source' ? sentence() : prose(1 + int(3));
   // Its changes to come: each some days after the one before, the last closing it when it closes.
   const steps: number[] = [];
   let t = at;
@@ -222,8 +222,8 @@ function makeFact(type: string, at: number, actor: string, by: Item, cs: string,
   const shown = steps.filter((s) => s <= END);
   const status = closes ? pick(life.closed) : shown.length ? life.open.at(-1)! : life.open[0];
   const archived = chance(0.02) ? at + expo(120) * DAY : undefined;
-  const props = type === 'work.decision' && closes ? { outcome: sentence(), rationale: sentence() } : type === 'work.task' && chance(0.2) ? { due: iso(at + expo(20) * DAY).slice(0, 10), priority: pick(['high', 'medium', 'low']) } : {};
-  const item = entity(type, isProject ? `${word()[0].toUpperCase()}${word().slice(1)} ${word()} project` : type === 'sys.source' ? `${by.title}, ${iso(at).slice(0, 10)}: ${word()} ${word()}` : title(), body, status, !closes, at, {
+  const props = type === 'decision' && closes ? { outcome: sentence(), rationale: sentence() } : type === 'task' && chance(0.2) ? { due: iso(at + expo(20) * DAY).slice(0, 10), priority: pick(['high', 'medium', 'low']) } : {};
+  const item = entity(type, isProject ? `${word()[0].toUpperCase()}${word().slice(1)} ${word()} project` : type === 'source' ? `${by.title}, ${iso(at).slice(0, 10)}: ${word()} ${word()}` : title(), body, status, !closes, at, {
     owner: chance(0.4) ? by.id : undefined, private_to: chance(0.12) ? by.id : null, props, source: source?.id, updated: shown.at(-1) ?? at, archived: archived && archived <= END ? archived : undefined,
   });
   items.push(item);
@@ -248,21 +248,21 @@ function factChangeset(dayIndex: number) {
   const actor = human ? humanActor(by) : `agent:claude-code/claude-code:${word()}-${word()}-${int(1e6).toString(36)}`;
   const cs = newId('c');
   const reason = prose(1 + int(2));
-  const source = chance(0.3) ? makeFact('sys.source', at, actor, by, cs, 'Source of this change') : undefined;
+  const source = chance(0.3) ? makeFact('source', at, actor, by, cs, 'Source of this change') : undefined;
   for (let n = 1 + count(expo(2.5)); n > 0; n--) {
     const type = weighted(FACT_TYPES);
-    if (type === 'sys.source') continue;
+    if (type === 'source') continue;
     const item = makeFact(type, at, actor, by, cs, reason, source);
     const authority = authorityOf(actor, by);
     const project = projects.length ? pick(projects.filter((p) => p.until > at).slice(-60).concat(projects.slice(-5))).item : undefined;
     const unlinked = () => (chance(0.06) ? at + expo(30) * DAY : undefined);
-    if (type === 'work.project') {
+    if (type === 'project') {
       if (project && chance(0.15)) link('part_of', item, project, at, actor, cs, reason, { authority });
-      if (chance(0.3)) link('software.lives_in', item, pick(repos), at, actor, cs, reason, { authority });
+      if (chance(0.3)) link('lives_in', item, pick(repos), at, actor, cs, reason, { authority });
       projects.push({ item, until: at + (60 + expo(300)) * DAY });
       continue;
     }
-    if (type === 'work.task') {
+    if (type === 'task') {
       const parent = chance(0.2) && recentTasks.length ? pick(recentTasks) : project;
       if (parent) link('part_of', item, parent, at, actor, cs, reason, { authority, until: unlinked() });
       if (recentTasks.length && chance(0.3)) link('depends_on', item, pick(recentTasks.slice(-400)), at, actor, cs, reason, { authority, until: unlinked() });
@@ -270,9 +270,9 @@ function factChangeset(dayIndex: number) {
       recentTasks.push(item);
       if (recentTasks.length > 3000) recentTasks.splice(0, 1000);
     } else if (project) link('part_of', item, project, at, actor, cs, reason, { authority, until: unlinked() });
-    if (['work.document', 'work.decision', 'work.note'].includes(type) && recentTasks.length && chance(0.5)) link('about', item, pick(recentTasks), at, actor, cs, reason, { authority });
-    if (type === 'software.feature') recentFeatures.push(item);
-    if (type === 'software.pull_request' && recentTasks.length) link('link', item, pick(recentTasks.slice(-200)), at, actor, cs, reason, { authority });
+    if (['document', 'decision', 'note'].includes(type) && recentTasks.length && chance(0.5)) link('about', item, pick(recentTasks), at, actor, cs, reason, { authority });
+    if (type === 'feature') recentFeatures.push(item);
+    if (type === 'pull_request' && recentTasks.length) link('link', item, pick(recentTasks.slice(-200)), at, actor, cs, reason, { authority });
   }
 }
 
@@ -283,8 +283,8 @@ function release(dayIndex: number) {
   const actor = humanActor(by);
   const cs = newId('c');
   const happens = at + expo(20) * DAY;
-  const item = entity('software.release', `Release ${int(9)}.${int(30)}`, prose(1), happens <= END ? 'happened' : 'upcoming', happens > END, at, { props: { version: `${int(9)}.${int(30)}.0`, at: iso(happens).slice(0, 10) }, updated: Math.min(happens, END) });
-  log(at, actor, 'entity.create', item.id, cs, 'The next release', { type: 'software.release', title: item.title, status: 'upcoming' });
+  const item = entity('release', `Release ${int(9)}.${int(30)}`, prose(1), happens <= END ? 'happened' : 'upcoming', happens > END, at, { props: { version: `${int(9)}.${int(30)}.0`, at: iso(happens).slice(0, 10) }, updated: Math.min(happens, END) });
+  log(at, actor, 'entity.create', item.id, cs, 'The next release', { type: 'release', title: item.title, status: 'upcoming' });
   for (let n = 5 + int(25); n > 0 && recentTasks.length; n--) link('depends_on', item, pick(recentTasks.slice(-300)), at, actor, cs, 'What it waits for');
   for (let n = 1 + int(4); n > 0 && recentFeatures.length; n--) link('ships', item, pick(recentFeatures.slice(-40)), at, actor, cs, 'What it ships');
   if (happens <= END) log(happens, actor, 'entity.update', item.id, newId('c'), 'Released', { title: item.title, changes: { status: { from: 'upcoming', to: 'happened' } } });
@@ -301,14 +301,14 @@ function run(dayIndex: number) {
   const status = open ? 'running' : weighted({ finished: 90, failed: 5, cancelled: 5 });
   const story = Array.from({ length: count(expo(4)) }, (_, n) => ({ n: n + 1, at: iso(at + (n + 1) * 120_000), said: prose(1), about: task ? [task.id] : [], links: [], ...(chance(0.2) && { finding: true }) }));
   const tokens = Math.round(expo(120_000));
-  const item = entity('sys.run', task?.title ?? `Session ${word()} ${word()}`, '', status, open, at, {
+  const item = entity('run', task?.title ?? `Session ${word()} ${word()}`, '', status, open, at, {
     private_to: p.id, updated: Math.min(ends, END),
     props: { surface: 'claude-code', session_id: newId('s'), branch: `claude/${word()}-${word()}`, cwd: `/work/${word()}`, started_by: humanActor(p), last_seen: iso(Math.min(ends, END)), tokens_used: tokens, cost_usd: Math.round(tokens * 0.0009) / 100, turns: 1 + int(80), active: open, story },
   });
   const cs = newId('c');
-  log(at, actor, 'entity.create', item.id, cs, 'Session started', { type: 'sys.run', title: item.title, status: 'running' });
-  if (task) link('sys.works_on', item, task, at, actor, cs, 'Session started');
-  link('software.lives_in', item, pick(repos), at, actor, cs, 'Session started');
+  log(at, actor, 'entity.create', item.id, cs, 'Session started', { type: 'run', title: item.title, status: 'running' });
+  if (task) link('works_on', item, task, at, actor, cs, 'Session started');
+  link('lives_in', item, pick(repos), at, actor, cs, 'Session started');
   if (chance(0.3)) {
     const resource = pick(resources);
     const until = at + expo(25) * 60_000;
@@ -328,9 +328,9 @@ function notification(dayIndex: number) {
   const read = at + expo(1.5) * DAY;
   const isRead = chance(0.85) && read <= END;
   const from = recentRuns.length && chance(0.7) ? `agent:claude-code/claude-code:${word()}` : 'system';
-  const item = entity('sys.notification', `${pick(['Waiting on you:', 'Done:', 'Blocked:', 'Gone quiet:', 'Pushed:'])} ${title()}`, prose(1), isRead ? 'read' : 'unread', !isRead, at, { private_to: p.id, updated: isRead ? read : at, props: { level: weighted({ info: 80, warning: 18, error: 2 }), from } });
+  const item = entity('notification', `${pick(['Waiting on you:', 'Done:', 'Blocked:', 'Gone quiet:', 'Pushed:'])} ${title()}`, prose(1), isRead ? 'read' : 'unread', !isRead, at, { private_to: p.id, updated: isRead ? read : at, props: { level: weighted({ info: 80, warning: 18, error: 2 }), from } });
   const cs = newId('c');
-  log(at, from, 'entity.create', item.id, cs, 'Notification', { type: 'sys.notification', title: item.title, status: 'unread' });
+  log(at, from, 'entity.create', item.id, cs, 'Notification', { type: 'notification', title: item.title, status: 'unread' });
   if (recentTasks.length && chance(0.7)) link('about', item, pick(recentTasks.slice(-1000)), at, from, cs, 'Notification');
   if (isRead) log(read, humanActor(p), 'entity.update', item.id, newId('c'), 'Read', { title: item.title, changes: { status: { from: 'unread', to: 'read' } } });
 }
@@ -370,7 +370,7 @@ function proposal(dayIndex: number) {
   const status = decided > END ? 'pending' : weighted({ approved: 70, rejected: 25, superseded: 5 });
   const id = newId('p');
   const reason = prose(1);
-  const ops = Array.from({ length: 1 + int(4) }, () => (recentTasks.length && chance(0.6) ? { op: 'update', id: pick(recentTasks).id, append: sentence() } : { op: 'create', ref: `n${int(9)}`, type: 'work.task', title: title() }));
+  const ops = Array.from({ length: 1 + int(4) }, () => (recentTasks.length && chance(0.6) ? { op: 'update', id: pick(recentTasks).id, append: sentence() } : { op: 'create', ref: `n${int(9)}`, type: 'task', title: title() }));
   buffers.proposal.push([id, iso(at), actor, reason, json(ops), status, status === 'pending' ? null : status === 'superseded' ? 'agent:pelago' : humanActor(p), status === 'pending' ? null : iso(decided), null, json({ rule: 'agent_changes' })]);
   log(at, actor, 'proposal.create', null, null, reason, { proposal: id, ops: ops.length, held_by: 'agent_changes' }, 'pelago', p.id);
   if (status !== 'pending') log(decided, status === 'superseded' ? 'agent:pelago' : humanActor(p), `proposal.${status === 'approved' ? 'approve' : status === 'rejected' ? 'reject' : 'supersede'}`, null, null, reason, { proposal: id, proposed_by: actor }, 'pelago', p.id);
@@ -381,7 +381,7 @@ const RATES: [number, (d: number) => void][] = [[155, factChangeset], [300, run]
 const t0 = performance.now();
 for (today = 0; today < DAYS; today++) {
   const g = growth(today);
-  if (today === 0) for (let i = 0; i < 40; i++) projects.push({ item: makeFact('work.project', START + 9 * 3_600_000, 'human:owner', person[0], newId('c'), 'The projects we start with'), until: END + DAY });
+  if (today === 0) for (let i = 0; i < 40; i++) projects.push({ item: makeFact('project', START + 9 * 3_600_000, 'human:owner', person[0], newId('c'), 'The projects we start with'), until: END + DAY });
   for (const [rate, make] of RATES) for (let n = count(rate * g); n > 0; n--) make(today);
   if (today === DAYS - 1) release(today); // one still to come, whatever the size
   day.push(...later[today]);
@@ -403,6 +403,6 @@ await mentionedAll(db);
 process.stderr.write('analysing\n');
 await db.query('analyze');
 const counts = (await db.query<Record<string, number>>(`select (select count(*) from entity)::int as items, (select count(*) from relation)::int as links, (select count(*) from event)::int as events, (select count(*) from proposal)::int as proposals`)).rows[0];
-const facts = (await db.query<{ n: number }>(`select count(*)::int as n from entity where type not in ('sys.run', 'sys.notification', 'software.component', 'sys.connection', 'resource')`)).rows[0].n;
+const facts = (await db.query<{ n: number }>(`select count(*)::int as n from entity where type not in ('run', 'notification', 'component', 'connection', 'resource')`)).rows[0].n;
 console.log(JSON.stringify({ seed: SEED, end: iso(END), days: DAYS, ...counts, facts, seconds: Math.round((performance.now() - t0) / 1000) }));
 await db.close();

@@ -23,10 +23,10 @@ const server = process.env.PELAGO_TEST_DATABASE_URL;
 async function aMap(l: Archipelago) {
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Move it' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Replay the log', owner: me, body: 'Entry by entry.' },
-    { op: 'create', ref: 'u', type: 'work.task', title: 'Compare both sides' },
-    { op: 'create', ref: 'q', type: 'work.decision', title: 'Where does it move?' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Move it' },
+    { op: 'create', ref: 't', type: 'task', title: 'Replay the log', owner: me, body: 'Entry by entry.' },
+    { op: 'create', ref: 'u', type: 'task', title: 'Compare both sides' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Where does it move?' },
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam Quill' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'link', type: 'part_of', from: 'u', to: 'p' },
@@ -40,7 +40,7 @@ async function aMap(l: Archipelago) {
   await l.change(agent, { reason: 'Later', ops: [{ op: 'update', id: made.p, props: { hub_at: 4 } }] });
   const edit = (await l.change(human, { reason: 'Reshape', ops: [{ op: 'update', id: made.u, title: 'Compare' }, { op: 'archive', id: made.u }] })) as { changeset: string };
   await undo(l, human, { changeset: edit.changeset });
-  const twin = (await make(l, [{ op: 'create', ref: 'x', type: 'work.task', title: 'Replay it' }, { op: 'link', type: 'part_of', from: 'x', to: made.p }])).x;
+  const twin = (await make(l, [{ op: 'create', ref: 'x', type: 'task', title: 'Replay it' }, { op: 'link', type: 'part_of', from: 'x', to: made.p }])).x;
   await make(l, [{ op: 'merge', keep: made.t, drop: twin }]);
   // A forget rewrites an operational entry that names Sam (src/opseal.ts), after the one that follows it: they still go across in their order.
   await l.record('claims', 'human:test', [['+', made.sam, 'note', 'Reviews on Fridays']]);
@@ -123,11 +123,11 @@ test('a move refuses a target that holds anything, a source whose chain is broke
   const l = await fresh();
   await aMap(l);
   const full = await fresh();
-  await make(full, [{ op: 'create', type: 'work.task', title: 'Already here' }]);
+  await make(full, [{ op: 'create', type: 'task', title: 'Already here' }]);
   await assert.rejects(move(l.db, full.db, l.registry), /not empty/);
 
   const broken = await fresh();
-  await make(broken, [{ op: 'create', type: 'work.task', title: 'One' }]);
+  await make(broken, [{ op: 'create', type: 'task', title: 'One' }]);
   // Forged as the next entry, as the chain's trigger asks (src/partitions.ts), with a hash its contents do not make.
   await broken.db.query(
     `insert into log_entry (stream, pos, id, at, head, prev, hash)
@@ -152,7 +152,7 @@ test('a map is moved from the command line, with its server’s key, and nothing
     const { registry } = await fresh();
     const db = await openDb(join(dir, 'data'));
     const l = new Archipelago(db, registry);
-    await make(l, [{ op: 'create', type: 'work.task', title: 'Moved from the command line', body: 'Sealed.' }]);
+    await make(l, [{ op: 'create', type: 'task', title: 'Moved from the command line', body: 'Sealed.' }]);
     await db.close();
     const cli = (args: string[], secrets = key) =>
       spawnSync(process.execPath, [join(import.meta.dirname, '..', 'src', 'cli.ts'), 'move', ...args], { encoding: 'utf8', env: { ...process.env, PELAGO_SECRETS_KEY: secrets, PELAGO_DATA: join(dir, 'data') } });

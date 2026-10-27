@@ -6,7 +6,8 @@
   "requires": ["core"],
   "types": [
     {
-      "id": "sys.source",
+      "id": "source",
+      "moved_from": ["sys.source"],
       "extends": "system",
       "title": "Source",
       "description": "The original input a fact came from: a file, an email, a commit, a conversation.",
@@ -17,7 +18,8 @@
       }
     },
     {
-      "id": "sys.connection",
+      "id": "connection",
+      "moved_from": ["sys.connection"],
       "extends": "resource",
       "title": "Connection",
       "description": "An external tool, such as an MCP server. Status says whether it is reachable right now.",
@@ -28,7 +30,8 @@
       }
     },
     {
-      "id": "sys.run",
+      "id": "run",
+      "moved_from": ["sys.run"],
       "extends": "system",
       "title": "Run",
       "description": "One agent session or one execution of an automation.",
@@ -51,7 +54,8 @@
       }
     },
     {
-      "id": "sys.notification",
+      "id": "notification",
+      "moved_from": ["sys.notification"],
       "extends": "system",
       "title": "Notification",
       "description": "A message for the human, from an agent, an automation or the system.",
@@ -62,7 +66,8 @@
       }
     },
     {
-      "id": "sys.automation",
+      "id": "automation",
+      "moved_from": ["sys.automation"],
       "extends": "system",
       "title": "Automation",
       "description": "A trigger that fires an action. Only fires while its status is enabled.",
@@ -83,7 +88,8 @@
       }
     },
     {
-      "id": "sys.shared_document",
+      "id": "shared_document",
+      "moved_from": ["sys.shared_document"],
       "extends": "record",
       "public": true,
       "title": "Shared document",
@@ -100,11 +106,12 @@
   ],
   "links": [
     {
-      "id": "sys.works_on",
+      "id": "works_on",
+      "moved_from": ["sys.works_on"],
       "extends": "about",
       "title": "is working on",
       "inverse": "is being worked on by",
-      "from": ["sys.run", "agent", "person"],
+      "from": ["run", "agent", "person"],
       "to": ["*"],
       "description": "What a run or actor is doing right now."
     }
@@ -112,10 +119,10 @@
   "rules": [
     {
       "id": "automations",
-      "when": { "actor": "agent", "op": ["create", "update", "restore"], "type": "sys.automation" },
+      "when": { "actor": "agent", "op": ["create", "update", "restore"], "type": "automation" },
       "then": "hold",
       "say": "An automation acts later on the authority of the human who approved it: making, changing or bringing one back is theirs."
     }
   ],
-  "views": [{ "form": "screen", "id": "sys.shared_reading", "title": "Reading", "on": ["sys.shared_document"], "pieces": [{ "piece": "document" }] }]
+  "views": [{ "form": "screen", "id": "sys.shared_reading", "title": "Reading", "on": ["shared_document"], "pieces": [{ "piece": "document" }] }]
 }

@@ -13,12 +13,12 @@ test('every projection made again from the log is the live one', async () => {
   const l = await fresh();
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const made = await make(l, [
-    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Projections' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Project the facts', owner: me },
-    { op: 'create', ref: 'u', type: 'work.task', title: 'Read events from the log' },
-    { op: 'create', ref: 'q', type: 'work.decision', title: 'Keep the event table?' },
-    { op: 'link', type: 'software.lives_in', from: 'p', to: 'repo' },
+    { op: 'create', ref: 'repo', type: 'repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
+    { op: 'create', ref: 'p', type: 'project', title: 'Projections' },
+    { op: 'create', ref: 't', type: 'task', title: 'Project the facts', owner: me },
+    { op: 'create', ref: 'u', type: 'task', title: 'Read events from the log' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Keep the event table?' },
+    { op: 'link', type: 'lives_in', from: 'p', to: 'repo' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'link', type: 'part_of', from: 'u', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'u', to: 't' },
@@ -27,7 +27,7 @@ test('every projection made again from the log is the live one', async () => {
   // Two ops on one item in one change: the second is planned on what the first did.
   await make(l, [{ op: 'update', id: made.t, status: 'doing' }, { op: 'update', id: made.t, append: 'Op by op.' }, { op: 'update', id: made.t, append: 'In order.' }]);
   assert.equal((await l.entity(made.t))!.body, 'Op by op.\n\nIn order.');
-  const twice = await make(l, [{ op: 'create', ref: 's', type: 'work.task', title: 'Cited twice' }, { op: 'link', type: 'part_of', from: 's', to: made.p }, { op: 'link', type: 'part_of', from: 's', to: made.p }]);
+  const twice = await make(l, [{ op: 'create', ref: 's', type: 'task', title: 'Cited twice' }, { op: 'link', type: 'part_of', from: 's', to: made.p }, { op: 'link', type: 'part_of', from: 's', to: made.p }]);
   assert.equal((await l.get(twice.s)).outgoing.length, 1, 'a link made twice in one change is made once');
 
   // A session at work, through the tools, as an agent does it.
@@ -66,11 +66,11 @@ test('every projection made again from the log is the live one', async () => {
 test('what is inside what, all the way down, follows every link made, ended and moved, and is read by index', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'top', type: 'work.project', title: 'Top' },
-    { op: 'create', ref: 'mid', type: 'work.project', title: 'Middle' },
-    { op: 'create', ref: 'other', type: 'work.project', title: 'Other' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A', body: 'See {mid} first.' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'top', type: 'project', title: 'Top' },
+    { op: 'create', ref: 'mid', type: 'project', title: 'Middle' },
+    { op: 'create', ref: 'other', type: 'project', title: 'Other' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A', body: 'See {mid} first.' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
     { op: 'link', type: 'part_of', from: 'mid', to: 'top' },
     { op: 'link', type: 'part_of', from: 'a', to: 'mid' },
     { op: 'link', type: 'part_of', from: 'b', to: 'a' },
@@ -95,8 +95,8 @@ test('what a change set did is read from the log, not kept a second time as even
   const l = await fresh();
   const start = await latestSeq(l);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'History' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Read it back' },
+    { op: 'create', ref: 'p', type: 'project', title: 'History' },
+    { op: 'create', ref: 't', type: 'task', title: 'Read it back' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
   await l.change(human, { reason: 'Started', ops: [{ op: 'update', id: made.t, status: 'doing', title: 'Read it back from the log' }] });
@@ -119,7 +119,7 @@ test('what a change set did is read from the log, not kept a second time as even
 
   // An event about what a viewer may not see is not theirs to read.
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
-  const hidden = (await l.as(me).change(human, { reason: 'Mine', ops: [{ op: 'create', ref: 'h', type: 'work.task', title: 'Private', visibility: 'private' }] })) as { created: Record<string, string> };
+  const hidden = (await l.as(me).change(human, { reason: 'Mine', ops: [{ op: 'create', ref: 'h', type: 'task', title: 'Private', visibility: 'private' }] })) as { created: Record<string, string> };
   assert.ok((await readEvents(l.as(me).db, { target: hidden.created.h })).length === 1);
   assert.deepEqual(await readEvents(l.as('e_someone').db, { target: hidden.created.h }), []);
 

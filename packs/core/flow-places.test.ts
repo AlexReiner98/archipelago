@@ -16,14 +16,14 @@ for (const [name, file] of Object.entries(pack.drawings.find((d: any) => d.id ==
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
-const item = (id: string, title: string, kind = 'place') => ({ id, kind, type: 'software.part', title, place: 0, open: true, status: 'works', state, fields: {} });
+const item = (id: string, title: string, kind = 'place') => ({ id, kind, type: 'part', title, place: 0, open: true, status: 'works', state, fields: {} });
 const answer = {
   items: [item('e_hostzzzz', 'Machine'), item('e_cloudzzz', 'Cloud'), item('e_hookzzzz', 'Hook'), item('e_toolzzzz', 'Tool'), item('e_storezzz', 'Store'), item('e_taskzzzz', 'A task', 'work')],
   links: [
     { type: 'part_of', from: 'e_hookzzzz', to: 'e_hostzzzz' },
     { type: 'part_of', from: 'e_toolzzzz', to: 'e_hostzzzz' },
     { type: 'part_of', from: 'e_storezzz', to: 'e_cloudzzz' },
-    { type: 'software.calls', from: 'e_hookzzzz', to: 'e_storezzz' },
+    { type: 'calls', from: 'e_hookzzzz', to: 'e_storezzz' },
     { type: 'part_of', from: 'e_taskzzzz', to: 'e_hookzzzz' },
   ],
 };
