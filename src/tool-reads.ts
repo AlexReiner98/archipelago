@@ -253,6 +253,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       ...VIEW_INPUT,
       width: z.number().int().min(320).max(1920).optional().describe('The picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('Its height (750).'),
+      scheme: z.enum(['dark', 'light']).optional().describe('The theme it is drawn in, as a reader whose system is dark or light sees it (dark).'),
       fresh: z.boolean().optional().describe('Draw it again even when the map has not changed since the last look at it.'),
     },
     run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, await viewAddress(l, input), input),

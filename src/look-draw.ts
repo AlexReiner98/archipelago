@@ -43,19 +43,21 @@ const getBrowser = () => {
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Draw `address` (the app's page, in look mode) at this size, once the queue reaches it. */
-export function drawLook(address: string, pass: string, width: number, height: number): Promise<Drawn> {
-  const turn = queue.then(() => drawNow(address, pass, width, height));
+export function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light'): Promise<Drawn> {
+  const turn = queue.then(() => drawNow(address, pass, width, height, scheme));
   queue = turn.catch(() => {});
   return turn;
 }
 
-async function drawNow(address: string, pass: string, width: number, height: number): Promise<Drawn> {
+async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light'): Promise<Drawn> {
   clearTimeout(idle);
   const began = Date.now();
   const tab = await (await getBrowser()).tab();
   try {
     await tab.send('Page.enable');
     await tab.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+    // The page, and a style's code, take dark or light from the system's scheme: this one look's.
+    await tab.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
     // The pass is the page's token for this one look: put where the page reads its token, before any of its code runs.
     await tab.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('pelago-token', ${JSON.stringify(pass)}); } catch {}` });
     await tab.send('Page.navigate', { url: address });
