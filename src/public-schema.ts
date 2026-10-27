@@ -104,3 +104,17 @@ language sql stable security definer set search_path = public as $fn$
 $fn$;
 grant execute on function pelago_published_at(text, text[]), pelago_site_pages(text[]) to pelago_public;
 `;
+
+/**
+ * Step 26 (src/migrate.ts): a document shared with another workspace may be published there, when the admin who
+ * shares it says so (src/workspace-share.ts). The receiving workspace is given what it may publish through one
+ * function, and only while the share stands: the document and what it brings in, as the share shows them.
+ */
+export const SHARE_PUBLISHABLE = `
+alter table share add column if not exists publishable boolean not null default false;
+create or replace function pelago_workspace_publishable(share_id text, reader text) returns boolean
+language sql stable security definer set search_path = public as $fn$
+  select coalesce((select s.publishable from share s where s.id = share_id and s.to_workspace = reader and s.revoked_at is null), false)
+$fn$;
+grant execute on function pelago_workspace_publishable(text, text) to pelago_public;
+`;

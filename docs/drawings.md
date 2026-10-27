@@ -30,7 +30,7 @@ export function picture({ answer, style, reduced }, { measure, patch, open, fram
 ```
 
 - `answer` is the lens answer, `style` the style's fields, `reduced` whether the reader asked for less motion.
-- `measure(text, px, font)` is a text's width, as the page's canvas would give it.
+- `measure(text, px, font, role)` is a text's width, as the page's canvas would give it; given one of the style's text roles (`type`: weight, style, case, track), as that role sets it.
 - `patch(list)` changes what is drawn, at any time; `open(id)` opens an item's page; `frame()` resolves at the page's next frame, for what moves.
 - `scene` is `{ svg, key, bar, css, size: { width, height }, start }`, or `{ message }` when there is nothing to draw. A picture whose root is HTML, not an SVG (the grid's cards), or that says it is `flat` (the time axis, drawn to the page's width), is laid out by the page: not panned or zoomed, its key below it, and brought to the mark `focus` names.
 - `key` says what each mark the picture uses means, one row each: `{ glyph, label, item }`, `glyph` a small mark (an `svg` of its own, checked as every mark is, drawn in the scene's stylesheet), `label` its words, and `item`, when the row stands for an item, the id its row opens. The page draws the key in the one frame every key has: on the canvas always in sight, beside the picture in the room the bars leave (the fit leaves room for it), below a picture the page lays out, above a still one; and not at all where the style says `key: "hidden"` (core's house style says `shown`). A drawing names only what it draws: the flow a row for each shape, state and link type it uses, each link type in its colour. A drawing written before the key was data may still give `legend`, marks it lays out itself.

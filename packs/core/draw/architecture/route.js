@@ -91,7 +91,7 @@ export function route({ nodes, chains, layers, x, byId, order, colLeft, colRight
     : [...new Set(all.filter((n) => !n.dummy && n.home !== null).map((n) => n.home))].map((c) => {
     const mine = all.filter((n) => !n.dummy && n.home === c), ks = mine.map((n) => n.layer);
     const [k0, k1] = [Math.min(...ks), Math.max(...ks)];
-    const lo = Math.min(...mine.map((n) => x.get(n.id) - n.w / 2)), hi = Math.max(lo + measure(byId.get(c).title, PLACE_TEXT) + PLACE_NAME_PAD, ...mine.map((n) => x.get(n.id) + n.w / 2));
+    const lo = Math.min(...mine.map((n) => x.get(n.id) - n.w / 2)), hi = Math.max(lo + measure(byId.get(c).title, PLACE_TEXT, 'region') + PLACE_NAME_PAD, ...mine.map((n) => x.get(n.id) + n.w / 2));
     return { id: c, item: byId.get(c), health: health(byId.get(c)), x: lo - PAD, y: rowTop[k0] - HEAD, w: hi - lo + 2 * PAD, h: rowBottom[k1] - rowTop[k0] + HEAD + PAD };
   });
   const width = Math.max(...[...colRight.values()]) + PAD + MARGIN;

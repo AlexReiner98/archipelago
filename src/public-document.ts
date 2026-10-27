@@ -8,15 +8,18 @@
 // their names and states only. Nothing private (a section shows once it is shared with the workspace), nothing archived,
 // nothing of another workspace. What it does not give is scrubbed from the text as a link's is.
 
-import { forReader, SHARED, type Given, type Part } from './documents.ts';
+import { forReader, type Given, type Part } from './documents.ts';
 import type { Archipelago } from './pelago.ts';
 
 // What the database gives of it is pelago_public_document (src/public-schema.ts).
 
 const ID = /^e_[a-z0-9]{8}$/;
 
-/** The types a document is read whole as and can be public: a flavour that cannot be (an invoice) is left out. */
-export const readable = (l: Archipelago) => l.registry.drawnWith('document').filter((t) => t !== SHARED && l.registry.type(t)?.public);
+/**
+ * The types a document is read whole as and can be public: a flavour that cannot be (an invoice) is left out. A
+ * shared one is published only as its sender gives it (src/published-share.ts), never read here as its own.
+ */
+export const readable = (l: Archipelago) => l.registry.drawnWith('document').filter((t) => l.registry.type(t)?.public);
 
 /** A public document as anyone reads it, or null when there is no such public document. */
 export async function publicDocument(l: Archipelago, id: string, elsewhere?: Map<string, string>) {

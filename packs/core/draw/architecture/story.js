@@ -130,11 +130,16 @@ export function story({ answer, style, reduced }, tools) {
     if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
     return v;
   };
-  const measure = (text, px) => tools.measure(text, px, style.font);
-  const fit = (text, width, px) => {
-    if (measure(text, px) <= width) return text;
+  // A text is measured as it is drawn: in the plain face, or as one of the style's text roles (type): a place's name
+  // as a region.
+  const measure = (text, px, role) => {
+    const as = role && style.type?.[role];
+    return tools.measure(text, px, (as && style.faces?.[as.face]) || style.font, as);
+  };
+  const fit = (text, width, px, role) => {
+    if (measure(text, px, role) <= width) return text;
     let t = text;
-    while (t.length > 1 && measure(`${t}…`, px) > width) t = t.slice(0, -1);
+    while (t.length > 1 && measure(`${t}…`, px, role) > width) t = t.slice(0, -1);
     return `${t}…`;
   };
   // Each step laid out with the one before it as its prior, a flagged part made wider by its flag. A step that brings
@@ -223,8 +228,8 @@ export function story({ answer, style, reduced }, tools) {
   // A place's name is on its top edge, where no wire of the step comes in across it.
   const placeAt = (b, f) => {
     const x = b.x + shift, inset = z('place_name_inset'), high = z('place_name_height'), mid = b.y + inset + high / 2;
-    const text = fit(b.item.title, b.w - z('place_name_room'), z('place_text'));
-    const width = measure(text, z('place_text')) + z('place_name_room') - inset;
+    const text = fit(b.item.title, b.w - z('place_name_room'), z('place_text'), 'region');
+    const width = measure(text, z('place_text'), 'region') + z('place_name_room') - inset;
     const dx = nameLeft(x + inset, width, x + b.w - inset, b.y, b.y + inset + high, [...f.wires.values()].map(wireAt), inset) - (x + inset);
     return { box: { x, y: b.y, width: b.w, height: b.h }, n: { x: x + inset + dx, y: b.y + inset, width }, d: { cx: x + z('place_dot_x') + dx, cy: mid }, t: { x: x + z('place_text_x') + dx, y: mid }, text, title: b.item.title, flag: f.flags.get(b.id) ?? '' };
   };

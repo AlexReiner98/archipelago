@@ -2,7 +2,7 @@
 /* Light or dark as the reader's system is; the colours of each are the workspace's theme, sent with the page's data. */
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--public-bg, Canvas); color: var(--public-text, CanvasText); font: var(--text-6)/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { margin: 0; background: var(--public-bg, Canvas); color: var(--public-text, CanvasText); font: var(--text-6)/1.5 var(--face-text); }
 main { max-width: var(--public-most); margin: 0 auto; padding: var(--space-12) var(--space-9) var(--space-14); }
 h1 { font-size: var(--text-9); margin: 0; }
 h2 { font-size: var(--text-6); margin: 0; }

@@ -21,8 +21,8 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   // The page's colours are the house style's theme, light and dark alike, every name in both.
   const { light, dark } = workspace.style.theme;
   assert.deepEqual([typeof light.bg, typeof dark.bg, Object.keys(light).sort()], ['string', 'string', Object.keys(dark).sort()]);
-  // Every length the app, the reader and the public page read is one the house style names, and /layout.css says it.
-  const named = new Set([...Object.keys(light), ...Object.keys(workspace.style.lengths)].map((n) => n.replaceAll('_', '-')));
+  // Every length, face and text role the app, the reader and the public page read is one the house style names, and /layout.css says it.
+  const named = new Set([...Object.keys(light), ...Object.keys(workspace.style.lengths), ...Object.keys(workspace.style.faces).map((n) => `face_${n}`), ...Object.keys(workspace.style.type).flatMap((r) => ['family', 'weight', 'style', 'case', 'track'].map((p) => `type_${r}_${p}`))].map((n) => n.replaceAll('_', '-')));
   const sheet = lengthsSheet(l.registry.packs);
   for (const file of ['ui/style.css', 'ui/doc.css', 'ui/public.css']) {
     const css = readFileSync(file, 'utf8');
@@ -33,6 +33,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
     assert.deepEqual([...new Set(unnamed)], [], `${file} reads lengths the house style does not name`);
   }
   assert.match(sheet, /--space-5: 8px;/);
+  assert.match(sheet, /--face-chart: Georgia/);
   const project = await of(made.p);
   assert.deepEqual([project.style.page.picture, project.style.page.notes], [true, 'open'], 'a project has the house style');
   const doc = await of(made.d);

@@ -10,11 +10,15 @@ import { newId, type Q } from './db.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, otherMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
+import { unpublishShare } from './published-share.ts';
 
 // ---- the sending side ----------------------------------------------------
 
-/** Share a document with another workspace: it arrives there as an offer, and nothing is read until it is accepted. */
-export async function shareWithWorkspace(l: Archipelago, actor: Actor, input: { id: string; workspace: string }) {
+/**
+ * Share a document with another workspace: it arrives there as an offer, and nothing is read until it is accepted.
+ * With publish, the admin also lets that workspace publish it, as this map gives it (src/published-share.ts).
+ */
+export async function shareWithWorkspace(l: Archipelago, actor: Actor, input: { id: string; workspace: string; publish?: boolean }) {
   if (actor.kind !== 'human' || !actor.admin) throw new Error('Only an admin can share a document with another workspace.');
   if (input.workspace === l.workspace) throw new Error('That is this workspace: whoever may see the document here can read it already.');
   const doc = await l.entity(input.id);
@@ -27,28 +31,32 @@ export async function shareWithWorkspace(l: Archipelago, actor: Actor, input: { 
   const share = newId('s');
   const from = `workspace:${l.workspace}/${actor.name}`;
   const { created } = await target.apply(from, {
-    ops: [{ op: 'create', ref: 'd', type: SHARED, title: doc.title.slice(0, 60), status: 'offered', visibility: 'shared', body: `From the workspace "${l.workspace}". Set it to accepted to read it here; it is read from there each time.`, props: { from_workspace: l.workspace, share } }],
+    ops: [{ op: 'create', ref: 'd', type: SHARED, title: doc.title.slice(0, 60), status: 'offered', visibility: 'shared', body: `From the workspace "${l.workspace}". Set it to accepted to read it here; it is read from there each time.${input.publish ? ' It may be published here.' : ''}`, props: { from_workspace: l.workspace, share } }],
     reason: `Shared by the workspace "${l.workspace}"`,
   });
   try {
     await l.db.transaction(async (tx: Q) => {
-      await tx.query(`insert into share (id, workspace, hint, entity_id, made_by, to_workspace, to_item) values ($1, $2, $3, $4, $5, $6, $7)`, [share, l.workspace, input.workspace, doc.id, actor.person ?? actorId(actor), input.workspace, created.d]);
-      await l.log(tx, { actor: actorId(actor), action: 'share.workspace', target: doc.id, reason: `Shared with the workspace "${input.workspace}"`, detail: { share, to: input.workspace } });
+      await tx.query(`insert into share (id, workspace, hint, entity_id, made_by, to_workspace, to_item, publishable) values ($1, $2, $3, $4, $5, $6, $7, $8)`, [share, l.workspace, input.workspace, doc.id, actor.person ?? actorId(actor), input.workspace, created.d, input.publish === true]);
+      await l.log(tx, { actor: actorId(actor), action: 'share.workspace', target: doc.id, reason: `Shared with the workspace "${input.workspace}"`, detail: { share, to: input.workspace, publish: input.publish === true } });
     });
   } catch (err) {
     await target.apply('system', { ops: [{ op: 'archive', id: created.d }], reason: 'The share could not be recorded where it was made' }).catch(() => null);
     throw err;
   }
   await notify(target, { kind: 'agent', name: from }, { title: `"${doc.title}" was shared with this workspace`, about: created.d, body: `From the workspace "${l.workspace}". Accept it to read it here.` });
-  return { share, workspace: input.workspace, note: `Offered to "${input.workspace}": it can be read there once someone there accepts it, until it is revoked.` };
+  return { share, workspace: input.workspace, publish: input.publish === true, note: `Offered to "${input.workspace}": it can be read there once someone there accepts it${input.publish ? ', and published there' : ''}, until it is revoked.` };
 }
 
-/** Stop a link or a share with a workspace. A workspace's copy of the share is marked ended, so it is not left offered. */
+/**
+ * Stop a link or a share with a workspace. A workspace's copy of the share is marked ended, so it is not left offered,
+ * and taken down where it was published: what it may publish ends with the share.
+ */
 export async function endShare(l: Archipelago, actor: Actor, share: string) {
   const done = await revokeShare(l, actor, share);
   if (done.to_workspace && done.to_item) {
     const target = await otherMap(done.to_workspace);
     await target?.apply('system', { ops: [{ op: 'update', id: done.to_item, status: 'ended' }], reason: `The workspace "${l.workspace}" stopped sharing it` }).catch(() => null);
+    if (target) await unpublishShare(target, done.to_item).catch(() => null);
   }
   return { revoked: done.revoked, document: done.document };
 }

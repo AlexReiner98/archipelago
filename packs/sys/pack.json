@@ -85,13 +85,16 @@
     {
       "id": "sys.shared_document",
       "extends": "record",
+      "public": true,
       "title": "Shared document",
       "deliverable": true,
-      "description": "A document another workspace on this server shares with this one. It stays in that workspace's map and is read from there each time, while it is shared: set it to accepted to read it here, declined or ended to stop. Only the document and the items it brings in are read.",
+      "description": "A document another workspace on this server shares with this one. It stays in that workspace's map and is read from there each time, while it is shared: set it to accepted to read it here, declined or ended to stop. Only the document and the items it brings in are read. Where that workspace allows it, it can be published here, frozen as that workspace gives it.",
       "statuses": { "open": ["offered", "accepted"], "closed": ["declined", "ended"] },
       "fields": {
         "from_workspace": { "type": "string", "description": "The workspace that shares it.", "system": true },
-        "share": { "type": "string", "description": "The share it is read through, in that workspace.", "system": true }
+        "share": { "type": "string", "description": "The share it is read through, in that workspace.", "system": true },
+        "path": { "type": "string", "description": "Its address word once published here, as a document's: published only where the workspace that shares it allows it." },
+        "menu": { "type": "number", "description": "Its place in the site's header, lowest first, as a document's." }
       }
     }
   ],

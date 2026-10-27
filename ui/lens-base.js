@@ -2,6 +2,7 @@
 // colours and sizes a style may set. The drawings (flow, list, a style's own code) import this; lens.js picks one.
 
 import { h } from './base.js';
+import { typeVars } from './theme.js';
 
 export const LIT = [
   ['all', 'All', 'Everything in the view'],
@@ -18,7 +19,7 @@ const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh
 const NAME = /^[a-z][a-z0-9_]*$/;
 const asLength = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? `${v}px` : typeof v === 'string' && LENGTH.test(v) ? v : null);
 /**
- * A style's colours, sizes and numbers, handed to the stylesheet as --ln-<name>. Only a plain hex colour, a length
+ * A style's colours, sizes, numbers and faces, handed to the stylesheet as --ln-<name>. Only a plain hex colour, a length
  * or a number is: a style is written by anyone who can change the map. What the style does not say is not set: the
  * values are the presets' (each pack's styles), never the kernel's.
  */
@@ -29,7 +30,10 @@ export function dress(host, style) {
   for (const [name, value] of Object.entries(style.sizes ?? {})) if (NAME.test(name) && asLength(value)) set.set(`--ln-${name.replaceAll('_', '-')}`, asLength(value));
   for (const [name, value] of Object.entries(style.numbers ?? {})) if (NAME.test(name) && Number.isFinite(value)) set.set(`--ln-${name.replaceAll('_', '-')}`, String(value));
   if (typeof style.font === 'string' && !/[;{}]/.test(style.font)) set.set('--ln-font', style.font);
-  for (const name of [...host.style].filter((n) => n.startsWith('--ln-') && !set.has(n))) host.style.removeProperty(name);
+  // A view's own faces and text roles, over the page's: the same variables the page sets, so a drawing's text keeps
+  // to the roles the page's does.
+  if (style.faces || style.type) for (const [name, value] of typeVars(style.type, style.faces)) set.set(name, value);
+  for (const name of [...host.style].filter((n) => /^--(ln|face|type)-/.test(n) && !set.has(n))) host.style.removeProperty(name);
   for (const [name, value] of set) host.style.setProperty(name, value);
 }
 /** A size a drawing's code lays out by, in pixels: the style's, named by the house style. */

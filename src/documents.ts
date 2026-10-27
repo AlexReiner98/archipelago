@@ -104,8 +104,8 @@ export async function createShare(l: Archipelago, actor: Actor, id: string) {
 
 /** The links made to a document, standing first. */
 export async function listShares(l: Archipelago, id: string) {
-  const { rows } = await l.db.query<{ id: string; hint: string; made_by: string; created_at: Date; revoked_at: Date | null; to_workspace: string | null }>(
-    `select id, hint, made_by, created_at, revoked_at, to_workspace from share where entity_id = $1 order by revoked_at is not null, created_at desc`,
+  const { rows } = await l.db.query<{ id: string; hint: string; made_by: string; created_at: Date; revoked_at: Date | null; to_workspace: string | null; publishable: boolean }>(
+    `select id, hint, made_by, created_at, revoked_at, to_workspace, publishable from share where entity_id = $1 order by revoked_at is not null, created_at desc`,
     [id],
   );
   return rows;

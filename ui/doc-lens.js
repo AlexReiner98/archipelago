@@ -1,5 +1,5 @@
 // A picture in a published document (/p/...): the lens's answer as it was frozen when the document was published,
-// drawn by its drawing, read by anyone with no login. Nothing is asked of the map: the
+// drawn by its drawing, read by anyone with no login (and a draft's, read now, on /read/<id>). Nothing is asked of the map: the
 // answer is all there is. A part opens nowhere: what it says of itself, its drawing says (in a tip, ui/drawing-tip.js).
 
 import { h } from './base.js';

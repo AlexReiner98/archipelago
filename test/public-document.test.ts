@@ -113,6 +113,10 @@ test('a published document reads as it was published until it is published again
   ).result.created;
   const { d, s, l, a, x } = made;
   assert.equal((await call('/api/published', undefined, { id: d })).result.published, false);
+  // Before it is published, its reader may ask for its pictures as they would be kept: drawn now, with what they may see.
+  assert.equal((await call('/api/document', undefined, { id: d })).result.lenses, undefined, 'only when asked');
+  const draft = (await call('/api/document', undefined, { id: d, drawn: true })).result as { lenses: Record<string, { items: { title: string }[] }> };
+  assert.deepEqual(draft.lenses[l].items.map((i) => i.title).sort(), ['A part', 'A private part', 'Another part', 'The system']);
   assert.equal((await call('/api/publish', undefined, { id: d })).status, 200);
   const read = async () => (await (await fetch(`${base}/p/default/${d}/data`)).json()) as { published_at: string; parts: { section?: { id: string; body: string } }[]; lenses: Record<string, { items: { id: string; title: string; gist: string; state: { waits_on: unknown[]; sessions: number } }[] }> };
   const first = await read();

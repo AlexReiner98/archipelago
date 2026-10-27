@@ -74,7 +74,7 @@ const toLight = (r: Row): Light => ({ ...r.head, stream: r.stream, pos: r.pos, a
 export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number; days?: [string, string]; field?: string } = {}): Promise<Light[]> {
   const { rows } = await q.query<Row>(
     `select stream, pos::int as pos, at, head, facts from log_op where stream = $1 and pos >= $2 and ($3::bigint is null or pos <= $3)
-       and ($4::date is null or (at >= $4::date at time zone 'UTC' and at < ($5::date + 1) at time zone 'UTC'))
+       and ($4::date is null or (at >= $4::date::timestamp at time zone 'UTC' and at < ($5::date + 1)::timestamp at time zone 'UTC'))
        and ($6::jsonb is null or facts @> $6::jsonb) order by at, pos`,
     [stream, range.from ?? 1, range.to ?? null, range.days?.[0] ?? null, range.days?.[1] ?? null, range.field === undefined ? null : JSON.stringify([[range.field]])],
   );

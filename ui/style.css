@@ -7,7 +7,7 @@ body {
   /* The theme's colours are the style's (theme, set by ui/theme.js); until it is read, the browser's own. */
   background: var(--bg, Canvas);
   color: var(--text, CanvasText);
-  font: var(--text-5)/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: var(--text-5)/1.45 var(--face-text);
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -259,7 +259,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: var(--space-3); }
 .proposal .warning { color: var(--warn); }
 .proposal .actions { padding: var(--space-7) var(--space-8); border-top: var(--border-1) solid var(--line); display: flex; gap: var(--space-5); align-items: center; flex-wrap: wrap; }
 .ops { width: 100%; border-collapse: collapse; }
-.ops th { text-align: left; font-size: var(--text-1); text-transform: uppercase; letter-spacing: var(--track-2); color: var(--muted); padding: var(--space-5) var(--space-5); border-bottom: var(--border-1) solid var(--line); background: var(--bg); }
+.ops th { text-align: left; font-size: var(--text-1); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); color: var(--muted); padding: var(--space-5) var(--space-5); border-bottom: var(--border-1) solid var(--line); background: var(--bg); }
 .ops td { padding: var(--space-4) var(--space-5); border-bottom: var(--border-1) solid var(--line); vertical-align: top; }
 .ops tr.off td { opacity: 0.4; }
 .ops tr.off input[type="text"] { text-decoration: line-through; }
@@ -292,7 +292,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: var(--space-3); }
 
 table.list { width: 100%; border-collapse: collapse; }
 table.list td, table.list th { padding: var(--space-5) var(--space-8); border-bottom: var(--border-1) solid var(--line); text-align: left; vertical-align: top; }
-table.list th { font-size: var(--text-1); text-transform: uppercase; letter-spacing: var(--track-2); color: var(--muted); }
+table.list th { font-size: var(--text-1); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); color: var(--muted); }
 table.list tr:last-child td { border-bottom: 0; }
 table.list td.act { width: 1%; white-space: nowrap; text-align: right; }
 .add-relation { border-top: var(--border-1) solid var(--line); }
@@ -417,7 +417,7 @@ svg.graph .dim { opacity: 0.18; }
 #followed > .grow { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 
 .secret { margin: 0 0 var(--space-8); padding: var(--space-7) var(--space-8); border: var(--border-1) solid var(--warn); background: var(--warn-soft); border-radius: var(--radius-4); display: grid; gap: var(--space-5); }
-.secret code { font: var(--text-4)/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; user-select: all; }
+.secret code { font: var(--text-4)/1.4 var(--face-mono); overflow-wrap: anywhere; user-select: all; }
 .legend .swatch.rm-active { border: var(--border-3) solid var(--warn); border-radius: var(--radius-1); }
 .legend .swatch.rm-closed { background: var(--ok-soft); border: var(--border-2) solid var(--ok); border-radius: var(--radius-1); }
 .legend .swatch.rm-blocked { background: var(--g-blocked); }
@@ -431,7 +431,7 @@ svg.graph .dim { opacity: 0.18; }
 .project > header h2 { margin-right: auto; }
 .project > header > a { font-weight: 400; font-size: var(--text-4); }
 .project .now { padding: var(--space-5) var(--space-8) 0; margin: 0; }
-.sub { padding: var(--space-6) var(--space-8) var(--space-2); font-size: var(--text-2); font-weight: 600; text-transform: uppercase; letter-spacing: var(--track-2); color: var(--muted); }
+.sub { padding: var(--space-6) var(--space-8) var(--space-2); font-size: var(--text-2); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); color: var(--muted); }
 .strip { margin: var(--space-10) 0 var(--space-7); flex-wrap: wrap; }
 .strip button:disabled { opacity: 0.5; cursor: default; }
 .page-head { display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap; }
@@ -535,7 +535,7 @@ details.menu > .menu-items > button { max-width: var(--menu-item-most); overflow
 .around-side.out { justify-items: end; text-align: right; }
 .around-group { display: grid; gap: var(--space-3); position: relative; min-width: 0; max-width: 100%; }
 .around-side.out .around-group { justify-items: end; }
-.around-phrase { font-size: var(--text-1); color: var(--muted); text-transform: uppercase; letter-spacing: var(--track-2); }
+.water { font-family: var(--type-water-family); font-weight: var(--type-water-weight); font-style: var(--type-water-style); text-transform: var(--type-water-case); letter-spacing: var(--type-water-track); } /* a link, in the chart face's italic, as water is named on a chart */ .around-phrase { font-size: var(--text-3); color: var(--muted); font-family: var(--type-water-family); font-weight: var(--type-water-weight); font-style: var(--type-water-style); text-transform: var(--type-water-case); letter-spacing: var(--type-water-track); }
 .around-items { display: flex; flex-wrap: wrap; gap: var(--space-4); min-width: 0; max-width: 100%; }
 .around-side.out .around-items { justify-content: flex-end; }
 .around-item { max-width: min(var(--around-item), 100%); box-sizing: border-box; padding: var(--space-3) var(--space-6); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); font-size: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); text-decoration: none; }
@@ -570,7 +570,7 @@ details.menu > .menu-items > button { max-width: var(--menu-item-most); overflow
 
 /* An item's neighbourhood as a drawing: boxes in rows, joined to the item by curves. */
 .around-graph { padding: var(--space-4) 0 var(--space-2); display: grid; justify-items: center; }
-.nb-head { fill: var(--muted); font-size: var(--text-1); text-transform: uppercase; letter-spacing: var(--track-2); }
+.nb-head { fill: var(--muted); font-size: var(--text-1); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); }
 .rm-node.nb.more .box { stroke-dasharray: 4 3; }
 .rm-node.nb.more text { fill: var(--muted); }
 .rm-node.nb.closed text { fill: var(--muted); }

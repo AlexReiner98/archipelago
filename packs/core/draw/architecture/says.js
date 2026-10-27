@@ -15,7 +15,7 @@ export function saysSpots({ labels, chains, boxes, parts = [], measure, z }) {
   const BESIDE = HEAD_HALF + 2;
   // Every part, as [left, top, right, bottom]: words never cover one.
   const onPart = (x, y, w) => parts.some(([l, t, r, b]) => x + w / 2 > l - 2 && x - w / 2 < r + 2 && y + HIGH / 2 > t - 2 && y - HIGH / 2 < b + 2);
-  const placed = boxes.map((b) => [b.x + Math.min(b.w, measure(b.item.title, PLACE_TEXT) + z('place_name_room')) / 2, b.y + z('place_name_inset') + z('place_name_height') / 2, Math.min(b.w, measure(b.item.title, PLACE_TEXT) + z('place_name_room'))]);
+  const placed = boxes.map((b) => [b.x + Math.min(b.w, measure(b.item.title, PLACE_TEXT, 'region') + z('place_name_room')) / 2, b.y + z('place_name_inset') + z('place_name_height') / 2, Math.min(b.w, measure(b.item.title, PLACE_TEXT, 'region') + z('place_name_room'))]);
   // Whether another wire passes through a box of words centred at x, y.
   const crossed = (c, x, y, w) =>
     chains.some((o) => o !== c && o.points.some((p, k) => k > 0 && Math.max(p[0], o.points[k - 1][0]) >= x - w / 2 && Math.min(p[0], o.points[k - 1][0]) <= x + w / 2 && Math.max(p[1], o.points[k - 1][1]) >= y - HIGH / 2 && Math.min(p[1], o.points[k - 1][1]) <= y + HIGH / 2));
@@ -23,7 +23,7 @@ export function saysSpots({ labels, chains, boxes, parts = [], measure, z }) {
   const ends = chains.flatMap((o) => [o.points[0], o.points.at(-1)]);
   const onEnd = (x, y, w) => ends.some(([ex, ey]) => Math.abs(ex - x) <= w / 2 + HEAD_HALF && Math.abs(ey - y) <= HIGH / 2 + HEAD_LONG);
   return labels.flatMap(({ c, text }) => {
-    const w = measure(text, SAYS_TEXT) + 2 * z('says_pad'), p = c.points;
+    const w = measure(text, SAYS_TEXT, 'water') + 2 * z('says_pad'), p = c.points;
     // The middle of each run long enough to hold the words: the run in first, then the run out, then the rest. A run
     // down may hold them on it, or just beside it, right or left.
     const runs = p.slice(1).map((q, k) => [p[k], q]);

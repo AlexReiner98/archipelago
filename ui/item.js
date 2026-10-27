@@ -46,7 +46,8 @@ export async function entity(id, here) {
   // An item a screen reads whole can be printed and shared: its text with the items it brings in, in their places.
   const { doc, links } = readWhole(e.type) ? await readDocument(id) : { doc: null, links: [] };
   // A document is read in public as it was last published: whether it is, and whether its draft says something else now.
-  const shown = doc && !doc.from && type?.public ? await api('published', { id }).catch(() => null) : null;
+  // One shared from another workspace too, which publishes only where that workspace allows it (src/published-share.ts).
+  const shown = doc && type?.public ? await api('published', { id }).catch(() => null) : null;
   // What it holds that can be published: a site's project publishes all of it with one click.
   const plan = !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? await api('publish_plan', { within: id }).catch(() => null) : null;
   // How its page looks is its style: the house style's, its kind's (a document reads through), its own.

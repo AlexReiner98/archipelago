@@ -49,7 +49,7 @@ function outline(shape, x, y, w, hgt, rx) {
 
 /**
  * The graph: its steps, the wires and ties between them and what each choice is. `input` is what the page gives every
- * drawing (the answer, the style); `tools.measure(text, px, font)` is how wide a text is drawn.
+ * drawing (the answer, the style); `tools.measure(text, px, font, role)` is how wide a text is drawn, as one of the style's text roles when one is given.
  */
 export function picture({ answer, style, reduced }, tools) {
   // A story lays out what its steps bring in, all of it, each mark hidden until a step shows it.
@@ -72,12 +72,16 @@ export function picture({ answer, style, reduced }, tools) {
   };
   const NOTE = style.numbers?.note_opening_cut;
   if (typeof NOTE !== 'number') throw new Error('The style names no number "note_opening_cut": the house style (packs/core/pack.json) names every one a drawing uses');
-  const measure = (text, px) => tools.measure(text, px, style.font);
+  // A text is measured as it is drawn: in the plain face, or as one of the style's text roles (type), such as water.
+  const measure = (text, px, role) => {
+    const as = role && style.type?.[role];
+    return tools.measure(text, px, (as && style.faces?.[as.face]) || style.font, as);
+  };
   const [TEXT, STUB_TEXT, CORNER] = ['text', 'stub_text', 'corner'].map(z);
-  const fit = (text, width, px) => {
-    if (measure(text, px) <= width) return text;
+  const fit = (text, width, px, role) => {
+    if (measure(text, px, role) <= width) return text;
     let t = text;
-    while (t.length > 1 && measure(`${t}…`, px) > width) t = t.slice(0, -1);
+    while (t.length > 1 && measure(`${t}…`, px, role) > width) t = t.slice(0, -1);
     return `${t}…`;
   };
   // Steps put where a person put them stay there, and the rest is laid out round them (./layout.js, ./free.js). The
@@ -195,7 +199,7 @@ export function picture({ answer, style, reduced }, tools) {
   const said = new Map();
   for (const c of g.chains) if (c.says && !g.nodes.get(c.b).stub) said.set(`${c.a} ${c.says}`, c);
   const saysLayer = [...said.values()].map((c) => {
-    const d = g.nodes.get(c.a), text = fit(c.says, z('says_most'), z('says_text')), w = measure(text, z('says_text')) + 2 * z('says_pad');
+    const d = g.nodes.get(c.a), text = fit(c.says, z('says_most'), z('says_text'), 'water'), w = measure(text, z('says_text'), 'water') + 2 * z('says_pad');
     const lx = g.x.get(d.id) + w / 2 + z('says_aside'), ly = (g.y.get(d.id) + d.h / 2 + c.points[1][1]) / 2, sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
