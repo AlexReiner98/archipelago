@@ -10,6 +10,7 @@ import { newId, type Q } from './db.ts';
 import { notify } from './notify.ts';
 import { acceptedSenders, otherMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
+import { picturesOf } from './published-pictures.ts';
 import { unpublishShare } from './published-share.ts';
 
 // ---- the sending side ----------------------------------------------------
@@ -79,6 +80,19 @@ export async function readAny(l: Archipelago, id: string) {
   const { rows } = await at.from.forAnyone().db.query<{ doc: Given | null }>(`select pelago_workspace_document($1, $2) as doc`, [at.share, l.workspace]);
   if (!rows[0]?.doc) throw new Error(`"${item.title}" is no longer shared with this workspace: "${item.props.from_workspace}" revoked it.`);
   return { ...forReader(at.from, rows[0].doc, item.id), id: item.id, from: item.props.from_workspace };
+}
+
+/**
+ * The views a shared document brings in, drawn on the map that shares it as publishing here would keep them
+ * (src/published-share.ts), so it is reviewed as it will publish. Only where it may be published: a share to be read
+ * gives its sections, not pictures of the sender's map.
+ */
+export async function sharedPictures(l: Archipelago, id: string, sections: { id: string; type: string }[]) {
+  const item = await l.entity(id);
+  const at = item?.type === SHARED ? await sharer(item) : undefined;
+  if (!at) return {};
+  const { rows } = await at.from.forAnyone().db.query<{ publishable: boolean }>(`select pelago_workspace_publishable($1, $2) as publishable`, [at.share, l.workspace]);
+  return rows[0]?.publishable ? picturesOf(at.from, sections, true) : {};
 }
 
 /** The figure of one section of a shared document, or null. */

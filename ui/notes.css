@@ -55,3 +55,5 @@
 #sheet .field-find { flex: 0 1 auto; min-width: 0; font: inherit; }
 #sheet .field-hits { display: flex; gap: var(--space-2); min-width: 0; overflow: hidden; }
 #sheet .field-hit { flex: 0 1 auto; min-width: 0; max-width: var(--chip-most); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; }
+/* A document read in its sheet (ui/item-read.js): each section it brings in a fold, titled a step above a note's own. */
+.reading > details.read-section > summary { font-size: var(--text-5); }

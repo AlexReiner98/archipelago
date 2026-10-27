@@ -5,6 +5,7 @@
 import { api, ask, h, part, state, tell } from './base.js';
 import { draftOf } from './draft.js';
 import { documentMenu, figureOf, readDocument } from './item-doc.js';
+import { readingOf } from './item-read.js';
 import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { relationEditor } from './item-links.js';
@@ -109,8 +110,11 @@ export async function entity(id, here) {
 
   redraw.inPlace = inPlace;
   // Its title and note, written in place and saved as one change (ui/draft.js).
-  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, saved: again });
-  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, draft.note));
+  // A document reads in its note's place as it will publish (ui/item-read.js); one shared from another workspace is
+  // read there, not written here.
+  const reading = doc && readingOf(doc, looks);
+  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, reading, saved: again });
+  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, doc?.from ? reading : draft.note));
   // A field picked is changed at once; words written in a field wait with the note for its Save. A pick made while
   // words wait leaves the page as it stands, so they are not lost: it is drawn again when they are saved.
   const fieldEdit = !e.archived_at && {

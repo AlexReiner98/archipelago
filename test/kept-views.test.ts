@@ -55,9 +55,10 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
   };
   const linked = (scope: string, id: string) => `Boolean(document.querySelector('${scope} a[href="#/e/${id}"]'))`;
   try {
-    // The document: its page in the sheet is its words, with no view drawn in it.
+    // The document: its page in the sheet reads it as it will publish, its words and its view drawn in its place
+    // (the owner, 27 Oct 2026: a document is reviewed in its sheet as it will publish).
     assert.ok(await until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Closing words')`), `the document's words: ${page.logs().join('\n')}`);
-    assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#sheet .lf-stage, #sheet .doc-lens'))`)), 'no view drawn on a bare page');
+    assert.ok(await until(`Boolean(document.querySelector('#sheet .reading .doc-lens .lens-view')?.childElementCount)`), `its view drawn in the sheet: ${page.logs().join('\n')}`);
     // Its kept view, opened as a canvas: drawn flat (depth is never drawn on the canvas), the server and both parts.
     await page.go(`${base}/#/v?canvas=${kept.l}`);
     assert.ok(await until(`${linked('#canvas', made.a)} && ${linked('#canvas', made.b)} && ${linked('#canvas', made.e)}`), `the view is drawn as a canvas: ${page.logs().join('\n')}`);
