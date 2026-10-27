@@ -8,10 +8,12 @@ body { overflow: hidden; }
 #canvas { position: fixed; inset: var(--main-top, 0%) var(--main-right, 0%) var(--main-bottom, 0%) var(--main-left, 0%); background: var(--ln-sea, var(--bg)); }
 #canvas > .lens-wrap, #canvas .lens-view { height: 100%; }
 /* The safe zone: the bar and the query bar above, the find bar below. A drawing that does not pan (a list, a grid)
-   is laid out between them and scrolls there; one on the plane keeps the whole page and is fitted inside them. */
+   is laid out between them and scrolls there; one on the plane starts under the bars, so they never cover it, and is
+   fitted above find. A main canvas the bar does not act on keeps room for the top bar alone. */
 #canvas { --safe-top: calc(2 * var(--box-9) + var(--space-8) + var(--space-6)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
+body[data-active="pane"] #canvas { --safe-top: calc(var(--box-9) + var(--space-7) + var(--space-5)); --safe-bottom: 0; }
 #canvas .lens-view { position: relative; box-sizing: border-box; padding: var(--safe-top) 0 var(--safe-bottom); overflow: auto; }
-#canvas .lens-view:has(.lf-stage) { padding: 0; overflow: hidden; }
+#canvas .lens-view:has(.lf-stage) { padding: var(--safe-top) 0 0; overflow: hidden; }
 #canvas .lf-stage { height: 100%; }
 /* The key is shown when the reader turns it on in the settings menu (ui/canvas.js); the drawing's own controls are not drawn. */
 /* The key, always in sight on the canvas: in the safe zone, under the query bar, scrolled when it is longer than the room. */
@@ -177,9 +179,12 @@ body[data-dragging="pane"] { cursor: grabbing; }
 .pane-zone { position: fixed; z-index: 7; pointer-events: none; background: var(--accent-soft); border: var(--border-1) solid var(--accent); box-sizing: border-box; transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s; }
 .pane-zone[hidden] { display: none; }
 
-/* The pane the bar and find act on, among several: marked by a line round it. A docked one has its own bar of names
-   at its top, which the query bar sits under. */
-#panes > .pane.pane-active, #canvas.pane-active { box-shadow: inset 0 0 0 var(--border-1) var(--accent); }
-body[data-active="pane"] #query { top: calc(var(--active-top, 0%) + var(--box-9)); }
-/* The key of the docked pane the bar acts on sits under the bar, not behind it. */
-#panes > .pane.pane-active .lf-legend { top: calc(var(--box-9) + var(--space-6)); }
+/* The pane the bar and find act on, among several: a line of the accent along its top; the names of the others quiet. */
+#panes > .pane.pane-active > .pane-bar { box-shadow: inset 0 var(--border-2, var(--border-1)) 0 var(--accent); }
+#panes > .pane:not(.pane-active) .pane-name { color: var(--muted); font-weight: 400; }
+#canvas.pane-active::before { content: ''; position: absolute; z-index: 4; top: 0; left: 0; right: 0; height: var(--border-2, var(--border-1)); background: var(--accent); pointer-events: none; }
+/* A pane not in focus takes the first press on a style's frame itself (a frame keeps its presses), and is then in focus. */
+#panes > .pane:not(.pane-active) > .pane-canvas:has(iframe)::after, body[data-active="pane"] #canvas:has(iframe)::after { content: ''; position: absolute; inset: 0; z-index: 3; cursor: pointer; }
+/* A docked pane the bar acts on: the query bar sits in a strip of its own under the pane's names, over nothing drawn. */
+body[data-active="pane"] #query { top: calc(var(--active-top, 0%) + var(--active-bar, 0%) + var(--space-3)); }
+#panes > .pane.pane-active > .pane-canvas { box-sizing: border-box; padding-top: calc(var(--query-tall, 0%) + 2 * var(--space-3)); }

@@ -155,6 +155,10 @@ let frames = [];
 function frameActive() {
   const box = frames.find(([g]) => g === active)?.[1] ?? frames.find(([g]) => g === 'main')?.[1];
   for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--active-${side}`, `${((box?.[side] ?? 0) * 100).toFixed(3)}%`);
+  // How tall the docked pane's names are and the query bar is, measured: the bar's strip is made that tall.
+  const bar = drawn.get(active)?.el.querySelector('.pane-bar');
+  document.body.style.setProperty('--active-bar', `${bar?.offsetHeight ?? 0}px`);
+  document.body.style.setProperty('--query-tall', `${document.getElementById('query')?.offsetHeight ?? 0}px`);
 }
 
 // ---- The main pane's back and forth: a step each time it draws another lens (ui/canvas.js tells), none for a page.
@@ -212,10 +216,14 @@ function draw() {
   for (const [id, entry] of drawn) if (layout.panes[id]?.at !== entry.at) load(id, layout.panes[id].at);
   const dir = dirNow();
   host.dataset.dir = dir;
+  // Several panes share the room left of an open sheet, so none is behind it; one alone stays under it, as it was.
+  const sheet = document.getElementById('sheet');
+  const aside = layout.groups.length > 1 && document.body.dataset.sheet === 'open' && sheet.offsetWidth < innerWidth * 0.8 ? sheet.offsetWidth / innerWidth : 0;
+  const room = 1 - aside;
   let from = 0;
   frames = layout.groups.map((g, n) => {
     const share = layout.sizes[n];
-    const box = dir === 'row' ? { left: from, right: 1 - from - share, top: 0, bottom: 0 } : { top: from, bottom: 1 - from - share, left: 0, right: 0 };
+    const box = dir === 'row' ? { left: from * room, right: 1 - (from + share) * room, top: 0, bottom: 0 } : { top: from, bottom: 1 - from - share, left: 0, right: aside };
     from += share;
     return [g, box];
   });
@@ -343,6 +351,8 @@ addEventListener('resize', () => {
   const dir = dirNow();
   if (host.dataset.dir !== dir) ((host.dataset.dir = dir), draw());
 });
+// The sheet opening or shutting changes the room the panes share.
+new MutationObserver(() => started && !popped && layout.groups.length > 1 && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 
 /** The query bar's own: back and forth in the pane it acts on, and split (in a popped window, dock back). */
 hooks.paneButtons = () => {

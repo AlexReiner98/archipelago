@@ -29,7 +29,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
     const local = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1].slice(2)));
     // Set on an element by the page's own code, not by a style: the graph's zoom, a ring's share, a calendar's lane,
     // the main canvas's frame among the panes and the frame of the one the bar acts on (ui/panes.js).
-    const byCode = new Set(['k', 'pct', 'cal-agents', 'cal-hue', 'main-top', 'main-left', 'main-right', 'main-bottom', 'active-top', 'active-left', 'active-right', 'active-bottom']);
+    const byCode = new Set(['k', 'pct', 'cal-agents', 'cal-hue', 'main-top', 'main-left', 'main-right', 'main-bottom', 'active-top', 'active-left', 'active-right', 'active-bottom', 'active-bar', 'query-tall']);
     const unnamed = [...css.matchAll(/var\(--([a-z0-9-]+)/g)].map((m) => m[1]).filter((n) => !named.has(n) && !local.has(n) && !byCode.has(n) && !n.startsWith('ln-'));
     assert.deepEqual([...new Set(unnamed)], [], `${file} reads lengths the house style does not name`);
   }
