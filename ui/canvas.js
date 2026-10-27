@@ -215,8 +215,10 @@ const covered = () => {
 /** What the bars cover of the canvas above and below: the query bar's foot, and the find bar's top, in the canvas's own frame (it may be one pane of several, ui/panes.js). */
 const bars = () => {
   const edge = (id, side) => { const el = document.getElementById(id); return el && !el.hidden ? el.getBoundingClientRect()[side] : undefined; };
-  const box = host.getBoundingClientRect();
-  const foot = edge('query', 'bottom') ?? edge('nav', 'bottom') ?? box.top, find = edge('find', 'top');
+  // The plane, which starts under the bars (ui/shell.css), else the canvas; a bar over another pane covers none of it.
+  const box = (host.querySelector('.lf-stage') ?? host).getBoundingClientRect();
+  const over = (id) => { const r = document.getElementById(id)?.getBoundingClientRect(); return r && r.right > box.left && r.left < box.right; };
+  const foot = (over('query') && edge('query', 'bottom')) || (over('nav') && edge('nav', 'bottom')) || box.top, find = over('find') ? edge('find', 'top') : undefined;
   return [Math.max(0, foot - box.top), find === undefined ? 0 : Math.max(0, box.bottom - find)];
 };
 /** All of it in sight, beside the sheet and between the bars, when the reader asked for that. */

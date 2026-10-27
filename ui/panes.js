@@ -144,18 +144,29 @@ function activeIs(id) {
 }
 const touched = (target) => {
   const pane = target?.closest?.('#panes > .pane');
-  const id = pane ? pane.dataset.pane : target?.closest?.('#canvas') ? 'main' : null;
+  const id = pane ? pane.dataset.pane : target?.closest?.('#canvas, #main-name') ? 'main' : null;
   if (id && id !== active) activeIs(id);
 };
 addEventListener('pointerdown', (ev) => touched(ev.target), true);
 addEventListener('blur', () => setTimeout(() => document.activeElement?.tagName === 'IFRAME' && touched(document.activeElement), 0));
 
+/** A side of a frame as CSS: across, a share of the page; down, a share of what the band above leaves (ui/shell.css). */
+const edge = (side, v) => {
+  const share = (v * 100).toFixed(3);
+  if (side === 'left' || side === 'right') return `${share}%`;
+  return side === 'top' ? `calc(var(--band, 0%) + (100% - var(--band, 0%)) * ${share} / 100)` : `calc((100% - var(--band, 0%)) * ${share} / 100)`;
+};
 /** The frame of the pane the bar acts on, for the bar and find to sit in (ui/shell.css: --active-*). */
 let frames = [];
 function frameActive() {
   const box = frames.find(([g]) => g === active)?.[1] ?? frames.find(([g]) => g === 'main')?.[1];
-  for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--active-${side}`, `${((box?.[side] ?? 0) * 100).toFixed(3)}%`);
+  for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--active-${side}`, edge(side, box?.[side] ?? 0));
+  // Out of focus, the main pane says its name in its strip, as a docked one does.
+  mainName.hidden = active === 'main' || !drawn.size;
+  const canvas = /canvas=(e_[a-z0-9]{8})/.exec(canvasHref())?.[1];
+  mainName.textContent = (canvas && titles.get(canvas)) || 'Canvas';
 }
+const mainName = document.body.appendChild(h('div', { id: 'main-name', hidden: true, title: 'The main canvas: press to work in it' }));
 
 // ---- The main pane's back and forth: a step each time it draws another lens (ui/canvas.js tells), none for a page.
 
@@ -212,21 +223,24 @@ function draw() {
   for (const [id, entry] of drawn) if (layout.panes[id]?.at !== entry.at) load(id, layout.panes[id].at);
   const dir = dirNow();
   host.dataset.dir = dir;
+  // Several panes share the room left of an open sheet, so none is behind it; one alone stays under it, as it was.
+  const sheet = document.getElementById('sheet');
+  const aside = layout.groups.length > 1 && document.body.dataset.sheet === 'open' && sheet.offsetWidth < innerWidth * 0.8 ? sheet.offsetWidth / innerWidth : 0;
+  const room = 1 - aside;
   let from = 0;
   frames = layout.groups.map((g, n) => {
     const share = layout.sizes[n];
-    const box = dir === 'row' ? { left: from, right: 1 - from - share, top: 0, bottom: 0 } : { top: from, bottom: 1 - from - share, left: 0, right: 0 };
+    const box = dir === 'row' ? { left: from * room, right: 1 - (from + share) * room, top: 0, bottom: 0 } : { top: from, bottom: 1 - from - share, left: 0, right: aside };
     from += share;
     return [g, box];
   });
-  const pct = (v) => `${(v * 100).toFixed(3)}%`;
   for (const [g, box] of frames) {
     if (g === 'main') {
-      for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--main-${side}`, pct(box[side]));
+      for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--main-${side}`, edge(side, box[side]));
       continue;
     }
     const el = drawn.get(g)?.el ?? paneEl(g);
-    for (const side of ['left', 'right', 'top', 'bottom']) el.style[side] = pct(box[side]);
+    for (const side of ['left', 'right', 'top', 'bottom']) el.style[side] = edge(side, box[side]);
     if (el.parentNode !== host) host.append(el);
   }
   document.body.dataset.panes = String(layout.groups.length);
@@ -343,18 +357,28 @@ addEventListener('resize', () => {
   const dir = dirNow();
   if (host.dataset.dir !== dir) ((host.dataset.dir = dir), draw());
 });
+// The sheet opening or shutting changes the room the panes share.
+new MutationObserver(() => started && !popped && layout.groups.length > 1 && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 
 /** The query bar's own: back and forth in the pane it acts on, and split (in a popped window, dock back). */
 hooks.paneButtons = () => {
   const { back, forth } = historyNow();
   const button = (label, title, mark, onclick, off) => h('button', { type: 'button', class: 'q-save', title, 'aria-label': label, disabled: off, onclick }, mark);
+  // A docked pane in focus has its names covered by the bar: what they offered is here, and it is dragged from ⠿.
+  const entry = active === 'main' ? null : drawn.get(active);
+  const grip = entry ? h('button', { type: 'button', class: 'q-save q-grip', title: 'Drag to dock this pane elsewhere; out of the window to pop it out', 'aria-label': 'Move this pane' }, '⠿') : null;
+  grip?.addEventListener('pointerdown', (ev) => dragPane(ev, active, entry.el, { groups: groupEls, drop }));
   return [
+    grip,
     button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length),
     button('Forward', 'Forward again', '›', () => travel(1), !forth.length),
     popped
       ? button('Dock back', 'Dock this window back into the main one', '⇲', dockBack)
-      : button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', '◫', () => openPane(asPane(active === 'main' ? canvasHref() : `#/${drawn.get(active).at}`), 'right', active)),
-  ];
+      : button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', '◫', () => openPane(asPane(active === 'main' ? canvasHref() : `#/${entry.at}`), 'right', active)),
+    entry && button('Make main', 'Open it as the main canvas', '⤢', () => toMain(active)),
+    entry && button('Pop out', 'Pop it out into a window of its own', '⧉', () => popOut(active)),
+    entry && button('Close', 'Close this pane', '×', () => close(active)),
+  ].filter(Boolean);
 };
 
 /**
