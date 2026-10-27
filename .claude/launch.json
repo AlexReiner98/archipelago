@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3100
+    },
+    {
+      "name": "patterns-sketch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["sketches/serve.mjs"],
+      "port": 3210
     }
   ]
 }

@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archipelago ridges</title>
+<!-- Display faces to try, open licence (SIL OFL), for the sketch only: the app loads none of them. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400..900;1,400..900&family=Newsreader:ital,wght@0,400..800;1,400..800&family=Literata:ital,wght@0,400..900;1,400..900&family=Inter:ital,wght@0,400..900;1,400..900&family=Manrope:wght@400..800&family=Space+Grotesk:wght@400..700&family=Bricolage+Grotesque:wght@400..800&family=Archivo:ital,wght@0,400..900;1,400..900&display=swap">
+<style>
+  :root { --ink: #1d2428; --paper: #f4f2ec; --line: #0002; font: 13px/1.4 system-ui, sans-serif; color: var(--ink); }
+  body { margin: 0; display: grid; grid-template-columns: 260px 1fr; height: 100vh; background: #d9d6ce; }
+  aside { padding: 14px 16px; border-right: 1px solid var(--line); overflow: auto; background: var(--paper); }
+  h1 { font-size: 15px; margin: 0 0 10px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; opacity: .55; margin: 16px 0 6px; }
+  label { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; margin: 7px 0; }
+  label input[type=range] { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; }
+  label small { opacity: .55; }
+  label.check { display: flex; gap: 6px; align-items: center; }
+  select, button { font: inherit; padding: 3px 6px; }
+  select { width: 100%; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+  .swatches input { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
+  .swatches .role { outline: 2px solid #0004; outline-offset: 1px; }
+  #drop { border: 1px dashed #0004; border-radius: 6px; padding: 10px; text-align: center; opacity: .75; cursor: pointer; }
+  #drop.over { background: #0001; }
+  #photo { display: none; max-width: 100%; border-radius: 4px; margin-top: 6px; }
+  main { display: grid; place-items: center; overflow: auto; padding: 20px; }
+  canvas { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
+  body.emblem canvas#view { max-height: calc(100vh - 340px); }
+  canvas.at { image-rendering: pixelated; }
+  body.emblem #sizes { display: grid; gap: 8px; margin-top: 14px; }
+  #sizes div { display: flex; gap: 10px; align-items: flex-end; padding: 8px 10px; border-radius: 6px; }
+  #sizes canvas { box-shadow: none; }
+  body:not(.emblem) .only-emblem, body:not(.clouds) .only-clouds, body:not(.letter) .only-letter, body:not(.diffusion) .only-diffusion, body.noise .not-noise, body.noise .mix { display: none; }
+  .mix { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; font-size: 12px; }
+  .mix label { margin: 0; display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #sources { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #sources a { color: inherit; }
+  #nameText { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; }
+  body:not(.named) .only-name { display: none; }
+  #letterText { width: 4.5em; font: inherit; padding: 3px 6px; }
+  #face { width: 100%; }
+  #preset, #presetName { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; }
+  #presetNote { font-size: 11px; opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #note { opacity: .6; font-variant-numeric: tabular-nums; font-size: 12px; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Archipelago ridges</h1>
+  <h2>Presets</h2>
+  <div class="row"><select id="preset" aria-label="Saved presets" title="Load a saved setup"></select><button id="presetDelete" title="Forget the chosen preset">Delete</button></div>
+  <div class="row"><input id="presetName" placeholder="Name this setup" aria-label="Preset name"><button id="presetSave" title="Save everything as it is now: dials, palettes, colours, background, seed">Save</button></div>
+  <div class="row"><button id="presetExport" title="Download all presets as a file">Export</button><button id="presetImport" title="Add presets from a file">Import</button><input id="presetFile" type="file" accept="application/json,.json" hidden><span id="presetNote"></span></div>
+  <h2>Palette</h2>
+  <select id="place" aria-label="Palette"></select>
+  <div class="swatches" id="swatches" title="Paper and ink first, then the island colours. Click one to change it."></div>
+  <div id="sources"></div>
+  <div class="row" title="The colour of the open water behind everything"><label class="check">Background <input id="bg" type="color"></label><button id="bgReset" title="Back to this palette's deep water">From palette</button></div>
+  <div class="row" title="Grounds the brand uses: the app's neutral dark, or its paper"><button data-ground="#161614">Neutral dark</button><button data-ground="#f6f5f2">Paper</button></div>
+  <label title="As photographed (0), enriched (1), or richer still (2): more colour and contrast, every hue kept">Richness <output id="richnessOut"></output><input id="richness" type="range" min="0" max="3" step="0.05" value="1"></label>
+  <div class="row"><button id="shuffle" title="Same colours, another order">Shuffle colours</button><label class="check" title="Use each colour as much as it covers the photos"><input id="weighted" type="checkbox" checked> As in the photos</label></div>
+  <div id="drop" title="Draw a palette from a photo of the place">Drop a photo, or click to choose<input id="file" type="file" accept="image/*" hidden></div>
+  <img id="photo" alt="">
+  <h2>Type</h2>
+  <select id="face" aria-label="Display face" title="The display face: the name over the picture and the letter the islands are seeded with">
+    <optgroup label="Serif, open licence">
+      <option value="'Fraunces', serif">Fraunces</option>
+      <option value="'Newsreader', serif">Newsreader</option>
+      <option value="'Literata', serif">Literata</option>
+    </optgroup>
+    <optgroup label="Sans, open licence">
+      <option value="'Inter', sans-serif">Inter</option>
+      <option value="'Manrope', sans-serif">Manrope</option>
+      <option value="'Space Grotesk', sans-serif">Space Grotesk</option>
+      <option value="'Bricolage Grotesque', sans-serif">Bricolage Grotesque</option>
+      <option value="'Archivo', sans-serif">Archivo</option>
+    </optgroup>
+    <optgroup label="On this computer">
+      <option value="system-ui, -apple-system, 'Segoe UI', sans-serif" selected>System UI (the app's)</option>
+      <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+      <option value="'Arial Black', 'Helvetica Neue', Arial, sans-serif">Arial Black</option>
+      <option value="Impact, 'Arial Narrow', sans-serif">Impact</option>
+    </optgroup>
+  </select>
+  <label title="How heavy the name is set; the letter seed is always set as heavy as the face goes">Weight <output id="faceWeightOut"></output><input id="faceWeight" type="range" min="400" max="900" step="50" value="600"></label>
+  <h2>Frame</h2>
+  <select id="frame" aria-label="Frame" title="The picture's shape: islands and rows keep their size, a wider frame holds more of them">
+    <option value="800x1000">Page, 800 × 1000</option>
+    <option value="1600x800">Hero, 1600 × 800</option>
+    <option value="2400x900">Wide hero, 2400 × 900</option>
+    <option value="1200x630">Share image, 1200 × 630</option>
+  </select>
+  <div class="row"><label class="check" title="Set a name over the picture, in the app's typeface"><input id="name" type="checkbox"> Name</label><input id="nameText" value="Archipelago" aria-label="Name" title="The name to set"></div>
+  <label class="only-name" title="How large the name is, against the frame's height">Name size <small>small · large</small><input id="nameSize" type="range" min="0.04" max="0.3" step="0.005" value="0.1"></label>
+  <label class="only-name" title="Open water round the name, the islands parting round it: none, a little, or a wide bay">Clearing <small>none · wide</small><input id="nameClear" type="range" min="0" max="2" step="0.01" value="1"></label>
+  <div class="row only-name" title="Set as a chart labels a sea or a group of islands: capitals spaced wide, often in italic"><label class="check"><input id="nameCaps" type="checkbox"> Capitals</label><label class="check"><input id="nameItalic" type="checkbox"> Italic</label></div>
+  <label class="only-name" title="Space between the letters, as a share of the type size">Spacing <small>none · wide</small><input id="nameSpacing" type="range" min="0" max="0.8" step="0.01" value="0"></label>
+  <select id="namePlace" class="only-name" aria-label="Where the name goes" title="Where the name goes">
+    <option value="low-left">Lower left</option>
+    <option value="low">Lower centre</option>
+    <option value="centre">Centre</option>
+  </select>
+  <h2>Emblem</h2>
+  <label class="check" title="This drawing as an icon: fitted into a square, shown at a chosen size and below at icon sizes"><input id="emblem" type="checkbox"> Emblem</label>
+  <label class="only-emblem" title="Draw the emblem above at an icon's size, magnified so each pixel shows: tune it as it will be seen">Draw at <output id="emAtOut"></output><input id="emAt" type="range" min="0" max="6" step="1" value="0"></label>
+  <h2>Archipelagos</h2>
+  <select id="source" aria-label="Land source" title="Where land comes from">
+    <option value="noise">Land from noise: one field</option>
+    <option value="chains" selected>Land from chains</option>
+    <option value="diffusion">Land from diffusion</option>
+    <option value="diffusion-chains">Diffusion along chains</option>
+  </select>
+  <label class="check" title="Gather the islands into the shape of a letter or a word (optional)"><input id="letter" type="checkbox"> Seed with a letter</label>
+  <div class="row only-letter"><input id="letterText" value="A" maxlength="6" aria-label="Letter" title="The letter, or a few"></div>
+  <label class="only-letter" title="How much of the page the letter fills">Letter size <small>small · full</small><input id="letterSize" type="range" min="0.2" max="1.4" step="0.01" value="0.85"></label>
+  <label class="only-letter" title="How firmly the land keeps to the letter: a hint, or the letter clearly read">Letter strength <small>hint · clear</small><input id="letterStrength" type="range" min="0" max="1.5" step="0.01" value="1"></label>
+  <label class="only-diffusion">Pattern <small>spots · worms · coral</small><input id="pattern" type="range" min="-0.3" max="1.5" step="0.05"></label>
+  <label class="only-diffusion">Scale <small>large · fine</small><input id="scale" type="range" min="-0.3" max="1.6" step="0.05"></label>
+  <label class="only-diffusion" title="Spots, worms and coral side by side, drifting across the page">Variety <small>one · many</small><input id="variety" type="range" min="0" max="2" step="0.05"></label>
+  <label class="only-diffusion" title="Read the field through noise, so its spacing goes irregular">Warp <small>even · wild</small><input id="warp" type="range" min="0" max="3" step="0.01"></label>
+  <label class="only-diffusion" title="Blend in the noise field: islands of every size">Noise <small>pure · mixed</small><input id="mix" type="range" min="0" max="1" step="0.01"></label>
+  <label class="not-noise">Archipelagos <output id="chainsOut"></output><input id="chains" type="range" min="1" max="24" step="1" title="How many archipelagos share the page"></label>
+  <label class="check not-noise" title="Each ticked place becomes one archipelago where it really is: west to east across, north at the top"><input id="geo" type="checkbox" checked> Place them as on a map</label>
+  <div class="row" title="Tick the places the archipelagos are drawn from"><button data-mix="all">All</button><button data-mix="canada">Canada</button><button data-mix="elsewhere">Elsewhere</button></div>
+  <div class="mix" id="mix" title="Which places' palettes the chains take, in turn, after the palette above"></div>
+  <h2>Land</h2>
+  <label>Land <small>sea · land</small><input id="land" type="range" min="0" max="1" step="0.01"></label>
+  <label>Islands <small>few, large · many, small</small><input id="islands" type="range" min="0" max="3" step="0.01"></label>
+  <label>Height <small>low · tall</small><input id="rise" type="range" min="0" max="3" step="0.01"></label>
+  <label title="How steeply land may rise from the nearest water: a wide island can stand tall, a narrow one stays low. 0 for no limit">Max slope <output id="slopeOut"></output><input id="slope" type="range" min="0" max="5" step="0.05"></label>
+  <label title="Each section of a climb a random check: up (at up to the max slope) or level, for ramps, benches and plateaus">Slope variety <small>steady · varied</small><input id="undulate" type="range" min="0" max="2" step="0.01"></label>
+  <label title="Ranges lining up into bands, or distinct summits, each row its own">Peaks <small>bands · summits</small><input id="peaks" type="range" min="0" max="2" step="0.01"></label>
+  <label>Rugged <small>hills · peaks</small><input id="rugged" type="range" min="0" max="2" step="0.01"></label>
+  <h2>Terraces</h2>
+  <label>Step <small>fine · coarse</small><input id="step" type="range" min="0.05" max="5" step="0.01"></label>
+  <label>Soft <small>stairs · slopes</small><input id="soft" type="range" min="0.01" max="1" step="0.01"></label>
+  <label>Bands <output id="bandsOut"></output><input id="bands" type="range" min="1" max="20" step="1"></label>
+  <h2>Rows</h2>
+  <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="6" max="400" step="1"></label>
+  <label class="check" title="The faint lines along each row, on the water"><input id="swell" type="checkbox" checked> Swell lines</label>
+  <h2>Sky</h2>
+  <label title="Cloud cover: none, to overcast">Clouds <small>none · overcast</small><input id="clouds" type="range" min="0" max="1" step="0.01" value="0"></label>
+  <label class="only-clouds" title="Small, many cloud banks or large, few">Cloud size <small>small · large</small><input id="cloudSize" type="range" min="0.2" max="3" step="0.01" value="1"></label>
+  <label class="only-clouds" title="How high the cloud tops billow at the heart of each cloud">Billow at heart <small>flat · towering</small><input id="cloudPuff" type="range" min="0" max="6" step="0.05" value="1"></label>
+  <label class="only-clouds" title="How high the cloud tops billow at the thin ends of each cloud: small tips, or blunt ends">Billow at tips <small>small · blunt</small><input id="cloudTip" type="range" min="0" max="6" step="0.05" value="0.15"></label>
+  <label class="only-clouds" title="How much of the cloud is the mountains' own: caps on the summits that reach the cloud level, windward slopes, banners and lee waves downwind, against the spread grown from them">From peaks <small>spread · mountains</small><input id="cloudPeaks" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+  <label class="only-clouds" title="How far the cloud the peaks make spreads across the sky: on the mountains only, to all of it, farther downwind">Spread <small>peaks · sky</small><input id="cloudSpread" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+  <label class="only-clouds" title="Wind strength: still air gives caps on the summits only; a strong wind trails banners and lines of lee-wave clouds downwind">Wind <small>still · gale</small><input id="wind" type="range" min="0" max="2" step="0.01" value="0.6"></label>
+  <label class="only-clouds" title="Where the wind blows: right, out of the page (towards the nearer rows), left, or into it">Wind direction <svg id="windArrow" viewBox="-10 -10 20 20" width="14" height="14" style="vertical-align:middle"><path d="M-7 0H6M2-4L6 0 2 4" stroke="currentColor" stroke-width="2" fill="none"/></svg><input id="windDir" type="range" min="0" max="360" step="1" value="0"></label>
+  <label class="only-clouds" title="How solid the clouds are">Opacity <small>veil · solid</small><input id="cloudOpacity" type="range" min="0.2" max="1" step="0.01" value="0.92"></label>
+  <label class="only-clouds" title="The shadow a cloud casts on the water beneath it">Shadow <small>none · dark</small><input id="cloudShadow" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+  <h2>Geography</h2>
+  <label class="check" title="Each place's own landforms: fjord cliffs, karst towers, shield volcanoes, low reef islets"><input id="forms" type="checkbox" checked> Landforms by place</label>
+  <label title="Islands all alike, or a few large leading many small">Hierarchy <small>even · few large</small><input id="hierarchy" type="range" min="0" max="1.3" step="0.01"></label>
+  <label class="not-noise" title="Along a chain: young, tall, dark islands at one end; old, low, sinking atolls at the other">Age <small>none · strong</small><input id="age" type="range" min="0" max="1.2" step="0.01"></label>
+  <label title="Some islands lifted into massifs, others kept low">Relief <small>even · varied</small><input id="relief" type="range" min="0" max="2" step="0.01"></label>
+  <label title="A calm border of open water, its edge wobbling: islands float free of the frame">Edges <small>none · wide</small><input id="edges" type="range" min="0" max="2" step="0.01"></label>
+  <label title="Smaller hills in front of each range, overlapping it into smaller regions, where the species' colours land">Foothills <small>none · many</small><input id="foothills" type="range" min="0" max="4" step="0.01"></label>
+  <label title="Pale shallow water round the land">Shallows <small>none · wide</small><input id="shallows" type="range" min="0" max="3" step="0.01"></label>
+  <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="8" step="0.05"></label>
+  <label class="check"><input id="wrap" type="checkbox"> Repeat left to right</label>
+  <div class="row">
+    <button id="reseed" title="Same dials, another map">Reseed</button>
+    <button id="svg" title="Download as SVG">SVG</button>
+    <button id="png" title="Download as PNG">PNG</button>
+  </div>
+  <div id="note"></div>
+</aside>
+<main><canvas id="view"></canvas><div id="sizes" class="only-emblem" title="The drawing at 16, 24, 32, 48, 64 and 128 px"></div></main>
+<script type="module">
+  import { ridges, DEFAULTS } from './ridges.js';
+  import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
+  import * as presets from './presets.js';
+  import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
+
+  const $ = (id) => document.getElementById(id);
+  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
+  for (const k of DIALS) $(k).value = DEFAULTS[k];
+  // Palettes are kept as photographed (a palette shipped enriched is taken back to its raw colours); Richness enriches
+  // them as they are drawn, so the swatches always show and edit the colours the photos gave.
+  const baseOf = (p) => (p.raw ? { ...structuredClone({ ...p, raw: undefined }), colours: [...p.raw.colours], sea: p.raw.sea && [...p.raw.sea] } : structuredClone(p));
+  const palettes = Object.fromEntries(Object.entries(PLACES).map(([k, p]) => [k, baseOf(p)]));
+  const richer = new Map();
+  const richOf = (p) => {
+    const r = +$('richness').value;
+    if (!p || !r) return p;
+    const key = JSON.stringify([p.colours, p.sea, p.weights, r]);
+    if (!richer.has(key)) richer.set(key, enrich(p, { chroma: 1 + 0.4 * r, contrast: 1 + 0.18 * r, sea: 1 + 0.25 * r, ceiling: 0.11 + 0.04 * r }));
+    return richer.get(key);
+  };
+  // The menu by where: Canada's archipelagos, those elsewhere, and the hand-picked palettes.
+  const kinds = [['Canada', (p) => p.region === 'canada'], ['Elsewhere', (p) => p.photos && !p.region?.startsWith('canada')], ['Canada, set aside', (p) => p.region === 'canada-aside'], ['By hand', (p) => !p.photos]];
+  $('place').innerHTML = kinds.map(([label, is]) => `<optgroup label="${label}">${Object.entries(palettes).filter(([, p]) => is(p)).map(([k, p]) => `<option value="${k}">${p.title}</option>`).join('')}</optgroup>`).join('');
+  $('mix').innerHTML = Object.entries(palettes).filter(([, p]) => p.photos).map(([k, p]) => `<label><input type="checkbox" value="${k}" checked> ${p.title}</label>`).join('');
+  let seed = 1;
+  const pal = () => palettes[$('place').value];
+  // The palette each chain takes. The first chain has the one chosen above; each next chain, nearest the ones
+  // already given first, takes the ticked place whose cast differs most from its neighbours', a neighbour counting
+  // less the further off it is; no place is used twice until every ticked one is used.
+  let given = [];
+  const palOf = (group) => richOf(palettes[given[group]] ?? pal());
+  // On a map: the place chosen above and every ticked place that has a position, each one archipelago.
+  const geo = () => $('geo').checked && $('source').value !== 'noise';
+  const geoPlaces = () => [...new Set([$('place').value, ...[...$('mix').querySelectorAll('input:checked')].map((c) => c.value)])].filter((k) => palettes[k].where);
+  function assign(chains, width) {
+    if (geo()) return void (given = geoPlaces().slice(0, chains.length));
+    const mix = [...new Set([$('place').value, ...[...$('mix').querySelectorAll('input:checked')].map((c) => c.value)])];
+    const sig = Object.fromEntries(mix.map((k) => [k, signature(palettes[k])]));
+    const contrast = (a, b) => Math.hypot(sig[a][0] - sig[b][0], sig[a][1] - sig[b][1], sig[a][2] - sig[b][2]);
+    const apart = chains.map((p) => chains.map((q) => Math.min(...p.map(([x, y]) => Math.min(...q.map(([u, v]) => Math.hypot(x - u, y - v))))) / width));
+    given = chains.map(() => null);
+    if (!chains.length) return;
+    given[0] = mix[0];
+    for (let n = 1; n < chains.length; n++) {
+      const done = given.map((k, i) => (k ? i : -1)).filter((i) => i >= 0);
+      const near = (i) => Math.min(...done.map((j) => apart[i][j]));
+      const next = given.map((k, i) => (k ? -1 : i)).filter((i) => i >= 0).sort((a, b) => near(a) - near(b))[0];
+      let best = mix[0], score = -Infinity;
+      // Every ticked place is used once before any is used again.
+      const unused = mix.filter((k) => !given.includes(k));
+      for (const k of unused.length ? unused : mix) {
+        const s = Math.min(...done.map((j) => contrast(k, given[j]) + apart[next][j] * 0.4));
+        if (s > score) (score = s), (best = k);
+      }
+      given[next] = best;
+    }
+  }
+
+  // The seeding letter: the text drawn heavy and centred on a small canvas the page's shape, blurred so the land
+  // eases in and out of it; its coverage, 0 to 1, is the mask the land keeps to. Drawn again only when it changes.
+  let glyph = { key: '', shape: null };
+  function letterShape() {
+    const text = $('letterText').value.trim();
+    if (!$('letter').checked || !text) return null;
+    const font = $('face').value, size = +$('letterSize').value, key = [text, font, size, frame()].join('|');
+    if (glyph.key === key) return glyph.shape;
+    const [w, hgt] = frame(), nx = 200, ny = Math.round((nx * hgt) / w), c = document.createElement('canvas');
+    [c.width, c.height] = [nx, ny];
+    const g = c.getContext('2d');
+    let px = ny * 0.8 * size;
+    g.font = `900 ${px}px ${font}`;
+    // Sized by the letters as drawn (a capital is only part of its type size): their height to the dial, then
+    // narrowed if they would run wider than the page.
+    const first = g.measureText(text);
+    px *= (ny * 0.78 * size) / Math.max(1, first.actualBoundingBoxAscent + first.actualBoundingBoxDescent);
+    g.font = `900 ${px}px ${font}`;
+    const wide = g.measureText(text).width;
+    if (wide > nx * 0.86 * size) (px *= (nx * 0.86 * size) / wide), (g.font = `900 ${px}px ${font}`);
+    const m = g.measureText(text);
+    g.filter = 'blur(3px)';
+    g.textAlign = 'center';
+    g.fillText(text, nx / 2, ny / 2 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2);
+    const data = g.getImageData(0, 0, nx, ny).data, v = new Float32Array(nx * ny);
+    for (let i = 0; i < v.length; i++) v[i] = data[i * 4 + 3] / 255;
+    glyph = { key, shape: { nx, ny, v } };
+    return glyph.shape;
+  }
+
+  const frame = () => $('frame').value.split('x').map(Number);
+  const emblem = () => $('emblem').checked;
+  // The name set over the picture: the app's typeface, in the palette's paper on a dark ground and its ink on a light one.
+  const named = () => $('name').checked && $('nameText').value.trim();
+  function nameOf(pic, p) {
+    const px = Math.round(+$('nameSize').value * pic.height), at = $('namePlace').value, M = DEFAULTS.margin;
+    // Letter spacing is added after every letter, the last too: centred, the name is moved by half of it to stay centred.
+    const spacing = Math.round(+$('nameSpacing').value * px * 10) / 10, text = $('nameText').value.trim();
+    const x = at === 'low-left' ? M : pic.width / 2 + spacing / 2, y = at === 'centre' ? pic.height / 2 + px * 0.35 : pic.height - M;
+    return { text: $('nameCaps').checked ? text.toUpperCase() : text, px, x, y, spacing, italic: $('nameItalic').checked, align: at === 'low-left' ? 'left' : 'center', colour: p && (isLight(background(p)) ? p.ink : p.paper), font: `${$('nameItalic').checked ? 'italic ' : ''}${$('faceWeight').value} ${px}px ${$('face').value}` };
+  }
+  // The clearing round the name: the name drawn on a small canvas the frame's shape, thickened and blurred by the
+  // Clearing dial, so the land keeps off it with room to spare. Drawn again only when it changes.
+  let clearing = { key: '', grid: null };
+  function clearOf() {
+    const pad = +$('nameClear').value;
+    if (!named() || !pad) return null;
+    const [width, height] = frame(), n = nameOf({ width, height }, null), key = [n.text, n.font, n.x, n.y, n.align, n.spacing, pad].join('|');
+    if (clearing.key === key) return clearing.grid;
+    const nx = 240, ny = Math.round((nx * height) / width), k = nx / width, c = document.createElement('canvas');
+    [c.width, c.height] = [nx, ny];
+    const g = c.getContext('2d');
+    g.scale(k, k);
+    Object.assign(g, { font: n.font, letterSpacing: `${n.spacing}px`, textAlign: n.align, fillStyle: '#000', strokeStyle: '#000', lineJoin: 'round', lineWidth: n.px * pad * 0.9, filter: `blur(${n.px * pad * 0.35 * k}px)` });
+    g.fillText(n.text, n.x, n.y);
+    g.strokeText(n.text, n.x, n.y);
+    const data = g.getImageData(0, 0, nx, ny).data, v = new Float32Array(nx * ny);
+    for (let i = 0; i < v.length; i++) v[i] = data[i * 4 + 3] / 255;
+    clearing = { key, grid: { nx, ny, v } };
+    return clearing.grid;
+  }
+  function setName(g, pic, p) {
+    const n = nameOf(pic, p);
+    Object.assign(g, { font: n.font, letterSpacing: `${n.spacing}px`, textAlign: n.align, textBaseline: 'alphabetic', fillStyle: n.colour, shadowColor: background(p), shadowBlur: n.px * 0.4 });
+    g.fillText(n.text, n.x, n.y);
+    Object.assign(g, { shadowBlur: 0, letterSpacing: '0px' });
+  }
+  // The drawing as it is shown: with or without the swell lines on the water.
+  const shown = (pic) => ($('swell').checked ? pic : { ...pic, shapes: pic.shapes.filter((s) => !s.line) });
+  /** Paint the drawing into a square of px: the page fitted and centred on its ground, every setting as at full size. */
+  function icon(g, pic, px, dpr, opts) {
+    const k = px / Math.max(pic.width, pic.height);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = opts.background;
+    g.fillRect(0, 0, px, px);
+    g.setTransform(k * dpr, 0, 0, k * dpr, ((px - pic.width * k) / 2) * dpr, ((px - pic.height * k) / 2) * dpr);
+    paint(g, shown(pic), opts);
+  }
+
+  // The archipelagos' palettes are given as the land is laid out, so each can also set how its land stands.
+  const forms = (groups) => (assign(groups, 800), groups.length ? given.map((k) => palettes[k].form) : [pal().form]);
+  const dials = () => {
+    // Rows count down the page: a frame of another height has as many as keeps them as far apart.
+    const [width, height] = frame(), M = DEFAULTS.margin, rows = Math.max(1, Math.round((+$('rows').value * (height - 2 * M)) / (DEFAULTS.height - 2 * M)));
+    const d = { ...Object.fromEntries(DIALS.map((k) => [k, +$(k).value])), width, height, rows, clear: clearOf(), source: $('source').value, wrap: $('wrap').checked, seed, shape: letterShape(), shapeStrength: +$('letterStrength').value, anchors: geo() ? layout(geoPlaces().map((k) => palettes[k]), width, height) : null, forms: $('forms').checked ? forms : (g) => (assign(g, 800), []) };
+    return d;
+  };
+  const fillOf = (s) => fillWith(s, palOf, $('weighted').checked);
+  // The background: the palette's deep water, until a colour is picked; then that, whatever the palette.
+  let bgPicked = null;
+  const background = (p) => bgPicked ?? waterOf(p).deep;
+
+  function draw() {
+    const t0 = performance.now(), p = richOf(pal());
+    const pic = ridges(dials());
+    const cv = $('view'), dpr = devicePixelRatio || 1;
+    cv.width = pic.width * dpr; cv.height = pic.height * dpr;
+    cv.style.aspectRatio = `${pic.width} / ${pic.height}`;
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const opts = { base: p, palOf, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value };
+    // With Emblem ticked, the drawing can be shown at an icon's size: painted that small, shown magnified, pixels square.
+    const at = emblem() ? AT[+$('emAt').value] : 0;
+    cv.classList.toggle('at', !!at);
+    cv.style.width = at ? 'min(100%, calc(100vh - 340px))' : '';
+    if (at) {
+      cv.width = cv.height = Math.round(at * dpr);
+      cv.style.aspectRatio = '1';
+      icon(g, pic, at, dpr, opts);
+    } else {
+      paint(g, shown(pic), opts);
+      if (named()) setName(g, pic, p);
+    }
+    $('emAtOut').textContent = AT[+$('emAt').value] ? AT[+$('emAt').value] + ' px' : 'full';
+    $('bg').value = background(p);
+    if (emblem()) sizes(pic, opts);
+    $('bandsOut').textContent = $('bands').value;
+    $('slopeOut').textContent = +$('slope').value ? (+$('slope').value).toFixed(2) : 'none';
+    $('richnessOut').textContent = +$('richness').value ? `×${(+$('richness').value).toFixed(2)}` : 'as photographed';
+    $('rowsOut').textContent = $('rows').value;
+    $('chainsOut').textContent = geo() ? `${given.length}, one per place` : $('chains').value;
+    $('note').textContent = `${given.length ? given.map((k) => palettes[k].title).join(', ') + ' · ' : ''}${pic.shapes.length} shapes · ${(performance.now() - t0).toFixed(0)} ms`;
+  }
+
+  // With Emblem ticked, the drawing at icon sizes, each the full drawing scaled down, every setting as it is.
+  const SIZES = [16, 24, 32, 48, 64, 128];
+  const AT = [0, 128, 64, 48, 32, 24, 16];
+  function sizes(pic, opts) {
+    const dpr = devicePixelRatio || 1, row = document.createElement('div');
+    for (const px of SIZES) {
+      const c = document.createElement('canvas');
+      c.width = c.height = Math.round(px * dpr);
+      c.style.width = c.style.height = px + 'px';
+      icon(c.getContext('2d'), pic, px, dpr, opts);
+      row.append(c);
+    }
+    $('sizes').replaceChildren(row);
+  }
+
+  function swatches() {
+    const p = pal();
+    const all = [['paper', p.paper], ['ink', p.ink], ...p.colours.map((c, i) => [i, c])];
+    $('sources').innerHTML = p.photos ? 'From photos: ' + p.photos.map((s, i) => `<a href="${s.page}" target="_blank" rel="noopener" title="${s.by}, ${s.license}">${i + 1}</a>`).join(' · ') : '';
+    $('swatches').innerHTML = all.map(([k, c]) => `<input type="color" value="${c}" data-k="${k}" class="${typeof k === 'string' ? 'role' : ''}" title="${typeof k === 'string' ? k : 'colour ' + (k + 1)}">`).join('');
+  }
+  $('swatches').addEventListener('input', (ev) => {
+    const k = ev.target.dataset.k, p = pal();
+    if (k === 'paper' || k === 'ink') p[k] = ev.target.value; else p.colours[+k] = ev.target.value;
+    draw();
+  });
+
+  function usePhoto(file) {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'), s = 140 / Math.max(img.width, img.height);
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0, c.width, c.height);
+      palettes.photo = fromPixels(g.getImageData(0, 0, c.width, c.height).data, 9, seed);
+      if (![...$('place').options].some((o) => o.value === 'photo')) $('place').insertAdjacentHTML('beforeend', '<option value="photo">From photo</option>');
+      $('place').value = 'photo';
+      $('photo').src = img.src; $('photo').style.display = 'block';
+      swatches(); draw();
+    };
+    img.src = URL.createObjectURL(file);
+  }
+  $('drop').onclick = () => $('file').click();
+  $('file').onchange = () => $('file').files[0] && usePhoto($('file').files[0]);
+  for (const [ev, on] of [['dragover', true], ['dragleave', false], ['drop', false]]) $('drop').addEventListener(ev, (e) => (e.preventDefault(), $('drop').classList.toggle('over', on)));
+  $('drop').addEventListener('drop', (e) => e.dataTransfer.files[0] && usePhoto(e.dataTransfer.files[0]));
+
+  $('shuffle').onclick = () => {
+    const p = pal(), c = p.colours, w = p.weights;
+    for (let i = c.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [c[i], c[j]] = [c[j], c[i]];
+      if (w) [w[i], w[j]] = [w[j], w[i]];
+    }
+    swatches(); draw();
+  };
+  $('reseed').onclick = () => ((seed += 1), draw());
+  $('place').onchange = () => (swatches(), draw());
+  $('bg').addEventListener('input', () => ((bgPicked = $('bg').value), draw()));
+  $('bgReset').onclick = () => ((bgPicked = null), draw());
+  for (const b of document.querySelectorAll('[data-ground]')) b.onclick = () => ((bgPicked = b.dataset.ground), draw());
+  const showEmblem = () => document.body.classList.toggle('emblem', emblem());
+  $('emblem').addEventListener('input', () => (showEmblem(), draw()));
+  for (const k of ['emAt', 'swell', 'frame', 'nameText', 'nameSize', 'namePlace', 'nameClear', 'nameCaps', 'nameSpacing']) $(k).addEventListener('input', draw);
+  const showName = () => document.body.classList.toggle('named', $('name').checked);
+  $('name').addEventListener('input', () => (showName(), draw()));
+  // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
+  for (const k of [...DIALS, 'wrap', 'weighted', 'forms', 'geo']) $(k).addEventListener(k === 'pattern' || k === 'scale' || k === 'variety' ? 'change' : 'input', draw);
+  const showSource = () => { document.body.classList.toggle('diffusion', $('source').value.startsWith('diffusion')); document.body.classList.toggle('noise', $('source').value === 'noise'); };
+  $('source').addEventListener('change', () => (showSource(), draw()));
+  showSource();
+  $('mix').addEventListener('change', draw);
+  const showClouds = () => { document.body.classList.toggle('clouds', +$('clouds').value > 0); $('windArrow').style.transform = 'rotate(' + $('windDir').value + 'deg)'; };
+  $('windDir').addEventListener('input', showClouds);
+  $('clouds').addEventListener('input', showClouds);
+  $('cloudOpacity').addEventListener('input', draw);
+  showClouds();
+  const showLetter = () => document.body.classList.toggle('letter', $('letter').checked);
+  for (const k of ['letter', 'letterText', 'letterSize', 'letterStrength']) $(k).addEventListener('input', () => (showLetter(), draw()));
+  // A face is drawn once it has loaded, the weights the name and the letter use; the canvas would draw a fallback before.
+  const faceReady = () => Promise.all([`${$('faceWeight').value} 64px ${$('face').value}`, `italic ${$('faceWeight').value} 64px ${$('face').value}`, `900 64px ${$('face').value}`].map((f) => document.fonts.load(f).catch(() => null)));
+  for (const k of ['face', 'faceWeight', 'nameItalic']) $(k).addEventListener('input', () => (($('faceWeightOut').textContent = $('faceWeight').value), faceReady().then(draw)));
+  $('faceWeightOut').textContent = $('faceWeight').value;
+  showLetter();
+  $('richness').addEventListener('input', draw);
+  for (const b of document.querySelectorAll('[data-mix]')) b.onclick = () => {
+    // The set-aside places are ticked only by All.
+    const region = (k) => palettes[k].region ?? '';
+    for (const c of $('mix').querySelectorAll('input')) c.checked = b.dataset.mix === 'all' || (b.dataset.mix === 'canada' ? region(c.value) === 'canada' : !region(c.value).startsWith('canada'));
+    draw();
+  };
+
+  const save = (name, blob) => Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name }).click();
+  $('png').onclick = () => $('view').toBlob((b) => save(`archipelago-${$('place').value}-${seed}.png`, b));
+  const text = (pic, p) => {
+    if (!named()) return '';
+    const n = nameOf(pic, p), esc = n.text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    return `<text x="${n.x}" y="${n.y}" text-anchor="${n.align === 'left' ? 'start' : 'middle'}" fill="${n.colour}" font-family="${$('face').value.replace(/"/g, "'")}" font-weight="${$('faceWeight').value}"${n.italic ? ' font-style="italic"' : ''} letter-spacing="${n.spacing}" font-size="${n.px}">${esc}</text>`;
+  };
+  $('svg').onclick = () => {
+    const p = richOf(pal()), pic = shown(ridges(dials())), f = (v) => +v.toFixed(1);
+    const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
+    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p, background(p))}"/>` : s.shadow ? `<path d="${d(s)}" fill="#000" fill-opacity="${(0.35 * s.shadow).toFixed(3)}" stroke="none"/>` : s.cloud ? `<path d="${d(s)}" fill="${p.paper}" fill-opacity="${$('cloudOpacity').value}" stroke-width="${pic.line * 0.6}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
+    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g>${text(pic, p)}</svg>`], { type: 'image/svg+xml' }));
+  };
+
+  // Presets: everything that makes this picture, so it can be had again.
+  const paletteOf = (p) => ({ title: p.title, paper: p.paper, ink: p.ink, colours: [...p.colours], weights: p.weights ? [...p.weights] : undefined });
+  const changed = (k, p) => !PLACES[k] || JSON.stringify(paletteOf(p)) !== JSON.stringify(paletteOf(baseOf(PLACES[k])));
+  const capture = () => ({
+    v: 1,
+    place: $('place').value,
+    mix: [...$('mix').querySelectorAll('input:checked')].map((c) => c.value),
+    source: $('source').value,
+    dials: Object.fromEntries(DIALS.map((k) => [k, +$(k).value])),
+    weighted: $('weighted').checked, forms: $('forms').checked, wrap: $('wrap').checked, geo: $('geo').checked,
+    seed, bg: bgPicked, richness: +$('richness').value, cloudOpacity: +$('cloudOpacity').value,
+    face: { font: $('face').value, weight: +$('faceWeight').value },
+    letter: { on: $('letter').checked, text: $('letterText').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
+    emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value,
+    name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value, caps: $('nameCaps').checked, italic: $('nameItalic').checked, spacing: +$('nameSpacing').value },
+    // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
+    palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
+  });
+  function apply(s) {
+    for (const [k, p] of Object.entries(PLACES)) palettes[k] = baseOf(p);
+    for (const [k, p] of Object.entries(s.palettes ?? {})) {
+      palettes[k] = { ...(palettes[k] ?? {}), ...structuredClone(p) };
+      if (![...$('place').options].some((o) => o.value === k)) $('place').insertAdjacentHTML('beforeend', `<option value="${k}">${p.title ?? k}</option>`);
+    }
+    if (palettes[s.place]) $('place').value = s.place;
+    for (const c of $('mix').querySelectorAll('input')) c.checked = (s.mix ?? []).includes(c.value);
+    $('source').value = s.source ?? 'chains';
+    for (const k of DIALS) $(k).value = s.dials?.[k] ?? DEFAULTS[k];
+    $('weighted').checked = s.weighted ?? true; $('forms').checked = s.forms ?? true; $('wrap').checked = !!s.wrap; $('geo').checked = s.geo ?? false;
+    seed = s.seed ?? 1; bgPicked = s.bg ?? null; $('richness').value = s.richness ?? 1; $('cloudOpacity').value = s.cloudOpacity ?? 0.92;
+    const l = s.letter ?? {};
+    $('letter').checked = !!l.on; $('letterText').value = l.text ?? 'A'; $('letterSize').value = l.size ?? 0.85; $('letterStrength').value = l.strength ?? 1;
+    // The face: kept on its own since the picker; before it, a preset's letter had its own font, and its name was System UI 600.
+    const font = s.face?.font ?? l.font ?? $('face').options[0].value;
+    $('face').value = [...$('face').options].some((o) => o.value === font) ? font : $('face').querySelector('[selected]').value;
+    $('faceWeight').value = s.face?.weight ?? 600; $('faceWeightOut').textContent = $('faceWeight').value;
+    faceReady().then(draw);
+    const e = s.emblem ?? {};
+    $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true; $('frame').value = s.frame ?? '800x1000';
+    const n = s.name ?? {};
+    $('name').checked = !!n.on; $('nameText').value = n.text ?? 'Archipelago'; $('nameSize').value = n.size ?? 0.1; $('namePlace').value = n.place ?? 'low-left'; $('nameClear').value = n.clear ?? 1; $('nameCaps').checked = !!n.caps; $('nameItalic').checked = !!n.italic; $('nameSpacing').value = n.spacing ?? 0; showName();
+    showLetter(); showClouds(); showEmblem();
+    showSource(); swatches(); draw();
+  }
+  function listPresets(chosen = '') {
+    const names = Object.keys(presets.all()).sort((a, b) => a.localeCompare(b));
+    $('preset').innerHTML = `<option value="">${names.length ? 'Load a preset…' : 'No presets yet'}</option>` + names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
+    $('preset').value = chosen;
+  }
+  const tellPreset = (text) => ($('presetNote').textContent = text);
+  $('preset').onchange = () => {
+    const s = presets.all()[$('preset').value];
+    if (s) apply(s), ($('presetName').value = $('preset').value), tellPreset(`Loaded`);
+  };
+  $('presetSave').onclick = () => {
+    const name = $('presetName').value.trim() || `${pal().title} ${seed}`;
+    tellPreset(presets.keep(name, capture()) ? `Saved “${name}”` : 'This browser would not keep it: export instead');
+    listPresets(name);
+  };
+  $('presetDelete').onclick = () => {
+    const name = $('preset').value;
+    if (!name) return;
+    presets.remove(name);
+    tellPreset(`Deleted “${name}”`);
+    listPresets();
+  };
+  $('presetExport').onclick = () => save('archipelago-presets.json', new Blob([presets.exported()], { type: 'application/json' }));
+  $('presetImport').onclick = () => $('presetFile').click();
+  $('presetFile').onchange = async () => {
+    const file = $('presetFile').files[0];
+    if (!file) return;
+    try {
+      tellPreset(`Imported ${presets.imported(await file.text())}`);
+    } catch (err) {
+      tellPreset(err.message);
+    }
+    $('presetFile').value = '';
+    listPresets();
+  };
+
+  listPresets();
+  swatches();
+  draw();
+</script>
+</body>
+</html>

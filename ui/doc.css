@@ -22,7 +22,7 @@ h4,
 nav,
 footer,
 .muted {
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--face-text);
 }
 h1 {
   font-size: var(--reader-h1);
@@ -161,7 +161,7 @@ figure img {
 }
 /* An invoice: its number, dates and what is due as a heading block; the rest reads as the bill, in a plain face. */
 body.invoice main {
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--face-text);
   font-size: var(--text-6);
 }
 .invoice-head {
@@ -227,7 +227,7 @@ table.text-table {
   font-variant-numeric: tabular-nums;
 }
 table.text-table th {
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--face-text);
   font-size: var(--reader-tiny);
   font-weight: 600;
   letter-spacing: var(--track-2);
@@ -297,7 +297,7 @@ ul.checklist li.done {
 }
 code,
 pre {
-  font-family: ui-monospace, monospace;
+  font-family: var(--face-mono);
   font-size: var(--reader-small);
 }
 pre {

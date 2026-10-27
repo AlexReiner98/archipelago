@@ -4,7 +4,7 @@
 // whoever sends it to where it is kept. Each place that holds parts is a column of its own, drawn as a box around
 // them, so nothing of one place ever sits inside another's box; the parts are layered by longest path, ordered in
 // their column by barycentre sweeps, and the wires routed at right angles, each on a track of its own. Pure: an
-// answer in, geometry out; `measure(text, px)` gives a title's width at a size.
+// answer in, geometry out; `measure(text, px, role)` gives a title's width at a size, as a text role of the style when one is named.
 
 import { route } from './route.js';
 
@@ -311,7 +311,7 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
   const cell = (k, c) => layers[k].filter((id) => nodes.get(id).col === c);
   const widthOf = (ids) => ids.reduce((s, id, k) => s + nodes.get(id).w + (k ? gap(ids[k - 1], id) : 0), 0);
   const colLeft = new Map(), colRight = new Map();
-  const colWidth = (c) => Math.max(...layers.map((_, k) => widthOf(cell(k, c))), c === null ? 0 : measure(byId.get(c).title, PLACE_TEXT) + PLACE_NAME_PAD);
+  const colWidth = (c) => Math.max(...layers.map((_, k) => widthOf(cell(k, c))), c === null ? 0 : measure(byId.get(c).title, PLACE_TEXT, 'region') + PLACE_NAME_PAD);
   const between = COL_GAP + 2 * PAD;
   if (!prior) {
     let at = MARGIN + PAD;

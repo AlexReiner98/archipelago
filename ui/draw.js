@@ -197,18 +197,23 @@ say({ type: 'ready' });
     const post = (message) => self.postMessage(message);
     const text = (err) => String(err?.message ?? err).slice(0, 300);
     const ctx = new OffscreenCanvas(1, 1).getContext('2d');
-    /** How wide a text is drawn, as the page's own canvas would say: each once, since a drawing asks again and again as it cuts a name to fit. */
+    /**
+     * How wide a text is drawn, as the page's own canvas would say: each once, since a drawing asks again and again as
+     * it cuts a name to fit. Set as a text role (the style's type: weight, style, case, track), it is measured so.
+     */
     const widths = new Map();
     let current = '';
-    const measure = (words, px, font) => {
-      const want = `400 ${px}px ${font || 'system-ui'}`, key = `${want}|${words}`;
+    const measure = (words, px, font, as) => {
+      const said = as?.case === 'upper' ? String(words).toUpperCase() : String(words);
+      const want = `${as?.style === 'italic' ? 'italic ' : ''}${as?.weight === 600 ? 600 : 400} ${px}px ${font || 'system-ui'}`, key = `${want}|${said}`;
       let w = widths.get(key);
       if (w === undefined) {
         if (current !== want) ctx.font = current = want;
-        widths.set(key, (w = ctx.measureText(String(words)).width));
+        widths.set(key, (w = ctx.measureText(said).width));
         if (widths.size > 50000) widths.clear();
       }
-      return w;
+      const track = /^-?\d+(\.\d+)?em$/.test(as?.track ?? '') ? parseFloat(as.track) * px * [...said].length : 0;
+      return w + track;
     };
     let made;
     // A drawing is a set of modules, entered at index.js; one imports another as './name.js'. Each is given an

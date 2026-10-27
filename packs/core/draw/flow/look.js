@@ -52,5 +52,5 @@ export const css = `
 .lf-break rect { fill: var(--ln-sea); } .lf-break path { stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
 /* Zoomed out until only names are read (ui/pan-zoom.js): what a choice is is not drawn. */
 [data-text=names] .lf-says { display: none; }
-.lf-says rect { fill: var(--ln-sea); } .lf-says text { fill: var(--ln-muted); font-size: var(--ln-flow-says-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: middle; }
+.lf-says rect { fill: var(--ln-sea); } .lf-says text { fill: var(--ln-muted); font-size: var(--ln-flow-says-text); font-family: var(--type-water-family, var(--ln-font)); font-weight: var(--type-water-weight, 400); font-style: var(--type-water-style, normal); text-transform: var(--type-water-case, none); letter-spacing: var(--type-water-track, 0); text-anchor: middle; dominant-baseline: middle; }
 `;

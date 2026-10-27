@@ -28,7 +28,7 @@ export const css = `
 .ar-place-box.down { stroke: var(--ln-blocked); }
 .ar-place-name { fill: var(--ln-inner); }
 .ar-place:hover text { fill: var(--ln-text); }
-.ar-place text { fill: var(--ln-muted); font-weight: 600; font-size: var(--ln-arch-place-text); font-family: var(--ln-font); dominant-baseline: middle; }
+.ar-place text { fill: var(--ln-muted); font-size: var(--ln-arch-place-text); font-family: var(--type-region-family, var(--ln-font)); font-weight: var(--type-region-weight, 400); font-style: var(--type-region-style, normal); text-transform: var(--type-region-case, none); letter-spacing: var(--type-region-track, 0); dominant-baseline: middle; }
 /* Wires: wired solid, not yet wired dashed, broken in the colour of blocked. */
 .ar-wire { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
 .ar-wire.planned { stroke-dasharray: var(--ln-flow-dash-choice); stroke-opacity: var(--ln-arch-planned-wire); }
@@ -39,7 +39,7 @@ export const css = `
 .ar-hit { fill: none; stroke: transparent; stroke-width: var(--ln-arch-hit); cursor: default; }
 .ar-break rect { fill: var(--ln-sea); } .ar-break path { stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
 .ar-says rect { fill: var(--ln-sea); stroke: var(--ln-line); stroke-width: var(--ln-arch-says-stroke); }
-.ar-says text { fill: var(--ln-muted); font-size: var(--ln-arch-says-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: middle; }
+.ar-says text { fill: var(--ln-muted); font-size: var(--ln-arch-says-text); font-family: var(--type-water-family, var(--ln-font)); font-weight: var(--type-water-weight, 400); font-style: var(--type-water-style, normal); text-transform: var(--type-water-case, none); letter-spacing: var(--type-water-track, 0); text-anchor: middle; dominant-baseline: middle; }
 .ar-says.broken text { fill: var(--ln-blocked); }
 .ar-tally { display: flex; gap: var(--ln-grid-gap); align-items: center; min-width: 0; overflow: hidden; }
 `;
