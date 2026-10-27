@@ -33,6 +33,13 @@ export async function kept<T>(db: Q, key: string): Promise<T | undefined> {
   return rows[0]?.value;
 }
 
+/** What is kept under a key, with its bytes, if it has not run out. */
+export async function keptWith<T>(db: Q, key: string): Promise<{ value: T; data?: Buffer } | undefined> {
+  const { rows } = await db.query<{ value: T; data: Uint8Array | null }>(`select value, data from transient where key = $1 and until >= now()`, [key]);
+  const row = rows[0];
+  return row && { value: row.value, ...(row.data && { data: Buffer.from(row.data) }) };
+}
+
 /** What is kept under a key, given once: taken away as it is read, by whichever request asks first. */
 export async function take<T>(db: Q, key: string): Promise<{ value: T; data?: Buffer } | undefined> {
   const { rows } = await db.query<{ value: T; data: Uint8Array | null; live: boolean }>(`delete from transient where key = $1 returning value, data, until >= now() as live`, [key]);

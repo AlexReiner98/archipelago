@@ -36,6 +36,8 @@ export interface Step {
   did?: string;
   /** The UI address of what it did it to, when that is one item or one picture. */
   hash?: string;
+  /** For a show: the look the page that goes there answers with a picture of what it drew (src/looks.ts). */
+  look?: string;
 }
 
 /** How many steps are kept for a page to catch up on between two looks. */
@@ -52,7 +54,7 @@ export const LISTEN_MS = 15_000;
 
 /** Whose screen: per workspace and per person. */
 export type Whose = { workspace: string; viewer?: string };
-const whose = (w: Whose) => `${w.workspace}:${w.viewer ?? ''}`;
+export const whose = (w: Whose) => `${w.workspace}:${w.viewer ?? ''}`;
 
 // This process's own steps, per screen, and those not yet kept.
 const mine = new Map<string, Step[]>();

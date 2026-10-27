@@ -10,6 +10,7 @@ import { launch } from './launcher.ts';
 import { notifyWorkspace, wholeMap } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
 import { actorId } from './pelago.ts';
+import { drew } from './looks.ts';
 import { looked, presence } from './presence.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
@@ -34,9 +35,15 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
         .object({ page: z.string().max(40), on: z.boolean(), muted: z.array(z.string().max(200)).max(50) })
         .optional()
         .describe('The page asking, and what it follows: whether a show moves it, and whose steps it leaves out. An agent’s show says how many pages follow it.'),
+      drew: z
+        .object({ look: z.string().max(20), data: z.string().max(1_400_000).optional(), content_type: z.string().max(20).optional(), width: z.number().optional(), height: z.number().optional(), why: z.string().max(200).optional() })
+        .optional()
+        .describe('What the page drew where a show that asked for a look brought it: the picture as base64, or why there is none (src/looks.ts).'),
     },
-    run: async (l, _actor, { after, seq, ids = [], page }) => {
+    run: async (l, _actor, { after, seq, ids = [], page, drew: said }) => {
       if (page) await looked((await wholeMap(l)).db, l, page);
+      // A picture the server will not keep is let go: the page's following goes on either way.
+      if (said) await drew((await wholeMap(l)).db, l, said).catch(() => {});
       const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), presence((await wholeMap(l)).db, l), headPos(l.db)]);
       const stand = { queue: `${queue.rows[0].n}.${told}`, ...seen, ui: uiStamp() };
       const events = await eventsAfter(l.db, { seq, ids });

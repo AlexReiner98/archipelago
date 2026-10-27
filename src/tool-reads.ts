@@ -10,6 +10,7 @@ import { placesOn } from './canvas-places.ts';
 import { shownIn } from './lens-saved.ts';
 import { wholeMap } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
+import { lookAt } from './looks.ts';
 import { getPicture } from './pictures.ts';
 import { withScreens } from './screens.ts';
 import { schemaBrief, schemaOf } from './schema-brief.ts';
@@ -235,9 +236,13 @@ export const READ_TOOLS: Record<string, Tool> = {
     },
   },
   picture: {
-    description: 'The image kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; query document, which sections have a figure).',
-    input: { result: z.string().describe('The id of the test result, note or file.') },
-    run: async (l, _actor, input) => getPicture(l, input),
+    description: 'The image kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; query document, which sections have a figure). Or, with look, what the owner’s page drew where a show with look: true brought it: a PNG, or why there is none; nothing yet while no page has answered.',
+    input: { result: z.string().optional().describe('The id of the test result, note or file.'), look: z.string().optional().describe('The look a show with look: true answered with.') },
+    run: async (l, _actor, input) => {
+      if (input.look) return (await lookAt((await wholeMap(l)).db, l, input.look)) ?? { look: input.look, picture: null, why: 'No page has answered yet.' };
+      if (!input.result) throw new Error('picture needs "result" or "look".');
+      return getPicture(l, { result: input.result });
+    },
   },
   places: {
     description: 'Where each thing stands on one canvas, as a person put it there: by item, the middle of each as [x, y] in the picture’s own units. Read beside the lens of that canvas; what is not here is where the drawing lays it.',
