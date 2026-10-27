@@ -13,11 +13,11 @@ import { keep, kept as keptFor, take } from './transient.ts';
 import { undo } from './undo.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
-export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string): Promise<Focus> {
+export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string): Promise<Focus> {
   const next = { at: Date.now(), hash, actor: actor.name, note };
   const { db } = await wholeMap(l);
   await setFocus(db, l, next);
-  await took(db, l, { kind, actor: actor.name, did: note, hash }, true);
+  await took(db, l, { kind, actor: actor.name, did: note, hash, ...(pane && { pane }) }, true);
   return next;
 }
 

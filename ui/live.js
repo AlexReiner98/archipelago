@@ -28,6 +28,8 @@ export const following = {
   /** How many agents took a step lately: more than one, and nothing is followed unless the reader asks. */
   working: 0,
   get on() {
+    // A window popped out of the main page (ui/panes.js) draws one pane; the main page follows for it.
+    if (window.name.startsWith('pelago-pane:')) return false;
     try {
       const kept = localStorage.getItem('pelago-follow');
       if (kept) return kept !== 'off';
@@ -104,7 +106,8 @@ const thisPage = () => (lookMode ? undefined : { page: pageId, on: following.on 
 export const storyOf = new Map();
 
 export function follow(steps = []) {
-  if (lookMode) return;
+  // A look's page, and a popped-out pane, leave what agents show to the main page.
+  if (lookMode || window.name.startsWith('pelago-pane:')) return;
   // The first answer only says where things stand; an old step is not followed.
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
@@ -135,7 +138,9 @@ export function follow(steps = []) {
   clearTimeout(followedTimer);
   // A show offered to a page not following stays longer: it is the only way the reader hears of it.
   followedTimer = setTimeout(() => (followed.hidden = true), following.on ? 12000 : 60000);
-  if (!busy && there && location.hash !== there) location.hash = there;
+  // A canvas docked beside the main one draws it, when the show asked for a pane or one draws it already (ui/panes.js); else the main canvas goes there.
+  const frame = !busy && place?.kind === 'show' && place.hash ? hooks.showIn?.(place.hash, place.pane) : null;
+  if (!busy && there && !frame && location.hash !== there) location.hash = there;
 }
 
 /** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */

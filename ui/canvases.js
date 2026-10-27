@@ -5,7 +5,7 @@
 // The views kept before the flat lens were translated into such canvases when the workspace opened
 // (src/lens-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
 
-import { api, ask, h, tell } from './base.js';
+import { api, ask, h, hooks, tell } from './base.js';
 import { flatQuery, flatView } from './lens.js';
 import { isA, typeTitle } from './words.js';
 
@@ -78,7 +78,7 @@ const edited = (item, lens, style) => {
 };
 
 /** Keep what is up as a saved canvas: a name asked in the page; the name of one kept already updates it. */
-async function save(lens, style, current) {
+async function save(lens, style, current, open) {
   const all = await savedCanvases();
   const name = await ask({ title: 'Save this canvas', message: current ? `Its name: left empty, “${current.title}” is updated.` : 'Its name.', input: { placeholder: current?.title ?? 'A name, a few words' }, action: 'Save' });
   if (name === null) return;
@@ -93,14 +93,14 @@ async function save(lens, style, current) {
     : await api('change', { ops: [{ op: 'create', ref: 'canvas', type: TYPE, title, props }], reason: 'Saved from the query bar' });
   const id = same?.id ?? made.created?.canvas;
   savedCanvases(true);
-  if (id) location.hash = `#/v?${flatQuery(lens, { ...style, canvas: id })}`;
+  if (id) open(`#/v?${flatQuery(lens, { ...style, canvas: id })}`);
 }
 
 /** The saved canvas the canvas draws now, if one is: Home marks it. */
 let up = null;
 
-/** The canvas up, in the bar: a switch to every saved one (the current named, marked when changed since), and Save. */
-export function canvasSwitch(lens, style, isHome) {
+/** The canvas up, in the bar: a switch to every saved one (the current named, marked when changed since), and Save. `open` goes to an address (a pane's own, ui/panes.js). */
+export function canvasSwitch(lens, style, isHome, open = (href) => (location.hash = href)) {
   up = style.canvas ?? null;
   const part = h('span', { class: 'q-part q-canvas', title: 'The saved canvas up: switch to another, or save this one' });
   savedCanvases().then((all) => {
@@ -108,12 +108,12 @@ export function canvasSwitch(lens, style, isHome) {
     const changed = current && edited(current, lens, style);
     const pick = h(
       'select',
-      { class: 'q-pick', 'aria-label': 'Saved canvases', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not a saved canvas', onchange: (ev) => ev.target.value && (location.hash = ev.target.value) },
+      { class: 'q-pick', 'aria-label': 'Saved canvases', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not a saved canvas', onchange: (ev) => ev.target.value && open(ev.target.value) },
       !current && !isHome && h('option', { value: '', selected: true }, 'Not saved'),
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
       all.map((c) => h('option', { value: canvasAt(c.id), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
     );
-    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current) }, '☆'));
+    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, '☆'), ...(hooks.paneButtons?.() ?? []));
   });
   return part;
 }

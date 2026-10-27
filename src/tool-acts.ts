@@ -46,12 +46,16 @@ export const ACT_TOOLS: Record<string, Tool> = {
       width: z.number().int().min(320).max(1920).optional().describe('With look: the picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('With look: its height (750).'),
       scheme: z.enum(['dark', 'light']).optional().describe('With look: the theme it is drawn in (dark).'),
+      pane: z
+        .enum(['left', 'right', 'above', 'below', 'main', 'alone'])
+        .optional()
+        .describe('Which pane of their page it goes to: a side opens it in a pane beside their main canvas (one already drawing it moves there), main is the main canvas, alone closes the other panes first. Left out, a pane already drawing it is lit, else the main canvas goes there. Only a canvas or an item goes to a pane.'),
     },
     run: async (l, actor, input) => {
       // Where it pointed, and whether a page of theirs is there to follow it; with a look, the picture of what is there.
       const hash = await viewAddress(l, input);
       const { db } = await wholeMap(l);
-      const at = await point(l, actor, 'show', hash, input.note);
+      const at = await point(l, actor, 'show', hash, input.note, input.pane);
       const pages = await watching(db, l, actor.name);
       return { ...at, pages, ...(input.look && (await takeLook(db, l.db, l, actor.name, hash, input))) };
     },

@@ -99,7 +99,8 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     assert.ok(await until(drawn(made.q)), 'opened in one click: its lens drawn');
     assert.equal(await canvasUp(), other);
     assert.ok(await until(`${picked} === 'The other one'`), 'named in the bar');
-    assert.ok(await until(`[...document.querySelectorAll('#query .q-id')].some((c) => c.textContent.includes('Another project'))`), 'its lens in the bar');
+    // As a chip, or in the folded line when the bar is narrow (560 px, from the loop above).
+    assert.ok(await until(`[...document.querySelectorAll('#query .q-id, #query .q-sum')].some((c) => c.textContent.includes('Another project'))`), 'its lens in the bar');
     await page.evaluate(`(() => { const s = document.querySelector('#query .q-pick'); s.value = [...s.options].find((o) => o.textContent === 'Saved at 1280').value; s.dispatchEvent(new Event('change')); })()`);
     assert.ok(await until(drawn(made.a)), 'switched from the bar');
     assert.ok(await until(`${picked} === 'Saved at 1280'`));

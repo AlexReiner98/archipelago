@@ -36,6 +36,8 @@ export interface Step {
   did?: string;
   /** The UI address of what it did it to, when that is one item or one picture. */
   hash?: string;
+  /** For a show: the pane of the owner's page it goes to (ui/panes.js): a side of the main canvas, the main one, or the main one alone. */
+  pane?: string;
 }
 
 /** How many steps are kept for a page to catch up on between two looks. */
