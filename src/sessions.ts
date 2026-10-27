@@ -7,7 +7,7 @@
 import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
-import { heldResources } from './blocking.ts';
+import { heldResources } from './blocking.ts'; import { mintName } from './session-name.ts';
 import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
 import { sentCommits, unaccountedText } from './unaccounted.ts';
 import { STALE_DAYS } from './attention.ts'; import { instructionsFor } from './instructions.ts';
@@ -56,8 +56,9 @@ export async function sessionStart(
     const existing = await resolveRun(l, input.session_id, true);
     if (existing) {
       await touch(l, existing.id);
+      await nameIfUnnamed(l, actor, existing);
       // Its repository is said again: the hook tells a resumed session where things stand, as it told it at first.
-      return { run: existing.id, status: existing.status, resumed: true, repo: (await placeFor(l, input)) ?? undefined };
+      return { run: existing.id, name: (await l.entity(existing.id))?.title, status: existing.status, resumed: true, repo: (await placeFor(l, input)) ?? undefined };
     }
   }
   const task = input.task ? await l.entity(input.task) : undefined;
@@ -66,8 +67,11 @@ export async function sessionStart(
 
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
-  const title = input.title ?? (task ? `Session: ${task.title}` : `Session in ${repo?.title ?? input.cwd ?? 'unknown folder'}`);
-  const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props }];
+  // Its name is its title, the one a person calls it by everywhere; what it was started for is its note.
+  const name = await mintName(l);
+  if (name) props.name = name;
+  const title = name ?? input.title ?? (task ? `Session: ${task.title}` : `Session in ${repo?.title ?? input.cwd ?? 'unknown folder'}`);
+  const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props, ...(name && input.title && { body: input.title }) }];
   if (task) ops.push({ op: 'link', type: 'works_on', from: 'run', to: task.id });
   if (repo) ops.push({ op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id });
   const { created } = await l.apply(actorId(actor), { ops, reason: 'Session started' });
@@ -96,6 +100,7 @@ export async function sessionStart(
 
   return {
     run,
+    name,
     status: blocked.length ? 'waiting' : 'running',
     repo: repo && { id: repo.id, title: repo.title },
     claimed,
@@ -105,6 +110,13 @@ export async function sessionStart(
       : 'Call report with action session_update and a note when something worth knowing happens, and report with action session_end when you finish.',
     commit: task ? commitRule(task.id) : undefined,
   };
+}
+
+/** A session registered before sessions were named is named when it is heard from again. */
+async function nameIfUnnamed(l: Archipelago, actor: Actor, run: Entity): Promise<void> {
+  if (run.props.name) return;
+  const name = await mintName(l);
+  if (name) await l.apply(actorId(actor), { ops: [{ op: 'update', id: run.id, title: name, props: { name } }], reason: 'Session named' });
 }
 
 /** Two signs of a session at work this close together are one stretch of work; further apart, it was idle between. */
@@ -424,7 +436,7 @@ export async function sessionEnd(
  */
 export async function hookSessionStart(l: Archipelago, input: { session_id?: string; cwd?: string; remote?: string; commits?: unknown }): Promise<string> {
   const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code' });
-  const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}.`];
+  const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}${started.name ? `, named ${started.name}` : ''}.`];
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
   // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.

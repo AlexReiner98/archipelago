@@ -336,7 +336,7 @@ details.folded > summary::-webkit-details-marker { display: none; }
 details.folded > summary::before { content: "\25B8  "; }
 details.folded[open] > summary::before { content: "\25BE  "; }
 .who { font-weight: 600; min-width: var(--who); }
-.who::before { content: ""; display: inline-block; width: var(--box-3); height: var(--box-3); border-radius: 50%; margin-right: var(--space-5); background: var(--g-system); }
+.who::before, .who-session::before { content: ""; display: inline-block; width: var(--box-3); height: var(--box-3); border-radius: 50%; margin-right: var(--space-5); background: var(--session-hue, var(--g-system)); }
 .who-human::before { background: var(--ok); }
 .who-github::before { background: var(--muted); }
 .ago { color: var(--muted); font-size: var(--text-2); min-width: var(--ago); text-align: right; }

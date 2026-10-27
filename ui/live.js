@@ -1,8 +1,8 @@
 import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
-import { hear } from './pane-route.js';
-import { types } from './words.js';
+import { hear, nameOf, sessionOf } from './pane-route.js';
+import { sessionWho, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
@@ -16,8 +16,9 @@ export let uiFiles;
 export let outdated = false;
 export const stale = h('div', { id: 'stale', hidden: true }, 'The map has changed.', h('button', { onclick: () => (outdated ? location.reload() : route()) }, 'Refresh'));
 document.body.append(stale);
+// Words typed and not yet saved hold the page; a dial, a tick or a pick is not unsaved work.
 main.addEventListener('input', (e) => {
-  if (e.target.tagName !== 'SELECT') state.dirty = true;
+  if (e.target.matches?.('textarea, [contenteditable], input:not([type=range], [type=checkbox], [type=radio], [type=color])')) state.dirty = true;
 });
 
 // Following: an agent can point this page at what it is working on (the `show`
@@ -93,10 +94,6 @@ document.getElementById('follow-what').addEventListener('toggle', (ev) => ev.tar
 export const followed = h('div', { id: 'followed', hidden: true });
 document.body.append(followed);
 export let seenStep;
-/** When the reader last scrolled, pointed or typed: a page being read is not moved under them. */
-let readAt = 0;
-for (const name of ['scroll', 'wheel', 'pointermove', 'pointerdown', 'keydown']) addEventListener(name, () => (readAt = Date.now()), { passive: true, capture: true });
-const reading = () => Date.now() - readAt < 20_000 || Boolean(getSelection()?.toString());
 export let followedTimer;
 /** This page, among the owner's open pages: the server counts those that follow, so an agent's show says whether it landed. */
 const pageId = Math.random().toString(36).slice(2, 14);
@@ -104,6 +101,9 @@ const pageId = Math.random().toString(36).slice(2, 14);
 const thisPage = () => (lookMode ? undefined : { page: pageId, on: following.on && chosen.kinds.has('show'), muted: [...chosen.muted] });
 /** Where each agent that tells a story tells it: following it goes there, not from item to item. */
 export const storyOf = new Map();
+
+/** Windows the browser held back (ui/panes.js), one per session, each offered on the line until it is opened or old. */
+const toPop = new Map();
 
 export function follow(steps = []) {
   // A look's page, and a popped-out pane, leave what agents show to the main page.
@@ -124,24 +124,39 @@ export function follow(steps = []) {
   if (!to) return;
   const place = wanted.findLast((s) => s.hash || storyOf.has(s.actor));
   const there = place && `#/${storyOf.get(place.run ?? place.actor) ?? place.hash}`;
-  const busy = !following.on || state.dirty || document.querySelector('dialog[open]') || reading();
-  // Which pane it lands in, by whose step it is (ui/panes.js): 'main' moves the address, a frame is a pane that drew
-  // it, null is no pane that follows this session, and it is only offered.
+  // A pane being read or worked in is passed by, not taken (ui/pane-busy.js): only a question open over the page, or
+  // following turned off, holds every pane.
+  const busy = !following.on || document.querySelector('dialog[open]');
+  // Which pane it lands in, by whose step it is (ui/panes.js): 'main' moves the address, a frame or 'popped' is a pane
+  // that drew it, { popOut } a window the browser opens only from a press, null no pane that takes it: it is offered.
   const landed = !busy && there ? (hooks.land ? hooks.land({ ...place, hash: there.slice(2) }) : 'main') : null;
-  const offered = busy || !landed;
+  const popOut = landed?.popOut;
+  const offered = busy || !landed || popOut;
+  // A later step of the same session takes its place; one that landed needs none.
+  const whose = place && sessionOf(place);
+  if (popOut) toPop.set(whose, { popOut, at: Date.now() });
+  else if (landed && whose) toPop.delete(whose);
+  for (const [key, o] of toPop) if (Date.now() - o.at > 600_000) toPop.delete(key);
+  const popOne = (key, o) => (ev) => {
+    toPop.delete(key);
+    o.popOut();
+    ev.target.remove();
+    if (!toPop.size) followed.hidden = true;
+  };
   followed.replaceChildren(
     ...[
       // One line: who, and the first few words of why. The whole reason is on the page it brought you to.
-      h('strong', {}, to.actor.split('/').at(-1)),
+      to.name ? sessionWho(to.name, to.actor) : h('strong', {}, to.actor.split('/').at(-1)),
       h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : offered ? 'is working somewhere else' : 'brought you here'),
-      offered && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
+      ...[...toPop].map(([key, o]) => h('button', { title: `Open what ${nameOf(key)} showed in a window of its own, beside what you are doing`, onclick: popOne(key, o) }, toPop.size > 1 ? `Pop out ${nameOf(key)}` : 'Pop out')),
+      offered && !popOut && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
       following.on && h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
     ].filter(Boolean),
   );
   followed.hidden = false;
   clearTimeout(followedTimer);
   // A show offered to a page not following stays longer: it is the only way the reader hears of it.
-  followedTimer = setTimeout(() => (followed.hidden = true), following.on ? 12000 : 60000);
+  followedTimer = setTimeout(() => (followed.hidden = true), following.on && !toPop.size ? 12000 : 60000);
   if (landed === 'main' && location.hash !== there) location.hash = there;
 }
 
