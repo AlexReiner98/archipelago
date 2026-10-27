@@ -3,6 +3,7 @@
 
 import { api, ask, h } from './base.js';
 import { hint, link, menu, when } from './words.js';
+import { plate, plates } from './plates.js';
 
 // ---- Workspace -----------------------------------------------------------
 
@@ -141,7 +142,7 @@ export const line = (...kids) => h('li', { class: 'one' }, ...kids);
 // pushes are read, the repositories and the latest push, each repository's in the tooltip; the webhook in its menu.
 export function githubRow() {
   const row = line(h('span', { class: 'grow muted small' }, 'GitHub pushes…'));
-  const shown = h('li', { class: 'pack-body', hidden: true });
+  const shown = h('li', { hidden: true });
   const fail = (err) => row.replaceChildren(h('span', { class: 'grow error', title: err.message }, err.message));
   const draw = async (made) => {
     const s = made ?? (await api('github'));
@@ -253,20 +254,23 @@ export function notificationsRow(info, redraw, fail) {
   );
 }
 
-/** The server's packs, for an admin of the default workspace: each with what it may ask the server to do. Nothing when there are none. */
+/** The server's packs, for an admin of the default workspace: each a plate, with what it offers and may ask the server to do. Nothing when there are none. */
 export function serverPacksCard() {
   const box = card('Server packs', 'What this server does that no one workspace can, by packs kept on the machine it runs on');
   box.hidden = true;
   api('server_packs').then(({ packs, refused }) => {
     if (!packs.length && !refused.length) return;
-    const offers = (p) => [...p.pages.map((x) => `page ${x}`), ...p.entries.map((x) => `entry ${x}`), ...p.webhooks.map((x) => `webhook ${x}`)].join('\n');
-    const row = (p) =>
-      line(
-        h('span', { class: 'grow', title: `${p.title} ${p.version}, at /x/${p.id}\n${offers(p)}` }, h('strong', {}, p.title), ' ', h('span', { class: 'muted small' }, `/x/${p.id}`)),
-        h('span', { class: 'pill', title: `What it may ask the server for:\n${p.acts.join('\n') || 'nothing'}` }, `${p.acts.length} act${p.acts.length === 1 ? '' : 's'}`),
-      );
-    const left = (r) => line(h('span', { class: 'grow muted', title: `${r.folder}\n${r.why.join('\n')}` }, r.folder.split(/[\\/]/).pop()), h('span', { class: 'pill bad', title: r.why.join('\n') }, 'left out'));
-    box.append(h('ul', { class: 'rows' }, packs.map(row), refused.map(left)));
+    const offers = (p) => [...p.pages.map((x) => `page ${x}`), ...p.entries.map((x) => `entry ${x}`), ...p.webhooks.map((x) => `webhook ${x}`)];
+    const served = (p) =>
+      plate({
+        name: p.title,
+        title: `${p.title} ${p.version}, at /x/${p.id}`,
+        marks: [h('span', { class: 'muted small' }, p.version), h('span', { class: 'pill', title: `What it may ask the server for:\n${p.acts.join('\n') || 'nothing'}` }, `${p.acts.length} act${p.acts.length === 1 ? '' : 's'}`)],
+        says: `At /x/${p.id}`,
+        foot: offers(p).length > 0 && { text: offers(p).join(' · '), title: offers(p).join('\n') },
+      });
+    const left = (r) => plate({ name: r.folder.split(/[\\/]/).pop(), title: r.folder, off: true, marks: h('span', { class: 'pill bad', title: r.why.join('\n') }, 'left out'), says: r.why.join(' · ') });
+    box.append(plates(packs.map(served), refused.map(left)));
     box.hidden = false;
   }, () => null);
   return box;
