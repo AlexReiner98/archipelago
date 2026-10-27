@@ -1,75 +1,117 @@
-// What the owner's page drew when an agent showed it something and asked to see it (report show, look: true). The
-// picture is made in the owner's own browser, from what it drew there, and comes back with the page's next tail: a
-// view is never drawn on the server, so a style's code runs only where it runs for any reader, in the reader's
-// sandbox. A look is asked for one screen (a workspace and a person) and is kept there for LOOK_MS, in the transient
-// table, so a page that polls one server answers a show made on another. The first page to answer is the one kept.
+// What a view looks like, for an agent: drawn by the server, in its headless Chrome (src/look-draw.ts), from the
+// app's own page, as the agent sees the map, whatever page of the owner's is open or not (decision e_wsz3wdzp). The
+// page reads with a look pass: a token for one look, minted here for the asking agent's own person (never an admin),
+// good for LOOK_PASS_MS and for the reads a canvas makes (LOOK_READS) and nothing else. So private items are drawn
+// exactly as query shows them to that agent. The picture is kept in the transient table for LOOK_MS, under the
+// screen it was asked for, and read again with query picture; the same view at the same size, the map unchanged
+// since, is that kept picture again rather than a second drawing.
 
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { Q } from './db.ts';
-import { PICTURE_MAX } from './pictures.ts';
+import { drawLook } from './look-draw.ts';
 import { whose, type Whose } from './presence.ts';
+import { headPos } from './tail.ts';
 import { keep, kept, keptWith } from './transient.ts';
 
-/** How long a look asked for, and the picture that answers it, are kept. */
+/** How long a look's picture is kept. */
 export const LOOK_MS = 30 * 60_000;
+/** How long a look pass reads for: one drawing. */
+const LOOK_PASS_MS = 90_000;
+/** The most looks drawn for one workspace in an hour, by this process. */
+const PER_HOUR = 60;
 const LOOK = /^l_[0-9a-f]{12}$/;
-const TYPES = ['image/png', 'image/jpeg'];
+const PASS = /^look_([a-z0-9][a-z0-9-]{0,39})_[0-9a-f]{40}$/;
 
-/** What a page says of what it drew: the picture as base64, or why it has none. */
-export interface Drew {
-  look: string;
-  data?: string;
-  content_type?: string;
-  width?: number;
-  height?: number;
-  /** Why there is no picture: the page did not go there, or could not make one. */
+/** What a look pass may call through /api: what the canvas reads to draw a view, and nothing that writes. */
+export const LOOK_READS = new Set(['view', 'places', 'schema', 'get', 'proposals', 'search', 'picture', 'document', 'events']);
+
+/** Where the server's Chrome opens the app: this server, or the name another container knows it by. */
+let origin = 'http://127.0.0.1:3100';
+export const setLookOrigin = (url: string) => void (origin = url.replace(/\/$/, ''));
+export const lookOrigin = () => origin;
+
+/** Who a pass reads as: the person whose view it is (null: the map unscoped, as a server with no tokens has it). */
+export interface Pass {
+  viewer: string | null;
+  actor: string;
+}
+
+const hashOf = (pass: string) => createHash('sha256').update(pass).digest('hex');
+
+/** The workspace a look pass is for, when the token is one. Says nothing about whether it is good. */
+export const passWorkspace = (token: string | undefined) => (token ? PASS.exec(token)?.[1] : undefined);
+
+/** Whom a look pass reads as, while it is good. */
+export const readPass = (db: Q, token: string) => kept<Pass>(db, `lookpass:${hashOf(token)}`);
+
+/** A look pass for this screen's person, made for `actor`: what the server's Chrome reads with, for one drawing. */
+export async function passFor(db: Q, w: Whose, actor: string): Promise<string> {
+  const pass = `look_${w.workspace}_${randomBytes(20).toString('hex')}`;
+  await keep(db, `lookpass:${hashOf(pass)}`, { viewer: w.viewer ?? null, actor } satisfies Pass, LOOK_PASS_MS);
+  return pass;
+}
+
+const drawn = new Map<string, number[]>();
+/** Another look for this workspace, unless it has had PER_HOUR in the last hour. */
+function counted(workspace: string) {
+  const now = Date.now(), had = (drawn.get(workspace) ?? []).filter((t) => t > now - 3_600_000);
+  if (had.length >= PER_HOUR) throw new Error(`This workspace has had ${PER_HOUR} looks in the last hour: read one again with query picture, or wait.`);
+  drawn.set(workspace, [...had, now]);
+}
+
+interface Kept {
+  content_type: string;
+  width: number;
+  height: number;
+  state: string;
+  settled: boolean;
   why?: string;
+  hash: string;
+  ms: number;
 }
 
-/** Ask the owner's page for a picture of what the next show puts on it: a name to answer by. */
-export async function askLook(db: Q, w: Whose, actor: string): Promise<string> {
+/** What a look answers: what was drawn and how it stood, with the picture as an image (src/mcp.ts sends it as one). */
+const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
+  look,
+  view: k.hash,
+  state: k.state,
+  settled: k.settled,
+  ...(k.why && { why: k.why }),
+  width: k.width,
+  height: k.height,
+  bytes: data.length,
+  ...(again ? { again: true } : { ms: k.ms }),
+  image: { data: data.toString('base64'), content_type: k.content_type },
+});
+
+/**
+ * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>) for the asking agent and keep the
+ * picture. `fresh` draws it again even when the map has not changed since the last look at it.
+ */
+export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; fresh?: boolean } = {}) {
+  const width = Math.min(1920, Math.max(320, Math.round(size.width ?? 1200)));
+  const height = Math.min(1600, Math.max(240, Math.round(size.height ?? 750)));
+  const pos = await headPos(mapDb);
+  const same = `lookof:${whose(w)}:${createHash('sha256').update(JSON.stringify([hash, width, height, pos])).digest('hex').slice(0, 32)}`;
+  if (!size.fresh) {
+    const was = await kept<{ look: string }>(db, same);
+    const had = was && (await keptWith<Kept>(db, `look:${whose(w)}:${was.look}`));
+    if (was && had?.data) return answer(was.look, had.value, had.data, true);
+  }
+  counted(w.workspace);
+  const pass = await passFor(db, w, actor);
+  const got = await drawLook(`${origin}/?look#/${hash}`, pass, width, height);
   const look = `l_${randomBytes(6).toString('hex')}`;
-  await keep(db, `look:${whose(w)}:${look}`, { actor, asked: Date.now() }, LOOK_MS);
-  return look;
+  const k: Kept = { content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms };
+  await keep(db, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
+  await keep(db, same, { look }, LOOK_MS);
+  return answer(look, k, got.data);
 }
 
-/** A page's answer to a look: kept when the look was asked of this screen and nothing has answered it with a picture. */
-export async function drew(db: Q, w: Whose, said: Drew): Promise<boolean> {
-  if (!LOOK.test(said.look)) return false;
-  const key = `look:${whose(w)}:${said.look}`;
-  if (!(await kept(db, key))) return false;
-  const had = await keptWith<{ why?: string }>(db, `${key}:drew`);
-  if (had && !had.value.why) return false;
-  if (!said.data) {
-    await keep(db, `${key}:drew`, { why: String(said.why ?? 'The page drew nothing.').slice(0, 200) }, LOOK_MS);
-    return true;
-  }
-  if (!TYPES.includes(String(said.content_type))) throw new Error(`A picture of the page is one of ${TYPES.join(', ')}.`);
-  const bytes = Buffer.from(said.data, 'base64');
-  if (!bytes.length || bytes.length > PICTURE_MAX) throw new Error(`A picture of the page is 1 to ${PICTURE_MAX} bytes, not ${bytes.length}.`);
-  const size = (n: unknown) => (Number.isFinite(n) ? Math.round(Number(n)) : undefined);
-  await keep(db, `${key}:drew`, { content_type: said.content_type, width: size(said.width), height: size(said.height), at: Date.now() }, LOOK_MS, bytes);
-  return true;
-}
-
-/** What answered a look on this screen: the picture as base64, or why there is none; undefined while nothing has. */
+/** A look taken on this screen in the last LOOK_MS, again. */
 export async function lookAt(db: Q, w: Whose, look: string) {
-  if (!LOOK.test(look)) throw new Error(`"${look}" is not a look: show with look: true names one.`);
-  const key = `look:${whose(w)}:${look}`;
-  if (!(await kept(db, key))) throw new Error(`No look "${look}" was asked of this screen in the last ${LOOK_MS / 60_000} minutes.`);
-  const got = await keptWith<{ content_type?: string; width?: number; height?: number; why?: string }>(db, `${key}:drew`);
-  if (!got) return undefined;
-  if (got.value.why || !got.data) return { look, picture: null, why: got.value.why ?? 'The page drew nothing.' };
-  return { look, content_type: got.value.content_type, width: got.value.width, height: got.value.height, size: got.data.length, data: got.data.toString('base64') };
-}
-
-/** Wait up to `ms` for a look to be answered. */
-export async function awaitLook(db: Q, w: Whose, look: string, ms: number) {
-  const until = Date.now() + ms;
-  for (;;) {
-    const got = await lookAt(db, w, look);
-    if (got && !got.why) return got;
-    if (Date.now() >= until) return got ?? { look, picture: null, why: `No page of theirs answered within ${Math.round(ms / 1000)} s: read it later with query picture, look.` };
-    await new Promise((r) => setTimeout(r, 400));
-  }
+  if (!LOOK.test(look)) throw new Error(`"${look}" is not a look: query look or show with look: true names one.`);
+  const got = await keptWith<Kept>(db, `look:${whose(w)}:${look}`);
+  if (!got?.data) throw new Error(`No look "${look}" was taken on this screen in the last ${LOOK_MS / 60_000} minutes.`);
+  return answer(look, got.value, got.data, true);
 }

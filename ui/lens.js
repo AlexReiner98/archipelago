@@ -5,6 +5,7 @@ import { drawWith, drawings, warmDrawings } from './drawing.js';
 import { dress } from './lens-base.js';
 import { drawList } from './list.js';
 import { drawCode } from './style-code.js';
+import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles } from './words.js';
 
 // ---- A session's story -----------------------------------------------------
@@ -195,12 +196,15 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     host.dispatchEvent(new CustomEvent('lens-answer'));
     if (quiet) (host.closest('.lens-card') ?? host).hidden = !answer.items.length;
     if (!answer.items.length && quiet) return;
-    if (!answer.items.length) return body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this lens.'));
+    if (!answer.items.length) return (body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this lens.')), saidDrawn(body, 'empty'));
     for (const name of Object.keys(chosen)) delete chosen[name];
     Object.assign(chosen, look.style, keptStyle(key), style, { noLit: true });
     dress(body, chosen);
     const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === chosen.shape;
-    (typeof chosen.code === 'string' && chosen.code.trim() ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(shown), chosen, keep, place);
+    const coded = typeof chosen.code === 'string' && chosen.code.trim();
+    (coded ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(shown), chosen, keep, place);
+    // A drawing or a style's code says when it has drawn; a shape drawn here has drawn now.
+    if (!coded && !drawn) saidDrawn(body, 'drawn');
   };
   const load = async (refreshing = false) => {
     let store;
@@ -212,6 +216,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     } catch (err) {
       host.failed = err.message;
       host.dispatchEvent(new CustomEvent('lens-answer'));
+      saidDrawn(body, 'error', err.message);
       return refreshing || body.replaceChildren(h('div', { class: 'error' }, err.message));
     }
     if (host.store) unfollow(host.store);

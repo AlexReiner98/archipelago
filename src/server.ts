@@ -39,6 +39,7 @@ import { serveConnect } from './connect.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
+import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts'; import './agent-run.ts';
@@ -102,8 +103,11 @@ export { lenient } from './mcp.ts';
 export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
-  const [named, sites] = [options.publicHosts ?? [], options.sites ?? {}], hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named];
-  const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`)];
+  // The server's own Chrome may reach it by another name, from a container beside it (src/looks.ts).
+  const lookAt = new URL(process.env.PELAGO_LOOK_ORIGIN ?? `http://127.0.0.1:${port}`);
+  setLookOrigin(lookAt.origin);
+  const [named, sites] = [options.publicHosts ?? [], options.sites ?? {}], hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named, lookAt.host];
+  const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`), lookAt.origin];
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
   // The server packs are told the address this server is reached at from outside; a workspace's packs reach them as its connections (src/pack-reach.ts).
@@ -132,7 +136,19 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   };
 
   /** The workspace a request is for and who is making it. */
-  async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent'): Promise<{ ws: Workspace; pelago: Archipelago; actor: (label?: string) => Actor }> {
+  async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent'): Promise<{ ws: Workspace; pelago: Archipelago; actor: (label?: string) => Actor; look?: true }> {
+    // A look pass reads as the agent it was made for, for one drawing by this server's Chrome, and only through /api.
+    const pass = bearer(req.headers.authorization), passFor = passWorkspace(pass);
+    if (passFor) {
+      const ws = surface === 'human' && (await workspaces.has(passFor)) ? await workspaces.get(passFor) : undefined;
+      const as = ws && (await readPass(ws.pelago.db, pass!));
+      if (!ws || !as) throw new Refused(401, 'This look pass is not good here, or has run out.');
+      res.once('close', workspaces.hold(passFor));
+      const pelago = as.viewer === null ? (tokens ? ws.pelago.as('') : ws.pelago) : ws.pelago.as(as.viewer);
+      // It reads as the page does (answers whole, as a person's page has them), as the agent's person sees the map; it
+      // writes nothing (LOOK_READS), so it never acts on anyone's authority.
+      return { ws, pelago, actor: () => ({ kind: 'human', name: `${as.actor} (look)`, ...(as.viewer && { person: as.viewer }) }), look: true };
+    }
     if (!tokens) {
       const ws = await workspaces.get(DEFAULT_WORKSPACE);
       return { ws, pelago: ws.pelago, actor: (label) => (surface === 'human' ? { kind: 'human', name: 'local', admin: true } : { kind: 'agent', name: label || 'claude' }) };
@@ -289,8 +305,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const surface = url.pathname.startsWith('/api/') ? 'api' : url.pathname.startsWith('/agent/') ? 'agent' : undefined;
       if (req.method === 'POST' && surface) {
         if (!local(req)) return send(res, 403, { error: 'The API accepts only local JSON requests from the CLI, hooks or the pelago UI.' });
-        const { pelago, actor } = await resolve(req, res, surface === 'api' ? 'human' : 'agent');
+        const { pelago, actor, look } = await resolve(req, res, surface === 'api' ? 'human' : 'agent');
         const name = url.pathname.slice(surface.length + 2);
+        if (look && !LOOK_READS.has(name)) return send(res, 403, { error: `A look reads; it does not call ${name}.` });
         try {
           const body = ((await readJson(req)) ?? {}) as Record<string, unknown>;
           if (surface === 'api') return send(res, 200, { result: await callTool(pelago, actor(), name, body) });

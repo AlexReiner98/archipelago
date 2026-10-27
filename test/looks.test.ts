@@ -1,58 +1,56 @@
-// What the owner's page drew, for an agent that showed it something and asked to see it (report show, look: true;
-// src/looks.ts, ui/look.js). The picture is made in the owner's browser and comes back with its next tail: asked of
-// one screen, answered once, read again with query picture. In a real browser (skipped where there is no Chrome): a
-// view drawn by the flow comes back as a PNG of the canvas, and so does one a style's own code paints, its pixels
-// given by its sandboxed frame.
+// What a view looks like, for an agent (src/looks.ts, decision e_wsz3wdzp): drawn by the server in its own headless
+// Chrome, from the app's page in look mode, with a pass that reads as the asking agent and only reads. Without a
+// browser: what a pass may read and call, and the picture going out as an MCP image. In a real browser (skipped where
+// there is no Chrome): a flow, a style whose own code paints its canvas, and a lens that finds nothing, each taken once
+// the page says it has drawn, with no page of the owner's open.
 
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { chrome, open } from './browser.ts';
+import { after, test } from 'node:test';
+import { createToken } from '../src/auth.ts';
+import { chromeBinary } from '../src/chrome.ts';
+import { stopDrawing } from '../src/look-draw.ts';
+import { passFor } from '../src/looks.ts';
+import { contentOf } from '../src/mcp.ts';
+import { open } from './browser.ts';
 import { serve } from './serve.ts';
 
-// The smallest PNG there is: one pixel.
-const DOT = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-const PNG = /^iVBORw0KGgo/;
+after(stopDrawing);
 
-test('a look is asked of the screen a show points, answered once by a page, and read again with query picture', async () => {
-  const { call } = await serve('off');
-  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Something to see' }] })).result.created as Record<string, string>;
-  const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, look: true, ...params } }).then((r) => r.result);
-  // With no page following, nothing will draw it: said at once.
-  const none = await show({});
-  assert.equal(none.picture, null);
-  assert.match(none.why, /No page of theirs follows/);
-  // A page that follows is open; the show answers with the look to read later.
-  const page = { page: 'p1', on: true, muted: [] };
-  await call('/api/tail', undefined, { page });
-  const asked = await show({ wait_seconds: 0 });
-  assert.match(asked.look, /^l_[0-9a-f]{12}$/);
-  assert.deepEqual((await call('/agent/query', undefined, { name: 'picture', params: { look: asked.look } })).result, { look: asked.look, picture: null, why: 'No page has answered yet.' });
-  // The page's step carries the look, so it knows to answer.
-  const steps = (await call('/api/tail', undefined, { page })).result.steps;
-  assert.ok(steps.some((s: { kind: string; look?: string }) => s.kind === 'show' && s.look === asked.look));
-  // A page that did not go there says why; one that drew it sends the picture, which stands over the why.
-  await call('/api/tail', undefined, { page, drew: { look: asked.look, why: 'They were busy on the page.' } });
-  assert.match((await call('/agent/query', undefined, { name: 'picture', params: { look: asked.look } })).result.why, /busy/);
-  await call('/api/tail', undefined, { page, drew: { look: asked.look, data: DOT, content_type: 'image/png', width: 1, height: 1 } });
-  const got = (await call('/agent/query', undefined, { name: 'picture', params: { look: asked.look } })).result;
-  assert.deepEqual({ ...got, data: undefined }, { look: asked.look, content_type: 'image/png', width: 1, height: 1, size: 70, data: undefined });
-  assert.equal(got.data, DOT);
-  // Answered once: a second picture does not replace the first.
-  await call('/api/tail', undefined, { page, drew: { look: asked.look, data: DOT.replace('AAAAA', 'AAAAB'), content_type: 'image/png' } });
-  assert.equal((await call('/agent/query', undefined, { name: 'picture', params: { look: asked.look } })).result.data, DOT);
-  // A look nobody asked for is not kept, and what is not a picture is let go without stopping the page's tail.
-  assert.equal((await call('/api/tail', undefined, { page, drew: { look: 'l_000000000000', data: DOT, content_type: 'image/png' } })).status, 200);
-  assert.match((await call('/agent/query', undefined, { name: 'picture', params: { look: 'l_000000000000' } })).error, /No look/);
-  const other = await show({ wait_seconds: 0 });
-  assert.equal((await call('/api/tail', undefined, { page, drew: { look: other.look, data: DOT, content_type: 'text/html' } })).status, 200);
-  assert.equal((await call('/agent/query', undefined, { name: 'picture', params: { look: other.look } })).result.why, 'No page has answered yet.');
-  // A test result's picture is read as before.
-  assert.match((await call('/agent/query', undefined, { name: 'picture', params: {} })).error, /needs "result" or "look"/);
+test('a look pass reads as its agent’s person, only through /api, and only what the canvas reads', async () => {
+  const { workspaces, call, member } = await serve('tokens');
+  const db = (await workspaces.get('default')).pelago.db;
+  const owner = (await createToken(db, 'default', { kind: 'human', name: 'owner', admin: true })).token;
+  const sam = await member(owner, { email: 'sam@example.com', name: 'Sam' });
+  const kim = await member(owner, { email: 'kim@example.com', name: 'Kim' });
+  const samId = (await call('/whoami', sam, undefined, 'GET')).actor.person as string;
+  const make = async (token: string, title: string) => ((await call('/api/change', token, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'work.task', title, visibility: 'private' }] })).result.created as Record<string, string>).x;
+  const [mine, theirs] = [await make(sam, 'Sam’s own'), await make(kim, 'Kim’s own')];
+  const pass = await passFor(db, { workspace: 'default', viewer: samId }, 'claude/look');
+  // It reads the map as Sam does: their private item, not Kim's.
+  const flat = (await call('/api/view', pass, { name: 'flat', params: { filter: { ids: [mine, theirs] } } })).result;
+  assert.deepEqual(flat.items.map((i: { id: string }) => i.id), [mine]);
+  // It writes nothing, and is no token anywhere but the page's reads.
+  const refused = await call('/api/change', pass, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'From a look' }] });
+  assert.equal(refused.status, 403);
+  assert.match(refused.error, /A look reads/);
+  for (const path of ['/agent/query', '/mcp']) assert.equal((await call(path, pass, { name: 'search', params: {} })).status, 401, `${path} takes no look pass`);
+  // One nobody made, or for another workspace, is no pass.
+  assert.equal((await call('/api/view', `look_default_${'0'.repeat(40)}`, { name: 'flat', params: { filter: { ids: [mine] } } })).status, 401);
+  assert.equal((await call('/api/view', pass.replace('look_default_', 'look_acme_'), { name: 'flat', params: { filter: { ids: [mine] } } })).status, 401);
 });
 
-const browser = chrome();
+test('a picture in a tool’s answer goes to MCP as an image of its own, out of the text', () => {
+  const [text, image] = contentOf({ look: 'l_0123456789ab', state: 'drawn', image: { data: 'AAAA', content_type: 'image/png' } });
+  assert.deepEqual(image, { type: 'image', data: 'AAAA', mimeType: 'image/png' });
+  assert.equal(text.type, 'text');
+  assert.deepEqual(JSON.parse((text as { text: string }).text), { look: 'l_0123456789ab', state: 'drawn' });
+  assert.equal(contentOf({ a: 1 }).length, 1);
+});
 
-test('in a browser, a show with a look answers with what the canvas drew: a flow, and a style’s own code', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+const browser = chromeBinary();
+const PNG = /^iVBORw0KGgo/;
+
+test('in a browser, a look is the view as drawn: a flow, a style’s own code, a lens that finds nothing', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const steps = (await call('/api/change', undefined, {
     reason: 'test',
@@ -62,46 +60,55 @@ test('in a browser, a show with a look answers with what the canvas drew: a flow
       { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
     ],
   })).result.created as Record<string, string>;
-  // A ref in a lens's props is not made an id (issue e_vw733yx9): the views are made with the ids.
   const lens = { filter: { ids: [steps.a] }, walk: { over: ['depends_on'], steps: 1 } };
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
       { op: 'create', ref: 'f', type: 'lens', title: 'The steps', status: 'current', props: lens },
       { op: 'create', ref: 'c', type: 'lens', title: 'The steps, painted', status: 'current', props: lens },
-      { op: 'create', ref: 's', type: 'style', title: 'Painted', status: 'current', props: { code: "export default function draw({ canvas }) { const c = canvas.getContext('2d'); c.fillStyle = '#ff00ff'; c.fillRect(0, 0, canvas.width, canvas.height); }" } },
+      // It paints only after a wait, as code that loads or lays out first does: the look waits for it.
+      { op: 'create', ref: 's', type: 'style', title: 'Painted', status: 'current', props: { code: "export default async function draw({ canvas }) { await new Promise((r) => setTimeout(r, 1500)); const c = canvas.getContext('2d'); c.fillStyle = '#ff00ff'; c.fillRect(0, 0, canvas.width, canvas.height); }" } },
       { op: 'link', type: 'about', from: 's', to: 'c' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  // The colours in a picture, read by the browser: how many there are, and the one at its middle.
+  const look = (params: Record<string, unknown>) => call('/agent/query', undefined, { actor: 'robot', name: 'look', params }).then((r) => r.result ?? r);
+  // A page to read the pictures with: not the owner's (none is open), only a browser to decode them in.
+  const reader = await open('about:blank');
   const colours = (data: string) =>
-    page.evaluate<{ count: number; middle: number[] }>(`(async () => {
+    reader.evaluate<{ count: number; middle: number[]; width: number }>(`(async () => {
       const img = new Image(); img.src = 'data:image/png;base64,${data}'; await img.decode();
       const c = document.createElement('canvas'); Object.assign(c, { width: img.width, height: img.height });
       const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
       const px = ctx.getImageData(0, 0, img.width, img.height).data, seen = new Set();
       for (let i = 0; i < px.length; i += 4 * 97) seen.add(px[i] << 16 | px[i + 1] << 8 | px[i + 2]);
       const m = ctx.getImageData(img.width >> 1, img.height >> 1, 1, 1).data;
-      return { count: seen.size, middle: [m[0], m[1], m[2]] };
+      return { count: seen.size, middle: [m[0], m[1], m[2]], width: img.width };
     })()`);
   try {
-    // The page follows agents (it would by itself with one at work), and has heard where things stand before it is shown anything.
-    await page.evaluate(`localStorage.setItem('pelago-follow', 'on')`);
-    await wait(3000);
-    const flow = (await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.f, look: true, wait_seconds: 30 } })).result;
-    assert.ok(flow.pages.following >= 1, 'the page follows');
-    assert.match(flow.data ?? '', PNG, `a PNG of the canvas: ${JSON.stringify({ ...flow, data: undefined })} ${page.logs().join('\n')}`);
-    assert.ok(flow.width > 600 && flow.height > 400, `the canvas's size: ${flow.width} × ${flow.height}`);
-    assert.ok((await colours(flow.data)).count > 2, 'something is drawn on it');
-    assert.ok(await page.evaluate(`document.querySelector('#canvas svg')?.textContent.includes('Second step')`), 'what it drew is the view');
-    assert.ok(await page.evaluate(`document.getElementById('followed').textContent.includes('An image of this canvas went to robot')`), 'the owner is told what left the page');
+    const flow = await look({ entity: made.f });
+    assert.equal(flow.state, 'drawn', JSON.stringify({ ...flow, image: undefined }));
+    assert.match(flow.image?.data ?? '', PNG);
+    assert.deepEqual([flow.width, flow.height], [1200, 750]);
+    const seen = await colours(flow.image.data);
+    assert.equal(seen.width, 1200);
+    assert.ok(seen.count > 3, 'something is drawn on it');
+    // The same view, the map unchanged: the picture already taken.
+    const again = await look({ entity: made.f });
+    assert.equal(again.again, true);
+    assert.equal(again.look, flow.look);
+    assert.equal((await call('/agent/query', undefined, { name: 'picture', params: { look: flow.look } })).result.image.data, flow.image.data);
 
-    const painted = (await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.c, look: true, wait_seconds: 30 } })).result;
-    assert.match(painted.data ?? '', PNG, `a PNG of the painted canvas: ${JSON.stringify({ ...painted, data: undefined })} ${page.logs().join('\n')}`);
-    assert.deepEqual((await colours(painted.data)).middle, [255, 0, 255], 'what the style’s code painted, as its frame gave it');
+    const painted = await look({ entity: made.c, width: 800, height: 500 });
+    assert.equal(painted.state, 'drawn', JSON.stringify({ ...painted, image: undefined }));
+    assert.deepEqual((await colours(painted.image.data)).middle, [255, 0, 255], 'what the style’s code painted, once it had');
+
+    const none = await look({ lens: { filter: { text: 'nothing is called this zzqx' } } });
+    assert.equal(none.state, 'empty', JSON.stringify({ ...none, image: undefined }));
+    // A show with a look points the owner's screen and answers with the same kind of picture.
+    const shown = (await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.f, look: true } })).result;
+    assert.equal(shown.hash, `v?canvas=${made.f}`);
+    assert.equal(shown.state, 'drawn');
   } finally {
-    page.close();
+    reader.close();
   }
 });
