@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
 import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, MEMBER, ORDERED, SCHEMA, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
-import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH } from './public-schema.ts';
+import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
 import { SEARCH_INDEX } from './search.ts';
@@ -63,6 +63,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 23, name: 'snapshots of the projections, and room to rebuild them', sql: SNAPSHOT },
   { version: 24, name: 'the compacted streams sealed, guarded by row, and reached by a forget', sql: OPLOG_GUARDED },
   { version: 25, name: 'what is inside what, what names what, the indexes reads are bounded by, and visibility asked row by row', sql: CLOSURE + MENTIONS + READ_INDEXES + ROW_POLICIES + ACTIVE_HOLDS_BY_KEY },
+  { version: 26, name: 'a document shared with another workspace may be published there', sql: SHARE_PUBLISHABLE },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

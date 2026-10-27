@@ -106,3 +106,75 @@ test('the receiver ends a share on its side, and the sender can share again', as
   await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: item.id, status: 'ended' }] });
   await assert.rejects(api(theirs, 'document', { id: item.id }), /no longer shared/);
 });
+
+test('a shared document is published where it is read only if its sender says so, as the sender gives it, until the share ends', async () => {
+  const { workspaces, call, base } = await serve('tokens');
+  const operator = (await workspaces.ensureOperator())!;
+  const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const api = async (token: string, tool: string, input: unknown = {}) => {
+    const answer = await call(`/api/${tool}`, token, input);
+    if (answer.error) throw new Error(answer.error);
+    return answer.result;
+  };
+  const made = (
+    await api(mine, 'change', {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'p', type: 'work.document', title: 'A principle', visibility: 'shared', body: 'Held by what serves it.\n\n{l}' },
+        { op: 'create', ref: 'e', type: 'work.document', title: 'The principles', visibility: 'shared', body: 'Read {p} first.' },
+        { op: 'create', ref: 'f', type: 'software.feature', title: 'The rule', visibility: 'shared', body: 'Holds a change.' },
+        { op: 'create', ref: 't', type: 'work.task', title: 'A test of it', visibility: 'shared', body: 'Checks it.' },
+        { op: 'create', ref: 'x', type: 'work.task', title: 'Not for them', visibility: 'private', body: 'Secret.' },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What holds it', visibility: 'shared', status: 'current', props: { filter: { types: ['work.task', 'software.feature'] } } },
+        { op: 'link', type: 'part_of', from: 't', to: 'f' },
+        { op: 'link', type: 'part_of', from: 'x', to: 'f' },
+        { op: 'link', type: 'about', from: 'l', to: 'f' },
+      ],
+    })
+  ).created;
+  await api(theirs, 'workspace_set', { accepts_from: ['default'] });
+  const accept = async (title: string) => {
+    const item = (await api(theirs, 'search', { type: 'sys.shared_document' })).find((s: any) => s.title === title && s.status === 'offered');
+    await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: item.id, status: 'accepted' }] });
+    return item.id as string;
+  };
+
+  // Shared to be read, it is not published there.
+  const readOnly = await api(mine, 'share_workspace', { id: made.e, workspace: 'acme' });
+  assert.equal(readOnly.publish, false);
+  const entryRead = await accept('The principles');
+  await assert.rejects(api(theirs, 'publish', { id: entryRead }), /to be read here, not published/);
+  assert.equal((await api(theirs, 'get', { id: entryRead })).entity.visibility, 'shared', 'nothing made public by the refusal');
+  await api(mine, 'share_revoke', { id: readOnly.share });
+
+  // Shared to be published, it is: as the sender gives it, its view drawn there with nothing private.
+  const shared = await api(mine, 'share_workspace', { id: made.p, workspace: 'acme', publish: true });
+  assert.equal((await api(mine, 'share_list', { id: made.p }))[0].publishable, true);
+  const page = await accept('A principle');
+  assert.equal((await api(theirs, 'publish', { id: page })).published, page);
+  const read = async (id: string) => (await (await fetch(`${base}/p/acme/${id}/data`)).json()) as any;
+  const published = await read(page);
+  assert.match(published.parts[0].text, /Held by what serves it/);
+  assert.deepEqual(published.lenses[made.l].items.map((i: any) => i.title).sort(), ['A test of it', 'The rule']);
+  assert.ok(!JSON.stringify(published).includes(made.x) && !JSON.stringify(published).includes('Secret'), 'nothing private of the sender');
+
+  // A page it shares names another it shares by the sender's id: published here, it names it by this map's.
+  const entryShare = await api(mine, 'share_workspace', { id: made.e, workspace: 'acme', publish: true });
+  const entry = await accept('The principles');
+  await api(theirs, 'publish', { id: entry });
+  assert.equal((await read(entry)).links?.[page], 'A principle');
+  assert.match((await read(entry)).parts[0].text, new RegExp(page));
+
+  // The sender changes it: nothing public changes until it is published here again.
+  await api(mine, 'change', { reason: 'test', ops: [{ op: 'update', id: made.p, body: 'Rewritten.\n\n' + made.l }] });
+  assert.match((await read(page)).parts[0].text, /Held by what serves it/);
+  assert.equal((await api(theirs, 'published', { id: page })).changed, true);
+
+  // The sender stops sharing it: it is taken down there at once.
+  await api(mine, 'share_revoke', { id: shared.share });
+  assert.equal((await fetch(`${base}/p/acme/${page}/data`)).status, 404);
+  assert.equal((await api(theirs, 'get', { id: page })).entity.visibility, 'shared');
+  await assert.rejects(api(theirs, 'publish', { id: page }), /no longer shared/);
+  await api(mine, 'share_revoke', { id: entryShare.share });
+});

@@ -18,7 +18,7 @@ export const figureOf = (s, cls = 'doc-figure') => {
   return img;
 };
 
-/** What the item's menu offers for reading it: print it, make a link to it, share it with a workspace, stop sharing. */
+/** What the item's menu offers for reading it: print it, make a link to it, share it with a workspace (to publish, or not), stop sharing. */
 export function documentMenu(e, links, page, redraw, doc) {
   const shareLink = async () => {
     if (!(await ask({ title: `Make a link to "${e.title}"?`, message: 'Anyone with the link can read it and every item it brings in, with no login, until the link is revoked.', action: 'Make link' }))) return;
@@ -29,11 +29,15 @@ export function documentMenu(e, links, page, redraw, doc) {
       tell('No link was made', err.message);
     }
   };
-  const shareWorkspace = async () => {
-    const workspace = await ask({ title: `Share "${e.title}" with a workspace?`, message: 'Those there can read it and every item it brings in once they accept it, until you stop sharing.', input: { placeholder: 'Workspace id' }, action: 'Share' });
+  // To publish too: that workspace may publish it as this map gives it, until the share stops, which takes it down there.
+  const shareWorkspace = async (publish) => {
+    const message = publish
+      ? 'Those there can read it and every item it brings in once they accept it, and publish it as this map gives it, until you stop sharing: that takes it down there.'
+      : 'Those there can read it and every item it brings in once they accept it, until you stop sharing.';
+    const workspace = await ask({ title: `Share "${e.title}" with a workspace${publish ? ', to publish' : ''}?`, message, input: { placeholder: 'Workspace id' }, action: 'Share' });
     if (!workspace) return;
     try {
-      await api('share_workspace', { id: e.id, workspace });
+      await api('share_workspace', { id: e.id, workspace, publish });
       redraw();
     } catch (err) {
       tell('It was not shared', err.message);
@@ -50,7 +54,8 @@ export function documentMenu(e, links, page, redraw, doc) {
   return [
     ['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')],
     !e.archived_at && ['Make a link to read it', shareLink],
-    !e.archived_at && ['Share with a workspace', shareWorkspace],
+    !e.archived_at && ['Share with a workspace', () => shareWorkspace(false)],
+    !e.archived_at && ['Share with a workspace, to publish', () => shareWorkspace(true)],
     plain.length > 0 && ['Stop the links', () => stop(plain, plain.length === 1 ? 'the link' : `the ${plain.length} links`), 'danger'],
     ...links.filter((s) => s.to_workspace).map((s) => [`Stop sharing with ${s.to_workspace}`, () => stop([s], `sharing with ${s.to_workspace}`), 'danger']),
   ];

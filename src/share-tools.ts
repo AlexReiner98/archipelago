@@ -39,7 +39,11 @@ export const SHARE_TOOLS: Record<string, Tool> = {
   share_workspace: {
     description: 'Share one document with another workspace on this server, for those there to read and nobody else. It arrives there as an offer to accept, if that workspace accepts shares from this one. An admin’s.',
     humanOnly: true,
-    input: { id: z.string().describe('The document.'), workspace: z.string().describe('The id of the workspace to share it with.') },
+    input: {
+      id: z.string().describe('The document.'),
+      workspace: z.string().describe('The id of the workspace to share it with.'),
+      publish: z.boolean().optional().describe('true to let that workspace publish it too, as this map gives it, until the share is revoked: revoking takes it down there.'),
+    },
     run: async (l, actor, input) => shareWithWorkspace(l, actor, input),
   },
   share_list: {
