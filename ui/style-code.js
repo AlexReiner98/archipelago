@@ -15,7 +15,7 @@ export function drawCode(host, answer, style, keep) {
   const { code, ...fields } = style;
   const { style: _kept, ...data } = answer;
   const error = h('div', { class: 'lens-error', hidden: true });
-  const stage = h('div');
+  const stage = h('div', { class: 'code-stage' });
   const colours = () => Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(host).getPropertyValue(`--ln-${name}`).trim()]));
   let frame;
   const draw = () => {

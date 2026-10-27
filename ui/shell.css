@@ -9,12 +9,16 @@ option, optgroup { background: var(--panel); color: var(--text); }
 /* The canvas: the view drawn edge to edge, its frame the whole page. */
 #canvas { position: fixed; inset: var(--main-top, 0%) var(--main-right, 0%) var(--main-bottom, 0%) var(--main-left, 0%); background: var(--ln-sea, var(--bg)); }
 #canvas > .lens-wrap, #canvas .lens-view { height: 100%; }
-/* The safe zone: the bar and the query bar above, the find bar below. A drawing that does not pan (a list, a grid)
-   is laid out between them and scrolls there; one on the plane starts under the bars, so they never cover it, and is
-   fitted above find. */
+/* The safe zone: the bar and the query bar above, the find bar below. A drawing starts under the bars, so they never
+   cover it, and runs to the foot of the page, with find drawn over it: no room is kept for find. A drawing on the
+   plane is fitted above find; one that scrolls (a list, a grid) keeps room for it after its end only, so its last row
+   can be scrolled out from under it. */
 #canvas { --safe-top: calc(2 * var(--box-9) + var(--space-8) + var(--space-6)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
 #canvas .lens-view { position: relative; box-sizing: border-box; padding: var(--safe-top) 0 var(--safe-bottom); overflow: auto; }
-#canvas .lens-view:has(.lf-stage) { padding: var(--safe-top) 0 0; overflow: hidden; }
+#canvas .lens-view:has(.lf-stage), #canvas .lens-view:has(.code-stage) { padding: var(--safe-top) 0 0; overflow: hidden; }
+/* A style's own code fills its canvas or pane, not the height a document gives its frame. */
+#canvas .code-stage, #panes .pane-canvas .code-stage { height: 100%; }
+#canvas .code-stage > .lens-frame, #panes .pane-canvas .code-stage > .lens-frame { height: 100%; min-height: 0; }
 #canvas .lf-stage { height: 100%; }
 /* The key is shown when the reader turns it on in the settings menu (ui/canvas.js); the drawing's own controls are not drawn. */
 /* The key, always in sight on the canvas: in the safe zone, under the query bar, scrolled when it is longer than the room. */
