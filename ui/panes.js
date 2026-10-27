@@ -10,6 +10,7 @@ import { api, h, hooks, known, store } from './base.js';
 import { activate, canvasHref, focusOn, home, sheetOver, withItem } from './canvas.js';
 import { canvasLens } from './canvases.js';
 import { flatQuery, flatView, readFlatLens } from './lens.js';
+import { lookMode } from './look.js';
 import { dragPane, sashes } from './pane-drag.js';
 import { unfollow } from './replica.js';
 import { titles } from './words.js';
@@ -376,4 +377,5 @@ hooks.showIn = (at, pane) => {
 
 /** Draw the panes kept, once the map's schema is read (ui/app.js): what they draw is read through it. */
 let started = false;
-export const startPanes = () => started || ((started = true), draw());
+// A look's page (the server's own, ui/look.js) draws the view it was asked for alone.
+export const startPanes = () => lookMode || started || ((started = true), draw());

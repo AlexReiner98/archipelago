@@ -7,10 +7,9 @@ import { z } from 'zod';
 import { askView } from './askview.ts';
 import { putPlaces } from './canvas-places.ts';
 import { importAudit } from './audit.ts';
-import { askLook, awaitLook } from './looks.ts';
+import { takeLook } from './looks.ts';
 import { toConfirm } from './confirm.ts';
 import { stopLaunched } from './launcher.ts';
-import { readFlat } from './lens-flat.ts';
 import { notify } from './notify.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
@@ -21,6 +20,7 @@ import { point } from './tool-change.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
+import { VIEW_INPUT, viewAddress } from './view-address.ts';
 
 export const ACT_TOOLS: Record<string, Tool> = {
   backup: {
@@ -37,72 +37,27 @@ export const ACT_TOOLS: Record<string, Tool> = {
       'Answer the human with a drawing on their canvas: a kept view (entity: a lens item, a saved canvas) or a lens and style of your own, or open an item\'s page or the workspace. ' +
       'Their page goes there within a couple of seconds if it follows agents; one that does not offers the link instead. The answer says how many of their pages are open and how many follow you (pages). Add a short note saying what they are looking at. ' +
       'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching. ' +
-      'With look: true, a page of theirs that goes there answers with a picture of what it drew (picture: base64 PNG and its size), made in their browser, private items and a style’s own code as they see them; the answer waits for it up to wait_seconds, and query picture with the look reads it later.',
+      'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page).',
     input: {
-      entity: z.string().optional().describe('An item id: open its page; a view kept on the map (type lens, a saved canvas) is opened as their canvas, its lens in their query bar.'),
+      ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
-      lens: z
-        .record(z.string(), z.unknown())
-        .optional()
-        .describe('What their canvas draws: a flat lens, as query flat takes it ({ filter: { text, types, ids, links, only, within, exclude }, walk: { over, steps }, limit }), shown in their query bar as if they had written it. With entity, under that item\'s page. {} is the canvas as it opens.'),
-      style: z
-        .object({
-          lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
-          shape: z.enum(['list', 'flow', 'grid', 'time', 'architecture']).optional().describe('One of the built-in drawings. list: each thing one line, what holds others a box that folds. flow: a process map, top down, wires at right angles. grid: rows by what the start holds, columns by lane, each thing a card. time: along the lens\x27s time axis, a calendar or bars. architecture: a system, each part a box inside a box for where it runs, wires down to what it calls, each part and wire marked with its health.'),
-          id: z.string().optional().describe('A style kept on the map (an item of type style), drawn with for this one look.'),
-        })
-        .optional()
-        .describe('How the view is drawn, for this one look. The style a view opens in is kept on the map: an item of type style, about the project or item it is for, or about nothing for the whole workspace; change it with change.'),
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
-      look: z.boolean().optional().describe('Ask the page that goes there for a picture of what it drew: the canvas as the owner sees it.'),
+      look: z.boolean().optional().describe('Also answer with a picture of it, drawn by the server (as query look draws it).'),
+      width: z.number().int().min(320).max(1920).optional().describe('With look: the picture’s width in pixels (1200).'),
+      height: z.number().int().min(240).max(1600).optional().describe('With look: its height (750).'),
+      scheme: z.enum(['dark', 'light']).optional().describe('With look: the theme it is drawn in (dark).'),
       pane: z
         .enum(['left', 'right', 'above', 'below', 'main', 'alone'])
         .optional()
-        .describe('Which pane of their page it goes to: a side opens it in a pane beside their main canvas (one already drawing it moves there), main is the main canvas, alone closes the other panes first. Left out, a pane already drawing it is lit, else the main canvas goes there. Only a canvas or an item goes to a pane; with look, the picture is of that pane.'),
-      wait_seconds: z.number().int().min(0).max(60).optional().describe('With look: how long to wait for the picture (20). 0 answers at once with the look, to read with query picture.'),
+        .describe('Which pane of their page it goes to: a side opens it in a pane beside their main canvas (one already drawing it moves there), main is the main canvas, alone closes the other panes first. Left out, a pane already drawing it is lit, else the main canvas goes there. Only a canvas or an item goes to a pane.'),
     },
     run: async (l, actor, input) => {
-      // Where it pointed, and whether a page of theirs is there to follow it; with a look, what that page drew.
-      const shown = async (hash: string, note?: string) => {
-        const { db } = await wholeMap(l);
-        const look = input.look ? await askLook(db, l, actor.name) : undefined;
-        const at = await point(l, actor, 'show', hash, note, look, input.pane);
-        const pages = await watching(db, l, actor.name);
-        if (!look) return { ...at, pages };
-        if (!pages.following) return { ...at, pages, look, picture: null, why: 'No page of theirs follows you: nothing went there to draw it.' };
-        const wait = (input.wait_seconds ?? 20) * 1000;
-        return { ...at, pages, ...(wait ? await awaitLook(db, l, look, wait) : { look }) };
-      };
-      // A saved canvas is opened as what their canvas draws: the page reads its lens and style from the map.
-      const kept = input.entity && (await l.entity(input.entity));
-      if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return shown(`v?canvas=${input.entity}`, input.note);
-      if (input.lens || input.style) {
-        // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on the owner's screen.
-        const asked = (input.lens ?? {}) as { filter?: { exclude?: unknown }; limit?: unknown };
-        const lens = Object.keys(asked).length ? readFlat(l, asked) : undefined;
-        for (const id of [...(lens?.include.ids ?? []), ...(input.entity ? [input.entity] : [])]) if (!(await l.entity(id))) throw new Error(`No item "${id}"`);
-        // The address says the lens as the page reads it (ui/lens.js, readFlatLens): each term of the filter, the walk, the limit.
-        const query = new URLSearchParams();
-        if (lens) {
-          const { text, types, ids, links } = lens.include;
-          const walked = lens.walk.over === 'all' || lens.walk.over.length > 0;
-          if (text) query.set('text', text);
-          if (types?.length) query.set('types', types.join(','));
-          if (ids?.length) query.set('ids', ids.join(','));
-          for (const t of links ?? []) query.append('link', `${t.link} ${t.to ?? t.from}`);
-          if (asked.filter?.exclude !== undefined) query.set('exclude', lens.exclude.join(','));
-          if (walked) query.set('over', lens.walk.over === 'all' ? 'all' : (lens.walk.over as string[]).join(','));
-          if (walked) query.set('steps', String(lens.walk.steps));
-          if (asked.limit !== undefined) query.set('limit', String(lens.limit));
-        }
-        if (input.style?.lit) query.set('lit', input.style.lit);
-        if (input.style?.shape) query.set('shape', input.style.shape);
-        if (input.style?.id) query.set('style', input.style.id);
-        // Their canvas draws it, under the item's page when one is named.
-        return shown(`${input.entity ? `e/${input.entity}` : 'v'}${query.size ? `?${query}` : ''}`, input.note);
-      }
-      if (!input.entity && !input.screen) throw new Error('show needs "entity", "screen" or "lens".');
-      return shown(input.entity ? `e/${input.entity}` : input.screen, input.note);
+      // Where it pointed, and whether a page of theirs is there to follow it; with a look, the picture of what is there.
+      const hash = await viewAddress(l, input);
+      const { db } = await wholeMap(l);
+      const at = await point(l, actor, 'show', hash, input.note, input.pane);
+      const pages = await watching(db, l, actor.name);
+      return { ...at, pages, ...(input.look && (await takeLook(db, l.db, l, actor.name, hash, input))) };
     },
   },
   claim: {

@@ -204,7 +204,7 @@ as a column.
 An agent's show takes `pane`: a side opens what it shows in a pane there (one
 already drawing it moves), `main` is the main canvas, `alone` closes the
 others. Left out, a pane already drawing it is lit, else the main canvas goes
-there. A look is of the pane it went to. A popped-out window follows no agent:
+there. A popped-out window follows no agent:
 the main page does, for both.
 
 ## What is not yet so

@@ -10,13 +10,14 @@ import { placesOn } from './canvas-places.ts';
 import { shownIn } from './lens-saved.ts';
 import { wholeMap } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
-import { lookAt } from './looks.ts';
+import { lookAt, takeLook } from './looks.ts';
 import { getPicture } from './pictures.ts';
 import { withScreens } from './screens.ts';
 import { schemaBrief, schemaOf } from './schema-brief.ts';
 import { withStyles } from './styles.ts';
 import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
+import { VIEW_INPUT, viewAddress } from './view-address.ts';
 
 /** One thing the human did to the map, small enough to put in front of a model. */
 export interface HumanChange {
@@ -236,13 +237,26 @@ export const READ_TOOLS: Record<string, Tool> = {
     },
   },
   picture: {
-    description: 'The image kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; query document, which sections have a figure). Or, with look, what the owner’s page drew where a show with look: true brought it: a PNG, or why there is none; nothing yet while no page has answered.',
-    input: { result: z.string().optional().describe('The id of the test result, note or file.'), look: z.string().optional().describe('The look a show with look: true answered with.') },
+    description: 'The image kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; query document, which sections have a figure). Or, with look, a look taken in the last 30 minutes, again, as an image.',
+    input: { result: z.string().optional().describe('The id of the test result, note or file.'), look: z.string().optional().describe('A look query look or show answered with.') },
     run: async (l, _actor, input) => {
-      if (input.look) return (await lookAt((await wholeMap(l)).db, l, input.look)) ?? { look: input.look, picture: null, why: 'No page has answered yet.' };
+      if (input.look) return lookAt((await wholeMap(l)).db, l, input.look);
       if (!input.result) throw new Error('picture needs "result" or "look".');
       return getPicture(l, { result: input.result });
     },
+  },
+  look: {
+    description:
+      'See what a view looks like: the server draws it in its own browser, from the same page, drawings and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the lens found nothing, error, late), settled (false for a drawing still moving), why. ' +
+      'It never moves the owner’s page (show with look: true does both). The same view at the same size, the map unchanged, answers with the picture already taken (again: true) unless fresh. At most 60 an hour per workspace.',
+    input: {
+      ...VIEW_INPUT,
+      width: z.number().int().min(320).max(1920).optional().describe('The picture’s width in pixels (1200).'),
+      height: z.number().int().min(240).max(1600).optional().describe('Its height (750).'),
+      scheme: z.enum(['dark', 'light']).optional().describe('The theme it is drawn in, as a reader whose system is dark or light sees it (dark).'),
+      fresh: z.boolean().optional().describe('Draw it again even when the map has not changed since the last look at it.'),
+    },
+    run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, await viewAddress(l, input), input),
   },
   places: {
     description: 'Where each thing stands on one canvas, as a person put it there: by item, the middle of each as [x, y] in the picture’s own units. Read beside the lens of that canvas; what is not here is where the drawing lays it.',

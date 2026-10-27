@@ -47,15 +47,9 @@ function inside(home) {
   };
   const heard = {};
   const size = { width: 0, height: 0, dpr: 1 };
-  let painted;
   self.onmessage = async (ev) => {
     const said = ev.data;
     if (said.type === 'ping') return post({ type: 'pong' });
-    // What it has painted, as an image: for a picture the page makes of itself (ui/look.js).
-    if (said.type === 'capture') {
-      const image = painted ? await createImageBitmap(painted).catch(() => null) : null;
-      return self.postMessage({ type: 'captured', image }, image ? [image] : []);
-    }
     if (said.type === 'event') {
       if (said.name === 'resize') Object.assign(size, said.event);
       for (const fn of heard[said.name] ?? []) {
@@ -68,7 +62,6 @@ function inside(home) {
       return;
     }
     if (said.type !== 'draw') return;
-    painted = said.canvas;
     Object.assign(size, { width: said.width, height: said.height, dpr: said.dpr });
     try {
       // The code is a module of its own, loaded from its text: by a blob's address where the browser allows that here, else as a data address.
@@ -87,6 +80,11 @@ function inside(home) {
         tip: (text, x, y) => post({ type: 'tip', text: text == null ? null : String(text), x: Number(x), y: Number(y) }),
         cursor: (name) => post({ type: 'cursor', name: String(name) }),
       });
+      // Its code has returned: once two frames have been painted after it, the view has drawn (ui/look.js).
+      const frame = () => new Promise((r) => (self.requestAnimationFrame ? self.requestAnimationFrame(r) : setTimeout(r, 16)));
+      await frame();
+      await frame();
+      post({ type: 'drew' });
     } catch (err) {
       fail(err);
     }
@@ -103,8 +101,6 @@ const EVENTS = ['pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'whee
 
 let worker;
 addEventListener('message', (ev) => {
-  // The page asks for what has been painted: the worker answers with an image.
-  if (ev.source === parent && ev.data?.type === 'capture') return void (worker?.postMessage ? worker.postMessage({ type: 'capture' }) : say({ type: 'captured', image: null }));
   if (ev.source !== parent || ev.data?.type !== 'draw' || worker) return;
   const { code, answer, style, theme } = ev.data;
   document.body.style.background = theme.sea;
@@ -128,7 +124,7 @@ addEventListener('message', (ev) => {
     unanswered = 0;
     // Only these, and each one checked: what the code says is never trusted.
     if (said?.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) say({ type: 'open', id: said.id });
-    else if (said?.type === 'captured') parent.postMessage({ type: 'captured', image: said.image instanceof ImageBitmap ? said.image : null }, '*', said.image instanceof ImageBitmap ? [said.image] : []);
+    else if (said?.type === 'drew') say({ type: 'drew' });
     else if (said?.type === 'error') fail(said.message);
     else if (said?.type === 'cursor' && CURSORS.includes(said.name)) canvas.style.cursor = said.name;
     else if (said?.type === 'tip') {

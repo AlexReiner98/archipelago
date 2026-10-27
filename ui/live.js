@@ -1,6 +1,6 @@
 import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
-import { drawnNow, pictureOf } from './look.js';
+import { lookMode } from './look.js';
 import { types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
@@ -100,13 +100,14 @@ const reading = () => Date.now() - readAt < 20_000 || Boolean(getSelection()?.to
 export let followedTimer;
 /** This page, among the owner's open pages: the server counts those that follow, so an agent's show says whether it landed. */
 const pageId = Math.random().toString(36).slice(2, 14);
-const thisPage = () => ({ page: pageId, on: following.on && chosen.kinds.has('show'), muted: [...chosen.muted] });
+// A page the server draws for an agent's look is no page of the owner's: it is not counted, and follows nobody.
+const thisPage = () => (lookMode ? undefined : { page: pageId, on: following.on && chosen.kinds.has('show'), muted: [...chosen.muted] });
 /** Where each agent that tells a story tells it: following it goes there, not from item to item. */
 export const storyOf = new Map();
 
 export function follow(steps = []) {
-  // A popped-out pane leaves what agents show to the main page, which answers for both.
-  if (window.name.startsWith('pelago-pane:')) return;
+  // A look's page, and a popped-out pane, leave what agents show to the main page.
+  if (lookMode || window.name.startsWith('pelago-pane:')) return;
   // The first answer only says where things stand; an old step is not followed.
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
@@ -121,8 +122,6 @@ export function follow(steps = []) {
   // The line says the last thing done; the page goes to the last that has a place. A step may have none: then the page stays.
   const to = wanted.at(-1);
   if (!to) return;
-  // A show that asked to see what this page draws there is answered: a picture once it has gone there and drawn it, else why not.
-  const asked = to.kind === 'show' && /^l_[0-9a-f]{12}$/.test(to.look ?? '') ? to.look : null;
   const place = wanted.findLast((s) => s.hash || storyOf.has(s.actor));
   const there = place && `#/${storyOf.get(place.actor) ?? place.hash}`;
   const busy = !following.on || state.dirty || document.querySelector('dialog[open]') || reading();
@@ -142,26 +141,6 @@ export function follow(steps = []) {
   // A canvas docked beside the main one draws it, when the show asked for a pane or one draws it already (ui/panes.js); else the main canvas goes there.
   const frame = !busy && place?.kind === 'show' && place.hash ? hooks.showIn?.(place.hash, place.pane) : null;
   if (!busy && there && !frame && location.hash !== there) location.hash = there;
-  if (asked) answerLook(asked, to.actor, !busy && there ? null : !following.on ? 'Their page does not follow agents.' : 'They were busy on the page: it did not go there.', frame ?? undefined);
-}
-
-/** The answers owed to looks, sent with the next tail (src/looks.ts). */
-const owed = [];
-async function answerLook(look, actor, why, frame) {
-  if (why) return void owed.push({ look, why });
-  try {
-    await drawnNow(frame);
-    owed.push({ look, ...(await pictureOf(frame)) });
-    // The reader is told what left the page, and for whom.
-    const line = h('span', { class: 'grow' }, `An image of this canvas went to ${actor.split('/').at(-1)}`);
-    followed.replaceChildren(line);
-    followed.hidden = false;
-    clearTimeout(followedTimer);
-    followedTimer = setTimeout(() => (followed.hidden = true), 6000);
-  } catch (err) {
-    owed.push({ look, why: `The page could not make an image: ${String(err?.message ?? err).slice(0, 150)}` });
-  }
-  checkTail();
 }
 
 /** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */
@@ -188,7 +167,8 @@ export const kinds = {
  * stands is read first, so nothing said while the lens is read is missed. Stop with `unfollow` (ui/replica.js).
  */
 export async function replicate(read) {
-  const { pos, queue } = await api('tail', {});
+  // A look draws once and is closed: it is kept current from nothing (and tail is the owner's page's, not an agent's).
+  const { pos, queue } = lookMode ? {} : await api('tail', {});
   const store = new Replica(kinds);
   const [answer, held] = await Promise.all([read(), heldNow()]);
   store.hold(answer, pos);
@@ -235,7 +215,7 @@ function touchedBy(beat, pos) {
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;
 export async function checkTail() {
-  if (document.hidden || redrawing) return;
+  if (lookMode || document.hidden || redrawing) return;
   let now;
   let touched;
   let more = false;
@@ -245,8 +225,7 @@ export async function checkTail() {
     const at = [state.pos, ...stores.map((s) => s.pos)].filter((pos) => pos !== undefined);
     const from = at.length ? Math.min(...at) : undefined;
     const ids = [...new Set([...shownIds(), ...stores.flatMap((s) => s.ids())])];
-    const drew = owed.shift();
-    const beat = await api('tail', { ...(from === undefined ? { page: thisPage() } : { after: from, seq: state.seq, ids, page: thisPage() }), ...(drew && { drew }) });
+    const beat = await api('tail', { ...(from === undefined ? { page: thisPage() } : { after: from, seq: state.seq, ids, page: thisPage() }) });
     // Only an answer that read the facts moves a store: one that says only where the log stands would skip them.
     if (beat.entries) for (const store of stores) {
       try {

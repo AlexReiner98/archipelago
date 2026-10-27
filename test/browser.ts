@@ -3,14 +3,13 @@
 // those tests are skipped.
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { chromeBinary } from '../src/chrome.ts';
 
-const PLACES = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
-
-/** Where Chrome is, or null. */
-export const chrome = (): string | null => [process.env.CHROME, ...PLACES].find((p): p is string => Boolean(p && existsSync(p))) ?? null;
+/** Where Chrome is, or null: where the server looks for the one it draws looks in (src/chrome.ts). */
+export const chrome = chromeBinary;
 
 export interface Page {
   /** Open another address in the same page (the same browser, its storage kept). */

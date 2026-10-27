@@ -1,6 +1,6 @@
 // More than one canvas at once (ui/panes.js): an agent's show can name a pane of the owner's page, the step carrying
-// it; in a real browser (skipped where there is no Chrome) a show opens a canvas in a pane beside the main one, its
-// look is of that pane, a change reaches both panes, a pane's name dragged to the other side docks it there, and alone
+// it; in a real browser (skipped where there is no Chrome) a show opens a canvas in a pane beside the main one, a
+// change reaches both panes, the bar and find act on the pane last touched, with back and forward, a pane's name dragged to the other side docks it there, and alone
 // leaves the main canvas by itself.
 
 import assert from 'node:assert/strict';
@@ -52,10 +52,8 @@ test('in a browser, a show opens a canvas in a pane beside the main one, both ke
     await wait(3000);
     await show({ entity: views.f });
     await until('the main canvas draws the first', () => page.evaluate(`document.querySelector('#canvas svg')?.textContent.includes('First step') ?? false`));
-    // A show into a pane: the second beside the first, and its look is of that pane alone.
-    const looked = await show({ entity: views.g, pane: 'right', look: true, wait_seconds: 30 });
-    assert.match(looked.data ?? '', /^iVBORw0KGgo/, `a picture of the pane: ${JSON.stringify({ ...looked, data: undefined })}`);
-    assert.ok(looked.width < 700, `the pane's width, not the page's: ${looked.width}`);
+    // A show into a pane: the second beside the first.
+    await show({ entity: views.g, pane: 'right' });
     await until('the pane draws the second', () => page.evaluate(`document.querySelector('#panes svg')?.textContent.includes('Second step') ?? false`));
     assert.deepEqual((await panes()).map((p: [string, number]) => p[0]), ['The second']);
     assert.ok(await page.evaluate(`document.querySelector('#canvas svg').textContent.includes('First step') && location.hash.includes('${views.f}')`), 'the main canvas still draws the first');
