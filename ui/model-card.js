@@ -44,12 +44,12 @@ export function modelCard() {
         const v = kind.value;
         draw(await api('model_account', { provider: v, key: key.value.trim() || undefined, model: model.value.trim() || undefined, url: v === 'compatible' ? url.value.trim() : undefined }));
       } catch (err) {
-        said.replaceChildren(h('div', { class: 'error', style: `padding: 0 var(--space-8) var(--space-7); ${ONE_LINE}`, title: err.message }, err.message));
+        said.replaceChildren(h('div', { class: 'error', style: `padding: 0 0 var(--space-6); ${ONE_LINE}`, title: err.message }, err.message));
         save.disabled = false;
         save.textContent = 'Connect';
       }
     };
-    return [h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, kind, url, key, model, save, again && h('button', { onclick: () => draw(s) }, 'Cancel')), said];
+    return [h('div', { class: 'toolbar', style: 'padding: var(--space-6) 0' }, kind, url, key, model, save, again && h('button', { onclick: () => draw(s) }, 'Cancel')), said];
   };
 
   // The price, in one line in place of the row's last part: in and out, US$ a million tokens.
@@ -60,8 +60,8 @@ export function modelCard() {
     const save = h('button', { class: 'primary' }, 'Save');
     const said = h('div');
     save.onclick = () =>
-      api('model_account', { price_in: Number(pin.value), price_out: Number(pout.value) }).then(draw, (err) => said.replaceChildren(h('div', { class: 'error', style: `padding: 0 var(--space-8) var(--space-7); ${ONE_LINE}`, title: err.message }, err.message)));
-    return [h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)', title: 'From the provider’s price list. Each run here is said to cost what it read and wrote at these prices.' }, h('span', { class: 'muted small' }, 'US$ / M tokens'), pin, pout, save, h('button', { onclick: () => draw(s) }, 'Cancel')), said];
+      api('model_account', { price_in: Number(pin.value), price_out: Number(pout.value) }).then(draw, (err) => said.replaceChildren(h('div', { class: 'error', style: `padding: 0 0 var(--space-6); ${ONE_LINE}`, title: err.message }, err.message)));
+    return [h('div', { class: 'toolbar', style: 'padding: var(--space-6) 0', title: 'From the provider’s price list. Each run here is said to cost what it read and wrote at these prices.' }, h('span', { class: 'muted small' }, 'US$ / M tokens'), pin, pout, save, h('button', { onclick: () => draw(s) }, 'Cancel')), said];
   };
 
   const draw = (s) => {
@@ -73,7 +73,7 @@ export function modelCard() {
     const what = a ? [a.name, a.url && new URL(a.url).host, a.model].filter(Boolean).join(' · ') : s.server_model ? `the server’s model · ${s.server_model}` : 'no model';
     const row = h(
       'li',
-      { class: 'row-top', style: 'flex-wrap: nowrap' },
+      { class: 'one' },
       h(
         'span',
         { class: `pill ${a ? 'ok' : s.server_model ? '' : 'warn'}`, title: a ? 'Model calls here run on this account' : s.server_model ? 'Until an account is connected, this server’s own model is used' : 'Nothing here can ask a model: pushes are recorded, not read' },

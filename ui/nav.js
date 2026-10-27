@@ -1,11 +1,11 @@
 // The menu and the screens in it. What waits for you and the Workspace page are always there; between them come
 // the screens the owner has given a place, each a page of its own drawn from its pieces, opened in the sheet. Packs offer
-// screens as presets; the owner adds one, takes it out and puts it back on the Workspace page, where what each
-// screen is (a page in the nav, or a part of every item of a kind) is listed with its switch.
+// screens as presets; the owner adds one, takes it out and puts it back on its pack's card on the Workspace page, where each
+// screen is (a page in the nav, or a part of every item of a kind) is a row with its switch.
 
 import { api, ask, h, part, state, tell } from './base.js';
 import { drawScreen } from './screens.js';
-import { loadSchema, typeTitle } from './words.js';
+import { loadSchema, menu, typeTitle } from './words.js';
 
 const byPlace = (a, b) => a.nav - b.nav;
 /** The screens in the nav, in their places. */
@@ -43,9 +43,8 @@ const where = (s) =>
   [s.at === 'home' && 'on Home', typeof s.nav === 'number' && 'in the nav', s.on.length > 0 && `on ${s.on.map(typeTitle).join('\n')}`].filter(Boolean).join(' · ') ||
   (s.homeable ? 'taken off Home' : s.offered ? 'offered for the nav' : 'not shown');
 
-/** The Workspace card: every screen, and the switch that puts one in the nav or takes it out. */
-export function screensCard(then) {
-  const screens = state.schema?.screens ?? [];
+/** Rows for some screens (a pack's, on its card on the Workspace page), each with the switch that puts it on Home or in the nav, or takes it away. */
+export function screenRows(screens, then) {
   const write = async (ops, reason) => {
     try {
       await api('change', { ops, reason });
@@ -67,30 +66,26 @@ export function screensCard(then) {
     s.item
       ? write([{ op: 'update', id: s.item, props: { home: s.homeable ? (on ? null : false) : on || null } }], `${s.title} ${on ? 'put on' : 'taken off'} Home`)
       : write([{ op: 'create', type: 'screen', title: s.title, status: 'current', props: { preset: s.id, home: on } }], `${s.title} ${on ? 'put on' : 'taken off'} Home`);
-  const homeButton = (s) =>
-    s.at === 'home'
-      ? h('button', { style: 'white-space: nowrap', title: 'It stays here, to be put back', onclick: () => home(s, false) }, 'Take off Home')
-      : s.homeable && h('button', { style: 'white-space: nowrap', title: 'Draw it on Home again, where its pack put it', onclick: () => home(s, true) }, 'Put on Home');
   // What could be a page in the nav: what is there, what a pack offers, and the owner's own.
   const navable = (s) => typeof s.nav === 'number' || Boolean(s.offered) || Boolean(s.item && !s.pack && !s.on.length);
+  // Taking a screen off Home or out of the nav, in its menu: room kept where there is nothing to take away.
+  const rare = (s) => {
+    const items = [s.at === 'home' && ['Take off Home', () => home(s, false)], typeof s.nav === 'number' && ['Take out of the nav', () => remove(s)]].filter(Boolean);
+    return items.length ? menu('⋯', items) : h('span', { class: 'menu-room' });
+  };
   const row = (s) =>
     h(
       'li',
-      {},
-      h(
-        'div',
-        { class: 'row-top', style: 'flex-wrap: nowrap; align-items: center' },
-        h('span', { class: 'grow gist', title: `${s.title}${s.pack ? `, from the ${s.pack} pack` : ''}: ${where(s)}` }, s.item ? h('a', { href: `#/e/${s.item}` }, h('strong', {}, s.title)) : h('strong', {}, s.title), ' ', h('span', { class: 'muted small' }, where(s))),
-        homeButton(s),
-        navable(s) && (typeof s.nav === 'number' ? h('button', { style: 'white-space: nowrap', onclick: () => remove(s) }, 'Take out') : h('button', { style: 'white-space: nowrap', title: 'Give it a place in the nav, after the others', onclick: () => add(s) }, 'Add to nav')),
-      ),
+      { class: 'one' },
+      h('span', { class: 'grow', title: `${s.title}${s.pack ? `, from the ${s.pack} pack` : ''}: ${where(s)}` }, s.item ? h('a', { href: `#/e/${s.item}` }, h('strong', {}, s.title)) : h('strong', {}, s.title), ' ', h('span', { class: 'muted small' }, where(s))),
+      // Putting a screen somewhere is in sight; taking it away is rarer, and in its menu.
+      s.homeable && s.at !== 'home' && h('button', { title: 'Draw it on Home again, where its pack put it', onclick: () => home(s, true) }, 'Put on Home'),
+      navable(s) && typeof s.nav !== 'number' && h('button', { title: 'Give it a place in the nav, after the others', onclick: () => add(s) }, 'Add to nav'),
+      rare(s),
     );
-  // A screen on the pages of a kind has no switch here: those are one row, each named in its tooltip.
+  // A screen on the pages of a kind has no switch here: it is a row of its own, saying which pages it is on.
   const actionable = (s) => s.at === 'home' || Boolean(s.homeable) || navable(s);
   const onPages = screens.filter((s) => !actionable(s));
-  const pagesRow =
-    onPages.length > 0 &&
-    h('li', {}, h('div', { class: 'row-top' }, h('span', { class: 'muted small gist', title: onPages.map((s) => `${s.title}: ${where(s)}`).join('\n') }, `${onPages.length} more on item pages`)));
   const sorted = [...screens].filter(actionable).sort((a, b) => Number(b.at === 'home' || Boolean(b.homeable)) - Number(a.at === 'home' || Boolean(a.homeable)) || (typeof a.nav === 'number' ? a.nav : 1e9) - (typeof b.nav === 'number' ? b.nav : 1e9) || Number(navable(b)) - Number(navable(a)));
-  return h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: 'hinted', title: 'Pages drawn from pieces: on Home, in the nav, or on every item of a kind. Packs offer them; you choose what shows.' }, 'Screens')), h('ul', { class: 'rows' }, sorted.map(row), pagesRow));
+  return [...sorted.map(row), ...onPages.map(row)];
 }

@@ -1,13 +1,14 @@
-// Whether the reader is busy in a pane (ui/panes.js), so that what an agent shows passes it by (ui/pane-route.js): a
-// press, a scroll, a wheel or a key in that pane within the last while, text selected there, or, for the main pane,
-// words typed into the sheet and not yet saved. Moving the pointer is watching, not working, and a dial, a tick or a
-// pick is not unsaved work (ui/live.js). A window popped out keeps when it was last worked in, for the main page to
-// read; and the main page keeps the windows it popped out, so an agent's next step can go to one.
+// Whether the reader is busy in a pane of the tab in sight (ui/panes.js), so that what an agent shows passes it by
+// (ui/pane-route.js): a press, a scroll, a wheel or a key in that pane within the last while, text selected there, or,
+// for the main pane, words typed into the sheet and not yet saved. Moving the pointer is watching, not working, and a
+// dial, a tick or a pick is not unsaved work (ui/live.js). A tab popped out into a window (ui/tab-bar.js) keeps when it
+// was last worked in, for the main page to read; and the main page keeps the windows it popped out, so an agent's next
+// step can go to one.
 
 import { state } from './base.js';
 
 const quietAfter = 20_000;
-const popped = window.name.startsWith('pelago-pane:') ? window.name.slice('pelago-pane:'.length) : null;
+const popped = window.name.startsWith('pelago-tab:') ? window.name.slice('pelago-tab:'.length) : null;
 const keyOf = (id) => `pelago-pane-busy:${id}`;
 
 /** The pane an element is in: a docked one by its id, the main canvas and the sheet over it as main. */
@@ -35,7 +36,7 @@ for (const name of ['pointerdown', 'wheel', 'keydown', 'scroll']) addEventListen
 // The focus going into a drawing's frame is a press there: the frame keeps its own presses.
 addEventListener('blur', () => setTimeout(() => document.activeElement?.tagName === 'IFRAME' && stir(document.activeElement), 0));
 
-/** Whether the reader is at work in pane `id` now. */
+/** Whether the reader is at work in pane `id` of the tab in sight now, or in the window tab `id` was popped out into. */
 export function busy(id) {
   let last = lastAt.get(id) ?? 0;
   try {
@@ -49,9 +50,9 @@ export function busy(id) {
   return id === 'main' && state.dirty;
 }
 
-/** The windows this page popped out, by pane: an agent's step reaches one through it. */
+/** The windows this page popped out, by tab: an agent's step reaches one through it. */
 export const windows = new Map();
-/** A window popped out by this page that is still open, if pane `id` has one. */
+/** A window popped out by this page that is still open, if tab `id` has one. */
 export const windowOf = (id) => {
   const win = windows.get(id);
   return win && !win.closed ? win : null;
