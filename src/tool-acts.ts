@@ -51,7 +51,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
         .regex(/^[a-z][a-z0-9-]{0,23}$/, 'pane is a side (left, right, above, below), main, alone, or a short lower-case name of your own')
         .optional()
         .describe(
-          'Which pane of their page it goes to. A name of your own ("map", "tests") is a pane of your session’s: opened beside their main canvas the first time, drawn in again each time you name it, so you can keep two things in sight at once. ' +
+          'Which pane of their page it goes to. A name of your own ("map", "review") is a pane of your session’s: opened beside their main canvas the first time, drawn in again each time you name it, so you can keep two things in sight at once. ' +
             'A side (left, right, above, below) puts your session’s pane there; main is the main canvas; alone closes the other panes first. ' +
             'Left out, it goes to the pane that follows your session, else to one that follows everyone and no other session at work holds, else to a new pane of your own. The owner picks whom each pane follows, and a pane following someone else is not yours to move. Only a canvas or an item goes to a pane.',
         ),
