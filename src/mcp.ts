@@ -56,6 +56,20 @@ const inputsOf = (tool: Tool) => {
   return made;
 };
 
+/**
+ * What a tool answered, as MCP content: its words as text, and a picture it carries (`image`: base64 and its content
+ * type, as a look answers) as an image of its own, which the client shows the model as an image rather than as text.
+ */
+export function contentOf(result: unknown) {
+  const image = result && typeof result === 'object' ? (result as { image?: { data?: unknown; content_type?: unknown } }).image : undefined;
+  if (!image || typeof image.data !== 'string' || typeof image.content_type !== 'string') return [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }];
+  const { image: _sent, ...rest } = result as Record<string, unknown>;
+  return [
+    { type: 'text' as const, text: JSON.stringify(rest, null, 2) },
+    { type: 'image' as const, data: image.data, mimeType: image.content_type },
+  ];
+}
+
 /** A server for one request, with the tools the caller's workspace offers now. */
 function serverFor(caller: Caller): McpServer {
   const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true } } });
@@ -64,7 +78,7 @@ function serverFor(caller: Caller): McpServer {
       const { actor, ...input } = args;
       try {
         const result = await callTool(caller.pelago, caller.actor(actor as string | undefined), name, input);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        return { content: contentOf(result) };
       } catch (err) {
         return { content: [{ type: 'text' as const, text: (err as Error).message }], isError: true };
       }

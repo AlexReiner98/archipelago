@@ -12,6 +12,7 @@ import { tipOf } from './drawing-tip.js';
 import { build, cssFor, patch, step } from './marks.js';
 import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './lens-base.js';
 import { surfaceOf } from './surface.js';
+import { saidDrawn } from './look.js';
 import { relations, types as registry, typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
 
@@ -114,7 +115,7 @@ function colours(host, style) {
 export function drawWith(host, answer, style, keep) {
   host.endDrawing?.();
   const { drawing } = style;
-  const failed = (message) => host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`));
+  const failed = (message) => (host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`)), saidDrawn(host, 'error', message));
   // Its code: sent with the answer, kept by this browser, or fetched from this server by its hash (a published page's).
   const sent = drawing?.modules ?? drawings.get(drawing?.hash);
   const code = sent ? Promise.resolve(sent) : /^\/[^/]/.test(drawing?.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : null;
@@ -162,6 +163,8 @@ export function drawWith(host, answer, style, keep) {
         const got = performance.now();
         mounted = true;
         mount(said.scene ?? {});
+        // Drawn once its marks are mounted, and a surface over them has shown its first frame.
+        (surface ? surface.first : Promise.resolve()).then(() => saidDrawn(host, 'drawn'));
         for (const list of early.splice(0)) apply(list);
         if (moving.size) requestAnimationFrame(run);
         scenes.delete(seen);
@@ -193,7 +196,7 @@ ${JSON.stringify(input)}`;
   port.postMessage({ type: 'start', input });
   // A picture published with its first frame (src/published-frames.ts) has it on screen now; the drawing's own scene
   // takes its place when it answers.
-  if (kept) ((mounted = true), mount(kept));
+  if (kept) ((mounted = true), mount(kept), saidDrawn(host, 'drawn'));
   else if (opening) {
     // Checked as any scene is: one that says what a drawing may not is not drawn, and the drawing draws the picture.
     try {

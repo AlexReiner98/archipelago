@@ -11,7 +11,8 @@ import { h } from './base.js';
 /** A surface over `picture`, spoken of over `port`; `colours()` is how the page is coloured when the drawing asks. */
 export function surfaceOf(picture, port, colours) {
   const canvas = h('canvas', { class: 'lf-surface', 'aria-hidden': 'true' });
-  let given = false, shown = null;
+  let given = false, shown = null, firstSeen;
+  const first = new Promise((r) => (firstSeen = r));
   const sizeNow = () => {
     const box = picture.getBoundingClientRect();
     return { width: box.width, height: box.height, dpr: Math.min(devicePixelRatio || 1, 2) };
@@ -39,7 +40,10 @@ export function surfaceOf(picture, port, colours) {
       if (!(image instanceof ImageBitmap)) return;
       shown ??= canvas.getContext('bitmaprenderer');
       shown.transferFromImageBitmap(image);
+      firstSeen();
     },
+    /** Settled once the first frame is shown. */
+    first,
     end: () => watch.disconnect(),
   };
 }

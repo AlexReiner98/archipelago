@@ -67,6 +67,10 @@ A surface does not open them: the drawing paints on a canvas of its own in its w
 
 The drawing runs in a worker inside one sandboxed frame (`ui/draw.html`, `ui/draw.js`): an origin of its own, a policy that sends nothing anywhere, no page. Each picture talks to its worker over a channel of its own. A drawing that does not answer for 12 seconds is stopped. `test/drawings.test.ts` tries all of this against a real browser.
 
+## When a view has drawn
+
+An agent sees a view the way a reader does: `query look` (and `report show` with `look: true`) has the server open the app's own page in its headless Chrome (`src/look-draw.ts`, `src/chrome.ts`), as that agent sees the map, with a look pass that reads and writes nothing (`src/looks.ts`). The picture is taken once the view says it has drawn, never on a timer: the page in look mode (`?look`, `ui/look.js`) sets `data-look` on its root from the first `view-drawn` event the canvas raises. A drawing raises it once its scene is mounted and any surface over it has shown its first frame; a style's own code, once its default function has returned and its worker has painted two frames since (`drew`, from `ui/draw.js`); the lens, when it found nothing or failed. A view that says nothing in 15 seconds is taken as it stands (`late`). The answer says whether two pictures a moment apart were the same (`settled`), and carries the picture as an MCP image.
+
 ## How fast
 
 Measured in headless Chrome with `node scripts/drawing-bench.ts <server>`, 22 Oct 2026, against the kernel's own architecture drawing before it moved (in parentheses):
