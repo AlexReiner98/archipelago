@@ -227,7 +227,7 @@ test('launching runs a headless session on a task, holding the lane and recordin
   const first = await launch(l, human, { task: made.live });
   assert.deepEqual([first.mode, first.claimed], ['plan', ['Live lane']]);
   // While it runs it holds the lane, so a second launch on the same task is refused.
-  await assert.rejects(launch(l, human, { task: made.live }), /Not launched\. "Live lane" is held by "Headless \(plan\): Capture probe"/);
+  await assert.rejects(launch(l, human, { task: made.live }), /Not launched\. "Live lane" is held by "[A-Z][a-z]+"/);
 
   const done = await ended(first.run);
   assert.equal(done.status, 'finished');
@@ -323,11 +323,11 @@ test('a run in GitHub Actions reports what it used, once, and the repository add
   const run = (await l.entity(first.run))!;
   assert.deepEqual([run.type, run.status, run.is_open, run.props.surface, run.props.tokens_used, run.props.cost_usd, run.props.turns, run.body], ['run', 'finished', false, 'github-actions', 42_000, 0.3134, 9, 'Closed one task.']);
   // A session on a machine in the same repository is counted beside it, apart.
-  await sessionStart(l, agent, { session_id: 'local', cwd: 'C:\\code\\site', surface: 'claude-code' });
+  const local = await sessionStart(l, agent, { session_id: 'local', cwd: 'C:\\code\\site', surface: 'claude-code' });
   await recordUsage(l, 'local', 100_000);
   const usage = (await callTool(l, human, 'view', { name: 'agent_usage', params: { repo: 'Site repo' } })) as any;
   assert.deepEqual(usage.week, { 'claude-code': { runs: 1, tokens: 100_000, cost_usd: 0 }, 'github-actions': { runs: 2, tokens: 50_000, cost_usd: 0.3134 } });
-  assert.deepEqual(usage.runs.map((x: any) => [x.title, x.status, x.tokens]).sort(), [['Read the push to main (abc1234)', 'finished', 42_000], ['Scheduled re-check', 'failed', 8_000], ['Session in Site repo', 'running', 100_000]]);
+  assert.deepEqual(usage.runs.map((x: any) => [x.title, x.status, x.tokens]).sort(), [['Read the push to main (abc1234)', 'finished', 42_000], ['Scheduled re-check', 'failed', 8_000], [local.name!, 'running', 100_000]].sort());
   assert.equal((await l.proposals()).length, 0, 'a report is not a change to review');
 });
 

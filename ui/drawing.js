@@ -130,7 +130,10 @@ export function drawWith(host, answer, style, keep) {
   const early = [];
   // The canvas a scene asked for (surface.js): handed to the drawing when it asks for it, and only then.
   let surface = null;
-  const end = () => ((ended = true), surface?.end(), port.postMessage({ type: 'end' }), port.close());
+  // A picture laid out to its pane's shape (a scene that says `shaped`) is drawn again once the pane has settled into
+  // another shape: as wide as tall by more than the style's plane_reshape_ratio apart, still for plane_reshape_after ms.
+  let reshape = null;
+  const end = () => ((ended = true), reshape?.disconnect(), surface?.end(), port.postMessage({ type: 'end' }), port.close());
   host.endDrawing = end;
   const send = (event) => !ended && port.postMessage({ type: 'event', event });
   // A press on a mark that asked to be dragged is followed by the page (drag.js); every other event is told as it is.
@@ -188,7 +191,7 @@ export function drawWith(host, answer, style, keep) {
   const { drawing: _code, code: _canvas, ...fields } = style;
   // The titles of the types the picture holds, as this page knows them: a drawing has no registry of its own.
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
-  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: Number(host.dataset.room) || host.clientWidth, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: Number(host.dataset.room) || host.clientWidth, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);
@@ -273,6 +276,18 @@ ${JSON.stringify(input)}`;
     const lit = litSwitch(answer.viewer, style, keep, redraw);
     const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, over, legend);
     host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
+    if (scene.shaped && input.width > 0 && input.height > 0 && !reshape) {
+      let wait;
+      reshape = new ResizeObserver(() => {
+        clearTimeout(wait);
+        wait = setTimeout(() => {
+          const [w, hgt] = [Number(host.dataset.room) || host.clientWidth, host.clientHeight];
+          const apart = Math.abs(Math.log((w / hgt) / (input.width / input.height)));
+          if (!ended && w > 0 && hgt > 0 && apart > Math.log(numberOf(style, 'plane_reshape_ratio'))) drawWith(host, answer, style, keep);
+        }, numberOf(style, 'plane_reshape_after'));
+      });
+      reshape.observe(host);
+    }
     const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, told: (view) => !ended && port.postMessage({ type: 'viewport', view }) }));
     const zoom = h(
       'span',

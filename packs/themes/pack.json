@@ -2,7 +2,7 @@
   "id": "themes",
   "version": "0.1.0",
   "title": "Themes",
-  "description": "Colours for the whole app, a document's page and a public page, each taken from one of Canada's archipelagos: only its paper, its ink and its sea, the rest worked out from them so text, muted words, links and states keep their contrast. None is used until the owner keeps a version of one.",
+  "description": "Colours for the whole app, a document's page and a public page, each taken from an archipelago's own colours, as the ridges drawing reads them from photos of the place: only its paper, its ink, its sea and, for some, a mark its links are made from (a moss, a lava, a lupin), the rest worked out from them so text, muted words, links and states keep their contrast. None is used until the owner keeps a version of one.",
   "requires": [
     "core"
   ],
@@ -14,16 +14,64 @@
       "props": {"theme": {"light": {"paper": "#f5f6f0", "ink": "#1f1e1b", "sea": "#216bc0"}, "dark": {"paper": "#13161a", "ink": "#ecebe6", "sea": "#70a4e6"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "sea", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
     },
     {
-      "id": "themes.ice",
-      "title": "Ice",
-      "over": "chosen",
-      "props": {"theme": {"light": {"paper": "#f8f5ef", "ink": "#1f1e1b", "sea": "#4666c3"}, "dark": {"paper": "#14161a", "ink": "#ecebe6", "sea": "#83a1ea"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "sea", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
-    },
-    {
       "id": "themes.bay",
       "title": "Bay",
       "over": "chosen",
       "props": {"theme": {"light": {"paper": "#f8f4ef", "ink": "#1f1e1b", "sea": "#077783"}, "dark": {"paper": "#121718", "ink": "#ecebe6", "sea": "#28b1c3"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "sea", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.haida_gwaii",
+      "title": "Haida Gwaii",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#e7e4e0", "ink": "#0b0a0a", "sea": "#3f6269", "mark": "#5d8003", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#131a0a", "ink": "#f4f3f1", "sea": "#799196", "mark": "#5d8003"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.galapagos",
+      "title": "Galápagos",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#e9e4dd", "ink": "#0b0909", "sea": "#107dd3", "mark": "#94341c", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#191817", "ink": "#f5f3f0", "sea": "#58a4e0", "mark": "#94341c"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.raja_ampat",
+      "title": "Raja Ampat",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#e5e5dd", "ink": "#0f1010", "sea": "#0969b0", "mark": "#29804d", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#112029", "ink": "#f3f3f0", "sea": "#5396c8", "mark": "#29804d"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.cyclades",
+      "title": "Cyclades",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#ece3d7", "ink": "#222022", "sea": "#3672b2", "mark": "#0e4978", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#2b131c", "ink": "#f6f2ed", "sea": "#729cc9", "mark": "#0e4978"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.svalbard",
+      "title": "Svalbard",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#e6ebe4", "ink": "#1b110c", "sea": "#71829d", "mark": "#56698a", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#1e222b", "ink": "#f4f6f3", "sea": "#9ca8ba", "mark": "#56698a"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.maldives",
+      "title": "Maldives",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#e7e5db", "ink": "#000000", "sea": "#52b1e5", "mark": "#518082", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#0e1c31", "ink": "#f4f3ef", "sea": "#86c8ed", "mark": "#518082"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.magdalen",
+      "title": "Magdalen Islands",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#f1ece5", "ink": "#0b090a", "sea": "#5b73d3", "mark": "#e056be", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#1a1712", "ink": "#f9f6f3", "sea": "#8c9de0", "mark": "#e056be"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.thousand_islands",
+      "title": "Thousand Islands",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#e4e5e0", "ink": "#010101", "sea": "#548fd8", "mark": "#b7344e", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#0f130f", "ink": "#f3f3f1", "sea": "#87b1e4", "mark": "#b7344e"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.great_slave",
+      "title": "Great Slave Lake",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#f4efe9", "ink": "#1d201d", "sea": "#3d7cb0", "mark": "#d9bf4c", "ok": {"search": "#2c7a4b", "on": ["bg", "panel"], "ratio": 4.6}, "warn": {"search": "#a35a00", "on": ["bg", "panel"], "ratio": 4.6}, "bad": {"search": "#b3312b", "on": ["bg", "panel"], "ratio": 4.6}}, "dark": {"paper": "#1b1b0c", "ink": "#faf8f5", "sea": "#77a3c8", "mark": "#d9bf4c"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "mark", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
     }
   ]
 }

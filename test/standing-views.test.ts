@@ -79,6 +79,8 @@ async function fixture() {
   await l.db.query(`update entity e set created_at = t.at, updated_at = t.at from (select id, timestamptz '2026-10-01T00:00:00Z' + (row_number() over (order by title)) * interval '1 minute' as at from entity) t where t.id = e.id`);
   await l.init(human, { name: 'Owner' });
   const { run } = await sessionStart(l, agent, { task: made.hover, session_id: 'pin', title: 'Pinning session' });
+  // Its minted name is picked at random; the frozen answers hold it to one.
+  await l.apply('system', { ops: [{ op: 'update', id: run, title: 'Pinning session' }], reason: 'A fixed name for the frozen answers' });
   return { l, made: { ...made, run } as Record<string, string> };
 }
 

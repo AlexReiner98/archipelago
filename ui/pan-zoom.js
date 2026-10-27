@@ -164,10 +164,19 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   };
   frame.addEventListener('pointerup', end);
   frame.addEventListener('pointercancel', end);
-  // A frame that changes size keeps what was in sight; one first given a size opens.
-  let opened = Boolean(frame.clientWidth);
+  // A frame that changes size keeps what was in the middle of it in the middle (a pane whose edge is dragged does not
+  // carry the picture with that edge); one first given a size opens.
+  let opened = Boolean(frame.clientWidth), was = size();
   if (opened) open();
-  new ResizeObserver(() => (frame.clientWidth ? (opened ? apply() : ((opened = true), open())) : null)).observe(frame);
+  new ResizeObserver(() => {
+    if (!frame.clientWidth) return;
+    const now = size();
+    if (!opened) return void ((opened = true), (was = now), open());
+    view.x += (was[0] - now[0]) / 2 / view.s;
+    view.y += (was[1] - now[1]) / 2 / view.s;
+    was = now;
+    apply();
+  }).observe(frame);
   /** Where it stands now, and put back where it stood (a picture drawn again, kept where the reader left it). */
   const state = () => ({ ...view });
   const restore = (was) => (Object.assign(view, was), now());

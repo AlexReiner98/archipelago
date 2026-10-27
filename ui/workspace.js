@@ -1,180 +1,97 @@
-// The Workspace screen.
+// The Workspace screen: setting the workspace up, in five sections shown one at a time. People: who is in it. Agents:
+// what they act with, what they may do, and the model they run on. Map: its theme, whether new things start private,
+// its backup. Packs: what it is made of, each pack's card holding everything that pack offers. Connections: what is tied
+// to it from outside. Which is open is kept in the address (#/workspace?at=map); a step of Start here (ui/start.js)
+// names a card, and lands on its section with that card in view.
 
-import { api, ask, authHeaders, h, part, tell } from './base.js';
-import { screensCard } from './nav.js';
-import { stylesCard } from './styles-card.js';
+import { api, authHeaders, h, part, state } from './base.js';
+import { screenRows } from './nav.js';
+import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
-import { ago, when } from './words.js';
-import { scopePills } from './token-piece.js';
 import { membersCard } from './members-card.js';
 import { planCard } from './plan-card.js';
 import { modelCard } from './model-card.js';
 import { connectionsCard } from './connections-card.js';
-import { backupCard, codeCard, connectBox, githubCard, ownerCard, publishCard, replyRulesCard, secretBox, serverPacksCard } from './workspace-cards.js';
+import { agentsMayCard, tokenRow, tokensCard } from './agents-card.js';
+import { backupCard, card, githubRow, notificationsRow, ownerRow, serverPacksCard, visibilityRow } from './workspace-cards.js';
 
-/** A card a step of Start here (ui/start.js) leads to, as #/workspace?at=<step>. */
-const at = (step, card) => (card && (card.dataset.at = step), card);
+const SECTIONS = [
+  ['people', 'People', 'Who is in this workspace'],
+  ['agents', 'Agents', 'What agents act with, what they may do, and the model they run on'],
+  ['map', 'Map', 'Its theme, whether new things start private, and its backup'],
+  ['packs', 'Packs', 'The ways of working it is made of, and what each offers'],
+  ['connections', 'Connections', 'What is tied to it from outside'],
+];
+/** The section each card a step of Start here names is in. */
+const CARD_IN = { team: 'people', agent: 'agents', model: 'agents', backup: 'map', connections: 'connections', github: 'connections' };
+/** Sections by the names they had before (27 Oct 2026), for an address kept from then. */
+const WAS = { look: 'map', outside: 'connections' };
 
-/** Bring the card asked for into view, once the cards that load their own content have their height. */
-function seek() {
-  const step = new URLSearchParams(location.hash.split('?')[1] ?? '').get('at');
-  if (!step) return;
-  history.replaceState(null, '', '#/workspace');
-  setTimeout(() => document.querySelector(`[data-at="${CSS.escape(step)}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 400);
+/** The section open, and the card asked for, if any. */
+let open = 'people';
+function asked() {
+  const at = new URLSearchParams(location.hash.split('?')[1] ?? '').get('at');
+  if (at && SECTIONS.some(([key]) => key === at)) open = at;
+  else if (at && (CARD_IN[at] || WAS[at])) open = CARD_IN[at] ?? WAS[at];
+  history.replaceState(null, '', `#/workspace?at=${open}`);
+  return at && CARD_IN[at] ? at : null;
 }
+
+/** A card a step of Start here leads to, as #/workspace?at=<step>. */
+const at = (step, el) => (el && (el.dataset.at = step), el);
 
 export async function workspace() {
   const main = part('workspace');
+  const step = asked();
   const me = await (await fetch('/whoami', { headers: authHeaders() })).json();
-  const head = h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name));
-  if (me.auth !== 'tokens') {
-    const { owner } = await api('workspace_info');
-    return main.replaceChildren(
-      head,
-      h('div', { class: 'grid' }, ownerCard(owner, workspace), modelCard(), backupCard(workspace), publishCard(), codeCard(), replyRulesCard(), packsCard({ h, api, ask, tell, then: workspace }), serverPacksCard(), screensCard(workspace), stylesCard(workspace)),
-    );
-  }
-  const [info, tokens, people, members] = await Promise.all([api('workspace_info'), api('token_list'), api('search', { type: 'person', limit: 200 }), me.actor.admin ? api('member_list') : []]);
-  const personName = (id) => people.find((p) => p.id === id)?.title;
+  const tokensOn = me.auth === 'tokens';
+  const admin = !tokensOn || me.actor.admin;
+  const [info, tokens, people, members] = await Promise.all([
+    api('workspace_info'),
+    tokensOn ? api('token_list') : [],
+    tokensOn ? api('search', { type: 'person', limit: 200 }) : [],
+    tokensOn && me.actor.admin ? api('member_list') : [],
+  ]);
   const notice = h('div');
-  const fail = (err) => notice.replaceChildren(h('div', { class: 'error', style: 'padding: var(--space-6) var(--space-8)' }, err.message));
-  const live = tokens.filter((t) => !t.revoked_at);
+  const fail = (err) => notice.replaceChildren(h('div', { class: 'error gist', title: err.message }, err.message));
   // A word at the top of the page once it is drawn again, brought into view from wherever the button was.
-  const say = (cls, text) => {
-    main.children[1].replaceChildren(h('div', { class: cls, style: 'padding: var(--space-6) var(--space-8)' }, text));
-    main.children[1].scrollIntoView({ block: 'center' });
+  // Said as (class, words), or as a box drawn whole (a new token's secret).
+  const say = (what, text) => {
+    const box = main.querySelector('.ws-notice');
+    box?.replaceChildren(text === undefined ? what : h('div', { class: `${what} gist`, title: text }, text));
+    box?.scrollIntoView({ block: 'center' });
   };
+  const live = tokens.filter((t) => !t.revoked_at);
+  const row = (t) => tokenRow(t, { me, personName: (id) => people.find((p) => p.id === id)?.title, then: workspace, fail });
+  const go = (key) => {
+    open = key;
+    history.replaceState(null, '', `#/workspace?at=${key}`);
+    workspace();
+  };
+  // The owner's own screens, which no pack offers, are controlled under the packs.
+  const own = (state.schema?.screens ?? []).filter((s) => !s.pack);
 
-  const tokenRow = (t) =>
-    h(
-      'li',
-      {},
-      h(
-        'div',
-        { class: 'row-top' },
-        h('span', { class: 'chip' }, t.kind),
-        h('span', { class: 'grow' }, h('strong', {}, t.name), t.admin && [' ', h('span', { class: 'pill' }, 'admin')], t.id === me.actor.token && [' ', h('span', { class: 'pill ok' }, 'this session')], scopePills(t)),
-        t.kind === 'agent' && h('span', { class: 'muted small', title: [t.last_used ? `Last used ${when(t.last_used)}` : 'Never used', t.seen?.length ? `from ${t.seen.length} place${t.seen.length === 1 ? '' : 's'}: ${t.seen.join(', ')}` : ''].filter(Boolean).join(', ') }, t.expires_at ? `expires ${when(t.expires_at)}` : 'never expires'),
-        h(
-          'button',
-          {
-            class: 'danger',
-            disabled: t.id === me.actor.token,
-            title: t.id === me.actor.token ? 'This is the token you are signed in with' : '',
-            onclick: async () => (await ask({ title: `Revoke the token "${t.name}"?`, message: 'Whoever uses it is signed out at once.', action: 'Revoke', danger: true })) && api('token_revoke', { id: t.id }).then(workspace, fail),
-          },
-          'Revoke',
-        ),
-      ),
-      h('div', { class: 'row-sub' }, t.entity_id && `${personName(t.entity_id) ?? t.entity_id} · `, `${t.hint} · `, t.last_used ? ['used ', ago(t.last_used)] : 'never used', t.expires_at && ` · expires ${when(t.expires_at)}`),
-    );
-
-  const agentName = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1; min-width: var(--input-least)' });
-  // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
-  const agentLife = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
-  const agentToken = (fallback) => ({ kind: 'agent', name: agentName.value.trim() || fallback, ...(Number(agentLife.value) > 0 && { expires_days: Number(agentLife.value) }) });
-  const accepts = h('input', { type: 'text', value: info.accepts_from.join(', '), placeholder: 'workspace ids, separated by commas', style: 'flex: 1; min-width: var(--input-wide)' });
-
-  main.replaceChildren(
-    head,
-    notice,
-    h(
-      'div',
-      { class: 'grid' },
-      (me.actor.admin || !info.owner) && ownerCard(info.owner, workspace),
-      me.actor.admin && at('backup', backupCard(workspace)),
-      me.actor.admin && publishCard(),
-      me.actor.admin && codeCard(),
-      me.actor.admin && replyRulesCard(),
-      me.actor.admin && me.workspace.id === 'default' && serverPacksCard(),
-      me.actor.admin && packsCard({ h, api, ask, tell, then: workspace }),
-      me.actor.admin && screensCard(workspace),
-      me.actor.admin && stylesCard(workspace),
-      at(
-        'agent',
-        h(
-        'section',
-        { class: 'card wide' },
-        h('header', {}, h('h2', { class: 'hinted', title: 'An agent with one of these acts for you: it sees what you see and proposes to you.' }, 'Agent tokens')),
-        h('ul', { class: 'rows' }, live.filter((t) => t.kind === 'agent').map(tokenRow)),
-        h(
-          'div',
-          { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' },
-          agentName,
-          agentLife,
-          h(
-            'button',
-            {
-              class: 'primary',
-              onclick: () =>
-                api('token_create', agentToken('claude-code'))
-                  .then((made) => workspace().then(() => main.children[1].replaceChildren(connectBox(made))))
-                  .catch(fail),
-            },
-            'Connect an agent',
-          ),
-          h(
-            'button',
-            {
-              title: 'For an agent that is not Claude Code: the bare token, to send as Authorization: Bearer',
-              onclick: () =>
-                api('token_create', agentToken('agent'))
-                  .then((made) => workspace().then(() => main.children[1].replaceChildren(secretBox(`Token for ${made.name}`, made.token))))
-                  .catch(fail),
-            },
-            'Token only',
-          ),
-        ),
-        ),
-      ),
-      me.actor.admin && planCard(info.member_limit, members.length, info.ended),
+  // Each section drawn only when it is open: some of its cards read the server.
+  const sections = {
+    people: () => [
+      (admin || !info.owner) && card('Owner', null, h('ul', { class: 'rows' }, ownerRow(info.owner, workspace))),
+      tokensOn && me.actor.admin && planCard(info.member_limit, members.length, info.ended),
       // A workspace for one person (its limit is one, and it has no more) has no members to manage.
-      me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow, then: workspace, fail, say })),
-      me.actor.admin &&
-        h(
-          'section',
-          { class: 'card wide' },
-          h('header', {}, h('h2', {}, 'Settings')),
-          h(
-            'dl',
-            { class: 'fields' },
-            h('dt', {}, 'New things are'),
-            h(
-              'dd',
-              {},
-              h(
-                'select',
-                { onchange: (e) => api('workspace_set', { default_visibility: e.target.value }).then(workspace, fail) },
-                [['private', 'Private to their author unless shared'], ['shared', 'Shared with everyone unless made private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label)),
-              ),
-            ),
-            h('dt', { class: 'hinted', title: 'Either way every change is in the log with who made it and why, and can be undone. Held, the answer to a decision or a hypothesis waits for you too. Taking effect, an agent can settle one: it has to say what was chosen and why, and you are notified on Home.' }, 'What agents change'),
-            h(
-              'dd',
-              {},
-              h(
-                'select',
-                { onchange: (e) => api('workspace_set', { agent_changes: e.target.value }).then(workspace, fail) },
-                [['hold', 'Is held until I have looked'], ['apply', 'Takes effect as they make it']].map(([v, label]) => h('option', { value: v, selected: v === info.agent_changes }, label)),
-              ),
-            ),
-            h('dt', { class: 'hinted', title: `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".` }, 'Accept notifications from'),
-            h(
-              'dd',
-              {},
-              h(
-                'div',
-                { class: 'toolbar' },
-                accepts,
-                h('button', { onclick: () => api('workspace_set', { accepts_from: accepts.value.split(',').map((s) => s.trim()).filter(Boolean) }).then(workspace, fail) }, 'Save'),
-              ),
-            ),
-          ),
-        ),
-      me.actor.admin && at('model', modelCard()),
-      me.actor.admin && at('connections', connectionsCard()),
-      me.actor.admin && at('github', githubCard()),
-    ),
+      tokensOn && me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow: row, then: workspace, fail, say })),
+    ],
+    agents: () => [tokensOn && at('agent', tokensCard({ tokens: live.filter((t) => t.kind === 'agent'), row, then: workspace, fail, say })), admin && agentsMayCard(info, workspace, fail), admin && at('model', modelCard())],
+    map: () => [themesCard(workspace), at('backup', backupCard(workspace, visibilityRow(info, workspace, fail)))],
+    packs: () => [packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard()],
+    connections: () => [at('connections', connectionsCard(...githubRow(), notificationsRow(info, workspace, fail)))],
+  };
+  // What a person who is not an admin may change is only their own agent tokens.
+  const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !info.owner));
+  if (!shown.some(([key]) => key === open)) open = shown[0]?.[0] ?? 'agents';
+  main.replaceChildren(
+    h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name)),
+    shown.length > 1 && h('div', { class: 'switch ws-sections', role: 'tablist' }, shown.map(([key, label, tip]) => h('button', { class: key === open ? 'on' : '', role: 'tab', title: tip, onclick: () => go(key) }, label))),
+    h('div', { class: 'ws-notice' }, notice),
+    h('div', { class: 'grid' }, sections[open]()),
   );
-  seek();
+  if (step) setTimeout(() => main.querySelector(`[data-at="${CSS.escape(step)}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 400);
 }

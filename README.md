@@ -72,7 +72,7 @@ and ask it something like:
 > working on as tasks, and tell me what you would do first.
 
 Its change is on the map at once, and on **Changes** with Undo; under
-**Workspace → Settings** you can have agents' changes wait for you instead.
+**Workspace → Agents** you can have agents' changes wait for you instead.
 
 ## Host your own
 

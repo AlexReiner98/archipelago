@@ -24,18 +24,16 @@ export function membersCard({ me, members, others, tokenRow, then, fail, say }) 
     const you = m.person_id === me.actor.person;
     return h(
       'li',
-      {},
-      h(
-        'div',
-        { class: 'row-top' },
-        h('span', { class: 'grow' }, h('strong', {}, m.name ?? m.email), m.admin && [' ', h('span', { class: 'pill' }, 'admin')], you && [' ', h('span', { class: 'pill ok' }, 'you')]),
-        !you &&
-          menu('⋯', [
+      { class: 'one' },
+      h('span', { class: 'grow', title: m.email }, h('strong', {}, m.name ?? m.email), ' ', h('span', { class: 'muted small' }, m.last_used ? ['signed in ', ago(m.last_used)] : 'not signed in yet')),
+      m.admin && h('span', { class: 'pill' }, 'admin'),
+      you && h('span', { class: 'pill ok' }, 'you'),
+      you
+        ? h('span', { class: 'menu-room' })
+        : menu('⋯', [
             [m.admin ? 'Not an admin' : 'Make admin', () => set(m, { admin: !m.admin })],
             ['Remove', async () => (await ask({ title: `Remove ${m.name ?? m.email}?`, message: 'They are signed out at once, everywhere.', action: 'Remove', danger: true })) && set(m, { remove: true }), 'danger'],
           ]),
-      ),
-      h('div', { class: 'row-sub', title: m.email }, m.name !== m.email && [m.email, ' · '], m.last_used ? ['signed in ', ago(m.last_used)] : 'not signed in yet'),
     );
   };
   email.addEventListener('keydown', (e) => e.key === 'Enter' && add());
@@ -44,6 +42,6 @@ export function membersCard({ me, members, others, tokenRow, then, fail, say }) 
     { class: 'card wide' },
     h('header', {}, h('h2', { class: 'hinted', title: 'People who sign in to this workspace, each by their email address.' }, 'Members')),
     h('ul', { class: 'rows' }, members.map(row), others.map(tokenRow)),
-    h('div', { class: 'toolbar', style: 'padding: var(--space-7) var(--space-8)' }, email, name, h('label', {}, admin, ' Admin'), h('button', { class: 'primary', title: 'They are sent an invitation by email', onclick: add }, 'Add member')),
+    h('div', { class: 'toolbar', style: 'padding: var(--space-6) 0' }, email, name, h('label', {}, admin, ' Admin'), h('button', { class: 'primary', title: 'They are sent an invitation by email', onclick: add }, 'Add member')),
   );
 }

@@ -2,7 +2,7 @@ import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
 import { hear, nameOf, sessionOf } from './pane-route.js';
-import { types } from './words.js';
+import { sessionWho, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
@@ -29,8 +29,8 @@ main.addEventListener('input', (e) => {
 // so several at work do not take the one canvas from each other.
 export const following = {
   get on() {
-    // A window popped out of the main page (ui/panes.js) draws one pane; the main page follows for it.
-    if (window.name.startsWith('pelago-pane:')) return false;
+    // A window popped out of the main page (ui/tab-bar.js) draws one tab; the main page follows for it.
+    if (window.name.startsWith('pelago-tab:')) return false;
     try {
       const kept = localStorage.getItem('pelago-follow');
       if (kept) return kept !== 'off';
@@ -102,12 +102,9 @@ const thisPage = () => (lookMode ? undefined : { page: pageId, on: following.on 
 /** Where each agent that tells a story tells it: following it goes there, not from item to item. */
 export const storyOf = new Map();
 
-/** Windows the browser held back (ui/panes.js), one per session, each offered on the line until it is opened or old. */
-const toPop = new Map();
-
 export function follow(steps = []) {
-  // A look's page, and a popped-out pane, leave what agents show to the main page.
-  if (lookMode || window.name.startsWith('pelago-pane:')) return;
+  // A look's page, and a popped-out tab, leave what agents show to the main page.
+  if (lookMode || window.name.startsWith('pelago-tab:')) return;
   // The first answer only says where things stand; an old step is not followed.
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
@@ -127,36 +124,31 @@ export function follow(steps = []) {
   // A pane being read or worked in is passed by, not taken (ui/pane-busy.js): only a question open over the page, or
   // following turned off, holds every pane.
   const busy = !following.on || document.querySelector('dialog[open]');
-  // Which pane it lands in, by whose step it is (ui/panes.js): 'main' moves the address, a frame or 'popped' is a pane
-  // that drew it, { popOut } a window the browser opens only from a press, null no pane that takes it: it is offered.
+  // Which tab and pane it lands in, by whose step it is (ui/pane-land.js): 'main' moves the address, a frame or
+  // 'popped' is a pane that drew it, { open } a tab out of sight that drew it, null no tab that takes it: it is offered.
   const landed = !busy && there ? (hooks.land ? hooks.land({ ...place, hash: there.slice(2) }) : 'main') : null;
-  const popOut = landed?.popOut;
-  const offered = busy || !landed || popOut;
-  // A later step of the same session takes its place; one that landed needs none.
-  const whose = place && sessionOf(place);
-  if (popOut) toPop.set(whose, { popOut, at: Date.now() });
-  else if (landed && whose) toPop.delete(whose);
-  for (const [key, o] of toPop) if (Date.now() - o.at > 600_000) toPop.delete(key);
-  const popOne = (key, o) => (ev) => {
-    toPop.delete(key);
-    o.popOut();
-    ev.target.remove();
-    if (!toPop.size) followed.hidden = true;
-  };
+  const aside = landed?.open;
+  const offered = busy || !landed;
+  // Several sessions at once: each other session's last step with a place lands too, in its own tab, behind this one.
+  if (!busy && place && hooks.land) {
+    const last = new Map();
+    for (const s of wanted) if (s !== place && sessionOf(s) !== sessionOf(place) && (s.hash || storyOf.has(s.actor))) last.set(sessionOf(s), s);
+    for (const s of last.values()) hooks.land({ ...s, hash: storyOf.get(s.run ?? s.actor) ?? s.hash });
+  }
   followed.replaceChildren(
     ...[
       // One line: who, and the first few words of why. The whole reason is on the page it brought you to.
-      h('strong', {}, to.actor.split('/').at(-1)),
-      h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : offered ? 'is working somewhere else' : 'brought you here'),
-      ...[...toPop].map(([key, o]) => h('button', { title: `Open what ${nameOf(key)} showed in a window of its own, beside what you are doing`, onclick: popOne(key, o) }, toPop.size > 1 ? `Pop out ${nameOf(key)}` : 'Pop out')),
-      offered && !popOut && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
+      to.name ? sessionWho(to.name, to.actor) : h('strong', {}, to.actor.split('/').at(-1)),
+      h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : offered || aside ? 'is working somewhere else' : 'brought you here'),
+      aside && h('button', { title: `Bring ${nameOf(sessionOf(place))}’s tab into sight`, onclick: () => (aside(), (followed.hidden = true)) }, 'Open tab'),
+      offered && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
       following.on && h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
     ].filter(Boolean),
   );
   followed.hidden = false;
   clearTimeout(followedTimer);
   // A show offered to a page not following stays longer: it is the only way the reader hears of it.
-  followedTimer = setTimeout(() => (followed.hidden = true), following.on && !toPop.size ? 12000 : 60000);
+  followedTimer = setTimeout(() => (followed.hidden = true), following.on ? 12000 : 60000);
   if (landed === 'main' && location.hash !== there) location.hash = there;
 }
 

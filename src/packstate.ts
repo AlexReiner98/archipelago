@@ -15,7 +15,7 @@ import { env } from './env.ts';
 import { append, type Fact } from './log.ts';
 import { decideAct, listActs, setPackSecret } from './outside.ts';
 import { KERNEL_PACKS } from './packorder.ts';
-import { LOCAL_PACK } from './packs.ts';
+import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
@@ -107,9 +107,53 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   return facts;
 }
 
-/** Every pack on this server, with its state in this workspace and why. */
+/** One thing a pack brings: its name in words, what it is in a few, and for the page, which sort it is. */
+export interface Touched {
+  name: string;
+  about: string;
+  sort?: string;
+}
+
+/** The point of a description: up to its first full stop or colon, at most a short line. */
+const gist = (text: unknown) => {
+  const point = String(text ?? '').split(/(?<=[.:])\s/)[0].replace(/[.:]$/, '');
+  return point.length > 90 ? `${point.slice(0, 89)}…` : point;
+};
+/** A name, not an identifier: an id without a title is read as its last part, in words. */
+const words = (id: unknown) => String(id ?? '').split('.').pop()!.replaceAll('_', ' ');
+/** The same, as a name: its first letter a capital. */
+const title = (id: unknown) => words(id).replace(/^./, (c) => c.toUpperCase());
+
+/**
+ * What a pack touches, read from its manifest's keys and grouped as a person reads them: what it adds to the map
+ * (types, links), what it shows (views), how things look and what agents are told (styles, instructions), what decides
+ * a write or asks an agent (rules), what can be done through it (actions), what runs by itself (runs), and what it
+ * reaches beyond the map (reach). Each group with how many, and each thing in it by name, with what it is.
+ */
+export function packTouches(p: PackFile) {
+  type Entry = Record<string, unknown>;
+  const all = (v: unknown) => (Array.isArray(v) ? (v as Entry[]) : []);
+  const named = (e: Entry) => (e.title ? String(e.title) : title(e.id ?? e.of ?? e.name));
+  const styles = all(p.styles);
+  const told = styles.filter((s) => s.type === 'instruction');
+  const reach = (p.reach ?? {}) as Entry;
+  const groups: [string, Touched[]][] = [
+    ['types', all(p.types).map((t) => ({ name: t.of ? title(t.of) : named(t), about: t.of ? `fields added: ${Object.keys((t.fields as Entry) ?? {}).map(words).join(', ')}` : gist(t.description) || (t.extends ? `a ${words(t.extends)}` : '') }))],
+    ['links', all(p.links).map((r) => ({ name: named(r), about: gist(r.description) }))],
+    ['views', all(p.views).map((v) => ({ name: named(v), about: [({ screen: 'a screen', tree: 'a tree', attention: 'a reason for attention' } as Record<string, string>)[String(v.form)] ?? 'a read', gist(v.description)].filter(Boolean).join(': '), sort: String(v.form ?? 'read') }))],
+    ['styles', [...all(p.drawings).map((d) => ({ name: named(d), about: 'a drawing', sort: 'drawing' })), ...styles.filter((s) => !told.includes(s)).map((s) => ({ name: named(s), about: s.over === 'chosen' ? 'a theme' : Array.isArray(s.on) && s.on.length ? `on ${(s.on as string[]).map(words).join(', ')}` : 'the whole map', sort: s.over === 'chosen' ? 'theme' : 'preset' }))]],
+    ['instructions', told.map((s) => ({ name: named(s), about: gist(s.body) }))],
+    ['rules', all(p.rules).map((r) => ({ name: title(r.id), about: r.on === 'reply_ended' ? 'asks an agent as its reply ends' : r.then === 'refuse' ? 'refuses a change' : r.then === 'hold' ? 'holds a change for a person' : 'decides a change', sort: r.on === 'reply_ended' ? 'check' : 'decides' }))],
+    ['actions', all(p.actions).filter((a) => !a.kernel).map((a) => ({ name: named(a), about: [a.verb && `under ${a.verb}`, gist(a.description)].filter(Boolean).join(': ') }))],
+    ['runs', all(p.handlers).map((r) => ({ name: title(r.event ?? r.schedule ?? r.webhook), about: r.event ? 'on an event' : r.webhook ? 'on a webhook' : r.every_minutes ? `every ${r.every_minutes} minutes` : 'on a schedule' }))],
+    ['reach', [...all(reach.hosts).map((x) => ({ name: String(x.host ?? x.id ?? x.name ?? 'a host'), about: 'a host it calls' })), ...all(reach.secrets).map((x) => ({ name: title(x.name), about: 'a secret it holds' })), ...all(reach.webhooks).map((x) => ({ name: title(x.id ?? x.name), about: 'a webhook it hears' })), ...(reach.server ? [{ name: 'the server', about: 'what no one workspace can do' }] : [])]],
+  ];
+  return groups.map(([key, items]) => ({ key, n: items.length, items }));
+}
+
+/** Every pack on this server, with its state in this workspace and why, what it needs, and what it touches. */
 export function packStates(l: Archipelago) {
-  return l.registry.found.map((p) => ({ id: p.id, title: p.title, version: p.version, ...l.registry.states.get(p.id)! }));
+  return l.registry.found.map((p) => ({ id: p.id, title: p.title, version: p.version, description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...l.registry.states.get(p.id)! }));
 }
 
 /** Turn a pack off or on in this workspace. */

@@ -61,8 +61,18 @@ The web UI has five places, and one page for each thing.
   left out or corrected before you apply it. Below that it lists what agents
   changed without waiting since you last looked, each with Undo; "Mark all
   seen" records that you looked.
-- **Workspace** holds the owner, agent tokens, members, GitHub, what agents
-  may change unreviewed, importing a backup, and what the work has cost.
+- **Workspace** sets the workspace up, in five sections shown one at a time
+  (`#/workspace?at=<section>`): **People** (the owner, members, the plan),
+  **Agents** (agent tokens, what agents may do, the model account they run
+  on), **Map** (the theme as swatches, tried on your screen and then kept;
+  whether new things start private; the backup), **Packs** (each pack a card with
+  its on/off switch and what it touches, its manifest's keys grouped as types,
+  links, views, styles, instructions, rules, actions, runs and reach, each
+  counted; a click opens a group in the card, each thing in it one line by name
+  and what it is, with its controls where it is changed here: styles, screens,
+  checks), and **Connections** (the
+  GitHub App, pushes and the webhook, the other workspaces that may notify
+  this one). Each setting is one row; what is done rarely is in its ⋯ menu.
 
 Every item has a single page, and every way to it leads there: its head,
 its note folded to the first paragraph, each field drawn by its kind, where
@@ -128,7 +138,7 @@ reason and a source.
    policy, where agents propose everything; loosen it per op in
    `pelago.config.json`: `{ "policy": { "create": "auto", "link": "auto" } }`.
    A workspace can make the choice for itself, on its Workspace screen under
-   Settings ("What agents change"): held until you have looked, or taking
+   Agents ("Their changes"): held until you have looked, or taking
    effect as agents make it, merges and archives included. A workspace
    begins taking effect: its first owner being set chooses that for it
    (since 21 Oct 2026; one made before keeps what it had). Then an agent can
@@ -536,7 +546,7 @@ is still priced at Anthropic's rates.
 
 **Or the server hears the push through a webhook added by hand.** Pushes are
 taken in by the GitHub pack (`packs/github`), at the webhook it declares. On
-the Workspace screen, **GitHub** makes the pack's secret and shows the address
+the Workspace screen, under Connections, the **Pushes** row's menu makes the pack's secret and shows the address
 to give GitHub (`/hook/<workspace>/github/github.push`): in each repository,
 Settings, Webhooks, Add webhook, content type `application/json`, that secret,
 push events only. (Until 22 Oct 2026 the address was `/github/<workspace>`;
@@ -691,7 +701,8 @@ its keys wrapped under a one-time key.
 Then put that folder in place of `data/`.
 
 To bring a backup into a map that already exists, an admin of that workspace
-uses **Import a backup** on the Workspace screen (or the `import_backup`
+uses **Import a backup** on the Workspace screen (Map, the Backup row's
+menu; or the `import_backup`
 tool). It merges, matching by id, and can be repeated as often as wanted, in
 either direction:
 
