@@ -4,7 +4,8 @@
 // was split), held in its own store and kept current from the log as the main one is (ui/live.js). Every pane is live:
 // the query bar and find act on the one last touched (decision e_h2pqjy2q), and each pane keeps its own back and
 // forward, a step for each lens it was given, not for a page opened over it (e_ssnyd3ex). Where the panes stand is the reader's, kept in this browser for each workspace, as the canvas's
-// settings are: never on the map, and meaning nothing. An agent arranges them with report show and its `pane`.
+// settings are: never on the map, and meaning nothing. An agent arranges them with report show and its `pane`. Each
+// pane follows everyone, one session or nobody, as the reader picks in the bar; where a step lands is ui/pane-route.js.
 
 import { api, h, hooks, known, store } from './base.js';
 import { activate, canvasHref, focusOn, home, sheetOver, withItem } from './canvas.js';
@@ -12,6 +13,7 @@ import { canvasLens } from './canvases.js';
 import { flatQuery, flatView, readFlatLens } from './lens.js';
 import { lookMode } from './look.js';
 import { dragPane, sashes } from './pane-drag.js';
+import { heard, nameOf, route, sessionOf } from './pane-route.js';
 import { unfollow } from './replica.js';
 import { titles } from './words.js';
 
@@ -24,11 +26,11 @@ const SIDES = { left: ['row', 0], right: ['row', 1], above: ['column', 0], below
 // ---- The layout: the groups in one row or one column, main among them, each its share; and the panes popped out.
 
 const key = () => `pelago-panes:${Object.entries(known.all()).find(([, w]) => w.token && w.token === store.token)?.[0] ?? 'here'}`;
-const fresh = () => ({ dir: 'row', groups: ['main'], sizes: [1], panes: {} });
+const fresh = () => ({ dir: 'row', groups: ['main'], sizes: [1], panes: {}, main: {} });
 function read() {
   try {
     const got = JSON.parse(localStorage.getItem(key()) ?? 'null');
-    if (got?.groups?.includes('main') && got.sizes?.length === got.groups.length) return got;
+    if (got?.groups?.includes('main') && got.sizes?.length === got.groups.length) return { main: {}, ...got };
   } catch {
     // Without storage, one pane.
   }
@@ -75,16 +77,17 @@ const drawn = new Map();
 
 function paneEl(id) {
   const name = h('span', { class: 'pane-name', title: 'Drag to dock it elsewhere; out of the window to pop it out' }, 'Canvas');
+  const mark = h('span', { class: 'pane-follows', hidden: true });
   const body = h('div', { class: 'pane-canvas' });
   const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
   const el = h(
     'section',
     { class: 'pane', 'data-pane': id },
-    h('header', { class: 'pane-bar' }, name, button('Open it as the main canvas', '⤢', () => toMain(id)), button('Pop it out into a window of its own', '⧉', () => popOut(id)), button('Close this pane', '×', () => close(id))),
+    h('header', { class: 'pane-bar' }, name, mark, button('Open it as the main canvas', '⤢', () => toMain(id)), button('Pop it out into a window of its own', '⧉', () => popOut(id)), button('Close this pane', '×', () => close(id))),
     body,
   );
   name.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
-  const entry = { el, body, name, view: null, at: null, back: [], forth: [] };
+  const entry = { el, body, name, mark, view: null, at: null, back: [], forth: [] };
   drawn.set(id, entry);
   fitOnMount(body);
   load(id, layout.panes[id].at);
@@ -165,6 +168,13 @@ function frameActive() {
   mainName.hidden = active === 'main' || !drawn.size;
   const canvas = /canvas=(e_[a-z0-9]{8})/.exec(canvasHref())?.[1];
   mainName.textContent = (canvas && titles.get(canvas)) || 'Canvas';
+  const whose = followsWord(layout.main);
+  if (whose) mainName.append(h('span', { class: 'pane-follows' }, whose));
+  for (const [g, e] of drawn) {
+    const p = layout.panes[g];
+    e.mark.textContent = [followsWord(p), p?.slot].filter(Boolean).join(' · ');
+    e.mark.hidden = !e.mark.textContent;
+  }
 }
 const mainName = document.body.appendChild(h('div', { id: 'main-name', hidden: true, title: 'The main canvas: press to work in it' }));
 
@@ -257,15 +267,50 @@ function draw() {
   dispatchEvent(new Event('resize'));
 }
 
+// ---- Whose steps a pane follows: everyone (unset), nobody ('none'), or one session (its run, or the agent's name).
+
+/** What a pane's strip says of whom it follows (`p`, as kept: whom, and the session's name when it was picked): nothing for everyone. */
+function followsWord(p) {
+  if (!p?.follows || p.follows === 'all') return null;
+  return p.follows === 'none' ? 'Follows nobody' : heard.has(p.follows) ? nameOf(p.follows) : (p.named ?? nameOf(p.follows));
+}
+/** The reader picks whom pane `id` follows; a session it held lets go of it. */
+function setFollows(id, follows) {
+  const named = heard.has(follows) ? nameOf(follows) : undefined;
+  if (id === 'main') layout.main = { ...layout.main, follows, named };
+  else if (layout.panes[id]) layout.panes[id] = { ...layout.panes[id], follows, named };
+  landed.delete(id);
+  keep();
+  frameActive();
+}
+/** The picker in the bar: everyone, nobody, the sessions heard from lately, newest first. */
+function followsPicker(id) {
+  const now = (id === 'main' ? layout.main?.follows : layout.panes[id]?.follows) ?? 'all';
+  const sessions = [...heard].sort(([, a], [, b]) => b.at - a.at).map(([key]) => key);
+  if (!['all', 'none', ...sessions].includes(now)) sessions.unshift(now);
+  const pick = h(
+    'select',
+    { class: 'q-follows', title: 'Whose shows and changes this pane follows', 'aria-label': 'Whom this pane follows', onchange: (ev) => setFollows(id, ev.target.value) },
+    h('option', { value: 'all' }, 'Everyone'),
+    h('option', { value: 'none' }, 'Nobody'),
+    ...sessions.map((key) => h('option', { value: key, title: key }, key === now ? (followsWord(id === 'main' ? layout.main : layout.panes[id]) ?? nameOf(key)) : nameOf(key))),
+  );
+  pick.value = now;
+  return pick;
+}
+
 // ---- What can be done with a pane: open, move, close, make main, pop out and dock back.
 
 const newId = () => `p${Math.random().toString(36).slice(2, 10)}`;
-/** Open this address in a pane on this side of the pane `by` (the main one, unless named); one already on it is moved there. */
-export function openPane(at, side = 'right', by = 'main') {
+/**
+ * Open this address in a pane on this side of the pane `by` (the main one, unless named); one already on it is moved
+ * there. A pane opened for a session (`follows`, and the name it gave, `slot`) is its own, never one already open.
+ */
+export function openPane(at, side = 'right', by = 'main', own = {}) {
   if (!drawable(at)) return null;
-  const same = Object.entries(layout.panes).find(([id, p]) => !p.popped && layout.groups.includes(id) && named(p.at) === named(at));
+  const same = !own.follows && Object.entries(layout.panes).find(([id, p]) => !p.popped && layout.groups.includes(id) && !p.follows && named(p.at) === named(at));
   const id = same?.[0] ?? newId();
-  layout.panes[id] = { at };
+  layout.panes[id] = { at, ...own };
   place(id, side, by);
   return id;
 }
@@ -370,6 +415,7 @@ hooks.paneButtons = () => {
   grip?.addEventListener('pointerdown', (ev) => dragPane(ev, active, entry.el, { groups: groupEls, drop }));
   return [
     grip,
+    !popped && followsPicker(active),
     button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length),
     button('Forward', 'Forward again', '›', () => travel(1), !forth.length),
     popped
@@ -381,17 +427,32 @@ hooks.paneButtons = () => {
   ].filter(Boolean);
 };
 
+/** When each pane last drew a session's step, by pane: a pane that follows everyone is that session's while it is at work. */
+const landed = new Map();
 /**
- * Where an agent's show lands (ui/live.js): `pane` as it asked (a side: opened there; alone: the other panes closed;
- * main: the main pane), else the docked pane already drawing what it names, else the main pane. Answers with the frame
- * that draws it, for its look, or null for the main canvas, which the address then moves.
+ * Where an agent's step lands (ui/live.js), as ui/pane-route.js works it out from whom each pane follows: answers
+ * 'main' for the main canvas, which the address then moves; the frame of a pane that draws it; or null where no pane
+ * takes it, and it is only offered.
  */
-hooks.showIn = (at, pane) => {
-  if (popped || !drawable(at)) return null;
-  if (pane === 'alone') return void alone(), null;
-  if (pane === 'main') return null;
-  const id = SIDES[pane] ? openPane(at, pane) : docked().find((g) => named(layout.panes[g].at) === named(at));
-  const entry = id && drawn.get(id);
+hooks.land = (step) => {
+  if (popped) return null;
+  const at = step.hash;
+  const pane = (id, p) => ({ id, follows: p?.follows ?? 'all', slot: p?.slot, landed: landed.get(id), draws: named(id === 'main' ? asPane(canvasHref()) : p.at) === named(at) });
+  const panes = [pane('main', layout.main), ...docked().map((g) => pane(g, layout.panes[g]))];
+  const to = route(step, panes, { now: Date.now(), recent: 600_000, most: 4, drawable: drawable(at) });
+  if (to.offer) return null;
+  const session = sessionOf(step);
+  if (to.pane === 'main') {
+    if (to.side === 'alone') alone();
+    landed.set('main', { session, at: Date.now() });
+    return 'main';
+  }
+  const id = to.open ? openPane(at, to.open.side, 'main', { follows: to.open.follows, named: nameOf(to.open.follows), ...(to.open.slot && { slot: to.open.slot }) }) : to.pane;
+  if (!id) return null;
+  if (to.side) place(id, to.side, 'main');
+  goPane(id, at);
+  landed.set(id, { session, at: Date.now() });
+  const entry = drawn.get(id);
   if (!entry) return null;
   entry.el.classList.remove('pane-shown');
   void entry.el.offsetWidth;
