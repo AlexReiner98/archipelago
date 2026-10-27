@@ -46,7 +46,8 @@ import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
-import { servePublic } from './public-route.ts'; import { serveSite } from './site.ts'; import { lengthsSheet, pageLook } from './styles.ts';
+import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts';
+import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
@@ -231,6 +232,23 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
         res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
         return res.end(await uiPage('doc.html'));
+      }
+      // A document's preview, for someone signed in: the published page, drawn from what publishing would freeze now
+      // (src/published-preview.ts), its site's other pages each led to by their own preview.
+      if (req.method === 'GET' && /^\/preview\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
+        res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_POLICY });
+        return res.end(await uiPage('doc.html'));
+      }
+      const preview = req.method === 'POST' ? /^\/preview\/(e_[a-z0-9]{8})\/data$/.exec(url.pathname) : null;
+      if (preview) {
+        if (!local(req)) return send(res, 403, { error: 'A preview is read by the pelago UI.' });
+        const { ws, pelago } = await resolve(req, res, 'human');
+        try {
+          return send(res, 200, { result: await previewOf(pelago, preview[1], () => siteNav(workspaces, ws.id, (page) => `/preview/${page.id}`)) });
+        } catch (err) {
+          if (err instanceof Refused) throw err;
+          return send(res, 400, { error: (err as Error).message });
+        }
       }
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {

@@ -1,7 +1,8 @@
 // What still drew from the old lens, drawn from flat lenses (task e_vtvhebut), in a real browser (skipped where there
 // is no Chrome): a document's kept view, opened as a canvas, drawn flat; and the pictures the packs' screens draw on Home
 // (the software pack's Releases). An item's page is bare (task e_cbjpfd2f; the owner, 26 Oct 2026: bare means bare):
-// the sheet shows a document's words and draws no view, and a company's page no pack's screen.
+// a company's page draws no pack's screen. A document's sheet reads it as it will publish, its view drawn (the owner,
+// 27 Oct 2026).
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

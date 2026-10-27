@@ -159,6 +159,8 @@ export async function entity(id, here) {
             (await ask({ title: `Publish everything in "${e.title}"?`, message: `Its ${plan.documents.length} documents, as they are now, for anyone to read at their own addresses, each linking to the others. What you change afterwards stays a draft until you publish again.`, action: 'Publish all', danger: plan.documents.some((d) => !d.published) })) &&
             api('publish_all', { within: id }).then((r) => (r.refused && tell('Some were not published', r.refused.map((x) => `${x.title}: ${x.error}`).join(' ')), again()), (err) => tell('Nothing was published', err.message)),
         ],
+        // The page a reader would be given if it were published now, drawn by the published page itself.
+        publishable && doc && ['Preview as published', () => window.open(`/preview/${id}`, '_blank')],
         shown && [
           shown.published ? 'Publish again' : 'Publish',
           async () =>

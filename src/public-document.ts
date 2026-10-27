@@ -8,7 +8,7 @@
 // their names and states only. Nothing private (a section shows once it is shared with the workspace), nothing archived,
 // nothing of another workspace. What it does not give is scrubbed from the text as a link's is.
 
-import { forReader, type Given, type Part } from './documents.ts';
+import { forReader, sectionIds, type Given, type Part } from './documents.ts';
 import type { Archipelago } from './pelago.ts';
 
 // What the database gives of it is pelago_public_document (src/public-schema.ts).
@@ -27,6 +27,25 @@ export async function publicDocument(l: Archipelago, id: string, elsewhere?: Map
   const { rows } = await l.forAnyone().db.query<{ doc: Given | null }>(`select pelago_public_document($1, $2::text[]) as doc`, [id, readable(l)]);
   const doc = rows[0]?.doc;
   return doc ? forReader(l, doc, undefined, elsewhere) : null;
+}
+
+/**
+ * A document not yet public, as the public read above will give it once it is: for a preview of it before it is
+ * published. The same rule, read as the one asking sees the map: of what its note brings in, what it holds with its
+ * note, what is public in its own right by name and state, nothing private.
+ */
+export async function draftDocument(l: Archipelago, id: string, elsewhere?: Map<string, string>) {
+  const doc = ID.test(id) ? await l.entity(id) : null;
+  if (!doc || doc.archived_at || doc.private_to || !readable(l).includes(doc.type)) return null;
+  const { rows } = await l.db.query<Given['items'][number] & { held: boolean; public: boolean }>(
+    `select e.id, e.type, e.title, e.status, e.body, e.updated_at, exists (select 1 from picture p where p.entity_id = e.id) as picture,
+            exists (select 1 from relation r where r.type = 'part_of' and r.valid_to is null and r.from_id = e.id and r.to_id = $2) as held,
+            pelago_is_public(e.id) as public
+     from entity e where e.id = any($1::text[]) and e.archived_at is null and e.private_to is null and e.visibility <> 'private' and e.workspace = $3`,
+    [sectionIds(doc.body), doc.id, l.workspace],
+  );
+  const items = rows.filter((r) => r.held || r.public).map(({ held, public: _, ...r }) => ({ ...r, body: held ? r.body : '' }));
+  return forReader(l, { id: doc.id, type: doc.type, title: doc.title, body: doc.body, status: doc.status, props: doc.props, updated_at: String(doc.updated_at), items }, undefined, elsewhere);
 }
 
 /** The figure of one section a public document shows, or null. */
