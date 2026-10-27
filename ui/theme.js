@@ -27,7 +27,7 @@ export function typeVars(type, faces) {
     out.push([`${at}-weight`, [400, 600].includes(t.weight) ? String(t.weight) : '400']);
     out.push([`${at}-style`, t.style === 'italic' ? 'italic' : 'normal']);
     out.push([`${at}-case`, t.case === 'upper' ? 'uppercase' : 'none']);
-    out.push([`${at}-track`, typeof t.track === 'string' && TRACK.test(t.track) ? t.track : '0em']);
+    out.push([`${at}-track`, typeof t.track === 'string' && TRACK.test(t.track) ? t.track : '0']);
   }
   return out;
 }
