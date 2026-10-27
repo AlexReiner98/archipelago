@@ -91,3 +91,26 @@ test('a setting lifts only a rule its pack declared liftable', async () => {
   assert.equal((await change(l, agent, [{ op: 'create', type: 'work.task', title: 'Plain' }])).status, 'applied', 'agent_changes lifts core’s agent_changes');
   assert.equal((await change(l, agent, [{ op: 'create', type: 'shop.order', title: 'Oven', props: { total: 900 } }])).status, 'proposed', 'and not a rule declared without a lift');
 });
+
+test('a drawing asks in data: inside the types its style writes it applies, anything else waits for the person', async () => {
+  const l = await map();
+  const made = (await change(l, human, [
+    { op: 'create', ref: 's', type: 'style', title: 'Shop drawing', props: { code: 'export default () => {}', writes: ['shop.order'] } },
+    { op: 'create', ref: 'plain', type: 'style', title: 'No code' },
+    { op: 'create', ref: 'task', type: 'work.task', title: 'Count stock' },
+  ])) as { created: Record<string, string> };
+  const { s, plain, task } = made.created;
+  const asked = (ops: Op[], actor = human, drawing = s) => l.change(actor, { reason: 'Saved in the drawing', ops, drawing });
+  const kept = (await asked([{ op: 'create', ref: 'o', type: 'shop.order', title: 'Flour', props: { total: 80 } }])) as { status: string; created: Record<string, string> };
+  assert.equal(kept.status, 'applied', 'a type its style writes');
+  assert.equal((await asked([{ op: 'update', id: kept.created.o, props: { total: 90 } }])).status, 'applied');
+  assert.equal((await asked([{ op: 'archive', id: kept.created.o }])).status, 'applied');
+  const held = (await asked([{ op: 'update', id: task, title: 'Count it all' }])) as { status: string; held_by?: { rule: string } };
+  assert.deepEqual([held.status, held.held_by?.rule], ['proposed', 'drawing_reach'], 'a type it does not write waits, though a person sent it');
+  assert.equal(((await asked([{ op: 'link', type: 'relates_to', from: task, to: s }])) as { status: string }).status, 'proposed', 'a link waits');
+  assert.equal(((await asked([{ op: 'update', id: s, props: { writes: ['work.task'] } }])) as { held_by?: { rule: string } }).held_by?.rule !== undefined, true, 'what a drawing may write is not its own to widen');
+  await assert.rejects(asked([{ op: 'merge', keep: task, drop: plain }]), /may ask to create/);
+  await assert.rejects(asked([{ op: 'create', type: 'shop.order', title: 'Oil' }], human, plain), /no style with code/);
+  await assert.rejects(asked([{ op: 'create', type: 'shop.order', title: 'Oil' }], agent), /sent by the page/);
+  assert.equal((await change(l, human, [{ op: 'update', id: task, title: 'Count it all' }])).status, 'applied', 'the person, not through a drawing, waits for nobody');
+});

@@ -16,7 +16,7 @@ export interface Page {
   go: (url: string) => Promise<void>;
   evaluate: <T = unknown>(expression: string) => Promise<T>;
   /** A DevTools command, for what the rest does not cover (emulating less motion, say). */
-  send: (method: string, params?: Record<string, unknown>) => Promise<any>;
+  send: (method: string, params?: Record<string, unknown>, sessionId?: string) => Promise<any>;
   /** The page as it looks, as a PNG. */
   screenshot: () => Promise<Buffer>;
   /** What the page logged and threw. */
@@ -65,11 +65,12 @@ export async function open(url: string): Promise<Page> {
     if (m.id && waiting.has(m.id)) (waiting.get(m.id)!(m), waiting.delete(m.id));
     else events.push(m);
   };
-  const send = (method: string, params: Record<string, unknown> = {}) =>
+  // A session (Target.attachToTarget, flatten) speaks to a frame in a process of its own: a sandboxed frame is isolated.
+  const send = (method: string, params: Record<string, unknown> = {}, sessionId?: string) =>
     new Promise<any>((resolve) => {
       const n = ++id;
       waiting.set(n, resolve);
-      ws.send(JSON.stringify({ id: n, method, params }));
+      ws.send(JSON.stringify({ id: n, method, params, ...(sessionId && { sessionId }) }));
     });
   await send('Page.enable');
   await send('Runtime.enable');

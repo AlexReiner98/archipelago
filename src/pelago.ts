@@ -10,7 +10,7 @@ import { readEvents, type EventQuery } from './eventlog.ts';
 import type { Registry, TypeDef } from './packs.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
-import { search, type SearchInput } from './search.ts';
+import { search, type SearchInput } from './search.ts'; import { drawingOf } from './drawing-changes.ts';
 import { append, headOf, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
 import { privateDependencies } from './private-deps.ts'; import { decideProposal, supersede } from './proposals.ts'; import { asOwner, forgetIn, type ForgetOp } from './forget.ts';
 
@@ -128,7 +128,7 @@ export interface ChangeInput {
   /** From an agent: have this change wait for a human even where agents' changes are applied as made. */
   hold?: boolean;
   /** The pack action that made it, named on every event it logs ("time.log made this"). */
-  action?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string;
+  action?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string; /** From the page: the style whose code asked for it (src/drawing-changes.ts). */ drawing?: string;
   /** The change set this one reverses: undo's own. */
   undoes?: string;
 }
@@ -253,7 +253,7 @@ export class Archipelago {
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);
     // Whether it applies, waits or is refused is the rules' to say (src/rules.ts), and the answer names the rule.
-    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), pack: input.pack };
+    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), pack: input.pack, ...(await drawingOf(this, actor, input)) };
     const verdict = await decide(this.db, this.registry, who, input.ops, this.policy);
     if (verdict.outcome === 'refuse') throw new Error(`Change rejected:\n${verdict.refused.map((r) => `- ${r}`).join('\n')}`);
     // A question an agent settled, where the owner lets it, is put to them by the next session they talk to.

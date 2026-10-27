@@ -202,7 +202,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     dress(body, chosen);
     const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === chosen.shape;
     const coded = typeof chosen.code === 'string' && chosen.code.trim();
-    (coded ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(shown), chosen, keep, place);
+    (coded ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(shown), chosen, keep, place, look.coder);
     // A drawing or a style's code says when it has drawn; a shape drawn here has drawn now.
     if (!coded && !drawn) saidDrawn(body, 'drawn');
   };
