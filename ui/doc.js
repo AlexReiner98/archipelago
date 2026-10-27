@@ -6,7 +6,7 @@ import { drawFrozen } from './doc-lens.js';
 import { warmDrawings } from './drawing.js';
 import { checkedCss } from './marks.js';
 import { readSpans, readText } from './text.js';
-import { typeVars } from './theme.js';
+import { applyTheme } from './theme.js';
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
@@ -130,18 +130,6 @@ function invoiceHead(d) {
   );
 }
 
-/** The page's colours, lengths, faces and text roles: the workspace's style, light or dark as the reader's system is. Only plain hex colours and lengths. */
-const dark = matchMedia('(prefers-color-scheme: dark)');
-const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?)*$/;
-const asLength = (v) => (typeof v === 'number' && v >= 0 ? `${v}px` : typeof v === 'string' && LENGTH.test(v) ? v : null);
-let look = {};
-const paint = () => {
-  const set = (name, value) => /^[a-z][a-z0-9_]*$/.test(name) && document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, value);
-  for (const [name, colour] of Object.entries(look.theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (/^#[0-9a-f]{3,8}$/i.test(String(colour))) set(name, colour);
-  for (const [name, value] of Object.entries(look.lengths ?? {})) if (asLength(value)) set(name, asLength(value));
-  for (const [name, value] of typeVars(look.type, look.faces)) document.documentElement.style.setProperty(name, value);
-};
-dark.addEventListener('change', paint);
 
 /** The address word of a site's front page (src/site.ts). */
 const FRONT = 'home';
@@ -168,8 +156,7 @@ const pageCss = (css) => {
 };
 
 function draw(d) {
-  look = d;
-  paint();
+  applyTheme(d);
   pageSheet.replaceSync(pageCss(d.page_css));
   document.title = d.head === 'invoice' && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
@@ -223,7 +210,7 @@ if (!given) warmDrawings();
   : preview
   ? post(`${here}/data`, {})
   : own
-  ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: {} }), api('view', { name: 'style', params: { of: own } })]).then(([d, s, mine]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths, faces: s.style.faces, type: s.style.type, head: mine.style.page?.head }))
+  ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: { of: own } })]).then(([d, { style: s }]) => ({ ...d, theme: s.theme, lengths: s.lengths, faces: s.faces, type: s.type, head: s.page?.head }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');

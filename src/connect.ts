@@ -99,7 +99,7 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   // The page's colours and lengths before anyone is signed in, so the sign-in page is drawn like every other.
   if (req.method === 'GET' && path === '/connect/theme') {
     if (at.tooOften()) return;
-    const { style } = await pageStyle((await at.workspaces.get(at.fallback)).pelago, {});
+    const { style } = await pageStyle((await at.workspaces.get(at.fallback)).pelago, {}, false);
     return reply(res, 200, { theme: style.theme ?? null, lengths: style.lengths ?? null });
   }
   // The documents a person agrees to before they are signed in, for a page that asks for them first (a signup).

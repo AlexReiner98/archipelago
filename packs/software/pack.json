@@ -415,5 +415,16 @@
         "additionalProperties": false
       }
     }
+  ],
+  "styles": [
+    {
+      "id": "software.public_colours",
+      "title": "A product's public page colours",
+      "props": {
+        "theme": {
+          "derive": { "public_bg": "bg", "public_panel": "panel", "public_text": "text", "public_muted": "muted", "public_line": "line", "public_soft": "closed_soft", "public_ok": "ok", "public_ok_soft": "ok_soft", "public_warn": "warn", "public_warn_soft": "warn_soft", "public_bad": "bad", "public_bad_soft": "bad_soft" }
+        }
+      }
+    }
   ]
 }

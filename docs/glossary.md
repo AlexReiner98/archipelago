@@ -76,6 +76,13 @@ screenshot). The read tools a pack declares (`views` in a pack file) are
 also called views; one declared with a `lens` is answered by a read of the
 kernel's that it names (the flat lens, the graph, the tree, attention...).
 
+**theme.** A style's colours (its `theme` field): a few given, the rest
+worked out from them as data (a mix, or a contrast held), finished on the
+server so every page and agent reads the same (`src/colours.ts`). A theme a
+pack ships is a style preset used once the owner keeps a version of it; a
+person's own is a style kept about their person item, read last on the pages
+they see. A published page keeps the colours it was published with.
+
 **drawing.** The code that draws one form of view (list, flow, grid, time,
 architecture): shipped by a pack (`drawings` in its pack file), run in the
 sandbox (`ui/draw.html`), answering with marks the page checks
