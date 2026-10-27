@@ -10,7 +10,7 @@ export const relations = new Map();
 
 export async function loadSchema() {
   // The schema, and the workspace's style: what a page that is not a picture is drawn by, until it asks for its own;
-  // with the theme being tried on this screen over it (ui/styles-card.js), which nothing keeps.
+  // with the theme being tried on this screen over it (ui/themes-card.js), which nothing keeps.
   [state.schema, state.style] = await Promise.all([api('schema'), api('view', { name: 'style', params: state.trying ? { try: state.trying } : {} }).then((r) => r.style)]);
   applyTheme(state.style);
   types.clear();

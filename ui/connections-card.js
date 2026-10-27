@@ -24,7 +24,7 @@ export function connectionsCard() {
       ...packs.map((p) =>
         h(
           'li',
-          { class: 'row-top' },
+          { class: 'one' },
           h('span', { class: `pill${p.connected ? ' ok' : ''}` }, p.connected ? 'connected' : p.ready ? 'not connected' : 'not set up'),
           h('span', { class: 'grow', title: p.name ?? p.title }, p.title, p.connected?.account ? h('span', { class: 'muted small' }, ` ${p.connected.account}`) : ''),
           p.connected

@@ -133,6 +133,24 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .card > header h2, #sheet details.fold > summary h2 { font-size: var(--text-3); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); color: var(--muted); }
 #sheet .card .rows > li, #sheet .card .empty { padding-left: 0; padding-right: 0; }
 #sheet .part > :first-child .card:first-child > header, #sheet .part > .card:first-child > header { padding-right: calc(var(--box-8) + var(--space-5)); }
+/* A row that never wraps: its name cut with an ellipsis, its marks and one action at the end, rare ones in a menu. */
+.rows > li.one { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--space-5); white-space: nowrap; min-width: 0; }
+.rows > li.one > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rows > li.one > * { flex: none; }
+.rows > li.one > .grow, .rows > li.one > input[type='text'] { flex: 1 1 0; }
+.rows > li.one .menu-room { width: var(--box-7); }
+/* The Workspace page: its sections, one shown at a time; the theme as swatches, each painted in its own colours. */
+#sheet .ws-sections { margin: 0 0 var(--space-10); }
+#sheet .ws-notice:not(:empty) { margin: 0 0 var(--space-8); }
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--count-col), 1fr)); gap: var(--space-6); padding: var(--space-4) 0 var(--space-6); }
+.theme-tile { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
+.theme-tile .paint { position: relative; height: var(--box-9); padding: var(--space-3) var(--space-4); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); background: var(--bg); text-align: left; font-weight: 600; }
+.theme-tile .sea { position: absolute; left: var(--space-4); right: var(--space-4); bottom: var(--space-4); height: var(--box-1); border-radius: var(--radius-1); background: var(--accent); }
+.theme-tile .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2); color: var(--muted); }
+.theme-tile:hover .paint { border-color: var(--edge-strong); }
+.theme-tile.kept .paint { outline: var(--border-3) solid var(--accent); outline-offset: var(--border-2); }
+.theme-tile.trying .paint { outline: var(--border-3) dashed var(--accent); outline-offset: var(--border-2); }
+.theme-tile.kept .name, .theme-tile.trying .name { color: var(--text); }
 /* The item's page: what it holds, a section each, as headings over plain rows of a name and its value, one line each. */
 #sheet .page-section { margin: 0 0 var(--space-10); }
 #sheet .page-section > h2 { display: flex; align-items: baseline; gap: var(--space-5); margin: 0 0 var(--space-5); padding-bottom: var(--space-3); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-2); color: var(--muted); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); }

@@ -4,7 +4,7 @@
 /** The kernel's packs, which are never off. */
 const KERNEL = ['core'];
 
-export function packsCard({ h, api, ask, tell, then }) {
+export function packsCard({ h, api, ask, tell, menu, then }) {
   const list = h('ul', { class: 'rows' });
   const turn = async (p, on) => {
     const sure = await ask({
@@ -18,14 +18,11 @@ export function packsCard({ h, api, ask, tell, then }) {
   const row = (p) =>
     h(
       'li',
-      {},
-      h(
-        'div',
-        { class: 'row-top', style: 'flex-wrap: nowrap; align-items: center' },
-        h('span', { class: 'grow', title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}`, style: 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap' }, h('strong', {}, p.title), ' ', h('span', { class: 'muted small' }, p.version)),
-        p.state !== 'active' && h('span', { class: `pill${p.state === 'waiting' ? ' warn' : ' closed'}`, title: p.why ?? '' }, p.state),
-        !KERNEL.includes(p.id) && h('button', { title: p.why ?? '', style: 'white-space: nowrap', onclick: () => turn(p, p.state === 'off') }, p.state === 'off' ? 'Turn on' : 'Turn off'),
-      ),
+      { class: 'one' },
+      h('span', { class: 'grow', title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}` }, h('strong', {}, p.title), ' ', h('span', { class: 'muted small' }, p.version)),
+      p.state !== 'active' && h('span', { class: `pill${p.state === 'waiting' ? ' warn' : ' closed'}`, title: p.why ?? '' }, p.state),
+      // Turning a pack off is rare, and in its menu; one that is off is turned on in sight.
+      KERNEL.includes(p.id) ? h('span', { class: 'menu-room' }) : p.state === 'off' ? h('button', { title: p.why ?? '', onclick: () => turn(p, true) }, 'Turn on') : menu('⋯', [['Turn off', () => turn(p, false), 'danger']]),
     );
   api('packs').then(
     (packs) => list.replaceChildren(...packs.map(row)),
