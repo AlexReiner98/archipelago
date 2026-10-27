@@ -93,15 +93,17 @@ const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)}
  * The shared document page (ui/doc.html) as a public document's: its own title, a description from its first
  * paragraph and the address to keep, and no request to be left out of a search engine's index.
  */
-export function publicHead(html: string, doc: { title: string; parts: Part[] }, canonical: string, site?: string): string {
+export function publicHead(html: string, doc: { title: string; parts: Part[] }, canonical: string, site?: string, image?: string): string {
   const description = describe(doc.parts);
-  // What a link to it shows where it is posted: its title, its first words and its address (Open Graph, and a card).
-  const share: [string, string | undefined][] = [['og:type', 'article'], ['og:title', doc.title], ['og:description', description], ['og:url', canonical], ['og:site_name', site]];
+  // What a link to it shows where it is posted: its title, its first words, its address and the picture its style
+  // names (Open Graph, and a card, large when there is a picture). A picture is named only at a whole address.
+  const picture = image && /^https:\/\//.test(image) ? image : undefined;
+  const share: [string, string | undefined][] = [['og:type', 'article'], ['og:title', doc.title], ['og:description', description], ['og:url', canonical], ['og:site_name', site], ['og:image', picture]];
   const head = [
     description && `<meta name="description" content="${escape(description)}" />`,
     `<link rel="canonical" href="${escape(canonical)}" />`,
     ...share.filter(([, value]) => value).map(([name, value]) => `<meta property="${name}" content="${escape(value!)}" />`),
-    '<meta name="twitter:card" content="summary" />',
+    `<meta name="twitter:card" content="${picture ? 'summary_large_image' : 'summary'}" />`,
   ].filter(Boolean).join('\n    ');
   // Put in by functions, so nothing a document says is read as a replacement pattern ($&, $').
   return html.replace(/<meta name="robots" content="noindex" \/>/, () => head).replace(/<title>[^<]*<\/title>/, () => `<title>${escape(doc.title)}</title>`);

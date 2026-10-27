@@ -116,7 +116,7 @@ export const VIEWS: Record<string, View> = {
     run: (l, input) => savedViews(l, input as { limit?: number }),
   },
   style: {
-    description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page, the pages that are not views and the canvas are drawn by. Params: of (an item id), style (the id of one kept on the map, used outright), view (a view kept on the map: the styles kept about it too), have (the hashes of the drawings the page holds: then the style carries the drawing it names, its code left out when the page has it).',
+    description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page, the pages that are not views and the canvas are drawn by. Params: of (an item id), style (the id of one kept on the map, used outright), view (a view kept on the map: the styles kept about it too), have (the hashes of the drawings the page holds: then the style carries the drawing it names, its code left out when the page has it), try (a theme preset’s id: drawn as if the owner kept it, for this read only, nothing kept).',
     run: (l, input) => pageStyle(l, input),
   },
   instructions: {

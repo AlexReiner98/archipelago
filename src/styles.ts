@@ -36,6 +36,8 @@ export interface StyleAsk {
   named?: unknown;
   /** The person the page is drawn for: their own style's colours lie over everything. */
   person?: string;
+  /** A chosen preset (a theme) tried on one screen: drawn as if the owner kept it, over every other chosen one, and nothing kept. */
+  try?: string;
 }
 
 /** The owner's versions of presets, open or retired: retired, the preset is not used. */
@@ -62,9 +64,10 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
   const layers: { weight: number; id: string; title: string; preset?: string; props: Record<string, unknown> }[] = [];
   for (const p of presets) {
     const mine = versions.find((v) => v.props.preset === p.id);
-    if ((mine && !mine.is_open) || (p.over === 'chosen' && !mine)) continue;
+    const tried = p.over === 'chosen' && p.id === ask.try;
+    if (!tried && ((mine && !mine.is_open) || (p.over === 'chosen' && !mine))) continue;
     const on = mine && listed(mine.props.on).length ? listed(mine.props.on) : (p.on ?? []);
-    const weight = !on.length ? (p.over === 'workspace' ? 1.5 : p.over === 'chosen' ? 0.5 : 0) : onIt(on) ? 2 : -1;
+    const weight = !on.length ? (p.over === 'workspace' ? 1.5 : tried ? 0.6 : p.over === 'chosen' ? 0.5 : 0) : onIt(on) ? 2 : -1;
     if (weight < 0) continue;
     layers.push({ weight, id: mine?.id ?? p.id, title: mine?.title || p.title, preset: p.id, props: mine ? over(p.props, fields(mine.props)) : p.props });
   }
@@ -107,7 +110,7 @@ export async function withStyles<T extends { styles: Preset[] }>(l: Archipelago,
  * map when one is named (`style`), and a style kept about a view kept on the map when it is drawn (`view`). What the item page, the pages that are not pictures and the canvas read; asked
  * with `have` (the drawings' hashes the page holds), with the drawing it names, as a lens answer's style is.
  */
-export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; view?: unknown; have?: unknown }, forPerson = true) {
+export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; view?: unknown; have?: unknown; try?: unknown }, forPerson = true) {
   const of = typeof input.of === 'string' ? input.of : undefined;
   const named = typeof input.style === 'string' ? input.style : undefined;
   const item = of === undefined ? undefined : (await l.db.query<{ id: string; type: string }>('select id, type from entity where id = $1', [of])).rows[0];
@@ -115,7 +118,8 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   const view = typeof input.view === 'string' ? input.view : undefined;
   // The person it is drawn for: the one signed in, or on a map nobody signs in to, its owner.
   const person = !forPerson ? undefined : l.viewer === undefined ? await l.setting<string>('me') : l.viewer || undefined;
-  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(named && { named }), ...(person && { person }) });
+  const tried = typeof input.try === 'string' ? input.try : undefined;
+  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
   // A view kept on the map draws in the shape it keeps, and lights what it says, over every style.
   const own = view === undefined ? undefined : ((await l.entity(view))?.props.style as Record<string, unknown> | undefined);
   for (const key of ['shape', 'lit']) if (typeof own?.[key] === 'string') read.style[key] = own[key];
@@ -125,7 +129,7 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
 /**
  * What a page read by no login is drawn in: the colours (theme), lengths, typefaces (faces) and text roles (type) of
  * the workspace's style, and of a document, its own style over the workspace's, with the head it gives its page
- * (page.head: an invoice's). Never a viewer's own. A published document is drawn as the map stood at the position
+ * (page.head: an invoice's) and the section whose figure is shown where a link to it is posted (page.share). Never a viewer's own. A published document is drawn as the map stood at the position
  * it was published at (`at`, kept with it), so its colours change only when a person publishes it again.
  */
 export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
@@ -134,15 +138,23 @@ export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
   const key = at === undefined ? '' : `${l.workspace} ${at} ${String(doc?.id)}`;
   if (key && looks.has(key)) return looks.get(key)!;
   const { kept, versions } = at === undefined ? { kept: await keptOf(l, 'style', undefined), versions: undefined } : await stylesAt(l, at);
-  const style = (await styleFor(l, kept, hub, versions)).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown; page?: { head?: unknown } };
+  const style = (await styleFor(l, kept, hub, versions)).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown; page?: { head?: unknown; share?: unknown } };
   const { theme, lengths, faces, type, page_css, page } = style;
-  const look = { theme, lengths, faces, type, ...(typeof page_css === 'string' && page_css.trim() && { page_css }), ...(typeof page?.head === 'string' && { head: page.head }) };
+  const look = {
+    theme, lengths, faces, type,
+    ...(typeof page_css === 'string' && page_css.trim() && { page_css }),
+    ...(typeof page?.head === 'string' && { head: page.head }),
+    ...(typeof page?.share === 'string' && SECTION.test(page.share) && { share: page.share }),
+  };
   if (key) {
     looks.set(key, look);
     if (looks.size > LOOKS_KEPT) looks.delete(looks.keys().next().value!);
   }
   return look;
 }
+
+/** An item's id, as a style names the section whose figure is a page's link picture (page.share). */
+const SECTION = /^e_[a-z0-9]{8}$/;
 
 /** Published looks already read, by workspace, position and document: what stood then does not change. */
 const looks = new Map<string, Record<string, unknown>>();

@@ -143,3 +143,36 @@ test('a site’s pages each end with what its footer page says, and the sitemap 
   assert.equal(JSON.parse((await visit(base, '/data', 'site.test')).body).site.footer, 'Made in Canada. Questions: hello@example.com.');
   assert.ok(!(await visit(base, '/sitemap.xml', 'site.test')).body.includes('/footer'));
 });
+
+test('a link to a site’s page shows the figure its style names, and the page leaves that section out', async () => {
+  const { call, base } = await serve('off', undefined, { 'site.test': 'default' });
+  const { home, hero, card, a } = (
+    await call('/api/change', undefined, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: '{hero}\n\nThe front page.\n\n{card}' },
+        { op: 'create', ref: 'hero', type: 'note', title: 'Hero', visibility: 'shared', body: '' },
+        { op: 'create', ref: 'card', type: 'note', title: 'Share', visibility: 'shared', body: '' },
+        { op: 'link', type: 'part_of', from: 'hero', to: 'home' },
+        { op: 'link', type: 'part_of', from: 'card', to: 'home' },
+        { op: 'create', ref: 'a', type: 'document', title: 'How it works', visibility: 'shared', props: { path: 'how-it-works' }, body: 'How it works.' },
+      ],
+    })
+  ).result.created;
+  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
+  for (const id of [hero, card]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: png, content_type: 'image/png' })).status, 200);
+  // Before the style names one, a link shows no picture.
+  for (const id of [home, a]) assert.equal((await call('/api/publish', undefined, { id })).status, 200);
+  assert.match((await visit(base, '/', 'site.test')).body, /<meta name="twitter:card" content="summary" \/>/);
+  assert.ok(!(await visit(base, '/', 'site.test')).body.includes('og:image'));
+  // The workspace's style names the section; a page publishes in the style as it stands then.
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'The site', props: { page: { share: card } } }] });
+  for (const id of [home, a]) assert.equal((await call('/api/publish', undefined, { id })).status, 200);
+  const front = (await visit(base, '/', 'site.test')).body;
+  assert.match(front, new RegExp(`<meta property="og:image" content="https://site\.test/picture/${card}" />`));
+  assert.match(front, /<meta name="twitter:card" content="summary_large_image" \/>/);
+  assert.equal((await visit(base, `/picture/${card}`, 'site.test')).status, 200);
+  // A page without the section shows the front page's.
+  assert.match((await visit(base, '/how-it-works', 'site.test')).body, new RegExp(`og:image" content="https://site\.test/picture/${card}"`));
+  assert.equal(JSON.parse((await visit(base, '/data', 'site.test')).body).share, card, 'the page is told which section not to draw');
+});
