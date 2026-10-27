@@ -6,7 +6,7 @@ import { secretBox } from './workspace-cards.js';
 
 /** The item as a reader meets it, and the links to it that still work. */
 export async function readDocument(id) {
-  const doc = await api('document', { id }).catch(() => null);
+  const doc = await api('document', { id, drawn: true }).catch(() => null);
   const links = doc ? (await api('share_list', { id }).catch(() => [])).filter((s) => !s.revoked_at) : [];
   return { doc, links };
 }

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createShare, listShares } from './documents.ts';
 import { picturesOf, publish, publishAll, publishAsk, publishedState, publishPlan, unpublish } from './published.ts';
 import type { Tool } from './tools.ts';
-import { endShare, readAny, sharedFigure, shareWithWorkspace } from './workspace-share.ts';
+import { endShare, readAny, sharedFigure, sharedPictures, shareWithWorkspace } from './workspace-share.ts';
 
 const authority = z
   .object({
@@ -22,12 +22,13 @@ export const SHARE_TOOLS: Record<string, Tool> = {
       'To write one, make an item of type work.document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its view, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
     input: {
       id: z.string(),
-      drawn: z.boolean().optional().describe('true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft. Not through a share.'),
+      drawn: z.boolean().optional().describe('true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft. Through a share, only one that may be published here.'),
     },
     run: async (l, _actor, input) => {
       const doc = await readAny(l, input.id);
-      if (!input.drawn || 'from' in doc) return doc;
-      return { ...doc, ...(await picturesOf(l, doc.parts.flatMap((p) => ('section' in p ? [p.section] : [])), false)) };
+      if (!input.drawn) return doc;
+      const sections = doc.parts.flatMap((p) => ('section' in p ? [p.section] : []));
+      return { ...doc, ...('from' in doc ? await sharedPictures(l, input.id, sections) : await picturesOf(l, sections, false)) };
     },
   },
   share_create: {

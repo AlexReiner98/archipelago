@@ -12,7 +12,7 @@ import { drawingFor } from './drawings.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
 import { SHARED } from './documents.ts';
-import { publicDocument, readable } from './public-document.ts';
+import { draftDocument, publicDocument, readable } from './public-document.ts';
 import { picturesOf } from './published-pictures.ts';
 import { freezeShared } from './published-share.ts';
 import { republished } from './published-live.ts';
@@ -26,7 +26,7 @@ export { gist, picturesOf } from './published-pictures.ts';
  * sections it holds that are shared, the rest only by name and state), and for each lens among them its picture,
  * with nothing private in it.
  */
-async function freeze(l: Archipelago, id: string) {
+async function freeze(l: Archipelago, id: string, draft = false) {
   // One another workspace shares with this one is frozen as that workspace gives it.
   const item = await l.entity(id);
   if (item?.type === SHARED) return { ...(await freezeShared(l, item)), path: pathOf(item.props.path), menu: typeof item.props.menu === 'number' ? item.props.menu : null };
@@ -36,7 +36,7 @@ async function freeze(l: Archipelago, id: string) {
      where p.entity_id <> $1 and e.visibility = 'public' and e.archived_at is null and e.private_to is null`,
     [id],
   );
-  const reader = await publicDocument(l, id, new Map(others.map((o) => [o.id, o.title])));
+  const reader = await (draft ? draftDocument : publicDocument)(l, id, new Map(others.map((o) => [o.id, o.title])));
   if (!reader) throw new Error(`"${id}" is not a public document.`);
   const sections = reader.parts.flatMap((part) => ('section' in part ? [part.section] : []));
   const { lenses, types } = await picturesOf(l, sections, true);
@@ -44,6 +44,16 @@ async function freeze(l: Archipelago, id: string) {
   const props = (await l.entity(id))?.props ?? {};
   const paths = Object.fromEntries(others.filter((o) => o.path && reader.links?.[o.id]).map((o) => [o.id, o.path]));
   return { ...reader, sections: sections.map((s) => s.id), lenses, types, path: pathOf(props.path), menu: typeof props.menu === 'number' ? props.menu : null, ...(Object.keys(paths).length && { paths }) };
+}
+
+/**
+ * What publishing a document now would freeze, without publishing it: for its preview (src/published-preview.ts).
+ * One not yet public is read as it will be once it is; one shared from another workspace, as that workspace gives it.
+ */
+export async function wouldPublish(l: Archipelago, id: string) {
+  const doc = ID.test(id) ? await l.entity(id) : null;
+  if (!doc || !readable(l).includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
+  return freeze(l, id, doc.visibility !== 'public');
 }
 
 /** An address word: lowercase letters and digits, words joined by single dashes. */

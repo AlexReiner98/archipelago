@@ -11,8 +11,10 @@ import { typeVars } from './theme.js';
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
 // Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in; from a link (/s/...), with the link;
-// made public (/p/<workspace>/<id>), as anyone.
+// made public (/p/<workspace>/<id>), as anyone. A preview (/preview/<id>) is drawn as the published page would be, from
+// what publishing it would give now (src/published-preview.ts), read with the reader's sign-in.
 const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
+const preview = /^\/preview\/e_[a-z0-9]{8}$/.test(here);
 const published = here.startsWith('/p/');
 const token = () => {
   try {
@@ -21,14 +23,15 @@ const token = () => {
     return '';
   }
 };
-const api = async (tool, input) => {
-  const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token() && { authorization: `Bearer ${token()}` }) }, body: JSON.stringify(input) });
+const post = async (at, input) => {
+  const res = await fetch(at, { method: 'POST', headers: { 'content-type': 'application/json', ...(token() && { authorization: `Bearer ${token()}` }) }, body: JSON.stringify(input) });
   const body = await res.json();
   if (!res.ok) throw new Error(res.status === 401 ? 'Sign in to Archipelago in this browser first, then open this again.' : body.error);
   return body.result;
 };
+const api = (tool, input) => post(`/api/${tool}`, input);
 /** A section's figure: from the link's own address, or fetched with the reader's sign-in. */
-const figureSrc = (id) => (own ? '' : `${here}/picture/${id}`);
+const figureSrc = (id) => (own || preview ? '' : `${here}/picture/${id}`);
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -208,7 +211,7 @@ function draw(d) {
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
   for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types);
   // Read with the reader's sign-in, a figure is fetched the same way.
-  if (own) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
+  if (own || preview) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }
 
 // A published page carries its data (src/published-page.ts); a link's and a signed-in reader's page fetch it, and
@@ -217,6 +220,8 @@ const given = document.getElementById('page-data');
 if (!given) warmDrawings();
 (given
   ? Promise.resolve(JSON.parse(given.textContent))
+  : preview
+  ? post(`${here}/data`, {})
   : own
   ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: {} }), api('view', { name: 'style', params: { of: own } })]).then(([d, s, mine]) => ({ ...d, theme: s.style.theme, lengths: s.style.lengths, faces: s.style.faces, type: s.style.type, head: mine.style.page?.head }))
   : fetch(`${here}/data`).then(async (res) => {

@@ -18,9 +18,10 @@ export const mayLeave = async () => !unsaved() || Boolean(await ask({ title: 'Le
 /**
  * The title, the note and the bar that saves them. `base` is the item as the sheet opened it ({ id, type, title, body,
  * updated_at }), or a new item's type and any title it starts with. `note`: false where the note is not written here
- * (a document, read whole). `saved(id)` is told when the change is made.
+ * (a document, read whole). `reading`: what the note reads as, where it is not the note itself (a document, with the
+ * sections it brings in). `saved(id)` is told when the change is made.
  */
-export function draftOf({ base, style, editable = true, note = true, saved }) {
+export function draftOf({ base, style, editable = true, note = true, reading, saved }) {
   const isNew = !base.id;
   const title = h('h1', { class: 'draft-title', contenteditable: editable ? 'plaintext-only' : 'false', 'data-placeholder': 'Title', spellcheck: 'true' }, base.title ?? '');
   const area = h('textarea', { class: 'draft-body', placeholder: 'What is it, and how does it relate to other items?', rows: 4, hidden: !isNew && Boolean(base.body) });
@@ -41,7 +42,7 @@ export function draftOf({ base, style, editable = true, note = true, saved }) {
     }
   };
   // The note as it reads, folded (renderBody), until it is clicked to be written.
-  const read = !isNew && base.body && h('div', { class: 'draft-read', title: editable ? 'Click to write' : '' }, renderBody(base.body, { style, tick: editable ? tick : undefined }));
+  const read = !isNew && base.body && h('div', { class: 'draft-read', title: editable ? 'Click to write' : '' }, reading ?? renderBody(base.body, { style, tick: editable ? tick : undefined }));
   const said = h('span', { class: 'draft-said' });
   const save = h('button', { class: 'primary', type: 'button' }, isNew ? 'Create' : 'Save');
   const discard = h('button', { class: 'quiet-button', type: 'button' }, 'Discard');
@@ -68,7 +69,7 @@ export function draftOf({ base, style, editable = true, note = true, saved }) {
     grow();
     area.focus();
   };
-  if (read && editable) read.addEventListener('click', (ev) => !ev.target.closest('a, summary, button, input') && write());
+  if (read && editable) read.addEventListener('click', (ev) => !ev.target.closest('a, summary, button, input, .doc-lens') && write());
   title.addEventListener('input', update);
   title.addEventListener('keydown', (ev) => ev.key === 'Enter' && (ev.preventDefault(), note ? write() : title.blur()));
   area.addEventListener('input', () => (grow(), update()));
