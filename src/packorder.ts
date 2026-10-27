@@ -8,7 +8,7 @@ import type { PackFile } from './packs.ts';
 export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 
 /** The kernel's packs: the kinds and root relations, and the system tier. Never off. */
-export const KERNEL_PACKS = ['core', 'sys'];
+export const KERNEL_PACKS = ['core'];
 
 /**
  * Put the packs found in load order and say the state of each. `off` is what is off, each with why. The workspace's own

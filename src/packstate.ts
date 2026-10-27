@@ -1,13 +1,17 @@
 // Packs in time (Rule 8 of the target model, docs/log.md section 8): a pack's presence in a workspace is a fact on its
-// log, kept forever: ["+", "pack:<id>", "pack", { version, manifest }] when it is added (the manifest is the SHA-256 of
-// its pack.json as read), ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
+// log, kept forever: ["+", "pack:<id>", "pack", { version, manifest, text? }] when it is added (the manifest is the SHA-256
+// of its pack.json as read, and its text the first time the log meets that hash), and only the owner adds one; ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
 // and everything a pack registers is derived from the set (src/packs.ts), so taking one out unwinds it at once: its
 // types turn dormant in the type table, its tools leave the tool list, its process stops, and connected agents are
 // told the list changed. What it made stays, as dormant items a person can still edit. Adding it back brings it all
 // back. It is the owner's: a pack carries rules and code.
 
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { newId } from './db.ts';
+import { env } from './env.ts';
 import { append, type Fact } from './log.ts';
 import { decideAct, listActs, setPackSecret } from './outside.ts';
 import { KERNEL_PACKS } from './packorder.ts';
@@ -23,7 +27,7 @@ export const PACKS_OFF = 'packs_off';
 /** The id a pack's presence is kept under on the log. */
 export const packFact = (pack: string) => `pack:${pack}`;
 
-type Said = { id: string; op: '+' | '-'; value: { version?: string; manifest?: string } | null };
+type Said = { id: string; op: '+' | '-'; value: { version?: string; manifest?: string; text?: string } | null };
 
 /** The last fact said of each pack here. */
 async function packFacts(l: Archipelago): Promise<Map<string, Said>> {
@@ -35,10 +39,13 @@ async function packFacts(l: Archipelago): Promise<Map<string, Said>> {
 let toolsChanged: (workspace: string) => void = () => {};
 export const onToolsChanged = (fn: (workspace: string) => void) => (toolsChanged = fn);
 
-/** The packs taken out of a workspace: those whose last fact retracts them; before any pack fact, the old setting. */
+/**
+ * The packs off in a workspace: those whose last fact retracts them, and those this server has that its log never
+ * added (a pack is the owner's to add, decided 27 Oct 2026); before any pack fact, the old setting.
+ */
 export async function packsOff(l: Archipelago): Promise<string[]> {
   const said = await packFacts(l);
-  if (said.size) return [...said.values()].filter((f) => f.op === '-').map((f) => f.id.slice('pack:'.length));
+  if (said.size) return l.registry.found.map((p) => p.id).filter((id) => id !== LOCAL_PACK && !KERNEL_PACKS.includes(id) && said.get(id)?.op !== '+');
   const { rows } = await l.db.query<{ value: unknown }>(`select value from setting where key = $1`, [PACKS_OFF]);
   return Array.isArray(rows[0]?.value) ? (rows[0].value as string[]) : [];
 }
@@ -47,25 +54,54 @@ export async function packsOff(l: Archipelago): Promise<string[]> {
 const appendPacks = (l: Archipelago, by: string, action: string, reason: string, facts: Fact[]) =>
   l.db.transaction((tx) => append(tx, l.workspace, 'facts', { id: newId('c'), actor: { id: by }, authority: by === 'system' ? null : { of: 'human', who: by }, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts));
 
+/** The packs a new workspace starts with beside the kernel's: none, unless the server says (PELAGO_START_PACKS, a list or "all"). */
+const startPacks = (): string[] | 'all' => {
+  const said = env('START_PACKS')?.trim();
+  return said === 'all' ? 'all' : (said?.split(',').map((p) => p.trim()).filter(Boolean) ?? []);
+};
+
+/** The manifests whose text this log keeps, by hash. */
+async function keptManifests(l: Archipelago): Promise<Set<string>> {
+  const { rows } = await l.db.query<{ manifest: string }>(`select distinct value->>'manifest' as manifest from log_fact where stream = 'facts' and field = 'pack' and id like 'pack:%' and value->>'text' is not null -- index log_fact_kept`);
+  return new Set(rows.map((r) => r.manifest));
+}
+
+/** A pack's presence as a fact: its version and manifest hash, and the manifest's text the first time this log meets that hash. */
+function present(l: Archipelago, pack: { id: string; version: string }, kept: Set<string>): Fact {
+  const manifest = l.registry.hashes.get(pack.id);
+  const file = join(l.registry.dir, pack.id, 'pack.json');
+  const text = manifest && !kept.has(manifest) && existsSync(file) ? readFileSync(file, 'utf8') : undefined;
+  const same = text !== undefined && createHash('sha256').update(text).digest('hex') === manifest;
+  if (same) kept.add(manifest!);
+  return ['+', packFact(pack.id), 'pack', { version: pack.version, manifest, ...(same && { text }) }];
+}
+
 /**
- * Bring the log in line with the packs this server has, when a workspace opens: a pack found here and not yet said to
- * be present is asserted, and so is one whose version or manifest changed; one taken out stays out (and one the old
- * setting turned off is retracted once). A pack the server does not enable is not said either way. One system change set.
+ * Bring the log in line with the packs this server has, when a workspace opens. The kernel's packs are asserted, and a
+ * pack the log has added is asserted again when its version or manifest changed. A pack the log never added is not
+ * added: that is the owner's. A new workspace starts with the kernel's packs (and those the server starts with); one
+ * made before packs were facts is said to have what it had (and one the old setting turned off is retracted once). A
+ * pack the server does not enable is not said either way. One system change set.
  */
 export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   const said = await packFacts(l);
   const off = new Set(await packsOff(l));
+  const kept = await keptManifests(l);
+  const start = startPacks();
+  const first = !said.size && !(await l.db.query(`select 1 from entity limit 1`)).rows.length;
   const facts: Fact[] = [];
   for (const p of l.registry.found) {
-    const state = l.registry.states.get(p.id);
-    if (p.id === LOCAL_PACK || (state?.state === 'off' && !off.has(p.id))) continue;
+    if (p.id === LOCAL_PACK || (l.registry.only && !l.registry.only.includes(p.id))) continue;
     const was = said.get(p.id);
-    if (off.has(p.id) && !KERNEL_PACKS.includes(p.id)) {
-      if (!was) facts.push(['-', packFact(p.id), 'pack']);
-      continue;
+    const kernel = KERNEL_PACKS.includes(p.id);
+    const changed = !was || was.op === '-' || was.value?.version !== p.version || was.value?.manifest !== l.registry.hashes.get(p.id);
+    if (kernel || was?.op === '+') {
+      if (changed) facts.push(present(l, p, kept));
+    } else if (!said.size && first) {
+      if (start === 'all' || start.includes(p.id)) facts.push(present(l, p, kept));
+    } else if (!said.size) {
+      facts.push(off.has(p.id) ? ['-', packFact(p.id), 'pack'] : present(l, p, kept));
     }
-    const manifest = l.registry.hashes.get(p.id);
-    if (!was || was.op === '-' || was.value?.version !== p.version || was.value?.manifest !== manifest) facts.push(['+', packFact(p.id), 'pack', { version: p.version, manifest }]);
   }
   if (facts.length) await appendPacks(l, 'system', 'pack.sync', 'The packs as this server has them', facts);
   return facts;
@@ -89,7 +125,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   else off.add(input.pack);
   const list = [...off].sort();
   const pack = l.registry.found.find((p) => p.id === input.pack)!;
-  const fact: Fact = input.on ? ['+', packFact(input.pack), 'pack', { version: pack.version, manifest: l.registry.hashes.get(input.pack) }] : ['-', packFact(input.pack), 'pack'];
+  const fact: Fact = input.on ? present(l, pack, await keptManifests(l)) : ['-', packFact(input.pack), 'pack'];
   await appendPacks(l, actorId(actor), input.on ? 'pack.on' : 'pack.off', `${input.on ? 'Added' : 'Took out'} the ${input.pack} pack`, [fact]);
   l.registry.turnOff(list);
   if (!input.on) hostFor(l.registry).stop();

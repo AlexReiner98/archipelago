@@ -33,7 +33,7 @@ const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(
 const kernelFiles = [...walk('src'), ...walk('ui')].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
 const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory());
 /** The kernel's own packs: the kinds, the root relations and the system tier. */
-const KERNEL_PACKS = ['core', 'sys', 'local'];
+const KERNEL_PACKS = ['core', 'local'];
 
 /**
  * Compare what is counted with what is allowed: anything not listed may have up to `limit`; a listed

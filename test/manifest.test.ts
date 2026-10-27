@@ -129,8 +129,9 @@ test("a change a pack's action makes may touch only what the pack declares or re
 test("adding and taking out a pack is a fact on the log; its registrations follow, and its items stay", async () => {
   const l = await mapOf(packsWith());
   const first = await syncPacks(l);
-  assert.deepEqual(first.map((f) => f[1]).sort(), l.registry.found.map((p) => `pack:${p.id}`).sort(), 'every pack found is asserted when the workspace opens');
-  assert.deepEqual(first.find((f) => f[1] === 'pack:time'), ['+', 'pack:time', 'pack', { version: '0.1.0', manifest: l.registry.hashes.get('time') }]);
+  assert.deepEqual(first.map((f) => f[1]).sort(), l.registry.found.map((p) => `pack:${p.id}`).sort(), 'every pack the server starts a workspace with is asserted when it opens');
+  const time = first.find((f) => f[1] === 'pack:time')![3] as { version: string; manifest: string; text: string };
+  assert.deepEqual([time.version, time.manifest, createHash('sha256').update(time.text).digest('hex')], ['0.1.0', l.registry.hashes.get('time'), l.registry.hashes.get('time')], 'the log keeps the manifest itself, the first time it meets it');
   assert.deepEqual(await syncPacks(l), [], 'and only once');
   const entry = await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'e', type: 'time_entry', title: 'Drafting', props: { date: '2026-10-16', hours: 3 } }] }) as { created: Record<string, string> };
 
@@ -146,7 +147,29 @@ test("adding and taking out a pack is a fact on the log; its registrations follo
   await assert.rejects(setPack(l, human, { pack: 'core', on: false }), /the kernel's own/);
   await setPack(l, human, { pack: 'time', on: true });
   assert.ok(!l.registry.type('time_entry')!.dormant && l.registry.tools.has('time_log'), 'and adding it back brings it all back');
+  assert.deepEqual((await entries(l.db)).at(-1)!.facts, [['+', 'pack:time', 'pack', { version: '0.1.0', manifest: l.registry.hashes.get('time') }]], 'a manifest the log keeps already is named, not kept again');
 
   l.registry.hashes.set('time', 'f'.repeat(64));
   assert.deepEqual(await syncPacks(l), [['+', 'pack:time', 'pack', { version: '0.1.0', manifest: 'f'.repeat(64) }]], 'a manifest that changed on the server is asserted again');
+});
+
+test('a new workspace starts with the kernel alone, and a pack the log never added waits for the owner', async () => {
+  const was = process.env.PELAGO_START_PACKS;
+  delete process.env.PELAGO_START_PACKS;
+  try {
+    const l = await mapOf(packsWith());
+    assert.deepEqual((await syncPacks(l)).map((f) => f[1]), ['pack:core'], 'only the kernel is asserted');
+    assert.deepEqual((await packsOff(l)).sort(), l.registry.found.map((p) => p.id).filter((p) => p !== 'core').sort(), 'every other pack is off');
+    assert.deepEqual(await syncPacks(l), [], 'and opening it again adds none');
+    await setPack(l, human, { pack: 'work', on: true });
+    assert.ok(!(await packsOff(l)).includes('work') && (await packsOff(l)).includes('time'), 'the owner adds one');
+
+    // A workspace made before packs were facts holds items: it is said to have every pack it had.
+    const old = await mapOf(packsWith());
+    await old.change(human, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Made long ago' }] });
+    assert.equal((await syncPacks(old)).length, old.registry.found.length);
+  } finally {
+    if (was === undefined) delete process.env.PELAGO_START_PACKS;
+    else process.env.PELAGO_START_PACKS = was;
+  }
 });

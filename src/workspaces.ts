@@ -238,10 +238,10 @@ export class Workspaces {
       registry.keepLocal = (def) => addLocalType(db, def);
       const pelago = new Archipelago(db, registry, policy, id);
       // The packs the owner turned off here stay off; what they made is dormant.
+      await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
       pelago.registry.turnOff(await packsOff(pelago));
       await takeTypeItems(pelago);
       await syncTypes(pelago);
-      await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };
       if (this.leading) this.clocks(ws, true);
       return ws;

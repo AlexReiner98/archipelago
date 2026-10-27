@@ -39,7 +39,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   const { grant, task, hours } = made.created;
 
   // The same map, opened without the funding and time packs.
-  const l = new Archipelago(db, new Registry(dir, ['core', 'sys', 'software']));
+  const l = new Archipelago(db, new Registry(dir, ['core', 'software']));
   const synced = await syncTypes(l);
   assert.ok(synced.dormant.includes('program') && synced.dormant.includes('time_entry') && synced.dormant.includes('could_fund'));
   const program = l.registry.type('program')!;
@@ -62,7 +62,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   // The kept definitions travel in a backup, and a fresh map restoring it keeps them dormant.
   const copy = await openDb();
   await restore(copy, { ...(await dump(db, { id: 'default', name: 'Default' })), vault: await dumpVault(db) });
-  const there = new Archipelago(copy, new Registry(dir, ['core', 'sys', 'software']));
+  const there = new Archipelago(copy, new Registry(dir, ['core', 'software']));
   await syncTypes(there);
   assert.equal(there.registry.type('time_entry')?.dormant, true);
 

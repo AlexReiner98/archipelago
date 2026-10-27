@@ -376,20 +376,21 @@ Types live in files under `packs/`, one folder per pack:
 
 - `core`: the seven kinds of the work and the system kind, the common
   types of them (person, company, agent, goal, area, tag, event, resource), the
-  system's own (lens, style, screen) and the root links, which name
-  kinds at their ends.
-- `work`, on in every workspace: project, task, decision, issue, meeting,
+  system's own (lens, style, screen, type, link type, and the primitives
+  source, connection, run, notification and automation) and the root links,
+  which name kinds at their ends. It is the one pack always on.
+- `work`: project, task, decision, issue, meeting,
   idea, note, file, document and procedure, as `task` and so on.
 - `inquiry`: hypothesis, experiment and result, with tests, supports,
   refutes, assumes and explains.
 - `money`: what is paid regularly (`cost`).
-- `sys`: the system's own primitives (source, connection, run, notification,
-  automation).
 - `software`: application, repo, feature, bug, release, proof question, test,
   test result, pull request, environment, spec, handoff.
 - `time`: time entries, routines and invoices.
 - `funding`: funding programs, tied to the work they could pay for.
-- `local`: created when you approve a `define_type` proposal.
+- `local`: a workspace's own types, `local.<name>`.
+
+A new workspace starts with `core` alone; the owner adds the rest.
 
 Each pack is described by its `pack.json`, a manifest of fifteen keys
 ([docs/packs.md](packs.md)): what it declares, which packs it requires or
