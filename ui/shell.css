@@ -34,6 +34,18 @@ option, optgroup { background: var(--panel); color: var(--text); }
 /* With the sheet open, the bar keeps to the canvas left of it. */
 body[data-sheet="open"] #nav { right: calc(max(var(--main-right, 0%), min(var(--sheet), 50%)) + var(--space-9)); }
 #nav > .grow { flex: 1; pointer-events: none; }
+/* Tabs (ui/tab-bar.js): one for each canvas kept, a session's named in its hue; many shrink to their mark and first letters. */
+#tabs { display: flex; align-items: center; gap: var(--space-3); min-width: 0; overflow-x: auto; scrollbar-width: none; }
+#tabs > .tab { pointer-events: auto; flex: 0 1 auto; min-width: calc(var(--box-3) + 2 * var(--space-5) + 2 * var(--border-1)); box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-5); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); color: var(--muted); font-size: var(--text-3); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
+#tabs > .tab[aria-selected="true"] { flex-shrink: 0; max-width: 40%; color: var(--text); font-weight: 600; border-color: var(--session-hue, var(--accent)); }
+#tabs > .tab.tab-out { border-style: dashed; }
+#tabs > .tab[data-unseen] { color: var(--text); box-shadow: inset 0 0 0 var(--border-1) var(--session-hue, var(--accent)); }
+#tabs > .tab.tab-shown { animation: tab-shown 1.2s ease 2; }
+@keyframes tab-shown { 50% { background: var(--accent-soft); } }
+#tabs .tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#tabs .tab-name.who-session::before { margin-right: var(--space-3); }
+#tabs .tab-act { flex: none; border: 0; background: none; padding: 0 var(--space-2); color: var(--muted); font: inherit; font-weight: 400; cursor: pointer; }
+#tabs .tab-act:hover { color: var(--accent); }
 #nav .brand { flex: none; font-family: var(--type-wordmark-family); font-weight: var(--type-wordmark-weight); font-style: var(--type-wordmark-style); text-transform: var(--type-wordmark-case); letter-spacing: var(--type-wordmark-track); font-size: var(--text-7); color: var(--text); text-decoration: none; padding: var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
 #nav .brand .workspace-name { display: none; }
 /* The query bar (ui/query-bar.js): the canvas's lens on one line under the top bar, its terms as chips; what does not fit scrolls along it. */
@@ -157,8 +169,8 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 .signup-email { flex: 2; min-width: var(--field-least); }
 .signup-error { padding: 0 var(--space-8) var(--space-8); }
 
-/* Panes (ui/panes.js): the canvases docked beside the main one, each with its name, a way to make it main, to pop it
-   out and to close it. Their frames are set by the layout as shares of the page; the line between two is dragged. */
+/* Panes (ui/panes.js): the canvases docked beside the main one in a tab, each with its name, a way to make it main
+   and to close it. Their frames are set by the layout as shares of the page; the line between two is dragged. */
 #panes > .pane { position: fixed; z-index: 1; display: flex; flex-direction: column; background: var(--ln-sea, var(--bg)); border-left: var(--border-1) solid var(--line); border-top: var(--border-1) solid var(--line); box-sizing: border-box; }
 #panes > .pane.pane-shown { animation: pane-shown 1.2s ease; }
 @keyframes pane-shown { from { box-shadow: inset 0 0 0 var(--border-2, var(--border-1)) var(--accent); } to { box-shadow: none; } }
