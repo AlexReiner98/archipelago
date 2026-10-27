@@ -300,11 +300,11 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
 
   const { latest } = (await call('/agent/watch', robot)).result;
   const preview = (await call('/api/import_backup', admin, { backup, vault })).result;
-  assert.deepEqual([preview.applied, preview.entities.added, preview.types_added], [false, 2, ['local.site_visit']]);
+  assert.deepEqual([preview.applied, preview.entities.added, preview.types_added], [false, 3, ['local.site_visit']], 'its two items and the type item one of them needs');
   const titles = async () => ((await call('/api/search', admin)).result as any[]).map((e) => e.title).sort();
   assert.ok(!(await titles()).includes('Order the stone'), 'looking changes nothing');
   const done = (await call('/api/import_backup', admin, { backup, vault, apply: true })).result;
-  assert.deepEqual([done.applied, done.entities.added], [true, 2]);
+  assert.deepEqual([done.applied, done.entities.added], [true, 3]);
   assert.deepEqual((await titles()).filter((t) => ['Already here', 'Order the stone', 'Visit the quarry'].includes(t)), ['Already here', 'Order the stone', 'Visit the quarry']);
   assert.equal(((await call('/api/search', admin, { type: 'local.site_visit' })).result as any[]).length, 1, 'with the type it needed');
 

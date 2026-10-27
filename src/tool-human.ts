@@ -15,6 +15,7 @@ import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { eventsAfter, factsAfter, HELD_MOST, headPos } from './tail.ts';
+import { typeItemsIn, typesTaken } from './type-items.ts';
 
 /** Moves when any file of the web UI is saved (the projector it runs too), so an open page knows to load itself again. */
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
@@ -66,13 +67,17 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       const whole = await wholeMap(l); // everything in the file goes in, whoever it is private to: this is the map as a whole, as a backup is
       const file = await readable(whole.db, { ...parseBackup(Buffer.from(input.backup, 'base64')), ...(input.vault && { vault: parseVault(Buffer.from(input.vault, 'base64')) }) });
       const defined = ((file.local_pack as { types?: TypeDef[] } | null)?.types ?? []).filter((t) => !whole.registry.types.has(t.id));
-      const known = new Set([...whole.registry.types.keys(), ...defined.map((t) => t.id)]);
+      // Its own types, kept as type items, are taken in with it.
+      const kept = typeItemsIn(file.tables?.entity ?? []);
+      const named = kept.flatMap((i) => (typeof i.props.name === 'string' && !i.props.preset && !whole.registry.types.has(i.props.name) && !whole.registry.relations.has(i.props.name) ? [i.props.name] : []));
+      const known = new Set([...whole.registry.types.keys(), ...defined.map((t) => t.id), ...named]);
       const unknown = [...new Set((file.tables?.entity ?? []).map((e) => e.type as string))].filter((t) => !known.has(t));
       if (unknown.length) throw new Error(`The file uses types this server does not have: ${unknown.join(', ')}. Install the pack that defines them first.`);
       const backUp = backupNow();
       const backed_up_first = input.apply ? Boolean(backUp && (await backUp())) : undefined;
       // The file's own types first, in the order they were defined: its entities need them.
       if (input.apply) for (const def of defined) await whole.registry.defineLocal(def);
+      if (input.apply && named.length) await typesTaken(whole, kept);
       // A map brought from elsewhere has its own person for its owner. If that is
       // who owns this workspace too, the two can be made one.
       const theirs = file.tables?.setting?.find((s) => s.key === 'me')?.value as string | undefined;
@@ -81,6 +86,7 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       const my = their ? await whole.entity(mine!) : undefined;
       const owners = their && my && !my.archived_at ? { here: { id: my.id, title: my.title }, file: { id: theirs!, title: their.title as string }, made_one: false } : undefined;
       const report = await merge(whole.db, file, { workspace: l.workspace, sessionTypes: whole.registry.family('run'), apply: input.apply });
+      if (input.apply && named.length) await typesTaken(whole);
       if (input.apply && input.same_owner && owners) {
         await whole.apply(actorId(actor), { ops: [{ op: 'merge', keep: owners.file.id, drop: owners.here.id }], reason: 'The owner here and the owner in the imported backup are one person' });
         // Who they are goes with them: their tokens, what is private to them, and owning the workspace.
@@ -99,7 +105,7 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
           detail: { from: file.workspace, taken: file.taken, first_seq: report.events.first_seq, last_seq: report.events.last_seq, entities: report.entities, relations: report.relations },
         });
       }
-      return { ...report, owners, types_added: defined.map((t) => t.id), backed_up_first };
+      return { ...report, owners, types_added: [...defined.map((t) => t.id), ...named], backed_up_first };
     },
   },
   launch: {

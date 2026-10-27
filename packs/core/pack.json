@@ -265,7 +265,8 @@
         "name": { "type": "string", "description": "A type of this workspace's own: its id, local.<name>." },
         "extends": { "type": "string", "description": "A type of this workspace's own: the kind or type it is a flavour of, whose fields and statuses it takes." },
         "fields": { "type": "json", "description": "Fields added, by name, each as a type declares one, e.g. {\"rate\": {\"type\": \"number\"}}." },
-        "statuses": { "type": "json", "description": "A type of this workspace's own: its statuses, {\"open\": [...], \"closed\": [...]}, when not its parent's." }
+        "statuses": { "type": "json", "description": "A type of this workspace's own: its statuses, {\"open\": [...], \"closed\": [...]}, when not its parent's." },
+        "deliverable": { "type": "boolean", "description": "A type of this workspace's own: made for a reader or a customer, like a document; what it is part of names it under its title." }
       }
     },
     {

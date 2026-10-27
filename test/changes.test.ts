@@ -171,7 +171,12 @@ test('an approved type proposal becomes a flavour in the local pack', async () =
   assert.deepEqual(l.registry.type('local.site_visit')!.lineage, ['local.site_visit', 'event', 'occurrence']);
   await make(l, [{ op: 'create', type: 'local.site_visit', title: 'Snowdon', props: { address: '1 High St', at: '2026-11-01T10:00:00Z' } }]);
   assert.equal((await l.search({ type: 'event' })).length, 1);
-  await assert.rejects(make(l, [{ op: 'define_type', type: { id: 'thing', title: 'T', description: '' } }]), /must look like "local.my_type"/);
+  // One way to make a type: define_type keeps it as a type item on the map, not in the old table of local types.
+  const kept = (await l.search({ type: 'type' })).find((e) => e.title === 'Site visit')!;
+  const item = (await l.get(kept.id)).entity;
+  assert.deepEqual([item.props.name, item.props.extends, item.body], ['local.site_visit', 'event', 'A visit to a site.']);
+  assert.equal((await l.db.query<{ n: number }>(`select count(*)::int as n from local_type`)).rows[0].n, 0);
+  await assert.rejects(make(l, [{ op: 'define_type', type: { id: 'thing', title: 'T', description: '' } }]), /must be named "local.<name>"/);
 });
 
 test('a connection\'s tool-call log is imported once into the activity log', async () => {

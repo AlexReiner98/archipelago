@@ -53,7 +53,7 @@ export function ownPack(before: PackFile | undefined, items: TypeItem[], id: str
   if (!own.length) return before;
   const types: TypeDef[] = own.filter((i) => !isLink(i)).map((i) => ({
     id: text(i.props.name)!, title: i.title, description: text(i.body) ?? i.title, ...(text(i.props.extends) && { extends: text(i.props.extends) }),
-    ...(record(i.props.fields) && { fields: record<FieldDef>(i.props.fields) }), ...(record(i.props.statuses) && { statuses: i.props.statuses as TypeDef['statuses'] }), ...(!i.is_open && { retired: true }),
+    ...(record(i.props.fields) && { fields: record<FieldDef>(i.props.fields) }), ...(record(i.props.statuses) && { statuses: i.props.statuses as TypeDef['statuses'] }), ...(i.props.deliverable === true && { deliverable: true }), ...(!i.is_open && { retired: true }),
   }));
   const links: RelationDef[] = own.filter(isLink).map((i) => ({
     id: text(i.props.name)!, title: i.title, description: text(i.body) ?? i.title, inverse: text(i.props.inverse) ?? i.title,

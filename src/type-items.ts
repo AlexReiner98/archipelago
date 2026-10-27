@@ -1,7 +1,7 @@
 // The types and link types kept on the map, read for the registry (src/type-overlay.ts lays them over the packs), and
 // the registry a change is checked and applied against when it makes or changes one.
 
-import type { Registry } from './packs.ts';
+import type { Registry, TypeDef } from './packs.ts';
 import type { Archipelago, Op } from './pelago.ts';
 import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 
@@ -11,9 +11,22 @@ const KINDS = [TYPE_ITEM, LINK_ITEM];
 let typesChanged: (l: Archipelago) => Promise<unknown> = async () => {};
 export const onTypesChanged = (fn: (l: Archipelago) => Promise<unknown>) => (typesChanged = fn);
 
-/** An op naming a type or link type by a name it had before (work.task) names it as it is now (task): set in place, so a held change and its proposal read alike. */
+/**
+ * An op naming a type or link type by a name it had before (work.task) names it as it is now (task), and a define_type
+ * is the type item it makes: one way to make a type. Set in place, so a held change and its proposal read alike.
+ */
 export function currentNames(reg: Registry, ops: Op[]): void {
-  for (const op of ops) if (op.op === 'create' || op.op === 'link') op.type = reg.canonical(op.type);
+  for (const [i, op] of ops.entries()) {
+    if (op.op === 'define_type') ops[i] = asTypeItem(op.type);
+    else if (op.op === 'create' || op.op === 'link') op.type = reg.canonical(op.type);
+  }
+}
+
+/** A type as define_type gives it, as the `type` item that keeps it on the map. */
+function asTypeItem(def: TypeDef): Op {
+  const { id, title, description, extends: parent, fields, statuses, deliverable } = def;
+  const props = { name: id, ...(parent && { extends: parent }), ...(fields && { fields }), ...(statuses && { statuses }), ...(deliverable && { deliverable: true }) };
+  return { op: 'create', type: TYPE_ITEM, title, ...(description && { body: description }), props };
 }
 
 /** Every type and link type kept on the map, archived ones left out. */
@@ -62,10 +75,18 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
   return trial;
 }
 
-/** After a change is applied: the types it defined taken in, and when it made or changed a type item, the registry and the type table brought in line. */
+/** After a change is applied: when it made or changed a type item, the registry and the type table brought in line. */
 export async function typesApplied(l: Archipelago, ops: Op[], used: Registry): Promise<void> {
-  for (const op of ops) if (op.op === 'define_type') await l.registry.defineLocal(op.type);
-  if (used === l.registry) return;
-  l.registry.takeItems(await typeItems(l));
+  if (used !== l.registry) await typesTaken(l);
+}
+
+/** The registry and the type table brought in line with the type items on the map, and these besides (a backup's, before it is merged). */
+export async function typesTaken(l: Archipelago, besides: TypeItem[] = []): Promise<void> {
+  const here = await typeItems(l);
+  l.registry.takeItems([...here, ...besides.filter((b) => !here.some((i) => i.id === b.id))]);
   await typesChanged(l);
 }
+
+/** A backup's type items: its own types (a name, no preset) are what its items may need. */
+export const typeItemsIn = (rows: Record<string, unknown>[]): TypeItem[] =>
+  rows.filter((r) => KINDS.includes(r.type as string) && !r.archived_at).map((r) => ({ id: r.id as string, type: r.type as string, title: r.title as string, body: (r.body as string) ?? '', is_open: r.is_open !== false, props: (r.props as Record<string, unknown>) ?? {} }));
