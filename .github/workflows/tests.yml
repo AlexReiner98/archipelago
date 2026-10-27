@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false # every shard reports, so a failure shows all that broke
       matrix:
-        shard: [rest, browser 1/2, browser 2/2, whole-map, table]
+        shard: [rest 1/2, rest 2/2, browser 1/2, browser 2/2, whole-map, table]
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +45,7 @@ jobs:
       - run: npm ci
 
       - run: npm run typecheck
-        if: matrix.shard == 'rest'
+        if: matrix.shard == 'rest 1/2'
 
       - run: node scripts/test.ts shard ${{ matrix.shard }}
 
@@ -58,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [rest, browser 1/2, browser 2/2, whole-map, table]
+        shard: [rest 1/2, rest 2/2, browser 1/2, browser 2/2, whole-map, table]
     services:
       postgres:
         image: postgres:18
@@ -100,7 +100,7 @@ jobs:
       # log, its lock and the move again as a role that may make databases and roles, and nothing more. The roles the
       # superuser's run made are granted to it to hand on, as it hands them to itself on opening (src/pg.ts).
       - name: The log as a role that is not a superuser
-        if: matrix.shard == 'rest'
+        if: matrix.shard == 'whole-map' # the shard with time to spare
         run: |
           psql "$PELAGO_TEST_DATABASE_URL" -c "create role pelago_app login password 'app' createdb createrole" -c "create database pelago_app owner pelago_app" -c "grant pelago_member, pelago_public, pelago_compactor to pelago_app with admin option"
           PELAGO_TEST_DATABASE_URL=postgres://pelago_app:app@127.0.0.1:5432/pelago_app node --test --test-force-exit --test-global-setup=./test/global.ts --import ./test/each.ts test/log.test.ts test/connections.test.ts test/move.test.ts test/streams.test.ts test/keys.test.ts
