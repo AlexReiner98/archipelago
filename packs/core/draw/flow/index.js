@@ -289,7 +289,7 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     return patches;
   };
   return {
-    scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
+    scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
     on(event) {
       const { name, key } = event;
