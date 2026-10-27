@@ -9,6 +9,7 @@
 
 import { authorityOf } from './authority.ts';
 import { drawingFor } from './drawings.ts';
+import { headOf } from './log.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
 import { SHARED } from './documents.ts';
@@ -85,7 +86,8 @@ export async function publish(l: Archipelago, actor: Actor, id: string, said?: S
   // A shared one is frozen first: whether its sender lets it be published is known before it is made public.
   const early = doc.type === SHARED ? await freeze(l, id) : null;
   if (doc.visibility !== 'public') await l.apply(actorId(actor), { ops: [{ op: 'update', id, visibility: 'public' }], reason: 'Published, for anyone to read' }, { authority });
-  const given = early ?? (await freeze(l, id));
+  // Drawn as the map's styles stood now (src/styles.ts, pageLook), until it is published again.
+  const given = { ...(early ?? (await freeze(l, id))), style_at: (await headOf(l.db)).pos };
   if (given.path) {
     const { rows } = await l.db.query<{ title: string }>(`select given ->> 'title' as title from published where path = $1 and entity_id <> $2`, [given.path, id]);
     if (rows[0]) throw new Error(`"${rows[0].title}" is already published at /${given.path}: give this one another path.`);
@@ -121,7 +123,8 @@ export async function publishedState(l: Archipelago, id: string) {
   const { rows } = await l.db.query<{ given: Record<string, unknown>; published_by: string; published_at: Date }>(`select given, published_by, published_at from published where entity_id = $1`, [id]);
   if (!rows[0]) return { published: false };
   const now = await freeze(l, id).catch(() => null);
-  return { published: true, at: rows[0].published_at, by: rows[0].published_by, changed: !now || !same(now, rows[0].given) };
+  const { style_at: _, ...given } = rows[0].given;
+  return { published: true, at: rows[0].published_at, by: rows[0].published_by, changed: !now || !same(now, given) };
 }
 
 /** A published document as anyone reads it, or null. Read through one narrow function: nothing of the map as it is now. */

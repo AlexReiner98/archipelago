@@ -34,7 +34,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
     if (doc) {
       const path = publicPath(workspace, id);
       const canonical = domain && doc.path ? `https://${domain}${siteHref(doc.path)}` : at.named[0] ? `https://${at.named[0]}${path}` : path;
-      const page = await publishedPage(doc, canonical, site?.name, pageData({ ...doc, ...(await pageLook(pelago!)), site }, path));
+      const page = await publishedPage(doc, canonical, site?.name, pageData({ ...doc, ...(await pageLook(pelago!, { ...doc, id })), site }, path));
       return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': POLICY }).end(page);
     }
     // A product's page reads its data once open. What is not public, or not there, has no page at all.
@@ -44,7 +44,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
   }
   if (!pelago) return none();
   if (what === 'data') {
-    if (doc) return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify(pageData({ ...doc, ...(await pageLook(pelago)), site }, publicPath(workspace, id))));
+    if (doc) return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify(pageData({ ...doc, ...(await pageLook(pelago, { ...doc, id })), site }, publicPath(workspace, id))));
     const page = await publicPage(pelago, id, match.build);
     if (!page) return none();
     return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));

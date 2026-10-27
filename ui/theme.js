@@ -1,8 +1,8 @@
-// The page's colours, light and dark, are the style's theme, its lengths the style's lengths, and its text the style's
-// faces and text roles (type); the house style names every one, and /layout.css holds the lengths, faces and roles
-// until the style is read. Each is set on the page as --<name>, the colours for the scheme the reader's system is in,
-// set again when that changes. Only a plain hex colour, a plain length and a plain list of families are: a style is
-// written by anyone who can change the map.
+// The one painter of every page, the app's, a document's and a product's public page: the colours (theme), lengths,
+// typefaces (faces) and text roles (type) the server sends, each set on the page as --<name>, the colours for the
+// scheme the reader's system is in, set again when that changes. The server finishes the colours (src/colours.ts):
+// the page works none out, it only paints. Only a plain hex colour, a plain length and a plain list of families are
+// painted: a style is written by anyone who can change the map.
 
 const dark = matchMedia('(prefers-color-scheme: dark)');
 const NAME = /^[a-z][a-z0-9_]*$/;

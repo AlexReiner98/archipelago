@@ -1,6 +1,8 @@
 // The public page of one product: how we know it is correct, and what has been built. No login, no framework,
 // and nothing drawn that the server did not say: every text is set as text, never as markup.
 
+import { applyTheme } from './theme.js';
+
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
 
@@ -95,25 +97,13 @@ function draw(d) {
   main.replaceChildren(...page.childNodes);
 }
 
-/** The page's colours and lengths: the workspace's style, light or dark as the reader's system is. Only plain hex colours and lengths. */
-const dark = matchMedia('(prefers-color-scheme: dark)');
-const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?)*$/;
-const asLength = (v) => (typeof v === 'number' && v >= 0 ? `${v}px` : typeof v === 'string' && LENGTH.test(v) ? v : null);
-let look = {};
-const paint = () => {
-  const set = (name, value) => /^[a-z][a-z0-9_]*$/.test(name) && document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, value);
-  for (const [name, colour] of Object.entries(look.theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (/^#[0-9a-f]{3,8}$/i.test(String(colour))) set(name, colour);
-  for (const [name, value] of Object.entries(look.lengths ?? {})) if (asLength(value)) set(name, asLength(value));
-};
-dark.addEventListener('change', paint);
 
 async function load(build) {
   try {
     const res = await fetch(`${here}/data${build ? `?build=${encodeURIComponent(build)}` : ''}`);
     if (!res.ok) return main.replaceChildren(h('p', { class: 'muted' }, 'There is nothing public at this address.'));
     const page = await res.json();
-    look = page;
-    paint();
+    applyTheme(page);
     draw(page);
   } catch {
     main.replaceChildren(h('p', { class: 'muted' }, 'This page could not be loaded. Try again in a moment.'));

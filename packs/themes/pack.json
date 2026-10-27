@@ -1,0 +1,29 @@
+{
+  "id": "themes",
+  "version": "0.1.0",
+  "title": "Themes",
+  "description": "Colours for the whole app, a document's page and a public page, each taken from one of Canada's archipelagos: only its paper, its ink and its sea, the rest worked out from them so text, muted words, links and states keep their contrast. None is used until the owner keeps a version of one.",
+  "requires": [
+    "core"
+  ],
+  "styles": [
+    {
+      "id": "themes.open_water",
+      "title": "Open water",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#f5f6f0", "ink": "#1f1e1b", "sea": "#216bc0"}, "dark": {"paper": "#13161a", "ink": "#ecebe6", "sea": "#70a4e6"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "sea", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.ice",
+      "title": "Ice",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#f8f5ef", "ink": "#1f1e1b", "sea": "#4666c3"}, "dark": {"paper": "#14161a", "ink": "#ecebe6", "sea": "#83a1ea"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "sea", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    },
+    {
+      "id": "themes.bay",
+      "title": "Bay",
+      "over": "chosen",
+      "props": {"theme": {"light": {"paper": "#f8f4ef", "ink": "#1f1e1b", "sea": "#077783"}, "dark": {"paper": "#121718", "ink": "#ecebe6", "sea": "#28b1c3"}, "derive": {"bg": "paper", "text": "ink", "panel": {"light": "#ffffff", "dark": {"mix": ["ink", "paper"], "share": 0.042}}, "line": {"mix": ["ink", "paper"], "share": {"light": 0.088, "dark": 0.14}}, "muted": {"search": {"mix": ["ink", "paper"], "share": 0.64}, "on": ["bg", "panel"], "ratio": 4.8}, "accent": {"search": "sea", "on": {"light": ["bg", "panel"], "dark": "bg"}, "ratio": {"light": 4.8, "dark": 7}}, "accent_soft": {"search": {"mix": ["accent", "bg"], "share": 0.3}, "on": "ink", "ratio": {"light": 14, "dark": 11.5}}, "edge": {"mix": ["ink", "paper"], "share": 0.28}, "edge_strong": {"mix": ["ink", "paper"], "share": 0.72}, "relief_water": "sea"}}}
+    }
+  ]
+}

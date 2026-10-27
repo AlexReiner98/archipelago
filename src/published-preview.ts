@@ -9,5 +9,5 @@ import { pageLook } from './styles.ts';
 /** The data a published page would draw from, read now. `nav` gives the site's header and footer (src/site.ts). */
 export async function previewOf(l: Archipelago, id: string, nav: () => Promise<Record<string, unknown>>) {
   const given = await wouldPublish(l, id);
-  return { ...given, ...(await pageLook(l)), site: await nav() };
+  return { ...given, ...(await pageLook(l, { ...given, id })), site: await nav() };
 }

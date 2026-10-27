@@ -156,6 +156,10 @@ test('in a browser, the workspace style’s page_css is how a published page loo
     // One that would fetch something is not read, and the page is drawn as it is.
     const { rows } = { rows: (await call('/api/search', undefined, { q: 'The site', type: 'style' })).result };
     await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: 'h2 { letter-spacing: 3px; background: url(https://example.com/) }' } }] });
+    // What is published keeps the look it was published with until it is published again.
+    await page.go(`${base}/p/default/${d}`);
+    assert.equal(await spacing(), '3px');
+    await call('/api/publish', undefined, { id: d });
     await page.go(`${base}/p/default/${d}`);
     assert.equal(await spacing(), 'normal');
     assert.equal(await page.evaluate(`document.querySelector('main h1').textContent`), 'The system');

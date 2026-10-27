@@ -81,7 +81,7 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
     return code ? send(200, 'application/json', JSON.stringify(code), { 'cache-control': 'public, max-age=31536000, immutable' }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));
   }
   const site = { ...(await siteNav(at.workspaces, at.workspace, (page) => (page.path ? siteHref(page.path) : null))), host: at.host };
-  const data = pageData({ ...doc, ...(await pageLook(pelago)), site }, siteHref(doc.path));
+  const data = pageData({ ...doc, ...(await pageLook(pelago, doc)), site }, siteHref(doc.path));
   if (what === 'data') return send(200, 'application/json', JSON.stringify(data), { 'cache-control': 'no-cache' });
   const page = await publishedPage(doc, origin + siteHref(doc.path), site.name, data);
   return send(200, 'text/html; charset=utf-8', page, { 'cache-control': 'no-store', 'content-security-policy': POLICY });

@@ -200,6 +200,15 @@
       "title": "Reading a document",
       "on": ["work.document"],
       "props": { "page": { "picture": false, "notes": "whole" }, "notes": { "measure": "reader_measure" } }
+    },
+    {
+      "id": "work.reader_colours",
+      "title": "A document's colours",
+      "props": {
+        "theme": {
+          "derive": { "reader_ink": "text", "reader_muted": "muted", "reader_line": "line", "reader_link": "accent", "reader_page": { "light": "panel", "dark": "bg" }, "reader_bad": "bad", "reader_figure": "figure", "reader_paid": "ok", "reader_void": "bad", "reader_print_ink": "#000000", "reader_print_muted": "#555555", "reader_print_page": "#ffffff" }
+        }
+      }
     }
   ]
 }
