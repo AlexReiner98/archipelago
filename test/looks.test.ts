@@ -98,6 +98,15 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
     assert.equal(again.look, flow.look);
     assert.equal((await call('/agent/query', undefined, { name: 'picture', params: { look: flow.look } })).result.image.data, flow.image.data);
 
+    // Drawn dark unless asked light: the page's own colours follow the scheme the look is drawn in.
+    assert.equal(flow.scheme, 'dark');
+    const light = await look({ entity: made.f, scheme: 'light' });
+    assert.equal(light.scheme, 'light');
+    assert.notEqual(light.look, flow.look, 'a light look is not the dark one again');
+    const corner = (data: string) => reader.evaluate<number[]>(`(async () => { const img = new Image(); img.src = 'data:image/png;base64,${data}'; await img.decode(); const c = document.createElement('canvas'); Object.assign(c, { width: img.width, height: img.height }); const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0); return [...ctx.getImageData(600, 700, 1, 1).data.slice(0, 3)]; })()`);
+    const [d, l] = [await corner(flow.image.data), await corner(light.image.data)];
+    assert.ok(d.reduce((a, b) => a + b) < l.reduce((a, b) => a + b), `dark is darker: ${d} against ${l}`);
+
     const painted = await look({ entity: made.c, width: 800, height: 500 });
     assert.equal(painted.state, 'drawn', JSON.stringify({ ...painted, image: undefined }));
     assert.deepEqual((await colours(painted.image.data)).middle, [255, 0, 255], 'what the style’s code painted, once it had');

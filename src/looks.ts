@@ -60,6 +60,7 @@ function counted(workspace: string) {
 }
 
 interface Kept {
+  scheme: 'dark' | 'light';
   content_type: string;
   width: number;
   height: number;
@@ -74,6 +75,7 @@ interface Kept {
 const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
   look,
   view: k.hash,
+  scheme: k.scheme,
   state: k.state,
   settled: k.settled,
   ...(k.why && { why: k.why }),
@@ -88,11 +90,12 @@ const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
  * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>) for the asking agent and keep the
  * picture. `fresh` draws it again even when the map has not changed since the last look at it.
  */
-export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; fresh?: boolean } = {}) {
+export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean } = {}) {
   const width = Math.min(1920, Math.max(320, Math.round(size.width ?? 1200)));
   const height = Math.min(1600, Math.max(240, Math.round(size.height ?? 750)));
+  const scheme = size.scheme ?? 'dark';
   const pos = await headPos(mapDb);
-  const same = `lookof:${whose(w)}:${createHash('sha256').update(JSON.stringify([hash, width, height, pos])).digest('hex').slice(0, 32)}`;
+  const same = `lookof:${whose(w)}:${createHash('sha256').update(JSON.stringify([hash, width, height, scheme, pos])).digest('hex').slice(0, 32)}`;
   if (!size.fresh) {
     const was = await kept<{ look: string }>(db, same);
     const had = was && (await keptWith<Kept>(db, `look:${whose(w)}:${was.look}`));
@@ -100,9 +103,9 @@ export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: s
   }
   counted(w.workspace);
   const pass = await passFor(db, w, actor);
-  const got = await drawLook(`${origin}/?look#/${hash}`, pass, width, height);
+  const got = await drawLook(`${origin}/?look#/${hash}`, pass, width, height, scheme);
   const look = `l_${randomBytes(6).toString('hex')}`;
-  const k: Kept = { content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms };
+  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms };
   await keep(db, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
   await keep(db, same, { look }, LOOK_MS);
   return answer(look, k, got.data);

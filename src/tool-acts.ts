@@ -45,6 +45,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       look: z.boolean().optional().describe('Also answer with a picture of it, drawn by the server (as query look draws it).'),
       width: z.number().int().min(320).max(1920).optional().describe('With look: the picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('With look: its height (750).'),
+      scheme: z.enum(['dark', 'light']).optional().describe('With look: the theme it is drawn in (dark).'),
     },
     run: async (l, actor, input) => {
       // Where it pointed, and whether a page of theirs is there to follow it; with a look, the picture of what is there.
