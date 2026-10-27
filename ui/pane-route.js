@@ -7,6 +7,9 @@
 //   drawing it, else the main one. A session holds such a pane while it lands there within `recent`.
 // - When every such pane is held by another session at work, the session gets a pane of its own, following it.
 // - Past `most` panes, or where the panes it may use follow someone else or nobody, it is only offered (the line).
+// - A step that is not a show (a change, a beat of its story) moves no pane the session has not shown into: it lands in
+//   the session's own, or in one it holds, or, while no other session is at work, where a show would; else it is
+//   offered. A page left open is not taken by agents writing elsewhere.
 
 /** The words a show's `pane` places by, rather than names. */
 export const SIDE_WORDS = new Set(['left', 'right', 'above', 'below', 'main', 'alone']);
@@ -33,9 +36,16 @@ export function nameOf(key) {
  * Where this step goes. `panes` are those docked, the main one among them (id "main"), each
  * { id, follows: 'all' | 'none' | <session>, slot?, draws?, landed?: { session, at } }, with `draws` true where the pane
  * draws what the step names. Answers { pane, side? } to draw it in a pane (moved to `side` when one is asked), { open:
- * { follows, slot?, side } } to open one, or { offer: true } to only offer it.
+ * { follows, slot?, side } } to open one, or { offer: true } to only offer it. `others` is how many other sessions
+ * took a step within `recent`.
  */
-export function route(step, panes, { now, recent, most, drawable = true }) {
+export function route(step, panes, { now, recent, most, others = 0, drawable = true }) {
+  if (step.kind !== 'show' && others > 0) {
+    const session = sessionOf(step);
+    const held = panes.filter((p) => p.follows === session || (p.follows === 'all' && p.landed?.session === session && now - p.landed.at < recent));
+    const to = held.find((p) => drawable || p.id === 'main');
+    return to ? { pane: to.id } : { offer: true };
+  }
   const session = sessionOf(step);
   const asked = step.pane;
   const slot = asked && !SIDE_WORDS.has(asked) ? asked : undefined;

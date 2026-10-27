@@ -439,7 +439,9 @@ hooks.land = (step) => {
   const at = step.hash;
   const pane = (id, p) => ({ id, follows: p?.follows ?? 'all', slot: p?.slot, landed: landed.get(id), draws: named(id === 'main' ? asPane(canvasHref()) : p.at) === named(at) });
   const panes = [pane('main', layout.main), ...docked().map((g) => pane(g, layout.panes[g]))];
-  const to = route(step, panes, { now: Date.now(), recent: 600_000, most: 4, drawable: drawable(at) });
+  const now = Date.now();
+  const others = [...heard].filter(([key, o]) => key !== sessionOf(step) && now - o.at < 600_000).length;
+  const to = route(step, panes, { now, recent: 600_000, most: 4, others, drawable: drawable(at) });
   if (to.offer) return null;
   const session = sessionOf(step);
   if (to.pane === 'main') {

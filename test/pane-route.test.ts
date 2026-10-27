@@ -55,3 +55,12 @@ test('a side moves the session\'s pane there; what only the main canvas draws go
 test('among panes that follow everyone, the one drawing it already is lit', () => {
   assert.deepEqual(route(step('e_aaaaaaaa'), [main(), { id: 'p1', follows: 'all', draws: true }], at), { pane: 'p1' });
 });
+
+test('a change moves no pane its session has not shown into while others are at work', () => {
+  const change = { ...step('e_cccccccc'), kind: 'change' };
+  assert.deepEqual(route(change, [main()], { ...at, others: 2 }), { offer: true });
+  assert.deepEqual(route(change, [main(), { id: 'p1', follows: 'e_cccccccc' }], { ...at, others: 2 }), { pane: 'p1' });
+  assert.deepEqual(route(change, [main({ landed: { session: 'e_cccccccc', at: now } })], { ...at, others: 2 }), { pane: 'main' });
+  // Alone at work, its change goes where a show would.
+  assert.deepEqual(route(change, [main()], at), { pane: 'main' });
+});
