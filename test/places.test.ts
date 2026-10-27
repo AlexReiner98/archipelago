@@ -40,13 +40,13 @@ test('with the software pack a session lands on its repository, by its remote or
   const made = (await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'a', type: 'software.repo', title: 'A repo', props: { remote: 'https://github.com/me/a', path: 'C:\\code\\a' } },
-      { op: 'create', ref: 'b', type: 'software.repo', title: 'B repo', props: { remote: 'https://github.com/me/b' } },
+      { op: 'create', ref: 'a', type: 'repo', title: 'A repo', props: { remote: 'https://github.com/me/a', path: 'C:\\code\\a' } },
+      { op: 'create', ref: 'b', type: 'repo', title: 'B repo', props: { remote: 'https://github.com/me/b' } },
     ],
   })) as { created: Record<string, string> };
   const byRemote = (await callTool(l, human, 'session_start', { remote: 'git@github.com:me/b.git', cwd: 'C:\\code\\a' })) as { run: string; repo: { id: string } };
   assert.equal(byRemote.repo.id, made.created.b, 'the address wins over the folder: it is the same on every machine');
-  assert.deepEqual(await linksOf(l, byRemote.run), [{ type: 'software.lives_in', to_id: made.created.b }], 'tied by the flavour of lives_in a repository is made for');
+  assert.deepEqual(await linksOf(l, byRemote.run), [{ type: 'lives_in', to_id: made.created.b }], 'tied by the flavour of lives_in a repository is made for');
   const byFolder = (await callTool(l, human, 'session_start', { cwd: 'c:/code/a/src' })) as { run: string; repo: { id: string } };
   assert.equal(byFolder.repo.id, made.created.a);
   const nowhere = (await callTool(l, human, 'session_start', { cwd: 'D:\\elsewhere' })) as { run: string; repo?: unknown };

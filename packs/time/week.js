@@ -61,7 +61,7 @@ export async function week(input, ctx) {
 
   // Routines and sessions, placed by the kernel's time axis over the week and the two weeks before today.
   const back = addDays(day0, -13);
-  const placed = { items: await r.read({ placed: { types: ['time.routine', 'sys.run'], from: back < from ? back : from, to: day0 > to ? day0 : to, by: ['when'] } }) };
+  const placed = { items: await r.read({ placed: { types: ['routine', 'run'], from: back < from ? back : from, to: day0 > to ? day0 : to, by: ['when'] } }) };
   const routines = [];
   for (const item of placed.items.filter((i) => i.open && i.time?.some((s) => s.by === 'repeat'))) {
     const [part] = await r.read({ related: item.id, relation: 'part_of' });
@@ -86,7 +86,7 @@ export async function week(input, ctx) {
   const reported = days.map(() => 0);
   // In the order they began, so that two begun at once always take the same lanes.
   const begun = (run) => Math.min(...(run.time ?? []).map((s) => Date.parse(s.start)));
-  for (const run of placed.items.filter((i) => i.type === 'sys.run').sort((a, b) => begun(a) - begun(b) || a.id.localeCompare(b.id)))
+  for (const run of placed.items.filter((i) => i.type === 'run').sort((a, b) => begun(a) - begun(b) || a.id.localeCompare(b.id)))
     for (const span of run.time ?? []) {
       const [a, b] = [Date.parse(span.start), Date.parse(span.end)];
       if (b <= a) {
@@ -120,7 +120,7 @@ export async function week(input, ctx) {
     to,
     zone,
     // What the Time screen makes when it logs time or keeps a routine: this pack's types, so the page names none.
-    types: { entry: 'time.entry', routine: 'time.routine' },
+    types: { entry: 'time_entry', routine: 'routine' },
     // Every project the week touches, in a fixed order, so each keeps one colour all week.
     projects: await Promise.all([...counted].sort().map(async (id) => ({ id, title: await r.title(id) }))),
     days: days.map((date, i) => ({

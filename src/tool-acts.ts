@@ -47,15 +47,21 @@ export const ACT_TOOLS: Record<string, Tool> = {
       height: z.number().int().min(240).max(1600).optional().describe('With look: its height (750).'),
       scheme: z.enum(['dark', 'light']).optional().describe('With look: the theme it is drawn in (dark).'),
       pane: z
-        .enum(['left', 'right', 'above', 'below', 'main', 'alone'])
+        .string()
+        .regex(/^[a-z][a-z0-9-]{0,23}$/, 'pane is a side (left, right, above, below), main, alone, or a short lower-case name of your own')
         .optional()
-        .describe('Which pane of their page it goes to: a side opens it in a pane beside their main canvas (one already drawing it moves there), main is the main canvas, alone closes the other panes first. Left out, a pane already drawing it is lit, else the main canvas goes there. Only a canvas or an item goes to a pane.'),
+        .describe(
+          'Which pane of their page it goes to. A name of your own ("map", "review") is a pane of your session’s: opened beside their main canvas the first time, drawn in again each time you name it, so you can keep two things in sight at once. ' +
+            'A side (left, right, above, below) puts your session’s pane there; main is the main canvas; alone closes the other panes first. ' +
+            'Left out, it goes to the pane that follows your session, else to one that follows everyone and no other session at work holds, else to a new pane of your own. The owner picks whom each pane follows, and a pane following someone else is not yours to move. Only a canvas or an item goes to a pane.',
+        ),
+      run: z.string().optional().describe('Your session’s run id, so the pane that follows your session is the one it goes to. Left out, the one you last named in a session_update or tell.'),
     },
     run: async (l, actor, input) => {
       // Where it pointed, and whether a page of theirs is there to follow it; with a look, the picture of what is there.
       const hash = await viewAddress(l, input);
       const { db } = await wholeMap(l);
-      const at = await point(l, actor, 'show', hash, input.note, input.pane);
+      const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run);
       const pages = await watching(db, l, actor.name);
       return { ...at, pages, ...(input.look && (await takeLook(db, l.db, l, actor.name, hash, input))) };
     },
@@ -130,7 +136,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const answer = await tell(l, actor, input);
       const { db } = await wholeMap(l);
       await tellStamp(db, l.workspace);
-      await took(db, l, { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}` }, true);
+      await took(db, l, { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}`, run: answer.run }, true);
       return answer;
     },
   },
@@ -231,7 +237,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // The notices that said each one was settled have been answered with them.
       const { rows } = await l.db.query<{ id: string }>(
         `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
-         where r.to_id = any($1::text[]) and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.title like '% settled "%'`,
+         where r.to_id = any($1::text[]) and n.type = 'notification' and n.is_open and n.archived_at is null and n.title like '% settled "%'`,
         [answered],
       );
       if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n) => ({ op: 'update' as const, id: n.id, status: 'read' })), reason: 'Put to the owner and answered in chat' });

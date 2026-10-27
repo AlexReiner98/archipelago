@@ -13,12 +13,12 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
     await call('/api/change', admin, {
       reason: 'x',
       ops: [
-        { op: 'create', ref: 'r', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site' } },
-        { op: 'create', ref: 'other', type: 'software.repo', title: 'Books repo', props: { remote: 'https://github.com/acme/books' } },
-        { op: 'create', ref: 'p', type: 'work.project', title: 'Site' },
-        { op: 'create', ref: 't', type: 'work.task', title: 'Fix the footer' },
-        { op: 'create', ref: 'o', type: 'work.task', title: 'Close the year' },
-        { op: 'link', type: 'software.lives_in', from: 'p', to: 'r' },
+        { op: 'create', ref: 'r', type: 'repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site' } },
+        { op: 'create', ref: 'other', type: 'repo', title: 'Books repo', props: { remote: 'https://github.com/acme/books' } },
+        { op: 'create', ref: 'p', type: 'project', title: 'Site' },
+        { op: 'create', ref: 't', type: 'task', title: 'Fix the footer' },
+        { op: 'create', ref: 'o', type: 'task', title: 'Close the year' },
+        { op: 'link', type: 'lives_in', from: 'p', to: 'r' },
         { op: 'link', type: 'part_of', from: 't', to: 'p' },
       ],
     })
@@ -39,8 +39,8 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
   assert.equal((await call('/agent/get', site, { id: made.o })).result.entity.title, 'Close the year');
   assert.equal((await change(free, [{ op: 'update', id: made.o, status: 'doing' }])).result.status, 'proposed', 'a token with no limit is as before');
   // What it makes has to be tied into that work in the same change; then it may be.
-  assert.match((await change(site, [{ op: 'create', type: 'work.task', title: 'Loose' }])).error, /made without being tied to anything there/);
-  assert.equal((await change(site, [{ op: 'create', ref: 'n', type: 'work.task', title: 'Test the footer' }, { op: 'create', ref: 'q', type: 'work.decision', title: 'Which footer?' }, { op: 'link', type: 'part_of', from: 'n', to: made.p }, { op: 'link', type: 'depends_on', from: 'n', to: 'q' }])).result.status, 'proposed');
+  assert.match((await change(site, [{ op: 'create', type: 'task', title: 'Loose' }])).error, /made without being tied to anything there/);
+  assert.equal((await change(site, [{ op: 'create', ref: 'n', type: 'task', title: 'Test the footer' }, { op: 'create', ref: 'q', type: 'decision', title: 'Which footer?' }, { op: 'link', type: 'part_of', from: 'n', to: made.p }, { op: 'link', type: 'depends_on', from: 'n', to: 'q' }])).result.status, 'proposed');
   // It may say its work waits on something outside, but not hang anything on what is outside, nor merge, archive or retype the map.
   assert.equal((await change(site, [{ op: 'link', type: 'depends_on', from: made.t, to: made.o }])).result.status, 'proposed');
   assert.match((await change(site, [{ op: 'link', type: 'depends_on', from: made.o, to: made.t }])).error, /cannot change what it is linked to/);
@@ -59,14 +59,14 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
     await call('/api/change', admin, {
       reason: 'x',
       ops: [
-        { op: 'create', ref: 'q', type: 'software.proof', title: 'Does the footer stay down?' },
-        { op: 'create', ref: 'mine', type: 'software.test', title: 'Footer stays down', props: { entrypoint: 'Footer.StaysDown' } },
-        { op: 'create', ref: 'theirs', type: 'software.test', title: 'Books balance', props: { entrypoint: 'Books.Balance' } },
+        { op: 'create', ref: 'q', type: 'proof', title: 'Does the footer stay down?' },
+        { op: 'create', ref: 'mine', type: 'test', title: 'Footer stays down', props: { entrypoint: 'Footer.StaysDown' } },
+        { op: 'create', ref: 'theirs', type: 'test', title: 'Books balance', props: { entrypoint: 'Books.Balance' } },
         { op: 'create', ref: 'lane', type: 'resource', title: 'The one browser' },
         { op: 'create', ref: 'press', type: 'resource', title: 'The printing press' },
         { op: 'create', ref: 'shared', type: 'resource', title: 'The one lane' },
         { op: 'link', type: 'part_of', from: 'q', to: made.p },
-        { op: 'link', type: 'software.answers', from: 'mine', to: 'q' },
+        { op: 'link', type: 'answers', from: 'mine', to: 'q' },
         { op: 'link', type: 'needs', from: made.t, to: 'lane' },
         { op: 'link', type: 'needs', from: made.o, to: 'press' },
       ],
@@ -138,18 +138,18 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
   const change = (token: string, ops: unknown[], authority?: unknown) => call(token === admin ? '/api/change' : '/agent/change', token, { reason: 'x', ops, authority });
   const made = (await change(admin, [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Paint the fence', visibility: 'shared' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'Paint the fence again', visibility: 'shared' },
-    { op: 'create', ref: 'd', type: 'work.decision', title: 'Which colour?', visibility: 'shared' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Paint the fence', visibility: 'shared' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Paint the fence again', visibility: 'shared' },
+    { op: 'create', ref: 'd', type: 'decision', title: 'Which colour?', visibility: 'shared' },
   ])).result.created;
 
   assert.equal((await call('/api/workspace_info', admin)).result.agent_changes, 'hold', 'held unless the workspace says otherwise');
-  assert.equal((await change(robot, [{ op: 'create', type: 'work.note', title: 'One', visibility: 'shared' }])).result.status, 'proposed');
+  assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'One', visibility: 'shared' }])).result.status, 'proposed');
   assert.match((await call('/api/workspace_set', member, { agent_changes: 'apply' })).error, /admin/);
   assert.match((await call('/agent/workspace_set', robot, { agent_changes: 'apply' })).error, /humans only/, 'an agent cannot let itself through');
 
   assert.equal((await call('/api/workspace_set', admin, { agent_changes: 'apply' })).result.agent_changes, 'apply');
-  const applied = (await change(robot, [{ op: 'create', type: 'work.note', title: 'Two', visibility: 'shared' }])).result;
+  const applied = (await change(robot, [{ op: 'create', type: 'note', title: 'Two', visibility: 'shared' }])).result;
   assert.equal(applied.status, 'applied');
   assert.equal((await change(robot, [{ op: 'merge', keep: made.a, drop: made.b }])).result.status, 'applied', 'merging too');
   assert.equal((await change(robot, [{ op: 'archive', id: made.a }])).result.status, 'applied', 'and archiving');
@@ -172,10 +172,10 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const said = (await call('/agent/confirmed', robot, { upto: asked.to_confirm.upto, basis: 'Alex, in chat on 9 Oct: "yes, green"' })).result;
   assert.deepEqual([said.questions, said.left], [1, 0]);
   // What an agent settled on its own judgment comes first and is counted apart: it is what the owner has not seen.
-  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'work.decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
+  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
   await change(robot, [{ op: 'update', id: guessed.d, status: 'decided', props: { outcome: 'The wide one', rationale: 'It is the one we have.' } }], word);
   await change(robot, [{ op: 'update', id: guessed.h, status: 'refuted' }], { of: 'agent', basis: 'A month of photos' });
-  await change(robot, [{ op: 'create', type: 'work.note', title: 'Three', visibility: 'shared' }]);
+  await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }]);
   const sorted = await toConfirm();
   assert.deepEqual([sorted.to_confirm.on_agents_judgment, sorted.to_confirm.on_owners_word, sorted.items.map((q: any) => q.title)], [1, 1, ['Green fades', 'Which brush?']]);  const relayed = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).find((e) => e.action === 'questions.confirmed');
   assert.deepEqual(relayed.detail.authority, { of: 'human', basis: 'Alex, in chat on 9 Oct: "yes, green"', stated_by: 'agent:robot/script' });
@@ -183,14 +183,14 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const byRobot = (await call('/agent/events', robot, { by: 'agent:robot/script', limit: 50 })).result as any[];
   assert.ok(byRobot.length > 0 && byRobot.every((e) => e.actor === 'agent:robot/script'));
   assert.ok(((await call('/agent/events', robot, { before: byRobot[0].seq, limit: 50 })).result as any[]).every((e) => e.seq < byRobot[0].seq));
-  const guess = (await change(admin, [{ op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Green hides dirt', visibility: 'shared' }])).result.created.h;
+  const guess = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green hides dirt', visibility: 'shared' }])).result.created.h;
   assert.equal((await change(robot, [{ op: 'update', id: guess, status: 'supported' }], { of: 'agent', basis: 'Two weeks of photos' })).result.status, 'applied', 'and a hypothesis');
   // Every change says on whose authority it was made: the human's own, a human's word as an agent reports it, or the agent's judgment.
   const authorityOf = async (id: string) => ((await call('/api/events', admin, { target: id, limit: 1 })).result as any[])[0].detail.authority;
   assert.deepEqual(await authorityOf(made.d), onWord);
   assert.deepEqual(await authorityOf(guess), { of: 'agent', who: 'agent:robot/script', basis: 'Two weeks of photos' });
   assert.deepEqual(await authorityOf(applied.created['#1']), { of: 'agent', who: 'agent:robot/script' }, 'unsaid, it is the agent\u2019s own');
-  const mine = (await change(admin, [{ op: 'create', ref: 'n', type: 'work.note', title: 'Mine', visibility: 'shared' }], { of: 'agent' })).result.created.n;
+  const mine = (await change(admin, [{ op: 'create', ref: 'n', type: 'note', title: 'Mine', visibility: 'shared' }], { of: 'agent' })).result.created.n;
   assert.deepEqual([(await authorityOf(mine)).of, /alex/.test((await authorityOf(mine)).who)], ['human', true], 'a human\u2019s own change is theirs, whatever it claims');
 
   // What was applied is on the record, with who made it, and can be put back.
@@ -201,10 +201,10 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   assert.match((await call('/agent/seen', robot, { upto: logged[0].seq })).error, /humans only/);
   assert.equal((await call('/api/seen', admin, { upto: logged[0].seq })).result.seen_upto, logged[0].seq);
   const looked = ((await call('/api/events', admin, { limit: 5 })).result as any[]).find((e) => e.action === 'changes.seen');
-  assert.deepEqual([looked.detail.upto, /alex/.test(looked.actor), logged[0].target_type], [logged[0].seq, true, 'work.note']);
+  assert.deepEqual([looked.detail.upto, /alex/.test(looked.actor), logged[0].target_type], [logged[0].seq, true, 'note']);
 
   await call('/api/workspace_set', admin, { agent_changes: 'hold' });
-  assert.equal((await change(robot, [{ op: 'create', type: 'work.note', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
+  assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
   const [held] = (await call('/api/proposals', admin)).result as any[];
   const let_in = (await call('/api/decide', admin, { proposal: held.id, approve: true })).result;
   const by = (await authorityOf(Object.values(let_in.created)[0] as string)) as any;
@@ -218,8 +218,8 @@ test('a product\u2019s public page is open to anyone, and says nothing until som
   const made = await call('/api/change', undefined, {
     reason: 'x',
     ops: [
-      { op: 'create', ref: 'app', type: 'work.project', title: 'App', body: 'An internal note' },
-      { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
+      { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'An internal note' },
+      { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?' },
       { op: 'link', type: 'part_of', from: 'sun', to: 'app' },
     ],
   });

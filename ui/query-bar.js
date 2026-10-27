@@ -5,9 +5,12 @@
 // puts its words back in the box to be written again, the box takes a new term, and the walk and the limit have their
 // own controls. Every change is a new lens, handed to `go` (the canvas puts it in the address and draws it). The bar is
 // never wider than the screen: a filter whose chips do not fit is folded to one short line of what it finds, its
-// chips a click away (e_6p6eysty), and unfolded they scroll inside their part.
+// chips a click away (e_6p6eysty), and unfolded they scroll inside their part. The walk's link picker and the box's
+// types lead with what this canvas and its neighbourhood use (ui/picker-rank.js).
 
-import { api, h } from './base.js';
+import { api, h, state } from './base.js';
+import { numberOf } from './lens-base.js';
+import { ranked, around, uses } from './picker-rank.js';
 import { relations, titles, typeTitle, types } from './words.js';
 
 const bar = document.getElementById('query');
@@ -17,6 +20,34 @@ let words = '';
 let unfolded = false;
 /** Items the bar has asked the names of, so each is asked once. */
 const asking = new Set();
+/** What is used one step around the canvas, asked once for each lens (`key`), and the bar drawn last. */
+let near = { key: '', uses: null };
+let last = null;
+
+/**
+ * Ask what is used one step around what the canvas draws, and draw the bar again with it: once for each lens, so what
+ * the log brings to the canvas later is never a read of its own (the page is a replica, docs/canvas.md).
+ */
+function lookAround(lens, answer) {
+  const ids = answer.items.map((i) => i.id).slice(0, numberOf(state.style, 'picker_around_from'));
+  const key = JSON.stringify([lens.filter, lens.walk, lens.limit]);
+  if (!ids.length || key === near.key) return;
+  near = { key, uses: null };
+  const exclude = lens.filter.exclude;
+  api('view', { name: 'flat', params: { filter: { ids, ...(exclude && { exclude }) }, walk: { over: 'all', steps: 1 }, limit: numberOf(state.style, 'picker_around_most') } })
+    .then((wider) => near.key === key && ((near.uses = around(answer, wider)), last && drawQuery(...last)))
+    .catch(() => {});
+}
+
+/** Options grouped by where they are used, once anything is used here or around; else one plain list. */
+function grouped(list, option) {
+  if (!list.some((d) => d.near)) return list.map(option);
+  const group = (label, where) => {
+    const some = list.filter((d) => d.near === where);
+    return some.length > 0 && h('optgroup', { label }, some.map(option));
+  };
+  return [group('Here', 'here'), group('Around', 'around'), group('Other', undefined)];
+}
 
 const isId = (s) => /^e_[a-z0-9]{8}$/.test(s);
 /** A type by its id or its title, any case. */
@@ -117,7 +148,11 @@ function summary(f, redraw) {
 export function drawQuery(lens, view, go, lead, folded = false) {
   if (!bar) return;
   const redraw = () => drawQuery(lens, view, go, lead);
+  last = [lens, view, go, lead];
   const f = lens.filter;
+  const answer = view?.answer;
+  if (answer) lookAround(lens, answer);
+  const here = uses(answer?.items, answer?.links);
   const exclude = f.exclude ?? ['system'];
   const filled = (lens.filter.text || lens.filter.types?.length || lens.filter.ids?.length || lens.filter.links?.length);
   // A chip: its words, a click to write them again, an × to take it away. The last term the filter includes is not taken away: a lens includes something.
@@ -148,6 +183,10 @@ export function drawQuery(lens, view, go, lead, folded = false) {
     },
     oninput: (ev) => (ev.stopPropagation(), ev.target.classList.remove('wrong'), (ev.target.size = Math.max(ev.target.value.length, 1))),
   });
+  // The types the box offers as it is written in, those in use here first.
+  box.setAttribute('list', 'q-types');
+  const typeList = h('datalist', { id: 'q-types' },
+    ranked([...types.values()].filter((t) => !t.system && t.kind !== 'system'), here.types, near.uses?.types).map((t) => h('option', { value: t.title })));
   const { over, steps } = lens.walk ?? { over: [], steps: 0 };
   const walked = over === 'all' ? [] : over;
   const walk = (change) => go({ ...lens, walk: { over, steps, ...change } });
@@ -156,9 +195,8 @@ export function drawQuery(lens, view, go, lead, folded = false) {
     { class: 'q-add', title: 'Walk along one more link', 'aria-label': 'Walk along one more link', onchange: (ev) => ev.target.value && walk(ev.target.value === 'all' ? { over: 'all', steps: steps || 1 } : { over: [...walked, ev.target.value], steps: steps || 1 }) },
     h('option', { value: '' }, '+'),
     over !== 'all' && h('option', { value: 'all' }, 'every link'),
-    [...relations.values()].filter((r) => !r.id.startsWith('sys.') && !walked.includes(r.id)).map((r) => h('option', { value: r.id }, r.title ?? r.id)),
+    grouped(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.') && !walked.includes(r.id)), here.links, near.uses?.links), (r) => h('option', { value: r.id }, r.title ?? r.id)),
   );
-  const answer = view?.answer;
   const fold = (open) => ((unfolded = open), redraw());
   const terms = [
       f.text && chip('q-text', `“${f.text}”`, 'Words it finds', 'text', f.text, f.text),
@@ -177,6 +215,7 @@ export function drawQuery(lens, view, go, lead, folded = false) {
   const said = summary(f, redraw);
   bar.replaceChildren(
     lead ?? '',
+    typeList,
     folded
       ? h('span', { class: 'q-part q-filter', title: 'The filter: what it finds is drawn, and what is left out is left out of everything' },
           h('button', { type: 'button', class: 'q-sum', title: `${said}: show each term`, onclick: () => fold(true) }, said || 'The filter'),

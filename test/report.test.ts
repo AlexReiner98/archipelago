@@ -60,9 +60,9 @@ test('a monitor’s report takes a component down and back up, logged with what 
     (await l.change(owner, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'llm', type: 'software.component', title: 'LiteLLM', status: 'up', props: { url: 'http://litellm:4000/health/liveliness' } },
-        { op: 'create', ref: 'pg', type: 'software.component', title: 'Postgres 17', status: 'up' },
-        { op: 'create', ref: 'green', type: 'software.component', title: 'App, green', status: 'planned', props: { url: 'http://app-green:3100/health' } },
+        { op: 'create', ref: 'llm', type: 'component', title: 'LiteLLM', status: 'up', props: { url: 'http://litellm:4000/health/liveliness' } },
+        { op: 'create', ref: 'pg', type: 'component', title: 'Postgres 17', status: 'up' },
+        { op: 'create', ref: 'green', type: 'component', title: 'App, green', status: 'planned', props: { url: 'http://app-green:3100/health' } },
       ],
     })) as { created: Record<string, string> }
   ).created;

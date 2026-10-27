@@ -34,21 +34,21 @@ export async function make(l: Archipelago, ops: Op[]) {
 /** A project in a repo, with one task that needs the live lane and one that does not. */
 export async function laneSetup(l: Archipelago) {
   return make(l, [
-    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
-    { op: 'create', ref: 'proj', type: 'work.project', title: 'Apex' },
+    { op: 'create', ref: 'repo', type: 'repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
+    { op: 'create', ref: 'proj', type: 'project', title: 'Apex' },
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
-    { op: 'create', ref: 'rule', type: 'work.decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives the CAD app.' } },
-    { op: 'create', ref: 'live', type: 'work.task', title: 'Capture probe' },
-    { op: 'create', ref: 'offline', type: 'work.task', title: 'Write unit tests' },
-    { op: 'create', ref: 'q', type: 'work.decision', title: 'Which target?' },
-    { op: 'create', ref: 'gated', type: 'work.task', title: 'Tune the solver' },
-    { op: 'link', type: 'software.lives_in', from: 'proj', to: 'repo' },
+    { op: 'create', ref: 'rule', type: 'decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives the CAD app.' } },
+    { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
+    { op: 'create', ref: 'offline', type: 'task', title: 'Write unit tests' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Which target?' },
+    { op: 'create', ref: 'gated', type: 'task', title: 'Tune the solver' },
+    { op: 'link', type: 'lives_in', from: 'proj', to: 'repo' },
     { op: 'link', type: 'part_of', from: 'live', to: 'proj' },
     { op: 'link', type: 'part_of', from: 'offline', to: 'proj' },
     { op: 'link', type: 'part_of', from: 'gated', to: 'proj' },
     { op: 'link', type: 'depends_on', from: 'gated', to: 'q' },
     { op: 'link', type: 'needs', from: 'live', to: 'lane' },
-    { op: 'link', type: 'work.governed_by', from: 'lane', to: 'rule' },
+    { op: 'link', type: 'governed_by', from: 'lane', to: 'rule' },
   ]);
 }
 

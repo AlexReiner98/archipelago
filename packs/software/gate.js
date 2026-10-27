@@ -9,7 +9,7 @@ import { proof } from './proof.js';
 import { isA } from './repo.js';
 
 /** What holds work together: what the roadmap starts from or is made of (its tree in pack.json). */
-const CONTAINERS = ['work.project', 'software.feature'];
+const CONTAINERS = ['project', 'feature'];
 const container = (e) => CONTAINERS.some((t) => isA(e, t));
 const slim = (e) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
 /** A feature that is built is ready for a release, though it stays open until it ships. */

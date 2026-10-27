@@ -6,7 +6,8 @@
   "requires": ["core", "work"],
   "types": [
     {
-      "id": "software.application",
+      "id": "application",
+      "moved_from": ["software.application"],
       "extends": "place",
       "title": "Application",
       "description": "A software application the work uses or targets, such as a CAD program or a browser.",
@@ -14,7 +15,8 @@
       "fields": { "version": { "type": "string" } }
     },
     {
-      "id": "software.repo",
+      "id": "repo",
+      "moved_from": ["software.repo"],
       "capabilities": { "where": { "address": "remote", "folder": "path" } },
       "extends": "place",
       "title": "Repository",
@@ -27,7 +29,8 @@
       }
     },
     {
-      "id": "software.feature",
+      "id": "feature",
+      "moved_from": ["software.feature"],
       "altitude": "stream",
       "public": true,
       "capabilities": { "where": { "link": "lives_in" } },
@@ -42,14 +45,16 @@
       }
     },
     {
-      "id": "software.bug",
-      "extends": "work.issue",
+      "id": "bug",
+      "moved_from": ["software.bug"],
+      "extends": "issue",
       "title": "Bug",
       "description": "A defect in software.",
       "fields": { "repro": { "type": "string", "description": "How to reproduce it." } }
     },
     {
-      "id": "software.release",
+      "id": "release",
+      "moved_from": ["software.release"],
       "altitude": "stream",
       "public": true,
       "extends": "event",
@@ -59,7 +64,8 @@
       "fields": { "version": { "type": "string" }, "tag": { "type": "string" } }
     },
     {
-      "id": "software.proof",
+      "id": "proof",
+      "moved_from": ["software.proof"],
       "public": true,
       "extends": "question",
       "title": "Proof",
@@ -67,10 +73,11 @@
       "statuses": { "open": ["open"], "closed": ["retired"] }
     },
     {
-      "id": "software.test",
+      "id": "test",
+      "moved_from": ["software.test"],
       "public": true,
-      "belongs_with": [{ "relation": "software.answers", "direction": "out" }],
-      "extends": "work.procedure",
+      "belongs_with": [{ "relation": "answers", "direction": "out" }],
+      "extends": "procedure",
       "title": "Test",
       "description": "One check that helps answer a proof question. A draft is a test that is wanted and not yet written. What it found is kept per build, as test results.",
       "fields": {
@@ -82,7 +89,8 @@
       }
     },
     {
-      "id": "software.rule",
+      "id": "rule",
+      "moved_from": ["software.rule"],
       "extends": "record",
       "title": "Rule",
       "description": "A rule a pack keeps as data: when a change applies, waits for a person or is refused, or what a reply is asked. Read in from the pack file by npm run principles, never typed; it serves the principles it upholds.",
@@ -96,7 +104,8 @@
       }
     },
     {
-      "id": "software.action",
+      "id": "action",
+      "moved_from": ["software.action"],
       "extends": "record",
       "title": "Agent action",
       "description": "One thing an agent can do, called under one of the six verbs: the kernel's own or a pack's. Read in from the code by npm run principles, never typed; it serves the principles it upholds.",
@@ -109,7 +118,8 @@
       }
     },
     {
-      "id": "software.test_result",
+      "id": "test_result",
+      "moved_from": ["software.test_result"],
       "public": true,
       "belongs_with": [{ "relation": "produced", "direction": "in" }],
       "extends": "record",
@@ -126,7 +136,8 @@
       }
     },
     {
-      "id": "software.commit",
+      "id": "commit",
+      "moved_from": ["software.commit"],
       "extends": "record",
       "capabilities": { "accounts": { "field": "sha", "accounted": "accounted" } },
       "title": "Commit",
@@ -137,7 +148,8 @@
       }
     },
     {
-      "id": "software.pull_request",
+      "id": "pull_request",
+      "moved_from": ["software.pull_request"],
       "extends": "work",
       "title": "Pull request",
       "description": "A proposed code change.",
@@ -145,7 +157,8 @@
       "fields": { "url": { "type": "url" }, "branch": { "type": "string" } }
     },
     {
-      "id": "software.environment",
+      "id": "environment",
+      "moved_from": ["software.environment"],
       "extends": "place",
       "title": "Environment",
       "description": "Somewhere software runs: a machine, a VM, staging, production.",
@@ -153,12 +166,13 @@
       "fields": { "host": { "type": "string" } }
     },
     {
-      "id": "software.component",
+      "id": "component",
+      "moved_from": ["software.component"],
       "altitude": "stream",
       "capabilities": { "watch": { "field": "url", "up": "up", "down": "down", "also": ["degraded"], "idle": "standby", "commit": "commit" } },
       "extends": "place",
       "title": "Component",
-      "description": "A part of a running system: a service, a store, a proxy, a model endpoint, a client. Part of the environment it runs in; it calls (software.calls) what it sends to, the link's says naming how (HTTPS, SQL) and its state saying whether it is wired, planned or broken. Its status is its health, kept true as it is wired up and watched: standby is built but stopped on purpose (the idle colour of a blue-green pair), which monitors leave alone. Drawn by the architecture shape.",
+      "description": "A part of a running system: a service, a store, a proxy, a model endpoint, a client. Part of the environment it runs in; it calls (calls) what it sends to, the link's says naming how (HTTPS, SQL) and its state saying whether it is wired, planned or broken. Its status is its health, kept true as it is wired up and watched: standby is built but stopped on purpose (the idle colour of a blue-green pair), which monitors leave alone. Drawn by the architecture shape.",
       "statuses": { "open": ["planned", "wiring", "up", "standby", "degraded", "down"], "closed": ["retired"] },
       "fields": {
         "role": { "type": "enum", "values": ["client", "edge", "app", "data", "storage", "model", "monitor", "network", "tool", "service"], "shown": true, "description": "What it does in the system. data and storage are drawn as a cylinder, client as a pill." },
@@ -169,10 +183,11 @@
       }
     },
     {
-      "id": "software.part",
+      "id": "part",
+      "moved_from": ["software.part"],
       "extends": "place",
       "title": "Part",
-      "description": "A part of a mechanism: a rule, a hook, a tool, a step of how something works. Its status says whether it does its job (sketched, works, partly, broken), not whether it answers: what runs and is watched is a component. Part of the mechanism or place it belongs to; it calls (software.calls) what it hands on to. Drawn by the same shapes as a component.",
+      "description": "A part of a mechanism: a rule, a hook, a tool, a step of how something works. Its status says whether it does its job (sketched, works, partly, broken), not whether it answers: what runs and is watched is a component. Part of the mechanism or place it belongs to; it calls (calls) what it hands on to. Drawn by the same shapes as a component.",
       "statuses": { "open": ["sketched", "works", "partly", "broken"], "closed": ["retired"] },
       "fields": {
         "role": { "type": "enum", "values": ["client", "edge", "app", "data", "storage", "model", "monitor", "network", "tool", "service"], "shown": true, "description": "What it does in the mechanism, as a component's role: data and storage are drawn as a cylinder, client as a pill." },
@@ -180,15 +195,17 @@
       }
     },
     {
-      "id": "software.spec",
-      "extends": "work.file",
+      "id": "spec",
+      "moved_from": ["software.spec"],
+      "extends": "file",
       "title": "Spec",
       "description": "A design or requirements document.",
       "deliverable": false
     },
     {
-      "id": "software.handoff",
-      "extends": "work.note",
+      "id": "handoff",
+      "moved_from": ["software.handoff"],
+      "extends": "note",
       "title": "Handoff",
       "description": "Where a working session left things for the next one.",
       "note_max": {
@@ -197,8 +214,9 @@
       }
     },
     {
-      "id": "software.diagram",
-      "extends": "work.file",
+      "id": "diagram",
+      "moved_from": ["software.diagram"],
+      "extends": "file",
       "title": "Diagram",
       "deliverable": false,
       "description": "One page of a diagram made from the code (npm run diagrams), kept as data its page draws: boxes, areas and the wires between them, at the commit it was made from.",
@@ -213,42 +231,27 @@
       "on": "reply_ended",
       "when": { "reply": { "unaccounted": true } },
       "then": "ask",
-      "say": "This reply made commits the map does not account for. In one change: a software.commit (full sha) each, a software.settles link per item it settles, or none; one heard from a push: accounted true.",
-      "record": { "type": "software.commit", "field": "sha" },
+      "say": "This reply made commits the map does not account for. In one change: a commit (full sha) each, a settles link per item it settles, or none; one heard from a push: accounted true.",
+      "record": { "type": "commit", "field": "sha" },
       "lifted": "reply_account_commits"
     }
   ],
   "links": [
+    
     {
-      "id": "software.lives_in",
-      "extends": "lives_in",
-      "title": "lives in",
-      "inverse": "hosts",
-      "from": ["*"],
-      "to": ["software.repo"],
-      "description": "The repository that holds the work."
-    },
-    {
-      "id": "software.uses",
-      "extends": "relates_to",
-      "title": "uses",
-      "inverse": "is used by",
-      "from": ["*"],
-      "to": ["software.application"],
-      "description": "An application the work depends on or targets."
-    },
-    {
-      "id": "software.answers",
+      "id": "answers",
+      "moved_from": ["software.answers"],
       "extends": "bears_on",
       "title": "helps answer",
       "inverse": "is answered by",
-      "from": ["software.test"],
-      "to": ["software.proof"],
+      "from": ["test"],
+      "to": ["proof"],
       "description": "The test is part of how we know. A proof question is answered on a build when every test that helps answer it passed there."
     },
     {
-      "id": "software.calls",
-      "extends": "relates_to",
+      "id": "calls",
+      "moved_from": ["software.calls"],
+      "extends": "uses",
       "title": "calls",
       "inverse": "is called by",
       "from": ["*"],
@@ -256,20 +259,12 @@
       "description": "A wire of a running system: the one part sends to the other (a request, a query, a backup). It blocks nothing. props.says names how (HTTPS, SQL); props.state is wired, planned or broken, and left out it is read from the health of the two ends."
     },
     {
-      "id": "software.ships",
-      "extends": "ships",
-      "title": "ships",
-      "inverse": "ships in",
-      "from": ["software.release"],
-      "to": ["*"],
-      "description": "What a release contains."
-    },
-    {
-      "id": "software.settles",
-      "extends": "relates_to",
+      "id": "settles",
+      "moved_from": ["software.settles"],
+      "extends": "about",
       "title": "settles",
       "inverse": "is settled by",
-      "from": ["software.commit"],
+      "from": ["commit"],
       "to": ["*"],
       "description": "The commit finished or changed this item: a task it did, a bug it fixed, a decision it carried out."
     }
@@ -280,7 +275,7 @@
       "id": "software.unaccounted",
       "reason": "unaccounted",
       "description": "Pushed, and nobody has said what it settles: account for it with its settles links, and accounted true.",
-      "of": "software.commit",
+      "of": "commit",
       "where": { "accounted": false },
       "joins": "waits_on",
       "mark": "not accounted for",
@@ -334,7 +329,7 @@
       "id": "software.proof",
       "shape": "data",
       "limit_ms": 30000,
-      "description": "How we know the software is correct: the proof questions of a product (a project or feature; a question is a software.proof that is part of it or about it), each with the tests that help answer it and what every test found on one build, with its picture. A question is answered on a build when all its tests passed there. Params: of (an entity id; without it, the projects that have proof questions), build (a version or commit; without it, the build last reported).",
+      "description": "How we know the software is correct: the proof questions of a product (a project or feature; a question is a proof that is part of it or about it), each with the tests that help answer it and what every test found on one build, with its picture. A question is answered on a build when all its tests passed there. Params: of (an entity id; without it, the projects that have proof questions), build (a version or commit; without it, the build last reported).",
       "input": {
         "type": "object",
         "properties": { "of": { "type": "string", "description": "A project or feature; without it, the projects that have proof questions." }, "build": { "type": "string", "description": "A version or commit; without it, the build last reported." }, "within": { "type": "array", "items": { "type": "string" }, "description": "In place of of: only these items and what is part of them (a gate's stake, a public page's items)." }, "full": { "type": "boolean", "description": "true for the answer whole, as the screen has it." } },
@@ -369,9 +364,9 @@
       "id": "software.roadmap",
       "title": "Roadmap",
       "description": "A project's features in the order they are to be built, the work under each, and where work is happening now.",
-      "roots": ["work.project"],
-      "branches": ["software.feature"],
-      "work": ["work.task", "work.issue"],
+      "roots": ["project"],
+      "branches": ["feature"],
+      "work": ["task", "issue"],
       "order": "order",
       "active": ["building", "doing"]
     },
@@ -380,26 +375,26 @@
       "id": "software.releases",
       "title": "Releases",
       "at": "home",
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "types": ["software.release"], "exclude": ["closed", "system"] } }, "style": { "shape": "list" } }]
+      "pieces": [{ "piece": "picture", "lens": { "filter": { "types": ["release"], "exclude": ["closed", "system"] } }, "style": { "shape": "list" } }]
     },
     { "form": "screen", "id": "software.gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
     {
       "form": "screen",
       "id": "software.roadmap",
       "title": "Roadmap",
-      "on": ["work.project"],
+      "on": ["project"],
       "pieces": [{ "piece": "tree", "tree": "software.roadmap" }]
     },
     {
       "form": "screen",
       "id": "software.proof",
       "title": "How we know",
-      "on": ["work.project", "software.feature", "software.proof"],
+      "on": ["project", "feature", "proof"],
       "pieces": [{ "piece": "proof" }]
     },
-    { "form": "screen", "id": "software.usage", "title": "Tokens used here", "on": ["software.repo"], "pieces": [{ "piece": "usage" }] },
-    { "form": "screen", "id": "software.drawn", "title": "What it drew", "on": ["software.test_result"], "pieces": [{ "piece": "figure" }] },
-    { "form": "screen", "id": "software.diagram", "title": "The diagram", "on": ["software.diagram"], "pieces": [{ "piece": "diagram" }] }
+    { "form": "screen", "id": "software.usage", "title": "Tokens used here", "on": ["repo"], "pieces": [{ "piece": "usage" }] },
+    { "form": "screen", "id": "software.drawn", "title": "What it drew", "on": ["test_result"], "pieces": [{ "piece": "figure" }] },
+    { "form": "screen", "id": "software.diagram", "title": "The diagram", "on": ["diagram"], "pieces": [{ "piece": "diagram" }] }
   ],
   "actions": [
     {
@@ -407,7 +402,7 @@
       "title": "Report a test run",
       "verb": "report",
       "limit_ms": 10000,
-      "description": "Say what a test run found on one build. Each result names its test by id or by its entrypoint (the name the harness knows it by) and says whether it passed, with the measured value, where the evidence is and the picture the test drew. One result is kept per test per build: reported again, it is replaced, and the pictures kept for that test's results are removed. Where a test answers a public question, the answer names the pictures to send now (answer.send_pictures: each with picture_put). A test the map does not know is named in the answer (answer.unknown) and nothing is made for it: create the software.test first and link it to the proof question it helps answer. Called as test_report.",
+      "description": "Say what a test run found on one build. Each result names its test by id or by its entrypoint (the name the harness knows it by) and says whether it passed, with the measured value, where the evidence is and the picture the test drew. One result is kept per test per build: reported again, it is replaced, and the pictures kept for that test's results are removed. Where a test answers a public question, the answer names the pictures to send now (answer.send_pictures: each with picture_put). A test the map does not know is named in the answer (answer.unknown) and nothing is made for it: create the test first and link it to the proof question it helps answer. Called as test_report.",
       "input": {
         "type": "object",
         "properties": { "build": { "type": "string", "minLength": 1, "description": "The version or commit the tests ran on." }, "results": { "type": "array", "minItems": 1, "items": { "type": "object", "properties": { "test": { "type": "string", "description": "The test: its id, or its entrypoint." }, "passed": { "type": "boolean" }, "value": { "type": "string", "description": "The headline number or outcome, e.g. \"0.004 degrees\"." }, "evidence": { "type": "string", "description": "Where the proof is: a path, URL or commit." }, "picture": { "type": "string", "description": "Where the picture the test drew is: a path in the repository, under its .proof folder (which git ignores), e.g. \".proof/1.0.0/Sun.MatchesNoaa.png\". The file is not sent here." } }, "required": ["test", "passed"], "additionalProperties": false } }, "link": { "type": "string", "description": "Where the run can be looked at." } },

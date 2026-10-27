@@ -14,9 +14,9 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'a', type: 'work.task', title: 'First step' },
-      { op: 'create', ref: 'b', type: 'work.task', title: 'Second step' },
-      { op: 'create', ref: 'd', type: 'work.task', title: 'Elsewhere' },
+      { op: 'create', ref: 'a', type: 'task', title: 'First step' },
+      { op: 'create', ref: 'b', type: 'task', title: 'Second step' },
+      { op: 'create', ref: 'd', type: 'task', title: 'Elsewhere' },
       { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
     ],
   })).result.created as Record<string, string>;
@@ -44,7 +44,7 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
     assert.ok(await until(drawn('Renamed step')), `the new title is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
     assert.equal(await page.evaluate('window.flatReads'), 0, 'drawn from the facts, with no lens read');
     // An item made in the same change as its link to what is drawn comes with the facts: still no lens read.
-    await agentChange([{ op: 'create', ref: 'c', type: 'work.task', title: 'Third step' }, { op: 'link', type: 'depends_on', from: 'c', to: made.a }]);
+    await agentChange([{ op: 'create', ref: 'c', type: 'task', title: 'Third step' }, { op: 'link', type: 'depends_on', from: 'c', to: made.a }]);
     assert.ok(await until(drawn('Third step')), `a new item linked in is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
     assert.equal(await page.evaluate('window.flatReads'), 0, 'what came with its link needs no lens read');
     // A link to an item that was there all along, not held: the lens is read again, and the walk reaches it.

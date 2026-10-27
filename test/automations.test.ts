@@ -14,7 +14,7 @@ const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<stri
 
 test('an agent can notify the human; a stale session raises one notification', async () => {
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 't', type: 'work.task', title: 'Ship it' }]);
+  const made = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Ship it' }]);
   await callTool(l, agent, 'notify', { title: 'Blocked on a certificate', level: 'warning', about: made.t });
   assert.equal((await l.proposals()).length, 0);
   let unread = (await VIEWS.notifications.run(l, {})) as any[];
@@ -59,25 +59,25 @@ test('an agent can notify the human; a stale session raises one notification', a
 test('automations fire on a schedule and on events, are logged, and cannot trigger each other', async () => {
   const l = await fresh();
   await assert.rejects(
-    make(l, [{ op: 'create', type: 'sys.automation', title: 'Half-made', status: 'enabled', props: { trigger: 'every', action: 'tool', tool: 'decide' } }]),
+    make(l, [{ op: 'create', type: 'automation', title: 'Half-made', status: 'enabled', props: { trigger: 'every', action: 'tool', tool: 'decide' } }]),
     /needs every_minutes[\s\S]*tool to be one of: check_connections, import_audit/,
   );
   // An agent can only propose one.
-  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'sys.automation', title: 'Sneaky', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'notify' } }] });
+  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'automation', title: 'Sneaky', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'notify' } }] });
   assert.equal(proposed.status, 'proposed');
 
   const made = await make(l, [
-    { op: 'create', ref: 'hourly', type: 'sys.automation', title: 'Check connections', status: 'enabled', props: { trigger: 'every', every_minutes: 60, action: 'tool', tool: 'check_connections' } },
-    { op: 'create', ref: 'morning', type: 'sys.automation', title: 'Morning nudge', status: 'enabled', props: { trigger: 'daily', at: '09:00', action: 'notify', message: 'Review the map' } },
-    { op: 'create', ref: 'review', type: 'sys.automation', title: 'New proposal', status: 'enabled', props: { trigger: 'event', on_action: 'proposal.create', action: 'notify', message: 'Proposal from {actor}: {reason}', level: 'warning' } },
-    { op: 'create', ref: 'any', type: 'sys.automation', title: 'Everything', status: 'paused', props: { trigger: 'event', on_action: 'entity.*', action: 'notify' } },
+    { op: 'create', ref: 'hourly', type: 'automation', title: 'Check connections', status: 'enabled', props: { trigger: 'every', every_minutes: 60, action: 'tool', tool: 'check_connections' } },
+    { op: 'create', ref: 'morning', type: 'automation', title: 'Morning nudge', status: 'enabled', props: { trigger: 'daily', at: '09:00', action: 'notify', message: 'Review the map' } },
+    { op: 'create', ref: 'review', type: 'automation', title: 'New proposal', status: 'enabled', props: { trigger: 'event', on_action: 'proposal.create', action: 'notify', message: 'Proposal from {actor}: {reason}', level: 'warning' } },
+    { op: 'create', ref: 'any', type: 'automation', title: 'Everything', status: 'paused', props: { trigger: 'event', on_action: 'entity.*', action: 'notify' } },
   ]);
   // Nor where agents' other changes are applied as made: an automation acts later with a human's authority, so
   // making one, changing one or bringing one back waits for the human.
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', archive: 'auto', restore: 'auto', link: 'auto' });
   const launches = { trigger: 'every', every_minutes: 1, action: 'launch', input: { task: made.hourly, mode: 'acceptEdits', instructions: 'anything' } };
-  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'An ordinary thing' }] })).status, 'applied');
-  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'sys.automation', title: 'Launches', status: 'enabled', props: launches }] })).status, 'proposed');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'An ordinary thing' }] })).status, 'applied');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'automation', title: 'Launches', status: 'enabled', props: launches }] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.morning, props: launches }] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.any, status: 'enabled' }] })).status, 'proposed');
   const autos = new Automations(l);
@@ -90,7 +90,7 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   assert.deepEqual(await fired(at(9, 30)), [], 'daily fires once a day');
   assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 0)), [made.hourly, made.morning].sort());
 
-  await l.change(agent, { reason: 'Found a bug', ops: [{ op: 'create', type: 'software.bug', title: 'Crash' }] });
+  await l.change(agent, { reason: 'Found a bug', ops: [{ op: 'create', type: 'bug', title: 'Crash' }] });
   assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 5)), [made.review]);
   const unread = (await VIEWS.notifications.run(l, {})) as any[];
   assert.ok(unread.some((n) => n.title === 'Proposal from agent:test: Found a bug' && n.level === 'warning'));
@@ -113,7 +113,7 @@ test('a note is added to, or one passage of it replaced, without sending it agai
   const { undo } = await import('../src/undo.ts');
   const l = await fresh();
   const note = 'Seen\n- once, on Monday.\n\nWhat would help\nA smaller answer.';
-  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'work.task', title: 'Trim the answer', body: note }]);
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Trim the answer', body: note }]);
   const body = async () => (await l.entity(t))!.body;
 
   const added = await l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, status: 'done', append: 'Outcome\nTrimmed to a tenth.\n' }] });
@@ -159,8 +159,8 @@ test('a note is added to, or one passage of it replaced, without sending it agai
 test('a refused change is kept and corrected by its one wrong op; history says a change set’s reason once', async () => {
   const l = await fresh();
   const ops = [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Draw the plan' },
-    { op: 'create', ref: 'b', type: 'work.issue', title: 'The plan is drawn twice', props: { repro: 'Open it twice' } },
+    { op: 'create', ref: 'a', type: 'task', title: 'Draw the plan' },
+    { op: 'create', ref: 'b', type: 'issue', title: 'The plan is drawn twice', props: { repro: 'Open it twice' } },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
   ];
   // The refusal names the flavour that has the field, and the name the change is kept under.
@@ -168,17 +168,17 @@ test('a refused change is kept and corrected by its one wrong op; history says a
     () => assert.fail('an issue has no repro'),
     (e: Error) => e.message,
   );
-  assert.match(said, /op 2 \(create\): work\.issue has no field "repro".*software\.bug, a flavour of work\.issue, has it/);
+  assert.match(said, /op 2 \(create\): issue has no field "repro".*bug, a flavour of issue, has it/);
   const name = /kept for 10 minutes as "(k_\w+)"/.exec(said)![1];
   // A fix that is wrong again is refused again, under the same name.
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], title: 'x'.repeat(61) } }] }), new RegExp(`the title is 61 characters[^]*as "${name}"`));
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 9, op: null }] }), /no op 9/);
   // The name finds it, whatever the session calls itself this time.
-  const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'software.bug' } }] })) as any;
+  const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'bug' } }] })) as any;
   assert.equal(sent.status, 'proposed');
   const held = (await l.proposals()).at(-1)!;
   assert.equal(held.reason, 'A plan to draw');
-  assert.deepEqual(held.ops.map((o: any) => o.type), ['work.task', 'software.bug', 'depends_on']);
+  assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'bug', 'depends_on']);
   // Once it has gone through it is no longer kept; nor is it anyone else's to send.
   await assert.rejects(callTool(l, agent, 'change', { retry: name }), /No refused change is kept/);
   await assert.rejects(callTool(l, agent, 'change', { reason: 'nothing' }), /needs ops/);
@@ -186,8 +186,8 @@ test('a refused change is kept and corrected by its one wrong op; history says a
   // What changed since: one change set says its reason and authority on the first of its events, and long notes are cut.
   const long = 'A long note. '.repeat(100);
   const made = await make(l, [
-    { op: 'create', ref: 'x', type: 'work.task', title: 'First', body: long },
-    { op: 'create', ref: 'y', type: 'work.task', title: 'Second' },
+    { op: 'create', ref: 'x', type: 'task', title: 'First', body: long },
+    { op: 'create', ref: 'y', type: 'task', title: 'Second' },
   ]);
   await make(l, [{ op: 'update', id: made.x, body: `${long}More.` }]);
   const since = { name: 'changed_since', params: { since: '2000-01-01' } };
@@ -204,15 +204,15 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   const { undo } = await import('../src/undo.ts');
   const l = await fresh();
   const base = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
-    { op: 'create', ref: 'old', type: 'work.task', title: 'Old task', body: 'x'.repeat(500), props: { priority: 'low' } },
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'old', type: 'task', title: 'Old task', body: 'x'.repeat(500), props: { priority: 'low' } },
     { op: 'link', type: 'part_of', from: 'old', to: 'p' },
   ]);
   const rel = (await l.get(base.old)).outgoing[0] as any;
   const second = await l.change(human, {
     reason: 'Reshuffle',
     ops: [
-      { op: 'create', ref: 'n', type: 'work.task', title: 'New task' },
+      { op: 'create', ref: 'n', type: 'task', title: 'New task' },
       { op: 'link', type: 'part_of', from: 'n', to: base.p },
       { op: 'update', id: base.old, status: 'doing', body: 'short', props: { priority: 'high', due: '2026-12-01' } },
       { op: 'unlink', relation: rel.relation },
@@ -233,7 +233,7 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   assert.deepEqual([old.status, old.body.length, old.props.priority, old.props.due], ['todo', 500, 'urgent', undefined], 'long text comes back whole');
   assert.equal((await l.entity(base.p))!.archived_at, null, 'the archived project is restored');
   assert.deepEqual((await l.get(base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
-  assert.deepEqual((await l.search({ type: 'work.task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
+  assert.deepEqual((await l.search({ type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
 
   await assert.rejects(undo(l, human, { changeset: set }), /already been undone/);
   await assert.rejects(undo(l, human, { changeset: 'c_nope' }), /No change set/);
@@ -245,12 +245,12 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
 test('the graph view returns a preset of the whole map, or one entity\'s neighbourhood', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'software.bug', title: 'B' },
-    { op: 'create', ref: 'c', type: 'work.task', title: 'C', status: 'done' },
-    { op: 'create', ref: 'lonely', type: 'work.note', title: 'Lonely' },
-    { op: 'create', ref: 'far', type: 'work.task', title: 'Far' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'bug', title: 'B' },
+    { op: 'create', ref: 'c', type: 'task', title: 'C', status: 'done' },
+    { op: 'create', ref: 'lonely', type: 'note', title: 'Lonely' },
+    { op: 'create', ref: 'far', type: 'task', title: 'Far' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'far', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
@@ -262,8 +262,8 @@ test('the graph view returns a preset of the whole map, or one entity\'s neighbo
   assert.deepEqual(titles(blocking), ['A', 'B'], 'only what blocking relations connect; finished work left out');
   assert.deepEqual(blocking.edges.map((e: any) => e.type), ['depends_on']);
   const a = blocking.nodes.find((n: any) => n.title === 'A');
-  assert.deepEqual([a.blocked, a.root], [true, 'work.task']);
-  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'work.issue', 'a flavour reports its root type');
+  assert.deepEqual([a.blocked, a.root], [true, 'task']);
+  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'issue', 'a flavour reports its root type');
 
   assert.deepEqual(titles(await ask(l, 'graph', { relations: 'all', include_closed: true })), ['A', 'B', 'C', 'Far', 'Proj']);
   assert.deepEqual(titles(await ask(l, 'graph', { focus: made.far, depth: 1 })), ['Far', 'Proj']);

@@ -44,11 +44,11 @@ test("the page's projector makes the server's rows from the log, row for row", a
   const l = await fresh();
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Replica' },
-    { op: 'create', ref: 'q', type: 'work.project', title: 'Elsewhere' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Project in the page', owner: me, body: 'Facts in, rows out.' },
-    { op: 'create', ref: 'u', type: 'work.task', title: 'Tail the log' },
-    { op: 'create', ref: 'd', type: 'work.decision', title: 'Keep the pulse?' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Replica' },
+    { op: 'create', ref: 'q', type: 'project', title: 'Elsewhere' },
+    { op: 'create', ref: 't', type: 'task', title: 'Project in the page', owner: me, body: 'Facts in, rows out.' },
+    { op: 'create', ref: 'u', type: 'task', title: 'Tail the log' },
+    { op: 'create', ref: 'd', type: 'decision', title: 'Keep the pulse?' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'link', type: 'part_of', from: 'u', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'u', to: 't', props: { why: 'needs it' } },
@@ -60,8 +60,8 @@ test("the page's projector makes the server's rows from the log, row for row", a
   const edit = (await l.change(human, { reason: 'Reshape', ops: [{ op: 'update', id: made.u, title: 'Tail it' }, { op: 'archive', id: made.u }] })) as { changeset: string };
   await undo(l, human, { changeset: edit.changeset });
   await make(l, [{ op: 'update', id: made.t, props: { tokens_estimated: null } }, { op: 'archive', id: made.q }]);
-  const gone = await make(l, [{ op: 'create', ref: 'g', type: 'work.task', title: 'Forgotten', owner: me }, { op: 'link', type: 'relates_to', from: 'g', to: made.t }]);
-  const kept = await make(l, [{ op: 'create', ref: 'k', type: 'work.task', title: 'Kept one' }, { op: 'link', type: 'relates_to', from: 'k', to: made.p }]);
+  const gone = await make(l, [{ op: 'create', ref: 'g', type: 'task', title: 'Forgotten', owner: me }, { op: 'link', type: 'link', from: 'g', to: made.t }]);
+  const kept = await make(l, [{ op: 'create', ref: 'k', type: 'task', title: 'Kept one' }, { op: 'link', type: 'link', from: 'k', to: made.p }]);
   await make(l, [{ op: 'merge', keep: made.t, drop: kept.k }]);
   await make(l, [{ op: 'forget', id: gone.g }]);
   const link = ((await l.get(made.t)).outgoing as { type: string; relation: string }[]).find((o) => o.type === 'part_of')!;
@@ -85,18 +85,18 @@ test('the facts after a position are read only on what is held, as the viewer ma
   const l = await fresh();
   const people = await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }, { op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Held' },
-    { op: 'create', ref: 'q', type: 'work.project', title: 'Not held' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Held' },
+    { op: 'create', ref: 'q', type: 'project', title: 'Not held' },
   ]);
   const mine = l.as(people.me);
-  const shared = ((await mine.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'work.task', title: 'Shared, held', visibility: 'shared' }] })) as { created: Record<string, string> }).created.s;
+  const shared = ((await mine.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'task', title: 'Shared, held', visibility: 'shared' }] })) as { created: Record<string, string> }).created.s;
   const start = await headPos(l.db);
   await assert.rejects(factsAfter(l.db, { after: start, ids: [] }), /names the ids it holds/, 'a read that names nothing is refused');
   await assert.rejects(callTool(l, agent, 'tail', { after: start, ids: [made.p] }), /humans only/);
 
   // A task made under what is held comes with its link; a change to what is not held does not.
   const more = await make(l, [
-    { op: 'create', ref: 't', type: 'work.task', title: 'New under it' },
+    { op: 'create', ref: 't', type: 'task', title: 'New under it' },
     { op: 'link', type: 'part_of', from: 't', to: made.p },
     { op: 'update', id: made.q, title: 'Still not held' },
   ]);
@@ -123,9 +123,9 @@ test('the facts after a position are read only on what is held, as the viewer ma
 test("an agent's change reaches a store holding a flat lens's answer, with no lens read", async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Canvas' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Flat lens' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'Tags' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Canvas' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Flat lens' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Tags' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'b', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
@@ -146,7 +146,7 @@ test("an agent's change reaches a store holding a flat lens's answer, with no le
     reason: 'Rework the canvas',
     ops: [
       { op: 'update', id: made.a, title: 'A flat lens', status: 'doing' },
-      { op: 'create', ref: 'c', type: 'work.task', title: 'Replica' },
+      { op: 'create', ref: 'c', type: 'task', title: 'Replica' },
       { op: 'link', type: 'part_of', from: 'c', to: made.p },
     ],
   })) as { proposal: string };

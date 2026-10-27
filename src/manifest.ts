@@ -237,10 +237,11 @@ export const isServerPack = (m: Pick<Manifest, 'reach'>) => m.reach?.server !== 
  * (fields added to its types, links to them, screens, trees, actions, styles and rules on them), and the rest stays.
  * The manifest itself when nothing it uses is absent.
  */
-export function withoutAbsent(m: Manifest, active: (pack: string) => boolean): Manifest {
+export function withoutAbsent(m: Manifest, active: (pack: string) => boolean, declaredBy: (name: string) => string | undefined = () => undefined): Manifest {
   const absent = (m.uses ?? []).filter((u) => !active(u));
   if (!absent.length) return m;
-  const gone = (name: string) => absent.some((u) => name.startsWith(`${u}.`));
+  // A type or link type is named by what it is, so the pack that declares it says whose it is; a tree or view, its name.
+  const gone = (name: string) => absent.some((u) => declaredBy(name) === u || name.startsWith(`${u}.`));
   const keep = (names: string[] | undefined) => names?.filter((n) => !gone(n));
   // A list that named only what is gone leaves its registration with nothing to be on: it is left out too.
   const emptied = (before: string[] | undefined, after: string[] | undefined) => Boolean(before?.length) && !after?.length;

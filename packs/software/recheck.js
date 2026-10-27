@@ -32,7 +32,7 @@ async function recheckOf(ctx, project, now) {
  * lives here too is that project's, and is not listed twice.
  */
 async function projectsIn(ctx, repo) {
-  const living = (await ctx.read({ related: repo, relation: 'lives_in', direction: 'in', types: ['work.project', 'software.feature'], fields: ['recheck_days', 'rechecked_at'] })).filter((p) => p.is_open);
+  const living = (await ctx.read({ related: repo, relation: 'lives_in', direction: 'in', types: ['project', 'feature'], fields: ['recheck_days', 'rechecked_at'] })).filter((p) => p.is_open);
   const out = [];
   for (const p of living) {
     let there = false;
@@ -84,7 +84,7 @@ export async function recheck(input, ctx) {
  */
 export async function agentUsage(input, ctx) {
   const repo = await findRepo(ctx, input.repo, 'agent_usage');
-  const rows = await ctx.read({ related: repo.id, relation: 'lives_in', direction: 'in', types: ['sys.run'], newest: 'created', fields: ['tokens_used', 'surface', 'cost_usd', 'turns', 'link'] });
+  const rows = await ctx.read({ related: repo.id, relation: 'lives_in', direction: 'in', types: ['run'], newest: 'created', fields: ['tokens_used', 'surface', 'cost_usd', 'turns', 'link'] });
   const runs = rows
     .filter((e) => e.props.tokens_used != null)
     .map((e) => ({ id: e.id, title: e.title, status: e.status, surface: e.props.surface ?? 'unknown', tokens: Number(e.props.tokens_used ?? 0), cost_usd: e.props.cost_usd, turns: e.props.turns, link: e.props.link, at: e.created_at }));

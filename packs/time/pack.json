@@ -6,7 +6,8 @@
   "requires": ["core", "work"],
   "types": [
     {
-      "id": "time.entry",
+      "id": "time_entry",
+      "moved_from": ["time.entry"],
       "capabilities": { "when": { "at": "date", "start": "start", "end": "end" } },
       "extends": "occurrence",
       "title": "Time entry",
@@ -22,7 +23,8 @@
       }
     },
     {
-      "id": "time.routine",
+      "id": "routine",
+      "moved_from": ["time.routine"],
       "capabilities": {
         "when": { "repeat": { "from": "from_time", "to": "to_time", "days": "days", "starts": "starts", "until": "until", "skip": "skip", "moved": "moved", "done": "done" } }
       },
@@ -42,9 +44,10 @@
       }
     },
     {
-      "id": "time.invoice",
+      "id": "invoice",
+      "moved_from": ["time.invoice"],
       "capabilities": { "bound": { "field": "due", "limit": "today" } },
-      "extends": "work.document",
+      "extends": "document",
       "public": false,
       "title": "Invoice",
       "description": "A bill to a client for time entries, kept as a document: its note is the invoice as sent, fixed when made. Read, print or share it as any document.",
@@ -92,32 +95,33 @@
   ],
   "links": [
     {
-      "id": "time.bills",
-      "extends": "relates_to",
+      "id": "bills",
+      "moved_from": ["time.bills"],
+      "extends": "about",
       "title": "bills",
       "inverse": "is billed on",
-      "from": ["time.invoice"],
-      "to": ["time.entry"],
+      "from": ["invoice"],
+      "to": ["time_entry"],
       "description": "The invoice bills this time entry."
     }
   ],
   "rules": [
     {
       "id": "routine_days",
-      "when": { "actor": "agent", "op": "update", "type": "time.routine", "fields": ["done"] },
+      "when": { "actor": "agent", "op": "update", "type": "routine", "fields": ["done"] },
       "then": "refuse",
       "say": "\"{title}\" is a routine: only a person confirms a day of it, on the Time screen. Its days wait there under To confirm."
     },
     {
       "id": "planned_time",
-      "when": { "actor": "agent", "op": "update", "type": "time.entry", "status": { "from": "planned" } },
+      "when": { "actor": "agent", "op": "update", "type": "time_entry", "status": { "from": "planned" } },
       "then": "refuse",
       "say": "\"{title}\" is planned time: only a person confirms that it happened, on the Time screen. It waits there under To confirm."
     },
     {
       "id": "invoice_numbers",
       "unique": ["billed_by", "number"],
-      "type": "time.invoice",
+      "type": "invoice",
       "say": "\"{title}\" already has that number from the same biller: invoice numbers are not reused."
     }
   ],
@@ -158,7 +162,7 @@
       "id": "time.invoices",
       "title": "Invoices",
       "on": ["company"],
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "links": ["part_of {here}"] } }, "only": ["time.invoice"], "style": { "shape": "list", "show": ["status"] } }]
+      "pieces": [{ "piece": "picture", "lens": { "filter": { "links": ["part_of {here}"] } }, "only": ["invoice"], "style": { "shape": "list", "show": ["status"] } }]
     }
   ],
   "actions": [
@@ -213,5 +217,5 @@
       }
     }
   ],
-  "styles": [{ "id": "time.invoice_page", "title": "An invoice's page", "on": ["time.invoice"], "props": { "page": { "head": "invoice" } } }]
+  "styles": [{ "id": "time.invoice_page", "title": "An invoice's page", "on": ["invoice"], "props": { "page": { "head": "invoice" } } }]
 }

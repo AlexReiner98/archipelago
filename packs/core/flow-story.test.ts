@@ -18,7 +18,7 @@ const measure = (t: string, px: number) => t.length * px * 0.55;
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
 const ROOT = 'e_rootzzzz';
 const [ASK, PLAN, BUILD, OLD] = ['e_askzzzzz', 'e_planzzzz', 'e_buildzzz', 'e_oldzzzzz'];
-const item = (id: string, title: string) => ({ id, kind: 'work', type: 'work.task', inside: ROOT, title, place: 0, open: true, status: 'todo', state, within: { items: 0 }, fields: {} });
+const item = (id: string, title: string) => ({ id, kind: 'work', type: 'task', inside: ROOT, title, place: 0, open: true, status: 'todo', state, within: { items: 0 }, fields: {} });
 const answer = {
   lens: { from: ROOT },
   items: [{ ...item(ROOT, 'A process'), kind: 'aim', inside: null }, item(ASK, 'Ask'), item(PLAN, 'Plan'), item(BUILD, 'Build'), item(OLD, 'Old way'), item('e_unnamedz', 'Never named')],

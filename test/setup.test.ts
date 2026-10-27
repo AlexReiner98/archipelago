@@ -251,7 +251,7 @@ test('the operator can create a workspace from a backup file: the map, its types
   assert.deepEqual(tokens.filter((t) => !t.revoked_at).map((t) => t.name), ['owner']);
 
   // It carries on from there, and the original is untouched.
-  await call('/api/change', made.owner_token, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'Written after the move' }] });
+  await call('/api/change', made.owner_token, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Written after the move' }] });
   assert.equal(((await call('/api/search', old, { q: 'Written after the move' })).result as any[]).length, 0);
   assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup })).error, /already exists/);
 });
@@ -283,7 +283,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   // Where the file comes from: another map, with a type of its own and things its owner did.
   const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
-  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'work.task', title: 'Order the stone' }] });
+  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'task', title: 'Order the stone' }] });
   const laptop = await workspaces.get('laptop');
   const taken = await dump(laptop.pelago.db, { id: 'laptop', name: 'Laptop' }, laptop.pelago.registry.localPack());
   const backup = gzipSync(JSON.stringify(taken)).toString('base64');
@@ -293,18 +293,18 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   const admin = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const member = await join(admin, { email: 'sam@example.com', name: 'Sam' });
   const robot = (await createToken(main.pelago.db, 'default', { kind: 'agent', name: 'robot' })).token;
-  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'Already here', visibility: 'shared' }] });
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Already here', visibility: 'shared' }] });
   assert.match((await call('/api/import_backup', member, { backup })).error, /Only a workspace admin/);
   assert.match((await call('/agent/import_backup', robot, { backup })).error, /humans only/);
   assert.match((await call('/api/import_backup', admin, { backup: 'bm90IGEgYmFja3Vw' })).error, /not an Archipelago backup/);
 
   const { latest } = (await call('/agent/watch', robot)).result;
   const preview = (await call('/api/import_backup', admin, { backup, vault })).result;
-  assert.deepEqual([preview.applied, preview.entities.added, preview.types_added], [false, 2, ['local.site_visit']]);
+  assert.deepEqual([preview.applied, preview.entities.added, preview.types_added], [false, 3, ['local.site_visit']], 'its two items and the type item one of them needs');
   const titles = async () => ((await call('/api/search', admin)).result as any[]).map((e) => e.title).sort();
   assert.ok(!(await titles()).includes('Order the stone'), 'looking changes nothing');
   const done = (await call('/api/import_backup', admin, { backup, vault, apply: true })).result;
-  assert.deepEqual([done.applied, done.entities.added], [true, 2]);
+  assert.deepEqual([done.applied, done.entities.added], [true, 3]);
   assert.deepEqual((await titles()).filter((t) => ['Already here', 'Order the stone', 'Visit the quarry'].includes(t)), ['Already here', 'Order the stone', 'Visit the quarry']);
   assert.equal(((await call('/api/search', admin, { type: 'local.site_visit' })).result as any[]).length, 1, 'with the type it needed');
 
@@ -318,14 +318,14 @@ test('an import can make the owner in the file and the owner here one person, an
   const operator = (await workspaces.ensureOperator())!;
   const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
   const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
-  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'From the laptop', owner: theirs }] });
+  await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'From the laptop', owner: theirs }] });
   const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).pelago.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');
   const vault = gzipSync(JSON.stringify(await dumpVault((await workspaces.get('laptop')).pelago.db))).toString('base64');
 
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const mine = (await call('/api/init', alex, { name: 'Alex R' })).result.me as string;
-  await call('/api/change', alex, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Mine alone' }] });
+  await call('/api/change', alex, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Mine alone' }] });
 
   const preview = (await call('/api/import_backup', alex, { backup, vault })).result;
   assert.deepEqual(preview.owners, { here: { id: mine, title: 'Alex R' }, file: { id: theirs, title: 'Alex Reiner' }, made_one: false });
@@ -338,7 +338,7 @@ test('an import can make the owner in the file and the owner here one person, an
   assert.deepEqual([done.owners.made_one, done.entities.added], [true, 0]);
   assert.equal((await call('/whoami', alex, undefined, 'GET')).actor.person, theirs, 'the token is now the person from the file');
   assert.equal((await call('/api/workspace_info', alex)).result.owner.id, theirs, 'who owns the workspace');
-  const tasks = ((await call('/api/search', alex, { type: 'work.task' })).result as any[]).map((e) => e.title).sort();
+  const tasks = ((await call('/api/search', alex, { type: 'task' })).result as any[]).map((e) => e.title).sort();
   assert.deepEqual(tasks, ['From the laptop', 'Mine alone'], 'and still sees what was private to them');
   const people = ((await call('/api/search', alex, { type: 'person' })).result as any[]).map((e) => e.title);
   assert.deepEqual(people, ['Alex Reiner'], 'one person, not two');

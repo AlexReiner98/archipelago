@@ -4,6 +4,7 @@
 // sees is not narrowed here: that stays the database's, its person's view.
 
 import { scopeOf } from './places.ts';
+import { LINK_ITEM, TYPE_ITEM } from './type-overlay.ts';
 import type { Actor, Archipelago, Op } from './pelago.ts';
 
 /** Everything a token within these items may write to. */
@@ -54,6 +55,7 @@ export async function opsWithin(l: Archipelago, within: string[], ops: Op[]): Pr
   }
   // What it touches first, then what it makes: a link to what is not there is the better reason to give.
   for (const op of [...ops.filter((o) => o.op !== 'create'), ...ops.filter((o) => o.op === 'create')]) {
+    if (op.op === 'define_type' || (op.op === 'create' && (op.type === TYPE_ITEM || op.type === LINK_ITEM))) refuse('It cannot define a type: that changes the whole map.');
     if (op.op === 'create' && !(op.ref && tied.has(op.ref))) refuse(`"${op.title}" is made without being tied to anything there: give it a ref and link it (is part of, is about) to something of that work in the same change.`);
     if (op.op === 'update') await mustBeIn(op.id, 'change it');
     if (op.op === 'archive' || op.op === 'restore') await mustBeIn(op.id, `${op.op} it`);
@@ -66,7 +68,6 @@ export async function opsWithin(l: Archipelago, within: string[], ops: Op[]): Pr
       const { rows } = await l.db.query<{ from_id: string }>(`select from_id from relation where id = $1`, [op.relation]);
       if (rows[0]) await mustBeIn(rows[0].from_id, 'change what it is linked to');
     }
-    if (op.op === 'define_type') refuse('It cannot define a type: that changes the whole map.');
     if (op.op === 'forget') refuse('It cannot forget: that reaches the log, the backups and every read.');
   }
 }

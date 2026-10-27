@@ -14,15 +14,15 @@ import { serve } from './serve.ts';
 test('the tail says what the changes since a look did to what is shown: what changed and the link made to it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
-    { op: 'create', ref: 'q', type: 'work.project', title: 'Q' },
+    { op: 'create', ref: 'p', type: 'project', title: 'P' },
+    { op: 'create', ref: 'q', type: 'project', title: 'Q' },
   ]);
   const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;
   const { pos, seq } = await tail({});
   const still = await tail({ after: pos, seq, ids: [made.p, made.q] });
   assert.deepEqual([still.pos, still.entries, still.events, still.made], [pos, [], [], 0], 'nothing changed since');
   const more = await make(l, [
-    { op: 'create', ref: 't', type: 'work.task', title: 'T' },
+    { op: 'create', ref: 't', type: 'task', title: 'T' },
     { op: 'link', type: 'part_of', from: 't', to: made.p },
   ]);
   const after = await tail({ after: pos, seq, ids: [made.p, made.q] });
@@ -45,11 +45,11 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     return res.result.created as Record<string, string>;
   };
   const made = await change('agent:setup', [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Read here', body: 'What it is.\n\nA part of it\nFolded until it is asked for.' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'On the page' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Read here', body: 'What it is.\n\nA part of it\nFolded until it is asked for.' },
+    { op: 'create', ref: 't', type: 'task', title: 'On the page' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
-    { op: 'create', ref: 'q', type: 'work.project', title: 'Elsewhere' },
-    { op: 'create', ref: 'u', type: 'work.task', title: 'Away' },
+    { op: 'create', ref: 'q', type: 'project', title: 'Elsewhere' },
+    { op: 'create', ref: 'u', type: 'task', title: 'Away' },
     { op: 'link', type: 'part_of', from: 'u', to: 'q' },
   ]);
   const page = await open(`${base}/#/e/${made.p}`);
@@ -75,7 +75,7 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     }
     await wait(2500);
     const still = await page.evaluate<{ mark: number; swaps: number; hash: string; following: boolean }>(`({ mark: window.stillMark, swaps: window.swaps, hash: location.hash, following: document.querySelector('#follow input').checked })`);
-    assert.deepEqual(still, { mark: 1, swaps: 0, hash: `#/e/${made.p}`, following: false }, 'not reloaded, not drawn again, not taken elsewhere: with three agents at work, nothing is followed unless the reader asks');
+    assert.deepEqual(still, { mark: 1, swaps: 0, hash: `#/e/${made.p}`, following: true }, 'not reloaded, not drawn again, not taken elsewhere: with three agents at work, a change moves no pane its session has not shown into (ui/pane-route.js)');
     // A change to what is on the page shows on it, in place.
     await change('agent:a', [{ op: 'update', id: made.t, title: 'Renamed on the page' }]);
     assert.ok(await until(`document.querySelector('main').textContent.includes('Renamed on the page')`), 'the change shows');
@@ -95,8 +95,8 @@ test("in a browser, an agent's change reaches a store holding a flat lens's answ
     return res.result.created as Record<string, string>;
   };
   const made = await change([
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Canvas' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Flat lens' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Canvas' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Flat lens' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
   ]);
   const page = await open(`${base}/#/e/${made.p}`);
@@ -122,7 +122,7 @@ test("in a browser, an agent's change reaches a store holding a flat lens's answ
     assert.equal(await page.evaluate(`window.store.answer().items.length`), 2);
     const more = await change([
       { op: 'update', id: made.a, title: 'A flat lens' },
-      { op: 'create', ref: 'r', type: 'work.task', title: 'Replica' },
+      { op: 'create', ref: 'r', type: 'task', title: 'Replica' },
       { op: 'link', type: 'part_of', from: 'r', to: made.p },
     ]);
     assert.ok(await until(`window.store.item('${made.a}')?.title === 'A flat lens' && window.store.item('${more.r}')?.title === 'Replica'`), 'the change reaches the store');

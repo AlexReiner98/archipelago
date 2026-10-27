@@ -20,13 +20,13 @@ const facts = async (l: Archipelago, stream: OpStream) => (await readOps(l.db, s
 test('each operational write lands in its stream, at once, with the light header', async () => {
   const l = await fresh();
   const { run, auto, res, task, n, conn, note } = await make(l, [
-    { op: 'create', ref: 'run', type: 'sys.run', title: 'A run' },
-    { op: 'create', ref: 'auto', type: 'sys.automation', title: 'Nightly', props: { trigger: 'every', every_minutes: 60, action: 'notify' } },
+    { op: 'create', ref: 'run', type: 'run', title: 'A run' },
+    { op: 'create', ref: 'auto', type: 'automation', title: 'Nightly', props: { trigger: 'every', every_minutes: 60, action: 'notify' } },
     { op: 'create', ref: 'res', type: 'resource', title: 'The lane' },
-    { op: 'create', ref: 'task', type: 'work.task', title: 'Hold it' },
-    { op: 'create', ref: 'n', type: 'sys.notification', title: 'Look' },
-    { op: 'create', ref: 'conn', type: 'sys.connection', title: 'Nowhere', props: { url: 'http://127.0.0.1:1/' } },
-    { op: 'create', ref: 'note', type: 'work.note', title: 'Drawn' },
+    { op: 'create', ref: 'task', type: 'task', title: 'Hold it' },
+    { op: 'create', ref: 'n', type: 'notification', title: 'Look' },
+    { op: 'create', ref: 'conn', type: 'connection', title: 'Nowhere', props: { url: 'http://127.0.0.1:1/' } },
+    { op: 'create', ref: 'note', type: 'note', title: 'Drawn' },
   ]);
   await l.operational(run, { add: { tokens_used: 40 }, props: { story: [{ n: 1, said: 'began' }], last_seen: 'now' } });
   await l.operational(run, { add: { tokens_used: 2 } });

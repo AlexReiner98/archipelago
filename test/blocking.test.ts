@@ -12,10 +12,10 @@ test('blockers are derived, and roots are what has to move first', async () => {
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Me' },
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
-    { op: 'create', ref: 'ship', type: 'work.task', title: 'Ship release', owner: 'me' },
-    { op: 'create', ref: 'sign', type: 'work.task', title: 'Sign installer', owner: 'me' },
-    { op: 'create', ref: 'cert', type: 'work.decision', title: 'Which certificate?', owner: 'sam' },
-    { op: 'create', ref: 'free', type: 'work.task', title: 'Write notes', owner: 'me' },
+    { op: 'create', ref: 'ship', type: 'task', title: 'Ship release', owner: 'me' },
+    { op: 'create', ref: 'sign', type: 'task', title: 'Sign installer', owner: 'me' },
+    { op: 'create', ref: 'cert', type: 'decision', title: 'Which certificate?', owner: 'sam' },
+    { op: 'create', ref: 'free', type: 'task', title: 'Write notes', owner: 'me' },
     { op: 'link', type: 'depends_on', from: 'ship', to: 'sign' },
     { op: 'link', type: 'depends_on', from: 'sign', to: 'cert' },
   ]);
@@ -37,8 +37,8 @@ test('blockers are derived, and roots are what has to move first', async () => {
 test('a dependency cycle does not hang the views', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
     { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
   ]);
@@ -50,11 +50,11 @@ test('an exclusive resource has one holder, and blocks other work that needs it'
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live CAD lane' },
-    { op: 'create', ref: 'run1', type: 'sys.run', title: 'Session one' },
-    { op: 'create', ref: 'run2', type: 'sys.run', title: 'Session two' },
-    { op: 'create', ref: 'live1', type: 'work.task', title: 'Capture parity probe' },
-    { op: 'create', ref: 'live2', type: 'work.task', title: 'Debug conduit' },
-    { op: 'create', ref: 'offline', type: 'work.task', title: 'Write unit tests' },
+    { op: 'create', ref: 'run1', type: 'run', title: 'Session one' },
+    { op: 'create', ref: 'run2', type: 'run', title: 'Session two' },
+    { op: 'create', ref: 'live1', type: 'task', title: 'Capture parity probe' },
+    { op: 'create', ref: 'live2', type: 'task', title: 'Debug conduit' },
+    { op: 'create', ref: 'offline', type: 'task', title: 'Write unit tests' },
     { op: 'link', type: 'needs', from: 'live1', to: 'lane' },
     { op: 'link', type: 'needs', from: 'live2', to: 'lane' },
   ]);
@@ -78,8 +78,8 @@ test('an exclusive resource has one holder, and blocks other work that needs it'
 test('overdue work is due, and what is far off is not', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', type: 'work.task', title: 'File return', props: { due: '2020-01-01' } },
-    { op: 'create', type: 'work.task', title: 'Far off', props: { due: '2999-01-01' } },
+    { op: 'create', type: 'task', title: 'File return', props: { due: '2020-01-01' } },
+    { op: 'create', type: 'task', title: 'Far off', props: { due: '2999-01-01' } },
   ]);
   // Work resting on a refuted hypothesis is the inquiry pack's to show, not the kernel's.
   await owned(l);

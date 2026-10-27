@@ -6,7 +6,7 @@
 import { findRepo, pushes, repoWork } from './repo.js';
 
 /** The kinds of thing that are true or not of the world, and so go stale: work, questions and problems. */
-export const GOES_STALE = ['work.task', 'work.decision', 'work.issue', 'inquiry.hypothesis', 'software.feature'];
+export const GOES_STALE = ['task', 'decision', 'issue', 'hypothesis', 'feature'];
 /** How long a handoff note may be: the type says so too (note_max), and the kernel holds agents to it. */
 export const HANDOFF_MAX = 3000;
 /** How far back a handoff looks when nobody has written a note to count from. */
@@ -25,13 +25,13 @@ export async function handoff(input, ctx) {
   const repo = await findRepo(ctx, input.repo, 'handoff');
   if (input.since && Number.isNaN(Date.parse(input.since))) throw new Error('handoff: "since" must be an ISO date or date-time');
   const work = await repoWork({ repo: repo.id }, ctx);
-  const [newest] = await ctx.read({ scope: repo.id, types: ['software.handoff'], open: true, fields: [] });
+  const [newest] = await ctx.read({ scope: repo.id, types: ['handoff'], open: true, fields: [] });
   const note = newest ? await ctx.read({ get: newest.id }) : null;
   const since = input.since ? new Date(input.since) : note ? new Date(note.updated_at) : new Date(Date.parse(ctx.now) - HANDOFF_DAYS * 86_400_000);
   const after = (t) => Date.parse(t) > since.getTime();
   // What goes stale and is the repository's, open or not, changed since then, newest first.
   const stale = (await ctx.read({ scope: repo.id, types: GOES_STALE, fields: [], since: since.toISOString() })).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || a.id.localeCompare(b.id));
-  const ran = (await ctx.read({ related: repo.id, relation: 'lives_in', direction: 'in', types: ['sys.run'], newest: 'updated', fields: [] })).filter((r) => !r.is_open && after(r.updated_at)).slice(0, 10);
+  const ran = (await ctx.read({ related: repo.id, relation: 'lives_in', direction: 'in', types: ['run'], newest: 'updated', fields: [] })).filter((r) => !r.is_open && after(r.updated_at)).slice(0, 10);
   const ended = [];
   for (const r of ran) ended.push({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said((await ctx.read({ get: r.id }))?.body) });
   // What agents settled and the owner has not confirmed, as attention gives it to the owner.
@@ -62,7 +62,7 @@ export async function handoff(input, ctx) {
     // Work that is owed though nobody wrote it down: an item here that has grown into a hub and has no view of its own.
     ...(unshaped.length > 0 && { to_shape: { hubs: unshaped.slice(0, 15), how: HUBS_HOW } }),
     how:
-      (note ? '' : `Nobody has written a handoff note for this repository. To write the first, create a software.handoff and link it software.lives_in to ${repo.id} in the same change; this view finds it from then on. `) +
+      (note ? '' : `Nobody has written a handoff note for this repository. To write the first, create a handoff and link it lives_in to ${repo.id} in the same change; this view finds it from then on. `) +
       (note && length > HANDOFF_MAX
         ? `The note is ${length} characters, and may be ${HANDOFF_MAX} at most: sessions have added to it and none has taken away. Before you finish, rewrite it whole (body), with one of each part. `
         : note && length > HANDOFF_MAX * 0.8

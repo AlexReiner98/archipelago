@@ -22,7 +22,7 @@ test('a run asked for once is run once: refused while it runs, for good once it 
   configureModels({ ask: () => async () => (asked++, { content: [{ type: 'text', text: 'Nothing to change.' }], stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 5 } }) as any });
   const l = await fresh();
   await l.setSecret('anthropic_key', 'sk-ant-' + 'x'.repeat(30));
-  const { repo } = await make(l, [{ op: 'create', ref: 'repo', type: 'software.repo', title: 'Tools repo' }]);
+  const { repo } = await make(l, [{ op: 'create', ref: 'repo', type: 'repo', title: 'Tools repo' }]);
   const pack = { id: 'demo', version: '0', title: 'Demo', reach: { runs: [] } };
   const ask = (once: string) => startRuns(l, { kind: 'agent', name: 'pack:demo' }, pack, 'event', [{ title: `Read ${once}`, system: 'Read it.', task: 'A push.', within: [repo], once }]);
   assert.deepEqual(await ask('acme/tools@b'), [{ started: true, title: 'Read acme/tools@b' }]);

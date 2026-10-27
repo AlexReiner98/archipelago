@@ -15,7 +15,7 @@ const patience = 15000;
 
 /** The links that can join a to b (types), each read from a's side: a link from a to b, or one from b to a in its inverse words. */
 export function linkChoices(a, b) {
-  const all = (state.schema?.relations ?? []).filter((r) => !r.dormant && !kept(r.id));
+  const all = (state.schema?.relations ?? []).filter((r) => !r.dormant && !r.retired && !kept(r.id));
   const out = all.filter((r) => fits(r.from, a.type) && fits(r.to, b.type)).map((r) => ({ type: r.id, from: a.id, to: b.id, label: r.title ?? r.id }));
   const back = all.filter((r) => fits(r.from, b.type) && fits(r.to, a.type) && r.inverse && r.inverse !== r.title).map((r) => ({ type: r.id, from: b.id, to: a.id, label: r.inverse }));
   return [...out, ...back];

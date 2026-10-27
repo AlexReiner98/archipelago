@@ -51,7 +51,11 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
 A person grows a canvas by editing its lens (a click adds an id, find sets
 the text, the query bar changes any term), and an agent reads the same lens
 (`query` name `flat`) and points the page at one (`report` action `show`
-with `lens`). The page calls no tool an agent lacks for it.
+with `lens`). The page calls no tool an agent lacks for it. The bar's
+pickers (the walk's links, the box's types) lead with what the canvas
+draws, then what lies one step around it (the same `flat` read, walked
+once), then the rest; a retired or dormant type or link type is never
+offered (`ui/picker-rank.js`, task e_css8swr9).
 - `test/structure.test.ts`: "the page calls no more tools through /api than
   it did" (the names it calls, frozen on 25 Oct 2026; the list only shrinks).
 - `test/lens-flat.test.ts`: "an agent asks it by name, and sees only what
@@ -201,11 +205,26 @@ reader's, kept in this browser for each workspace like the canvas settings:
 never on the map, meaning nothing. On a page taller than wide a row is drawn
 as a column.
 
-An agent's show takes `pane`: a side opens what it shows in a pane there (one
-already drawing it moves), `main` is the main canvas, `alone` closes the
-others. Left out, a pane already drawing it is lit, else the main canvas goes
-there. A popped-out window follows no agent:
-the main page does, for both.
+Each pane follows everyone (the default), one session, or nobody: the reader
+picks it in the bar of the pane in focus, and a pane that follows someone says
+whom in its strip. Where an agent's step lands is `pane-route.js`, worked out
+from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
+- a session's show or change goes to the pane that follows it;
+- a show's `pane` may be a name of the session's own ("map", "tests"): a pane
+  by that name is opened beside the main one the first time, following the
+  session, and drawn in again each time it is named;
+- else it goes to a pane that follows everyone and no other session at work
+  (a step within ten minutes) holds: the one drawing it already, else the
+  main one; so one session alone works on the main canvas as before;
+- when those are all held by other sessions, it gets a pane of its own;
+- past four panes, or where no pane will take it, it is only offered (the line
+  at the foot, with Go there).
+A side (`left`, `right`, `above`, `below`) puts the session's pane there,
+`main` is the main canvas and `alone` closes the others, if the main canvas
+follows everyone or that session. A session is its run: a step carries the run
+it names (show, tell, session_update), or the one its agent last named
+(`src/presence.ts`). Following is on until the reader turns it off. A
+popped-out window follows no agent: the main page does, for both.
 
 ## What is not yet so
 - Find excludes only what the query bar's box excludes (closed, system, a

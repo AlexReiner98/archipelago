@@ -3,7 +3,7 @@
   "from": "e_rootzzzz",
   "by": "part_of",
   "over": [
-   "software.calls"
+   "calls"
   ],
   "fold": [
    "closed",
@@ -314,8 +314,8 @@
  "items": [
   {
    "id": "e_rootzzzz",
-   "type": "work.project",
-   "root": "work.project",
+   "type": "project",
+   "root": "project",
    "kind": "work",
    "title": "Archipelago, the whole system",
    "status": "active",
@@ -351,8 +351,8 @@
   },
   {
    "id": "e_placeser",
-   "type": "software.environment",
-   "root": "software.environment",
+   "type": "environment",
+   "root": "environment",
    "kind": "place",
    "title": "An Archipelago server",
    "status": "up",
@@ -389,8 +389,8 @@
   },
   {
    "id": "e_placeout",
-   "type": "software.environment",
-   "root": "software.environment",
+   "type": "environment",
+   "root": "environment",
    "kind": "place",
    "title": "Outside services",
    "status": "up",
@@ -427,8 +427,8 @@
   },
   {
    "id": "e_placeyou",
-   "type": "software.environment",
-   "root": "software.environment",
+   "type": "environment",
+   "root": "environment",
    "kind": "place",
    "title": "You and your agents",
    "status": "up",
@@ -465,8 +465,8 @@
   },
   {
    "id": "e_readersz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Readers",
    "status": "up",
@@ -506,8 +506,8 @@
   },
   {
    "id": "e_styleszz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Style drawings",
    "status": "up",
@@ -547,8 +547,8 @@
   },
   {
    "id": "e_reporter",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Systems that report",
    "status": "up",
@@ -588,8 +588,8 @@
   },
   {
    "id": "e_agentszz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Your agents",
    "status": "up",
@@ -629,8 +629,8 @@
   },
   {
    "id": "e_browserz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Your browser",
    "status": "up",
@@ -670,8 +670,8 @@
   },
   {
    "id": "e_approval",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Approvals",
    "status": "up",
@@ -711,8 +711,8 @@
   },
   {
    "id": "e_automati",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Automations",
    "status": "up",
@@ -752,8 +752,8 @@
   },
   {
    "id": "e_changezz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Change",
    "status": "up",
@@ -793,8 +793,8 @@
   },
   {
    "id": "e_doorszzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Doors",
    "status": "up",
@@ -834,8 +834,8 @@
   },
   {
    "id": "e_logzzzzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Event log",
    "status": "up",
@@ -875,8 +875,8 @@
   },
   {
    "id": "e_mappacks",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Map packs",
    "status": "up",
@@ -916,8 +916,8 @@
   },
   {
    "id": "e_pgzzzzzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Postgres",
    "status": "up",
@@ -957,8 +957,8 @@
   },
   {
    "id": "e_publishi",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Publishing",
    "status": "up",
@@ -998,8 +998,8 @@
   },
   {
    "id": "e_pushzzzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Push reader",
    "status": "up",
@@ -1039,8 +1039,8 @@
   },
   {
    "id": "e_serverpa",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Server packs",
    "status": "up",
@@ -1080,8 +1080,8 @@
   },
   {
    "id": "e_sessions",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Sessions",
    "status": "up",
@@ -1121,8 +1121,8 @@
   },
   {
    "id": "e_viewszzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Views and lenses",
    "status": "up",
@@ -1162,8 +1162,8 @@
   },
   {
    "id": "e_lookszzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "How things look",
    "status": "retired",
@@ -1203,8 +1203,8 @@
   },
   {
    "id": "e_projects",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Projects and roadmap",
    "status": "retired",
@@ -1244,8 +1244,8 @@
   },
   {
    "id": "e_question",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Questions",
    "status": "retired",
@@ -1285,8 +1285,8 @@
   },
   {
    "id": "e_costszzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Costs and time",
    "status": "retired",
@@ -1326,8 +1326,8 @@
   },
   {
    "id": "e_githubap",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "GitHub App",
    "status": "retired",
@@ -1367,8 +1367,8 @@
   },
   {
    "id": "e_githubzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "GitHub",
    "status": "up",
@@ -1408,8 +1408,8 @@
   },
   {
    "id": "e_lemonzzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Lemon Squeezy",
    "status": "up",
@@ -1449,8 +1449,8 @@
   },
   {
    "id": "e_mailzzzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Mail",
    "status": "up",
@@ -1490,8 +1490,8 @@
   },
   {
    "id": "e_modelzzz",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Your model provider",
    "status": "up",
@@ -1531,8 +1531,8 @@
   },
   {
    "id": "e_supabase",
-   "type": "software.component",
-   "root": "software.component",
+   "type": "component",
+   "root": "component",
    "kind": "place",
    "title": "Supabase backups",
    "status": "retired",
@@ -1573,187 +1573,187 @@
  ],
  "links": [
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_agentszz",
    "to": "e_doorszzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_browserz",
    "to": "e_doorszzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_readersz",
    "to": "e_doorszzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_reporter",
    "to": "e_doorszzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_browserz",
    "to": "e_styleszz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_doorszzz",
    "to": "e_lookszzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_doorszzz",
    "to": "e_changezz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_doorszzz",
    "to": "e_sessions",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_doorszzz",
    "to": "e_viewszzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_doorszzz",
    "to": "e_publishi",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_doorszzz",
    "to": "e_serverpa",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_doorszzz",
    "to": "e_mailzzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_changezz",
    "to": "e_logzzzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_changezz",
    "to": "e_approval",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_changezz",
    "to": "e_pgzzzzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_sessions",
    "to": "e_pgzzzzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_viewszzz",
    "to": "e_pgzzzzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_publishi",
    "to": "e_pgzzzzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_automati",
    "to": "e_changezz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_automati",
    "to": "e_mappacks",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_mappacks",
    "to": "e_changezz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_pushzzzz",
    "to": "e_changezz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_pushzzzz",
    "to": "e_modelzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_githubzz",
    "to": "e_pushzzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_lemonzzz",
    "to": "e_serverpa",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_doorszzz",
    "to": "e_projects",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_projects",
    "to": "e_changezz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_question",
    "to": "e_changezz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_costszzz",
    "to": "e_changezz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_githubap",
    "to": "e_pushzzzz",
    "n": 1
   },
   {
-   "kind": "software.calls",
+   "kind": "calls",
    "from": "e_pgzzzzzz",
    "to": "e_supabase",
    "n": 1

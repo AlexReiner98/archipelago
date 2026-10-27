@@ -16,10 +16,10 @@ test('in a browser, a wire drawn by hand becomes a link, and a held change is dr
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'work.project', title: 'Wired here' },
-      { op: 'create', ref: 'a', type: 'work.task', title: 'First step' },
-      { op: 'create', ref: 'b', type: 'work.task', title: 'Second step' },
-      { op: 'create', ref: 'd', type: 'work.task', title: 'Third step' },
+      { op: 'create', ref: 'p', type: 'project', title: 'Wired here' },
+      { op: 'create', ref: 'a', type: 'task', title: 'First step' },
+      { op: 'create', ref: 'b', type: 'task', title: 'Second step' },
+      { op: 'create', ref: 'd', type: 'task', title: 'Third step' },
       { op: 'link', type: 'part_of', from: 'a', to: 'p' },
       { op: 'link', type: 'part_of', from: 'b', to: 'p' },
       { op: 'link', type: 'part_of', from: 'd', to: 'p' },
@@ -97,7 +97,7 @@ test('in a browser, a wire drawn by hand becomes a link, and a held change is dr
     assert.ok((await call('/api/proposals', undefined, { status: 'approved' })).result.some((p: { id: string }) => p.id === held.proposal), 'approved through decide');
 
     // ---- An agent's held item, a faint step where it would land, declined there.
-    await call('/agent/change', undefined, { actor: 'robot', reason: 'held item test', ops: [{ op: 'create', ref: 'e', type: 'work.task', title: 'Proposed step' }, { op: 'link', type: 'part_of', from: 'e', to: made.p }] });
+    await call('/agent/change', undefined, { actor: 'robot', reason: 'held item test', ops: [{ op: 'create', ref: 'e', type: 'task', title: 'Proposed step' }, { op: 'link', type: 'part_of', from: 'e', to: made.p }] });
     assert.ok(await until(`[...document.querySelectorAll('#canvas .lf-step.ghost')].some((g) => g.textContent.includes('Proposed step')) && Boolean(${badge('held item test')})`), `a faint step: ${await probe()}`);
     const ghostAt = await rect(badge('held item test'));
     await click([ghostAt.x + ghostAt.w / 2, ghostAt.y + ghostAt.h / 2]);

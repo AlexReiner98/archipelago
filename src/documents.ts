@@ -55,7 +55,7 @@ export function assemble(body: string, items: Map<string, Section>): Part[] {
 }
 
 /** The item a workspace holds a document another workspace shares with it as (src/workspace-share.ts). A kernel type. */
-export const SHARED = 'sys.shared_document';
+export const SHARED = 'shared_document';
 
 /** Of an item's fields, those its type's pack marks as shown: what a page may lay out (an invoice's number, dates, total). */
 export const shownOf = (l: Archipelago, type: string, props: Record<string, unknown>) => {

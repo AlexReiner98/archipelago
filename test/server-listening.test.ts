@@ -23,12 +23,12 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   const shown = (await call('/api/tail')).result.focus;
   assert.deepEqual([shown.hash, shown.actor, shown.note], ['workspace', 'robot', 'Look here']);
 
-  await call('/agent/change', undefined, { actor: 'robot', reason: 'A note', ops: [{ op: 'create', type: 'work.note', title: 'N' }] });
+  await call('/agent/change', undefined, { actor: 'robot', reason: 'A note', ops: [{ op: 'create', type: 'note', title: 'N' }] });
   const proposed = (await call('/api/tail')).result.focus;
   assert.deepEqual([proposed.hash, proposed.note], ['review', 'A note'], 'a change that waits for review points at Review');
   assert.ok(proposed.at >= shown.at);
 
-  await call('/api/change', undefined, { reason: 'mine', ops: [{ op: 'create', type: 'work.note', title: 'M' }] });
+  await call('/api/change', undefined, { reason: 'mine', ops: [{ op: 'create', type: 'note', title: 'M' }] });
   assert.equal((await call('/api/tail')).result.focus.hash, 'review', 'the human\'s own changes do not move their screen');
 
   // Every step an agent takes is kept, the last few of them, each with its kind: the page follows the kinds the person chose.
@@ -45,7 +45,7 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   const read = await last();
   assert.deepEqual([read.kind, read.did, read.hash], ['read', 'is reading this', `e/${note}`]);
   assert.ok(read.at > searched.at);
-  await call('/agent/view', undefined, { actor: 'robot', name: 'flat', params: { filter: { types: ['work.note'] } } });
+  await call('/agent/view', undefined, { actor: 'robot', name: 'flat', params: { filter: { types: ['note'] } } });
   assert.deepEqual([(await last()).kind, (await last()).did, (await last()).hash], ['view', 'asked for flat', 'graph?lens']);
   await call('/agent/proposals', undefined, { actor: 'robot' });
   assert.deepEqual([(await last()).kind, (await last()).did], ['read', 'proposals']);
@@ -58,7 +58,7 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
 
 test('an agent hears what the human does: by waiting for it, and with the owner\'s next message', async () => {
   const { call } = await serve('off');
-  const made = await call('/api/change', undefined, { reason: 'seed', ops: [{ op: 'create', type: 'work.decision', title: 'Which?' }] });
+  const made = await call('/api/change', undefined, { reason: 'seed', ops: [{ op: 'create', type: 'decision', title: 'Which?' }] });
   const id = made.result.created['#1'];
   const { latest } = (await call('/agent/watch')).result;
   assert.deepEqual((await call('/agent/watch', undefined, { after: latest })).result.changes, [], 'nothing yet, and no waiting when none is asked for');
@@ -68,14 +68,14 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   const waiting = call('/agent/watch', undefined, { after: latest, wait_seconds: 20 });
   await new Promise((r) => setTimeout(r, 300));
   assert.equal((await call('/api/tail')).result.listening, 1, 'the UI can see someone is listening');
-  await call('/agent/change', undefined, { actor: 'robot', reason: 'noise', ops: [{ op: 'create', type: 'work.note', title: 'An agent\'s own change' }] });
+  await call('/agent/change', undefined, { actor: 'robot', reason: 'noise', ops: [{ op: 'create', type: 'note', title: 'An agent\'s own change' }] });
   await call('/api/change', undefined, { reason: 'Decided in the UI', ops: [{ op: 'update', id, status: 'decided', props: { outcome: 'This one' } }] });
   const heard = (await waiting).result;
   assert.deepEqual([heard.changes.length, heard.changes[0].target.title, heard.changes[0].changes['props.outcome'].to], [1, 'Which?', 'This one'], 'woken by the human\'s change, not the agent\'s');
   assert.equal((await call('/api/tail')).result.listening, 0);
 
   const told = await call('/hooks/prompt', undefined, { session_id: 's1' });
-  assert.match(told.hookSpecificOutput.additionalContext, /entity\.update work\.decision "Which\?".*props\.outcome: nothing -> "This one"/s);
+  assert.match(told.hookSpecificOutput.additionalContext, /entity\.update decision "Which\?".*props\.outcome: nothing -> "This one"/s);
   assert.deepEqual(await call('/hooks/prompt', undefined, { session_id: 's1' }), { status: 200 }, 'told once');
 
   // A session that began before this server did has lived through a restart: it is told, once, that its tools may be old.

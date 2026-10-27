@@ -20,10 +20,10 @@ test('a domain serves a workspace’s published pages at their address words, th
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'home', type: 'work.document', title: 'Welcome', visibility: 'shared', props: { path: 'home', menu: 0 }, body: 'The front page. Read {a}.' },
-        { op: 'create', ref: 'a', type: 'work.document', title: 'How it works', visibility: 'shared', props: { path: 'how-it-works', menu: 1 }, body: 'How it works, in short. Back to {home}.' },
-        { op: 'create', ref: 'b', type: 'work.document', title: 'Not in the header', visibility: 'shared', props: { path: 'aside' }, body: 'An aside.' },
-        { op: 'create', ref: 'd', type: 'work.document', title: 'A draft', visibility: 'shared', props: { path: 'draft' }, body: 'Not published.' },
+        { op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home', menu: 0 }, body: 'The front page. Read {a}.' },
+        { op: 'create', ref: 'a', type: 'document', title: 'How it works', visibility: 'shared', props: { path: 'how-it-works', menu: 1 }, body: 'How it works, in short. Back to {home}.' },
+        { op: 'create', ref: 'b', type: 'document', title: 'Not in the header', visibility: 'shared', props: { path: 'aside' }, body: 'An aside.' },
+        { op: 'create', ref: 'd', type: 'document', title: 'A draft', visibility: 'shared', props: { path: 'draft' }, body: 'Not published.' },
       ],
     })
   ).result.created;
@@ -72,13 +72,13 @@ test('everything a project holds is published with one click, an agent may only 
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'P', type: 'work.project', title: 'The site', visibility: 'shared' },
-        { op: 'create', ref: 'S', type: 'work.note', title: 'A part of it', visibility: 'shared' },
-        { op: 'create', ref: 'a', type: 'work.document', title: 'Alpha', visibility: 'shared', props: { path: 'alpha' }, body: 'Alpha. See {b}.' },
-        { op: 'create', ref: 'b', type: 'work.document', title: 'Beta', visibility: 'shared', props: { path: 'beta' }, body: 'Beta. Back to {a}.' },
-        { op: 'create', ref: 'd', type: 'work.document', title: 'Deeper', visibility: 'shared', props: { path: 'deeper' }, body: 'Held a step down.' },
-        { op: 'create', ref: 'c', type: 'work.document', title: 'Withdrawn', status: 'withdrawn', visibility: 'shared', body: 'Not published.' },
-        { op: 'create', ref: 'x', type: 'work.document', title: 'Taken', visibility: 'shared', props: { path: 'alpha' }, body: 'Its path is taken.' },
+        { op: 'create', ref: 'P', type: 'project', title: 'The site', visibility: 'shared' },
+        { op: 'create', ref: 'S', type: 'note', title: 'A part of it', visibility: 'shared' },
+        { op: 'create', ref: 'a', type: 'document', title: 'Alpha', visibility: 'shared', props: { path: 'alpha' }, body: 'Alpha. See {b}.' },
+        { op: 'create', ref: 'b', type: 'document', title: 'Beta', visibility: 'shared', props: { path: 'beta' }, body: 'Beta. Back to {a}.' },
+        { op: 'create', ref: 'd', type: 'document', title: 'Deeper', visibility: 'shared', props: { path: 'deeper' }, body: 'Held a step down.' },
+        { op: 'create', ref: 'c', type: 'document', title: 'Withdrawn', status: 'withdrawn', visibility: 'shared', body: 'Not published.' },
+        { op: 'create', ref: 'x', type: 'document', title: 'Taken', visibility: 'shared', props: { path: 'alpha' }, body: 'Its path is taken.' },
         { op: 'link', type: 'part_of', from: 'a', to: 'P' },
         { op: 'link', type: 'part_of', from: 'b', to: 'P' },
         { op: 'link', type: 'part_of', from: 'S', to: 'P' },
@@ -114,9 +114,9 @@ test('a path must be an address word, and one published path belongs to one docu
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'x', type: 'work.document', title: 'First', visibility: 'shared', props: { path: 'guide' }, body: 'One.' },
-        { op: 'create', ref: 'y', type: 'work.document', title: 'Second', visibility: 'shared', props: { path: 'guide' }, body: 'Two.' },
-        { op: 'create', ref: 'z', type: 'work.document', title: 'Third', visibility: 'shared', props: { path: 'Not A Path' }, body: 'Three.' },
+        { op: 'create', ref: 'x', type: 'document', title: 'First', visibility: 'shared', props: { path: 'guide' }, body: 'One.' },
+        { op: 'create', ref: 'y', type: 'document', title: 'Second', visibility: 'shared', props: { path: 'guide' }, body: 'Two.' },
+        { op: 'create', ref: 'z', type: 'document', title: 'Third', visibility: 'shared', props: { path: 'Not A Path' }, body: 'Three.' },
       ],
     })
   ).result.created;
@@ -132,8 +132,8 @@ test('a site’s pages each end with what its footer page says, and the sitemap 
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'home', type: 'work.document', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' },
-        { op: 'create', ref: 'foot', type: 'work.document', title: 'Footer', visibility: 'shared', props: { path: 'footer' }, body: 'Made in Canada. Questions: hello@example.com.' },
+        { op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' },
+        { op: 'create', ref: 'foot', type: 'document', title: 'Footer', visibility: 'shared', props: { path: 'footer' }, body: 'Made in Canada. Questions: hello@example.com.' },
       ],
     })
   ).result.created;

@@ -85,7 +85,7 @@ async function seed(l: Archipelago, f: Fixture): Promise<{ repo: string; ids: Ma
   const lives = livesInFor(l, f.repo.entity.type);
   f.items.forEach((item, n) => {
     // A type this checkout's packs do not have (a workspace's own) is read as a task: the reader only sees its name.
-    const type = known(item.type) ? item.type : 'work.task';
+    const type = known(item.type) ? item.type : 'task';
     const statuses = l.registry.type(type)?.statuses;
     const status = statuses && [...statuses.open, ...statuses.closed].includes(item.status) ? item.status : undefined;
     ops.push({ op: 'create', ref: `i${n}`, type, title: item.title.slice(0, 200), ...(status && { status }), ...(item.body && { body: item.body }) });
@@ -143,7 +143,7 @@ function lend(github: StandIn, repo: string) {
 /** The run the push started, once it is recorded: a run records itself when it ends, well or not. */
 async function runOf(l: Archipelago, most = 30 * 60_000): Promise<{ status: string; body: string | null; props: Record<string, unknown> } | undefined> {
   for (const until = Date.now() + most; Date.now() < until; await new Promise((r) => setTimeout(r, 500))) {
-    const { rows } = await l.db.query<{ status: string; body: string | null; props: Record<string, unknown> }>(`select status, body, props from entity where type = any($1::text[]) limit 1`, [l.registry.family('sys.run')]);
+    const { rows } = await l.db.query<{ status: string; body: string | null; props: Record<string, unknown> }>(`select status, body, props from entity where type = any($1::text[]) limit 1`, [l.registry.family('run')]);
     if (rows[0]) return rows[0];
   }
   return undefined;

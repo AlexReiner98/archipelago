@@ -20,20 +20,20 @@ async function system(call: (path: string, token?: string, body?: unknown) => Pr
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'work.project', title: 'A system' },
-      { op: 'create', ref: 'e', type: 'software.environment', title: 'A server', status: 'up' },
-      { op: 'create', ref: 'a', type: 'software.component', title: 'Doors', status: 'up' },
-      { op: 'create', ref: 'b', type: 'software.component', title: 'Store', status: 'up', props: { role: 'data' } },
+      { op: 'create', ref: 'p', type: 'project', title: 'A system' },
+      { op: 'create', ref: 'e', type: 'environment', title: 'A server', status: 'up' },
+      { op: 'create', ref: 'a', type: 'component', title: 'Doors', status: 'up' },
+      { op: 'create', ref: 'b', type: 'component', title: 'Store', status: 'up', props: { role: 'data' } },
       { op: 'link', type: 'part_of', from: 'e', to: 'p' },
       { op: 'link', type: 'part_of', from: 'a', to: 'e' },
       { op: 'link', type: 'part_of', from: 'b', to: 'e' },
-      { op: 'link', type: 'software.calls', from: 'a', to: 'b' },
+      { op: 'link', type: 'calls', from: 'a', to: 'b' },
     ],
   })).result.created as Record<string, string>;
   const kept = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { ids: [made.p] }, walk: { over: ['part_of', 'software.calls'], steps: 3 } } },
+      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { ids: [made.p] }, walk: { over: ['part_of', 'calls'], steps: 3 } } },
       { op: 'link', type: 'about', from: 'l', to: made.p },
       { op: 'create', ref: 's', type: 'style', title: 'As architecture', status: 'current', props: { shape: 'architecture' } },
       { op: 'link', type: 'about', from: 's', to: 'l' },
@@ -79,12 +79,12 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
 test('a picture with steps is sent them, and the finished parts they name, whatever it leaves out', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'A system' },
-    { op: 'create', ref: 'a', type: 'software.component', title: 'Doors', status: 'up' },
-    { op: 'create', ref: 'o', type: 'software.component', title: 'Old backups', status: 'retired' },
+    { op: 'create', ref: 'p', type: 'project', title: 'A system' },
+    { op: 'create', ref: 'a', type: 'component', title: 'Doors', status: 'up' },
+    { op: 'create', ref: 'o', type: 'component', title: 'Old backups', status: 'retired' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'o', to: 'p' },
-    { op: 'link', type: 'software.calls', from: 'a', to: 'o' },
+    { op: 'link', type: 'calls', from: 'a', to: 'o' },
   ]);
   const steps = [{ chapter: { name: 'Then', when: '7 Oct', count: 1 }, add: [made.a, made.o], titles: { [made.a]: 'Old doors' }, lines: [{ by: 'Alex', text: 'Back it up.' }] }, { remove: [made.o], lines: [{ by: 'Agent', text: 'It is gone.' }] }];
   Object.assign(made, await make(l, [{ op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { links: [`part_of ${made.p}`], exclude: ['closed', 'system'] }, steps } }]));

@@ -9,9 +9,9 @@ type Item = { id: string; type: string; title: string; is_open?: boolean; archiv
 type Heard = { detail: Record<string, unknown> };
 
 const TYPES: Record<string, { statuses: { open: string[]; closed: string[] }; settles: boolean }> = {
-  'software.repo': { statuses: { open: ['active'], closed: ['archived'] }, settles: false },
-  'work.task': { statuses: { open: ['todo', 'doing'], closed: ['done', 'dropped'] }, settles: false },
-  'work.decision': { statuses: { open: ['open'], closed: ['decided'] }, settles: true },
+  'repo': { statuses: { open: ['active'], closed: ['archived'] }, settles: false },
+  'task': { statuses: { open: ['todo', 'doing'], closed: ['done', 'dropped'] }, settles: false },
+  'decision': { statuses: { open: ['open'], closed: ['decided'] }, settles: true },
 };
 
 /** What the kernel answers: the items, the pushes heard on the repository, what is already proposed. */
@@ -29,10 +29,10 @@ function ctxOver(items: Item[], heard: Heard[] = [], proposed: string[] = []) {
   };
 }
 
-const repo: Item = { id: 'e_repo0001', type: 'software.repo', title: 'Shop', props: { remote: 'git@github.com:Acme/Shop.git' } };
-const task: Item = { id: 'e_task0001', type: 'work.task', title: 'Fix checkout' };
-const other: Item = { id: 'e_task0002', type: 'work.task', title: 'Done already', is_open: false };
-const question: Item = { id: 'e_dec00001', type: 'work.decision', title: 'Which card processor?' };
+const repo: Item = { id: 'e_repo0001', type: 'repo', title: 'Shop', props: { remote: 'git@github.com:Acme/Shop.git' } };
+const task: Item = { id: 'e_task0001', type: 'task', title: 'Fix checkout' };
+const other: Item = { id: 'e_task0002', type: 'task', title: 'Done already', is_open: false };
+const question: Item = { id: 'e_dec00001', type: 'decision', title: 'Which card processor?' };
 const push = (over: Record<string, unknown> = {}) => ({
   ref: 'refs/heads/main',
   before: 'a'.repeat(40),

@@ -22,8 +22,8 @@ const account = (l: Archipelago, settles: Record<string, string[]>) =>
   make(
     l,
     Object.entries(settles).flatMap(([sha, items]) => [
-      { op: 'create' as const, ref: sha, type: 'software.commit', title: `Commit ${sha.slice(0, 7)}`, props: { sha } },
-      ...items.map((to) => ({ op: 'link' as const, type: 'software.settles', from: sha, to })),
+      { op: 'create' as const, ref: sha, type: 'commit', title: `Commit ${sha.slice(0, 7)}`, props: { sha } },
+      ...items.map((to) => ({ op: 'link' as const, type: 'settles', from: sha, to })),
     ]),
   );
 
@@ -35,7 +35,7 @@ test('a rule on unaccounted commits names the record that accounts for one', () 
 
 test('a reply that committed and did not account for it is asked once, naming the commits, until one change accounts for them', async () => {
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 'task', type: 'work.task', title: 'Settled by a commit' }]);
+  const made = await make(l, [{ op: 'create', ref: 'task', type: 'task', title: 'Settled by a commit' }]);
   const { run } = await sessionStart(l, agent, { session_id: 'c1' });
   const reply = { committed: 1, pushed: 0 };
 
@@ -64,7 +64,7 @@ test('a session’s end lists its commits not accounted for, and ends once they 
   assert.match(asked.note, /unaccounted_commits/);
   await account(l, { [A]: [] });
   // A record waiting for the owner is said: the session ends, and the check on main waits for it to apply.
-  await l.change(agent, { reason: 'test', hold: true, ops: [{ op: 'create', type: 'software.commit', title: 'Held', props: { sha: B } }] });
+  await l.change(agent, { reason: 'test', hold: true, ops: [{ op: 'create', type: 'commit', title: 'Held', props: { sha: B } }] });
   const ended = (await callTool(l, agent, 'session_end', { run, cannot_tell_rest: true })) as any;
   assert.equal(ended.status, 'finished');
   assert.equal(ended.unaccounted_commits, undefined);

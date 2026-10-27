@@ -42,7 +42,7 @@ export async function entity(id, here) {
   };
   const owner = e.owner ? await api('get', { id: e.owner }).then((r) => r.entity, () => null) : null;
   // The kernel's own record of a session at work.
-  const run = isA(e.type, 'sys.run');
+  const run = isA(e.type, 'run');
   const session = run && e.is_open && !e.archived_at;
   // An item a screen reads whole can be printed and shared: its text with the items it brings in, in their places.
   const { doc, links } = readWhole(e.type) ? await readDocument(id) : { doc: null, links: [] };

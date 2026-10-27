@@ -75,7 +75,7 @@ test('an agent does a session’s work through the surface: start, change, tell,
   const l = await fresh();
   const start = (await callTool(l, agent, 'capture', { action: 'session_start', params: { title: 'Surface test', session_id: 'surface-1' } })) as { run: string; status: string };
   assert.equal(start.status, 'running');
-  const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Try the surface', status: 'todo' }] })) as { status: string };
+  const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Try the surface', status: 'todo' }] })) as { status: string };
   assert.ok(['applied', 'proposed'].includes(made.status));
   const told = (await callTool(l, agent, 'report', { action: 'tell', params: { run: start.run, said: 'The nine tools are enough for a session.' } })) as { run: string };
   assert.equal(told.run, start.run);

@@ -9,7 +9,7 @@ import { alike, unread } from './history.js';
 import { ON_PUSH } from './push.js';
 import { nearness, shortlist, shows, wordsOf } from './shortlist.js';
 
-const REPO = { id: 'e_repo0001', type: 'software.repo', title: 'Tools repo', props: { remote: 'https://github.com/acme/tools.git' } };
+const REPO = { id: 'e_repo0001', type: 'repo', title: 'Tools repo', props: { remote: 'https://github.com/acme/tools.git' } };
 const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
 const link = (sha: string) => `https://github.com/Acme/Tools/commit/${sha}`;
@@ -29,7 +29,7 @@ interface Map {
   item?: { id: string; type: string; status: string; title: string };
   due?: (q: any) => unknown;
 }
-const TASK = { id: 'e_task0001', type: 'work.task', status: 'todo', title: 'Oil the whetstone' };
+const TASK = { id: 'e_task0001', type: 'task', status: 'todo', title: 'Oil the whetstone' };
 
 function ctxOver({ github = {} as Record<string, unknown>, connected = true, map = {} as Map, now = '2026-10-22T12:00:00.000Z' } = {}) {
   const asked: string[] = [];
@@ -45,11 +45,11 @@ function ctxOver({ github = {} as Record<string, unknown>, connected = true, map
     read: async (q: any) => {
       reads.push(q);
       if ('connection' in q) return connected ? { id: '42', account: 'acme' } : null;
-      if (q.items?.type === 'software.repo') return [REPO];
-      if (q.items?.type === 'sys.run') return (map.runs ?? []).filter((r) => r.props.link === q.items.where.link);
+      if (q.items?.type === 'repo') return [REPO];
+      if (q.items?.type === 'run') return (map.runs ?? []).filter((r) => r.props.link === q.items.where.link);
       if (q.view === 'repo_work') return { ready: map.work ?? [TASK], blocked: [] };
       if (q.view === 'recheck') return map.due?.(q);
-      if (q.type_info) return { statuses: { open: ['todo', 'doing'], closed: ['done', 'dropped'] }, lives_in: 'software.lives_in' };
+      if (q.type_info) return { statuses: { open: ['todo', 'doing'], closed: ['done', 'dropped'] }, lives_in: 'lives_in' };
       if (q.related) return map.runs ?? [];
       if (q.events?.action === 'repo.push') return map.pushes ?? [];
       if (q.events?.action === 'entity.create') return map.made?.[q.events.target] ? [map.made[q.events.target]] : [{ actor: 'human:owner' }];
@@ -71,7 +71,7 @@ const github = {
   [`/repos/Acme/Tools/compare/${A}...${B}?per_page=100`]: { commits: [{ sha: B, commit: { message: 'Sharpen the tools\n\nThe whetstone still needs oiling.' } }], files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1, patch: '+  oil()' }] },
 };
 const pushEvent = (detail: Record<string, unknown>) => ({ event: { action: 'repo.push', target: REPO.id, pack: 'github', detail: { repo: 'acme/tools', branch: 'main', before: A, after: B, commits: [{ sha: 'bbbbbbb', subject: 'Sharpen the tools' }], ...detail } } });
-const pushContext = (branch = 'main', own: string[] = []) => ({ kind: 'push', repo: { name: 'Acme/Tools', entity: { id: REPO.id, title: 'Tools repo', type: 'software.repo' } }, push: { branch, default_branch: 'main', before: A, after: B }, own });
+const pushContext = (branch = 'main', own: string[] = []) => ({ kind: 'push', repo: { name: 'Acme/Tools', entity: { id: REPO.id, title: 'Tools repo', type: 'repo' } }, push: { branch, default_branch: 'main', before: A, after: B }, own });
 
 test('the reader asks GitHub only about the one repository, whatever the text it read there tells it to ask', () => {
   // A path or a ref is part of an address under the repository: a step up would land in another one.
@@ -98,8 +98,8 @@ test('a push the GitHub pack recorded is read once: one run, held to its reposit
   assert.deepEqual(run.tools.map((t: any) => t.name), ['decide', 'update', 'create', 'look', 'find', 'diff', 'file']);
   assert.ok(JSON.stringify(run.tools).length < 3000, 'small enough to send every turn');
   // The item the push is near is asked about by itself, with the part of the diff that touches it.
-  assert.match(run.task, /Branch "main"[\s\S]*a{40}\.\.b{40}[\s\S]*whetstone still needs oiling[\s\S]*Candidates \(1\): decide on each\.\n## e_task0001 work\.task \[todo\] Oil the whetstone\nWhy asked: its words are in the push\.[\s\S]*Other open items of this repository \(0\)[\s\S]*work\.task: open todo, doing; closed done, dropped/);
-  assert.deepEqual(run.context.repo, { name: 'Acme/Tools', entity: { id: REPO.id, title: 'Tools repo', type: 'software.repo' } });
+  assert.match(run.task, /Branch "main"[\s\S]*a{40}\.\.b{40}[\s\S]*whetstone still needs oiling[\s\S]*Candidates \(1\): decide on each\.\n## e_task0001 task \[todo\] Oil the whetstone\nWhy asked: its words are in the push\.[\s\S]*Other open items of this repository \(0\)[\s\S]*task: open todo, doing; closed done, dropped/);
+  assert.deepEqual(run.context.repo, { name: 'Acme/Tools', entity: { id: REPO.id, title: 'Tools repo', type: 'repo' } });
 });
 
 test('its brief asks only for what a commit shows: nothing is moved for having been started', () => {
@@ -137,17 +137,17 @@ test('a commit is read once, however many branches carry it: the merge of a bran
 });
 
 test('what it made itself and nobody has reviewed is marked as its own guess, and left alone', async () => {
-  const guess = { id: 'e_guess001', type: 'work.task', status: 'todo', title: 'Server reads no commit in a git worktree' };
-  const reviewed = { id: 'e_guess002', type: 'work.task', status: 'todo', title: 'Approved since' };
-  const changed = { id: 'e_guess003', type: 'work.task', status: 'todo', title: 'Retitled by the owner' };
+  const guess = { id: 'e_guess001', type: 'task', status: 'todo', title: 'Server reads no commit in a git worktree' };
+  const reviewed = { id: 'e_guess002', type: 'task', status: 'todo', title: 'Approved since' };
+  const changed = { id: 'e_guess003', type: 'task', status: 'todo', title: 'Retitled by the owner' };
   const map: Map = {
     work: [TASK, guess, reviewed, changed],
     made: { e_guess001: { actor: 'agent:reader' }, e_guess002: { actor: 'agent:reader', detail: { approved_by: 'human:owner' } }, e_guess003: { actor: 'agent:reader' } },
     changed: { e_guess003: [{ actor: 'human:owner' }] },
   };
   const { runs } = await handler['repo.push'](pushEvent({}), ctxOver({ github, map }).ctx);
-  assert.match(runs[0].task, /e_guess001 work\.task \[todo\] Server reads no commit in a git worktree \(unreviewed\)/);
-  assert.match(runs[0].task, /e_task0001 work\.task \[todo\] Oil the whetstone\n/);
+  assert.match(runs[0].task, /e_guess001 task \[todo\] Server reads no commit in a git worktree \(unreviewed\)/);
+  assert.match(runs[0].task, /e_task0001 task \[todo\] Oil the whetstone\n/);
   assert.match(runs[0].task, /Approved since\n[\s\S]*Retitled by the owner\n/, 'what the owner approved or changed is theirs');
   assert.deepEqual(runs[0].context.own, ['e_guess001']);
   const decide = handler.tool({ name: 'decide', input: { id: 'e_guess001', finished: true, quote: 'Sharpen the tools', why: 'x' }, context: runs[0].context }, ctxOver({ github, map: { item: guess } }).ctx);
@@ -172,7 +172,7 @@ test('decide closes only what the push shows, word for word, on the default bran
 });
 
 test('the items asked about are found without a model: named, worked on from the branch, or near by their words', () => {
-  const items = [TASK, { id: 'e_far00001', type: 'work.task', status: 'todo', title: 'Write the invoice export' }, { id: 'e_named001', type: 'work.task', status: 'todo', title: 'Anything at all' }, { id: 'e_work0001', type: 'work.issue', status: 'open', title: 'Unrelated words here' }];
+  const items = [TASK, { id: 'e_far00001', type: 'task', status: 'todo', title: 'Write the invoice export' }, { id: 'e_named001', type: 'task', status: 'todo', title: 'Anything at all' }, { id: 'e_work0001', type: 'issue', status: 'open', title: 'Unrelated words here' }];
   const pushed = { messages: ['Sharpen the tools\n\nThe whetstone still needs oiling. Closes: e_named001'], files: [{ filename: 'tools/sharpen.ts', patch: '+  oil()' }] };
   assert.deepEqual(shortlist(items, pushed, { named: ['e_named001'], worked: ['e_work0001'] }).map((c) => [c.item.id, c.why]), [
     ['e_named001', 'a commit names it'],
@@ -187,16 +187,16 @@ test('the items asked about are found without a model: named, worked on from the
 
 test('create makes no copies: what is open already, near enough by its title, or waiting for the owner, is named back', async () => {
   const context = pushContext();
-  const create = (title: string, map: Map = {}, extra = {}) => handler.tool({ name: 'create', input: { type: 'work.task', title, why: 'The commit says so', ...extra }, context }, ctxOver({ map }).ctx);
-  const found = [{ id: 'e_open0001', type: 'work.issue', status: 'open', title: 'Server reads no commit in a git worktree' }];
-  await assert.rejects(create('Server reads no commit in a Git worktree.', { found }), /Already there: e_open0001 work\.issue \[open\] "Server reads no commit in a git worktree"\. Change that one/);
+  const create = (title: string, map: Map = {}, extra = {}) => handler.tool({ name: 'create', input: { type: 'task', title, why: 'The commit says so', ...extra }, context }, ctxOver({ map }).ctx);
+  const found = [{ id: 'e_open0001', type: 'issue', status: 'open', title: 'Server reads no commit in a git worktree' }];
+  await assert.rejects(create('Server reads no commit in a Git worktree.', { found }), /Already there: e_open0001 issue \[open\] "Server reads no commit in a git worktree"\. Change that one/);
   await assert.rejects(create('The server reads no commit in a git worktree', { found }), /Already there: e_open0001/, 'a word more or less');
   await assert.rejects(create('Strop the blade', { waiting: ['Strop the blade'] }), /waiting for the owner already/);
   await assert.rejects(create('Strop blade', { waiting: ['Strop the blade'] }), /Making "Strop the blade" is waiting for the owner already: that is this one/, 'made twice in one read, worded twice');
-  await assert.rejects(create('Evaluate open models', { found: [{ id: 'e_open0002', type: 'work.task', status: 'todo', title: 'Evaluate open models through LiteLLM' }] }), /Already there: e_open0002/, 'every word of it is in one already there');
+  await assert.rejects(create('Evaluate open models', { found: [{ id: 'e_open0002', type: 'task', status: 'todo', title: 'Evaluate open models through LiteLLM' }] }), /Already there: e_open0002/, 'every word of it is in one already there');
   // Something new lives in the repository by the link its type says, or is part of what it is given.
   const made = await create('Strop the blade', { found });
-  assert.deepEqual(made.changes[0].ops, [{ op: 'create', ref: 'n', type: 'work.task', title: 'Strop the blade' }, { op: 'link', type: 'software.lives_in', from: 'n', to: REPO.id }]);
+  assert.deepEqual(made.changes[0].ops, [{ op: 'create', ref: 'n', type: 'task', title: 'Strop the blade' }, { op: 'link', type: 'lives_in', from: 'n', to: REPO.id }]);
   const under = await create('Hone', {}, { part_of: 'e_feat0001' });
   assert.deepEqual(under.changes[0].ops[1], { op: 'link', type: 'part_of', from: 'n', to: 'e_feat0001' });
   assert.equal(alike('Server reads no commit', 'Server reads every commit in a worktree'), false, 'different things are not taken for one');
@@ -204,7 +204,7 @@ test('create makes no copies: what is open already, near enough by its title, or
 
 test('what it looks up in the map goes through the map’s own reads, as the run’s agent', async () => {
   const looked = ctxOver({ map: { found: [TASK] } });
-  assert.equal((await handler.tool({ name: 'find', input: { words: 'whetstone' }, context: pushContext() }, looked.ctx)).answer, 'e_task0001 work.task [todo] Oil the whetstone');
+  assert.equal((await handler.tool({ name: 'find', input: { words: 'whetstone' }, context: pushContext() }, looked.ctx)).answer, 'e_task0001 task [todo] Oil the whetstone');
   assert.deepEqual(looked.reads.at(-1), { tool: 'search', input: { q: 'whetstone', limit: 10 } });
 });
 

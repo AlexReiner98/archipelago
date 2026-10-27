@@ -50,12 +50,12 @@ interface Case {
 }
 
 const said = { of: 'agent' as const, basis: 'the table' };
-const task = (ref = 't', extra: Partial<Op> = {}): Op => ({ op: 'create', ref, type: 'work.task', title: `Task ${ref}`, ...extra }) as Op;
-const decision: Op = { op: 'create', ref: 'd', type: 'work.decision', title: 'Which way?' };
-const hypothesis: Op = { op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'It is faster' };
+const task = (ref = 't', extra: Partial<Op> = {}): Op => ({ op: 'create', ref, type: 'task', title: `Task ${ref}`, ...extra }) as Op;
+const decision: Op = { op: 'create', ref: 'd', type: 'decision', title: 'Which way?' };
+const hypothesis: Op = { op: 'create', ref: 'h', type: 'hypothesis', title: 'It is faster' };
 const style = (ref = 's'): Op => ({ op: 'create', ref, type: 'style', title: `Style ${ref}` });
-const doc: Op = { op: 'create', ref: 'doc', type: 'work.document', title: 'Guide' };
-const automation: Op = { op: 'create', ref: 'a', type: 'sys.automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } };
+const doc: Op = { op: 'create', ref: 'doc', type: 'document', title: 'Guide' };
+const automation: Op = { op: 'create', ref: 'a', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } };
 
 const CASES: Record<string, Case> = {
   'create task': { ops: () => [task()] },

@@ -11,13 +11,13 @@ export const house = (shape: string) => ({ ...JSON.parse(readFileSync(here('..',
 
 const quiet = { blocked: false, waits_on: [] as string[], sessions: 0, needs_you: false };
 const within = { items: 0, work: 0, blocked: 0, waiting: 0, sessions: 0, tokens: { estimated: 0, used: 0 }, waits_on: {}, needs_you: 0, not_sent: 0 };
-const item = (id: string, title: string, inside: string | undefined, place: number, extra: Record<string, unknown> = {}) => ({ id, type: 'software.component', root: 'software.component', kind: 'place', title, status: 'up', open: true, inside, place, size: { work: 0, tokens: { estimated: 0, used: 0 } }, state: quiet, within, ...extra });
+const item = (id: string, title: string, inside: string | undefined, place: number, extra: Record<string, unknown> = {}) => ({ id, type: 'component', root: 'component', kind: 'place', title, status: 'up', open: true, inside, place, size: { work: 0, tokens: { estimated: 0, used: 0 } }, state: quiet, within, ...extra });
 
 /** Every mark: each health, each wire state, what a wire carries, a loop, a store, a client, a question, work on a part, what needs you. */
 function variety() {
   const healths = ['up', 'degraded', 'down', 'wiring', 'standby', 'planned', 'mystery'];
   const items = [
-    item('e_root0000', 'A system', undefined, 1, { kind: 'work', type: 'work.project' }),
+    item('e_root0000', 'A system', undefined, 1, { kind: 'work', type: 'project' }),
     item('e_placea00', 'The edge', 'e_root0000', 1),
     item('e_placeb00', 'The servers, with a long name that will not fit', 'e_root0000', 2),
     item('e_placec00', 'Stores', 'e_root0000', 3, { status: 'down' }),
@@ -28,21 +28,21 @@ function variety() {
     item('e_ask00000', 'Which store?', 'e_placeb00', 10, { kind: 'question', type: 'inquiry.question' }),
     item('e_db000000', 'Database', 'e_placec00', 1, { role: 'data' }),
     item('e_queue000', 'Queue', 'e_placec00', 2, { role: 'queue', state: { ...quiet, blocked: true, waits_on: ['e_person00'] } }),
-    item('e_task0000', 'Wire the queue', 'e_queue000', 1, { kind: 'work', type: 'work.task', status: 'doing', state: { ...quiet, sessions: 1, needs_you: true } }),
-    item('e_task1000', 'Watch it', 'e_queue000', 2, { kind: 'work', type: 'work.task', status: 'todo' }),
+    item('e_task0000', 'Wire the queue', 'e_queue000', 1, { kind: 'work', type: 'task', status: 'doing', state: { ...quiet, sessions: 1, needs_you: true } }),
+    item('e_task1000', 'Watch it', 'e_queue000', 2, { kind: 'work', type: 'task', status: 'todo' }),
   ];
   const svc = (n: number) => `e_svc${n}0000`.slice(0, 10);
   const links = [
-    { kind: 'software.calls', from: 'e_client00', to: svc(0), n: 1, says: 'HTTPS' },
-    { kind: 'software.calls', from: 'e_client00', to: svc(1), n: 1 },
-    { kind: 'software.calls', from: 'e_person00', to: svc(2), n: 1, state: 'planned', says: 'a very long thing it carries, longer than fits' },
-    ...healths.map((_, n) => ({ kind: 'software.calls', from: svc(n), to: n % 2 ? 'e_db000000' : 'e_queue000', n: 1, ...(n === 3 && { state: 'broken' }), ...(n === 0 && { says: 'SQL' }) })),
-    { kind: 'software.calls', from: 'e_db000000', to: svc(0), n: 1, says: 'a loop' },
-    { kind: 'software.calls', from: 'e_gone0000', to: 'e_db000000', n: 1 },
-    { kind: 'software.calls', from: 'e_ask00000', to: 'e_queue000', n: 1 },
-    { kind: 'software.calls', from: svc(6), to: 'e_ask00000', n: 1, state: 'wired' },
+    { kind: 'calls', from: 'e_client00', to: svc(0), n: 1, says: 'HTTPS' },
+    { kind: 'calls', from: 'e_client00', to: svc(1), n: 1 },
+    { kind: 'calls', from: 'e_person00', to: svc(2), n: 1, state: 'planned', says: 'a very long thing it carries, longer than fits' },
+    ...healths.map((_, n) => ({ kind: 'calls', from: svc(n), to: n % 2 ? 'e_db000000' : 'e_queue000', n: 1, ...(n === 3 && { state: 'broken' }), ...(n === 0 && { says: 'SQL' }) })),
+    { kind: 'calls', from: 'e_db000000', to: svc(0), n: 1, says: 'a loop' },
+    { kind: 'calls', from: 'e_gone0000', to: 'e_db000000', n: 1 },
+    { kind: 'calls', from: 'e_ask00000', to: 'e_queue000', n: 1 },
+    { kind: 'calls', from: svc(6), to: 'e_ask00000', n: 1, state: 'wired' },
   ];
-  return { lens: { from: 'e_root0000', by: 'part_of', over: ['software.calls'], fold: ['system'] }, items, links, rest: {}, viewer: 'e_person00', controls: ['lit'], views: [] };
+  return { lens: { from: 'e_root0000', by: 'part_of', over: ['calls'], fold: ['system'] }, items, links, rest: {}, viewer: 'e_person00', controls: ['lit'], views: [] };
 }
 
 export interface DrawingCase {
@@ -68,12 +68,12 @@ export function architectureCases(): DrawingCase[] {
 
 /** Every mark a process map has: each shape, each dot, a checklist, a question's choices, work on a step, a break. */
 function flowVariety() {
-  const step = (id: string, title: string, kind: string, extra: Record<string, unknown> = {}) => item(id, title, 'e_froot000', 1, { kind, type: kind === 'work' ? 'work.task' : kind === 'question' ? 'inquiry.question' : kind === 'record' ? 'inquiry.record' : 'work.milestone', root: kind === 'work' ? 'work.task' : undefined, status: 'todo', ...extra });
+  const step = (id: string, title: string, kind: string, extra: Record<string, unknown> = {}) => item(id, title, 'e_froot000', 1, { kind, type: kind === 'work' ? 'task' : kind === 'question' ? 'inquiry.question' : kind === 'record' ? 'inquiry.record' : 'work.milestone', root: kind === 'work' ? 'task' : undefined, status: 'todo', ...extra });
   const items = [
-    item('e_froot000', 'A release', undefined, 1, { kind: 'work', type: 'work.project' }),
+    item('e_froot000', 'A release', undefined, 1, { kind: 'work', type: 'project' }),
     step('e_fstart00', 'Start', 'occurrence', { open: false, status: 'happened' }),
     step('e_fwork100', 'Write it', 'work', { status: 'doing', state: { ...quiet, sessions: 1 } }),
-    item('e_fnote000', 'A note on it', 'e_fwork100', 1, { kind: 'work', type: 'work.task', state: { ...quiet, needs_you: true } }),
+    item('e_fnote000', 'A note on it', 'e_fwork100', 1, { kind: 'work', type: 'task', state: { ...quiet, needs_you: true } }),
     step('e_fask0000', 'Which way, with a long question to cut?', 'question', { choices: ['This way', 'That way', 'Neither'] }),
     step('e_fthis000', 'Go this way', 'work'),
     step('e_frec0000', 'The notes', 'record', { status: 'current' }),
@@ -145,7 +145,7 @@ export function bigSystem() {
   const root = hero.items.find((i: any) => i.id === hero.lens.from);
   const id = (p: number, k: number) => `e_p${String(p).padStart(2, '0')}k${String(k).padStart(3, '0')}z`;
   const items = [root, ...Array.from({ length: 12 }, (_, p) => [{ ...proto, id: `e_place${String(p).padStart(3, '0')}`, title: `Place ${p}`, inside: root.id, place: p }, ...Array.from({ length: 16 }, (_, k) => ({ ...proto, id: id(p, k), title: `Part ${p}.${k} with a name`, inside: `e_place${String(p).padStart(3, '0')}`, place: k }))]).flat()];
-  const links = Array.from({ length: 11 }, (_, p) => Array.from({ length: 16 }, (_, k) => [0, 3, 7].map((d) => ({ kind: 'software.calls', from: id(p, k), to: id(p + 1, (k + d) % 16), n: 1 })))).flat(2);
+  const links = Array.from({ length: 11 }, (_, p) => Array.from({ length: 16 }, (_, k) => [0, 3, 7].map((d) => ({ kind: 'calls', from: id(p, k), to: id(p + 1, (k + d) % 16), n: 1 })))).flat(2);
   return { ...hero, items, links };
 }
 
@@ -154,14 +154,14 @@ export function bigSystem() {
 function gridVariety(byLink: boolean) {
   const card = (id: string, title: string, inside: string, place: number, lane: string | null, fields: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) => item(id, title, inside, place, { lane, fields, ...extra });
   const items = [
-    item('e_groot000', 'A grid', undefined, 1, { kind: 'work', type: 'work.project' }),
-    item('e_grow1000', 'The first row, with a name long enough to be cut', 'e_groot000', 1, { kind: 'work', type: 'work.project' }),
+    item('e_groot000', 'A grid', undefined, 1, { kind: 'work', type: 'project' }),
+    item('e_grow1000', 'The first row, with a name long enough to be cut', 'e_groot000', 1, { kind: 'work', type: 'project' }),
     card('e_gcard100', 'A store', 'e_grow1000', 1, 'doing', { role: 'data', layer: 'store' }),
     card('e_gcard200', 'A browser with a title long enough to be cut in its card', 'e_grow1000', 2, 'doing', { role: 'client', layer: 'yours', due: '2026-11-05', due_note: 'Due' }),
     card('e_gcard300', 'Finished', 'e_grow1000', 3, 'done', { role: 'app' }, { open: false, status: 'retired' }),
-    item('e_gsub0000', 'Inside the first', 'e_grow1000', 4, { kind: 'work', type: 'work.project', lane: 'doing' }),
+    item('e_gsub0000', 'Inside the first', 'e_grow1000', 4, { kind: 'work', type: 'project', lane: 'doing' }),
     card('e_gdeep000', 'Two down', 'e_gsub0000', 1, 'e_gperson0', { role: 'monitor', due: '2026-12-01' }, { state: { ...quiet, needs_you: true } }),
-    item('e_grow2000', 'The second row', 'e_groot000', 2, { kind: 'work', type: 'work.project' }),
+    item('e_grow2000', 'The second row', 'e_groot000', 2, { kind: 'work', type: 'project' }),
     card('e_gcard400', 'Nothing filed', 'e_grow2000', 1, null, {}),
     card('e_gcard500', 'A model', 'e_grow2000', 2, 'odd_value', { role: 'model', layer: 'outside' }),
     card('e_gloose00', 'Held directly', 'e_groot000', 3, 'doing', { role: 'tool' }),
@@ -198,9 +198,9 @@ export function gridCases(): DrawingCase[] {
 /** A week on a time axis with every mark: two lanes (a person and the sessions), things that overlap, a stretch of a
  * session's minutes, a due date and a span of days in the strip, what each counts toward, and an early start. */
 function timeVariety() {
-  const at = (id: string, title: string, kind: string, lane: string, time: Record<string, unknown>[], extra: Record<string, unknown> = {}) => item(id, title, 'e_troot000', 1, { kind, type: kind === 'work' ? 'work.task' : 'event', lane, time, ...extra });
+  const at = (id: string, title: string, kind: string, lane: string, time: Record<string, unknown>[], extra: Record<string, unknown> = {}) => item(id, title, 'e_troot000', 1, { kind, type: kind === 'work' ? 'task' : 'event', lane, time, ...extra });
   const items = [
-    item('e_troot000', 'A week', undefined, 1, { kind: 'work', type: 'work.project' }),
+    item('e_troot000', 'A week', undefined, 1, { kind: 'work', type: 'project' }),
     at('e_ttask100', 'Write the copy, with a long name to cut', 'work', 'e_tsam0000', [{ start: '2026-11-03T09:00:00', end: '2026-11-03T11:30:00', by: 'logged', stream: 'e_tproj000' }]),
     at('e_ttask200', 'Review', 'work', 'e_tsam0000', [{ start: '2026-11-03T10:00:00', end: '2026-11-03T12:00:00', by: 'logged', stream: 'e_tproj100' }, { start: '2026-11-04T14:00:00', end: '2026-11-04T15:00:00', by: 'logged', stream: 'e_tproj100' }]),
     at('e_tdue0000', 'Due', 'work', 'e_tsam0000', [{ start: '2026-11-05', end: '2026-11-05', by: 'bound' }]),

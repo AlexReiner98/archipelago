@@ -81,7 +81,7 @@ export async function push(input, ctx) {
   const delivery = typeof headers['x-github-delivery'] === 'string' ? headers['x-github-delivery'] : undefined;
 
   const name = payload.repository?.full_name?.toLowerCase();
-  const repos = name ? await ctx.read({ items: { type: 'software.repo' }, fields: ['remote'] }) : [];
+  const repos = name ? await ctx.read({ items: { type: 'repo' }, fields: ['remote'] }) : [];
   const repo = repos.find((r) => repoName(r.props?.remote) === name);
   if (!repo) return { answer: { recorded: false, reason: `No repository in this map has the remote github.com/${name}. Give one that address and pushes to it will be recorded.` } };
 

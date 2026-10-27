@@ -22,7 +22,7 @@ async function projectOf(ctx, id) {
   while (level.length) {
     const up = [];
     for (const x of level) for (const rel of ['part_of', 'about']) for (const e of await ctx.read({ related: x, relation: rel, fields: [] })) if (!seen.has(e.id)) (seen.add(e.id), up.push(e));
-    const found = up.find((e) => isA(e, 'work.project'));
+    const found = up.find((e) => isA(e, 'project'));
     if (found) return found;
     level = up.map((e) => e.id);
   }
@@ -35,7 +35,7 @@ async function projectOf(ctx, id) {
  * that have proof questions.
  */
 export async function proof(input, ctx) {
-  const questions = (await ctx.read({ items: { type: 'software.proof' }, fields: [] })).filter((q) => q.is_open);
+  const questions = (await ctx.read({ items: { type: 'proof' }, fields: [] })).filter((q) => q.is_open);
   if (!input.of && !input.within) {
     const counts = new Map();
     for (const q of questions) {
@@ -53,10 +53,10 @@ export async function proof(input, ctx) {
   const tests = new Map();
   const results = new Map();
   for (const q of mine) {
-    const own = (await ctx.read({ related: q.id, relation: 'software.answers', direction: 'in', fields: ['compares', 'tolerance', 'environment', 'entrypoint'] })).filter((t) => t.is_open);
+    const own = (await ctx.read({ related: q.id, relation: 'answers', direction: 'in', fields: ['compares', 'tolerance', 'environment', 'entrypoint'] })).filter((t) => t.is_open);
     tests.set(q.id, own);
     for (const t of own)
-      if (!results.has(t.id)) results.set(t.id, (await ctx.read({ related: t.id, relation: 'produced', fields: ['build', 'passed', 'value', 'picture', 'evidence'] })).filter((r) => isA(r, 'software.test_result')).sort((a, b) => at(b) - at(a)));
+      if (!results.has(t.id)) results.set(t.id, (await ctx.read({ related: t.id, relation: 'produced', fields: ['build', 'passed', 'value', 'picture', 'evidence'] })).filter((r) => isA(r, 'test_result')).sort((a, b) => at(b) - at(a)));
   }
   const all = [...results.values()].flat();
   const kept = new Set(all.length ? await ctx.read({ pictures: all.map((r) => r.id) }) : []);
@@ -115,7 +115,7 @@ export async function proof(input, ctx) {
       .flatMap((p) => p.tests)
       .filter((t) => t.result?.picture && !t.result.stored)
       .map((t) => ({ result: t.result.id, test: t.title, picture: t.result.picture })),
-    how: 'A question is answered on a build when it has tests and every one passed there. To add a question: create a software.proof (the title is the question) that is part of the product or feature. To add a test: create a software.test and link it to the question with software.answers. Results come from test_report.',
+    how: 'A question is answered on a build when it has tests and every one passed there. To add a question: create a proof (the title is the question) that is part of the product or feature. To add a test: create a test and link it to the question with answers. Results come from test_report.',
   };
 }
 
@@ -136,7 +136,7 @@ export async function changelog(input, ctx) {
     let level = [id];
     while (level.length) {
       for (const x of level) {
-        const [release] = await ctx.read({ related: x, relation: 'software.ships', direction: 'in', fields: ['version'] });
+        const [release] = await ctx.read({ related: x, relation: 'ships', direction: 'in', fields: ['version'] });
         if (release) return release;
         seen.add(x);
       }
@@ -149,7 +149,7 @@ export async function changelog(input, ctx) {
   const features = [];
   for (const [id, row] of scope) {
     const e = row ?? (await ctx.read({ get: id }));
-    if (!e || !isA(e, 'software.feature') || (e.status !== 'built' && e.status !== 'shipped')) continue;
+    if (!e || !isA(e, 'feature') || (e.status !== 'built' && e.status !== 'shipped')) continue;
     const release = await releaseOf(e.id);
     features.push({ id: e.id, type: e.type, title: e.title, status: e.status, at: e.updated_at, release: release ? { id: release.id, title: release.title, status: release.status, version: release.props.version ?? null } : null });
   }

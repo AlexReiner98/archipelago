@@ -25,7 +25,7 @@ test('a session starting in a repository is asked to account for the commits the
   assert.match(quiet, /1 commits here are not accounted for/, 'a commit nothing holds is named');
   assert.match(quiet, /- aaaaaaa Change 1/);
   // Accounted for once a commit item holds its sha.
-  await make(l, [{ op: 'create', type: 'software.commit', title: 'Change 1', props: { sha: sha(1) } }]);
+  await make(l, [{ op: 'create', type: 'commit', title: 'Change 1', props: { sha: sha(1) } }]);
   assert.deepEqual(await unaccounted(l, [commit(1), commit(2)]), [commit(2)]);
   assert.doesNotMatch(await start([commit(1)], 's1'), /not accounted for/, 'all accounted for: nothing said');
   assert.doesNotMatch(await start(undefined, 's2'), /not accounted for/, 'no commits sent: nothing said');

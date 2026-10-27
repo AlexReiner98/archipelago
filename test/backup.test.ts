@@ -21,12 +21,12 @@ const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<stri
 test('a backup merges into a map that has moved on: nothing is lost, the later edit wins, and twice is the same as once', async () => {
   const a = await fresh();
   const made = await make(a, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Task' },
-    { op: 'create', ref: 'u', type: 'work.task', title: 'Other task' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 't', type: 'task', title: 'Task' },
+    { op: 'create', ref: 'u', type: 'task', title: 'Other task' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
-  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'work.note', title: 'Proposed' }] });
+  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
   // Each map has its own vault: a copy carries the vault's backup beside it.
   const snapshot = async (l: Archipelago) => ({ ...JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))), vault: await dumpVault(l.db) });
   // b starts as a copy of a, then each goes its own way.
@@ -34,12 +34,12 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   await restore(b.db, await snapshot(a));
   const partOf = ((await a.get(made.t)) as any).outgoing[0].relation;
 
-  await make(b, [{ op: 'update', id: made.p, title: 'Proj, renamed in b' }, { op: 'create', type: 'work.note', title: 'Only in b' }]);
+  await make(b, [{ op: 'update', id: made.p, title: 'Proj, renamed in b' }, { op: 'create', type: 'note', title: 'Only in b' }]);
   await make(a, [
     { op: 'update', id: made.t, title: 'Task, renamed in a' },
     { op: 'unlink', relation: partOf },
     { op: 'archive', id: made.u },
-    { op: 'create', ref: 'n', type: 'work.task', title: 'New in a' },
+    { op: 'create', ref: 'n', type: 'task', title: 'New in a' },
     { op: 'link', type: 'part_of', from: 'n', to: made.p },
   ]);
   const [pending] = await a.proposals();
@@ -49,7 +49,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   const count = async (l: Archipelago, table: string) => (await l.db.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0].n;
   const before = [await count(b, 'entity'), await count(b, 'event')];
 
-  const options = { workspace: 'default', sessionTypes: b.registry.family('sys.run') };
+  const options = { workspace: 'default', sessionTypes: b.registry.family('run') };
   const preview = await merge(b.db, from, options);
   assert.deepEqual([preview.applied, await count(b, 'entity'), await count(b, 'event')], [false, ...before], 'looking changes nothing');
   const done = await merge(b.db, from, { ...options, apply: true });
@@ -85,7 +85,7 @@ test('backups are written per workspace, read back, and only the newest are kept
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
   await workspaces.create('acme', 'Acme');
-  await make((await workspaces.get('acme')).pelago, [{ op: 'create', type: 'work.task', title: 'Theirs' }]);
+  await make((await workspaces.get('acme')).pelago, [{ op: 'create', type: 'task', title: 'Theirs' }]);
   const dir = join(root, 'backups');
   assert.equal(newestBackup(dir), undefined);
   for (let i = 0; i < 3; i++) {
@@ -129,10 +129,10 @@ test('backups are written per workspace, read back, and only the newest are kept
 test('search puts the best match first and forgives a slip of the keys', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', type: 'work.note', title: 'Roadmap for the garden app' },
-    { op: 'create', type: 'work.note', title: 'Hosting', body: 'Where the deployment runs.' },
-    { op: 'create', type: 'work.note', title: 'Unrelated', body: 'Mentions hosting once, in passing, among many other words about something else entirely.' },
-    { op: 'create', type: 'work.note', title: 'Nothing to do with it' },
+    { op: 'create', type: 'note', title: 'Roadmap for the garden app' },
+    { op: 'create', type: 'note', title: 'Hosting', body: 'Where the deployment runs.' },
+    { op: 'create', type: 'note', title: 'Unrelated', body: 'Mentions hosting once, in passing, among many other words about something else entirely.' },
+    { op: 'create', type: 'note', title: 'Nothing to do with it' },
   ]);
   const titles = async (q: string) => (await l.search({ q })).map((e) => e.title);
   assert.deepEqual(await titles('hosting'), ['Hosting', 'Unrelated'], 'a title match outranks a newer mention in the notes');
@@ -147,7 +147,7 @@ test('a workspace nobody is using is closed, and opens again with its data', asy
   const workspaces = new Workspaces({ dataDir: join(root, 'data'), rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') });
   await workspaces.get('default');
   const acme = await workspaces.create('acme', 'Acme');
-  await make(acme.pelago, [{ op: 'create', type: 'work.task', title: 'Theirs' }]);
+  await make(acme.pelago, [{ op: 'create', type: 'task', title: 'Theirs' }]);
 
   const release = workspaces.hold('acme');
   assert.deepEqual(await workspaces.closeIdle(0), [], 'not while a request is in hand, and never the default workspace');
@@ -157,7 +157,7 @@ test('a workspace nobody is using is closed, and opens again with its data', asy
   assert.deepEqual([workspaces.isOpen('acme'), workspaces.isOpen('default')], [false, true]);
 
   const again = await workspaces.get('acme');
-  assert.deepEqual((await again.pelago.search({ type: 'work.task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
+  assert.deepEqual((await again.pelago.search({ type: 'task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
   const session = await sessionStart(again.pelago, agent, { title: 'Working' });
   assert.deepEqual(await workspaces.closeIdle(0), [], 'a workspace with an open session stays open, so the session can be seen to go quiet');
   await sessionEnd(again.pelago, agent, { run: session.run, outcome: 'finished', summary: 'done' });
@@ -173,19 +173,19 @@ test('an event is a gate: what holds it by stream, what can follow, and what is 
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
-    { op: 'create', ref: 'app', type: 'work.project', title: 'App' },
-    { op: 'create', ref: 'business', type: 'work.project', title: 'Business' },
-    { op: 'create', ref: 'addin', type: 'software.feature', title: 'Add-in' },
-    { op: 'create', ref: 'installer', type: 'software.feature', title: 'Installer' },
-    { op: 'create', ref: 'docs', type: 'software.feature', title: 'Docs' },
-    { op: 'create', ref: 'sign', type: 'work.task', title: 'Sign the package' },
-    { op: 'create', ref: 'cert', type: 'work.decision', title: 'Which certificate?', owner: 'me' },
-    { op: 'create', ref: 'clean', type: 'work.task', title: 'Uninstall leaves it clean', status: 'done' },
-    { op: 'create', ref: 'hover', type: 'work.task', title: 'Hover cards' },
-    { op: 'create', ref: 'extras', type: 'work.task', title: 'Capture extras' },
-    { op: 'create', ref: 'guide', type: 'work.task', title: 'Write the guide' },
-    { op: 'create', ref: 'pricing', type: 'work.decision', title: 'What does it cost?', owner: 'me' },
-    { op: 'create', ref: 'release', type: 'software.release', title: 'Version 1.0' },
+    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'business', type: 'project', title: 'Business' },
+    { op: 'create', ref: 'addin', type: 'feature', title: 'Add-in' },
+    { op: 'create', ref: 'installer', type: 'feature', title: 'Installer' },
+    { op: 'create', ref: 'docs', type: 'feature', title: 'Docs' },
+    { op: 'create', ref: 'sign', type: 'task', title: 'Sign the package' },
+    { op: 'create', ref: 'cert', type: 'decision', title: 'Which certificate?', owner: 'me' },
+    { op: 'create', ref: 'clean', type: 'task', title: 'Uninstall leaves it clean', status: 'done' },
+    { op: 'create', ref: 'hover', type: 'task', title: 'Hover cards' },
+    { op: 'create', ref: 'extras', type: 'task', title: 'Capture extras' },
+    { op: 'create', ref: 'guide', type: 'task', title: 'Write the guide' },
+    { op: 'create', ref: 'pricing', type: 'decision', title: 'What does it cost?', owner: 'me' },
+    { op: 'create', ref: 'release', type: 'release', title: 'Version 1.0' },
     { op: 'link', type: 'part_of', from: 'addin', to: 'app' },
     { op: 'link', type: 'part_of', from: 'installer', to: 'addin' },
     { op: 'link', type: 'part_of', from: 'docs', to: 'addin' },
@@ -197,7 +197,7 @@ test('an event is a gate: what holds it by stream, what can follow, and what is 
     { op: 'link', type: 'part_of', from: 'guide', to: 'docs' },
     { op: 'link', type: 'part_of', from: 'pricing', to: 'business' },
     { op: 'link', type: 'depends_on', from: 'sign', to: 'cert' },
-    { op: 'link', type: 'software.ships', from: 'release', to: 'addin' },
+    { op: 'link', type: 'ships', from: 'release', to: 'addin' },
     // A feature that holds the event brings its work; a single item sits under the stream it is part of.
     { op: 'link', type: 'depends_on', from: 'release', to: 'installer' },
     { op: 'link', type: 'depends_on', from: 'release', to: 'pricing' },
@@ -245,19 +245,19 @@ test('an event is a gate: what holds it by stream, what can follow, and what is 
 test('a proof question is answered on a build when every test of it passed there', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'work.project', title: 'App' },
-    { op: 'create', ref: 'solver', type: 'software.feature', title: 'Solver' },
-    { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
-    { op: 'create', ref: 'areas', type: 'software.proof', title: 'How do we know the areas are correct?' },
-    { op: 'create', ref: 'noaa', type: 'software.test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa', tolerance: 'within 0.01 degrees' } },
-    { op: 'create', ref: 'pole', type: 'software.test', title: 'Shadow of a pole', status: 'current', props: { entrypoint: 'Sun.PoleShadow' } },
-    { op: 'create', ref: 'square', type: 'software.test', title: 'Area of a square' },
+    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'solver', type: 'feature', title: 'Solver' },
+    { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?' },
+    { op: 'create', ref: 'areas', type: 'proof', title: 'How do we know the areas are correct?' },
+    { op: 'create', ref: 'noaa', type: 'test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa', tolerance: 'within 0.01 degrees' } },
+    { op: 'create', ref: 'pole', type: 'test', title: 'Shadow of a pole', status: 'current', props: { entrypoint: 'Sun.PoleShadow' } },
+    { op: 'create', ref: 'square', type: 'test', title: 'Area of a square' },
     { op: 'link', type: 'part_of', from: 'solver', to: 'app' },
     { op: 'link', type: 'part_of', from: 'sun', to: 'solver' },
     { op: 'link', type: 'about', from: 'areas', to: 'app' },
-    { op: 'link', type: 'software.answers', from: 'noaa', to: 'sun' },
-    { op: 'link', type: 'software.answers', from: 'pole', to: 'sun' },
-    { op: 'link', type: 'software.answers', from: 'square', to: 'areas' },
+    { op: 'link', type: 'answers', from: 'noaa', to: 'sun' },
+    { op: 'link', type: 'answers', from: 'pole', to: 'sun' },
+    { op: 'link', type: 'answers', from: 'square', to: 'areas' },
   ]);
   type Proof = {
     build: string | null;

@@ -83,7 +83,7 @@ test('what a server pack may declare, and the acts on a workspace only once it c
   const control = await openDb();
   const at = { has: async () => true, get: async () => { throw new Error('reached a workspace'); }, hold: () => () => {} } as never;
   const acting = with_({}, { acts: ['workspace.add', 'workspace.deliver', 'connection.make'] }) as ServerPackFile;
-  await assert.rejects(connectAct(at, control, acting, 'workspace.add', { connection: '42', type: 'software.repo', unique: 'remote', items: [] }), /No workspace here has connected "42"/);
+  await assert.rejects(connectAct(at, control, acting, 'workspace.add', { connection: '42', type: 'repo', unique: 'remote', items: [] }), /No workspace here has connected "42"/);
   await assert.rejects(connectAct(at, control, acting, 'workspace.deliver', { connection: '42', event: 'repo.push' }), /No workspace here has connected "42"/);
   await assert.rejects(connectAct(at, control, acting, 'connection.make', { id: '42', state: 'default.guessed' }), /not started from Archipelago/);
 });

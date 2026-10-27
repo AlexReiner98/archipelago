@@ -7,7 +7,7 @@ export async function notify(l: Archipelago, actor: Actor, input: { title: strin
   const { created } = await l.apply(actorId(actor), {
     ops: [
       // A notification from someone's agent is for that someone, whatever the workspace default.
-      { op: 'create', ref: 'n', type: 'sys.notification', title: input.title, body: input.body, visibility: 'private', props: { level: input.level ?? 'info', from: actorId(actor) } },
+      { op: 'create', ref: 'n', type: 'notification', title: input.title, body: input.body, visibility: 'private', props: { level: input.level ?? 'info', from: actorId(actor) } },
       ...(input.about ? [{ op: 'link' as const, type: 'about', from: 'n', to: input.about }] : []),
     ],
     reason: 'Notification',

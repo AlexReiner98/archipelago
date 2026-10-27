@@ -16,8 +16,8 @@ const B = 'b'.repeat(40);
 test('a commit heard only from a push is not accounted for until someone says what it settles', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'heard', type: 'software.commit', title: 'Pushed', props: { sha: A, accounted: false } },
-    { op: 'create', ref: 'own', type: 'software.commit', title: 'Made by its session', props: { sha: B } },
+    { op: 'create', ref: 'heard', type: 'commit', title: 'Pushed', props: { sha: A, accounted: false } },
+    { op: 'create', ref: 'own', type: 'commit', title: 'Made by its session', props: { sha: B } },
   ]);
   const commit = (id: string) => ({ id, message: 'x' });
   assert.deepEqual((await unaccounted(l, [commit(A), commit(B)])).map((c) => c.id), [A], 'the session that starts is told of it');
@@ -31,11 +31,11 @@ test('a pushed commit nobody accounted for is the owner’s attention, by the re
   const l = await fresh();
   await callTool(l, human, 'init', { name: 'Alex' });
   const made = await make(l, [
-    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Shop repo' },
-    { op: 'create', ref: 'heard', type: 'software.commit', title: 'Tidy the cart', props: { sha: A, accounted: false } },
-    { op: 'link', type: 'software.lives_in', from: 'heard', to: 'repo' },
-    { op: 'create', ref: 'own', type: 'software.commit', title: 'Made by its session', props: { sha: B } },
-    { op: 'create', ref: 'task', type: 'work.task', title: 'Fix the cart' },
+    { op: 'create', ref: 'repo', type: 'repo', title: 'Shop repo' },
+    { op: 'create', ref: 'heard', type: 'commit', title: 'Tidy the cart', props: { sha: A, accounted: false } },
+    { op: 'link', type: 'lives_in', from: 'heard', to: 'repo' },
+    { op: 'create', ref: 'own', type: 'commit', title: 'Made by its session', props: { sha: B } },
+    { op: 'create', ref: 'task', type: 'task', title: 'Fix the cart' },
   ]);
   const titles = (a: { items: { title: string }[] }) => a.items.map((i) => i.title);
 
@@ -56,7 +56,7 @@ test('a pushed commit nobody accounted for is the owner’s attention, by the re
   // Accounted for: its links, and accounted true. It leaves attention.
   await make(l, [
     { op: 'update', id: made.heard, props: { accounted: true } },
-    { op: 'link', type: 'software.settles', from: made.heard, to: made.task },
+    { op: 'link', type: 'settles', from: made.heard, to: made.task },
   ]);
   assert.ok(!titles(await attend(l, { person: 'me' })).includes('Tidy the cart'));
 });

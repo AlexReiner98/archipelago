@@ -22,7 +22,7 @@ async function withDocument() {
   registries.push(reg);
   const db = await openDb();
   const l = new Archipelago(db, reg);
-  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'work.document', title: 'Landing', visibility: 'shared', body: 'What it is, in a line.' }] });
+  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'Landing', visibility: 'shared', body: 'What it is, in a line.' }] });
   return { l, db, doc: (made as { created: Record<string, string> }).created.d };
 }
 

@@ -56,7 +56,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -85,7 +85,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "changed": "<time>",
@@ -110,7 +110,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "changed": "<time>",
@@ -137,7 +137,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -164,7 +164,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -188,7 +188,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -212,7 +212,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -236,7 +236,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "changed": "<time>",
@@ -260,7 +260,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "changed": "<time>",
@@ -284,7 +284,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.issue"
+     "type": "issue"
     },
     {
      "changed": "<time>",
@@ -302,7 +302,7 @@
      "status": "planned",
      "title": "App",
      "top": null,
-     "type": "work.project"
+     "type": "project"
     },
     {
      "changed": "<time>",
@@ -326,7 +326,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "software.feature"
+     "type": "feature"
     }
    ],
    "person": null,
@@ -380,7 +380,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "changed": "<time>",
@@ -409,7 +409,7 @@
       "id": "<business>",
       "title": "Business"
      },
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "changed": "<time>",
@@ -437,7 +437,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "changed": "<time>",
@@ -462,7 +462,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "changed": "<time>",
@@ -483,7 +483,7 @@
      "status": "upcoming",
      "title": "Version 1.0",
      "top": null,
-     "type": "software.release"
+     "type": "release"
     },
     {
      "changed": "<time>",
@@ -510,7 +510,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -537,7 +537,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -561,7 +561,7 @@
       "id": "<business>",
       "title": "Business"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -585,7 +585,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -609,7 +609,7 @@
       "id": "<business>",
       "title": "Business"
      },
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "changed": "<time>",
@@ -633,7 +633,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.task"
+     "type": "task"
     },
     {
      "changed": "<time>",
@@ -657,7 +657,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "changed": "<time>",
@@ -681,7 +681,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "work.issue"
+     "type": "issue"
     },
     {
      "changed": "<time>",
@@ -699,7 +699,7 @@
      "status": "planned",
      "title": "Business",
      "top": null,
-     "type": "work.project"
+     "type": "project"
     },
     {
      "changed": "<time>",
@@ -717,7 +717,7 @@
      "status": "planned",
      "title": "App",
      "top": null,
-     "type": "work.project"
+     "type": "project"
     },
     {
      "changed": "<time>",
@@ -741,7 +741,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "software.feature"
+     "type": "feature"
     }
    ],
    "person": "<me>",
@@ -774,13 +774,13 @@
      "id": "<addin>",
      "status": "planned",
      "title": "Add-in",
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "id": "<app>",
      "status": "planned",
      "title": "App",
-     "type": "work.project"
+     "type": "project"
     }
    ],
    "repo": {
@@ -788,7 +788,7 @@
     "path": "C:\\code\\Apex",
     "status": "active",
     "title": "Apex repo",
-    "type": "software.repo"
+    "type": "repo"
    },
    "root_blockers": [
     {
@@ -804,7 +804,7 @@
     "id": "<hover>",
     "status": "doing",
     "title": "Hover cards",
-    "type": "work.task"
+    "type": "task"
    },
    "text": "# Hover cards\nTask, doing. Archipelago id: <hover>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Bo (person, active)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <hover>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <hover>, end its message with the line \"Closes: <hover>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
    "ties": []
@@ -817,13 +817,13 @@
      "id": "<addin>",
      "status": "planned",
      "title": "Add-in",
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "id": "<app>",
      "status": "planned",
      "title": "App",
-     "type": "work.project"
+     "type": "project"
     }
    ],
    "repo": {
@@ -831,14 +831,14 @@
     "path": "C:\\code\\Apex",
     "status": "active",
     "title": "Apex repo",
-    "type": "software.repo"
+    "type": "repo"
    },
    "root_blockers": [],
    "task": {
     "id": "<installer>",
     "status": "building",
     "title": "Installer",
-    "type": "software.feature"
+    "type": "feature"
    },
    "text": "# Installer\nFeature, building. Archipelago id: <installer>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <installer>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <installer>, end its message with the line \"Closes: <installer>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
    "ties": []
@@ -852,7 +852,7 @@
       "owner": "<me>",
       "status": "open",
       "title": "Which certificate?",
-      "type": "work.decision"
+      "type": "decision"
      },
      "why": "depends_on"
     }
@@ -871,19 +871,19 @@
      "id": "<installer>",
      "status": "building",
      "title": "Installer",
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "id": "<addin>",
      "status": "planned",
      "title": "Add-in",
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "id": "<app>",
      "status": "planned",
      "title": "App",
-     "type": "work.project"
+     "type": "project"
     }
    ],
    "repo": {
@@ -891,7 +891,7 @@
     "path": "C:\\code\\Apex",
     "status": "active",
     "title": "Apex repo",
-    "type": "software.repo"
+    "type": "repo"
    },
    "root_blockers": [
     {
@@ -900,30 +900,30 @@
      "owner": "<me>",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     }
    ],
    "task": {
     "id": "<sign>",
     "status": "todo",
     "title": "Sign the package",
-    "type": "work.task"
+    "type": "task"
    },
-   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (work.decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Relates to\n- Is the cert enough? (open)\n\n## Is governed by\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, end its message with the line \"Closes: <sign>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is governed by\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, end its message with the line \"Closes: <sign>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
    "ties": [
     {
-     "id": "<q>",
-     "relation": "relates_to",
-     "status": "open",
-     "title": "Is the cert enough?",
-     "type": "work.decision"
-    },
-    {
      "id": "<rule>",
-     "relation": "work.governed_by",
+     "relation": "governed_by",
      "status": "decided",
      "title": "One live lane.",
-     "type": "work.decision"
+     "type": "decision"
+    },
+    {
+     "id": "<q>",
+     "relation": "link",
+     "status": "open",
+     "title": "Is the cert enough?",
+     "type": "decision"
     }
    ]
   },
@@ -935,7 +935,7 @@
      "id": "<release>",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "software.release"
+     "type": "release"
     }
    ]
   },
@@ -947,7 +947,7 @@
      "relation": "<link>",
      "status": "doing",
      "title": "Hover cards",
-     "type": "work.task"
+     "type": "task"
     }
    ],
    "clear": false,
@@ -964,7 +964,7 @@
     "open": true,
     "status": "upcoming",
     "title": "Version 1.0",
-    "type": "software.release"
+    "type": "release"
    },
    "how": "To sort an item: link the event to it with depends_on (the event waits for it) or defers (it can follow). To move one across, unlink the link given here and link the other.",
    "proof": null,
@@ -978,13 +978,13 @@
        "id": "<sign>",
        "status": "todo",
        "title": "Sign the package",
-       "type": "work.task",
+       "type": "task",
        "waiting_on": [
         {
          "id": "<cert>",
          "status": "open",
          "title": "Which certificate?",
-         "type": "work.decision"
+         "type": "decision"
         }
        ],
        "yours": true
@@ -995,7 +995,7 @@
        "id": "<cert>",
        "status": "open",
        "title": "Which certificate?",
-       "type": "work.decision",
+       "type": "decision",
        "waiting_on": [],
        "yours": true
       },
@@ -1005,7 +1005,7 @@
        "id": "<q>",
        "status": "open",
        "title": "Is the cert enough?",
-       "type": "work.decision",
+       "type": "decision",
        "waiting_on": [],
        "yours": false
       },
@@ -1015,7 +1015,7 @@
        "id": "<clean>",
        "status": "done",
        "title": "Uninstall leaves it clean",
-       "type": "work.task",
+       "type": "task",
        "waiting_on": [],
        "yours": false
       }
@@ -1027,7 +1027,7 @@
      "relation": "<link>",
      "status": "building",
      "title": "Installer",
-     "type": "software.feature",
+     "type": "feature",
      "yours": 2
     },
     {
@@ -1040,7 +1040,7 @@
        "relation": "<link>",
        "status": "open",
        "title": "What does it cost?",
-       "type": "work.decision",
+       "type": "decision",
        "waiting_on": [],
        "yours": true
       }
@@ -1051,7 +1051,7 @@
      },
      "status": "planned",
      "title": "Business",
-     "type": "work.project",
+     "type": "project",
      "yours": 1
     }
    ],
@@ -1064,7 +1064,7 @@
       "title": "Add-in"
      },
      "title": "Capture extras",
-     "type": "work.task"
+     "type": "task"
     },
     {
      "id": "<bug>",
@@ -1074,7 +1074,7 @@
       "title": "Docs"
      },
      "title": "Crash on thin walls",
-     "type": "work.issue"
+     "type": "issue"
     },
     {
      "id": "<guide>",
@@ -1084,7 +1084,7 @@
       "title": "Docs"
      },
      "title": "Write the guide",
-     "type": "work.task"
+     "type": "task"
     }
    ]
   },
@@ -1094,7 +1094,7 @@
      "from": "<app>",
      "id": "<link>",
      "to": "<repo>",
-     "type": "software.lives_in"
+     "type": "lives_in"
     },
     {
      "from": "<addin>",
@@ -1196,13 +1196,13 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "software.ships"
+     "type": "ships"
     },
     {
      "from": "<release>",
@@ -1233,7 +1233,7 @@
      "kind": "work",
      "open": true,
      "order": 2,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Add-in",
      "tokens": {
@@ -1242,7 +1242,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -1252,7 +1252,7 @@
      "id": "<app>",
      "kind": "work",
      "open": true,
-     "root": "work.project",
+     "root": "project",
      "status": "planned",
      "title": "App",
      "tokens": {
@@ -1261,7 +1261,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "work.project",
+     "type": "project",
      "work": true
     },
     {
@@ -1272,7 +1272,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -1280,7 +1280,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -1290,7 +1290,7 @@
      "id": "<docs>",
      "kind": "work",
      "open": true,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Docs",
      "tokens": {
@@ -1298,7 +1298,7 @@
       "partial": true,
       "used": 500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -1308,14 +1308,14 @@
      "id": "<hover>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "doing",
      "title": "Hover cards",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1325,14 +1325,14 @@
      "id": "<extras>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Capture extras",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1344,7 +1344,7 @@
      "root": "event",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "software.release"
+     "type": "release"
     },
     {
      "blocked": false,
@@ -1352,10 +1352,10 @@
      "id": "<repo>",
      "kind": "place",
      "open": true,
-     "root": "software.repo",
+     "root": "repo",
      "status": "active",
      "title": "Apex repo",
-     "type": "software.repo"
+     "type": "repo"
     },
     {
      "blocked": true,
@@ -1364,14 +1364,14 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1380,10 +1380,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -1392,14 +1392,14 @@
      "id": "<guide>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Write the guide",
      "tokens": {
       "estimated": 2000,
       "used": 500
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1409,14 +1409,14 @@
      "id": "<bug>",
      "kind": "work",
      "open": true,
-     "root": "work.issue",
+     "root": "issue",
      "status": "open",
      "title": "Crash on thin walls",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.issue",
+     "type": "issue",
      "work": true
     },
     {
@@ -1426,14 +1426,14 @@
      "id": "<loose>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Loose task in app",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1442,10 +1442,10 @@
      "id": "<q>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -1464,10 +1464,10 @@
      "id": "<pricing>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "What does it cost?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -1476,14 +1476,14 @@
      "id": "<business>",
      "kind": "work",
      "open": true,
-     "root": "work.project",
+     "root": "project",
      "status": "planned",
      "title": "Business",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.project",
+     "type": "project",
      "work": true
     },
     {
@@ -1542,13 +1542,13 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "software.ships"
+     "type": "ships"
     },
     {
      "from": "<release>",
@@ -1567,7 +1567,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -1575,7 +1575,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -1586,7 +1586,7 @@
      "kind": "work",
      "open": true,
      "order": 2,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Add-in",
      "tokens": {
@@ -1595,7 +1595,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -1605,14 +1605,14 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1621,10 +1621,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -1633,7 +1633,7 @@
      "id": "<clean>",
      "kind": "work",
      "open": false,
-     "root": "work.task",
+     "root": "task",
      "status": "done",
      "title": "Uninstall leaves it clean",
      "tokens": {
@@ -1641,7 +1641,7 @@
       "estimated": 1000,
       "used": 1000
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1650,10 +1650,10 @@
      "id": "<q>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": true,
@@ -1664,7 +1664,7 @@
      "root": "event",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "software.release"
+     "type": "release"
     }
    ],
    "preset": "all"
@@ -1759,13 +1759,13 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "software.ships"
+     "type": "ships"
     },
     {
      "from": "<release>",
@@ -1796,7 +1796,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -1804,7 +1804,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -1815,7 +1815,7 @@
      "kind": "work",
      "open": true,
      "order": 2,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Add-in",
      "tokens": {
@@ -1824,7 +1824,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -1834,14 +1834,14 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1850,10 +1850,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -1862,7 +1862,7 @@
      "id": "<clean>",
      "kind": "work",
      "open": false,
-     "root": "work.task",
+     "root": "task",
      "status": "done",
      "title": "Uninstall leaves it clean",
      "tokens": {
@@ -1870,7 +1870,7 @@
       "estimated": 1000,
       "used": 1000
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1879,10 +1879,10 @@
      "id": "<q>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": true,
@@ -1893,7 +1893,7 @@
      "root": "event",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "software.release"
+     "type": "release"
     },
     {
      "blocked": false,
@@ -1902,7 +1902,7 @@
      "id": "<app>",
      "kind": "work",
      "open": true,
-     "root": "work.project",
+     "root": "project",
      "status": "planned",
      "title": "App",
      "tokens": {
@@ -1911,7 +1911,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "work.project",
+     "type": "project",
      "work": true
     },
     {
@@ -1921,7 +1921,7 @@
      "id": "<docs>",
      "kind": "work",
      "open": true,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Docs",
      "tokens": {
@@ -1929,7 +1929,7 @@
       "partial": true,
       "used": 500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -1939,14 +1939,14 @@
      "id": "<hover>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "doing",
      "title": "Hover cards",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1956,14 +1956,14 @@
      "id": "<extras>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Capture extras",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -1973,14 +1973,14 @@
      "id": "<guide>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Write the guide",
      "tokens": {
       "estimated": 2000,
       "used": 500
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2000,10 +2000,10 @@
      "id": "<pricing>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "What does it cost?",
-     "type": "work.decision"
+     "type": "decision"
     }
    ],
    "preset": "all"
@@ -2050,13 +2050,13 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "software.ships"
+     "type": "ships"
     },
     {
      "from": "<release>",
@@ -2074,14 +2074,14 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2092,7 +2092,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -2100,7 +2100,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2109,10 +2109,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -2131,10 +2131,10 @@
      "id": "<q>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -2144,7 +2144,7 @@
      "kind": "work",
      "open": true,
      "order": 2,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Add-in",
      "tokens": {
@@ -2153,7 +2153,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2165,7 +2165,7 @@
      "root": "event",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "software.release"
+     "type": "release"
     }
    ],
    "preset": "all"
@@ -2230,13 +2230,13 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "software.ships"
+     "type": "ships"
     },
     {
      "from": "<release>",
@@ -2254,7 +2254,7 @@
      "id": "<clean>",
      "kind": "work",
      "open": false,
-     "root": "work.task",
+     "root": "task",
      "status": "done",
      "title": "Uninstall leaves it clean",
      "tokens": {
@@ -2262,7 +2262,7 @@
       "estimated": 1000,
       "used": 1000
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2273,7 +2273,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -2281,7 +2281,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2291,14 +2291,14 @@
      "id": "<guide>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Write the guide",
      "tokens": {
       "estimated": 2000,
       "used": 500
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2309,7 +2309,7 @@
      "kind": "work",
      "open": true,
      "order": 2,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Add-in",
      "tokens": {
@@ -2318,7 +2318,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2328,14 +2328,14 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2344,10 +2344,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -2356,7 +2356,7 @@
      "id": "<docs>",
      "kind": "work",
      "open": true,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Docs",
      "tokens": {
@@ -2364,7 +2364,7 @@
       "partial": true,
       "used": 500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2373,10 +2373,10 @@
      "id": "<q>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": true,
@@ -2387,7 +2387,7 @@
      "root": "event",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "software.release"
+     "type": "release"
     }
    ],
    "preset": "all"
@@ -2398,7 +2398,7 @@
      "from": "<app>",
      "id": "<link>",
      "to": "<repo>",
-     "type": "software.lives_in"
+     "type": "lives_in"
     },
     {
      "from": "<addin>",
@@ -2476,7 +2476,7 @@
      "id": "<app>",
      "kind": "work",
      "open": true,
-     "root": "work.project",
+     "root": "project",
      "status": "planned",
      "title": "App",
      "tokens": {
@@ -2485,7 +2485,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "work.project",
+     "type": "project",
      "work": true
     },
     {
@@ -2494,10 +2494,10 @@
      "id": "<repo>",
      "kind": "place",
      "open": true,
-     "root": "software.repo",
+     "root": "repo",
      "status": "active",
      "title": "Apex repo",
-     "type": "software.repo"
+     "type": "repo"
     },
     {
      "blocked": false,
@@ -2507,7 +2507,7 @@
      "kind": "work",
      "open": true,
      "order": 2,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Add-in",
      "tokens": {
@@ -2516,7 +2516,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2526,14 +2526,14 @@
      "id": "<loose>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Loose task in app",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2544,7 +2544,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -2552,7 +2552,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2562,7 +2562,7 @@
      "id": "<docs>",
      "kind": "work",
      "open": true,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Docs",
      "tokens": {
@@ -2570,7 +2570,7 @@
       "partial": true,
       "used": 500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2580,14 +2580,14 @@
      "id": "<hover>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "doing",
      "title": "Hover cards",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2597,14 +2597,14 @@
      "id": "<extras>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Capture extras",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2614,14 +2614,14 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2630,10 +2630,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -2642,14 +2642,14 @@
      "id": "<guide>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Write the guide",
      "tokens": {
       "estimated": 2000,
       "used": 500
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2659,14 +2659,14 @@
      "id": "<bug>",
      "kind": "work",
      "open": true,
-     "root": "work.issue",
+     "root": "issue",
      "status": "open",
      "title": "Crash on thin walls",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.issue",
+     "type": "issue",
      "work": true
     },
     {
@@ -2675,10 +2675,10 @@
      "id": "<q>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "work.decision"
+     "type": "decision"
     }
    ],
    "preset": "structure"
@@ -2695,7 +2695,7 @@
      "from": "<app>",
      "id": "<link>",
      "to": "<repo>",
-     "type": "software.lives_in"
+     "type": "lives_in"
     },
     {
      "from": "<bug>",
@@ -2779,7 +2779,7 @@
      "from": "<release>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "software.ships"
+     "type": "ships"
     },
     {
      "from": "<release>",
@@ -2803,7 +2803,7 @@
      "from": "<run>",
      "id": "<link>",
      "to": "<hover>",
-     "type": "sys.works_on"
+     "type": "works_on"
     },
     {
      "from": "<sign>",
@@ -2827,7 +2827,7 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<tiers>",
@@ -2857,7 +2857,7 @@
      "kind": "work",
      "open": true,
      "order": 2,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Add-in",
      "tokens": {
@@ -2866,7 +2866,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2876,7 +2876,7 @@
      "id": "<app>",
      "kind": "work",
      "open": true,
-     "root": "work.project",
+     "root": "project",
      "status": "planned",
      "title": "App",
      "tokens": {
@@ -2885,7 +2885,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "work.project",
+     "type": "project",
      "work": true
     },
     {
@@ -2895,14 +2895,14 @@
      "id": "<bug>",
      "kind": "work",
      "open": true,
-     "root": "work.issue",
+     "root": "issue",
      "status": "open",
      "title": "Crash on thin walls",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.issue",
+     "type": "issue",
      "work": true
     },
     {
@@ -2912,14 +2912,14 @@
      "id": "<business>",
      "kind": "work",
      "open": true,
-     "root": "work.project",
+     "root": "project",
      "status": "planned",
      "title": "Business",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.project",
+     "type": "project",
      "work": true
     },
     {
@@ -2929,7 +2929,7 @@
      "id": "<docs>",
      "kind": "work",
      "open": true,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Docs",
      "tokens": {
@@ -2937,7 +2937,7 @@
       "partial": true,
       "used": 500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2948,7 +2948,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -2956,7 +2956,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -2966,14 +2966,14 @@
      "id": "<loose>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Loose task in app",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -2983,14 +2983,14 @@
      "id": "<plans>",
      "kind": "work",
      "open": true,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Price plans",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -3000,14 +3000,14 @@
      "id": "<tiers>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Write the tiers",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3017,14 +3017,14 @@
      "id": "<guide>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Write the guide",
      "tokens": {
       "estimated": 2000,
       "used": 500
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3044,10 +3044,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -3066,10 +3066,10 @@
      "id": "<pricing>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "What does it cost?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -3077,10 +3077,10 @@
      "id": "<q>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -3088,10 +3088,10 @@
      "id": "<repo>",
      "kind": "place",
      "open": true,
-     "root": "software.repo",
+     "root": "repo",
      "status": "active",
      "title": "Apex repo",
-     "type": "software.repo"
+     "type": "repo"
     },
     {
      "blocked": false,
@@ -3099,10 +3099,10 @@
      "id": "<run>",
      "kind": "system",
      "open": true,
-     "root": "sys.run",
+     "root": "run",
      "status": "running",
      "title": "Pinning session",
-     "type": "sys.run"
+     "type": "run"
     },
     {
      "blocked": false,
@@ -3122,14 +3122,14 @@
      "id": "<extras>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Capture extras",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3139,14 +3139,14 @@
      "id": "<hover>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "doing",
      "title": "Hover cards",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3156,14 +3156,14 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3175,7 +3175,7 @@
      "root": "event",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "software.release"
+     "type": "release"
     }
    ],
    "preset": "all"
@@ -3228,7 +3228,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -3236,7 +3236,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -3256,10 +3256,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -3278,10 +3278,10 @@
      "id": "<pricing>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "What does it cost?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": true,
@@ -3290,14 +3290,14 @@
      "id": "<extras>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Capture extras",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3307,14 +3307,14 @@
      "id": "<hover>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "doing",
      "title": "Hover cards",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3324,14 +3324,14 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3343,7 +3343,7 @@
      "root": "event",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "software.release"
+     "type": "release"
     }
    ],
    "preset": "blocking"
@@ -3360,7 +3360,7 @@
      "from": "<app>",
      "id": "<link>",
      "to": "<repo>",
-     "type": "software.lives_in"
+     "type": "lives_in"
     },
     {
      "from": "<bug>",
@@ -3468,7 +3468,7 @@
      "kind": "work",
      "open": true,
      "order": 2,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Add-in",
      "tokens": {
@@ -3477,7 +3477,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -3487,7 +3487,7 @@
      "id": "<app>",
      "kind": "work",
      "open": true,
-     "root": "work.project",
+     "root": "project",
      "status": "planned",
      "title": "App",
      "tokens": {
@@ -3496,7 +3496,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "work.project",
+     "type": "project",
      "work": true
     },
     {
@@ -3506,14 +3506,14 @@
      "id": "<bug>",
      "kind": "work",
      "open": true,
-     "root": "work.issue",
+     "root": "issue",
      "status": "open",
      "title": "Crash on thin walls",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.issue",
+     "type": "issue",
      "work": true
     },
     {
@@ -3523,14 +3523,14 @@
      "id": "<business>",
      "kind": "work",
      "open": true,
-     "root": "work.project",
+     "root": "project",
      "status": "planned",
      "title": "Business",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.project",
+     "type": "project",
      "work": true
     },
     {
@@ -3540,7 +3540,7 @@
      "id": "<docs>",
      "kind": "work",
      "open": true,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Docs",
      "tokens": {
@@ -3548,7 +3548,7 @@
       "partial": true,
       "used": 500
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -3559,7 +3559,7 @@
      "kind": "work",
      "open": true,
      "order": 1,
-     "root": "software.feature",
+     "root": "feature",
      "status": "building",
      "title": "Installer",
      "tokens": {
@@ -3567,7 +3567,7 @@
       "estimated": 5000,
       "used": 1000
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -3577,14 +3577,14 @@
      "id": "<loose>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Loose task in app",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3594,14 +3594,14 @@
      "id": "<old>",
      "kind": "work",
      "open": false,
-     "root": "software.feature",
+     "root": "feature",
      "status": "shipped",
      "title": "Old feature",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -3611,14 +3611,14 @@
      "id": "<plans>",
      "kind": "work",
      "open": true,
-     "root": "software.feature",
+     "root": "feature",
      "status": "planned",
      "title": "Price plans",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "software.feature",
+     "type": "feature",
      "work": true
     },
     {
@@ -3628,14 +3628,14 @@
      "id": "<tiers>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Write the tiers",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3645,7 +3645,7 @@
      "id": "<clean>",
      "kind": "work",
      "open": false,
-     "root": "work.task",
+     "root": "task",
      "status": "done",
      "title": "Uninstall leaves it clean",
      "tokens": {
@@ -3653,7 +3653,7 @@
       "estimated": 1000,
       "used": 1000
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3663,14 +3663,14 @@
      "id": "<guide>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Write the guide",
      "tokens": {
       "estimated": 2000,
       "used": 500
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3679,10 +3679,10 @@
      "id": "<cert>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Which certificate?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -3690,10 +3690,10 @@
      "id": "<pricing>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "What does it cost?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -3701,10 +3701,10 @@
      "id": "<q>",
      "kind": "question",
      "open": true,
-     "root": "work.decision",
+     "root": "decision",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "work.decision"
+     "type": "decision"
     },
     {
      "blocked": false,
@@ -3712,10 +3712,10 @@
      "id": "<repo>",
      "kind": "place",
      "open": true,
-     "root": "software.repo",
+     "root": "repo",
      "status": "active",
      "title": "Apex repo",
-     "type": "software.repo"
+     "type": "repo"
     },
     {
      "blocked": true,
@@ -3724,14 +3724,14 @@
      "id": "<extras>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Capture extras",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3741,14 +3741,14 @@
      "id": "<hover>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "doing",
      "title": "Hover cards",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     },
     {
@@ -3758,21 +3758,21 @@
      "id": "<sign>",
      "kind": "work",
      "open": true,
-     "root": "work.task",
+     "root": "task",
      "status": "todo",
      "title": "Sign the package",
      "tokens": {
       "estimated": 4000,
       "used": 0
      },
-     "type": "work.task",
+     "type": "task",
      "work": true
     }
    ],
    "preset": "structure"
   },
   "handoff repo": {
-   "how": "Nobody has written a handoff note for this repository. To write the first, create a software.handoff and link it software.lives_in to <repo> in the same change; this view finds it from then on. Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be 3000 characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.",
+   "how": "Nobody has written a handoff note for this repository. To write the first, create a handoff and link it lives_in to <repo> in the same change; this view finds it from then on. Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be 3000 characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.",
    "last_push": null,
    "note": null,
    "open": {
@@ -3781,7 +3781,7 @@
       "id": "<sign>",
       "status": "todo",
       "title": "Sign the package",
-      "type": "work.task",
+      "type": "task",
       "waiting_on": [
        "Which certificate?"
       ]
@@ -3790,7 +3790,7 @@
       "id": "<hover>",
       "status": "doing",
       "title": "Hover cards",
-      "type": "work.task",
+      "type": "task",
       "waiting_on": [
        "Bo"
       ]
@@ -3799,7 +3799,7 @@
       "id": "<extras>",
       "status": "todo",
       "title": "Capture extras",
-      "type": "work.task",
+      "type": "task",
       "waiting_on": [
        "Bo"
       ]
@@ -3810,31 +3810,31 @@
       "id": "<guide>",
       "status": "todo",
       "title": "Write the guide",
-      "type": "work.task"
+      "type": "task"
      },
      {
       "id": "<cert>",
       "status": "open",
       "title": "Which certificate?",
-      "type": "work.decision"
+      "type": "decision"
      },
      {
       "id": "<loose>",
       "status": "todo",
       "title": "Loose task in app",
-      "type": "work.task"
+      "type": "task"
      },
      {
       "id": "<q>",
       "status": "open",
       "title": "Is the cert enough?",
-      "type": "work.decision"
+      "type": "decision"
      },
      {
       "id": "<bug>",
       "status": "open",
       "title": "Crash on thin walls",
-      "type": "work.issue"
+      "type": "issue"
      }
     ]
    },
@@ -3863,7 +3863,7 @@
       "id": "<addin>",
       "inside": 9,
       "title": "Add-in",
-      "type": "software.feature",
+      "type": "feature",
       "views": 0
      },
      {
@@ -3871,7 +3871,7 @@
       "id": "<installer>",
       "inside": 3,
       "title": "Installer",
-      "type": "software.feature",
+      "type": "feature",
       "views": 0
      },
      {
@@ -3879,7 +3879,7 @@
       "id": "<docs>",
       "inside": 2,
       "title": "Docs",
-      "type": "software.feature",
+      "type": "feature",
       "views": 0
      }
     ]
@@ -3893,7 +3893,7 @@
      "id": "<app>",
      "inside": 11,
      "title": "App",
-     "type": "work.project",
+     "type": "project",
      "views": 1
     },
     {
@@ -3901,7 +3901,7 @@
      "id": "<addin>",
      "inside": 9,
      "title": "Add-in",
-     "type": "software.feature",
+     "type": "feature",
      "views": 0
     },
     {
@@ -3909,7 +3909,7 @@
      "id": "<installer>",
      "inside": 3,
      "title": "Installer",
-     "type": "software.feature",
+     "type": "feature",
      "views": 0
     },
     {
@@ -3917,7 +3917,7 @@
      "id": "<docs>",
      "inside": 2,
      "title": "Docs",
-     "type": "software.feature",
+     "type": "feature",
      "views": 0
     }
    ],
@@ -3931,7 +3931,7 @@
      "id": "<app>",
      "inside": 11,
      "title": "App",
-     "type": "work.project",
+     "type": "project",
      "views": 1
     },
     {
@@ -3939,7 +3939,7 @@
      "id": "<addin>",
      "inside": 9,
      "title": "Add-in",
-     "type": "software.feature",
+     "type": "feature",
      "views": 0
     },
     {
@@ -3947,7 +3947,7 @@
      "id": "<installer>",
      "inside": 3,
      "title": "Installer",
-     "type": "software.feature",
+     "type": "feature",
      "views": 0
     },
     {
@@ -3955,7 +3955,7 @@
      "id": "<docs>",
      "inside": 2,
      "title": "Docs",
-     "type": "software.feature",
+     "type": "feature",
      "views": 0
     }
    ],
@@ -3977,7 +3977,7 @@
      "sessions": [],
      "status": "building",
      "title": "Installer",
-     "type": "software.feature",
+     "type": "feature",
      "work": [
       {
        "active": false,
@@ -3987,7 +3987,7 @@
        "sessions": [],
        "status": "todo",
        "title": "Sign the package",
-       "type": "work.task"
+       "type": "task"
       },
       {
        "active": false,
@@ -3997,7 +3997,7 @@
        "sessions": [],
        "status": "done",
        "title": "Uninstall leaves it clean",
-       "type": "work.task"
+       "type": "task"
       }
      ]
     },
@@ -4015,7 +4015,7 @@
      "sessions": [],
      "status": "planned",
      "title": "Docs",
-     "type": "software.feature",
+     "type": "feature",
      "work": [
       {
        "active": false,
@@ -4025,7 +4025,7 @@
        "sessions": [],
        "status": "todo",
        "title": "Write the guide",
-       "type": "work.task"
+       "type": "task"
       },
       {
        "active": false,
@@ -4035,7 +4035,7 @@
        "sessions": [],
        "status": "open",
        "title": "Crash on thin walls",
-       "type": "work.issue"
+       "type": "issue"
       }
      ]
     }
@@ -4064,7 +4064,7 @@
      "sessions": [],
      "status": "building",
      "title": "Installer",
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "active": true,
@@ -4080,7 +4080,7 @@
      ],
      "status": "doing",
      "title": "Hover cards",
-     "type": "work.task"
+     "type": "task"
     }
    ],
    "progress": {
@@ -4091,7 +4091,7 @@
     "id": "<addin>",
     "status": "planned",
     "title": "Add-in",
-    "type": "software.feature"
+    "type": "feature"
    },
    "tree": {
     "id": "software.roadmap",
@@ -4111,7 +4111,7 @@
      ],
      "status": "doing",
      "title": "Hover cards",
-     "type": "work.task"
+     "type": "task"
     },
     {
      "active": false,
@@ -4121,7 +4121,7 @@
      "sessions": [],
      "status": "todo",
      "title": "Capture extras",
-     "type": "work.task"
+     "type": "task"
     }
    ]
   },
@@ -4145,7 +4145,7 @@
        "sessions": [],
        "status": "building",
        "title": "Installer",
-       "type": "software.feature",
+       "type": "feature",
        "work": [
         {
          "active": false,
@@ -4155,7 +4155,7 @@
          "sessions": [],
          "status": "todo",
          "title": "Sign the package",
-         "type": "work.task"
+         "type": "task"
         },
         {
          "active": false,
@@ -4165,7 +4165,7 @@
          "sessions": [],
          "status": "done",
          "title": "Uninstall leaves it clean",
-         "type": "work.task"
+         "type": "task"
         }
        ]
       },
@@ -4183,7 +4183,7 @@
        "sessions": [],
        "status": "planned",
        "title": "Docs",
-       "type": "software.feature",
+       "type": "feature",
        "work": [
         {
          "active": false,
@@ -4193,7 +4193,7 @@
          "sessions": [],
          "status": "todo",
          "title": "Write the guide",
-         "type": "work.task"
+         "type": "task"
         },
         {
          "active": false,
@@ -4203,7 +4203,7 @@
          "sessions": [],
          "status": "open",
          "title": "Crash on thin walls",
-         "type": "work.issue"
+         "type": "issue"
         }
        ]
       }
@@ -4218,7 +4218,7 @@
      "sessions": [],
      "status": "planned",
      "title": "Add-in",
-     "type": "software.feature",
+     "type": "feature",
      "work": [
       {
        "active": true,
@@ -4233,7 +4233,7 @@
        ],
        "status": "doing",
        "title": "Hover cards",
-       "type": "work.task"
+       "type": "task"
       },
       {
        "active": false,
@@ -4243,7 +4243,7 @@
        "sessions": [],
        "status": "todo",
        "title": "Capture extras",
-       "type": "work.task"
+       "type": "task"
       }
      ]
     },
@@ -4261,7 +4261,7 @@
      "sessions": [],
      "status": "shipped",
      "title": "Old feature",
-     "type": "software.feature",
+     "type": "feature",
      "work": []
     }
    ],
@@ -4292,7 +4292,7 @@
      "sessions": [],
      "status": "building",
      "title": "Installer",
-     "type": "software.feature"
+     "type": "feature"
     },
     {
      "active": true,
@@ -4310,7 +4310,7 @@
      ],
      "status": "doing",
      "title": "Hover cards",
-     "type": "work.task"
+     "type": "task"
     }
    ],
    "progress": {
@@ -4321,7 +4321,7 @@
     "id": "<app>",
     "status": "planned",
     "title": "App",
-    "type": "work.project"
+    "type": "project"
    },
    "tree": {
     "id": "software.roadmap",
@@ -4336,7 +4336,7 @@
      "sessions": [],
      "status": "todo",
      "title": "Loose task in app",
-     "type": "work.task"
+     "type": "task"
     }
    ]
   },
@@ -4356,7 +4356,7 @@
      "sessions": [],
      "status": "planned",
      "title": "Price plans",
-     "type": "software.feature",
+     "type": "feature",
      "work": [
       {
        "active": false,
@@ -4366,7 +4366,7 @@
        "sessions": [],
        "status": "todo",
        "title": "Write the tiers",
-       "type": "work.task"
+       "type": "task"
       }
      ]
     }
@@ -4384,7 +4384,7 @@
     "id": "<business>",
     "status": "planned",
     "title": "Business",
-    "type": "work.project"
+    "type": "project"
    },
    "tree": {
     "id": "software.roadmap",
@@ -4399,14 +4399,14 @@
      "id": "<app>",
      "status": "planned",
      "title": "App",
-     "type": "work.project"
+     "type": "project"
     },
     {
      "branches": 1,
      "id": "<business>",
      "status": "planned",
      "title": "Business",
-     "type": "work.project"
+     "type": "project"
     }
    ],
    "tree": {

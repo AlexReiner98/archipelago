@@ -34,7 +34,7 @@ test('search through the indexes answers as reading every row did, for each view
     l,
     Array.from({ length: 180 }, (_, n) => ({
       op: 'create' as const,
-      type: n % 3 ? 'work.task' : 'work.note',
+      type: n % 3 ? 'task' : 'note',
       title: `${word(n)} ${word(n * 7 + 1)}${n % 11 === 0 ? ' the' : ''}`,
       body: n % 4 ? `About the ${word(n * 3)} of ${word(n * 5)}. ${'More words follow here. '.repeat(n % 6)}` : '',
       visibility: 'shared' as const,
@@ -42,11 +42,11 @@ test('search through the indexes answers as reading every row did, for each view
   );
   // Across the title and the note, with a word the index leaves out between: a phrase reads the positions.
   const { gone } = await make(l, [
-    { op: 'create', type: 'work.task', title: 'Fix the roof the', body: 'sheet music for the band', visibility: 'shared' },
-    { op: 'create', ref: 'gone', type: 'work.task', title: 'Archived roof review', visibility: 'shared' },
+    { op: 'create', type: 'task', title: 'Fix the roof the', body: 'sheet music for the band', visibility: 'shared' },
+    { op: 'create', ref: 'gone', type: 'task', title: 'Archived roof review', visibility: 'shared' },
   ]);
   await make(l, [{ op: 'archive', id: gone }]);
-  await l.as(bo).change({ kind: 'human', name: 'bo', person: bo }, { ops: [{ op: 'create', type: 'work.task', title: 'Bo private roof review', body: 'model export notes', visibility: 'private' }], reason: 'test' });
+  await l.as(bo).change({ kind: 'human', name: 'bo', person: bo }, { ops: [{ op: 'create', type: 'task', title: 'Bo private roof review', body: 'model export notes', visibility: 'private' }], reason: 'test' });
   // A distinct time for each item, so that equal ranks fall in one order however the rows are read.
   await l.db.query(`update entity set updated_at = now() - (('x' || substr(md5(id), 1, 6))::bit(24)::int || ' seconds')::interval`);
 
@@ -55,7 +55,7 @@ test('search through the indexes answers as reading every row did, for each view
   let found = 0;
   for (const [who, view] of viewers)
     for (const q of queries)
-      for (const input of [{ q }, { q, limit: 5 }, { q, type: 'work.task' }]) {
+      for (const input of [{ q }, { q, limit: 5 }, { q, type: 'task' }]) {
         const ids = (await view.search(input)).map((e) => e.id);
         found += ids.length;
         assert.deepEqual(ids, await before(view.db, { ...input, type: input.type ? l.registry.family(input.type) : undefined }), `${who}: ${JSON.stringify(input)}`);

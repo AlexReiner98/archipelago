@@ -68,7 +68,7 @@ export async function runSpans(l: Archipelago, runs: Run[], from: number, to: nu
   if (!runs.length) return out;
   const ids = runs.map((r) => r.id);
   const { rows: tasks } = await l.db.query<{ run: string; task: string; valid_from: Date; valid_to: Date | null }>(
-    `select from_id as run, to_id as task, valid_from, valid_to from relation where type = 'sys.works_on' and from_id = any($1::text[]) order by valid_from`,
+    `select from_id as run, to_id as task, valid_from, valid_to from relation where type = 'works_on' and from_id = any($1::text[]) order by valid_from`,
     [ids],
   );
   const { rows: places } = await l.db.query<{ run: string; place: string }>(`select from_id as run, to_id as place from relation where from_id = any($1::text[]) and type = any($2::text[]) and valid_to is null`, [ids, livesIn(l)]);

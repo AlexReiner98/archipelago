@@ -49,6 +49,34 @@ export const allTests = () => [...walk('test').filter((f) => /^test\/[^/]+\.test
 
 export const fastTests = () => allTests().filter((f) => !(f in SLOW));
 
+/**
+ * CI runs the full set as shards side by side (.github/workflows/tests.yml), so a push waits as long as its slowest
+ * shard rather than for every file in turn: one for the fast set ("rest"), one for each reason in SLOW (its words
+ * joined by "-"), and a shard split further as "rest 1/3", "rest 2/3", ... Every file is in exactly one shard;
+ * sets.test.ts checks the workflow names them all. The parts are dealt by weight, heaviest first, each file to the
+ * lightest part so far: the seconds each file took alone (test/weights.json, measured with scripts/test-weights.ts;
+ * only their order matters), a file not there counted as the middle one.
+ */
+export function shard(name: string, part = '1/1'): string[] {
+  const [k, n] = part.split('/').map(Number);
+  if (!(n >= 1 && k >= 1 && k <= n)) throw new Error(`No part ${part}: say k/n`);
+  const files = allTests().filter((f) => (f in SLOW ? SLOW[f].replaceAll(' ', '-') : 'rest') === name);
+  if (!files.length) throw new Error(`No shard ${name}`);
+  const weights: Record<string, number> = JSON.parse(readFileSync(join(ROOT, 'test/weights.json'), 'utf8'));
+  const known = Object.values(weights).sort((a, b) => a - b);
+  const weight = (f: string) => weights[f] ?? known[known.length >> 1] ?? 1;
+  const parts = Array.from({ length: n }, () => ({ files: [] as string[], load: 0 }));
+  for (const f of [...files].sort((a, b) => weight(b) - weight(a) || (a < b ? -1 : 1))) {
+    const lightest = parts.reduce((min, p) => (p.load < min.load ? p : min));
+    lightest.files.push(f);
+    lightest.load += weight(f);
+  }
+  return parts[k - 1].files.sort();
+}
+
+/** The names of the shards. */
+export const shardNames = () => ['rest', ...new Set(Object.values(SLOW).map((r) => r.replaceAll(' ', '-')))];
+
 const SPECIFIER = /(?:^|[\s;])(?:import|export)\s[^'"]*?from\s*['"](\.{1,2}\/[^'"]+)['"]|import\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)|^import\s*['"](\.{1,2}\/[^'"]+)['"]/gm;
 
 const direct = new Map<string, string[]>();

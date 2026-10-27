@@ -42,6 +42,18 @@ warning, until the release after 0.1.0, and then refused.
 | `tier` | goes: `reach.server` makes a server pack |
 | `contract` | goes: nothing read it |
 
+## On the map
+
+A pack's types and link types are presets, as its styles and instructions
+are. The owner keeps their version of one as an item of core's `type` or
+`link_type` with the preset's id in `preset`: its title and note over the
+preset's, its `fields` added to the preset's, and retired, no new item or
+link is made of it while those there stay. One with a `name` and no preset
+is the workspace's own, in the `local` pack. The registry lays the items
+over the manifests before it reads them (`src/type-overlay.ts`), and a
+change that makes or changes one is checked against the registry as it
+will be, so a type made in a change can be used in it (`src/type-items.ts`).
+
 ## In space
 
 A pack's **reach** is the types, link types and fields of the pack itself,
@@ -56,9 +68,13 @@ screens and actions on them) is registered only while that pack is active.
 
 Adding or taking out a pack is a fact on the workspace's log, kept forever:
 `["+", "pack:<id>", "pack", { version, manifest }]`, the manifest being the
-SHA-256 of its `pack.json`, and `["-", "pack:<id>", "pack"]` (docs/log.md,
-section 8). A workspace that opens asserts every pack this server has that
-the log does not yet say is present, or whose manifest changed. Taking a
+SHA-256 of its `pack.json`, its `text` kept with it the first time the log
+meets that hash, and `["-", "pack:<id>", "pack"]` (docs/log.md, section 8).
+Adding a pack is the owner's: a new workspace starts with the kernel's
+(core) alone, or those the server names (`PELAGO_START_PACKS`, a list or
+`all`), and a pack new to the server is off in a workspace until its owner
+adds it. A workspace that opens asserts again a pack it has whose manifest
+changed. Taking a
 pack out is the owner's, and is refused while another active pack requires
 it; the kernel's packs are never taken out. Everything a pack registers is
 derived from the set of packs, so taking one out unwinds it: its tools,
@@ -66,9 +82,8 @@ screens, rules and handlers go, and its items stay, their types dormant.
 
 ## Not yet
 
-- A manifest is named in the log by its hash; the manifest itself is not
-  kept beside the log yet, so the registry as of an old position reads the
-  pack files the server has now.
+- The log keeps each manifest, but the registry as of an old position still
+  reads the pack files the server has now.
 - A pack the log says is present but whose code the server lacks is not yet
   listed as waiting.
 - Taking out a pack together with the packs that require it, in one change,

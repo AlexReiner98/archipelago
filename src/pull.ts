@@ -51,7 +51,7 @@ export async function takeIn(dataDir: string, backup: Dump, keys?: { vault: Vaul
     // Its items as the file's log makes them, read before they go in, so its automations can be paused on the way.
     const clear = await readable(db, backup);
     let paused = 0;
-    for (const row of clear.tables.entity ?? []) if (row.type === 'sys.automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
+    for (const row of clear.tables.entity ?? []) if (row.type === 'automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
     return { counts: await restore(db, clear, 'default'), paused, vault: backup.vault };
   } finally {
     await db.close();

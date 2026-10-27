@@ -3,8 +3,9 @@
 //   npm run test:full              every file: before a commit to main, and in CI
 //   npm run test:changed [base]    the files what changed since base (where this branch left main) can reach
 //   npm test -- test/a.test.ts …   just those files; an argument starting -- goes to node (--test-name-pattern=…)
+//   node scripts/test.ts shard browser 1/2   one shard of the full run, as CI runs them side by side
 import { spawnSync } from 'node:child_process';
-import { affected, allTests, fastTests, ROOT } from '../test/sets.ts';
+import { affected, allTests, fastTests, ROOT, shard } from '../test/sets.ts';
 
 const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -17,6 +18,7 @@ function changedSince(base?: string) {
 
 let files: string[];
 if (args[0] === 'full') files = allTests();
+else if (args[0] === 'shard') files = shard(args[1], args[2]);
 else if (args[0] === 'changed') {
   const changed = changedSince(args[1]);
   const picked = affected(changed);
@@ -24,5 +26,8 @@ else if (args[0] === 'changed') {
   files = picked.files;
 } else files = args.length ? args : fastTests();
 
+// A new workspace starts with the kernel's packs alone; the tests' workspaces start with every pack, as the map they
+// were written against did (test/manifest.test.ts checks the kernel alone).
+process.env.PELAGO_START_PACKS ??= 'all';
 const run = spawnSync(process.execPath, ['--test', '--test-force-exit', '--test-global-setup=./test/global.ts', '--import', './test/each.ts', ...flags, ...files], { cwd: ROOT, stdio: 'inherit' });
 process.exit(run.status ?? 1);

@@ -10,7 +10,7 @@
       "title": "Re-check its oldest items now",
       "verb": "revise",
       "description": "Have the agent on the server re-check a repository's oldest open items against its code now, without waiting for one to be due. It runs on the workspace's model account, and its run shows on the repository's page when it is over. Only for a repository the GitHub App was given; admins only.",
-      "on": ["software.repo"],
+      "on": ["repo"],
       "item": "repo",
       "admin": true,
       "limit_ms": 30000,

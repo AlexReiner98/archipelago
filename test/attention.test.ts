@@ -21,21 +21,21 @@ const agent: Actor = { kind: 'agent', name: 'test' };
 export function scenario(soon: string): Op[] {
   return [
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
-    { op: 'create', ref: 'site', type: 'work.project', title: 'Website' },
-    { op: 'create', ref: 'copy', type: 'work.task', title: 'Write the copy', props: { due: soon } },
-    { op: 'create', ref: 'fonts', type: 'work.task', title: 'Pick the fonts', owner: 'sam' },
+    { op: 'create', ref: 'site', type: 'project', title: 'Website' },
+    { op: 'create', ref: 'copy', type: 'task', title: 'Write the copy', props: { due: soon } },
+    { op: 'create', ref: 'fonts', type: 'task', title: 'Pick the fonts', owner: 'sam' },
     { op: 'link', type: 'waits_on', from: 'fonts', to: 'ME', props: { for: 'Your taste' } },
-    { op: 'create', ref: 'launch', type: 'work.task', title: 'Launch', owner: 'sam' },
-    { op: 'create', ref: 'contract', type: 'work.task', title: 'Sign the contract' },
+    { op: 'create', ref: 'launch', type: 'task', title: 'Launch', owner: 'sam' },
+    { op: 'create', ref: 'contract', type: 'task', title: 'Sign the contract' },
     { op: 'link', type: 'depends_on', from: 'launch', to: 'contract' },
-    { op: 'create', ref: 'host', type: 'work.decision', title: 'Which host?' },
-    { op: 'create', ref: 'blog', type: 'inquiry.hypothesis', title: 'People read the blog' },
-    { op: 'create', ref: 'chore', type: 'work.task', title: 'Tidy the old pages' },
-    { op: 'create', ref: 'news', type: 'work.task', title: 'Draft the newsletter', props: { tokens_estimated: 20000 } },
-    { op: 'create', ref: 'cms', type: 'work.decision', title: 'Which CMS?' },
+    { op: 'create', ref: 'host', type: 'decision', title: 'Which host?' },
+    { op: 'create', ref: 'blog', type: 'hypothesis', title: 'People read the blog' },
+    { op: 'create', ref: 'chore', type: 'task', title: 'Tidy the old pages' },
+    { op: 'create', ref: 'news', type: 'task', title: 'Draft the newsletter', props: { tokens_estimated: 20000 } },
+    { op: 'create', ref: 'cms', type: 'decision', title: 'Which CMS?' },
     ...['copy', 'fonts', 'launch', 'contract', 'host', 'blog', 'chore', 'news', 'cms'].map((ref) => ({ op: 'link' as const, type: 'part_of', from: ref, to: 'site' })),
-    { op: 'create', ref: 'garden', type: 'work.project', title: 'Garden' },
-    { op: 'create', ref: 'seeds', type: 'work.task', title: 'Order the seeds', props: { due: soon } },
+    { op: 'create', ref: 'garden', type: 'project', title: 'Garden' },
+    { op: 'create', ref: 'seeds', type: 'task', title: 'Order the seeds', props: { due: soon } },
     { op: 'link', type: 'part_of', from: 'seeds', to: 'garden' },
   ];
 }
@@ -112,8 +112,8 @@ test('attention can be read latest first, each item saying when it last changed'
   const me = ((await callTool(l, human, 'init', { name: 'Alex' })) as { me: string }).me;
   const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   const made = ((await l.change(human, { reason: 'test', ops: [
-    { op: 'create', ref: 'old', type: 'work.task', title: 'Old and due', owner: me, props: { due: soon } },
-    { op: 'create', ref: 'new', type: 'work.task', title: 'New and waiting', owner: me },
+    { op: 'create', ref: 'old', type: 'task', title: 'Old and due', owner: me, props: { due: soon } },
+    { op: 'create', ref: 'new', type: 'task', title: 'New and waiting', owner: me },
     { op: 'link', type: 'waits_on', from: 'new', to: me },
   ] })) as { created: Record<string, string> }).created;
   await l.db.query(`update entity set updated_at = now() - interval '3 days' where id = $1`, [made.new]);

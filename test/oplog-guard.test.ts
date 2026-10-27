@@ -21,9 +21,9 @@ const stored = async (l: Archipelago) => JSON.stringify((await l.db.query(`selec
 /** A run that told a story, a held resource with words on the hold, and a reason in each. */
 async function setup(l: Archipelago) {
   const made = await make(l, [
-    { op: 'create', ref: 'run', type: 'sys.run', title: 'A run' },
+    { op: 'create', ref: 'run', type: 'run', title: 'A run' },
     { op: 'create', ref: 'res', type: 'resource', title: 'The lane' },
-    { op: 'create', ref: 'task', type: 'work.task', title: 'Hold it' },
+    { op: 'create', ref: 'task', type: 'task', title: 'Hold it' },
   ]);
   await l.record('sessions', 'agent:test', [['+', made.run, 'story', [{ n: 1, said: 'Quill called' }]], ['+', made.run, 'status', 'running']], 'Quill asked for it');
   await l.claim({ kind: 'agent', name: 'test' }, { resource: made.res, holder: made.task, reason: 'Quill needs the lane', for: made.task });
@@ -54,7 +54,7 @@ test('a value about an item is sealed with its key in log_op, structure stays cl
 
 test('a member reads only the entries about what they may see, and still appends after what they cannot', async () => {
   const l = await fresh();
-  const { mine } = await make(l, [{ op: 'create', ref: 'mine', type: 'sys.run', title: 'Mine', visibility: 'private' }]);
+  const { mine } = await make(l, [{ op: 'create', ref: 'mine', type: 'run', title: 'Mine', visibility: 'private' }]);
   await l.db.query(`update entity set private_to = 'e_owner' where id = $1`, [mine]);
   await l.record('sessions', 'agent:test', [['+', mine, 'tokens_used', 5]]);
   const theirs = l.as('e_other');

@@ -53,7 +53,7 @@ async function map(base: string) {
   return l;
 }
 
-const titles = async (l: Archipelago) => (await l.db.query<{ title: string }>(`select title from entity where type = 'work.note' order by created_at`)).rows.map((r) => r.title);
+const titles = async (l: Archipelago) => (await l.db.query<{ title: string }>(`select title from entity where type = 'note' order by created_at`)).rows.map((r) => r.title);
 
 test('a read is made at once with the secret; an act that moves money waits for a person; undo says what it could not reach', async () => {
   const { seen, base } = await shop();
@@ -68,7 +68,7 @@ test('a read is made at once with the secret; an act that moves money waits for 
   assert.deepEqual(seen.map((s) => `${s.method} ${s.path}`), ['GET /api/prices', 'POST /api/notes'], 'nothing bought yet');
   assert.ok(seen.every((s) => s.auth === 'Bearer s3cret'), 'the kernel added the secret');
   assert.deepEqual(await titles(l), ['Prices: flour, salt'], 'the answer was told to the handler, which wrote it');
-  const { rows: told } = await l.db.query<{ title: string }>(`select title from entity where type = 'sys.notification'`);
+  const { rows: told } = await l.db.query<{ title: string }>(`select title from entity where type = 'notification'`);
   assert.match(told[0].title, /Demo asks to buy supplies/);
 
   await assert.rejects(decideAct(host, l, { kind: 'agent', name: 'a' }, { act: buy.id!, allow: true }), /Only a person/);

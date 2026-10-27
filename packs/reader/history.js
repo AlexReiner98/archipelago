@@ -13,7 +13,7 @@ const short = (sha) => String(sha ?? '').slice(0, 7);
 
 /** The commits (by their first seven characters) of every push to this repository whose reading finished. */
 export async function readCommits(ctx, repo) {
-  const runs = await ctx.read({ related: repo.entity.id, relation: 'lives_in', direction: 'in', types: ['sys.run'], newest: 'created', fields: ['link'] });
+  const runs = await ctx.read({ related: repo.entity.id, relation: 'lives_in', direction: 'in', types: ['run'], newest: 'created', fields: ['link'] });
   const read = new Set(runs.filter((r) => r.status === 'finished').map((r) => r.props?.link).filter(Boolean));
   const pushes = await ctx.read({ events: { action: 'repo.push', target: repo.entity.id, limit: 300 } });
   const commits = new Set();

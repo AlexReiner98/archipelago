@@ -18,8 +18,8 @@ const authority = z
 export const SHARE_TOOLS: Record<string, Tool> = {
   document: {
     description:
-      'A document read whole, as its reader meets it: its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. A document another workspace shares with this one (sys.shared_document) is read from that workspace once it is accepted. ' +
-      'To write one, make an item of type work.document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its view, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
+      'A document read whole, as its reader meets it: its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. A document another workspace shares with this one (shared_document) is read from that workspace once it is accepted. ' +
+      'To write one, make an item of type document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its view, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
     input: {
       id: z.string(),
       drawn: z.boolean().optional().describe('true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft. Through a share, only one that may be published here.'),

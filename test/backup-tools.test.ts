@@ -36,7 +36,7 @@ const fetched = (l: Archipelago, made: Made) => takeBackup(l.db, made.path.split
 
 test('the owner downloads the whole map by a link that works once', async () => {
   const l = await map();
-  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Kept in the file' }] });
+  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Kept in the file' }] });
   const made = (await callTool(l, owner, 'backup_download', {})) as Made;
   assert.match(made.path, new RegExp(`^/backup-file/${l.workspace}/`), 'the link names its workspace, so any server can give it');
   const file = (await fetched(l, made))!;
@@ -71,7 +71,7 @@ test("an agent's own view of the map reads whether the owner allows it a backup"
 });
 test('a link given to a document is in the backup, and works again where the backup is restored', async () => {
   const l = await map();
-  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.document', title: 'Shared plan' }] });
+  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'document', title: 'Shared plan' }] });
   const doc = Object.values((made as { created: Record<string, string> }).created)[0];
   await createShare(l, owner, doc);
   const file = (await fetched(l, (await callTool(l, owner, 'backup_download', {})) as Made))!;
@@ -82,7 +82,7 @@ test('a link given to a document is in the backup, and works again where the bac
 
 test('a backup is restored from the command line into a new folder, and never over one', async () => {
   const l = await map();
-  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Carried over' }] });
+  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Carried over' }] });
   const taken = { ...(await dump(l.db, { id: 'default', name: 'Default' })), vault: await dumpVault(l.db) };
   const dir = mkdtempSync(join(tmpdir(), 'pelago-restore-'));
   try {
@@ -97,7 +97,7 @@ test('a backup is restored from the command line into a new folder, and never ov
 const server = process.env.PELAGO_TEST_DATABASE_URL;
 test('a backup is restored into a Postgres server where the server looks for its workspace', { skip: !server && 'PELAGO_TEST_DATABASE_URL is not set' }, async () => {
   const l = await map();
-  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Carried over' }] });
+  await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Carried over' }] });
   const base = `r${Date.now().toString(36)}`;
   const url = await databaseFor(server!, base); // stands for the server's own database: an empty one
   try {

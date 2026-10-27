@@ -37,9 +37,9 @@ const namedIn = (messages) => [...new Set(messages.join('\n').match(/\be_[a-z0-9
 
 /** The items the sessions that said they work on this branch were working on. */
 async function workedOn(ctx, push) {
-  const runs = await ctx.read({ items: { type: 'sys.run', where: { branch: push.branch } }, fields: ['branch'] });
+  const runs = await ctx.read({ items: { type: 'run', where: { branch: push.branch } }, fields: ['branch'] });
   const ids = [];
-  for (const r of runs.slice(-20)) for (const t of await ctx.read({ related: r.id, relation: 'sys.works_on' })) ids.push(t.id);
+  for (const r of runs.slice(-20)) for (const t of await ctx.read({ related: r.id, relation: 'works_on' })) ids.push(t.id);
   return ids;
 }
 
@@ -135,7 +135,7 @@ const def = (name, description, properties, required) => ({ name, description, i
 export const PUSH_TOOLS = [
   def('decide', 'Whether this push finished one open item. finished: true or false. quote: one line of a commit message or of the diff, word for word, that shows it finished (needed when true). why: in a sentence.', { id: text, finished: { type: 'boolean' }, quote: text, why: text }, ['id', 'finished', 'why']),
   def('update', 'Correct one open item: its title, or a line added to its note. why: what in the push shows it. To close one, decide.', { id: text, title: text, append: text, why: text }, ['id', 'why']),
-  def('create', 'Make a new item for work the push names but does not do. type: a kind from the list (or work.task); part_of: the id of the item it belongs to, if any.', { type: text, title: text, note: text, part_of: text, why: text }, ['type', 'title', 'why']),
+  def('create', 'Make a new item for work the push names but does not do. type: a kind from the list (or task); part_of: the id of the item it belongs to, if any.', { type: text, title: text, note: text, part_of: text, why: text }, ['type', 'title', 'why']),
   def('look', 'One item: its note and what it is linked to.', { id: text }, ['id']),
   def('find', 'Items in the map whose title or note match the words.', { words: text }, ['words']),
   def('diff', 'One commit in full: its message and each file’s whole patch.', { sha: text }, ['sha']),

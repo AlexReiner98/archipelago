@@ -1,7 +1,7 @@
 // A document shared with another workspace on this server, rather than with whoever holds a link. Each side keeps
 // control of its own part. The sender's admin chooses the document and the workspace, and can revoke it. The receiving
 // workspace has to accept offers from the sender at all (accepts_from, as for notifications); it holds the share as an
-// item of its own (sys.shared_document), which someone there accepts before it can be read, can keep private or
+// item of its own (shared_document), which someone there accepts before it can be read, can keep private or
 // share with everyone there, and can end. Nothing is copied: each read goes to the sender's map through one function
 // that gives that document and what it brings in to that workspace, while the share stands, and nothing else.
 

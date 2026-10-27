@@ -79,13 +79,13 @@ test("a pack turned off and on again on a running server: a connected agent's to
   const told = () => new Promise<void>((resolve, reject) => ((heard = resolve), setTimeout(() => reject(new Error('not told')), 5000)));
   assert.ok((await names()).includes('time_log'));
 
-  const made = await api('change', { reason: 'test', ops: [{ op: 'create', ref: 'e', type: 'time.entry', title: 'Drafting', props: { date: '2026-10-16', hours: 3 } }] });
+  const made = await api('change', { reason: 'test', ops: [{ op: 'create', ref: 'e', type: 'time_entry', title: 'Drafting', props: { date: '2026-10-16', hours: 3 } }] });
   const entry = made.result.created.e as string;
 
   const hearing = told();
   const off = await api('pack_set', { pack: 'time', on: false });
   assert.deepEqual(off.result.packs.find((p: { id: string }) => p.id === 'time'), { id: 'time', title: 'Time', version: '0.1.0', state: 'off', why: 'turned off here' });
-  assert.ok(off.result.dormant.includes('time.entry'));
+  assert.ok(off.result.dormant.includes('time_entry'));
   await hearing;
   assert.ok(!(await names()).includes('time_log'), 'the tool left the list');
   assert.equal((await api('get', { id: entry })).result.entity.title, 'Drafting', 'its item is still there');

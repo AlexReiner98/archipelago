@@ -140,7 +140,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   // Under way: a session at work on it.
   const { rows: at } = await l.db.query<{ target: string; n: number }>(
     `select r.to_id as target, count(*)::int as n from relation r join entity s on s.id = r.from_id
-     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null and r.to_id = any($1::text[]) group by r.to_id`,
+     where r.type = 'works_on' and r.valid_to is null and s.is_open and s.archived_at is null and r.to_id = any($1::text[]) group by r.to_id`,
     [[...live.keys()]],
   );
   for (const a of at) if (live.get(a.target) && theirs(live.get(a.target)!)) add(live.get(a.target), 'under_way', { sessions: a.n });
