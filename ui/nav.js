@@ -1,7 +1,7 @@
 // The menu and the screens in it. What waits for you and the Workspace page are always there; between them come
 // the screens the owner has given a place, each a page of its own drawn from its pieces, opened in the sheet. Packs offer
-// screens as presets; the owner adds one, takes it out and puts it back on the Workspace page, where what each
-// screen is (a page in the nav, or a part of every item of a kind) is listed with its switch.
+// screens as presets; the owner adds one, takes it out and puts it back on its pack's card on the Workspace page, where each
+// screen is (a page in the nav, or a part of every item of a kind) is a row with its switch.
 
 import { api, ask, h, part, state, tell } from './base.js';
 import { drawScreen } from './screens.js';
@@ -43,9 +43,8 @@ const where = (s) =>
   [s.at === 'home' && 'on Home', typeof s.nav === 'number' && 'in the nav', s.on.length > 0 && `on ${s.on.map(typeTitle).join('\n')}`].filter(Boolean).join(' · ') ||
   (s.homeable ? 'taken off Home' : s.offered ? 'offered for the nav' : 'not shown');
 
-/** The Workspace card: every screen, and the switch that puts one in the nav or takes it out. */
-export function screensCard(then) {
-  const screens = state.schema?.screens ?? [];
+/** Rows for some screens (a pack's, on its card on the Workspace page), each with the switch that puts it on Home or in the nav, or takes it away. */
+export function screenRows(screens, then) {
   const write = async (ops, reason) => {
     try {
       await api('change', { ops, reason });
@@ -89,7 +88,7 @@ export function screensCard(then) {
   const onPages = screens.filter((s) => !actionable(s));
   const pagesRow =
     onPages.length > 0 &&
-    h('li', { class: 'one' }, h('span', { class: 'grow muted small', title: onPages.map((s) => `${s.title}: ${where(s)}`).join('\n') }, `${onPages.length} more on item pages`));
+    h('li', { class: 'one' }, h('span', { class: 'grow muted small', title: onPages.map((s) => `${s.title}: ${where(s)}`).join('\n') }, `${onPages.length} on item pages`));
   const sorted = [...screens].filter(actionable).sort((a, b) => Number(b.at === 'home' || Boolean(b.homeable)) - Number(a.at === 'home' || Boolean(a.homeable)) || (typeof a.nav === 'number' ? a.nav : 1e9) - (typeof b.nav === 'number' ? b.nav : 1e9) || Number(navable(b)) - Number(navable(a)));
-  return h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: 'hinted', title: 'Pages drawn from pieces: on Home, in the nav, or on every item of a kind. Packs offer them; you choose what shows.' }, 'Screens')), h('ul', { class: 'rows' }, sorted.map(row), pagesRow));
+  return [...sorted.map(row), pagesRow];
 }

@@ -63,11 +63,13 @@ The web UI has five places, and one page for each thing.
   seen" records that you looked.
 - **Workspace** sets the workspace up, in five sections shown one at a time
   (`#/workspace?at=<section>`): **People** (the owner, members, the plan),
-  **Agents** (agent tokens, what agents may do, the checks), **Look** (the
-  theme as swatches, tried on your screen and then kept; the styles; the
-  screens), **Packs**, and **Outside** (the model account, connections,
-  GitHub, backups, the workspace's settings). Each setting is one row; what
-  is done rarely is in its ⋯ menu.
+  **Agents** (agent tokens, what agents may do, the model account they run
+  on), **Map** (the theme as swatches, tried on your screen and then kept;
+  whether new things start private; the backup), **Packs** (each pack one
+  line, opened to control everything it offers: its styles, screens and
+  checks, with its types, links and actions named), and **Connections** (the
+  GitHub App, pushes and the webhook, the other workspaces that may notify
+  this one). Each setting is one row; what is done rarely is in its ⋯ menu.
 
 Every item has a single page, and every way to it leads there: its head,
 its note folded to the first paragraph, each field drawn by its kind, where
@@ -541,7 +543,7 @@ is still priced at Anthropic's rates.
 
 **Or the server hears the push through a webhook added by hand.** Pushes are
 taken in by the GitHub pack (`packs/github`), at the webhook it declares. On
-the Workspace screen, under Outside, **GitHub**'s menu makes the pack's secret and shows the address
+the Workspace screen, under Connections, the **Pushes** row's menu makes the pack's secret and shows the address
 to give GitHub (`/hook/<workspace>/github/github.push`): in each repository,
 Settings, Webhooks, Add webhook, content type `application/json`, that secret,
 push events only. (Until 22 Oct 2026 the address was `/github/<workspace>`;
@@ -696,8 +698,8 @@ its keys wrapped under a one-time key.
 Then put that folder in place of `data/`.
 
 To bring a backup into a map that already exists, an admin of that workspace
-uses **Import a backup** on the Workspace screen (Outside, the Backups
-row's menu; or the `import_backup`
+uses **Import a backup** on the Workspace screen (Map, the Backup row's
+menu; or the `import_backup`
 tool). It merges, matching by id, and can be repeated as often as wanted, in
 either direction:
 

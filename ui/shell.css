@@ -142,6 +142,13 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 /* The Workspace page: its sections, one shown at a time; the theme as swatches, each painted in its own colours. */
 #sheet .ws-sections { margin: 0 0 var(--space-10); }
 #sheet .ws-notice:not(:empty) { margin: 0 0 var(--space-8); }
+.card > .rows + .rows:not(:empty) { border-top: var(--border-1) solid var(--line); }
+/* A pack folded is one line that opens on a click; opened, what it offers is set in under it. */
+.rows > li.one > .pack-open { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pack-open .fold-mark { display: inline-block; width: var(--space-8); color: var(--muted); }
+.rows > li.pack-body { padding-top: 0; padding-bottom: var(--space-6); }
+.rows > li.pack-body > .rows { margin-left: var(--space-8); }
+.rows > li.pack-body > .rows > li { padding-top: var(--space-4); padding-bottom: var(--space-4); }
 .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--count-col), 1fr)); gap: var(--space-6); padding: var(--space-4) 0 var(--space-6); }
 .theme-tile { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
 .theme-tile .paint { position: relative; height: var(--box-9); padding: var(--space-3) var(--space-4); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); background: var(--bg); text-align: left; font-weight: 600; }

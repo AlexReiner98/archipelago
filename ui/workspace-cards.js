@@ -136,12 +136,13 @@ export const card = (title, tip, ...body) => h('section', { class: 'card wide' }
 /** A row that never wraps: what does not fit is cut, the whole of it in the tooltip. */
 export const line = (...kids) => h('li', { class: 'one' }, ...kids);
 
-// GitHub tells this workspace when a repository is pushed to: through the GitHub App (the Connections card), or a
-// webhook added by hand, whose secret is made here and shown once, with where to put it. Each repository's pushes are
-// on its own page; here is one row: whether pushes are heard and read.
-export function githubCard() {
-  const body = h('div', {}, h('div', { class: 'empty' }, 'Loading…'));
-  const fail = (err) => body.replaceChildren(h('div', { class: 'error' }, err.message));
+// GitHub tells this workspace when a repository is pushed to: through the GitHub App (its row above, on the same
+// card), or a webhook added by hand, whose secret is made here and shown once, with where to put it. One row: whether
+// pushes are read, the repositories and the latest push, each repository's in the tooltip; the webhook in its menu.
+export function githubRow() {
+  const row = line(h('span', { class: 'grow muted small' }, 'GitHub pushes…'));
+  const shown = h('li', { class: 'pack-body', hidden: true });
+  const fail = (err) => row.replaceChildren(h('span', { class: 'grow error', title: err.message }, err.message));
   const draw = async (made) => {
     const s = made ?? (await api('github'));
     // What reads the pushes the GitHub App hands over: an agent on this server, on the workspace's model account.
@@ -153,16 +154,13 @@ export function githubCard() {
     };
     const heard = s.repos.filter((r) => r.last_push).sort((a, b) => (a.last_push.at < b.last_push.at ? 1 : -1));
     const repos = s.repos.map((r) => `${r.title}: ${!r.github ? 'no GitHub address' : r.last_push ? `pushed ${when(r.last_push.at)}` : 'no push heard yet'}`).join('\n');
-    body.replaceChildren(
-      h(
-        'ul',
-        { class: 'rows' },
-        line(
-          h('span', { class: `pill ${on ? 'ok' : 'warn'}`, title: on ? 'An agent on this server reads each push against the open work' : 'Pushes are recorded, but nothing reads them until a model account is connected, under Model' }, on ? 'read' : 'not read'),
-          h('span', { class: 'grow', title: repos || 'No repository on the map yet' }, `${s.repos.length} repositor${s.repos.length === 1 ? 'y' : 'ies'}`, heard[0] && h('span', { class: 'muted small' }, ` · ${heard[0].title} pushed ${when(heard[0].last_push.at)}`)),
-          menu('⋯', [[s.connected ? 'New webhook secret' : 'Use a webhook', fresh], s.connected && ['Copy the webhook address', () => navigator.clipboard.writeText(url)]]),
-        ),
-      ),
+    row.replaceChildren(
+      h('span', { class: `pill ${on ? 'ok' : 'warn'}`, title: on ? 'An agent on this server reads each push against the open work' : 'Pushes are recorded, but nothing reads them until a model account is connected, under Agents' }, on ? 'read' : 'not read'),
+      h('span', { class: 'grow', title: repos || 'No repository on the map yet' }, h('strong', {}, 'Pushes'), ' ', h('span', { class: 'muted small' }, `${s.repos.length} repositor${s.repos.length === 1 ? 'y' : 'ies'}`, heard[0] && ` · ${heard[0].title} pushed ${when(heard[0].last_push.at)}`)),
+      menu('⋯', [[s.connected ? 'New webhook secret' : 'Use a webhook', fresh], s.connected && ['Copy the webhook address', () => navigator.clipboard.writeText(url)]]),
+    );
+    shown.hidden = !made?.secret;
+    shown.replaceChildren(
       made?.secret
         ? h(
             'div',
@@ -180,7 +178,7 @@ export function githubCard() {
     );
   };
   draw().catch(fail);
-  return card('GitHub', 'Pushes keep the map current. Each repository says on its own page when it was pushed.', body);
+  return [row, shown];
 }
 
 // Whose workspace this is. "Needs you now" and the other standing questions
@@ -209,9 +207,9 @@ export function allowance(info, key, label, tip, question) {
   return line(name, allow);
 }
 
-/** The whole map as a file, for the owner to keep, and a map kept elsewhere merged in, rarely. */
-export function backupCard(done) {
-  const note = h('span', { class: 'muted small grow' }, 'The whole map, as one file');
+/** The whole map as a file, for the owner to keep, and a map kept elsewhere merged in, rarely: one row, under the rows given. */
+export function backupCard(done, ...before) {
+  const note = h('span', { class: 'muted small' }, 'the whole map, as one file');
   const download = async (ev) => {
     ev.target.disabled = true;
     try {
@@ -226,34 +224,32 @@ export function backupCard(done) {
   };
   const merge = importer(done);
   return card(
-    'Backups',
-    'The whole map as one file: to keep, to restore into another server, or to merge in from elsewhere',
-    h('ul', { class: 'rows' }, line(note, h('button', { onclick: download }, 'Download'), menu('⋯', [['Import a backup…', merge.open]]))),
+    'Settings',
+    null,
+    h('ul', { class: 'rows' }, before, line(h('span', { class: 'grow', title: 'The whole map as one file: to keep, to restore into another server, or to merge in from elsewhere' }, h('strong', {}, 'Backup'), ' ', note), h('button', { onclick: download }, 'Download'), menu('⋯', [['Import a backup…', merge.open]]))),
     merge.file,
     merge.result,
   );
 }
 
-/** The workspace's own settings: whether new things start private, and which workspaces may notify it. */
-export function settingsCard(info, redraw, fail) {
-  const set = (change) => api('workspace_set', change).then(redraw, fail);
+/** Whether new things start private or shared: a row of the Map section. */
+export function visibilityRow(info, redraw, fail) {
+  return line(
+    h('span', { class: 'grow', title: 'Who sees what is made here, unless its author says otherwise' }, 'New things are'),
+    h('select', { onchange: (e) => api('workspace_set', { default_visibility: e.target.value }).then(redraw, fail) }, [['private', 'Private unless shared'], ['shared', 'Shared unless private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label))),
+  );
+}
+
+/** Which other workspaces on this server may notify this one: a row of the Connections card, changed in its menu. */
+export function notificationsRow(info, redraw, fail) {
   const from = info.accepts_from.join(', ');
   const accept = async () => {
     const said = await ask({ title: 'Accept notifications from', message: `Other workspaces on this server, by id, separated by commas. Now: ${from || 'none'}. This one is "${info.id}".`, input: { placeholder: from || 'workspace ids' }, action: 'Save' });
-    if (said != null) set({ accepts_from: said.split(',').map((s) => s.trim()).filter(Boolean) });
+    if (said != null) api('workspace_set', { accepts_from: said.split(',').map((s) => s.trim()).filter(Boolean) }).then(redraw, fail);
   };
-  return card(
-    'Settings',
-    null,
-    h(
-      'ul',
-      { class: 'rows' },
-      line(
-        h('span', { class: 'grow' }, 'New things are'),
-        h('select', { onchange: (e) => set({ default_visibility: e.target.value }) }, [['private', 'Private unless shared'], ['shared', 'Shared unless private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label))),
-      ),
-      line(h('span', { class: 'grow', title: `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".` }, 'Notifications from ', h('span', { class: 'muted small' }, from || 'no other workspace')), menu('⋯', [['Change…', accept]])),
-    ),
+  return line(
+    h('span', { class: 'grow', title: `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".` }, h('strong', {}, 'Other workspaces'), ' ', h('span', { class: 'muted small' }, from ? `notify it: ${from}` : 'none may notify it')),
+    menu('⋯', [['Change…', accept]]),
   );
 }
 

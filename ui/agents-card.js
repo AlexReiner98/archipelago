@@ -67,14 +67,10 @@ export function agentsMayCard(info, then, fail) {
   );
 }
 
-/** The rules that ask an agent at its reply's end, each with how often it asked this week and a switch. Nothing when no pack has one. */
-export function checksCard(info) {
-  if (!info.reply_rules?.length) return null;
-  const row = (r) => {
-    const on = h('input', { type: 'checkbox', checked: !r.off, title: 'On: it asks an agent whose reply did what it names' });
-    const name = h('span', { class: 'grow', title: `${r.rule}\n${r.say}` }, r.rule.split('.').pop().replaceAll('_', ' '));
-    on.onchange = () => api('workspace_set', { lifted: { [r.lifted]: !on.checked } }).catch((err) => ((on.checked = !on.checked), (name.title = err.message)));
-    return line(name, h('span', { class: 'pill', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)), on);
-  };
-  return card('Checks', 'Rules that ask an agent, once a turn, when its reply ends having done what they name', h('ul', { class: 'rows' }, info.reply_rules.map(row)));
+/** A rule that asks an agent at its reply's end (on its pack's card): how often it asked this week, and its switch. */
+export function checkRow(r) {
+  const on = h('input', { type: 'checkbox', checked: !r.off, title: 'On: it asks an agent whose reply did what it names' });
+  const name = h('span', { class: 'grow', title: `A check: once a turn, it asks an agent whose reply did what it names.\n${r.say}` }, h('strong', {}, r.rule.split('.').pop().replaceAll('_', ' ')), ' ', h('span', { class: 'muted small' }, 'a check on replies'));
+  on.onchange = () => api('workspace_set', { lifted: { [r.lifted]: !on.checked } }).catch((err) => ((on.checked = !on.checked), (name.title = err.message)));
+  return line(name, h('span', { class: 'pill', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)), on);
 }
