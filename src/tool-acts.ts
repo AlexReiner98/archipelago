@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { askView } from './askview.ts';
 import { putPlaces } from './canvas-places.ts';
 import { importAudit } from './audit.ts';
+import { askLook, awaitLook } from './looks.ts';
 import { toConfirm } from './confirm.ts';
 import { stopLaunched } from './launcher.ts';
 import { readFlat } from './lens-flat.ts';
@@ -35,7 +36,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
     description:
       'Answer the human with a drawing on their canvas: a kept view (entity: a lens item, a saved canvas) or a lens and style of your own, or open an item\'s page or the workspace. ' +
       'Their page goes there within a couple of seconds if it follows agents; one that does not offers the link instead. The answer says how many of their pages are open and how many follow you (pages). Add a short note saying what they are looking at. ' +
-      'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching.',
+      'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching. ' +
+      'With look: true, a page of theirs that goes there answers with a picture of what it drew (picture: base64 PNG and its size), made in their browser, private items and a style’s own code as they see them; the answer waits for it up to wait_seconds, and query picture with the look reads it later.',
     input: {
       entity: z.string().optional().describe('An item id: open its page; a view kept on the map (type lens, a saved canvas) is opened as their canvas, its lens in their query bar.'),
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
@@ -52,10 +54,21 @@ export const ACT_TOOLS: Record<string, Tool> = {
         .optional()
         .describe('How the view is drawn, for this one look. The style a view opens in is kept on the map: an item of type style, about the project or item it is for, or about nothing for the whole workspace; change it with change.'),
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
+      look: z.boolean().optional().describe('Ask the page that goes there for a picture of what it drew: the canvas as the owner sees it.'),
+      wait_seconds: z.number().int().min(0).max(60).optional().describe('With look: how long to wait for the picture (20). 0 answers at once with the look, to read with query picture.'),
     },
     run: async (l, actor, input) => {
-      // Where it pointed, and whether a page of theirs is there to follow it.
-      const shown = async (hash: string, note?: string) => ({ ...(await point(l, actor, 'show', hash, note)), pages: await watching((await wholeMap(l)).db, l, actor.name) });
+      // Where it pointed, and whether a page of theirs is there to follow it; with a look, what that page drew.
+      const shown = async (hash: string, note?: string) => {
+        const { db } = await wholeMap(l);
+        const look = input.look ? await askLook(db, l, actor.name) : undefined;
+        const at = await point(l, actor, 'show', hash, note, look);
+        const pages = await watching(db, l, actor.name);
+        if (!look) return { ...at, pages };
+        if (!pages.following) return { ...at, pages, look, picture: null, why: 'No page of theirs follows you: nothing went there to draw it.' };
+        const wait = (input.wait_seconds ?? 20) * 1000;
+        return { ...at, pages, ...(wait ? await awaitLook(db, l, look, wait) : { look }) };
+      };
       // A saved canvas is opened as what their canvas draws: the page reads its lens and style from the map.
       const kept = input.entity && (await l.entity(input.entity));
       if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return shown(`v?canvas=${input.entity}`, input.note);

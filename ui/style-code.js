@@ -32,12 +32,24 @@ export function drawCode(host, answer, style, keep) {
     // The frame has no origin to name, so it is spoken to by its window alone; what goes in is only what it is to draw.
     if (said.type === 'ready') frame.ready = true;
     if (said.type === 'ready') frame.contentWindow.postMessage({ type: 'draw', code, answer: data, style: fields, theme: { ...colours(), dark: matchMedia('(prefers-color-scheme: dark)').matches } }, '*');
+    // What it painted, when the page asked for a picture of it (ui/look.js): an image, and nothing else.
+    else if (said.type === 'captured') captured?.(said.image instanceof ImageBitmap ? said.image : null);
     // It may ask for an item's page and nothing else: an id is the only address taken from it.
     else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
     // The first thing that went wrong is the one to read: what follows is usually its echo.
     else if (said.type === 'error' && error.hidden) ((error.textContent =`This style's code stopped: ${String(said.message).slice(0, 300)}`), (error.title = error.textContent), (error.hidden = false));
   };
   window.addEventListener('message', hear);
+  // A picture of what it painted, asked of the frame: its pixels are never read from outside it.
+  let captured;
+  host.capture = () =>
+    new Promise((resolve) => {
+      if (!frame?.ready) return resolve(null);
+      const done = (image) => ((captured = null), clearTimeout(late), resolve(image));
+      const late = setTimeout(() => done(null), 3000);
+      captured = done;
+      frame.contentWindow.postMessage({ type: 'capture' }, '*');
+    });
   // A bar only for the switch, when the view offers it.
   const lit = litSwitch(answer.viewer, style, (change) => (keep(change), Object.assign(fields, change)), draw);
   host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), error, stage].filter(Boolean));
