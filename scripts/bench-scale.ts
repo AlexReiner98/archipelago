@@ -158,9 +158,9 @@ async function time<B>(label: string, run: (b: B) => Promise<unknown>, before: (
 }
 
 const hub = (await agent('view', { name: 'hubs' })).hubs[0].id as string;
-const task = (await agent('search', { type: 'work.task', open: true, limit: 1 }))[0].id as string;
+const task = (await agent('search', { type: 'task', open: true, limit: 1 }))[0].id as string;
 const ops = [
-  ...[0, 1, 2].map((i) => ({ op: 'create', ref: `t${i}`, type: 'work.task', title: `Bench task ${i}`, body: 'Made by the bench, undone after.' })),
+  ...[0, 1, 2].map((i) => ({ op: 'create', ref: `t${i}`, type: 'task', title: `Bench task ${i}`, body: 'Made by the bench, undone after.' })),
   ...[0, 1, 2].map((i) => ({ op: 'link', type: 'part_of', from: `t${i}`, to: hub })),
   { op: 'link', type: 'depends_on', from: 't0', to: task },
   { op: 'update', id: task, append: 'Bench: a line added, undone after.' },

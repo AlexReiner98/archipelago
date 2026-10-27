@@ -75,9 +75,9 @@ test("a pack's screen for Home is offered there, and is on it only once the owne
   await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', type: 'inquiry.hypothesis', title: 'H', status: 'untested' },
-      { op: 'create', type: 'software.release', title: 'R', status: 'upcoming' },
-      { op: 'create', type: 'time.entry', title: 'T', status: 'logged', props: { date: '2026-10-17', hours: 1 } },
+      { op: 'create', type: 'hypothesis', title: 'H', status: 'untested' },
+      { op: 'create', type: 'release', title: 'R', status: 'upcoming' },
+      { op: 'create', type: 'time_entry', title: 'T', status: 'logged', props: { date: '2026-10-17', hours: 1 } },
     ],
   });
   assert.deepEqual(await onHome(), ['home'], "used, a pack's screen is still only offered");

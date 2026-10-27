@@ -48,13 +48,13 @@ function made(c, ref) {
     {
       op: 'create',
       ref,
-      type: 'software.commit',
+      type: 'commit',
       title: titled(c.subject, c.id),
-      body: `Pushed to ${c.branch} ${by ? `${by} ` : ''}on ${c.pushed.slice(0, 10)}, and nobody said what it settles within ${GRACE_MINUTES} minutes. Account for it: a software.settles link to each item it settles, or none, and accounted true.`,
+      body: `Pushed to ${c.branch} ${by ? `${by} ` : ''}on ${c.pushed.slice(0, 10)}, and nobody said what it settles within ${GRACE_MINUTES} minutes. Account for it: a settles link to each item it settles, or none, and accounted true.`,
       props: { sha: c.id, accounted: false },
       ...(c.url && { source: { uri: c.url, kind: 'commit', title: subject(c.subject) } }),
     },
-    ...(c.repo ? [{ op: 'link', type: 'software.lives_in', from: ref, to: c.repo }] : []),
+    ...(c.repo ? [{ op: 'link', type: 'lives_in', from: ref, to: c.repo }] : []),
   ];
 }
 
@@ -73,8 +73,8 @@ export async function commits(_input, ctx) {
   const owed = [];
   for (const c of pushedBefore(heard, now - GRACE_MINUTES * 60_000)) {
     if (owed.length >= MOST) break;
-    const found = await ctx.read({ items: { type: 'software.commit', where: { sha: c.id } }, fields: ['sha'] });
-    if (found.length || (await ctx.read({ proposed: { op: 'create', type: 'software.commit', props: { sha: c.id } } }))) continue;
+    const found = await ctx.read({ items: { type: 'commit', where: { sha: c.id } }, fields: ['sha'] });
+    if (found.length || (await ctx.read({ proposed: { op: 'create', type: 'commit', props: { sha: c.id } } }))) continue;
     owed.push(c);
   }
   if (owed.length)
@@ -84,13 +84,13 @@ export async function commits(_input, ctx) {
       authority: { of: 'agent', basis: 'Pushes GitHub delivered, and no commit item for these commits after the grace period' },
     });
 
-  for (const e of await ctx.read({ items: { type: 'software.commit', where: { accounted: false } }, fields: ['sha'] })) {
-    const same = (await ctx.read({ items: { type: 'software.commit', where: { sha: e.props?.sha } }, fields: ['sha', 'accounted'] })).filter((o) => o.id !== e.id && o.props?.accounted !== false);
+  for (const e of await ctx.read({ items: { type: 'commit', where: { accounted: false } }, fields: ['sha'] })) {
+    const same = (await ctx.read({ items: { type: 'commit', where: { sha: e.props?.sha } }, fields: ['sha', 'accounted'] })).filter((o) => o.id !== e.id && o.props?.accounted !== false);
     if (same.length) {
       changes.push({ ops: [{ op: 'merge', keep: same[0].id, drop: e.id }], reason: `Commit ${String(e.props?.sha).slice(0, 7)} is accounted for by another item: one item for it`, authority: { of: 'agent', basis: `${same[0].id} accounts for the same sha` } });
       continue;
     }
-    const settles = await ctx.read({ related: e.id, relation: 'software.settles', direction: 'out' });
+    const settles = await ctx.read({ related: e.id, relation: 'settles', direction: 'out' });
     if (settles.length) changes.push({ ops: [{ op: 'update', id: e.id, props: { accounted: true } }], reason: `Commit ${String(e.props?.sha).slice(0, 7)} names what it settles: accounted for`, authority: { of: 'agent', basis: `It has ${settles.length} settles link${settles.length === 1 ? '' : 's'}` } });
   }
   return { changes, answer: { made: owed.length, tidied: changes.length - (owed.length ? 1 : 0) } };

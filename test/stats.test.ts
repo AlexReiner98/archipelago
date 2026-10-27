@@ -20,7 +20,7 @@ const columns = async (db: Q, table: string) => (await db.query<{ n: number }>(`
 /** A map of a project with 80 tasks in it. */
 async function filled() {
   const l = await fresh();
-  const ops = [{ op: 'create', ref: 'p', type: 'work.project', title: 'Project' }, ...Array.from({ length: 80 }, (_, i) => [{ op: 'create', ref: `t${i}`, type: 'work.task', title: `Task ${i}` }, { op: 'link', type: 'part_of', from: `t${i}`, to: 'p' }]).flat()];
+  const ops = [{ op: 'create', ref: 'p', type: 'project', title: 'Project' }, ...Array.from({ length: 80 }, (_, i) => [{ op: 'create', ref: `t${i}`, type: 'task', title: `Task ${i}` }, { op: 'link', type: 'part_of', from: `t${i}`, to: 'p' }]).flat()];
   await l.change(human, { reason: 'a map to measure', ops: ops as any });
   return l;
 }
@@ -54,7 +54,7 @@ test('enough writes since the last time make a table due again, and analysing it
 test('writes not yet analysed when a database closes are analysed before it does', async () => {
   const dir = join(folder(), 'db');
   const first = new Archipelago(await openDb(dir), (await fresh()).registry);
-  const ops = Array.from({ length: 80 }, (_, i) => ({ op: 'create', type: 'work.task', title: `Task ${i}` }));
+  const ops = Array.from({ length: 80 }, (_, i) => ({ op: 'create', type: 'task', title: `Task ${i}` }));
   await first.change(human, { reason: 'writes', ops: ops as any });
   await first.db.close();
   const db = await openDb(dir);

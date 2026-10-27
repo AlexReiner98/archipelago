@@ -28,7 +28,7 @@ export async function log(input, ctx) {
   const props = { date, hours, ...(start && { start, end }), ...(input.billable === false && { billable: false }), ...(input.rate !== undefined && { rate: input.rate }) };
   return {
     ops: [
-      { op: 'create', ref: 'e', type: 'time.entry', title: input.what, status: input.planned ? 'planned' : 'logged', body: input.note ?? '', props },
+      { op: 'create', ref: 'e', type: 'time_entry', title: input.what, status: input.planned ? 'planned' : 'logged', body: input.note ?? '', props },
       { op: 'link', type: 'part_of', from: 'e', to: work.id },
     ],
     reason: `${input.planned ? 'Planned' : 'Logged'} ${hours} h on ${work.title} for ${date}`,
@@ -38,7 +38,7 @@ export async function log(input, ctx) {
 
 /** Invoices not yet paid: those sent (and of them, those past due) and the drafts, each with what is still owed. */
 async function owed(r, now) {
-  const rows = (await r.read({ items: { type: 'time.invoice', status: ['draft', 'sent'] } })).sort((a, b) => String(a.props.due ?? '').localeCompare(String(b.props.due ?? '')) || String(a.props.number ?? '').localeCompare(String(b.props.number ?? '')));
+  const rows = (await r.read({ items: { type: 'invoice', status: ['draft', 'sent'] } })).sort((a, b) => String(a.props.due ?? '').localeCompare(String(b.props.due ?? '')) || String(a.props.number ?? '').localeCompare(String(b.props.number ?? '')));
   const list = [];
   for (const i of rows) {
     const total = Number(i.props.total ?? 0);
@@ -115,7 +115,7 @@ export async function draftInvoice(input, ctx) {
   const total = cents(subtotal + tax);
   // The next number from this biller this year: INV-2026-001, then 002.
   const year = issued.slice(0, 4);
-  const numbers = (await r.read({ items: { type: 'time.invoice', where: { billed_by: billedBy.id } } })).map((i) => String(i.props.number ?? '')).filter((n) => n.startsWith(`INV-${year}-`));
+  const numbers = (await r.read({ items: { type: 'invoice', where: { billed_by: billedBy.id } } })).map((i) => String(i.props.number ?? '')).filter((n) => n.startsWith(`INV-${year}-`));
   const number = `INV-${year}-${String(Math.max(0, ...numbers.map((n) => Number(n.split('-').at(-1)) || 0)) + 1).padStart(3, '0')}`;
   const bp = billedBy.props ?? {};
   const said = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
@@ -147,10 +147,10 @@ export async function draftInvoice(input, ctx) {
   ].join('\n');
   return {
     ops: [
-      { op: 'create', ref: 'inv', type: 'time.invoice', title: `Invoice ${number}: ${client.title}`, status: 'draft', body, props: { number, client: client.id, billed_by: billedBy.id, issued, due, period_from: mine[0].date, period_to: mine.at(-1).date, hours, subtotal, tax, total, currency } },
+      { op: 'create', ref: 'inv', type: 'invoice', title: `Invoice ${number}: ${client.title}`, status: 'draft', body, props: { number, client: client.id, billed_by: billedBy.id, issued, due, period_from: mine[0].date, period_to: mine.at(-1).date, hours, subtotal, tax, total, currency } },
       { op: 'link', type: 'part_of', from: 'inv', to: client.id },
       ...mine.flatMap((e) => [
-        { op: 'link', type: 'time.bills', from: 'inv', to: e.id },
+        { op: 'link', type: 'bills', from: 'inv', to: e.id },
         { op: 'update', id: e.id, status: 'invoiced' },
       ]),
     ],
@@ -162,7 +162,7 @@ export async function draftInvoice(input, ctx) {
 /** Record a payment on an invoice: its date (today unless given), amount (what is still owed unless given) and method. Paid in full, it closes. */
 export async function payInvoice(input, ctx) {
   const invoice = await ctx.read({ get: input.id });
-  if (!invoice || !isA(invoice, 'time.invoice')) throw new Error(`"${input.id}" is not an invoice`);
+  if (!invoice || !isA(invoice, 'invoice')) throw new Error(`"${input.id}" is not an invoice`);
   if (invoice.status === 'void') throw new Error('It is void: nothing is owed on it.');
   const p = invoice.props ?? {};
   const total = Number(p.total ?? 0);
@@ -188,9 +188,9 @@ export async function payInvoice(input, ctx) {
 /** Void an invoice: its entries go back to being logged, to be billed again. */
 export async function voidInvoice(input, ctx) {
   const invoice = await ctx.read({ get: input.id });
-  if (!invoice || !isA(invoice, 'time.invoice')) throw new Error(`"${input.id}" is not an invoice`);
+  if (!invoice || !isA(invoice, 'invoice')) throw new Error(`"${input.id}" is not an invoice`);
   if (invoice.status === 'void') throw new Error('It is already void.');
-  const billed = await ctx.read({ related: invoice.id, relation: 'time.bills' });
+  const billed = await ctx.read({ related: invoice.id, relation: 'bills' });
   return {
     ops: [{ op: 'update', id: invoice.id, status: 'void' }, ...billed.map((e) => ({ op: 'update', id: e.id, status: 'logged' }))],
     reason: input.reason ?? `Voided ${String(invoice.props?.number ?? invoice.title)}; its time can be invoiced again`,

@@ -32,14 +32,14 @@ test('a read placed in time places what falls in its window, repeats as their da
   const made = (await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'task', type: 'work.task', title: 'Send the forms', props: { due: '2026-10-15' } },
+      { op: 'create', ref: 'task', type: 'task', title: 'Send the forms', props: { due: '2026-10-15' } },
       { op: 'create', ref: 'meet', type: 'event', title: 'Board meeting', props: { at: '2026-10-14T14:00:00Z', ends: '2026-10-14T15:30:00Z' } },
       { op: 'create', ref: 'later', type: 'event', title: 'Next year', props: { at: '2027-03-01T14:00:00Z' } },
-      { op: 'create', ref: 'gym', type: 'time.routine', title: 'Gym', props: { from_time: '07:00', to_time: '08:00', days: [1, 3, 5], starts: '2026-10-01' } },
-      { op: 'create', ref: 'loose', type: 'work.task', title: 'No date' },
+      { op: 'create', ref: 'gym', type: 'routine', title: 'Gym', props: { from_time: '07:00', to_time: '08:00', days: [1, 3, 5], starts: '2026-10-01' } },
+      { op: 'create', ref: 'loose', type: 'task', title: 'No date' },
     ],
   })) as { created: Record<string, string> };
-  const kinds = ['work.task', 'event', 'time.routine'];
+  const kinds = ['task', 'event', 'routine'];
   const placed = (time: Record<string, unknown>) => answerRead(l, { placed: { types: kinds, ...time } as never }) as Promise<Item[]>;
   const items = await placed({ from: '2026-10-12', to: '2026-10-18' });
   const of = (ref: string) => items.find((i) => i.id === made.created[ref]);

@@ -88,7 +88,7 @@ export async function tree(l: Archipelago, params: Record<string, unknown>) {
   }
   const { rows: sessions } = await l.db.query<{ target: string; id: string; title: string }>(
     `select r.to_id as target, s.id, s.title from relation r join entity s on s.id = r.from_id
-     where r.type = 'sys.works_on' and r.valid_to is null and s.is_open and s.archived_at is null and r.to_id = any($1::text[])`,
+     where r.type = 'works_on' and r.valid_to is null and s.is_open and s.archived_at is null and r.to_id = any($1::text[])`,
     [answer.items.map((i) => i.id)],
   );
   const props = new Map((await l.db.query<{ id: string; place: unknown; created_at: Date }>(`select e.id, e.props->$2 as place, e.created_at from entity e join unnest($1::text[]) s(id) on s.id = e.id`, [answer.items.map((i) => i.id), t.order])).rows.map((r) => [r.id, r]));

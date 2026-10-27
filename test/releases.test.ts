@@ -15,11 +15,11 @@ const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<stri
 test('a picture is kept for a result only when sent, travels in a backup, and goes when the test is run again', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'work.project', title: 'App' },
-    { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
-    { op: 'create', ref: 'noaa', type: 'software.test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
+    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?' },
+    { op: 'create', ref: 'noaa', type: 'test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
     { op: 'link', type: 'part_of', from: 'sun', to: 'app' },
-    { op: 'link', type: 'software.answers', from: 'noaa', to: 'sun' },
+    { op: 'link', type: 'answers', from: 'noaa', to: 'sun' },
   ]);
   type Found = { id: string; picture: string | null; stored: boolean };
   const found = async () => ((await callTool(l, human, 'view', { name: 'proof', params: { of: made.app } })) as { proofs: { tests: { result: Found | null }[] }[] }).proofs[0].tests[0].result!;
@@ -60,23 +60,23 @@ test('a picture is kept for a result only when sent, travels in a backup, and go
 test('a release is not clear until what it ships is proven on its own build, and a changelog is only what is built', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'work.project', title: 'App' },
-    { op: 'create', ref: 'addin', type: 'software.feature', title: 'Add-in', status: 'built' },
-    { op: 'create', ref: 'panel', type: 'software.feature', title: 'Panel', status: 'built' },
-    { op: 'create', ref: 'old', type: 'software.feature', title: 'Presets', status: 'shipped' },
-    { op: 'create', ref: 'later', type: 'software.feature', title: 'Sheets', status: 'planned' },
-    { op: 'create', ref: 'proofs', type: 'software.feature', title: 'Public proof', status: 'built' },
-    { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?' },
-    { op: 'create', ref: 'noaa', type: 'software.test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
-    { op: 'create', ref: 'release', type: 'software.release', title: 'Version 1.0', props: { version: '1.0.0' } },
+    { op: 'create', ref: 'app', type: 'project', title: 'App' },
+    { op: 'create', ref: 'addin', type: 'feature', title: 'Add-in', status: 'built' },
+    { op: 'create', ref: 'panel', type: 'feature', title: 'Panel', status: 'built' },
+    { op: 'create', ref: 'old', type: 'feature', title: 'Presets', status: 'shipped' },
+    { op: 'create', ref: 'later', type: 'feature', title: 'Sheets', status: 'planned' },
+    { op: 'create', ref: 'proofs', type: 'feature', title: 'Public proof', status: 'built' },
+    { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?' },
+    { op: 'create', ref: 'noaa', type: 'test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
+    { op: 'create', ref: 'release', type: 'release', title: 'Version 1.0', props: { version: '1.0.0' } },
     { op: 'link', type: 'part_of', from: 'addin', to: 'app' },
     { op: 'link', type: 'part_of', from: 'panel', to: 'addin' },
     { op: 'link', type: 'part_of', from: 'old', to: 'app' },
     { op: 'link', type: 'part_of', from: 'later', to: 'app' },
     { op: 'link', type: 'part_of', from: 'proofs', to: 'app' },
     { op: 'link', type: 'part_of', from: 'sun', to: 'proofs' },
-    { op: 'link', type: 'software.answers', from: 'noaa', to: 'sun' },
-    { op: 'link', type: 'software.ships', from: 'release', to: 'addin' },
+    { op: 'link', type: 'answers', from: 'noaa', to: 'sun' },
+    { op: 'link', type: 'ships', from: 'release', to: 'addin' },
     // The questions are asked of a feature the release does not ship: it is held by it, and so they are the release's too.
     { op: 'link', type: 'depends_on', from: 'release', to: 'proofs' },
   ]);
@@ -104,12 +104,12 @@ test('costs: dollars where a run says, tokens where it does not, and each regula
   const l = await fresh();
   const longAgo = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
   const made = await make(l, [
-    { op: 'create', ref: 'repo', type: 'software.repo', title: 'Repo' },
-    { op: 'create', ref: 'host', type: 'money.cost', title: 'Hosting', props: { amount: 25, since: longAgo, vendor: 'Render' } },
-    { op: 'create', ref: 'domain', type: 'money.cost', title: 'Domain', props: { amount: 120, every: 'year', since: longAgo } },
-    { op: 'create', ref: 'unknown', type: 'money.cost', title: 'Subscription' },
-    { op: 'create', ref: 'euro', type: 'money.cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: longAgo } },
-    { op: 'create', ref: 'ended', type: 'money.cost', title: 'Old host', status: 'ended', props: { amount: 50, since: longAgo, until: longAgo } },
+    { op: 'create', ref: 'repo', type: 'repo', title: 'Repo' },
+    { op: 'create', ref: 'host', type: 'cost', title: 'Hosting', props: { amount: 25, since: longAgo, vendor: 'Render' } },
+    { op: 'create', ref: 'domain', type: 'cost', title: 'Domain', props: { amount: 120, every: 'year', since: longAgo } },
+    { op: 'create', ref: 'unknown', type: 'cost', title: 'Subscription' },
+    { op: 'create', ref: 'euro', type: 'cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: longAgo } },
+    { op: 'create', ref: 'ended', type: 'cost', title: 'Old host', status: 'ended', props: { amount: 50, since: longAgo, until: longAgo } },
   ]);
   await callTool(l, human, 'run_report', { repo: made.repo, title: 'Read a push', tokens: 40_000, cost_usd: 0.31, surface: 'server', link: 'https://example.com/1' });
   await callTool(l, human, 'run_report', { repo: made.repo, title: 'Read another', tokens: 10_000, cost_usd: 0.09, surface: 'server', link: 'https://example.com/2' });
@@ -139,23 +139,23 @@ test('costs: dollars where a run says, tokens where it does not, and each regula
 test('public: only a human makes it so, only some kinds can be, and anyone then sees little of it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'work.project', title: 'App', body: 'Internal plan: the secret margin' },
-    { op: 'create', ref: 'between', type: 'software.feature', title: 'Proof work', body: 'Not for anyone' },
-    { op: 'create', ref: 'sun', type: 'software.proof', title: 'How do we know the sun is correct?', body: 'An internal note' },
-    { op: 'create', ref: 'areas', type: 'software.proof', title: 'How do we know the areas are correct?' },
-    { op: 'create', ref: 'noaa', type: 'software.test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa', tolerance: 'within 0.01 degrees' } },
-    { op: 'create', ref: 'square', type: 'software.test', title: 'Area of a square', status: 'current', props: { entrypoint: 'Area.Square' } },
-    { op: 'create', ref: 'panel', type: 'software.feature', title: 'Panel', status: 'built' },
-    { op: 'create', ref: 'hidden', type: 'software.feature', title: 'Unannounced', status: 'built' },
-    { op: 'create', ref: 'choice', type: 'work.decision', title: 'What does it cost?' },
+    { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'Internal plan: the secret margin' },
+    { op: 'create', ref: 'between', type: 'feature', title: 'Proof work', body: 'Not for anyone' },
+    { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?', body: 'An internal note' },
+    { op: 'create', ref: 'areas', type: 'proof', title: 'How do we know the areas are correct?' },
+    { op: 'create', ref: 'noaa', type: 'test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa', tolerance: 'within 0.01 degrees' } },
+    { op: 'create', ref: 'square', type: 'test', title: 'Area of a square', status: 'current', props: { entrypoint: 'Area.Square' } },
+    { op: 'create', ref: 'panel', type: 'feature', title: 'Panel', status: 'built' },
+    { op: 'create', ref: 'hidden', type: 'feature', title: 'Unannounced', status: 'built' },
+    { op: 'create', ref: 'choice', type: 'decision', title: 'What does it cost?' },
     { op: 'link', type: 'part_of', from: 'between', to: 'app' },
     { op: 'link', type: 'part_of', from: 'sun', to: 'between' },
     { op: 'link', type: 'part_of', from: 'areas', to: 'between' },
     { op: 'link', type: 'part_of', from: 'panel', to: 'app' },
     { op: 'link', type: 'part_of', from: 'hidden', to: 'app' },
     { op: 'link', type: 'part_of', from: 'choice', to: 'app' },
-    { op: 'link', type: 'software.answers', from: 'noaa', to: 'sun' },
-    { op: 'link', type: 'software.answers', from: 'square', to: 'areas' },
+    { op: 'link', type: 'answers', from: 'noaa', to: 'sun' },
+    { op: 'link', type: 'answers', from: 'square', to: 'areas' },
   ]);
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 8, 7]);
   const report = (await callTool(l, human, 'test_report', { build: '1.0.0', results: [
@@ -273,12 +273,12 @@ test('a document brings items in by id, and a link shows it and them to anyone h
   const boActor: Actor = { kind: 'human', name: 'bo', person: people.bo };
   const theirs = async (who: Archipelago, actor: Actor, ops: Op[]) => ((await who.change(actor, { ops, reason: 'test' })) as { created: Record<string, string> }).created;
   const hers = await theirs(ann, annActor, [
-    { op: 'create', ref: 'mine', type: 'work.note', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
-    { op: 'create', ref: 'all', type: 'work.note', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
+    { op: 'create', ref: 'mine', type: 'note', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
+    { op: 'create', ref: 'all', type: 'note', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
   ]);
-  const his = await theirs(bo, boActor, [{ op: 'create', ref: 'n', type: 'work.note', title: 'Bo’s secret plan', body: 'Not for Ann’s readers.', visibility: 'private' }]);
+  const his = await theirs(bo, boActor, [{ op: 'create', ref: 'n', type: 'note', title: 'Bo’s secret plan', body: 'Not for Ann’s readers.', visibility: 'private' }]);
   const body = `# Funding\n\nTwo programs, and a third (${his.n}) the reader does not see.\n\n${hers.mine}\n\nBetween them, ${hers.mine} comes first.\n${hers.all}\n${his.n}\ne_nothing1\n`;
-  const { doc } = await theirs(ann, annActor, [{ op: 'create', ref: 'doc', type: 'work.document', title: 'Funding for Northwind', body, visibility: 'private', props: { for: 'Sam' } }]);
+  const { doc } = await theirs(ann, annActor, [{ op: 'create', ref: 'doc', type: 'document', title: 'Funding for Northwind', body, visibility: 'private', props: { for: 'Sam' } }]);
   assert.deepEqual(sectionIds(body), [hers.mine, hers.all, his.n, 'e_nothing1']);
 
   // Its author reads it whole; what she may not see is said as missing, in its place.
@@ -325,12 +325,12 @@ test('what is made for a reader is marked deliverable by its type, and a documen
   const l = await fresh();
   const marked = (await callTool(l, human, 'schema', {})) as { types: { id: string; deliverable?: boolean }[] };
   const deliverable = (id: string) => Boolean(marked.types.find((t) => t.id === id)?.deliverable);
-  assert.deepEqual(['work.document', 'work.file', 'software.release', 'software.spec', 'work.note', 'work.task'].map(deliverable), [true, true, true, false, false, false]);
+  assert.deepEqual(['document', 'file', 'release', 'spec', 'note', 'task'].map(deliverable), [true, true, true, false, false, false]);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Research' },
-    { op: 'create', ref: 'a', type: 'work.note', title: 'Inside' },
-    { op: 'create', ref: 'b', type: 'work.note', title: 'Beside' },
-    { op: 'create', ref: 'd', type: 'work.document', title: 'Brief', body: '{a}\n{b}' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Research' },
+    { op: 'create', ref: 'a', type: 'note', title: 'Inside' },
+    { op: 'create', ref: 'b', type: 'note', title: 'Beside' },
+    { op: 'create', ref: 'd', type: 'document', title: 'Brief', body: '{a}\n{b}' },
     { op: 'link', type: 'part_of', from: 'd', to: 'p' },
     { op: 'link', type: 'part_of', from: 'a', to: 'd' },
     { op: 'link', type: 'part_of', from: 'b', to: 'p' },

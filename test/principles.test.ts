@@ -20,10 +20,10 @@ test('what was read is made, changed when the code is, left when it is not, and 
   assert.deepEqual(made.map((o) => o.op), ['create', 'link', 'create', 'link']);
 
   const kept: Kept[] = [
-    { id: 'e_1', type: 'software.rule', status: 'current', fields: { key: 'core/forget', digest: digestOf(read[0]) } },
-    { id: 'e_2', type: 'software.rule', status: 'current', fields: { key: 'core/settle', digest: 'old' } },
-    { id: 'e_3', type: 'software.rule', status: 'current', fields: { key: 'core/gone', digest: 'x' } },
-    { id: 'e_4', type: 'software.test', status: 'current', fields: {} },
+    { id: 'e_1', type: 'rule', status: 'current', fields: { key: 'core/forget', digest: digestOf(read[0]) } },
+    { id: 'e_2', type: 'rule', status: 'current', fields: { key: 'core/settle', digest: 'old' } },
+    { id: 'e_3', type: 'rule', status: 'current', fields: { key: 'core/gone', digest: 'x' } },
+    { id: 'e_4', type: 'test', status: 'current', fields: {} },
   ];
   assert.deepEqual(principlesChange(read, kept), [
     { op: 'update', id: 'e_2', title: read[1].title, body: read[1].body, status: 'current', props: { ...read[1].props, key: 'core/settle', digest: digestOf(read[1]) } },

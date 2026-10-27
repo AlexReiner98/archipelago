@@ -107,7 +107,7 @@ export function spansOf(l: Archipelago, e: Placed, axis: TimeAxis, zone: string)
 /** Where each item falls in the window; a session where it was at work, each stretch with what it was on. */
 export async function placeAll(l: Archipelago, items: (Placed & { updated_at?: Date })[], axis: TimeAxis, zone: string): Promise<Map<string, Span[]>> {
   const placed = new Map(items.map((e) => [e.id, spansOf(l, e, axis, zone)]));
-  if ((axis.by ?? ['when']).includes('when')) for (const [id, found] of await runSpans(l, items.filter((e) => l.registry.isA(e.type, 'sys.run')), ...windowOf(axis, zone))) placed.set(id, found);
+  if ((axis.by ?? ['when']).includes('when')) for (const [id, found] of await runSpans(l, items.filter((e) => l.registry.isA(e.type, 'run')), ...windowOf(axis, zone))) placed.set(id, found);
   return placed;
 }
 

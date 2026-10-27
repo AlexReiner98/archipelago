@@ -50,11 +50,11 @@ test("an agent's backup is pulled whole: private items, items from before the lo
   const me = (await make(whole, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const owner = whole.as(me, true);
   // An item from before the log: a row the log never said, as every item on the live map made before 24 Oct 2026 is.
-  const kind = whole.registry.type('work.task')?.kind ?? null;
-  await whole.db.query(`insert into entity (id, type, kind, title, status, is_open, visibility) values ('e_beforelog', 'work.task', $1, 'From before the log', 'todo', true, 'shared')`, [kind]);
-  const mine = (await owner.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'h', type: 'work.task', title: 'Only mine', visibility: 'private' }] })) as { created: Record<string, string> };
+  const kind = whole.registry.type('task')?.kind ?? null;
+  await whole.db.query(`insert into entity (id, type, kind, title, status, is_open, visibility) values ('e_beforelog', 'task', $1, 'From before the log', 'todo', true, 'shared')`, [kind]);
+  const mine = (await owner.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'h', type: 'task', title: 'Only mine', visibility: 'private' }] })) as { created: Record<string, string> };
   const made = await make(whole, [
-    { op: 'create', ref: 't', type: 'work.task', title: 'Shared' },
+    { op: 'create', ref: 't', type: 'task', title: 'Shared' },
     { op: 'link', type: 'depends_on', from: 't', to: mine.created.h },
     { op: 'link', type: 'depends_on', from: 't', to: 'e_beforelog' },
   ]);

@@ -45,19 +45,19 @@ test('a session registers, takes the lane its task needs, and gives it back when
 test('a project’s open questions are what needs the owner in it, and its next release says where it stands', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Shadows', status: 'active' },
-    { op: 'create', ref: 'q', type: 'work.decision', title: 'Which licence?', status: 'open', props: { options: ['MIT', 'Apache'] } },
+    { op: 'create', ref: 'p', type: 'project', title: 'Shadows', status: 'active' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Which licence?', status: 'open', props: { options: ['MIT', 'Apache'] } },
     { op: 'link', type: 'part_of', from: 'q', to: 'p' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Write the installer', status: 'todo' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'Sign the package', status: 'done' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Write the installer', status: 'todo' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Sign the package', status: 'done' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'b', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'q' },
-    { op: 'create', ref: 'r', type: 'software.release', title: 'First release', status: 'upcoming' },
+    { op: 'create', ref: 'r', type: 'release', title: 'First release', status: 'upcoming' },
     { op: 'link', type: 'part_of', from: 'r', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'r', to: 'a' },
     { op: 'link', type: 'depends_on', from: 'r', to: 'b' },
-    { op: 'create', ref: 'quiet', type: 'work.project', title: 'Quiet one', status: 'active' },
+    { op: 'create', ref: 'quiet', type: 'project', title: 'Quiet one', status: 'active' },
   ]);
   const asked = await attend(l, { reasons: ['unsettled'], within: made.p });
   assert.deepEqual(asked.items.map((q: any) => [q.title, q.reasons[0].by, q.top.title]), [['Which licence?', 'word', 'Shadows']]);
@@ -70,10 +70,10 @@ test('a project’s open questions are what needs the owner in it, and its next 
 test('a session tells the story of its work, beat by beat, and can take a beat back', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'Fix the halo' },
-    { op: 'create', ref: 'b', type: 'work.issue', title: 'Labels clip' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Fix the halo' },
+    { op: 'create', ref: 'b', type: 'issue', title: 'Labels clip' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
-    { op: 'create', ref: 'c', type: 'work.task', title: 'Unrelated' },
+    { op: 'create', ref: 'c', type: 'task', title: 'Unrelated' },
   ]);
   const { run } = await sessionStart(l, agent, { title: 'Storyteller', session_id: 's-story' });
   const one = await tell(l, agent, { run: 's-story', said: 'The halo is blocked by the clipping: fix that first.', links: [{ from: made.b, to: made.a, says: 'is why' }] });
@@ -123,7 +123,7 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
   const brief = (await ask(l, 'brief', { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Apex');
   assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
-  assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['work.governed_by', 'One live lane.']]);
+  assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['governed_by', 'One live lane.']]);
   for (const part of ['# Capture probe', 'Part of: Apex', 'held by Other session', 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
@@ -226,14 +226,14 @@ test('a session that finishes says where the repository\'s open work stands', as
   assert.deepEqual([atOnce.due, atOnce.projects[0].items.length], [true, 2]);
   // An issue filed as about a project, not as part of it, is the repository's work all the same.
   const { drift } = await make(l, [
-    { op: 'create', ref: 'drift', type: 'work.issue', title: 'The carve reads origins' },
+    { op: 'create', ref: 'drift', type: 'issue', title: 'The carve reads origins' },
     { op: 'link', type: 'about', from: 'drift', to: made.proj },
   ]);
   assert.ok(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any).ready.some((i: any) => i.id === drift));
 
   // An open issue in the repository is its work too: shown at the start, asked about at the end.
   const { leak } = await make(l, [
-    { op: 'create', ref: 'leak', type: 'work.issue', title: 'The probe leaks handles' },
+    { op: 'create', ref: 'leak', type: 'issue', title: 'The probe leaks handles' },
     { op: 'link', type: 'part_of', from: 'leak', to: made.proj },
   ]);
   assert.match(await hookSessionStart(l, { session_id: 'r5', cwd: 'C:\\code\\Apex' }), new RegExp(`- Issue: The probe leaks handles \\(${leak}\\)`));

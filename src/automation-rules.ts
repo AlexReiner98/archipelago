@@ -8,7 +8,7 @@ export const AUTOMATION_TOOLS = ['check_connections', 'import_audit'];
 
 /** Problems with what an automation is to do, when the type written is one. */
 export function checkWritten(reg: Registry, type: string, props: Record<string, unknown>): string[] {
-  return reg.isA(type, 'sys.automation') ? checkAutomation(props) : [];
+  return reg.isA(type, 'automation') ? checkAutomation(props) : [];
 }
 
 export function checkAutomation(props: Record<string, unknown>): string[] {

@@ -66,7 +66,7 @@ the key vault and the **transient** table of short-lived values.
 | `authority` | object | On whose authority: `{ "of": "human" \| "agent", "who": "e_…", "basis": sealed, "stated_by": "e_…" }`, as `Authority` in `src/pelago.ts` today. `basis` is free text and sealed. |
 | `rule` | object | What decided it (section 3): `{ "outcome": "apply", "spared": [{rule, pack, lifted}] }` for a change applied at once (the rules a setting lifted for it, if any), or, for an approved proposal, `{ "outcome": "approved", "held_by": {rule, pack}, "proposal": "p_…", "proposal_hash": "…", "by": "e_…", "revised": false, "except": [] }`. |
 | `reason` | sealed | Why. Required, as today. |
-| `source` | string \| null | The source item (`sys.source`) the facts came from. The source item's own facts are in this same entry when it is new. A fact with a different source says so itself. |
+| `source` | string \| null | The source item (`source`) the facts came from. The source item's own facts are in this same entry when it is new. A fact with a different source says so itself. |
 | `pack` | object \| null | The pack whose code made it, when a pack's action or handler did: `{ "id": "time", "manifest": "<hash>", "action": "log" }` or `{ …, "handler": "on_push" }` (section 8). Replaces today's `ChangeInput.action` string. |
 | `undoes` | string \| null | The change set this one reverses, for an undo. |
 | `facts` | array | The facts, in the order they apply. May be empty only for a decision entry (a rejected or superseded proposal, section 3) or a segment seal (section 4). |
@@ -227,7 +227,7 @@ asserted again when its manifest changes.
 | `restore` | `["-", e, "archived"]`. |
 | `merge` | On the kept item, its merged `body` and each declared field it gains from the dropped one. Each live link of the dropped item asserts `link` again with the kept item at that end; a link that would join the item to itself, or repeat one the kept item already has (the older stays), is retracted instead. Each `owner` that named the dropped item asserts the kept one. The dropped item gets `archived` and `merged_into`. |
 | `define_type` | `["+", type id, "type_def", def]`. |
-| a new source | The source item's own facts (`type: sys.source`, `title`, `uri`, `kind`, `body` from the excerpt), in the same entry, before the facts that name it. |
+| a new source | The source item's own facts (`type: source`, `title`, `uri`, `kind`, `body` from the excerpt), in the same entry, before the facts that name it. |
 
 A merge written this way is undoable, which today's is not: its undo asserts
 the old ends of each moved link, the old body and fields, and retracts
@@ -249,13 +249,13 @@ shown in clear; the first fact is shown sealed, as it is stored.
   "reason": "Retention rules need their own parser before compaction can run",
   "source": "e_src77", "pack": null, "undoes": null,
   "facts": [
-    ["+", "e_src77", "type", "sys.source"],
+    ["+", "e_src77", "type", "source"],
     ["+", "e_src77", "kind", "system"],
     ["+", "e_src77", "title", { "$k": 1, "$n": "q1Zt0h3Xl2c9aB4r", "$c": "7rV1…Yw" }],
     ["+", "e_src77", "uri", "docs/log.md"],
     ["+", "e_src77", "status", "recorded"],
     ["+", "e_src77", "visibility", "shared"],
-    ["+", "e_t5", "type", "work.task"],
+    ["+", "e_t5", "type", "task"],
     ["+", "e_t5", "kind", "work"],
     ["+", "e_t5", "title", "Parse retention rules"],
     ["+", "e_t5", "body", "A rule's keep clause read into a plan the compactor runs."],
@@ -270,7 +270,7 @@ shown in clear; the first fact is shown sealed, as it is stored.
 }
 ```
 
-`uri` is a declared field of `sys.source`, so it is sealed too in storage;
+`uri` is a declared field of `source`, so it is sealed too in storage;
 shown in clear above for reading. `r_p1` and `r_d1` have no fields of their
 own, so they need no key; a link that has fields has a key of its own
 (section 5).
@@ -495,7 +495,7 @@ with a `stream` and a `keep` in place of `then`:
 ```json
 {
   "id": "sessions",
-  "when": { "type": "sys.run", "fields": ["story", "tokens_used", "cost_usd", "stale_flagged"] },
+  "when": { "type": "run", "fields": ["story", "tokens_used", "cost_usd", "stale_flagged"] },
   "stream": "sessions",
   "keep": { "latest": true, "history": "P14D", "closed": "P180D" },
   "say": "A run's story and spend now, two weeks of how they got there, kept half a year after the run ends."
@@ -679,7 +679,7 @@ value by its digest is the one change ever made to a stored fact, made only
 by a forget, under the forget role. Snapshots and backups older than the
 forget still hold the ciphertext, unreadable once the key is gone. What stays
 of a forgotten item is its id, its type and the clear structure above: that
-something of type `work.task` existed and was linked, not what it said.
+something of type `task` existed and was linked, not what it said.
 
 **The reasons that mention it.** Free text in change set headers can name
 what is forgotten. A forget finds, through the search index, the change sets
@@ -1111,7 +1111,7 @@ section 4, Where this stands. Nothing else writes the map today
 | `apply` merge: four `update relation`, two `update entity`, `log entity.merge` | the merge facts (section 2), now undoable |
 | `apply` define_type: `registry.defineLocal`, `log type.define` | `type_def` fact; the registry and `local_type` are projections of it |
 | `apply` with `input.action` (a pack action) | the `pack` header, judged by `pack_reach` (section 8) |
-| `ensureSource`: `insert into entity` (sys.source), `log entity.create` | the source item's facts in the same change set |
+| `ensureSource`: `insert into entity` (source), `log entity.create` | the source item's facts in the same change set |
 | `supersede`: `update proposal set status = 'superseded'`, `log proposal.supersede` | a fact entry with no facts, `rule.outcome: superseded`, actor `system` |
 | `fillKinds`: `update entity set kind` | a system change set asserting `kind` (only when a pack moved a type's kind) |
 | `retype`: `update entity|relation set type`, lens and screen settings rewritten, `log type.moved` | a system change set asserting the new `type` (or `link`) and the renamed settings for each item touched (`e_w66xm7kt`) |

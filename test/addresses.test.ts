@@ -120,8 +120,8 @@ test('a link to a document opens its page and its text with no login, until it i
   const made = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'n', type: 'work.note', title: 'IRAP', body: 'Call first.' },
-      { op: 'create', ref: 'd', type: 'work.document', title: 'Funding', body: 'Intro.\n\n{n}' },
+      { op: 'create', ref: 'n', type: 'note', title: 'IRAP', body: 'Call first.' },
+      { op: 'create', ref: 'd', type: 'document', title: 'Funding', body: 'Intro.\n\n{n}' },
     ],
   });
   const { d } = made.result.created;
@@ -145,7 +145,7 @@ test('a link to a document opens its page and its text with no login, until it i
   assert.equal((await fetch(`${base}/read/not-an-id`)).status === 200, false);
   // A section's figure is shown through the link; a figure of anything the document does not bring in is not.
   const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
-  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'work.note', title: 'Not in it' }] })).result.created.o;
+  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'note', title: 'Not in it' }] })).result.created.o;
   for (const id of [made.result.created.n, other]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: png, content_type: 'image/png' })).status, 200);
   assert.match((await call('/api/picture_put', undefined, { result: d, data: png, content_type: 'image/png' })).error, /not a test result, a note, a file or a lens/);
   const pictured = (await (await fetch(`${base}${link.path}/data`)).json()) as { parts: { section?: { picture: boolean } }[] };

@@ -21,14 +21,14 @@ test('a project, its streams and their steps each sit at their own level', () =>
   const reg = new Registry(packsWith());
   const at = (id: string) => reg.type(id)!.altitude;
   assert.equal(at('goal'), 'workspace');
-  assert.equal(at('work.project'), 'project');
-  for (const id of ['software.feature', 'software.component', 'software.release', 'work.document']) assert.equal(at(id), 'stream', id);
-  for (const id of ['work.task', 'work.issue', 'software.bug', 'work.decision', 'inquiry.hypothesis', 'work.note']) assert.equal(at(id), 'step', id);
+  assert.equal(at('project'), 'project');
+  for (const id of ['feature', 'component', 'release', 'document']) assert.equal(at(id), 'stream', id);
+  for (const id of ['task', 'issue', 'bug', 'decision', 'hypothesis', 'note']) assert.equal(at(id), 'step', id);
   // People and places are not in the hierarchy.
   assert.equal(at('person'), undefined);
-  assert.equal(at('software.repo'), undefined);
+  assert.equal(at('repo'), undefined);
   // The UI is told it with the schema.
-  assert.equal(reg.describe().types.find((t) => t.id === 'work.project')?.altitude, 'project');
+  assert.equal(reg.describe().types.find((t) => t.id === 'project')?.altitude, 'project');
 });
 
 test('a type with a level that is not one stops the registry', () => {

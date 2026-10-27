@@ -7,34 +7,34 @@ import { gate } from './gate.js';
 type Item = { id: string; type: string; title: string; status?: string; is_open?: boolean; owner?: string | null; props?: Record<string, unknown> };
 
 const LINEAGE: Record<string, string[]> = {
-  'software.release': ['software.release', 'event', 'occurrence'],
+  'release': ['release', 'event', 'occurrence'],
   event: ['event', 'occurrence'],
-  'work.project': ['work.project', 'work'],
-  'software.feature': ['software.feature', 'work'],
-  'work.task': ['work.task', 'work'],
-  'work.decision': ['work.decision', 'question'],
-  'work.note': ['work.note', 'record'],
+  'project': ['project', 'work'],
+  'feature': ['feature', 'work'],
+  'task': ['task', 'work'],
+  'decision': ['decision', 'question'],
+  'note': ['note', 'record'],
   person: ['person', 'actor'],
 };
 const TYPES: Record<string, { estimated: boolean; settles: boolean; settled_by: string | null }> = {
-  'work.task': { estimated: true, settles: false, settled_by: null },
-  'software.feature': { estimated: true, settles: false, settled_by: null },
-  'work.project': { estimated: false, settles: false, settled_by: null },
-  'work.decision': { estimated: false, settles: true, settled_by: 'word' },
-  'work.note': { estimated: false, settles: false, settled_by: null },
+  'task': { estimated: true, settles: false, settled_by: null },
+  'feature': { estimated: true, settles: false, settled_by: null },
+  'project': { estimated: false, settles: false, settled_by: null },
+  'decision': { estimated: false, settles: true, settled_by: 'word' },
+  'note': { estimated: false, settles: false, settled_by: null },
 };
 
 /** A map of items and links, read as the kernel would answer: what is read around an item, links out of an item by kind (flavours included), what is part of what, and what blocks what. */
 function ctxOver(items: Item[], links: [string, string, string][], blocked: Record<string, string[]> = {}, me = 'e_me') {
   const byId = new Map(items.map((e) => [e.id, { status: 'todo', is_open: true, owner: null, props: {}, ...e, is: LINEAGE[e.type] ?? [e.type] }]));
-  const kinds: Record<string, string[]> = { ships: ['ships', 'software.ships'] };
+  const kinds: Record<string, string[]> = { ships: ['ships', 'ships'] };
   const out = (id: string, kind: string) => links.flatMap(([from, k, to], i) => (from === id && (kinds[kind] ?? [kind]).includes(k) && byId.has(to) ? [{ ...byId.get(to)!, link: `r${i}` }] : []));
   const parts = (id: string): string[] => links.filter(([, k, to]) => k === 'part_of' && to === id).flatMap(([from]) => [from, ...parts(from)]);
   return {
     read: async (q: Record<string, any>) => {
       if (q.me) return me;
       // What is read around the event: here, all of the map.
-      if (q.around) return { items: [...byId.values()], links: links.map(([from, type, to], i) => ({ id: `r${i}`, type, from, to, is: type === 'software.ships' ? ['software.ships', 'ships', 'relates_to'] : [type] })) };
+      if (q.around) return { items: [...byId.values()], links: links.map(([from, type, to], i) => ({ id: `r${i}`, type, from, to, is: type === 'ships' ? ['ships', 'ships', 'produced'] : [type] })) };
       if (q.parts_of) return [...new Set(q.parts_of.flatMap((id: string) => [id, ...parts(id)]))].map((id) => byId.get(id as string)!);
       if (q.get) return byId.get(q.get) ?? null;
       if (q.items) return [...byId.values()].filter((e) => e.is.includes(q.items.type));
@@ -49,17 +49,17 @@ function ctxOver(items: Item[], links: [string, string, string][], blocked: Reco
 }
 
 const MAP: Item[] = [
-  { id: 'rel', type: 'software.release', title: 'First release', status: 'upcoming', props: { at: '2026-11-01' } },
+  { id: 'rel', type: 'release', title: 'First release', status: 'upcoming', props: { at: '2026-11-01' } },
   { id: 'launch', type: 'event', title: 'A launch with nothing on it' },
-  { id: 'proj', type: 'work.project', title: 'Product', status: 'active' },
-  { id: 'feat', type: 'software.feature', title: 'Export', status: 'building' },
-  { id: 't1', type: 'work.task', title: 'Write the exporter', status: 'done', is_open: false },
-  { id: 't2', type: 'work.task', title: 'Test the exporter' },
-  { id: 'd1', type: 'work.decision', title: 'Which format', owner: 'e_me' },
-  { id: 'loose', type: 'work.task', title: 'Fix the icon' },
-  { id: 'later', type: 'work.task', title: 'Dark mode' },
-  { id: 'unsorted', type: 'work.task', title: 'Write the docs' },
-  { id: 'note', type: 'work.note', title: 'Notes on export' },
+  { id: 'proj', type: 'project', title: 'Product', status: 'active' },
+  { id: 'feat', type: 'feature', title: 'Export', status: 'building' },
+  { id: 't1', type: 'task', title: 'Write the exporter', status: 'done', is_open: false },
+  { id: 't2', type: 'task', title: 'Test the exporter' },
+  { id: 'd1', type: 'decision', title: 'Which format', owner: 'e_me' },
+  { id: 'loose', type: 'task', title: 'Fix the icon' },
+  { id: 'later', type: 'task', title: 'Dark mode' },
+  { id: 'unsorted', type: 'task', title: 'Write the docs' },
+  { id: 'note', type: 'note', title: 'Notes on export' },
 ];
 const LINKS: [string, string, string][] = [
   ['feat', 'part_of', 'proj'],
@@ -73,12 +73,12 @@ const LINKS: [string, string, string][] = [
   ['rel', 'depends_on', 'feat'],
   ['rel', 'depends_on', 'loose'],
   ['rel', 'defers', 'later'],
-  ['rel', 'software.ships', 'proj'],
+  ['rel', 'ships', 'proj'],
 ];
 
 test('without an event, the gate names the open events that have one', async () => {
   const { events } = (await gate({}, ctxOver(MAP, LINKS))) as any;
-  assert.deepEqual(events, [{ id: 'rel', type: 'software.release', title: 'First release', status: 'upcoming', at: '2026-11-01', holding: 2 }]);
+  assert.deepEqual(events, [{ id: 'rel', type: 'release', title: 'First release', status: 'upcoming', at: '2026-11-01', holding: 2 }]);
 });
 
 test('a gate groups what it waits for by stream, with what is the owner’s, what can follow and what is not sorted', async () => {

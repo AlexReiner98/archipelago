@@ -18,12 +18,12 @@ async function setUp() {
     await call('/api/change', admin, {
       reason: 'x',
       ops: [
-        { op: 'create', ref: 'env', type: 'software.environment', title: 'server-1' },
-        { op: 'create', ref: 'blue', type: 'software.component', title: 'App, blue', status: 'up', props: { url: 'http://app-blue:3100/health' } },
-        { op: 'create', ref: 'green', type: 'software.component', title: 'App, green', status: 'planned', props: { url: 'http://app-green:3100/health' } },
-        { op: 'create', ref: 'llm', type: 'software.component', title: 'LiteLLM', status: 'up', props: { url: 'http://litellm:4000/health' } },
-        { op: 'create', ref: 'other', type: 'software.component', title: 'Laptop proxy', status: 'up', props: { url: 'http://laptop:8080' } },
-        { op: 'create', ref: 'task', type: 'work.task', title: 'Paint the fence' },
+        { op: 'create', ref: 'env', type: 'environment', title: 'server-1' },
+        { op: 'create', ref: 'blue', type: 'component', title: 'App, blue', status: 'up', props: { url: 'http://app-blue:3100/health' } },
+        { op: 'create', ref: 'green', type: 'component', title: 'App, green', status: 'planned', props: { url: 'http://app-green:3100/health' } },
+        { op: 'create', ref: 'llm', type: 'component', title: 'LiteLLM', status: 'up', props: { url: 'http://litellm:4000/health' } },
+        { op: 'create', ref: 'other', type: 'component', title: 'Laptop proxy', status: 'up', props: { url: 'http://laptop:8080' } },
+        { op: 'create', ref: 'task', type: 'task', title: 'Paint the fence' },
         { op: 'link', type: 'part_of', from: 'blue', to: 'env' },
         { op: 'link', type: 'part_of', from: 'green', to: 'env' },
         { op: 'link', type: 'part_of', from: 'llm', to: 'env' },

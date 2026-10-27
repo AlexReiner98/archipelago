@@ -16,7 +16,7 @@ const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
 const ROOT = 'e_rootzzzz';
-const item = (id: string, title: string, inside: string | null = ROOT) => ({ id, kind: 'work', type: 'work.task', inside, title, place: 0, open: true, status: 'todo', state, within: { items: 0 }, fields: {} });
+const item = (id: string, title: string, inside: string | null = ROOT) => ({ id, kind: 'work', type: 'task', inside, title, place: 0, open: true, status: 'todo', state, within: { items: 0 }, fields: {} });
 const answer = {
   lens: { from: ROOT },
   items: [{ ...item(ROOT, 'A process', null), kind: 'aim' }, item('e_askzzzzz', 'Ask'), item('e_planzzzz', 'Plan'), item('e_loosezzz', 'Tagged only', null), { ...item('e_tagzzzzz', 'A tag', null), kind: 'aim', type: 'tag' }],

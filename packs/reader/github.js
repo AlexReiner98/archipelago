@@ -28,7 +28,7 @@ export async function repositories(ctx) {
 /** The repositories of this map that the installation can read: each its name on GitHub and its item here. */
 export async function readable(ctx) {
   const names = new Map((await repositories(ctx)).map((n) => [n.toLowerCase(), n]));
-  const items = await ctx.read({ items: { type: 'software.repo' }, fields: ['remote'] });
+  const items = await ctx.read({ items: { type: 'repo' }, fields: ['remote'] });
   const out = [];
   for (const r of items) {
     const match = /github\.com[:/]+([^/\s]+\/[^/\s?#]+?)(?:\.git)?(?:[/?#].*)?$/i.exec(String(r.props?.remote ?? ''));

@@ -26,7 +26,7 @@ import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 const HEX = /^#[0-9a-f]{3,8}$/i;
 /** The link type the order's wires are, for their colour. */
 const ORDER_TYPE = 'depends_on';
-/** A link type as the key says it: its name without its pack, in words ("funding.could_fund" is "Could fund"). */
+/** A link type as the key says it: its name without its pack, in words ("could_fund" is "Could fund"). */
 const linkName = (type) => {
   const words = type.split('.').pop().replaceAll('_', ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);

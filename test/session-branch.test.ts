@@ -37,8 +37,8 @@ test('a pack finds the sessions on a branch and what they work on, through its r
   const made = await laneSetup(l);
   await sessionStart(l, agent, { task: made.offline, branch: 'claude/tests' });
   await sessionStart(l, agent, { task: made.live, branch: 'elsewhere' });
-  const runs = (await answerRead(l, { items: { type: 'sys.run', where: { branch: 'claude/tests' } }, fields: ['branch'] })) as { id: string }[];
+  const runs = (await answerRead(l, { items: { type: 'run', where: { branch: 'claude/tests' } }, fields: ['branch'] })) as { id: string }[];
   assert.equal(runs.length, 1);
-  const worked = (await answerRead(l, { related: runs[0].id, relation: 'sys.works_on' })) as { id: string }[];
+  const worked = (await answerRead(l, { related: runs[0].id, relation: 'works_on' })) as { id: string }[];
   assert.deepEqual(worked.map((t) => t.id), [made.offline]);
 });

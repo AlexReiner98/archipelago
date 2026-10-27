@@ -38,7 +38,7 @@ export async function latestSeq(l: Archipelago): Promise<number> {
 /** What humans have done since an event, oldest first: their edits, decisions, approvals and rejections. Reading a notification is not news. */
 export async function humanChanges(l: Archipelago, after: number): Promise<HumanChange[]> {
   const read = await readEvents(l.db, { after, actorLike: 'human:%', news: true, oldest: true, limit: 50 });
-  const rows = read.filter((r) => r.target_type !== 'sys.notification').map((r) => ({ ...r, ts: r.ts as string, type: r.target_type, title: r.target_title }));
+  const rows = read.filter((r) => r.target_type !== 'notification').map((r) => ({ ...r, ts: r.ts as string, type: r.target_type, title: r.target_title }));
   return rows.map((r) => ({
     seq: r.seq,
     ts: r.ts,

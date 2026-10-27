@@ -23,14 +23,14 @@ test('a look pass reads as its agent’s person, only through /api, and only wha
   const sam = await member(owner, { email: 'sam@example.com', name: 'Sam' });
   const kim = await member(owner, { email: 'kim@example.com', name: 'Kim' });
   const samId = (await call('/whoami', sam, undefined, 'GET')).actor.person as string;
-  const make = async (token: string, title: string) => ((await call('/api/change', token, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'work.task', title, visibility: 'private' }] })).result.created as Record<string, string>).x;
+  const make = async (token: string, title: string) => ((await call('/api/change', token, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'task', title, visibility: 'private' }] })).result.created as Record<string, string>).x;
   const [mine, theirs] = [await make(sam, 'Sam’s own'), await make(kim, 'Kim’s own')];
   const pass = await passFor(db, { workspace: 'default', viewer: samId }, 'claude/look');
   // It reads the map as Sam does: their private item, not Kim's.
   const flat = (await call('/api/view', pass, { name: 'flat', params: { filter: { ids: [mine, theirs] } } })).result;
   assert.deepEqual(flat.items.map((i: { id: string }) => i.id), [mine]);
   // It writes nothing, and is no token anywhere but the page's reads.
-  const refused = await call('/api/change', pass, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'From a look' }] });
+  const refused = await call('/api/change', pass, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'From a look' }] });
   assert.equal(refused.status, 403);
   assert.match(refused.error, /A look reads/);
   for (const path of ['/agent/query', '/mcp']) assert.equal((await call(path, pass, { name: 'search', params: {} })).status, 401, `${path} takes no look pass`);
@@ -55,8 +55,8 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
   const steps = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'a', type: 'work.task', title: 'First step' },
-      { op: 'create', ref: 'b', type: 'work.task', title: 'Second step' },
+      { op: 'create', ref: 'a', type: 'task', title: 'First step' },
+      { op: 'create', ref: 'b', type: 'task', title: 'Second step' },
       { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
     ],
   })).result.created as Record<string, string>;

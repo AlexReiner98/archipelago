@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export const TYPES = ['software.rule', 'software.action', 'software.test'] as const;
+export const TYPES = ['rule', 'action', 'test'] as const;
 
 /** One fact as read from the code: what its item should say. */
 export interface Read {
@@ -49,7 +49,7 @@ interface PackAction {
 /** The rules a pack file keeps, each by its pack and id. */
 export function rulesOf(pack: { id: string; rules?: PackRule[] }): Read[] {
   return (pack.rules ?? []).map((r) => ({
-    type: 'software.rule',
+    type: 'rule',
     key: `${pack.id}/${r.id}`,
     title: cut(`${r.id} (${pack.id})`),
     body: r.say ?? '',
@@ -60,7 +60,7 @@ export function rulesOf(pack: { id: string; rules?: PackRule[] }): Read[] {
 /** The actions a pack file declares, and the kernel's own, each by its verb and name. */
 export function actionsOf(packs: { id: string; actions?: PackAction[] }[], kernel: { name: string; verb: string; description: string }[]): Read[] {
   const one = (name: string, verb: string, pack: string, description: string): Read => ({
-    type: 'software.action',
+    type: 'action',
     key: `${verb}/${name}`,
     title: cut(`${verb} ${name}`),
     body: description,
@@ -79,7 +79,7 @@ export function testsOf(file: string, source: string): Read[] {
   for (const m of source.matchAll(/^\s*test\(\s*(['"`])((?:\\.|(?!\1).)*)\1/gm)) {
     if (m[1] === '`' && m[2].includes('${')) continue;
     const name = m[2].replace(/\\(.)/g, '$1');
-    found.push({ type: 'software.test', key: `${file}: ${name}`, title: cut(name), body: `${name}\n\nIn ${file}.`, props: { executable: true, entrypoint: `node --test ${file}` } });
+    found.push({ type: 'test', key: `${file}: ${name}`, title: cut(name), body: `${name}\n\nIn ${file}.`, props: { executable: true, entrypoint: `node --test ${file}` } });
   }
   return found;
 }
@@ -135,7 +135,7 @@ export function named(read: Read[]): Read[] {
   const count = new Map<string, number>();
   for (const r of read) count.set(r.title, (count.get(r.title) ?? 0) + 1);
   return read.map((r) => {
-    if (count.get(r.title)! < 2 || r.type !== 'software.test') return r;
+    if (count.get(r.title)! < 2 || r.type !== 'test') return r;
     const [file, ...name] = r.key.split(': ');
     const where = ` (${file.split('/').pop()!.replace(/\.test\.ts$/, '')})`;
     const base = name.join(': ');

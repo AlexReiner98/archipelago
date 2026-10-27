@@ -14,9 +14,9 @@ test('in a browser, a step dragged on the canvas is kept in the places stream an
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'work.project', title: 'Moved here' },
-      { op: 'create', ref: 'a', type: 'work.task', title: 'First step' },
-      { op: 'create', ref: 'b', type: 'work.task', title: 'Second step' },
+      { op: 'create', ref: 'p', type: 'project', title: 'Moved here' },
+      { op: 'create', ref: 'a', type: 'task', title: 'First step' },
+      { op: 'create', ref: 'b', type: 'task', title: 'Second step' },
       { op: 'link', type: 'part_of', from: 'a', to: 'p' },
       { op: 'link', type: 'part_of', from: 'b', to: 'p' },
       { op: 'link', type: 'depends_on', from: 'b', to: 'a' },

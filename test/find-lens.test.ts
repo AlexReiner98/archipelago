@@ -16,11 +16,11 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'site', type: 'work.project', title: 'Site works' },
-      { op: 'create', ref: 'roof', type: 'work.task', title: 'Roof the shed' },
-      { op: 'create', ref: 'walls', type: 'work.task', title: 'Walls', body: 'Up before the roof goes on.' },
-      { op: 'create', ref: 'gutter', type: 'work.task', title: 'Gutters' },
-      { op: 'create', ref: 'other', type: 'work.task', title: 'Elsewhere' },
+      { op: 'create', ref: 'site', type: 'project', title: 'Site works' },
+      { op: 'create', ref: 'roof', type: 'task', title: 'Roof the shed' },
+      { op: 'create', ref: 'walls', type: 'task', title: 'Walls', body: 'Up before the roof goes on.' },
+      { op: 'create', ref: 'gutter', type: 'task', title: 'Gutters' },
+      { op: 'create', ref: 'other', type: 'task', title: 'Elsewhere' },
       { op: 'link', type: 'part_of', from: 'roof', to: 'site' },
       { op: 'link', type: 'part_of', from: 'walls', to: 'site' },
       { op: 'link', type: 'depends_on', from: 'gutter', to: 'roof' },

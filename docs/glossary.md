@@ -38,8 +38,10 @@ in `src/pelago.ts`, read with `get`. Replaces *entity*.
 
 **link.** A typed tie from one item to another: `depends_on`, `part_of`,
 `waits_on`. In the code: a row of the `relation` table, projected from the
-log's facts about the link (`r_…`); link types are a pack's `links`, the
-roots in `packs/core/pack.json`. Replaces *relation* (still the name of the
+log's facts about the link (`r_…`); link types are a pack's `links`, each a
+flavour of one of core's roots (`packs/core/pack.json`), the meanings the
+kernel reads. `link` is the plain wire, drawn before a meaning is known:
+nothing is a flavour of it. Replaces *relation* (still the name of the
 table and of the `relation` field that identifies a link in `unlink`).
 
 **kind.** One of the seven broad sorts every type belongs to: actor, aim,
@@ -49,10 +51,14 @@ registry gives it (`reg.type(id).kind`, `src/packs.ts`), and an item's, kept
 in its row (`entity.kind`), read without walking the type's ancestry. A kind
 is never a fact in the log: it is read from the type.
 
-**type.** What an item is within its kind (`work.task`, `software.repo`),
-with its statuses and fields. Declared in a pack file's `types`, or by a
-workspace with `define_type`. In the code: `TypeDef` in `src/packs.ts`.
-A flavour is a type that extends another.
+**type.** What an item is within its kind (`task`, `repo`),
+with its statuses and fields. A pack ships its types as presets; a type is
+also an item on the map, of core's `type` (a link type, of `link_type`):
+one with a preset's id is the owner's version of it (its title, note and
+added fields over the preset's; retired, no new item is made of it), one
+with a name and no preset is the workspace's own, `local.<name>`. In the
+code: `TypeDef` in `src/packs.ts`, the items laid over the packs in
+`src/type-overlay.ts`. A flavour is a type that extends another.
 
 **field.** A named value an item holds, declared by its kind or type: a due
 date, an outcome, a url. Every field written is checked against its
@@ -169,8 +175,8 @@ commit in a push or pull request is; a session is asked to account for
 its own commits before its reply and its run end. A pushed commit nobody
 accounted for within an hour is made a commit item with `accounted` false,
 which is the owner's attention (reason `unaccounted`) until someone sets it
-true with its links. In the code: `software.commit` and
-`software.settles` (`packs/software/pack.json`), `packs/github/account.js`.
+true with its links. In the code: `commit` and
+`settles` (`packs/software/pack.json`), `packs/github/account.js`.
 
 ## Retired words
 

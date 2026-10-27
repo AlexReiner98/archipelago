@@ -47,7 +47,7 @@ export function setupScript(origin: string, tokens = true): string {
     // Away from this repository the hook has no local server to fall back on: it calls the one that handed it out.
     hook: read('scripts/pelago-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin)).replace(`const SETUP = '';`, `const SETUP = '${SETUP_VERSION}';`),
     skill: read('.claude/skills/pelago-bump/SKILL.md'),
-    home: `# Where bumps live\n\nWorkspace: ${origin}.\n\nFind the feature that gathers friction with Archipelago by search (type \`software.feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,
+    home: `# Where bumps live\n\nWorkspace: ${origin}.\n\nFind the feature that gathers friction with Archipelago by search (type \`feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,
     rules: RULES,
   };
   return `const ORIGIN = ${JSON.stringify(origin)};\nconst TOKENS = ${tokens};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-setup.mjs')}`;

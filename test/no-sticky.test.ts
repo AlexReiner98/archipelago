@@ -61,13 +61,13 @@ test('a backup link, a refused change and the prompt hook are answered by the ot
   assert.equal(file.status, 200, 'the link made on one server gives the file on the other');
   assert.equal((await fetch(`http://127.0.0.1:${a}${made.path}`)).status, 404, 'and once');
 
-  const refused = (await post(a, '/agent/change', { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'x'.repeat(80) }] })).json.error as string;
+  const refused = (await post(a, '/agent/change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'x'.repeat(80) }] })).json.error as string;
   const name = /kept for \d+ minutes as "([^"]+)"/.exec(refused)![1];
-  const fixed = await post(b, '/agent/change', { retry: name, fixes: [{ at: 1, op: { op: 'create', type: 'work.task', title: 'Short' } }] });
+  const fixed = await post(b, '/agent/change', { retry: name, fixes: [{ at: 1, op: { op: 'create', type: 'task', title: 'Short' } }] });
   assert.equal(fixed.json.result?.status, 'proposed', 'the change refused by one server is corrected on the other');
 
   await post(a, '/hooks/session-start', { session_id: 's1' });
-  await post(a, '/api/change', { reason: 'the owner decides', ops: [{ op: 'create', type: 'work.task', title: 'Done by the owner' }] });
+  await post(a, '/api/change', { reason: 'the owner decides', ops: [{ op: 'create', type: 'task', title: 'Done by the owner' }] });
   const told = (await post(b, '/hooks/prompt', { session_id: 's1' })).json;
   assert.match(told.hookSpecificOutput?.additionalContext ?? '', /Done by the owner/, 'the other server knows where the session last heard up to');
   assert.deepEqual((await post(a, '/hooks/prompt', { session_id: 's1' })).json, {}, 'and nothing is told twice');

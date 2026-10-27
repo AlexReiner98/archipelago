@@ -1,5 +1,5 @@
 // Sessions: an agent session (or automation run) registers itself in the map
-// as a sys.run, says what it is working on, and takes the exclusive resources
+// as a run, says what it is working on, and takes the exclusive resources
 // that work needs. These writes skip the proposal step, like claim and
 // release: they are the session's own operational state, not facts about the
 // world, and coordination that waits for approval is no coordination.
@@ -18,11 +18,11 @@ const now = () => new Date().toISOString();
 /** Find a run by its entity id or by the session id its surface gave it. */
 export async function resolveRun(l: Archipelago, key: string, openOnly = false): Promise<Entity | undefined> {
   const byId = await l.entity(key);
-  if (byId && l.registry.isA(byId.type, 'sys.run')) return byId;
+  if (byId && l.registry.isA(byId.type, 'run')) return byId;
   const { rows } = await l.db.query<Entity>(
     `select * from entity where type = any($1::text[]) and props->>'session_id' = $2 and archived_at is null
        and ($3::boolean is false or is_open) order by is_open desc, created_at desc limit 1`,
-    [l.registry.family('sys.run'), key, openOnly],
+    [l.registry.family('run'), key, openOnly],
   );
   return rows[0];
 }
@@ -67,8 +67,8 @@ export async function sessionStart(
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
   const title = input.title ?? (task ? `Session: ${task.title}` : `Session in ${repo?.title ?? input.cwd ?? 'unknown folder'}`);
-  const ops: Op[] = [{ op: 'create', ref: 'run', type: 'sys.run', title, status: 'running', props }];
-  if (task) ops.push({ op: 'link', type: 'sys.works_on', from: 'run', to: task.id });
+  const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props }];
+  if (task) ops.push({ op: 'link', type: 'works_on', from: 'run', to: task.id });
   if (repo) ops.push({ op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id });
   const { created } = await l.apply(actorId(actor), { ops, reason: 'Session started' });
   const run = created.run;
@@ -146,7 +146,7 @@ async function heard(l: Archipelago, run: Entity, why: string): Promise<void> {
   await l.operational(run.id, { unset: ['stale_flagged'] });
   const { rows } = await l.db.query<{ id: string }>(
     `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
-     where r.to_id = $1 and n.type = 'sys.notification' and n.is_open and n.archived_at is null and n.props->>'from' in ('agent:pelago', 'agent:lattice')`,
+     where r.to_id = $1 and n.type = 'notification' and n.is_open and n.archived_at is null and n.props->>'from' in ('agent:pelago', 'agent:lattice')`,
     [run.id],
   );
   if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });
@@ -176,7 +176,7 @@ export async function recordUsage(l: Archipelago, sessionId: string | undefined,
   if (added <= 0) return { run: run.id, added: 0, to: [] };
   await l.operational(run.id, { add: { tokens_used: added } });
   const { rows } = await l.db.query<{ id: string; type: string }>(
-    `select e.id, e.type from relation r join entity e on e.id = r.to_id where r.type = 'sys.works_on' and r.from_id = $1 and r.valid_to is null and e.archived_at is null`,
+    `select e.id, e.type from relation r join entity e on e.id = r.to_id where r.type = 'works_on' and r.from_id = $1 and r.valid_to is null and e.archived_at is null`,
     [run.id],
   );
   const work = rows.filter((w) => l.registry.type(w.type)?.fields.tokens_used);
@@ -199,7 +199,7 @@ export async function recordRun(
   const repo = /^e_[a-z0-9]{8}$/.test(input.repo) ? await l.entity(input.repo) : await placeFor(l, { remote: input.repo });
   if (!repo) throw new Error(`No repository "${input.repo}" in the map`);
   if (input.link) {
-    const { rows } = await l.db.query<{ id: string }>(`select id from entity where type = any($1::text[]) and props->>'link' = $2 and title = $3 and archived_at is null limit 1`, [l.registry.family('sys.run'), input.link, input.title]);
+    const { rows } = await l.db.query<{ id: string }>(`select id from entity where type = any($1::text[]) and props->>'link' = $2 and title = $3 and archived_at is null limit 1`, [l.registry.family('run'), input.link, input.title]);
     if (rows.length) return { run: rows[0].id, recorded: false };
   }
   const number = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : undefined);
@@ -210,7 +210,7 @@ export async function recordRun(
   if (input.link) props.link = input.link; if (input.started_by) props.started_by = input.started_by;
   const { created } = await l.apply(actorId(actor), {
     ops: [
-      { op: 'create', ref: 'run', type: 'sys.run', title: input.title, status: input.ok === false ? 'failed' : 'finished', body: input.summary?.slice(0, 4000), props },
+      { op: 'create', ref: 'run', type: 'run', title: input.title, status: input.ok === false ? 'failed' : 'finished', body: input.summary?.slice(0, 4000), props },
       { op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id },
     ],
     reason: 'Run reported',
@@ -237,7 +237,7 @@ export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: 
       props: { last_seen: now(), ...(input.branch && { branch: input.branch }) },
     },
   ];
-  if (input.task) ops.push({ op: 'link', type: 'sys.works_on', from: run.id, to: input.task });
+  if (input.task) ops.push({ op: 'link', type: 'works_on', from: run.id, to: input.task });
   await l.apply(actorId(actor), { ops, reason: input.note ?? `Session ${input.status ?? 'update'}` });
   await touch(l, run.id);
   // Work that is picked up with no estimate is the moment to give it one.
@@ -406,7 +406,7 @@ export async function sessionEnd(
   for (const h of held) await l.release(actor, { resource: h.to_id, holder: run.id, reason: `Session ${outcome}` });
   await touch(l, run.id, 'close');
   await keepTouched(l, run.id);
-  const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'sys.works_on' and from_id = $1 and valid_to is null`, [run.id]);
+  const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
     ops: [
       { op: 'update', id: run.id, status: outcome, body: summary ? [run.body, `[${now()}] ${outcome}: ${summary}`].filter(Boolean).join('\n') : undefined },

@@ -16,13 +16,13 @@ const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<stri
 test('a picture is drawn in the styles kept for it, nearest last; hubs, code and where a kept view is seen', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
-    { op: 'create', ref: 'q', type: 'work.project', title: 'Q' },
-    { op: 'create', ref: 'late', type: 'software.feature', title: 'Late' },
-    { op: 'create', ref: 'early', type: 'software.feature', title: 'Early', status: 'building' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
-    { op: 'create', ref: 'c', type: 'work.task', title: 'C' },
+    { op: 'create', ref: 'p', type: 'project', title: 'P' },
+    { op: 'create', ref: 'q', type: 'project', title: 'Q' },
+    { op: 'create', ref: 'late', type: 'feature', title: 'Late' },
+    { op: 'create', ref: 'early', type: 'feature', title: 'Early', status: 'building' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
+    { op: 'create', ref: 'c', type: 'task', title: 'C' },
     { op: 'link', type: 'part_of', from: 'early', to: 'p' },
     { op: 'link', type: 'part_of', from: 'late', to: 'p' },
     { op: 'link', type: 'part_of', from: 'a', to: 'early' },
@@ -65,7 +65,7 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   assert.deepEqual((await run()).used.map((k: any) => k.title), [...added.map((a) => a.title), 'House style', 'Canvas'], 'retired, the preset is not used');
   await make(l, [{ op: 'update', id: mine.v, status: 'current' }, { op: 'update', id: mine.v, props: { lit: null } }]);
   // A style kept on a kind is how every such item's pictures look: over the workspace's, under the item's own.
-  const onKind = await make(l, [{ op: 'create', ref: 'k', type: 'style', title: 'Projects', props: { on: ['work.project'], open: 3, radius: 4, sizes: { list_row: 40 } } }]);
+  const onKind = await make(l, [{ op: 'create', ref: 'k', type: 'style', title: 'Projects', props: { on: ['project'], open: 3, radius: 4, sizes: { list_row: 40 } } }]);
   const kinded = await run({ of: made.p });
   assert.deepEqual([kinded.style.sizes.list_row, typeof kinded.style.sizes.flow_layer_gap], [40, 'number'], 'one size changed, the house style keeps the rest');
   assert.deepEqual([kinded.style.open, kinded.style.radius], [2, 4], "the item's own over its kind's, the kind's over the workspace's");
@@ -105,17 +105,17 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
 test('the roadmap tree orders a project\'s features, rolls up progress, and shows where work is happening', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
-    { op: 'create', ref: 'other', type: 'work.project', title: 'Other' },
-    { op: 'create', ref: 'late', type: 'software.feature', title: 'Late', props: { order: 2 } },
-    { op: 'create', ref: 'early', type: 'software.feature', title: 'Early', status: 'building', props: { order: 1 } },
-    { op: 'create', ref: 'unplaced', type: 'software.feature', title: 'No place yet' },
-    { op: 'create', ref: 'sub', type: 'software.feature', title: 'Sub' },
-    { op: 'create', ref: 't1', type: 'work.task', title: 'T1', status: 'done' },
-    { op: 'create', ref: 't2', type: 'work.task', title: 'T2', status: 'doing' },
-    { op: 'create', ref: 't3', type: 'software.bug', title: 'T3' },
-    { op: 'create', ref: 'loose', type: 'work.task', title: 'Loose' },
-    { op: 'create', ref: 'note', type: 'work.note', title: 'Not work' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'other', type: 'project', title: 'Other' },
+    { op: 'create', ref: 'late', type: 'feature', title: 'Late', props: { order: 2 } },
+    { op: 'create', ref: 'early', type: 'feature', title: 'Early', status: 'building', props: { order: 1 } },
+    { op: 'create', ref: 'unplaced', type: 'feature', title: 'No place yet' },
+    { op: 'create', ref: 'sub', type: 'feature', title: 'Sub' },
+    { op: 'create', ref: 't1', type: 'task', title: 'T1', status: 'done' },
+    { op: 'create', ref: 't2', type: 'task', title: 'T2', status: 'doing' },
+    { op: 'create', ref: 't3', type: 'bug', title: 'T3' },
+    { op: 'create', ref: 'loose', type: 'task', title: 'Loose' },
+    { op: 'create', ref: 'note', type: 'note', title: 'Not work' },
     ...['late', 'early', 'unplaced', 'loose'].map((from): Op => ({ op: 'link', type: 'part_of', from, to: 'p' })),
     { op: 'link', type: 'part_of', from: 'sub', to: 'early' },
     { op: 'link', type: 'part_of', from: 't1', to: 'early' },
@@ -156,16 +156,16 @@ test('the roadmap tree orders a project\'s features, rolls up progress, and show
 test('a project\'s unsettled questions are what needs settling in it, what holds up the most first', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj' },
-    { op: 'create', ref: 'other', type: 'work.project', title: 'Other' },
-    { op: 'create', ref: 'f', type: 'software.feature', title: 'Feature' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Task' },
-    { op: 'create', ref: 'big', type: 'work.decision', title: 'Big', props: { options: ['A', 'B'] } },
-    { op: 'create', ref: 'small', type: 'work.decision', title: 'Small' },
-    { op: 'create', ref: 'old', type: 'work.decision', title: 'Old', status: 'decided', props: { outcome: 'Yes', rationale: 'Because' } },
-    { op: 'create', ref: 'hyp', type: 'inquiry.hypothesis', title: 'Hyp' },
-    { op: 'create', ref: 'exp', type: 'inquiry.experiment', title: 'Try it' },
-    { op: 'create', ref: 'else', type: 'work.decision', title: 'Elsewhere' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'other', type: 'project', title: 'Other' },
+    { op: 'create', ref: 'f', type: 'feature', title: 'Feature' },
+    { op: 'create', ref: 't', type: 'task', title: 'Task' },
+    { op: 'create', ref: 'big', type: 'decision', title: 'Big', props: { options: ['A', 'B'] } },
+    { op: 'create', ref: 'small', type: 'decision', title: 'Small' },
+    { op: 'create', ref: 'old', type: 'decision', title: 'Old', status: 'decided', props: { outcome: 'Yes', rationale: 'Because' } },
+    { op: 'create', ref: 'hyp', type: 'hypothesis', title: 'Hyp' },
+    { op: 'create', ref: 'exp', type: 'experiment', title: 'Try it' },
+    { op: 'create', ref: 'else', type: 'decision', title: 'Elsewhere' },
     { op: 'link', type: 'part_of', from: 'f', to: 'p' },
     { op: 'link', type: 'part_of', from: 't', to: 'f' },
     { op: 'link', type: 'part_of', from: 'small', to: 'p' },
@@ -176,8 +176,8 @@ test('a project\'s unsettled questions are what needs settling in it, what holds
     { op: 'link', type: 'part_of', from: 'hyp', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'f', to: 'big' },
     { op: 'link', type: 'depends_on', from: 't', to: 'f' },
-    { op: 'link', type: 'inquiry.assumes', from: 't', to: 'hyp' },
-    { op: 'link', type: 'inquiry.tests', from: 'exp', to: 'hyp' },
+    { op: 'link', type: 'assumes', from: 't', to: 'hyp' },
+    { op: 'link', type: 'tests', from: 'exp', to: 'hyp' },
   ]);
 
   const unsettled = async (within: string) => (await attend(l, { within, reasons: ['unsettled', 'holding_up'] })).items.filter((x: any) => x.reasons.some((r: any) => r.why === 'unsettled'));
@@ -194,9 +194,9 @@ test('a project\'s unsettled questions are what needs settling in it, what holds
 test('a question in a project inside another is both projects\', and sits in the outer one at the top', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Parent' },
-    { op: 'create', ref: 'sub', type: 'work.project', title: 'Area' },
-    { op: 'create', ref: 'd', type: 'work.decision', title: 'Which way?' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Parent' },
+    { op: 'create', ref: 'sub', type: 'project', title: 'Area' },
+    { op: 'create', ref: 'd', type: 'decision', title: 'Which way?' },
     { op: 'link', type: 'part_of', from: 'sub', to: 'p' },
     { op: 'link', type: 'part_of', from: 'd', to: 'sub' },
   ]);
@@ -208,14 +208,14 @@ test('a question in a project inside another is both projects\', and sits in the
 test('an agent may settle its own work unreviewed, but only proposes the answer to a question', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'd', type: 'work.decision', title: 'Where do backups go?' },
-    { op: 'create', ref: 'h', type: 'inquiry.hypothesis', title: 'Hooks run in the desktop app' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Wire the upload' },
+    { op: 'create', ref: 'd', type: 'decision', title: 'Where do backups go?' },
+    { op: 'create', ref: 'h', type: 'hypothesis', title: 'Hooks run in the desktop app' },
+    { op: 'create', ref: 't', type: 'task', title: 'Wire the upload' },
   ]);
   // As in dev mode: nothing an agent does is reviewed.
   const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
-  const decided = l.registry.type('work.decision')!.statuses.closed[0];
-  const settled = l.registry.type('inquiry.hypothesis')!.statuses.closed[0];
+  const decided = l.registry.type('decision')!.statuses.closed[0];
+  const settled = l.registry.type('hypothesis')!.statuses.closed[0];
 
   assert.equal((await free.change(agent, { reason: 'did it', ops: [{ op: 'update', id: made.t, status: 'done' }] })).status, 'applied', 'its own task');
   assert.equal((await free.change(agent, { reason: 'a note', ops: [{ op: 'update', id: made.d, body: 'Supabase is set up.' }] })).status, 'applied', 'a note on a question');
@@ -233,9 +233,9 @@ test('an agent may settle its own work unreviewed, but only proposes the answer 
 test('a held change that asks only for what is already so leaves the queue as superseded', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'd', type: 'work.decision', title: 'Where do backups go?' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Wire the upload' },
-    { op: 'create', ref: 'u', type: 'work.task', title: 'Prune old copies' },
+    { op: 'create', ref: 'd', type: 'decision', title: 'Where do backups go?' },
+    { op: 'create', ref: 't', type: 'task', title: 'Wire the upload' },
+    { op: 'create', ref: 'u', type: 'task', title: 'Prune old copies' },
   ]);
   const hold = async (ops: any[]) => ((await l.change(agent, { reason: 'held', ops })) as { proposal: string }).proposal;
   const answer = await hold([{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Supabase' } }]);
@@ -261,11 +261,11 @@ test('a backup holds every row, and restores into an empty database that then ca
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Proj', owner: 'me' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Task', props: { due: '2026-11-01' } },
+    { op: 'create', ref: 'p', type: 'project', title: 'Proj', owner: 'me' },
+    { op: 'create', ref: 't', type: 'task', title: 'Task', props: { due: '2026-11-01' } },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
-  await l.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'work.note', title: 'Proposed' }] });
+  await l.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
 
   const taken = await dump(l.db, { id: 'default', name: 'Default' }, { id: 'local', types: [] });
   const copy = new Archipelago(await openDb(), l.registry);
@@ -280,7 +280,7 @@ test('a backup holds every row, and restores into an empty database that then ca
   assert.deepEqual([task.entity.title, task.entity.props.due, task.outgoing[0].title], ['Task', '2026-11-01', 'Proj']);
   assert.equal((await copy.proposals()).length, 1, 'what was waiting for review still is');
   const before = Math.max(...taken.tables.event.map((e) => e.seq as number));
-  await make(copy, [{ op: 'create', type: 'work.note', title: 'After the restore' }]);
+  await make(copy, [{ op: 'create', type: 'note', title: 'After the restore' }]);
   assert.ok((await lastSeq(copy.db)) > before, 'new events are numbered after the restored ones');
   await assert.rejects(restore(copy.db, taken), /not empty/);
 });

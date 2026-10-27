@@ -40,8 +40,8 @@ async function lay(tx: Q, e: Entry, at: string, prev: string): Promise<string> {
 async function aged() {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Years' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Cut the log', body: 'A year at a time.' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Years' },
+    { op: 'create', ref: 't', type: 'task', title: 'Cut the log', body: 'A year at a time.' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
   await make(l, [{ op: 'update', id: made.t, status: 'doing' }]);
@@ -102,7 +102,7 @@ test('a partition made after the schema refuses update, delete and truncate like
 
 test('an entry that does not follow the one before is refused, and a missing partition is made by the append that needs it', async () => {
   const l = await fresh();
-  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'work.task', title: 'Follow on' }]);
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Follow on' }]);
   const [last] = (await stored(l.db)).slice(-1);
   const head = JSON.stringify({ v: 1, ws: 'default', id: 'c_bad', actor: { id: 'system' }, reason: 'x' });
   const put = (pos: number, prev: string, at = 'now()') =>

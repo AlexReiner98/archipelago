@@ -7,8 +7,8 @@ import { agent, fresh, human, make } from './map.ts';
 
 const pair = (l: Archipelago) =>
   make(l, [
-    { op: 'create', ref: 'keep', type: 'work.issue', title: 'A page reloads on every change', body: 'The original.' },
-    { op: 'create', ref: 'drop', type: 'work.issue', title: 'Every screen redraws', body: 'The copy.' },
+    { op: 'create', ref: 'keep', type: 'issue', title: 'A page reloads on every change', body: 'The original.' },
+    { op: 'create', ref: 'drop', type: 'issue', title: 'Every screen redraws', body: 'The copy.' },
   ]);
 const events = async (l: Archipelago) => Number((await l.db.query<{ n: number }>(`select (select count(*) from event) + (select count(*) from log_entry) as n`)).rows[0].n);
 const hold = async (l: Archipelago, keep: string, drop: string) => {
@@ -29,7 +29,7 @@ test('a second merge of the same pair is refused, and the note is not appended a
 test('a merge into an archived item, or of the same item twice in one change, is refused', async () => {
   const l = await fresh();
   const { keep, drop } = await pair(l);
-  const { other } = await make(l, [{ op: 'create', ref: 'other', type: 'work.issue', title: 'A third copy' }]);
+  const { other } = await make(l, [{ op: 'create', ref: 'other', type: 'issue', title: 'A third copy' }]);
   await assert.rejects(l.change(human, { ops: [{ op: 'merge', keep, drop }, { op: 'merge', keep: other, drop }], reason: 'twice' }), /merged twice in this change/);
   await assert.rejects(l.change(human, { ops: [{ op: 'merge', keep, drop }, { op: 'merge', keep: drop, drop: other }], reason: 'into the gone' }), /merged away earlier in this change/);
   await make(l, [{ op: 'archive', id: other }]);

@@ -79,7 +79,7 @@ test('a held change names the rule that held it, in its answer and on the propos
   const strict = new Archipelago(l.db, l.registry);
   const code = (await change(strict, agent, [{ op: 'create', type: 'style', title: 'Loud', props: { code: 'export default () => {}' } }])) as { held_by: { rule: string } };
   assert.equal(code.held_by.rule, 'code_runs');
-  const plain = (await change(strict, agent, [{ op: 'create', type: 'work.task', title: 'Plain' }])) as { held_by: { rule: string } };
+  const plain = (await change(strict, agent, [{ op: 'create', type: 'task', title: 'Plain' }])) as { held_by: { rule: string } };
   assert.equal(plain.held_by.rule, 'agent_changes');
 });
 
@@ -88,6 +88,6 @@ test('a setting lifts only a rule its pack declared liftable', async () => {
   const shop = await map();
   const l = new Archipelago(shop.db, shop.registry);
   await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"'::jsonb)`);
-  assert.equal((await change(l, agent, [{ op: 'create', type: 'work.task', title: 'Plain' }])).status, 'applied', 'agent_changes lifts core’s agent_changes');
+  assert.equal((await change(l, agent, [{ op: 'create', type: 'task', title: 'Plain' }])).status, 'applied', 'agent_changes lifts core’s agent_changes');
   assert.equal((await change(l, agent, [{ op: 'create', type: 'shop.order', title: 'Oven', props: { total: 900 } }])).status, 'proposed', 'and not a rule declared without a lift');
 });

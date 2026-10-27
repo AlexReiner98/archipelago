@@ -19,7 +19,7 @@ export interface PackFile {
 const own = (p: PackFile) => (p.types ?? []).filter((t): t is typeof t & { id: string } => t.id !== undefined);
 
 /** A colour for each pack, the same on every page: the kernel's packs in grey, the rest in turn. */
-const KERNEL = ['core', 'sys'];
+const KERNEL = ['core'];
 const PALETTE = ['#dae8fc', '#d5e8d4', '#ffe6cc', '#e1d5e7', '#fff2cc', '#f8cecc', '#d0f0f0', '#f5e0f0'];
 const STROKES = ['#6c8ebf', '#82b366', '#d79b00', '#9673a6', '#d6b656', '#b85450', '#3a9a9a', '#b5739d'];
 function colours(packs: PackFile[]) {

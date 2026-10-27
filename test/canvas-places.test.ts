@@ -16,9 +16,9 @@ const DAY = 86_400_000;
 test('a batch of moves is written at once and read back by canvas, newest per item', async () => {
   const l = await fresh();
   const { p, a, b } = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'p', type: 'project', title: 'P' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
   ]);
   const counted = async () => Number((await l.db.query<{ n: number }>(`select (select count(*) from entity) + (select count(*) from relation) as n`)).rows[0].n);
   const before = await counted();
@@ -43,7 +43,7 @@ test('a batch of moves is written at once and read back by canvas, newest per it
 
 test('a move names a canvas and items the map has, each at [x, y]', async () => {
   const l = await fresh();
-  const { a } = await make(l, [{ op: 'create', ref: 'a', type: 'work.task', title: 'A' }]);
+  const { a } = await make(l, [{ op: 'create', ref: 'a', type: 'task', title: 'A' }]);
   await assert.rejects(putPlaces(l, human, { canvas: 'nowhere', moves: { [a]: [1, 2] } }), /No canvas "nowhere"/);
   await assert.rejects(putPlaces(l, human, { canvas: 'e_00000000', moves: { [a]: [1, 2] } }), /No canvas/);
   await assert.rejects(putPlaces(l, human, { moves: { e_00000000: [1, 2] } }), /No item e_00000000/);
@@ -53,7 +53,7 @@ test('a move names a canvas and items the map has, each at [x, y]', async () => 
 
 test('an agent puts and reads places through revise and query, at once', async () => {
   const l = await fresh();
-  const { a } = await make(l, [{ op: 'create', ref: 'a', type: 'work.task', title: 'A' }]);
+  const { a } = await make(l, [{ op: 'create', ref: 'a', type: 'task', title: 'A' }]);
   const put = (await callTool(l, agent, 'revise', { action: 'places_put', params: { moves: { [a]: [7, 8] } } })) as { put: number };
   assert.equal(put.put, 1);
   assert.deepEqual(await callTool(l, agent, 'query', { name: 'places' }), { [a]: [7, 8] });
@@ -76,8 +76,8 @@ test('keep latest for places: the newest place of each item on each canvas stays
 test('compaction leaves the newest place of each item on each canvas, and the chain verifies', async () => {
   const l = await fresh();
   const { a, b } = await make(l, [
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
   ]);
   for (const [x, y] of [[1, 1], [2, 2], [3, 3]]) await putPlaces(l, human, { moves: { [a]: [x, y], [b]: [y * 10, x * 10] } });
   // Sealed and compacted as tomorrow: the day they were written is closed.
@@ -92,9 +92,9 @@ test('compaction leaves the newest place of each item on each canvas, and the ch
 test("a style's places move into the stream, and the style is retired", async () => {
   const l = await fresh();
   const { p, a, b, blob, other } = await make(l, [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'P' },
-    { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
+    { op: 'create', ref: 'p', type: 'project', title: 'P' },
+    { op: 'create', ref: 'a', type: 'task', title: 'A' },
+    { op: 'create', ref: 'b', type: 'task', title: 'B' },
     { op: 'create', ref: 'blob', type: 'style', title: 'Canvas places', status: 'current' },
     { op: 'create', ref: 'other', type: 'style', title: 'Looks', status: 'current', props: { lit: 'you' } },
   ]);

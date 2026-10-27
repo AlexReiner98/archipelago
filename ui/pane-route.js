@@ -1,7 +1,7 @@
 // Where an agent's step lands among the panes of the owner's page (ui/panes.js), worked out from what each pane
 // follows and nothing else, so it is tested without a page. A pane follows everyone (as the main one does unless the
 // reader says), one session, or nobody (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
-// - A session's step goes to a pane that follows it: the one it named (`pane: "tests"`), else the one it last landed in.
+// - A session's step goes to a pane that follows it: the one it named (`pane: "review"`), else the one it last landed in.
 // - A pane named by a session that has none of that name is opened for it, following it.
 // - Otherwise it goes to a pane that follows everyone and that no other session at work holds: the one already
 //   drawing it, else the main one. A session holds such a pane while it lands there within `recent`.

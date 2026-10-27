@@ -19,10 +19,10 @@ test('the GitHub pack hears a push: it is recorded against its repository, and w
     await call('/api/change', admin, {
       reason: 'x',
       ops: [
-        { op: 'create', ref: 'r', type: 'software.repo', title: 'Site repo', visibility: 'shared', props: { remote: 'https://github.com/Acme/Site.git' } },
-        { op: 'create', ref: 't', type: 'work.task', title: 'Fix the footer', visibility: 'shared' },
-        { op: 'create', ref: 'd', type: 'work.decision', title: 'Which font?', visibility: 'shared' },
-        { op: 'link', type: 'software.lives_in', from: 't', to: 'r' },
+        { op: 'create', ref: 'r', type: 'repo', title: 'Site repo', visibility: 'shared', props: { remote: 'https://github.com/Acme/Site.git' } },
+        { op: 'create', ref: 't', type: 'task', title: 'Fix the footer', visibility: 'shared' },
+        { op: 'create', ref: 'd', type: 'decision', title: 'Which font?', visibility: 'shared' },
+        { op: 'link', type: 'lives_in', from: 't', to: 'r' },
       ],
     })
   ).result.created;
@@ -110,7 +110,7 @@ test('the GitHub pack hears a push: it is recorded against its repository, and w
   assert.match((await deliver(null, { raw: 'ref=x', form: true })).result.reason, /not JSON/);
 
   // Only what a commit says in its own words counts: not a denial, a quotation or a revert.
-  const header = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'h', type: 'work.task', title: 'Fix the header', visibility: 'shared' }] })).result.created.h;
+  const header = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'h', type: 'task', title: 'Fix the header', visibility: 'shared' }] })).result.created.h;
   for (const message of [
     `Start on the header\n\nThis does not fix ${header} yet.`,
     `Header, first half\n\nOnly partly fixes ${header}`,
@@ -177,7 +177,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
-  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'software.repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site.git' } }] });
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site.git' } }] });
   const page = (path: string) => fetch(base + path, { redirect: 'manual' });
   const theApp = async () => ((await call('/api/connections', admin)).result.packs as any[]).find((p) => p.pack === 'github_app');
 
@@ -246,7 +246,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.equal(await logged(), was);
   assert.equal(checks.length, 1);
   // Its session accounts for the commit on the map (it settles none): the check turns green on GitHub by itself.
-  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'software.commit', title: 'Sharpen the tools', props: { sha: 'a'.repeat(40) } }] });
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'commit', title: 'Sharpen the tools', props: { sha: 'a'.repeat(40) } }] });
   assert.deepEqual(await recheck(), { asked: 1, green: ['Acme/Tools@aaaaaaa'] });
   assert.deepEqual([checks[1].method, checks[1].url, checks[1].body.conclusion, checks[1].body.output.title], ['PATCH', '/repos/Acme/Tools/check-runs/900', 'success', 'All one commit accounted for']);
   assert.deepEqual(await recheck(), { asked: 0, green: [] }, 'and let go');
@@ -261,13 +261,13 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.equal(await runsOn(), null);
   assert.match((await call('/agent/model_account', robot, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) })).error, /humans only/);
   // Something that is not this repository's: the reader is held to the repository it reads, whatever it is told there.
-  const outside = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Pay the invoice' }] })).result.created['#1'];
+  const outside = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Pay the invoice' }] })).result.created['#1'];
   const asks: any[] = [];
   // The push is read with five narrow tools, what changed and the open work handed over first (src/reader-push.ts).
   const script = [
     { stop_reason: 'tool_use', content: [{ type: 'text', text: 'Reading the push.' }, { type: 'tool_use', id: 'tu_1', name: 'diff', input: { sha: 'b'.repeat(40) } }, { type: 'tool_use', id: 'tu_2', name: 'find', input: { words: 'whetstone' } }, { type: 'tool_use', id: 'tu_3', name: 'no_such_tool', input: {} }] },
     { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'update', input: { id: outside, title: 'Steered by a file in the repository', why: 'The file said to' } }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'create', input: { type: 'work.task', title: 'Oil the whetstone', why: 'The commit says the whetstone still needs oiling' } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'create', input: { type: 'task', title: 'Oil the whetstone', why: 'The commit says the whetstone still needs oiling' } }] },
     { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Made one task: Oil the whetstone.' }] },
   ];
   configureModels({ ask: (key) => async (params) => {
@@ -354,7 +354,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.match((await call('/agent/reader_recheck', robot, { repo: heard.repo.id })).error, /admins only/);
   assert.match((await call('/api/reader_recheck', admin, { repo: 'e_notarepo' })).error, /not a repository the GitHub App was given/);
   assert.deepEqual((await call('/api/reader_recheck', admin, { repo: heard.repo.id })).result.answer, { repo: 'Acme/Tools', reason: 'Nothing is due for a re-check.' }, 'nothing lives there to re-check');
-  const project = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'p', type: 'work.project', title: 'Tools' }, { op: 'link', type: 'lives_in', from: 'p', to: heard.repo.id }, { op: 'create', ref: 't', type: 'work.task', title: 'Hone the chisel' }, { op: 'link', type: 'part_of', from: 't', to: 'p' }] })).result.created.p;
+  const project = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'p', type: 'project', title: 'Tools' }, { op: 'link', type: 'lives_in', from: 'p', to: heard.repo.id }, { op: 'create', ref: 't', type: 'task', title: 'Hone the chisel' }, { op: 'link', type: 'part_of', from: 't', to: 'p' }] })).result.created.p;
   assert.deepEqual((await call('/api/reader_recheck', admin, { repo: heard.repo.id })).result.runs, [{ started: true, title: 'Re-check asked for by hand' }]);
   // The script has no more turns, so the run breaks: it is recorded as failed, and the wait starts again all the same.
   let rechecked: unknown;

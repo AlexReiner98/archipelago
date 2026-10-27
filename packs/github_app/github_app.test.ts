@@ -87,7 +87,7 @@ test('installed: the installation is asked of GitHub as the app, tied to the wor
   assert.deepEqual(acts.find(([n]) => n === 'connection.make')![1], { state: 'acme.c', id: '42', account: 'acme' });
   assert.deepEqual(requests.find((r) => r.path.startsWith('/installation/'))!.as, '42', 'the repositories are read as the installation');
   const added = acts.find(([n]) => n === 'workspace.add')![1];
-  assert.deepEqual([added.connection, added.type, added.unique, added.items, added.reason], ['42', 'software.repo', 'remote', [{ title: 'Site repo', props: { remote: 'https://github.com/Acme/Site' } }, { title: 'Tools repo', props: { remote: 'https://github.com/Acme/Tools' } }], 'Connected through the GitHub App on acme']);
+  assert.deepEqual([added.connection, added.type, added.unique, added.items, added.reason], ['42', 'repo', 'remote', [{ title: 'Site repo', props: { remote: 'https://github.com/Acme/Site' } }, { title: 'Tools repo', props: { remote: 'https://github.com/Acme/Tools' } }], 'Connected through the GitHub App on acme']);
 
   // Chosen again later on GitHub, it comes back with no word: known already, it is not made again.
   const later = ctxOver({ github, connections: { '42': { workspace: 'acme', account: 'acme' } } });

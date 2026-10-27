@@ -8,12 +8,12 @@ import { repoName } from './repo.js';
 type Item = { id: string; type: string; title: string; status?: string; is_open?: boolean; props?: Record<string, unknown>; body?: string; created_at?: string; updated_at?: string };
 
 const LINEAGE: Record<string, string[]> = {
-  'software.repo': ['software.repo', 'place'],
-  'work.project': ['work.project', 'work'],
-  'work.task': ['work.task', 'work'],
-  'work.issue': ['work.issue', 'work'],
-  'software.handoff': ['software.handoff', 'work.note', 'record'],
-  'sys.run': ['sys.run'],
+  'repo': ['repo', 'place'],
+  'project': ['project', 'work'],
+  'task': ['task', 'work'],
+  'issue': ['issue', 'work'],
+  'handoff': ['handoff', 'note', 'record'],
+  'run': ['run'],
 };
 
 /** What the kernel answers: items in a repository's scope, its pushes, what blocks what, and two of its own views. */
@@ -40,15 +40,15 @@ function ctxOver(items: Item[], opts: { scope?: Record<string, string[]>; lives?
 }
 
 const ITEMS: Item[] = [
-  { id: 'repo', type: 'software.repo', title: 'Apex repo', props: { remote: 'https://github.com/acme/apex.git' } },
-  { id: 'proj', type: 'work.project', title: 'Apex', props: { recheck_days: 7 } },
-  { id: 'a', type: 'work.task', title: 'Write the probe', props: { due: '2026-10-20' }, updated_at: '2026-09-01T00:00:00Z' },
-  { id: 'b', type: 'work.task', title: 'Tune the solver', updated_at: '2026-10-15T00:00:00Z' },
-  { id: 'c', type: 'work.issue', title: 'Thin walls diverge', updated_at: '2026-10-10T00:00:00Z' },
-  { id: 'gone', type: 'work.task', title: 'Old chore', status: 'done', is_open: false, updated_at: '2026-10-14T00:00:00Z' },
+  { id: 'repo', type: 'repo', title: 'Apex repo', props: { remote: 'https://github.com/acme/apex.git' } },
+  { id: 'proj', type: 'project', title: 'Apex', props: { recheck_days: 7 } },
+  { id: 'a', type: 'task', title: 'Write the probe', props: { due: '2026-10-20' }, updated_at: '2026-09-01T00:00:00Z' },
+  { id: 'b', type: 'task', title: 'Tune the solver', updated_at: '2026-10-15T00:00:00Z' },
+  { id: 'c', type: 'issue', title: 'Thin walls diverge', updated_at: '2026-10-10T00:00:00Z' },
+  { id: 'gone', type: 'task', title: 'Old chore', status: 'done', is_open: false, updated_at: '2026-10-14T00:00:00Z' },
   { id: 'who', type: 'person', title: 'Alex' },
-  { id: 'note', type: 'software.handoff', title: 'Apex handoff', body: 'Next\nRun the probe.', updated_at: '2026-10-12T00:00:00Z' },
-  { id: 'run', type: 'sys.run', title: 'Read the push', status: 'finished', is_open: false, body: '[2026-10-13T10:00:00Z] finished: all good', updated_at: '2026-10-13T10:00:00Z', created_at: '2026-10-13T09:00:00Z', props: { tokens_used: 1200, surface: 'github-actions', cost_usd: 0.25 } },
+  { id: 'note', type: 'handoff', title: 'Apex handoff', body: 'Next\nRun the probe.', updated_at: '2026-10-12T00:00:00Z' },
+  { id: 'run', type: 'run', title: 'Read the push', status: 'finished', is_open: false, body: '[2026-10-13T10:00:00Z] finished: all good', updated_at: '2026-10-13T10:00:00Z', created_at: '2026-10-13T09:00:00Z', props: { tokens_used: 1200, surface: 'github-actions', cost_usd: 0.25 } },
 ];
 const OPTS = {
   scope: { repo: ['proj', 'a', 'b', 'c', 'gone', 'note', 'run'], proj: ['proj', 'a', 'b', 'c', 'gone'] },

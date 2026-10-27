@@ -219,7 +219,7 @@
         "gap": { "type": "number", "description": "The room between things, in pixels." },
         "colors": { "type": "json", "description": "Colours by name, each a hex colour: sea, land, inner, line, text, muted, blocked, you, session, done." },
         "color_by": { "type": "string", "description": "grid: the shown field each card is coloured by, e.g. kind." },
-        "rows": { "type": "string", "description": "grid: what the rows are. Left empty, what the start holds. link:<kind>, the things those links lead to, e.g. link:funding.could_fund: a thing is a card in each row its links lead to, with the link's words as its second line." },
+        "rows": { "type": "string", "description": "grid: what the rows are. Left empty, what the start holds. link:<kind>, the things those links lead to, e.g. link:could_fund: a thing is a card in each row its links lead to, with the link's words as its second line." },
         "palette": { "type": "json", "description": "grid: a hex colour for each value of color_by, e.g. {\"grant\": \"#2e7d4f\"}. A value not named takes one of the built-in colours." },
         "labels": { "type": "json", "description": "grid: what a lane or a value is called, e.g. {\"set_up\": \"Set up\"}. Not named, it is the value in words." },
         "detail": { "type": "string", "description": "grid: the shown field written on each card's second line, e.g. amount." },
@@ -255,6 +255,36 @@
       }
     },
     {
+      "id": "type",
+      "extends": "system",
+      "title": "Type",
+      "description": "A type of item, kept on the map: as a style is how things look, a type is what an item is. A pack ships its types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's, its fields added to the preset's; retired, no new item is made of it, and those there are stay. One with a name and no preset is a type of this workspace's own, named local.<name>, extending a kind or a type of one.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "preset": { "type": "string", "description": "The id of the pack's type this is the owner's version of, e.g. task." },
+        "name": { "type": "string", "description": "A type of this workspace's own: its id, local.<name>." },
+        "extends": { "type": "string", "description": "A type of this workspace's own: the kind or type it is a flavour of, whose fields and statuses it takes." },
+        "fields": { "type": "json", "description": "Fields added, by name, each as a type declares one, e.g. {\"rate\": {\"type\": \"number\"}}." },
+        "statuses": { "type": "json", "description": "A type of this workspace's own: its statuses, {\"open\": [...], \"closed\": [...]}, when not its parent's." },
+        "deliverable": { "type": "boolean", "description": "A type of this workspace's own: made for a reader or a customer, like a document; what it is part of names it under its title." }
+      }
+    },
+    {
+      "id": "link_type",
+      "extends": "system",
+      "title": "Link type",
+      "description": "A type of link, kept on the map. A pack ships its link types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's; retired, no new link is made of it, and those there are stay. One with a name and no preset is a link type of this workspace's own, named local.<name>, a flavour of a link type it extends.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "preset": { "type": "string", "description": "The id of the pack's link type this is the owner's version of, e.g. depends_on." },
+        "name": { "type": "string", "description": "A link type of this workspace's own: its id, local.<name>." },
+        "extends": { "type": "string", "description": "A link type of this workspace's own: the link type it is a flavour of." },
+        "inverse": { "type": "string", "description": "A link type of this workspace's own: how it reads from the other end." },
+        "from": { "type": "json", "description": "A link type of this workspace's own: the types it may start from, as a list; any (*) unless said." },
+        "to": { "type": "json", "description": "A link type of this workspace's own: the types it may point to, as a list; any (*) unless said." }
+      }
+    },
+    {
       "id": "screen",
       "extends": "system",
       "title": "Screen",
@@ -266,6 +296,310 @@
         "nav": { "type": "number", "description": "Its place in the nav, after Home and Search: the lowest first. Left empty, it is not in the nav." },
         "home": { "type": "boolean", "description": "Drawn on Home (true) or taken off it (false). Left empty, the preset's: a pack's screen for Home is on it." },
         "preset": { "type": "string", "description": "The id of the pack's screen this is the owner's version of.", "system": true }
+      }
+    },
+    {
+      "id": "source",
+      "moved_from": [
+        "sys.source"
+      ],
+      "extends": "system",
+      "title": "Source",
+      "description": "The original input a fact came from: a file, an email, a commit, a conversation.",
+      "statuses": {
+        "open": [
+          "recorded"
+        ],
+        "closed": [
+          "removed"
+        ]
+      },
+      "fields": {
+        "uri": {
+          "type": "string",
+          "description": "A stable address: a file path, URL or message id."
+        },
+        "kind": {
+          "type": "enum",
+          "values": [
+            "file",
+            "email",
+            "web",
+            "conversation",
+            "commit",
+            "other"
+          ]
+        }
+      }
+    },
+    {
+      "id": "connection",
+      "moved_from": [
+        "sys.connection"
+      ],
+      "extends": "resource",
+      "title": "Connection",
+      "description": "An external tool, such as an MCP server. Status says whether it is reachable right now.",
+      "fields": {
+        "exclusive": {
+          "type": "boolean",
+          "default": false
+        },
+        "url": {
+          "type": "url",
+          "description": "Checked by check_connections."
+        },
+        "audit_log": {
+          "type": "string",
+          "description": "Path to a JSON-lines log of tool calls, read by import_audit."
+        }
+      }
+    },
+    {
+      "id": "run",
+      "moved_from": [
+        "sys.run"
+      ],
+      "extends": "system",
+      "title": "Run",
+      "description": "One agent session or one execution of an automation.",
+      "statuses": {
+        "open": [
+          "running",
+          "waiting"
+        ],
+        "closed": [
+          "finished",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "fields": {
+        "surface": {
+          "type": "string",
+          "description": "Where it runs, e.g. claude-code."
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The git branch the session said it works on: a push to it is read against the session's task.",
+          "system": true
+        },
+        "session_id": {
+          "type": "string",
+          "description": "The id the surface gave the session.",
+          "system": true
+        },
+        "last_seen": {
+          "type": "datetime",
+          "description": "Last time the session reported in.",
+          "system": true
+        },
+        "stale_flagged": {
+          "type": "boolean",
+          "description": "Set once the human has been told this session went quiet.",
+          "system": true
+        },
+        "started_by": {
+          "type": "json",
+          "description": "Who started the run, when it was not the owner: { kind: person, automation or webhook, id, name }. Such a run only proposes: its changes wait for the owner, whatever agents may do here.",
+          "system": true
+        },
+        "tokens_used": {
+          "type": "number",
+          "description": "Tokens the session has used so far, as its machine counted them.",
+          "system": true
+        },
+        "active": {
+          "type": "json",
+          "description": "When the session was at work: stretches from a turn's start to its end, as [from, to] date-times, oldest first.",
+          "system": true
+        },
+        "busy": {
+          "type": "boolean",
+          "description": "Set while a turn is under way: begun and not yet ended.",
+          "system": true
+        },
+        "story": {
+          "type": "json",
+          "large": true,
+          "description": "The story the session tells of its work, beat by beat (the tell tool).",
+          "system": true
+        },
+        "cost_usd": {
+          "type": "number",
+          "description": "What the run cost, in US dollars, where its surface says.",
+          "system": true
+        },
+        "turns": {
+          "type": "number",
+          "description": "How many turns the run took.",
+          "system": true
+        },
+        "link": {
+          "type": "url",
+          "description": "Where the run can be looked at, e.g. its page in GitHub Actions.",
+          "system": true
+        }
+      }
+    },
+    {
+      "id": "notification",
+      "moved_from": [
+        "sys.notification"
+      ],
+      "extends": "system",
+      "title": "Notification",
+      "description": "A message for the human, from an agent, an automation or the system.",
+      "statuses": {
+        "open": [
+          "unread"
+        ],
+        "closed": [
+          "read"
+        ]
+      },
+      "fields": {
+        "level": {
+          "type": "enum",
+          "values": [
+            "info",
+            "warning",
+            "urgent"
+          ],
+          "default": "info"
+        },
+        "from": {
+          "type": "string",
+          "description": "Who sent it.",
+          "system": true
+        }
+      }
+    },
+    {
+      "id": "automation",
+      "moved_from": [
+        "sys.automation"
+      ],
+      "extends": "system",
+      "title": "Automation",
+      "description": "A trigger that fires an action. Only fires while its status is enabled.",
+      "statuses": {
+        "open": [
+          "enabled",
+          "paused"
+        ],
+        "closed": [
+          "retired"
+        ]
+      },
+      "fields": {
+        "trigger": {
+          "type": "enum",
+          "values": [
+            "every",
+            "daily",
+            "event"
+          ],
+          "description": "every: an interval. daily: a time of day. event: something logged in the activity feed."
+        },
+        "every_minutes": {
+          "type": "number",
+          "description": "For trigger every."
+        },
+        "at": {
+          "type": "string",
+          "description": "For trigger daily: local time as HH:MM."
+        },
+        "on_action": {
+          "type": "string",
+          "description": "For trigger event: an event action such as proposal.create, or a prefix such as resource.*"
+        },
+        "action": {
+          "type": "enum",
+          "values": [
+            "notify",
+            "tool",
+            "launch"
+          ],
+          "description": "notify: tell the human. tool: call check_connections or import_audit. launch: start a headless session on a task."
+        },
+        "message": {
+          "type": "string",
+          "description": "For action notify. May use {target}, {action}, {actor} and {reason} from the triggering event."
+        },
+        "level": {
+          "type": "enum",
+          "values": [
+            "info",
+            "warning",
+            "urgent"
+          ]
+        },
+        "tool": {
+          "type": "string",
+          "description": "For action tool."
+        },
+        "input": {
+          "type": "json",
+          "description": "For action tool: the tool's input. For action launch: {task, mode, instructions}."
+        },
+        "last_fired": {
+          "type": "datetime",
+          "system": true
+        },
+        "last_result": {
+          "type": "string",
+          "system": true
+        },
+        "last_run": {
+          "type": "string",
+          "description": "The run the last launch started.",
+          "system": true
+        }
+      }
+    },
+    {
+      "id": "shared_document",
+      "moved_from": [
+        "sys.shared_document"
+      ],
+      "extends": "record",
+      "public": true,
+      "title": "Shared document",
+      "deliverable": true,
+      "description": "A document another workspace on this server shares with this one. It stays in that workspace's map and is read from there each time, while it is shared: set it to accepted to read it here, declined or ended to stop. Only the document and the items it brings in are read. Where that workspace allows it, it can be published here, frozen as that workspace gives it.",
+      "statuses": {
+        "open": [
+          "offered",
+          "accepted"
+        ],
+        "closed": [
+          "declined",
+          "ended"
+        ]
+      },
+      "fields": {
+        "from_workspace": {
+          "type": "string",
+          "description": "The workspace that shares it.",
+          "system": true
+        },
+        "share": {
+          "type": "string",
+          "description": "The share it is read through, in that workspace.",
+          "system": true
+        },
+        "path": {
+          "type": "string",
+          "description": "Its address word once published here, as a document's: published only where the workspace that shares it allows it."
+        },
+        "menu": {
+          "type": "number",
+          "description": "Its place in the site's header, lowest first, as a document's."
+        }
       }
     }
   ],
@@ -290,7 +624,8 @@
     },
     {
       "id": "ships",
-      "extends": "relates_to",
+      "moved_from": ["software.ships"],
+      "extends": "produced",
       "title": "ships",
       "inverse": "ships in",
       "from": ["occurrence"],
@@ -335,7 +670,7 @@
     },
     {
       "id": "works_at",
-      "extends": "relates_to",
+      "extends": "part_of",
       "title": "works at",
       "inverse": "employs",
       "from": ["person"],
@@ -371,7 +706,7 @@
     },
     {
       "id": "produced",
-      "extends": "relates_to",
+      "root": true,
       "title": "produced",
       "inverse": "was produced by",
       "from": ["*"],
@@ -380,6 +715,7 @@
     },
     {
       "id": "lives_in",
+      "moved_from": ["software.lives_in"],
       "root": true,
       "title": "lives in",
       "inverse": "is home to",
@@ -406,22 +742,51 @@
       "description": "Replaces an older version."
     },
     {
-      "id": "relates_to",
+      "id": "link",
       "root": true,
-      "title": "relates to",
-      "inverse": "relates to",
+      "title": "is linked to",
+      "inverse": "is linked to",
       "from": ["*"],
       "to": ["*"],
-      "description": "A loose link. Prefer a specific relation when one fits."
+      "description": "The plain wire, drawn before its meaning is known: any link already says its two ends relate, so this one says nothing more. Nothing is a flavour of it; a link that means something is a flavour of the root it means.",
+      "moved_from": ["relates_to"]
+    },
+    {
+      "id": "uses",
+      "root": true,
+      "title": "uses",
+      "inverse": "is used by",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "Relies on it to work, without waiting on it: a part that calls another, an app a team runs. Unlike depends on, it blocks nothing.",
+      "moved_from": ["software.uses"]
     },
     {
       "id": "tagged",
-      "extends": "relates_to",
+      "extends": "about",
       "title": "is tagged",
       "inverse": "tags",
       "from": ["*"],
       "to": ["tag"],
       "description": "What the item belongs with: any number of tags to an item. A lens's filter selects by it (tagged <tag id or name>); the house style draws no wire for it (undrawn)."
+    },
+    {
+      "id": "works_on",
+      "moved_from": [
+        "sys.works_on"
+      ],
+      "extends": "about",
+      "title": "is working on",
+      "inverse": "is being worked on by",
+      "from": [
+        "run",
+        "agent",
+        "person"
+      ],
+      "to": [
+        "*"
+      ],
+      "description": "What a run or actor is doing right now."
     }
   ],
   "rules": [
@@ -653,6 +1018,20 @@
         "latest": true
       },
       "say": "What a pack keeps, as it last kept it."
+    },
+    {
+      "id": "agent_automations",
+      "when": {
+        "actor": "agent",
+        "op": [
+          "create",
+          "update",
+          "restore"
+        ],
+        "type": "automation"
+      },
+      "then": "hold",
+      "say": "An automation acts later on the authority of the human who approved it: making, changing or bringing one back is theirs."
     }
   ],
   "views": [
@@ -697,7 +1076,7 @@
     {
       "id": "core.brief",
       "shape": "data",
-      "lens": { "over": ["needs", "lives_in", "relates_to", "about", "bears_on", "depends_on", "waits_on"] },
+      "lens": { "over": ["needs", "lives_in", "link", "about", "bears_on", "depends_on", "waits_on"] },
       "answer": "brief",
       "description": "Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required)."
     },
@@ -727,6 +1106,19 @@
       "title": "Tokens for this",
       "on": ["place", "aim"],
       "pieces": [{ "piece": "token_ask" }, { "piece": "token" }]
+    },
+    {
+      "form": "screen",
+      "id": "core.shared_reading",
+      "title": "Reading",
+      "on": [
+        "shared_document"
+      ],
+      "pieces": [
+        {
+          "piece": "document"
+        }
+      ]
     }
   ],
   "actions": [
@@ -834,7 +1226,7 @@
         "headless": ["part_of"],
         "place_hues": ["#2f5fb3", "#a86a12", "#0f7c86", "#b5489a", "#4f8a2b", "#d0622c", "#6f43b0", "#8a8f2a"],
         "key": "shown",
-        "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#b23a48", "relates_to": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
+        "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#b23a48", "link": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
         "lit": "all",
         "open": 1,
         "show": ["status", "waits", "sessions"],
@@ -848,7 +1240,7 @@
         "hues": ["#2e7d4f", "#2f5fb3", "#a86a12", "#6f43b0", "#59636e", "#0f7c86", "#b23a48", "#7a6a1c"],
         "link_hues": ["#2e7d4f", "#2f5fb3", "#a86a12", "#6f43b0", "#59636e", "#0f7c86", "#b23a48", "#7a6a1c", "#c0507a", "#4f8a2b", "#d0622c", "#3a7bd5", "#9a5b2e", "#2a9d8f", "#8a8f2a", "#b5489a"],
         "sizes": { "rule": 1, "snap": 16, "wire_edge": 8, "dot": 8, "dot_ring": 1.5, "small_text": 12, "tiny_text": 11, "legend_text": 12, "pill_pad_y": 1, "pill_pad_x": 7, "here_ring": 2, "swatch": 12, "swatch_radius": 3, "stage_least": 320, "stage": "68vh", "stage_most": 760, "legend_inset": 10, "legend_gap": 3, "legend_pad_y": 7, "legend_pad_x": 10, "legend_mark_gap": 8, "list_pad_top": 6, "list_pad_bottom": 10, "list_column_gap": 12, "list_row": 30, "list_group_row": 34, "list_side": 14, "list_indent": 22, "list_name_gap": 8, "list_dot_before": 6, "list_dot_after": 4, "list_fold": 18, "list_lane_indent": 26, "list_count_gap": 4, "list_count": 18, "list_column_most": "18ch", "list_status": "11ch", "list_waits": "14ch", "list_sessions": 10, "list_narrow_at": 640, "grid_pad": 10, "grid_gap": 6, "grid_head_pad_y": 7, "grid_head_pad_x": 10, "grid_row_pad_y": 8, "grid_card_gap": 2, "grid_card_pad_left": 11, "grid_card_pad_right": 9, "grid_stripe": 4, "grid_edge_mix": "55%", "grid_tint": "13%", "grid_tint_hover": "22%", "grid_swatch_mix": "30%", "grid_detail_text": "0.92em", "grid_mark_gap": 4, "grid_mark_text": "0.85em", "grid_legend_gap": 14, "grid_legend_pad_y": 8, "grid_legend_pad_x": 12, "grid_row_head": 120, "grid_lane": 170, "flow_layer_gap": 84, "flow_node_gap": 16, "flow_margin": 24, "flow_max_text": 140, "flow_track": 8, "flow_slot": 9, "flow_lead_out": 12, "flow_lead_in": 22, "flow_list_head": 28, "flow_list_row": 20, "flow_list_pad": 6, "flow_list_text_more": 40, "flow_text": 13, "flow_stub_text": 12, "flow_row_text": 12, "flow_diamond_pad": 96, "flow_diamond_height": 60, "flow_end_pad": 30, "flow_end_height": 30, "flow_box_pad": 42, "flow_box_height": 34, "flow_sheet_height": 40, "flow_corner": 6, "flow_head_half": 4.5, "flow_head_length": 9, "flow_break_half": 3, "flow_break_reach": 8, "flow_break_track": 6, "flow_row_inset": 2, "flow_row_dot_x": 15, "flow_dot_small": 4, "flow_row_text_x": 26, "flow_row_text_after": 10, "flow_list_head_x": 12, "flow_list_rule_above": 2, "flow_stub_text_x": 15, "flow_text_x": 27, "flow_text_after": 11, "flow_dot_gap": 12, "flow_dot": 4.5, "flow_sheet_lift": 2, "flow_badge_in": 4, "flow_badge": 8, "flow_says_most": 200, "flow_says_text": 11.5, "flow_says_pad": 7, "flow_says_aside": 6, "flow_says_height": 20, "flow_legend_from": 720, "flow_legend_room": 20, "flow_stroke": 1.25, "flow_stroke_lit": 2, "flow_dot_ring": 1.5, "flow_badge_text": 10.5, "flow_dash_scenario": "5 4", "flow_dash_choice": "6 5", "flow_dash_held": "2 4", "flow_held_badge": 6, "flow_held_text": 9, "time_head_text": 11, "time_hour_text": 10, "time_lane_dash": "2 3", "time_letter": 6.5, "time_least_block": 6, "time_day_start": 8, "time_day_end": 18, "time_gutter": 38, "time_hour": 34, "time_lane_named_from": 28, "time_chip": 18, "time_head_named": 36, "time_head": 22, "time_key_most": "28ch", "time_key_stripe": 10, "time_key_pad": 6, "time_key_gap": "4px 14px", "time_bar_label_most": 220, "time_bar_row": 24, "time_bar_day_every": 70, "arch_layer_gap": 48, "arch_node_gap": 18, "arch_col_gap": 36, "arch_margin": 24, "arch_max_text": 150, "arch_track": 8, "arch_slot": 10, "arch_lead_out": 12, "arch_lead_in": 20, "arch_head": 26, "arch_pad": 12, "arch_text": 13, "arch_place_text": 12, "arch_place_name_pad": 20, "arch_diamond_pad": 90, "arch_diamond_height": 56, "arch_store_pad": 44, "arch_store_height": 44, "arch_box_pad": 44, "arch_box_height": 34, "arch_says_text": 10.5, "arch_corner": 6, "arch_lid": 6, "arch_place_corner": 10, "arch_place_name_room": 34, "arch_place_name_inset": 4, "arch_place_name_height": 18, "arch_place_dot_x": 14, "arch_dot_small": 4, "arch_place_text_x": 24, "arch_says_most": 120, "arch_says_pad": 6, "arch_says_height": 16, "arch_text_x": 28, "arch_text_after": 12, "arch_dot_gap": 12, "arch_dot": 4.5, "arch_badge_in": 4, "arch_badge": 8, "arch_stroke_down": 1.75, "arch_stroke_warn": 1.5, "arch_dash_dot": "2 2", "arch_dash_place": "6 4", "arch_hit": 9, "arch_says_stroke": 0.75, "arch_story_least": 760, "arch_island_pad": 14, "arch_island_rise": 5, "arch_island_gap": 60, "arch_island_tint": "24%", "arch_deep_high": 62, "arch_deep_floor": 28, "arch_deep_route": 1.4, "arch_deep_name_lift": 14, "arch_deep_boat": 15, "arch_board_unit": 150, "arch_board_bar": 24, "arch_board_gap": 14, "arch_board_pad": 10, "arch_board_head": 34, "arch_board_card": 150, "arch_board_card_high": 26, "arch_deep_berth": 16 },
-        "numbers": { "dim": 0.32, "zoom_step": 1.25, "plane_zoom_least": 0.02, "plane_zoom_most": 4, "plane_open_least": 0.62, "plane_text_least": 4, "plane_more_from": 7, "plane_margin": 0.25, "plane_wheel": 0.0015, "plane_drag_from": 4, "plane_fit_pad": 16, "flow_fold_at": 4, "flow_ghost": 0.55, "time_bar_label_share": 0.3, "arch_place_fill": 0.55, "arch_planned_wire": 0.8, "arch_standby": 0.4, "arch_story_aspect": 1.6, "arch_story_gone_hold": 900, "arch_story_gone_fade": 700, "arch_story_move": 1300, "arch_story_new_for": 3200, "arch_story_draw": 900, "arch_story_read_base": 700, "arch_story_read_per_char": 26, "arch_story_beat_least": 3200, "arch_story_beat_after": 1800, "arch_story_typing": 900, "arch_story_chapter_pause": 500, "arch_story_jump": 1000, "arch_story_start": 400, "arch_story_lines_kept": 12, "arch_story_quick": 650, "arch_story_quick_move": 450, "arch_island_bow": 0.16, "arch_island_wobble": 0.12, "arch_island_arc": 1.3, "arch_island_squash": 0.75, "arch_deep_fov": 24, "arch_deep_angle": 48, "arch_deep_near": 0.94, "arch_deep_sail": 1700, "arch_deep_fly_pitch": 18, "arch_deep_fly_up": 2.2, "arch_deep_fly": 5200, "arch_deep_card_in": 1400, "arch_deep_card_after": 2200, "arch_deep_fold": 1300, "arch_deep_rise": 2600, "arch_story_deep_cover": 650, "note_title_most": 90, "note_opening_most": 320, "note_opening_cut": 240, "note_sentence_least": 80, "note_sentence_most": 300, "fact_most": 32, "field_fold_at": 140, "find_peek_names": 5 },
+        "numbers": { "dim": 0.32, "zoom_step": 1.25, "plane_zoom_least": 0.02, "plane_zoom_most": 4, "plane_open_least": 0.62, "plane_text_least": 4, "plane_more_from": 7, "plane_margin": 0.25, "plane_wheel": 0.0015, "plane_drag_from": 4, "plane_fit_pad": 16, "flow_fold_at": 4, "flow_ghost": 0.55, "time_bar_label_share": 0.3, "arch_place_fill": 0.55, "arch_planned_wire": 0.8, "arch_standby": 0.4, "arch_story_aspect": 1.6, "arch_story_gone_hold": 900, "arch_story_gone_fade": 700, "arch_story_move": 1300, "arch_story_new_for": 3200, "arch_story_draw": 900, "arch_story_read_base": 700, "arch_story_read_per_char": 26, "arch_story_beat_least": 3200, "arch_story_beat_after": 1800, "arch_story_typing": 900, "arch_story_chapter_pause": 500, "arch_story_jump": 1000, "arch_story_start": 400, "arch_story_lines_kept": 12, "arch_story_quick": 650, "arch_story_quick_move": 450, "arch_island_bow": 0.16, "arch_island_wobble": 0.12, "arch_island_arc": 1.3, "arch_island_squash": 0.75, "arch_deep_fov": 24, "arch_deep_angle": 48, "arch_deep_near": 0.94, "arch_deep_sail": 1700, "arch_deep_fly_pitch": 18, "arch_deep_fly_up": 2.2, "arch_deep_fly": 5200, "arch_deep_card_in": 1400, "arch_deep_card_after": 2200, "arch_deep_fold": 1300, "arch_deep_rise": 2600, "arch_story_deep_cover": 650, "note_title_most": 90, "note_opening_most": 320, "note_opening_cut": 240, "note_sentence_least": 80, "note_sentence_most": 300, "fact_most": 32, "field_fold_at": 140, "find_peek_names": 5, "picker_around_from": 100, "picker_around_most": 400 },
         "page": { "picture": true, "notes": "open", "ties": "open", "history": "closed" },
         "notes": { "callouts": { "note": "accent", "tip": "ok", "important": "accent", "warning": "warn", "caution": "bad" }, "measure": "measure" },
         "dots": { "islands": { "field": "status", "names": { "todo": "To do", "doing": "Doing", "done": "Done" }, "order": ["todo", "doing", "done"], "colours": { "todo": "closed", "doing": "warn", "done": "ok" } } },
@@ -863,7 +1255,7 @@
     { "id": "core.map_true", "type": "instruction", "title": "Keep the map true", "body": "When what you do or find settles something still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, rather than leaving it open with a note. Settle only what the work or the owner has in fact settled: closing a decision or hypothesis waits for the owner unless this workspace applies agents’ changes as made, so propose it with what was chosen (props.outcome) and why (props.rationale). A choice that is still the owner’s stays open.", "props": { "for": ["working_rules"], "order": 40 } },
     { "id": "core.authority", "type": "instruction", "title": "Say on whose authority", "body": "Every change takes authority: of \"human\" with what the owner said and where, when they told you to or decided it; of \"agent\" for your own reading of the work. Never claim the owner’s word for your own judgment.", "props": { "for": ["working_rules"], "order": 50 } },
     { "id": "core.names", "type": "instruction", "title": "A name is a few words", "body": "A title names the thing in 60 characters at most; the rest goes in the first line of its note. Lead a note with the point in two or three sentences, and give each further part a short title on a line of its own, so it folds. Write it in the map's one dialect, which every page reads alike: ## titles, - points, - [ ] and - [x] checklists, > [!NOTE] or > [!WARNING] callouts, | tables |, `code`, **strong**, and an item named by its id (e_...) or as [its name](e_...).", "props": { "for": ["working_rules"], "order": 60 } },
-    {"id":"core.unaccounted","type":"instruction","title":"Settle the commits no one has accounted for","body":"{count} commits here are not accounted for (a commit is, once the map holds a commit item for it: type software.commit, its full sha in sha, a software.settles link to each item it settles, none when it settles nothing):\n{commits}\nIn your first reply, tell the owner which these are, and make a commit item for each with change (or, where one heard from a push is there already with accounted false, set it true with its links), on the authority you have for it, as you settle what you did. If a commit is not yours to account for, say so.","props":{"for":["unaccounted_commits"],"order":40}},
+    {"id":"core.unaccounted","type":"instruction","title":"Settle the commits no one has accounted for","body":"{count} commits here are not accounted for (a commit is, once the map holds a commit item for it: type commit, its full sha in sha, a settles link to each item it settles, none when it settles nothing):\n{commits}\nIn your first reply, tell the owner which these are, and make a commit item for each with change (or, where one heard from a push is there already with accounted false, set it true with its links), on the authority you have for it, as you settle what you did. If a commit is not yours to account for, say so.","props":{"for":["unaccounted_commits"],"order":40}},
     { "id": "core.search_first", "type": "instruction", "title": "Search before you create", "body": "Query with name search first, so nothing is made twice.", "props": { "for": ["working_rules"], "order": 70 } },
     { "id": "core.waits_on", "type": "instruction", "title": "Say who is waited on with a link", "body": "A person who has to answer or act is waits_on (what for in props.for), removed once they have; other work is depends_on; a resource is needs, and an exclusive one is taken with assign, action claim, and given back with revise, action release.", "props": { "for": ["working_rules"], "order": 80 } }
   ]

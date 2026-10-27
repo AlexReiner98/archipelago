@@ -6,8 +6,8 @@
   "requires": ["core"],
   "types": [
     {
-      "id": "money.cost",
-      "moved_from": ["cost"],
+      "id": "cost",
+      "moved_from": ["money.cost"],
       "capabilities": { "when": { "start": "since", "end": "until" } },
       "extends": "occurrence",
       "title": "Cost",

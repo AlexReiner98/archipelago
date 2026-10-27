@@ -26,5 +26,8 @@ else if (args[0] === 'changed') {
   files = picked.files;
 } else files = args.length ? args : fastTests();
 
+// A new workspace starts with the kernel's packs alone; the tests' workspaces start with every pack, as the map they
+// were written against did (test/manifest.test.ts checks the kernel alone).
+process.env.PELAGO_START_PACKS ??= 'all';
 const run = spawnSync(process.execPath, ['--test', '--test-force-exit', '--test-global-setup=./test/global.ts', '--import', './test/each.ts', ...flags, ...files], { cwd: ROOT, stdio: 'inherit' });
 process.exit(run.status ?? 1);

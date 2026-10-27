@@ -12,10 +12,10 @@ test('with auth off, one workspace and the surface decides who is calling', asyn
   assert.equal((await call('/api/init', undefined, { name: 'Alex' })).status, 200, '/api is the human');
   assert.equal((await call('/api/workspace_info')).result.owner.title, 'Alex');
   // A workspace begins with its first owner, and from then on what its agents change takes effect as they make it.
-  const applied = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'M' }] });
+  const applied = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'note', title: 'M' }] });
   assert.equal(applied.result.status, 'applied', 'a new workspace applies what agents change');
   await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
-  const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'N' }] });
+  const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'note', title: 'N' }] });
   assert.equal(proposed.result.status, 'proposed', '/agent is an agent');
   await call('/api/init', undefined, { name: 'Alex' });
   assert.equal((await call('/api/workspace_info')).result.agent_changes, 'hold', 'an owner set again keeps the workspace as it chose');
@@ -54,7 +54,7 @@ test('a token fixes identity and authority, whichever surface is used', async ()
   assert.match(made.result.note, /cannot be shown again/);
 
   // An agent token is an agent on every surface, including the one the CLI uses.
-  const proposed = await call('/api/change', agent, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'From the agent' }] });
+  const proposed = await call('/api/change', agent, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'From the agent' }] });
   assert.equal(proposed.result.status, 'proposed');
   assert.match((await call('/api/decide', agent, { proposal: proposed.result.proposal, approve: true })).error, /humans only/);
   assert.match((await call('/api/token_create', agent, { kind: 'human', name: 'sneaky' })).error, /humans only/);
@@ -102,8 +102,8 @@ test('each workspace is its own database: tokens, data and local types do not cr
   assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.map((w: any) => w.id), ['default', 'acme']);
   assert.equal((await call('/api/search', operator)).status, 401, 'the operator cannot read any map');
 
-  await call('/api/change', mine, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'My secret plan' }] });
-  await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'work.note', title: 'Acme bid' }] });
+  await call('/api/change', mine, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'My secret plan' }] });
+  await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Acme bid' }] });
   const titles = async (token: string) => ((await call('/api/search', token)).result as any[]).map((e) => e.title);
   assert.deepEqual(await titles(mine), ['My secret plan']);
   assert.deepEqual(await titles(theirs), ['Acme bid']);
@@ -129,7 +129,7 @@ test('inside a workspace, private things are hidden from other members by the da
     if (r.status !== 200) throw new Error(r.error);
     return r.result;
   };
-  const titles = async (token: string, type = 'work.task') => ((await api(token, 'search', { type })) as any[]).map((e) => e.title).sort();
+  const titles = async (token: string, type = 'task') => ((await api(token, 'search', { type })) as any[]).map((e) => e.title).sort();
 
   // The first admin becomes a person; then adds a colleague.
   const me = (await api(alex, 'init', { name: 'Alex' })).me;
@@ -139,13 +139,13 @@ test('inside a workspace, private things are hidden from other members by the da
 
   // New things are private to their author unless they say otherwise.
   const mine = await api(alex, 'change', { reason: 'x', ops: [
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Launch', visibility: 'shared' },
-    { op: 'create', ref: 's', type: 'work.task', title: 'Shared task', visibility: 'shared', owner: me },
-    { op: 'create', ref: 'x', type: 'work.task', title: 'Alex private', owner: me },
+    { op: 'create', ref: 'p', type: 'project', title: 'Launch', visibility: 'shared' },
+    { op: 'create', ref: 's', type: 'task', title: 'Shared task', visibility: 'shared', owner: me },
+    { op: 'create', ref: 'x', type: 'task', title: 'Alex private', owner: me },
     { op: 'link', type: 'part_of', from: 's', to: 'p' },
     { op: 'link', type: 'part_of', from: 'x', to: 'p' },
   ] });
-  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Sam private', owner: samPerson }] });
+  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Sam private', owner: samPerson }] });
   assert.deepEqual(await titles(alex), ['Alex private', 'Shared task']);
   assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
 
@@ -161,7 +161,7 @@ test('inside a workspace, private things are hidden from other members by the da
   assert.match((await call('/api/change', sam, { reason: 'x', ops: [{ op: 'link', type: 'depends_on', from: mine.created.s, to: mine.created.x }] })).error, /no entity or ref/);
 
   // A picture is as private as the result it is of.
-  const shot = await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'r', type: 'software.test_result', title: 'Alex private result' }] });
+  const shot = await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'r', type: 'test_result', title: 'Alex private result' }] });
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]).toString('base64');
   await api(alex, 'picture_put', { result: shot.created.r, data: png, content_type: 'image/png' });
   assert.equal((await api(alex, 'picture', { result: shot.created.r })).data, png);
@@ -183,7 +183,7 @@ test('inside a workspace, private things are hidden from other members by the da
   await api(alex, 'workspace_set', { agent_changes: 'hold' });
   const samAgent = (await api(sam, 'token_create', { kind: 'agent', name: 'sam-claude' })).token as string;
   assert.deepEqual(await titles(samAgent), ['Sam private', 'Shared task']);
-  const proposed = await api(samAgent, 'change', { reason: 'From Sam\'s inbox', ops: [{ op: 'create', type: 'work.task', title: 'Reply to the client' }] });
+  const proposed = await api(samAgent, 'change', { reason: 'From Sam\'s inbox', ops: [{ op: 'create', type: 'task', title: 'Reply to the client' }] });
   assert.equal((await api(alex, 'proposals')).length, 0, 'not Alex\'s to review');
   assert.equal((await api(sam, 'proposals')).length, 1);
   assert.match((await call('/api/decide', alex, { proposal: proposed.proposal, approve: true })).error, /No proposal/);
@@ -205,7 +205,7 @@ test('inside a workspace, private things are hidden from other members by the da
 
   // A team that prefers openness can flip the default.
   await api(alex, 'workspace_set', { default_visibility: 'shared' });
-  await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', type: 'work.task', title: 'Open by default' }] });
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Open by default' }] });
   assert.ok((await titles(sam)).includes('Open by default'));
 });
 
@@ -223,25 +223,25 @@ test('nothing can depend on a private item from outside it, and a held resource 
   const sam = await member(alex, { email: 'sam@example.com', name: 'Sam' });
 
   const made = (await api(alex, 'change', { reason: 'x', ops: [
-    { op: 'create', ref: 'pub', type: 'work.task', title: 'Public task', visibility: 'shared' },
-    { op: 'create', ref: 'priv', type: 'work.task', title: 'Private prep' },
-    { op: 'create', ref: 'priv2', type: 'work.task', title: 'Private follow-up' },
-    { op: 'create', ref: 'base', type: 'work.task', title: 'Shared base', visibility: 'shared' },
+    { op: 'create', ref: 'pub', type: 'task', title: 'Public task', visibility: 'shared' },
+    { op: 'create', ref: 'priv', type: 'task', title: 'Private prep' },
+    { op: 'create', ref: 'priv2', type: 'task', title: 'Private follow-up' },
+    { op: 'create', ref: 'base', type: 'task', title: 'Shared base', visibility: 'shared' },
     { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane', visibility: 'shared' },
-    { op: 'create', ref: 'live', type: 'work.task', title: 'Live work', visibility: 'shared' },
+    { op: 'create', ref: 'live', type: 'task', title: 'Live work', visibility: 'shared' },
     { op: 'link', type: 'depends_on', from: 'priv2', to: 'priv' },
     { op: 'link', type: 'depends_on', from: 'priv', to: 'base' },
-    { op: 'create', ref: 'other', type: 'work.task', title: 'Other live work', visibility: 'shared' },
+    { op: 'create', ref: 'other', type: 'task', title: 'Other live work', visibility: 'shared' },
     { op: 'link', type: 'needs', from: 'live', to: 'lane' },
     { op: 'link', type: 'needs', from: 'other', to: 'lane' },
   ] })).created;
 
   // A shared item cannot wait on a private one: colleagues would see it as ready.
   assert.match(await refused(alex, [{ op: 'link', type: 'depends_on', from: made.pub, to: made.priv }]), /"Public task" is shared, so it cannot depend on "Private prep", which is private/);
-  assert.match(await refused(alex, [{ op: 'create', ref: 'n', type: 'work.task', title: 'New shared', visibility: 'shared' }, { op: 'link', type: 'depends_on', from: 'n', to: made.priv }]), /cannot depend on "Private prep"/);
+  assert.match(await refused(alex, [{ op: 'create', ref: 'n', type: 'task', title: 'New shared', visibility: 'shared' }, { op: 'link', type: 'depends_on', from: 'n', to: made.priv }]), /cannot depend on "Private prep"/);
   // Private on private (same person) and private on shared are both fine: they were created above.
   // A looser relation is not a dependency, so it is allowed.
-  await api(alex, 'change', { reason: 'x', ops: [{ op: 'link', type: 'relates_to', from: made.pub, to: made.priv }] });
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'link', type: 'link', from: made.pub, to: made.priv }] });
 
   // Sharing something that waits on a private item needs that item shared too.
   assert.match(await refused(alex, [{ op: 'update', id: made.priv2, visibility: 'shared' }]), /cannot be shared while it depends on private items: "Private prep"/);
@@ -249,7 +249,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
 
   // Something others depend on cannot be made private, even when the dependent is hidden from you.
   assert.match(await refused(alex, [{ op: 'update', id: made.priv, visibility: 'private' }]), /cannot be made private while other work depends on it: "Private follow-up"/);
-  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'mine', type: 'work.task', title: 'Sam secret' }, { op: 'link', type: 'depends_on', from: 'mine', to: made.base }] });
+  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'mine', type: 'task', title: 'Sam secret' }, { op: 'link', type: 'depends_on', from: 'mine', to: made.base }] });
   const hidden = await refused(alex, [{ op: 'update', id: made.base, visibility: 'private' }]);
   assert.match(hidden, /"Private prep", 1 item private to someone else/);
   assert.ok(!hidden.includes('Sam secret'), 'the hidden dependent is counted, not named');
@@ -257,7 +257,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
   // Sam's session is private to Sam, but the lane it holds is held for everyone.
   const session = await api(sam, 'session_start', { task: made.live, title: 'Sam debugging' });
   assert.deepEqual(session.claimed, ['Live lane']);
-  assert.ok(!((await api(alex, 'search', { type: 'sys.run' })) as any[]).length, 'Alex cannot see the session itself');
+  assert.ok(!((await api(alex, 'search', { type: 'run' })) as any[]).length, 'Alex cannot see the session itself');
   const alexRun = await api(alex, 'session_start', { title: 'Alex wants the lane', task: made.live });
   assert.equal(alexRun.status, 'waiting');
   assert.match(alexRun.blocked[0].why, /"Live lane" is held by "someone's private session"/);

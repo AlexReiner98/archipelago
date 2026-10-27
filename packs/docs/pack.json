@@ -6,7 +6,8 @@
   "requires": ["core", "software"],
   "types": [
     {
-      "id": "docs.principle",
+      "id": "principle",
+      "moved_from": ["docs.principle"],
       "extends": "aim",
       "title": "Principle",
       "description": "Something the product holds to, in a sentence or two of point and intent. What upholds it serves it; it is retired when it stops holding.",

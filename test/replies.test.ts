@@ -52,7 +52,7 @@ test('a rule on a reply ending is checked as data', () => {
 
 test('a rule on a reply ending has no say over a change', async () => {
   const l = await map();
-  const made = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: 'Untouched by the check' }] });
+  const made = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Untouched by the check' }] });
   assert.equal(made.status, 'applied');
 });
 

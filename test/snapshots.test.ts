@@ -18,10 +18,10 @@ import { dumpVault } from '../src/vault.ts';
 async function busy(l: Archipelago) {
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
-    { op: 'create', ref: 'p', type: 'work.project', title: 'Snapshots' },
-    { op: 'create', ref: 't', type: 'work.task', title: 'Take one', owner: 'me' },
-    { op: 'create', ref: 'u', type: 'work.task', title: 'Rebuild from it' },
-    { op: 'create', ref: 'q', type: 'work.decision', title: 'How often?' },
+    { op: 'create', ref: 'p', type: 'project', title: 'Snapshots' },
+    { op: 'create', ref: 't', type: 'task', title: 'Take one', owner: 'me' },
+    { op: 'create', ref: 'u', type: 'task', title: 'Rebuild from it' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'How often?' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'link', type: 'part_of', from: 'u', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'u', to: 't' },
@@ -32,7 +32,7 @@ async function busy(l: Archipelago) {
   await l.decide(human, { proposal: no.proposal, approve: false, note: 'Keep it' });
   const edit = (await l.change(human, { reason: 'Reshape', ops: [{ op: 'update', id: made.u, title: 'Rebuilt', body: 'From the start.' }, { op: 'archive', id: made.q }] })) as { changeset: string };
   await undo(l, human, { changeset: edit.changeset });
-  const twice = await make(l, [{ op: 'create', ref: 's', type: 'work.task', title: 'Said twice' }, { op: 'link', type: 'part_of', from: 's', to: made.p }]);
+  const twice = await make(l, [{ op: 'create', ref: 's', type: 'task', title: 'Said twice' }, { op: 'link', type: 'part_of', from: 's', to: made.p }]);
   await make(l, [{ op: 'merge', keep: made.t, drop: twice.s }]);
   return made;
 }
@@ -46,13 +46,13 @@ test('a rebuild from a snapshot is the rebuild from the start, made beside the l
   assert.deepEqual([first.from, first.snapshots.length, first.swapped], ['start', 1, undefined], 'a snapshot made from the start, the live tables untouched');
 
   // More after it: a change, a held one still waiting, and one written while the rebuild is under way.
-  await make(l, [{ op: 'update', id: made.u, status: 'doing' }, { op: 'create', ref: 'n', type: 'work.note', title: 'After the snapshot' }]);
+  await make(l, [{ op: 'update', id: made.u, status: 'doing' }, { op: 'create', ref: 'n', type: 'note', title: 'After the snapshot' }]);
   await l.change(agent, { reason: 'Later', ops: [{ op: 'update', id: made.p, props: { hub_at: 4 } }] });
   for (let i = 0; i < 6; i++) await make(l, [{ op: 'update', id: made.t, append: `Step ${i}.` }]);
   let during: Promise<unknown> | undefined;
   const fromSnapshot = await rebuildProjections(l.db, l.registry, l.workspace, {
     chunk: 2,
-    progress: () => void (during ??= make(l, [{ op: 'create', type: 'work.task', title: 'Written during the rebuild' }])),
+    progress: () => void (during ??= make(l, [{ op: 'create', type: 'task', title: 'Written during the rebuild' }])),
   });
   await during;
   assert.equal(fromSnapshot.from, first.snapshots[0], 'it starts at the snapshot');
@@ -100,7 +100,7 @@ test('a snapshot from other projector code, or off the chain, is not built on', 
 
 test('a past position reads as the map stood then: the nearest snapshot and the log after it', async () => {
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 'p', type: 'work.project', title: 'History' }, { op: 'create', ref: 't', type: 'work.task', title: 'First name' }]);
+  const made = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'History' }, { op: 'create', ref: 't', type: 'task', title: 'First name' }]);
   const seen: { pos: number; title: string; status: string; links: number }[] = [];
   const mark = async () => {
     const t = (await l.entity(made.t))!;
@@ -133,7 +133,7 @@ test('a past position reads as the map stood then: the nearest snapshot and the 
 
   // What a reader may not see now, they may not see then either.
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
-  const hid = (await l.as(me).change(human, { reason: 'Mine', ops: [{ op: 'create', ref: 'h', type: 'work.task', title: 'Private', visibility: 'private' }] })) as { created: Record<string, string> };
+  const hid = (await l.as(me).change(human, { reason: 'Mine', ops: [{ op: 'create', ref: 'h', type: 'task', title: 'Private', visibility: 'private' }] })) as { created: Record<string, string> };
   const head = (await headOf(l.db)).pos;
   assert.ok((await asOf(l.db, l.registry, l.workspace, head, l.as(me).db)).rows.entity.some((e) => e.id === hid.created.h));
   assert.ok(!(await asOf(l.db, l.registry, l.workspace, head, l.as('e_someone').db)).rows.entity.some((e) => e.id === hid.created.h));

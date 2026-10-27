@@ -2,7 +2,7 @@
 // the owner's switch. The page's own helpers are handed in, so this module imports nothing.
 
 /** The kernel's packs, which are never off. */
-const KERNEL = ['core', 'sys'];
+const KERNEL = ['core'];
 
 export function packsCard({ h, api, ask, tell, then }) {
   const list = h('ul', { class: 'rows' });

@@ -68,13 +68,13 @@ const TYPES = [
     fields: { address: { type: 'string' }, area_ha: { type: 'number' }, zoning: { type: 'string' }, official_plan: { type: 'string' }, regulated: { type: 'boolean', description: 'Partly within a conservation authority regulated area.' } },
   },
   {
-    id: 'local.application', title: 'Application', extends: 'work.project',
+    id: 'local.application', title: 'Application', extends: 'project',
     description: 'A planning application the proposal needs before it can be built.',
     statuses: { open: ['identified', 'preparing', 'submitted', 'under review'], closed: ['approved', 'refused', 'withdrawn'] },
     fields: { fee: { type: 'number', shown: true }, approver: { type: 'string' } },
   },
   {
-    id: 'local.study', title: 'Study', extends: 'work.task',
+    id: 'local.study', title: 'Study', extends: 'task',
     description: 'A study or plan a commenter asked for at pre-consultation, to be submitted with an application.',
     statuses: { open: ['required', 'scoping', 'under way', 'submitted'], closed: ['accepted', 'waived'] },
     fields: { est_cost: { type: 'number', shown: true, description: 'Estimated fee, in dollars.' }, est_weeks: { type: 'number', shown: true }, season: { type: 'string', description: 'When in the year the fieldwork can be done.' } },
@@ -137,32 +137,32 @@ async function fill(): Promise<void> {
         body: 'A 6.2 ha field on the edge of town, designated for employment but still zoned rural. Millers Creek crosses the south-east corner, so part of the lot is regulated by the conservation authority, and the lot sits within MTO\'s permit control area for Highway 7.',
       },
       {
-        op: 'create', ref: 'p', type: 'work.project', title: '4180 Concession Rd 6: industrial', status: 'active', owner: me,
+        op: 'create', ref: 'p', type: 'project', title: '4180 Concession Rd 6: industrial', status: 'active', owner: me,
         body: 'Northfield wants two light industrial buildings on this lot. The town held the pre-consultation on 22 September; comments were due on 13 October and four are still out. When the checklist is complete, Northfield decides whether to go ahead.\n\nWhat is proposed\nTwo buildings, 18,500 m² together, for warehousing and light manufacturing, with truck access from Concession Road 6 and 140 parking spaces.\n\nWhere it stands\nThe applications are known: a zoning amendment and a site plan, plus permits from the conservation authority and MTO. The study list is half built, and the studies with the longest lead time are the ones still waiting on comments.',
       },
       { op: 'link', type: 'about', from: 'p', to: 'lot' },
-      { op: 'link', type: 'work.requested_by', from: 'p', to: 'own' },
+      { op: 'link', type: 'requested_by', from: 'p', to: 'own' },
       { op: 'link', type: 'involves', from: 'p', to: 'town' },
       { op: 'link', type: 'involves', from: 'p', to: 'region' },
       { op: 'link', type: 'involves', from: 'p', to: 'ca' },
       { op: 'link', type: 'involves', from: 'p', to: 'mto' },
-      { op: 'create', ref: 'concept', type: 'work.document', title: 'Concept plan', status: 'ready', body: 'The site layout Northfield sent the town: two buildings, a truck court facing the highway, and a stormwater pond in the south-east corner, inside the regulated area.' },
+      { op: 'create', ref: 'concept', type: 'document', title: 'Concept plan', status: 'ready', body: 'The site layout Northfield sent the town: two buildings, a truck court facing the highway, and a stormwater pond in the south-east corner, inside the regulated area.' },
       { op: 'link', type: 'part_of', from: 'concept', to: 'p' },
       { op: 'link', type: 'produced', from: 'own', to: 'concept' },
 
       // The meeting.
-      { op: 'create', ref: 'meet', type: 'work.meeting', title: 'Pre-consultation meeting', status: 'happened', props: { at: '2026-09-22T14:00:00-04:00', location: 'Millbrook Town Hall, Room 2' } },
+      { op: 'create', ref: 'meet', type: 'meeting', title: 'Pre-consultation meeting', status: 'happened', props: { at: '2026-09-22T14:00:00-04:00', location: 'Millbrook Town Hall, Room 2' } },
       { op: 'link', type: 'part_of', from: 'meet', to: 'p' },
       { op: 'link', type: 'about', from: 'meet', to: 'concept' },
       ...['plan', 'eng', 'parks', 'forest', 'legal', 'fire', 'bldg', 'region', 'ca', 'mto', 'own', 'firm'].map((x) => ({ op: 'link', type: 'involves', from: 'meet', to: x })),
 
       // Which applications, decided by the town at the meeting.
       {
-        op: 'create', ref: 'which', type: 'work.decision', title: 'Which applications are needed?', status: 'decided',
+        op: 'create', ref: 'which', type: 'decision', title: 'Which applications are needed?', status: 'decided',
         props: { options: ['Zoning amendment and site plan', 'Official plan and zoning amendment, and site plan', 'Site plan only'], outcome: 'Zoning amendment and site plan', rationale: 'The official plan already allows employment uses here; the rural zoning does not, so only the zoning changes.', decided_on: '2026-09-22' },
       },
       { op: 'link', type: 'part_of', from: 'which', to: 'p' },
-      { op: 'link', type: 'work.requested_by', from: 'which', to: 'plan' },
+      { op: 'link', type: 'requested_by', from: 'which', to: 'plan' },
       { op: 'create', ref: 'zba', type: 'local.application', title: 'Zoning by-law amendment', status: 'identified', props: { fee: 24800, approver: 'Millbrook Council' } },
       { op: 'create', ref: 'spa', type: 'local.application', title: 'Site plan approval', status: 'identified', props: { fee: 31500, approver: 'Millbrook Planning' } },
       { op: 'create', ref: 'caperm', type: 'local.application', title: 'Conservation authority permit', status: 'identified', props: { fee: 4900, approver: 'Cedar Valley Conservation' } },
@@ -173,7 +173,7 @@ async function fill(): Promise<void> {
       { op: 'link', type: 'depends_on', from: 'spa', to: 'zba' },
 
       // The circulation: one step holding each commenter's comments, some answered.
-      { op: 'create', ref: 'circ', type: 'work.task', title: 'Circulation for comments', status: 'doing', owner: me, props: { due: DUE }, body: 'The town sent the concept to its departments and to the region, the conservation authority and MTO, with comments due on 13 October.' },
+      { op: 'create', ref: 'circ', type: 'task', title: 'Circulation for comments', status: 'doing', owner: me, props: { due: DUE }, body: 'The town sent the concept to its departments and to the region, the conservation authority and MTO, with comments due on 13 October.' },
       { op: 'link', type: 'part_of', from: 'circ', to: 'p' },
       ...[
         ['c_plan', 'plan', 'daniel', 'Planning', 'done', '2026-09-29'],
@@ -187,21 +187,21 @@ async function fill(): Promise<void> {
         ['c_ca', 'ca', 'liam', 'Conservation authority', 'waiting', null],
         ['c_mto', 'mto', 'nadia', 'MTO', 'waiting', null],
       ].flatMap(([ref, party, who, name, status, on]) => [
-        { op: 'create', ref, type: 'work.task', title: `${name} comments`, status, props: { due: DUE } },
+        { op: 'create', ref, type: 'task', title: `${name} comments`, status, props: { due: DUE } },
         { op: 'link', type: 'part_of', from: ref, to: 'circ' },
-        { op: 'link', type: 'work.owed_to', from: ref, to: 'firm' },
+        { op: 'link', type: 'owed_to', from: ref, to: 'firm' },
         ...(on
           ? [
               { op: 'create', ref: `${ref}_doc`, type: 'local.comment', title: `${name} comments`, status: 'received', props: { received_on: on } },
               { op: 'link', type: 'produced', from: ref, to: `${ref}_doc` },
-              { op: 'link', type: 'work.requested_by', from: `${ref}_doc`, to: party },
+              { op: 'link', type: 'requested_by', from: `${ref}_doc`, to: party },
               { op: 'link', type: 'part_of', from: `${ref}_doc`, to: 'p' },
             ]
           : [{ op: 'link', type: 'waits_on', from: ref, to: who, props: { for: `${name} comments on the concept` } }]),
       ]),
 
       // The checklist, as far as it goes.
-      { op: 'create', ref: 'list', type: 'work.document', title: 'Study checklist', status: 'draft', body: 'What the commenters asked to see with the applications. Built from each set of comments as it comes in; four are still out, and they are the ones that set the pace (stormwater, the creek, the highway).' },
+      { op: 'create', ref: 'list', type: 'document', title: 'Study checklist', status: 'draft', body: 'What the commenters asked to see with the applications. Built from each set of comments as it comes in; four are still out, and they are the ones that set the pace (stormwater, the creek, the highway).' },
       { op: 'link', type: 'part_of', from: 'list', to: 'p' },
       ...[
         ['pjr', 'Planning justification report', 'required', 'plan', 18000, 8, null],
@@ -216,7 +216,7 @@ async function fill(): Promise<void> {
       ].flatMap(([ref, title, status, by, cost, weeks, season]) => [
         { op: 'create', ref, type: 'local.study', title, status, props: { est_cost: cost, est_weeks: weeks, ...(season ? { season } : {}) } },
         { op: 'link', type: 'part_of', from: ref, to: 'list' },
-        { op: 'link', type: 'work.requested_by', from: ref, to: by },
+        { op: 'link', type: 'requested_by', from: ref, to: by },
       ]),
       // Known to be coming, though the comments asking for them are not in.
       {
@@ -227,8 +227,8 @@ async function fill(): Promise<void> {
       { op: 'create', ref: 'swm', type: 'local.study', title: 'Stormwater management report', status: 'required', props: { est_cost: 26000, est_weeks: 10 }, body: 'Engineering and the conservation authority will both review it; neither has sent comments yet, so the design storm and the outlet to the creek are still open.' },
       { op: 'link', type: 'part_of', from: 'eis', to: 'list' },
       { op: 'link', type: 'part_of', from: 'swm', to: 'list' },
-      { op: 'link', type: 'work.requested_by', from: 'eis', to: 'ca' },
-      { op: 'link', type: 'work.requested_by', from: 'swm', to: 'eng' },
+      { op: 'link', type: 'requested_by', from: 'eis', to: 'ca' },
+      { op: 'link', type: 'requested_by', from: 'swm', to: 'eng' },
       { op: 'link', type: 'depends_on', from: 'eis', to: 'c_ca' },
       { op: 'link', type: 'depends_on', from: 'swm', to: 'c_eng' },
       { op: 'link', type: 'depends_on', from: 'swm', to: 'c_ca' },
@@ -251,11 +251,11 @@ async function fill(): Promise<void> {
       ...['c_plan', 'c_parks', 'c_legal', 'c_fire', 'c_bldg', 'c_region', 'c_eng', 'c_forest', 'c_ca', 'c_mto', 'list'].map((x) => ({ op: 'link', type: 'depends_on', from: 'handover', to: x })),
 
       // Work on our side.
-      { op: 'create', ref: 'chase', type: 'work.task', title: 'Chase the late comments', status: 'todo', owner: me, props: { due: '2026-10-20', priority: 'high' }, body: 'Engineering, Forestry, the conservation authority and MTO are past the 13 October date. The conservation authority wants a site visit first, so ask for a date.' },
+      { op: 'create', ref: 'chase', type: 'task', title: 'Chase the late comments', status: 'todo', owner: me, props: { due: '2026-10-20', priority: 'high' }, body: 'Engineering, Forestry, the conservation authority and MTO are past the 13 October date. The conservation authority wants a site visit first, so ask for a date.' },
       { op: 'link', type: 'part_of', from: 'chase', to: 'circ' },
       { op: 'link', type: 'waits_on', from: 'chase', to: me, props: { for: 'emailing the four late commenters' } },
       {
-        op: 'create', ref: 'go', type: 'work.decision', title: 'Go ahead with the applications?', status: 'open',
+        op: 'create', ref: 'go', type: 'decision', title: 'Go ahead with the applications?', status: 'open',
         props: { options: ['Go ahead as proposed', 'Move the pond out of the regulated area, then go ahead', 'Do not go ahead'], due: '2026-11-13' },
         body: 'Northfield\'s call, once they have the checklist. What weighs on it is the environmental impact study: its surveys can only start in April, which puts the zoning amendment into late 2027.',
       },
@@ -301,7 +301,7 @@ async function fill(): Promise<void> {
     ops: [
       { op: 'create', ref: 'trees', type: 'local.study', title: 'Tree inventory and preservation plan', status: 'required', props: { est_cost: 8500, est_weeks: 4 } },
       { op: 'link', type: 'part_of', from: 'trees', to: m.list },
-      { op: 'link', type: 'work.requested_by', from: 'trees', to: m.forest },
+      { op: 'link', type: 'requested_by', from: 'trees', to: m.forest },
       { op: 'link', type: 'depends_on', from: m.spa, to: 'trees' },
       { op: 'link', type: 'depends_on', from: 'trees', to: m.go, props: { says: 'Go ahead as proposed' } },
     ],

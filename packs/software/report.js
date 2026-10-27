@@ -7,7 +7,7 @@
 export async function testReport(input, ctx) {
   const build = String(input.build ?? '').trim();
   if (!build) throw new Error('test_report needs "build": the version or commit the tests ran on.');
-  const tests = await ctx.read({ items: { type: 'software.test' } });
+  const tests = await ctx.read({ items: { type: 'test' } });
   const find = (key) => tests.find((t) => t.id === key) ?? tests.find((t) => t.props?.entrypoint === key);
   const today = ctx.now.slice(0, 10);
   const ops = [];
@@ -22,7 +22,7 @@ export async function testReport(input, ctx) {
       continue;
     }
     if (seen.has(test.id)) throw new Error(`test_report: "${r.test}" is reported twice for build ${build}.`);
-    const results = await ctx.read({ related: test.id, relation: 'produced', types: ['software.test_result'], fields: ['build'] });
+    const results = await ctx.read({ related: test.id, relation: 'produced', types: ['test_result'], fields: ['build'] });
     if (r.passed) passed++;
     else failed++;
     const before = results.find((k) => k.props?.build === build);
@@ -37,14 +37,14 @@ export async function testReport(input, ctx) {
     if (r.value !== undefined) props.value = r.value;
     if (r.evidence !== undefined) props.evidence = r.evidence;
     if (r.picture !== undefined) props.picture = r.picture;
-    ops.push({ op: 'create', ref: id, type: 'software.test_result', title: `${build}: ${test.title}`.slice(0, 60), props }, { op: 'link', type: 'produced', from: test.id, to: id });
+    ops.push({ op: 'create', ref: id, type: 'test_result', title: `${build}: ${test.title}`.slice(0, 60), props }, { op: 'link', type: 'produced', from: test.id, to: id });
   }
   if (!ops.length) return { answer: { build, recorded: 0, passed, failed, unknown } };
   // A public result shows its picture, and the picture is where the test ran: say which are owed.
   const sendPictures = [];
   for (const [test, kept] of seen) {
     if (!kept.picture) continue;
-    const questions = await ctx.read({ related: test, relation: 'software.answers', types: ['software.proof'], fields: [] });
+    const questions = await ctx.read({ related: test, relation: 'answers', types: ['proof'], fields: [] });
     if (questions.some((q) => q.visibility === 'public')) sendPictures.push({ result: kept.id, picture: kept.picture });
   }
   return {

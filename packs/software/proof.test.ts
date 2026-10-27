@@ -9,12 +9,12 @@ type Item = { id: string; type: string; title: string; status?: string; is_open?
 type Link = [string, string, string];
 
 const LINEAGE: Record<string, string[]> = {
-  'work.project': ['work.project', 'work'],
-  'software.feature': ['software.feature', 'work'],
-  'software.release': ['software.release', 'event', 'occurrence'],
-  'software.proof': ['software.proof', 'question'],
-  'software.test': ['software.test', 'work'],
-  'software.test_result': ['software.test_result', 'record'],
+  'project': ['project', 'work'],
+  'feature': ['feature', 'work'],
+  'release': ['release', 'event', 'occurrence'],
+  'proof': ['proof', 'question'],
+  'test': ['test', 'work'],
+  'test_result': ['test_result', 'record'],
 };
 
 function ctxOver(items: Item[], links: Link[], pictures: string[] = []) {
@@ -39,28 +39,28 @@ function ctxOver(items: Item[], links: Link[], pictures: string[] = []) {
 }
 
 const ITEMS: Item[] = [
-  { id: 'prod', type: 'work.project', title: 'Apex' },
-  { id: 'sun', type: 'software.feature', title: 'Sun study', status: 'shipped', updated_at: '2026-10-05T00:00:00Z' },
-  { id: 'shade', type: 'software.feature', title: 'Shade maps', status: 'built', updated_at: '2026-10-10T00:00:00Z' },
-  { id: 'later', type: 'software.feature', title: 'Wind', status: 'planned' },
-  { id: 'rel', type: 'software.release', title: 'First release', props: { version: '1.0.0' } },
-  { id: 'q', type: 'software.proof', title: 'Does the sun match NOAA?', visibility: 'public' },
-  { id: 'q2', type: 'software.proof', title: 'Are shadows right?' },
-  { id: 't1', type: 'software.test', title: 'Sun.MatchesNoaa', props: { entrypoint: 'Sun.MatchesNoaa' } },
-  { id: 't2', type: 'software.test', title: 'Sun.Equinox' },
-  { id: 'r1', type: 'software.test_result', title: '1.0.0: Sun.MatchesNoaa', props: { build: '1.0.0', passed: true, value: '0.004 deg', picture: '.proof/a.png' }, updated_at: '2026-10-12T00:00:00Z' },
-  { id: 'r2', type: 'software.test_result', title: '1.0.0: Sun.Equinox', props: { build: '1.0.0', passed: false }, updated_at: '2026-10-12T00:00:00Z' },
-  { id: 'r0', type: 'software.test_result', title: '0.9.0: Sun.MatchesNoaa', props: { build: '0.9.0', passed: false }, updated_at: '2026-10-01T00:00:00Z' },
+  { id: 'prod', type: 'project', title: 'Apex' },
+  { id: 'sun', type: 'feature', title: 'Sun study', status: 'shipped', updated_at: '2026-10-05T00:00:00Z' },
+  { id: 'shade', type: 'feature', title: 'Shade maps', status: 'built', updated_at: '2026-10-10T00:00:00Z' },
+  { id: 'later', type: 'feature', title: 'Wind', status: 'planned' },
+  { id: 'rel', type: 'release', title: 'First release', props: { version: '1.0.0' } },
+  { id: 'q', type: 'proof', title: 'Does the sun match NOAA?', visibility: 'public' },
+  { id: 'q2', type: 'proof', title: 'Are shadows right?' },
+  { id: 't1', type: 'test', title: 'Sun.MatchesNoaa', props: { entrypoint: 'Sun.MatchesNoaa' } },
+  { id: 't2', type: 'test', title: 'Sun.Equinox' },
+  { id: 'r1', type: 'test_result', title: '1.0.0: Sun.MatchesNoaa', props: { build: '1.0.0', passed: true, value: '0.004 deg', picture: '.proof/a.png' }, updated_at: '2026-10-12T00:00:00Z' },
+  { id: 'r2', type: 'test_result', title: '1.0.0: Sun.Equinox', props: { build: '1.0.0', passed: false }, updated_at: '2026-10-12T00:00:00Z' },
+  { id: 'r0', type: 'test_result', title: '0.9.0: Sun.MatchesNoaa', props: { build: '0.9.0', passed: false }, updated_at: '2026-10-01T00:00:00Z' },
 ];
 const LINKS: Link[] = [
   ['part_of', 'sun', 'prod'],
   ['part_of', 'shade', 'prod'],
   ['part_of', 'later', 'prod'],
-  ['software.ships', 'rel', 'sun'],
+  ['ships', 'rel', 'sun'],
   ['part_of', 'q', 'sun'],
   ['about', 'q2', 'shade'],
-  ['software.answers', 't1', 'q'],
-  ['software.answers', 't2', 'q'],
+  ['answers', 't1', 'q'],
+  ['answers', 't2', 'q'],
   ['produced', 't1', 'r1'],
   ['produced', 't1', 'r0'],
   ['produced', 't2', 'r2'],
@@ -80,7 +80,7 @@ test('a proof question is answered on a build when every test of it passed there
   const older = (await handler['software.proof']({ of: 'prod', build: '0.9.0' }, ctx)).answer;
   assert.deepEqual([older.counts.passed, older.counts.failed, older.counts.not_run], [0, 1, 1]);
   const listed = (await handler['software.proof']({}, ctx)).answer;
-  assert.deepEqual(listed.products, [{ id: 'prod', type: 'work.project', title: 'Apex', status: 'open', questions: 2 }]);
+  assert.deepEqual(listed.products, [{ id: 'prod', type: 'project', title: 'Apex', status: 'open', questions: 2 }]);
   await assert.rejects(handler['software.proof']({ of: 'nowhere' }, ctx), /No item "nowhere"/);
 });
 

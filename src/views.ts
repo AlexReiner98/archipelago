@@ -40,13 +40,13 @@ async function changedSince(l: Archipelago, input: { since?: string; limit?: num
 const STALE_MINUTES = 30;
 
 async function sessions(l: Archipelago) {
-  const runs = l.registry.family('sys.run');
+  const runs = l.registry.family('run');
   const homes = livesIn(l);
   const { rows: open } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null order by created_at desc`, [runs]);
   const { rows: links } = await l.db.query<{ run: string; type: string; id: string; title: string; entity_type: string }>(
     `select r.from_id as run, r.type, e.id, e.title, e.type as entity_type from relation r join entity e on e.id = r.to_id
      where r.from_id = any($1::text[]) and r.valid_to is null and r.type = any($2::text[])`,
-    [open.map((r) => r.id), ['sys.works_on', 'holds', ...homes]],
+    [open.map((r) => r.id), ['works_on', 'holds', ...homes]],
   );
   const { rows: ended } = await l.db.query(
     `select id, title, status, updated_at from entity where type = any($1::text[]) and not is_open and archived_at is null order by updated_at desc limit 10`,
@@ -66,7 +66,7 @@ async function sessions(l: Archipelago) {
         started: r.created_at,
         last_seen: seen,
         stale: Date.now() - Date.parse(seen) > STALE_MINUTES * 60_000,
-        working_on: of(r.id, 'sys.works_on'),
+        working_on: of(r.id, 'works_on'),
         holds: of(r.id, 'holds'),
         repo: of(r.id, ...homes)[0],
       };
@@ -84,7 +84,7 @@ async function notifications(l: Archipelago) {
      left join entity a on a.id = r.to_id
      where n.type = any($1::text[]) and n.is_open and n.archived_at is null
      order by n.created_at desc limit 100`,
-    [l.registry.family('sys.notification')],
+    [l.registry.family('notification')],
   );
   return rows;
 }

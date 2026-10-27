@@ -59,7 +59,7 @@ export interface Around {
 }
 
 /** One link a region is tied by beyond what it holds: the sessions at work on what is in it, now or before. */
-const WORKS_ON = 'sys.works_on';
+const WORKS_ON = 'works_on';
 
 const COLUMNS = (props: string) => `id, type, kind, title, status, is_open, owner, ${props}, created_at, updated_at`;
 /** What a lens reads of each link among some items (as r). */
@@ -77,7 +77,7 @@ export const KINDS_LIMIT = 2000;
 export async function scanKinds(l: Archipelago, known: { types: string[]; fold: string[]; by: string; over: string[] | null; time?: { from: string; to: string } }) {
   const keep = [known.fold.includes('closed') && 'is_open', known.fold.includes('system') && "(kind is null or kind <> 'system')"].filter(Boolean).join(' and ');
   // On a time axis a session falls where it ran: only those that ran in the window are read.
-  const runs = known.time ? known.types.filter((t) => l.registry.isA(t, 'sys.run')) : [];
+  const runs = known.time ? known.types.filter((t) => l.registry.isA(t, 'run')) : [];
   const params: unknown[] = [known.types.filter((t) => !runs.includes(t)), runs, ...(runs.length ? [known.time!.to, known.time!.from] : [])];
   const where = `(type = any($1::text[])${runs.length ? ' or (type = any($2::text[]) and created_at <= $3::timestamptz and updated_at >= $4::timestamptz)' : ' or type = any($2::text[])'}) and archived_at is null${keep ? ` and ${keep}` : ''}`;
   const { rows: entities } = await l.db.query<Row>(`select ${COLUMNS(l.props)} from entity where ${where} order by created_at desc, id limit ${KINDS_LIMIT + 1}`, params);

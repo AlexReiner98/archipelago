@@ -15,8 +15,8 @@ import { askView } from '../src/askview.ts';
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place', 'system'];
-const ROOTS = ['part_of', 'depends_on', 'defers', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'supersedes', 'relates_to'];
-const SYSTEM = ['lens', 'style', 'instruction', 'screen', 'sys.source', 'sys.run', 'sys.notification', 'sys.automation'];
+const ROOTS = ['part_of', 'depends_on', 'defers', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'supersedes', 'link', 'uses', 'produced'];
+const SYSTEM = ['lens', 'style', 'instruction', 'screen', 'type', 'link_type', 'source', 'run', 'notification', 'automation'];
 const human: Actor = { kind: 'human', name: 'test' };
 
 /** A copy of the shipped packs, with one more pack beside them when given. */
@@ -38,20 +38,20 @@ test('every shipped type extends one of the kinds, the system tier included', ()
     if (type.id === 'system' || SYSTEM.includes(type.id)) assert.ok(type.kind === 'system' && type.system, `${type.id} is of the system kind`);
     else assert.ok(type.kind !== 'system' && !type.system, `${type.id} is of the work`);
   }
-  assert.equal(reg.type('inquiry.experiment')!.kind, 'work');
-  assert.equal(reg.type('sys.connection')!.kind, 'place');
-  assert.equal(reg.type('time.invoice')!.kind, 'record');
-  assert.deepEqual(reg.ancestry('inquiry.experiment'), { root: 'work.task', kind: 'work' });
-  assert.deepEqual(reg.ancestry('sys.run'), { root: 'sys.run', kind: 'system' });
+  assert.equal(reg.type('experiment')!.kind, 'work');
+  assert.equal(reg.type('connection')!.kind, 'place');
+  assert.equal(reg.type('invoice')!.kind, 'record');
+  assert.deepEqual(reg.ancestry('experiment'), { root: 'task', kind: 'work' });
+  assert.deepEqual(reg.ancestry('run'), { root: 'run', kind: 'system' });
 });
 
 test('every relation extends one of the thirteen roots', () => {
   const reg = new Registry(packsWith());
   assert.deepEqual([...reg.relations.values()].filter((r) => r.root === r.id).map((r) => r.id).sort(), [...ROOTS].sort());
   for (const rel of reg.relations.values()) assert.ok(ROOTS.includes(rel.root), `${rel.id} reads as ${rel.root}`);
-  assert.equal(reg.relations.get('software.lives_in')!.root, 'lives_in');
-  assert.equal(reg.relations.get('inquiry.supports')!.root, 'bears_on');
-  assert.ok(reg.relationFamily('lives_in').includes('software.lives_in'));
+  assert.equal(reg.relations.get('lives_in')!.root, 'lives_in');
+  assert.equal(reg.relations.get('supports')!.root, 'bears_on');
+  assert.ok(reg.relationFamily('lives_in').includes('lives_in'));
 });
 
 test('a pack cannot leave a type without a kind, declare a kind, or stretch a root', () => {
@@ -65,7 +65,7 @@ test('a pack cannot leave a type without a kind, declare a kind, or stretch a ro
   assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel }]))), /must extend one of the root relations/);
   assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, root: true }]))), /only the core pack declares root/);
   // waits_on runs only to actors, so what extends it cannot run to a task.
-  assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, to: ['work.task'], extends: 'waits_on' }]))), /goes to work.task, which "waits_on" does not/);
+  assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, to: ['task'], extends: 'waits_on' }]))), /goes to task, which "waits_on" does not/);
 });
 
 test("a pack's relation extending depends_on blocks as depends_on does", async () => {
@@ -77,8 +77,8 @@ test("a pack's relation extending depends_on blocks as depends_on does", async (
   const made = await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'a', type: 'work.task', title: 'Pour the slab' },
-      { op: 'create', ref: 'b', type: 'work.task', title: 'Frame the walls' },
+      { op: 'create', ref: 'a', type: 'task', title: 'Pour the slab' },
+      { op: 'create', ref: 'b', type: 'task', title: 'Frame the walls' },
       { op: 'link', type: 'x.after', from: 'b', to: 'a' },
     ],
   });
@@ -117,16 +117,16 @@ test("the roots name kinds at their ends, so a pack's own actor can be waited on
   assert.deepEqual(ends('defers'), [['occurrence'], ['*']]);
   const core = new Set([...reg.types.keys()].filter((t) => reg.type(t)!.pack === 'core' && reg.type(t)!.kind !== t));
   for (const r of reg.relations.values()) if (r.root === r.id) for (const end of [...r.from, ...r.to]) assert.ok(!core.has(end), `${r.id} names the kind, not core's ${end}`);
-  assert.equal(reg.checkRelation('waits_on', 'work.task', 'x.crew'), undefined);
-  assert.equal(reg.checkRelation('needs', 'work.task', 'x.crane'), undefined);
-  assert.match(reg.checkRelation('waits_on', 'work.task', 'x.crane')!, /must point to actor/);
+  assert.equal(reg.checkRelation('waits_on', 'task', 'x.crew'), undefined);
+  assert.equal(reg.checkRelation('needs', 'task', 'x.crane'), undefined);
+  assert.match(reg.checkRelation('waits_on', 'task', 'x.crane')!, /must point to actor/);
   const l = new Archipelago(await openDb(), reg);
   const made = await l.change(human, {
     reason: 'test',
     ops: [
       { op: 'create', ref: 'crew', type: 'x.crew', title: 'Night crew' },
       { op: 'create', ref: 'crane', type: 'x.crane', title: 'Tower crane' },
-      { op: 'create', ref: 't', type: 'work.task', title: 'Lift the trusses' },
+      { op: 'create', ref: 't', type: 'task', title: 'Lift the trusses' },
       { op: 'link', type: 'waits_on', from: 't', to: 'crew', props: { for: 'Say when you can start' } },
       { op: 'link', type: 'needs', from: 't', to: 'crane' },
     ],
@@ -141,15 +141,15 @@ test('views of the work leave the system kind out by default', async () => {
   const made = await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'work.project', title: 'House' },
-      { op: 'create', ref: 't', type: 'work.task', title: 'Pour the slab' },
+      { op: 'create', ref: 'p', type: 'project', title: 'House' },
+      { op: 'create', ref: 't', type: 'task', title: 'Pour the slab' },
       { op: 'link', type: 'part_of', from: 't', to: 'p' },
       { op: 'create', ref: 'v', type: 'lens', title: 'Everything' },
     ],
   });
   const { p, t, v } = (made as { created: Record<string, string> }).created;
   // Of the whole map, a lens says the types it finds.
-  const types = ['work.task', 'lens'];
+  const types = ['task', 'lens'];
   const answer = (await ask(l, 'flat', { filter: { types, exclude: [] } })) as { items: { id: string }[] };
   assert.ok(answer.items.some((x) => x.id === v), 'asked to, a view shows the system kind');
   const folded = (await ask(l, 'flat', { filter: { types } })) as { items: { id: string }[] };

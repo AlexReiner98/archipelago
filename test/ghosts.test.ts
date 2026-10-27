@@ -14,9 +14,9 @@ test('held changes are drawn where they would land, and only there', () => {
     [
       { id: 'p_link', actor: 'robot', reason: 'a link', ops: [{ op: 'link', type: 'depends_on', from: 'e_aaaaaaaa', to: 'e_bbbbbbbb' }] },
       // A new item tied to what is drawn through another new item: both land, and both links.
-      { id: 'p_make', ops: [{ op: 'create', ref: 'x', type: 'work.task', title: 'X' }, { op: 'create', ref: 'y', type: 'work.task', title: 'Y' }, { op: 'link', type: 'part_of', from: 'x', to: 'y' }, { op: 'link', type: 'part_of', from: 'y', to: 'e_aaaaaaaa' }] },
+      { id: 'p_make', ops: [{ op: 'create', ref: 'x', type: 'task', title: 'X' }, { op: 'create', ref: 'y', type: 'task', title: 'Y' }, { op: 'link', type: 'part_of', from: 'x', to: 'y' }, { op: 'link', type: 'part_of', from: 'y', to: 'e_aaaaaaaa' }] },
       // Tied to nothing drawn: nothing.
-      { id: 'p_away', ops: [{ op: 'create', ref: 'z', type: 'work.task', title: 'Z' }, { op: 'link', type: 'part_of', from: 'z', to: 'e_zzzzzzzz' }] },
+      { id: 'p_away', ops: [{ op: 'create', ref: 'z', type: 'task', title: 'Z' }, { op: 'link', type: 'part_of', from: 'z', to: 'e_zzzzzzzz' }] },
       { id: 'p_edit', ops: [{ op: 'update', id: 'e_bbbbbbbb', title: 'B2' }, { op: 'update', id: 'e_zzzzzzzz', title: 'gone' }] },
     ],
     holds,

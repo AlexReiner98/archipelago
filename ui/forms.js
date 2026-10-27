@@ -120,7 +120,7 @@ export function newEntity(typeId) {
               draw();
             },
           },
-          state.schema.types.filter((t) => !t.dormant).map((t) => h('option', { value: t.id, selected: t.id === typeId }, typeChoice(t))),
+          state.schema.types.filter((t) => !t.dormant && (!t.retired || t.id === typeId)).map((t) => h('option', { value: t.id, selected: t.id === typeId }, typeChoice(t))),
         ),
       ),
       h('div', { class: 'grid' }, form),

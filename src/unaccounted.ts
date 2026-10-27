@@ -1,5 +1,5 @@
 // The commits in a checkout that no one has accounted for, put to the session that starts there (the owner, 26 Oct
-// 2026: every commit is accounted for before main). A commit is accounted for once the map holds a software.commit
+// 2026: every commit is accounted for before main). A commit is accounted for once the map holds a commit
 // item for its sha (packs/github/account.js, the check on main says the same). The checkout is the hook's to read
 // (scripts/pelago-hook.mjs sends its newest commits); the server only asks the map which of them it holds.
 
