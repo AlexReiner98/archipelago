@@ -159,6 +159,23 @@ figure img {
   border-radius: var(--radius-3);
   background: var(--reader-figure);
 }
+/* A front page that opens on a figure (ui/doc.js) runs it from edge to edge of the window, with no card round it:
+   its ground is the page's own. */
+body:has(section.lead) {
+  overflow-x: clip;
+}
+section.lead figure {
+  width: var(--reader-window);
+  margin-left: calc((100% - var(--reader-window)) / 2);
+}
+section.lead figure img {
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+section.lead + div.text {
+  border-top: none;
+}
 /* An invoice: its number, dates and what is due as a heading block; the rest reads as the bill, in a plain face. */
 body.invoice main {
   font-family: var(--face-text);

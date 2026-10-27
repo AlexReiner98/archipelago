@@ -144,13 +144,28 @@ test("a flat lens's answer is drawn: every item a step, part_of a tie, depends_o
   assert.ok(g.y.get('a') < g.y.get('b') && g.y.get('b') < g.y.get('c'), 'read from the top down');
 });
 
-test('many leaves of one, in no order, wrap in rows under it', () => {
+test('many leaves of one, in no order, wrap under it as an outline: each tie down its column and into a side', () => {
   const leaves = Array.from({ length: 14 }, (_, k) => item(`l${k}`));
   const g = run(leaves, []);
   checks(g);
   const rows = new Set(leaves.map((l) => g.y.get(l.id)));
-  assert.equal(rows.size, 3, 'fourteen in rows of six');
+  assert.ok(rows.size > 1, 'wrapped');
   assert.ok(Math.min(...rows) > g.y.get('r'), 'under what they are part of');
+  for (const l of leaves) {
+    const t = g.ties.find((t: any) => t.a === l.id), [[x1, y1], [x2, y2]] = t.points.slice(-2);
+    assert.ok(y1 === y2 && y2 === g.y.get(l.id) && x2 === g.x.get(l.id) - g.nodes.get(l.id).w / 2 && x1 < x2, `${l.id} is entered from its left side`);
+  }
+});
+
+test('leaves lean to the shape asked for: down a narrow pane, across a wide one', () => {
+  const leaves = Array.from({ length: 13 }, (_, k) => item(`l${k}`, 'question'));
+  const at = (aspect: number) => layout({ items: [{ ...item('r'), inside: null }, ...leaves], links: [], measure, sizes: house.sizes, aspect });
+  const [narrow, wide] = [at(0.5), at(2)];
+  checks(narrow);
+  checks(wide);
+  const rows = (g: any) => new Set(leaves.map((l) => g.y.get(l.id))).size;
+  assert.ok(rows(narrow) > rows(wide), `${rows(narrow)} rows in a narrow pane, ${rows(wide)} in a wide one`);
+  assert.ok(narrow.width < narrow.height && wide.width > wide.height, 'taller than wide in a narrow pane, wider than tall in a wide one');
 });
 
 test('what is tied to nothing is a step of its own, set apart from the rest', () => {

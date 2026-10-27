@@ -163,3 +163,14 @@ export function tieLine(a, b) {
   };
   return [edge(a, dx, dy), edge(b, -dx, -dy)];
 }
+
+/**
+ * A tie of an outline (./graph.js): down from the foot of what the leaf is part of (`a`) to halfway to the outline's
+ * top (`top`, the highest of its first row), across to the bus of the leaf's column (`bus` across from its left), down
+ * it, and into the leaf's (`b`) side. Every tie of a column runs along the same bus.
+ */
+export function outlineRoute(a, b, top, bus) {
+  const [foot, lane, line] = [a.y + a.h / 2, (a.y + a.h / 2 + top) / 2, b.x - b.w / 2 - bus];
+  const points = [[a.x, foot], [a.x, lane], [line, lane], [line, b.y], [b.x - b.w / 2, b.y]];
+  return points.filter((p, k) => !k || p[0] !== points[k - 1][0] || p[1] !== points[k - 1][1]);
+}

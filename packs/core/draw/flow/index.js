@@ -51,7 +51,7 @@ function outline(shape, x, y, w, hgt, rx) {
  * The graph: its steps, the wires and ties between them and what each choice is. `input` is what the page gives every
  * drawing (the answer, the style); `tools.measure(text, px, font, role)` is how wide a text is drawn, as one of the style's text roles when one is given.
  */
-export function picture({ answer, style, reduced }, tools) {
+export function picture({ answer, style, reduced, width, height }, tools) {
   // A story lays out what its steps bring in, all of it, each mark hidden until a step shows it.
   const story = Array.isArray(answer.steps) && answer.steps.length > 0;
   if (story) {
@@ -87,7 +87,16 @@ export function picture({ answer, style, reduced }, tools) {
   // Steps put where a person put them stay there, and the rest is laid out round them (./layout.js, ./free.js). The
   // link types the style draws no wire for (undrawn: core's house style, tagged) tie nothing here either.
   const placed = story ? {} : placesOf(answer, style);
-  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], placed, measure, sizes: style.sizes });
+  // The shape it is laid out toward: the pane's, as far as the style says to follow it (flow_aspect_follow, 0 not at
+  // all, 1 wholly, more to lean further), from the shape it takes when the pane's is not known (flow_aspect).
+  const [ASPECT, FOLLOW] = ['flow_aspect', 'flow_aspect_follow'].map((name) => {
+    const v = style.numbers?.[name];
+    if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+    return v;
+  });
+  const pane = width > 0 && height > 0 ? width / height : ASPECT;
+  const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
+  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], placed, measure, sizes: style.sizes, aspect });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const boxOf = (id) => ({ x: g.x.get(id), y: g.y.get(id), w: g.nodes.get(id).w, h: g.nodes.get(id).h });
@@ -280,7 +289,7 @@ export function picture({ answer, style, reduced }, tools) {
     return patches;
   };
   return {
-    scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined },
+    scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
     on(event) {
       const { name, key } = event;
