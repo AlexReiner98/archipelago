@@ -50,7 +50,7 @@ details.fold > summary .n { color: var(--muted); font-size: var(--text-2); }
 .page-head .delivers .deliverable .gist { overflow: hidden; text-overflow: ellipsis; }
 .page-head a.deliverable { text-decoration: none; }
 .page-head a.deliverable:hover { border-color: var(--accent); }
-.note > img.figure { display: block; margin: var(--space-8) var(--space-8) var(--space-3); max-width: calc(100% - var(--box-7)); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--figure); }
+.page-section > img.figure { display: block; margin: var(--space-8) var(--space-8) var(--space-3); max-width: calc(100% - var(--box-7)); height: auto; border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--figure); }
 .note.doc figure.doc-lens { margin: 0; }
 .note.doc .doc-lens .lens-card { border: var(--border-1) solid var(--line); border-radius: var(--radius-3); overflow: hidden; margin: var(--space-5) var(--space-8) 0; }
 .note.doc .doc-lens figcaption .body-text { color: var(--muted); font-size: var(--text-4); }
@@ -87,7 +87,7 @@ details.fold > summary .n { color: var(--muted); font-size: var(--text-2); }
 .tq-entry .tq-work-text { flex: 0 1 auto; max-width: 26%; margin-left: auto; }
 .tq-edit { width: 100%; }
 .tq-money .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.note.doc img.doc-figure { display: block; max-width: 100%; margin: var(--space-3) 0 var(--space-6); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--figure); }
+img.doc-figure { display: block; max-width: 100%; height: auto; margin: var(--space-3) 0 var(--space-6); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--figure); }
 #around svg.graph { height: var(--around-graph); }
 .card .empty, .card .error { padding: var(--space-8); color: var(--muted); }
 .card .error { color: var(--bad); }

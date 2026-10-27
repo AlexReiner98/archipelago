@@ -132,7 +132,9 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .note > .fields { padding: 0; margin: 0 0 var(--space-8); }
 #sheet .draft-read { cursor: text; }
 #sheet .draft-read .body-text, #sheet .note.doc .body-text { padding-left: 0; padding-right: 0; }
-#sheet .note.doc h3.doc-head, #sheet .note > img.figure { margin-left: 0; margin-right: 0; }
+#sheet .note.doc h3.doc-head, #sheet .page-section > img.figure { margin-left: 0; margin-right: 0; }
+/* An image never runs wider than the sheet: a wide one scales down with its proportions, a small one keeps its size. */
+#sheet img { max-width: 100%; height: auto; }
 #sheet .draft-body { display: block; width: 100%; min-height: var(--box-10); padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: var(--text-6); line-height: 1.6; resize: none; outline: none; overflow: hidden; }
 #sheet .draft-body::placeholder { color: var(--muted); }
 #sheet .draft-body[hidden] { display: none; }
