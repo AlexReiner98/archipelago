@@ -69,9 +69,10 @@ canvas as a flat graph", with its decisions.
   until it is tied; once a change ties it, the canvas goes to it.
 
 ### Panes
-- **More than one canvas at once,** side by side or popped out into a window
-  of its own, docked by dragging a pane's name as in a code editor
-  (`docs/canvas.md`, Panes). The bar and find act on the pane last touched,
+- **More than one canvas at once,** side by side in a tab, docked by dragging
+  a pane's name as in a code editor, and in tabs at the top, one for each
+  session at work, each popped out into a window of its own and back
+  (`docs/canvas.md`, Tabs and panes). The bar and find act on the pane last touched,
   and each pane has its own back and forward; the sheet opens over the main
   canvas. Where the panes stand is the reader's, in their browser.
 

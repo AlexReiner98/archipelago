@@ -15,7 +15,7 @@ import { readFlatLens } from './lens.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
-import { startPanes } from './panes.js';
+import { startTabs } from './pane-land.js';
 import { workspace } from './workspace.js';
 
 /** The pages the sheet holds, by the name in their address. */
@@ -54,7 +54,7 @@ async function route(pulse = false) {
   if (name === 'time') return void (location.hash = screenOfPage('time') ? `#/s/${screenOfPage('time').id}` : '#/workspace');
   drawFind();
   drawNav();
-  startPanes();
+  startTabs();
   const params = new URLSearchParams(query);
   // The canvas: the lens the address says (ui/query-bar.js shows it); an item's page with none keeps what is up when
   // it draws the item, and else opens on the item. An address from before the flat lens (?in=) opens on what it names.

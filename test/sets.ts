@@ -25,6 +25,7 @@ export const SLOW: Record<string, string> = {
   'test/published-frames.test.ts': 'browser',
   'test/saved-canvases.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',
+  'test/tabs.test.ts': 'browser',
   // A whole map moved, backed up, restored, migrated or pulled: databases opened, filled and replayed from the log,
   // 6 to 16 seconds of one process each. test:changed runs them for a change to what they import.
   'test/backup.test.ts': 'whole map',

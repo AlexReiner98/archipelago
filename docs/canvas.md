@@ -136,7 +136,8 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `pan-zoom.js` | the infinite plane |
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
 | `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
-| `panes.js`, `pane-drag.js` | more than one canvas at once: panes docked beside the main one, dragged, popped out and back |
+| `panes.js`, `pane-drag.js` | more than one canvas at once: panes docked beside the main one in a tab, dragged |
+| `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
 | `item.js` and the sheet's parts | the item's page (being settled) |
 | `fields.js` | a field's value by its kind, else by its shape; the choices a question settles by |
 | `text.js`, `body.js` | the one dialect a note is written in, and the note drawn from it, folded |
@@ -187,51 +188,62 @@ measure it reads at), shipped by the house style and a pack's presets.
 3. A held change comes back as a proposal, drawn as a ghost; a click on it
    asks Apply or Decline, and `decide` settles it.
 
-## Panes: more than one canvas at once
+## Tabs and panes: more than one canvas at once
 The main canvas is the one the address draws, and the sheet opens over it.
 Others can stand beside it, as a code editor's groups do: ◫ in the bar
 opens the canvas up in a pane beside it, a pane's name dragged onto a side of
-another docks it there (onto its middle swaps them, out of the window pops it
-out), the line between two shares the room, ⤢ makes a pane the main canvas,
-⧉ pops it into a window of its own and ⇲ there docks it back. Each pane is a
-lens and a style of its own, held in its own store and kept current from the
-log like the main one; its places are its canvas's. Every pane is live: the
-query bar and find act on the one last touched, and sit over it (decision
-e_h2pqjy2q). A click on a node in a docked pane adds it to that pane's filter
-and opens its page in the sheet over the main canvas. Each pane keeps its own
-back and forward (‹ › in the bar): a step for each lens it is given, none for
-typing or for a page opened over it (e_ssnyd3ex). The layout is the
-reader's, kept in this browser for each workspace like the canvas settings:
-never on the map, meaning nothing. On a page taller than wide a row is drawn
-as a column.
+another docks it there (onto its middle swaps them), the line between two
+shares the room, and ⤢ makes a pane the main canvas. Each pane is a lens and
+a style of its own, held in its own store and kept current from the log like
+the main one; its places are its canvas's. Every pane is live: the query bar
+and find act on the one last touched, and sit over it (decision e_h2pqjy2q).
+A click on a node in a docked pane adds it to that pane's filter and opens
+its page in the sheet over the main canvas. Each pane keeps its own back and
+forward (‹ › in the bar): a step for each lens it is given, none for typing
+or for a page opened over it (e_ssnyd3ex). On a page taller than wide a row
+is drawn as a column.
 
-Each pane follows everyone (the default), one session, or nobody: the reader
-picks it in the bar of the pane in focus, and a pane that follows someone says
-whom in its strip. Where an agent's step lands is `pane-route.js`, worked out
-from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
-- a session's show or change goes to the pane that follows it;
-- a show's `pane` may be a name of the session's own ("map", "tests"): a pane
-  by that name is opened beside the main one the first time, following the
-  session, and drawn in again each time it is named;
-- else it goes to a pane that follows everyone and no other session at work
-  (a step within ten minutes) holds: the one drawing it already, else the
-  main one; so one session alone works on the main canvas as before;
-- when those are all held by other sessions, it gets a pane of its own;
-- past four panes, or where no pane will take it, it is only offered (the line
-  at the foot, with Go there).
+A tab (`tab-bar.js`, `tabs.js`; decision e_mzer5m4t) is a whole canvas and
+the panes split beside it, which stay together in it. The tabs stand in the
+top bar, a session's named by the session in its hue; one tab alone shows no
+strip. There is no most: many shrink to their mark and first letters
+(e_q3amet26). ⊞ in the bar opens the canvas in a tab of its own; a press
+brings a tab into sight, a middle press closes it. A tab, not a pane, pops
+out into a window of its own (⧉ on the tab in sight, or the tab dragged out
+of the page) and ⇲ there docks it back whole (e_ezb7s3a7). The tabs are the
+reader's, kept in this browser for each workspace like the canvas settings:
+never on the map, meaning nothing.
+
+Each tab follows everyone (the default), one session, or nobody: the reader
+picks it in the bar. Where an agent's step lands is `pane-route.js`, worked
+out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
+- a session's show or change goes to the tab that follows it;
+- else to a tab that follows everyone and no other session at work (a step
+  within ten minutes) holds: the one it holds, the one drawing it, else the
+  one in sight; so one session alone works on the main canvas as before;
+- when those are all held by other sessions, it gets a tab of its own,
+  following it;
+- within the tab, a show's `pane` may be a name of the session's own ("map",
+  "tests"): a pane by that name is split beside the tab's canvas the first
+  time and drawn in again each time it is named; else it goes to the pane it
+  last landed in, the one drawing it, or the tab's canvas;
+- a tab comes into sight unless the reader is at work in the one in sight or
+  another session showed there in the last half minute: then it is drawn in
+  the background, its mark rings, and the line at the foot offers Open tab
+  (e_xjrpyysn);
 - a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
   in the last twenty seconds, text selected there, or words typed in the
   sheet and not saved; moving the pointer or turning a dial is not busy) is
-  never taken: a show bound for it opens in a window of its own, as does any
-  pane opened while the reader is busy in a docked one. Where the browser
-  holds back a window no press opened, the line offers Pop out. A step that
-  is not a show waits as the line.
-A side (`left`, `right`, `above`, `below`) puts the session's pane there,
-`main` is the main canvas and `alone` closes the others, if the main canvas
-follows everyone or that session. A session is its run: a step carries the run
-it names (show, tell, session_update), or the one its agent last named
-(`src/presence.ts`). Following is on until the reader turns it off. A
-popped-out window follows no agent: the main page does, for both.
+  never taken, and no pane is split into a tab the reader is at work in: a
+  show goes to a tab of its own in the background instead. A step that is not
+  a show moves no tab its session has not shown into while others are at
+  work, opens none and brings none into sight; otherwise it waits as the line.
+A side (`left`, `right`, `above`, `below`) puts the session's pane there in
+its tab, `main` is the tab's canvas and `alone` closes the others. A session
+is its run: a step carries the run it names (show, tell, session_update), or
+the one its agent last named (`src/presence.ts`). Following is on until the
+reader turns it off. A popped-out window follows no agent: the main page
+does, and draws a show for its tab in the window's canvas.
 
 ## What is not yet so
 - Find excludes only what the query bar's box excludes (closed, system, a
