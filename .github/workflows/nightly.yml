@@ -35,4 +35,4 @@ jobs:
 
       - run: npm run typecheck
 
-      - run: npm test
+      - run: npm run test:full # every file, the browser tests and the approvals table with them (test/sets.ts)

@@ -1,7 +1,5 @@
 // What the map's tests share: a fresh map in memory, the two actors, and quick ways to change and ask it.
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
@@ -15,11 +13,13 @@ import { KEPT_FIELDS } from '../src/operational.ts';
 export const human: Actor = { kind: 'human', name: 'test' };
 export const agent: Actor = { kind: 'agent', name: 'test' };
 
-/** A fresh in-memory map with its own copy of the packs, so tests can define types. */
+/** The packs as they are in the repository. Nothing writes there (a type a test defines is kept in its database), so
+ * the tests read them in place; a test that adds a pack makes its own copy. */
+export const PACKS = join(import.meta.dirname, '..', 'packs');
+
+/** A fresh in-memory map with the repository's packs. */
 export async function fresh() {
-  const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  const l = new Archipelago(await openDb(), new Registry(packs));
+  const l = new Archipelago(await openDb(), new Registry(PACKS));
   return (await syncTypes(l), l); // as a workspace is opened: the type table holds what the public rule reads
 }
 
