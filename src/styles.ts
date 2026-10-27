@@ -36,6 +36,8 @@ export interface StyleAsk {
   named?: unknown;
   /** The person the page is drawn for: their own style's colours lie over everything. */
   person?: string;
+  /** A chosen preset (a theme) tried on one screen: drawn as if the owner kept it, over every other chosen one, and nothing kept. */
+  try?: string;
 }
 
 /** The owner's versions of presets, open or retired: retired, the preset is not used. */
@@ -62,9 +64,10 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
   const layers: { weight: number; id: string; title: string; preset?: string; props: Record<string, unknown> }[] = [];
   for (const p of presets) {
     const mine = versions.find((v) => v.props.preset === p.id);
-    if ((mine && !mine.is_open) || (p.over === 'chosen' && !mine)) continue;
+    const tried = p.over === 'chosen' && p.id === ask.try;
+    if (!tried && ((mine && !mine.is_open) || (p.over === 'chosen' && !mine))) continue;
     const on = mine && listed(mine.props.on).length ? listed(mine.props.on) : (p.on ?? []);
-    const weight = !on.length ? (p.over === 'workspace' ? 1.5 : p.over === 'chosen' ? 0.5 : 0) : onIt(on) ? 2 : -1;
+    const weight = !on.length ? (p.over === 'workspace' ? 1.5 : tried ? 0.6 : p.over === 'chosen' ? 0.5 : 0) : onIt(on) ? 2 : -1;
     if (weight < 0) continue;
     layers.push({ weight, id: mine?.id ?? p.id, title: mine?.title || p.title, preset: p.id, props: mine ? over(p.props, fields(mine.props)) : p.props });
   }
@@ -107,7 +110,7 @@ export async function withStyles<T extends { styles: Preset[] }>(l: Archipelago,
  * map when one is named (`style`), and a style kept about a view kept on the map when it is drawn (`view`). What the item page, the pages that are not pictures and the canvas read; asked
  * with `have` (the drawings' hashes the page holds), with the drawing it names, as a lens answer's style is.
  */
-export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; view?: unknown; have?: unknown }, forPerson = true) {
+export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; view?: unknown; have?: unknown; try?: unknown }, forPerson = true) {
   const of = typeof input.of === 'string' ? input.of : undefined;
   const named = typeof input.style === 'string' ? input.style : undefined;
   const item = of === undefined ? undefined : (await l.db.query<{ id: string; type: string }>('select id, type from entity where id = $1', [of])).rows[0];
@@ -115,7 +118,8 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   const view = typeof input.view === 'string' ? input.view : undefined;
   // The person it is drawn for: the one signed in, or on a map nobody signs in to, its owner.
   const person = !forPerson ? undefined : l.viewer === undefined ? await l.setting<string>('me') : l.viewer || undefined;
-  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(named && { named }), ...(person && { person }) });
+  const tried = typeof input.try === 'string' ? input.try : undefined;
+  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
   // A view kept on the map draws in the shape it keeps, and lights what it says, over every style.
   const own = view === undefined ? undefined : ((await l.entity(view))?.props.style as Record<string, unknown> | undefined);
   for (const key of ['shape', 'lit']) if (typeof own?.[key] === 'string') read.style[key] = own[key];
