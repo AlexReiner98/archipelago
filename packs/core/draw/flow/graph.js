@@ -70,3 +70,24 @@ export function reduced(edges) {
   };
   return edges.filter((e) => !implied(e.a, e.b));
 }
+
+/**
+ * Many leaves of one (part of it, tied to nothing else, in no order) wrapped in rows under it: as many to a row as
+ * brings what it and they make nearest `aspect` times as wide as tall, so in a narrow pane they stack down it and in
+ * a wide one they spread across. What else is in their first layer takes its room in the first row. `near` is each
+ * step's ties ({ id, rel }), `asap` each step's layer, changed here; `wide` and `tall` a step's room across and down.
+ */
+export function wrapLeaves({ ids, near, asap, flows, wide, tall, aspect }) {
+  const leafy = new Set(ids.filter((id) => !flows(id) && (near.get(id) ?? []).length === 1 && near.get(id)[0].rel === 'parent'));
+  for (const id of ids) {
+    const leaves = (near.get(id) ?? []).filter((t) => t.rel === 'child' && leafy.has(t.id) && asap.get(t.id) === asap.get(id) + 1).map((t) => t.id);
+    if (leaves.length < 2) continue;
+    const layer = asap.get(id) + 1, each = leaves.reduce((s, l) => s + wide(l), 0) / leaves.length, row = highest(leaves.map(tall));
+    const taken = Math.round(ids.filter((o) => asap.get(o) === layer && !leafy.has(o)).reduce((s, o) => s + wide(o), 0) / each);
+    const slots = leaves.length + taken;
+    const off = (c) => Math.abs(Math.log((c * each) / ((1 + Math.ceil(slots / c)) * row) / aspect));
+    let across = 1;
+    for (let c = 2; c <= slots; c++) if (off(c) < off(across)) across = c;
+    leaves.forEach((l, k) => asap.set(l, layer + Math.floor((k + taken) / across)));
+  }
+}

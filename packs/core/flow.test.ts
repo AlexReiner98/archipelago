@@ -153,6 +153,17 @@ test('many leaves of one, in no order, wrap in rows under it', () => {
   assert.ok(Math.min(...rows) > g.y.get('r'), 'under what they are part of');
 });
 
+test('leaves lean to the shape asked for: down a narrow pane, across a wide one', () => {
+  const leaves = Array.from({ length: 13 }, (_, k) => item(`l${k}`, 'question'));
+  const at = (aspect: number) => layout({ items: [{ ...item('r'), inside: null }, ...leaves], links: [], measure, sizes: house.sizes, aspect });
+  const [narrow, wide] = [at(0.5), at(2)];
+  checks(narrow);
+  checks(wide);
+  const rows = (g: any) => new Set(leaves.map((l) => g.y.get(l.id))).size;
+  assert.ok(rows(narrow) > rows(wide), `${rows(narrow)} rows in a narrow pane, ${rows(wide)} in a wide one`);
+  assert.ok(narrow.width < narrow.height && wide.width > wide.height, 'taller than wide in a narrow pane, wider than tall in a wide one');
+});
+
 test('what is tied to nothing is a step of its own, set apart from the rest', () => {
   const top = (id: string, extra: Record<string, unknown> = {}) => ({ ...item(id), inside: null, ...extra });
   const g = layout({ items: [top('a'), top('b'), top('c'), top('p', { kind: 'actor' })], links: [dep('b', 'a'), { kind: 'waits_on', from: 'b', to: 'p' }], measure, sizes: house.sizes });

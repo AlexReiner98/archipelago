@@ -11,22 +11,21 @@
 // geometry out; `measure(text, px)` gives a title's width at a size.
 
 import { drawnPaths, field, route, take, tieRoute } from './free.js';
-import { acyclic, flatten, grouped, highest, lowest, NEAR, ORDER, QUIET, reduced } from './graph.js';
+import { acyclic, flatten, grouped, highest, lowest, NEAR, ORDER, QUIET, reduced, wrapLeaves } from './graph.js';
 
 /** Past this many steps in a cluster the layer search and the sifting are skipped: they grow with the square of the steps. */
 export const LARGE = 60;
-/** More than this many steps part of one, tied to nothing else and in no order, are wrapped in rows under it. */
-export const ACROSS = 6;
-/** The shape a large picture is wrapped toward, as wide as tall times this: about a page's. */
+/** The shape a picture is wrapped toward when none is asked for, as wide as tall times this: about a page's. */
 export const ASPECT = 1.6;
 
 /**
  * The steps (each with its place x, y and size w, h), the wires of the order (`chains`, each with its points), the
  * ties (each with its two points), the breaks and the whole size. Every length and count it lays out by is the
  * style's (`sizes` and `numbers`, flow_*): the house style in packs/core/pack.json names each, and a nearer style may
- * change any. `placed` is where steps were put by hand, their middles by item.
+ * change any. `placed` is where steps were put by hand, their middles by item. `aspect` is the shape to wrap toward,
+ * as wide as tall times it: the drawing gives the pane's, so a narrow pane is filled down and a wide one across.
  */
-export function layout({ items: given, links: told = [], undrawn = [], placed = {}, measure, sizes }) {
+export function layout({ items: given, links: told = [], undrawn = [], placed = {}, measure, sizes, aspect = ASPECT }) {
   const need = (set, name) => {
     if (typeof set?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every one the flow lays out by`);
     return set[name];
@@ -121,18 +120,15 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
     };
     spread([...asap.keys()]);
     for (const id of ids) if (!asap.has(id)) (asap.set(id, 0), spread([id]));
-    // Many leaves of one (part of it, tied to nothing else) wrap in rows under it.
-    for (const id of ids) {
-      const leaves = (near.get(id) ?? []).filter((t) => t.rel === 'child' && !flows(t.id) && near.get(t.id).length === 1 && asap.get(t.id) === asap.get(id) + 1);
-      if (leaves.length > ACROSS) leaves.forEach((t, k) => asap.set(t.id, asap.get(id) + 1 + Math.floor(k / ACROSS)));
-    }
+    const wide = (id) => nodes.get(id).w + NODE_GAP;
+    // Many leaves of one (part of it, tied to nothing else) wrap in rows under it, to the shape asked for (./graph.js).
+    wrapLeaves({ ids, near, asap, flows, wide, tall: (id) => nodes.get(id).h + LAYER_GAP, aspect });
     // In a large cluster, a layer wider than the picture should be wraps into rows, each a layer of its own, and pushes
-    // what is under it down: the order still reads from the top down, and a large map comes out about the page's
-    // shape, not one band. The width is the one that makes the whole about ASPECT times as wide as tall; what is part
+    // what is under it down: the order still reads from the top down, and a large map comes out about the shape asked
+    // for, not one band. The width is the one that makes the whole about `aspect` times as wide as tall; what is part
     // of one thing stays together in a row. Only steps in no order wrap: a step of the order keeps its layer, so the
     // order's wires gain no waypoints from the rows.
-    const wide = (id) => nodes.get(id).w + NODE_GAP;
-    const across = Math.max(highest(ids.map(wide)), Math.sqrt(ASPECT * (BOX_H + LAYER_GAP) * ids.reduce((s, id) => s + wide(id), 0)));
+    const across = Math.max(highest(ids.map(wide)), Math.sqrt(aspect * (BOX_H + LAYER_GAP) * ids.reduce((s, id) => s + wide(id), 0)));
     const byLayer = grouped(ids, (id) => asap.get(id));
     const parentOf = (id) => (near.get(id) ?? []).find((t) => t.rel === 'parent')?.id ?? '';
     let added = 0;
@@ -468,9 +464,9 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
     boxes.push({ l, t, r: l + c.width, b: t + c.height });
     return false;
   });
-  // The rest in rows, as wide as the widest of it or of what is placed, and about as wide as tall.
+  // The rest in rows, as wide as the widest of it or of what is placed, and about the shape asked for.
   const area = lone.reduce((s, c) => s + (c.width + GAP) * (c.height + GAP), 0);
-  const most = highest([...lone.map((c) => c.width), ...boxes.map((b) => b.r - MARGIN), Math.sqrt(area) * ASPECT]);
+  const most = highest([...lone.map((c) => c.width), ...boxes.map((b) => b.r - MARGIN), Math.sqrt(area * aspect)]);
   const shelf = { x: MARGIN, y: boxes.length ? highest(boxes.map((b) => b.b)) + LAYER_GAP : MARGIN, row: 0 };
   for (const c of lone) {
     if (shelf.x > MARGIN && shelf.x + c.width > MARGIN + most) Object.assign(shelf, { x: MARGIN, y: shelf.y + shelf.row + GAP, row: 0 });
