@@ -219,6 +219,13 @@ from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
 - when those are all held by other sessions, it gets a pane of its own;
 - past four panes, or where no pane will take it, it is only offered (the line
   at the foot, with Go there).
+- a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
+  in the last twenty seconds, text selected there, or words typed in the
+  sheet and not saved; moving the pointer or turning a dial is not busy) is
+  never taken: a show bound for it opens in a window of its own, as does any
+  pane opened while the reader is busy in a docked one. Where the browser
+  holds back a window no press opened, the line offers Pop out. A step that
+  is not a show waits as the line.
 A side (`left`, `right`, `above`, `below`) puts the session's pane there,
 `main` is the main canvas and `alone` closes the others, if the main canvas
 follows everyone or that session. A session is its run: a step carries the run

@@ -64,3 +64,19 @@ test('a change moves no pane its session has not shown into while others are at 
   // Alone at work, its change goes where a show would.
   assert.deepEqual(route(change, [main()], at), { pane: 'main' });
 });
+
+test('a pane the reader is busy in is passed by: a show opens a window of its own, a change is offered', () => {
+  const busyMain = [main({ busy: true })];
+  assert.deepEqual(route(step('e_aaaaaaaa'), busyMain, at), { open: { follows: 'e_aaaaaaaa', side: 'right', popped: true } });
+  assert.deepEqual(route({ ...step('e_aaaaaaaa'), kind: 'change' }, busyMain, at), { offer: true });
+  // A pane opened while the reader is busy in another is popped out, not docked to squeeze theirs.
+  const reading = [main({ busy: true, landed: { session: 'e_x', at: now } })];
+  assert.deepEqual(route(step('e_aaaaaaaa', 'review'), reading, at), { open: { follows: 'e_aaaaaaaa', slot: 'review', side: 'right', popped: true } });
+  // A session's own pane, popped out and not busy, is drawn in again.
+  const out = [main({ busy: true }), { id: 'w1', follows: 'e_aaaaaaaa', popped: true }];
+  assert.deepEqual(route(step('e_aaaaaaaa'), out, at), { pane: 'w1' });
+  // A busy pane elsewhere does not stop a show into a pane that is free.
+  assert.deepEqual(route(step('e_aaaaaaaa'), [main({ busy: true }), { id: 'p1', follows: 'e_aaaaaaaa' }], at), { pane: 'p1' });
+  // What only the main pane draws waits while the reader is in it.
+  assert.deepEqual(route(step('e_aaaaaaaa'), busyMain, { ...at, drawable: false }), { offer: true });
+});
