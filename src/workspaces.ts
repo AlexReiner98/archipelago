@@ -19,6 +19,28 @@ import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
 import { followPacks, packsOff, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
+import { onTypesChanged, typeItems } from './type-items.ts';
+
+// The type table follows the types kept on the map as it follows the packs.
+onTypesChanged(syncTypes);
+
+/** The type items each open workspace's registry last took, to follow another server's change to them. */
+const taken = new WeakMap<Archipelago, string>();
+
+/** Take in the types and link types kept on the map, when they changed: ones that no longer load (a pack gone) are said, and left out. */
+async function takeTypeItems(pelago: Archipelago): Promise<boolean> {
+  const items = await typeItems(pelago);
+  const now = JSON.stringify(items);
+  if (taken.get(pelago) === now) return false;
+  taken.set(pelago, now);
+  try {
+    pelago.registry.takeItems(items);
+  } catch (err) {
+    console.error(`the types kept on the map in ${pelago.workspace} do not load: ${(err as Error).message}`);
+    return false;
+  }
+  return true;
+}
 
 export const DEFAULT_WORKSPACE = 'default';
 /** How soon a pack switched on another server is followed here. */
@@ -109,6 +131,7 @@ export class Workspaces {
       if (!ws) continue;
       try {
         if (ws.pelago.registry.followLocal(await localTypes<TypeDef>(ws.pelago.db))) await syncTypes(ws.pelago);
+        if (await takeTypeItems(ws.pelago)) await syncTypes(ws.pelago);
         await followPacks(ws.pelago);
       } catch (err) {
         console.error(`following ${id} failed: ${(err as Error).message}`);
@@ -216,6 +239,7 @@ export class Workspaces {
       const pelago = new Archipelago(db, registry, policy, id);
       // The packs the owner turned off here stay off; what they made is dormant.
       pelago.registry.turnOff(await packsOff(pelago));
+      await takeTypeItems(pelago);
       await syncTypes(pelago);
       await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };

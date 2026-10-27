@@ -12,6 +12,7 @@ import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { isServerPack, parts, readManifest, withoutAbsent, type Manifest } from './manifest.ts';
 import { createHash } from 'node:crypto';
+import { ownPack, withVersions, type TypeItem } from './type-overlay.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
 
@@ -52,7 +53,7 @@ export interface TypeDef {
   capabilities?: Capabilities;
   /** How long its note may grow by an agent's hand, and what to tell one that goes over: a note every session reads whole is kept short. A flavour inherits it. */
   note_max?: NoteMax;
-  moved_from?: string[]; // Types whose items are this one's now, moved once no pack defines them (cost became money.cost).
+  moved_from?: string[]; retired?: boolean; // Types whose items are this one's now, moved once no pack defines them (cost became money.cost); retired: the owner's version is (src/type-overlay.ts).
 }
 
 export type NoteMax = { chars: number; say?: string };
@@ -68,7 +69,7 @@ export interface RelationDef {
   inverse: string;
   from: string[];
   to: string[];
-  description: string; moved_from?: string[]; // Relations whose links are this one's now, moved once no pack defines them.
+  description: string; moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
 }
 
 /** A pack file as the registry reads it: the manifest (src/manifest.ts). */
@@ -95,7 +96,7 @@ export interface ResolvedType {
   belongs_with?: BelongsWith[];
   capabilities: Capabilities;
   noteMax?: NoteMax; movedFrom?: string[];
-  /** Kept from the type table: its pack is gone, its items are not. */ dormant?: boolean;
+  /** Kept from the type table: its pack is gone, its items are not. */ dormant?: boolean; /** No new item is made of it: the owner retired it. */ retired?: boolean;
 }
 
 /** A relation as loaded: `root` names the root it extends (itself, for a root). */
@@ -108,7 +109,7 @@ export class Registry {
   readonly dir: string;
   readonly only: string[] | undefined;
   /** The types this workspace defined for itself (define_type), in order: its database keeps them (src/control.ts). */
-  private local: TypeDef[];
+  private local: TypeDef[]; /** The types and link types kept on the map (src/type-items.ts). */ private items: TypeItem[] = [];
   /** Where a type defined here is kept once the registry has taken it: the workspace's database. None keeps it in memory. */
   keepLocal: (def: TypeDef) => Promise<void> = async () => {};
   packs: PackFile[] = [];
@@ -161,14 +162,14 @@ export class Registry {
     }
     for (const w of warnings) if (!this.warned.has(w)) (this.warned.add(w), console.warn(w));
     if (!found.has('core')) throw new Error(`No core pack in ${this.dir}`);
-    if (this.local.length) found.set(LOCAL_PACK, this.localPack()!);
+    const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
     // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses).
-    const ordered = loaded.map((pack) => withoutAbsent(pack, (id) => states.get(id)?.state === 'active'));
+    const ordered = withVersions(loaded.map((pack) => withoutAbsent(pack, (id) => states.get(id)?.state === 'active')), this.items);
 
     const raw = new Map<string, TypeDef & { pack: string }>();
     const relations = new Map<string, ResolvedRelation>();
@@ -230,7 +231,7 @@ export class Registry {
         ...((def.belongs_with ?? parent?.belongs_with)?.length && { belongs_with: def.belongs_with ?? parent?.belongs_with }),
         capabilities: { ...parent?.capabilities, ...def.capabilities },
         ...((def.note_max ?? parent?.noteMax) && { noteMax: def.note_max ?? parent?.noteMax }),
-        ...(def.moved_from?.length && { movedFrom: def.moved_from }),
+        ...(def.moved_from?.length && { movedFrom: def.moved_from }), ...(def.retired && { retired: true }),
       };
       types.set(id, resolved);
       return resolved;
@@ -320,9 +321,7 @@ export class Registry {
     for (const r of kept.relations) if (!this.relations.has(r.id)) this.relations.set(r.id, { ...r, dormant: true });
   }
 
-  type(id: string): ResolvedType | undefined {
-    return this.types.get(id);
-  }
+  type(id: string): ResolvedType | undefined { return this.types.get(id); }
 
   /** Turn packs off in this workspace (the rest on), and load again if that changed anything. The kernel's packs stay on. Says what was newly turned off, or undefined when nothing changed. */
   turnOff(packs: string[]): string[] | undefined {
@@ -420,6 +419,7 @@ export class Registry {
     const rel = this.relations.get(relId);
     const taken = [...this.relations.values()].filter((r) => !r.dormant && r.moved_from?.includes(relId)).map((r) => `: it is ${r.id} now`).join('');
     if (!rel || (rel.dormant && taken)) return `unknown relation "${relId}"${taken}. Known relations: ${[...this.relations.keys()].join(', ')}`;
+    if (rel.retired) return `"${relId}" is retired here: no new link is made of it`;
     const fits = (allowed: string[], type: string) => allowed.some((a) => a === '*' || this.isA(type, a));
     if (!fits(rel.from, fromType)) return `"${relId}" must start from ${rel.from.join(' or ')}, not ${fromType}`;
     if (!fits(rel.to, toType)) return `"${relId}" must point to ${rel.to.join(' or ')}, not ${toType}`;
@@ -456,6 +456,10 @@ export class Registry {
     await this.keepLocal(def);
   }
 
+  /** Take in the types and link types kept on the map; one that does not load leaves the registry as it was, and says why. */
+  takeItems(items: TypeItem[]): void { const was = this.items; this.items = items; try { this.reload(); } catch (err) { this.items = was; this.reload(); throw err; } }
+  /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against. */
+  trial(items: TypeItem[]): Registry { const r = new Registry(this.dir, this.only, this.local); r.turnedOff = this.turnedOff; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));
@@ -484,7 +488,7 @@ export class Registry {
         ...(t.public && { public: true }),
         ...(t.belongs_with && { belongs_with: t.belongs_with }),
         ...(Object.keys(t.capabilities).length && { capabilities: t.capabilities }),
-        ...(t.dormant && { dormant: true }),
+        ...(t.dormant && { dormant: true }), ...(t.retired && { retired: true }),
       })),
       relations: [...this.relations.values()],
       trees: [...this.trees.values()],

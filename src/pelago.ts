@@ -7,7 +7,7 @@ import { mayWrite } from './within.ts'; import { stillWritable } from './ended.t
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { mergeRefusals, once, overtaken } from './merge.ts';
 import { readEvents, type EventQuery } from './eventlog.ts';
-import type { Registry, TypeDef } from './packs.ts';
+import type { Registry, TypeDef } from './packs.ts'; import { typesAfter, typesApplied } from './type-items.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
 import { search, type SearchInput } from './search.ts';
@@ -301,7 +301,7 @@ export class Archipelago {
     const errors: string[] = [], warnings: string[] = [];
     const refs = new Map<string, string>(); // ref -> type
     const seen = new Set<string>(), dropped = new Set<string>(); // dropped: what this change has merged away so far
-    const reg = this.registry;
+    const reg = await typesAfter(this, ops); // a type made in this change can be used in it (src/type-items.ts)
 
     const typeOf = async (key: string, where: string): Promise<string | undefined> => {
       const local = refs.get(key);
@@ -329,7 +329,7 @@ export class Archipelago {
           errors.push(...reg.check(op.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
           if (op.owner) await checkOwner(op.owner, where);
           const type = reg.type(op.type);
-          if (!type) break;
+          if (!type) break; if (type.retired) errors.push(`${where}: ${op.type} is retired here: no new item is made of it`);
           if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
           errors.push(...[...checkWritten(reg, op.type, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
           if (op.ref) {
@@ -415,7 +415,7 @@ export class Archipelago {
     const { warnings } = await this.plan(ops);
     const changeset = newId('c');
     const created: Record<string, string> = {};
-    const reg = this.registry;
+    const reg = await typesAfter(this, ops);
     // Each id it makes is named by what makes it, so that a held change approved with nothing moved makes the same ones.
     const ids: Record<string, string> = {};
     const mint = (key: string, prefix: string) => (ids[key] = opts.ids?.[key] ?? newId(prefix));
@@ -533,7 +533,7 @@ export class Archipelago {
     }).catch((err) => { if (err !== DRY) throw err; });
     if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
-    for (const op of ops) if (op.op === 'define_type') await this.registry.defineLocal(op.type);
+    await typesApplied(this, ops, reg);
     await supersede(this, changeset);
     return { status: 'applied' as const, changeset, created, warnings };
   }

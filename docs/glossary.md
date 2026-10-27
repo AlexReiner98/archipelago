@@ -50,9 +50,13 @@ in its row (`entity.kind`), read without walking the type's ancestry. A kind
 is never a fact in the log: it is read from the type.
 
 **type.** What an item is within its kind (`work.task`, `software.repo`),
-with its statuses and fields. Declared in a pack file's `types`, or by a
-workspace with `define_type`. In the code: `TypeDef` in `src/packs.ts`.
-A flavour is a type that extends another.
+with its statuses and fields. A pack ships its types as presets; a type is
+also an item on the map, of core's `type` (a link type, of `link_type`):
+one with a preset's id is the owner's version of it (its title, note and
+added fields over the preset's; retired, no new item is made of it), one
+with a name and no preset is the workspace's own, `local.<name>`. In the
+code: `TypeDef` in `src/packs.ts`, the items laid over the packs in
+`src/type-overlay.ts`. A flavour is a type that extends another.
 
 **field.** A named value an item holds, declared by its kind or type: a due
 date, an outcome, a url. Every field written is checked against its

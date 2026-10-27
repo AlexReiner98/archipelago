@@ -255,6 +255,35 @@
       }
     },
     {
+      "id": "type",
+      "extends": "system",
+      "title": "Type",
+      "description": "A type of item, kept on the map: as a style is how things look, a type is what an item is. A pack ships its types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's, its fields added to the preset's; retired, no new item is made of it, and those there are stay. One with a name and no preset is a type of this workspace's own, named local.<name>, extending a kind or a type of one.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "preset": { "type": "string", "description": "The id of the pack's type this is the owner's version of, e.g. work.task." },
+        "name": { "type": "string", "description": "A type of this workspace's own: its id, local.<name>." },
+        "extends": { "type": "string", "description": "A type of this workspace's own: the kind or type it is a flavour of, whose fields and statuses it takes." },
+        "fields": { "type": "json", "description": "Fields added, by name, each as a type declares one, e.g. {\"rate\": {\"type\": \"number\"}}." },
+        "statuses": { "type": "json", "description": "A type of this workspace's own: its statuses, {\"open\": [...], \"closed\": [...]}, when not its parent's." }
+      }
+    },
+    {
+      "id": "link_type",
+      "extends": "system",
+      "title": "Link type",
+      "description": "A type of link, kept on the map. A pack ships its link types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's; retired, no new link is made of it, and those there are stay. One with a name and no preset is a link type of this workspace's own, named local.<name>, a flavour of a link type it extends.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "preset": { "type": "string", "description": "The id of the pack's link type this is the owner's version of, e.g. depends_on." },
+        "name": { "type": "string", "description": "A link type of this workspace's own: its id, local.<name>." },
+        "extends": { "type": "string", "description": "A link type of this workspace's own: the link type it is a flavour of." },
+        "inverse": { "type": "string", "description": "A link type of this workspace's own: how it reads from the other end." },
+        "from": { "type": "json", "description": "A link type of this workspace's own: the types it may start from, as a list; any (*) unless said." },
+        "to": { "type": "json", "description": "A link type of this workspace's own: the types it may point to, as a list; any (*) unless said." }
+      }
+    },
+    {
       "id": "screen",
       "extends": "system",
       "title": "Screen",

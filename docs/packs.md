@@ -42,6 +42,18 @@ warning, until the release after 0.1.0, and then refused.
 | `tier` | goes: `reach.server` makes a server pack |
 | `contract` | goes: nothing read it |
 
+## On the map
+
+A pack's types and link types are presets, as its styles and instructions
+are. The owner keeps their version of one as an item of core's `type` or
+`link_type` with the preset's id in `preset`: its title and note over the
+preset's, its `fields` added to the preset's, and retired, no new item or
+link is made of it while those there stay. One with a `name` and no preset
+is the workspace's own, in the `local` pack. The registry lays the items
+over the manifests before it reads them (`src/type-overlay.ts`), and a
+change that makes or changes one is checked against the registry as it
+will be, so a type made in a change can be used in it (`src/type-items.ts`).
+
 ## In space
 
 A pack's **reach** is the types, link types and fields of the pack itself,
