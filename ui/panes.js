@@ -16,7 +16,7 @@ import { busy, windowOf, windows } from './pane-busy.js';
 import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf, route, sessionOf } from './pane-route.js';
 import { unfollow } from './replica.js';
-import { titles } from './words.js';
+import { sessionHue, titles } from './words.js';
 
 /** A window popped out of the main one draws one pane as its main canvas, and docks it back from its bar. */
 const popped = window.name.startsWith('pelago-pane:') ? window.name.slice('pelago-pane:'.length) : null;
@@ -170,11 +170,11 @@ function frameActive() {
   const canvas = /canvas=(e_[a-z0-9]{8})/.exec(canvasHref())?.[1];
   mainName.textContent = (canvas && titles.get(canvas)) || 'Canvas';
   const whose = followsWord(layout.main);
-  if (whose) mainName.append(h('span', { class: 'pane-follows' }, whose));
+  if (whose) mainName.append(marked(h('span', { class: 'pane-follows' }, whose), layout.main));
   for (const [g, e] of drawn) {
     const p = layout.panes[g];
     e.mark.textContent = [followsWord(p), p?.slot].filter(Boolean).join(' · ');
-    e.mark.hidden = !e.mark.textContent;
+    e.mark.hidden = !marked(e.mark, p).textContent;
   }
 }
 const mainName = document.body.appendChild(h('div', { id: 'main-name', hidden: true, title: 'The main canvas: press to work in it' }));
@@ -274,6 +274,11 @@ function draw() {
 function followsWord(p) {
   if (!p?.follows || p.follows === 'all') return null;
   return p.follows === 'none' ? 'Follows nobody' : heard.has(p.follows) ? nameOf(p.follows) : (p.named ?? nameOf(p.follows));
+}
+/** A strip that names the session its pane follows is marked in that session's hue, as the session is everywhere. */
+function marked(el, p) {
+  const hue = p?.follows && !['all', 'none'].includes(p.follows) ? sessionHue(heard.get(p.follows)?.name ?? p.named) : undefined;
+  return el.classList.toggle('who-session', Boolean(hue)), el.style.setProperty('--session-hue', hue ?? ''), el;
 }
 /** The reader picks whom pane `id` follows; a session it held lets go of it. */
 function setFollows(id, follows) {

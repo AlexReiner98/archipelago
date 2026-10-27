@@ -2,7 +2,7 @@ import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
 import { hear, nameOf, sessionOf } from './pane-route.js';
-import { types } from './words.js';
+import { sessionWho, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
@@ -146,7 +146,7 @@ export function follow(steps = []) {
   followed.replaceChildren(
     ...[
       // One line: who, and the first few words of why. The whole reason is on the page it brought you to.
-      h('strong', {}, to.actor.split('/').at(-1)),
+      to.name ? sessionWho(to.name, to.actor) : h('strong', {}, to.actor.split('/').at(-1)),
       h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : offered ? 'is working somewhere else' : 'brought you here'),
       ...[...toPop].map(([key, o]) => h('button', { title: `Open what ${nameOf(key)} showed in a window of its own, beside what you are doing`, onclick: popOne(key, o) }, toPop.size > 1 ? `Pop out ${nameOf(key)}` : 'Pop out')),
       offered && !popOut && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),

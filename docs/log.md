@@ -69,6 +69,7 @@ the key vault and the **transient** table of short-lived values.
 | `source` | string \| null | The source item (`source`) the facts came from. The source item's own facts are in this same entry when it is new. A fact with a different source says so itself. |
 | `pack` | object \| null | The pack whose code made it, when a pack's action or handler did: `{ "id": "time", "manifest": "<hash>", "action": "log" }` or `{ …, "handler": "on_push" }` (section 8). Replaces today's `ChangeInput.action` string. |
 | `undoes` | string \| null | The change set this one reverses, for an undo. |
+| `run` | string | The session the change was made in (its run's id), when the agent said it (`change` with `run`). Where it came from, never on whose authority; kept through approval. Absent from entries made before 27 Oct 2026 and from changes no session named: no upcaster, absence is the old meaning. |
 | `facts` | array | The facts, in the order they apply. May be empty only for a decision entry (a rejected or superseded proposal, section 3) or a segment seal (section 4). |
 | `keys` | array | The items whose keys this entry's sealed values use, sorted: lets a reader fetch every key it needs in one vault read. |
 | `prev` | string | Hex SHA-256 of the previous entry in this stream; 64 zeros for position 1. |

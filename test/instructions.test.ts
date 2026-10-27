@@ -43,7 +43,7 @@ test('the session-start text is read from the instructions on the map', async ()
   const l = await fresh();
   await laneSetup(l);
   const text = await hookSessionStart(l, { session_id: 'i1', cwd: 'C:\\code\\Apex' });
-  const run = /as run (\S+)\./.exec(text)?.[1];
+  const run = /as run (e_\w+)/.exec(text)?.[1];
   assert.match(text, /give it one: how many tokens/);
   assert.ok(text.includes(`report, action tell (run ${run})`), 'the run is filled in');
   assert.doesNotMatch(text, /Keep the map true|Search before you create/, 'the working rules are said in the rules file, not again here');

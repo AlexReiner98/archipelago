@@ -9,8 +9,9 @@ export const types = new Map();
 export const relations = new Map();
 
 export async function loadSchema() {
-  // The schema, and the workspace's style: what a page that is not a picture is drawn by, until it asks for its own.
-  [state.schema, state.style] = await Promise.all([api('schema'), api('view', { name: 'style', params: {} }).then((r) => r.style)]);
+  // The schema, and the workspace's style: what a page that is not a picture is drawn by, until it asks for its own;
+  // with the theme being tried on this screen over it (ui/styles-card.js), which nothing keeps.
+  [state.schema, state.style] = await Promise.all([api('schema'), api('view', { name: 'style', params: state.trying ? { try: state.trying } : {} }).then((r) => r.style)]);
   applyTheme(state.style);
   types.clear();
   relations.clear();
@@ -56,8 +57,25 @@ export const ago = (ts) => {
   return h('span', { class: 'ago', title: when(ts) }, text);
 };
 
-/** An actor as a person would name it; what the log holds ("agent:claude-code/claude-code:pelago") is the tooltip. */
-export function who(actor) {
+/**
+ * A session's mark among the style's hues: where its name stands among the names the run type gives sessions. The
+ * same name has the same hue on every page, and two open sessions are named so that their hues differ.
+ */
+export function sessionHue(name) {
+  const names = types.get('run')?.fields?.name?.values ?? [];
+  const hues = state.style?.hues ?? [];
+  const i = names.indexOf(name);
+  return i >= 0 && hues.length ? hues[i % hues.length] : undefined;
+}
+/** A session as a person names it everywhere: its name, marked in its hue; `tip` (whose it is, what it does) is the tooltip. */
+export function sessionWho(name, tip = '') {
+  const hue = sessionHue(name);
+  return h('span', { class: 'who who-session', title: tip, style: hue ? `--session-hue: ${hue}` : null }, name);
+}
+
+/** An actor as a person would name it; what the log holds ("agent:claude-code/claude-code:pelago") is the tooltip. With the session it acted in, the session's name. */
+export function who(actor, session) {
+  if (session) return sessionWho(session, actor ?? '');
   const raw = actor ?? '';
   const [kind, ...rest] = raw.split(':');
   const name = rest.join(':').split('/').at(-1) ?? '';
@@ -101,7 +119,7 @@ export function eventLine(ev) {
   return h(
     'div',
     { class: 'change line' },
-    who(ev.actor),
+    who(ev.actor, ev.detail?.run_name),
     h('span', { class: 'gist', title: ev.reason ?? '' }, h('span', { class: 'muted' }, `${verb(ev)} `), ev.target_id ? h('a', { href: `#/e/${ev.target_id}` }, ev.target_title ?? ev.target_id) : gist(ev.reason) || about),
     ago(ev.ts),
   );
@@ -134,7 +152,7 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   const row = h(
     'div',
     { class: `change line${undone || isUndo ? ' quiet' : ''}${attention?.length ? ' attn' : ''}${fresh ? ' fresh' : ''}`, title: attention?.map((n) => n.title).join(' / ') ?? '' },
-    who(work.actor),
+    who(work.actor, work.detail?.run_name),
     h('span', { class: 'gist', title: reason }, one ? [h('a', { href: `#/e/${one}`, onclick: read }, h('strong', {}, nameOf(one))), reason && ` · ${gist(reason)}`] : gist(reason) || verb(first)),
     moved.length === 1 ? effect : ids.length > 1 && !here && menu(`${ids.length} items`, ids.map((id) => [nameOf(id), () => (read(), (location.hash = `#/e/${id}`))])),
     approver ? h('span', { class: 'mark mark-human', title: `Applied by ${approver}` }, 'you applied') : touched.length > 0 && authorityMark(work.detail?.authority),

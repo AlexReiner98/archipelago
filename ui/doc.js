@@ -163,18 +163,21 @@ function draw(d) {
   away = new Map(Object.entries(d.links ?? {}));
   paths = d.paths ?? {};
   onSite = Boolean(d.site?.host);
-  const sections = d.parts.filter((p) => p.section);
+  // The section the style names for a link's picture (page.share) is shown where a link is posted, not on the page.
+  const sections = d.parts.filter((p) => p.section && p.section.id !== d.share);
   // The front page's first picture is the site's own, and may be as wide as the window allows: a whole system opens in
   // sight. One that plays how it came to be fills that width. Every other picture is as wide as the text, and what a
   // story says goes in a column of its own to the right of the text, where the window has room (roomy).
   const first = d.path === FRONT ? sections.find((p) => d.lenses?.[p.section.id])?.section.id : null;
+  // A front page that opens on a figure leads with it: from edge to edge, with no title over it (its title is its words).
+  const lead = d.path === FRONT && d.parts[0]?.section?.picture && !d.lenses?.[d.parts[0].section.id] ? d.parts[0].section.id : null;
   const lensClass = (id) => ['doc-lens', id === first && 'wide', d.lenses[id].steps && 'plays'].filter(Boolean).join(' ');
   const part = (p) =>
     p.section
       ? h(
           'section',
-          { id: p.section.id },
-          h('h2', {}, p.section.title),
+          { id: p.section.id, ...(p.section.id === lead && { class: 'lead' }) },
+          p.section.id !== lead && h('h2', {}, p.section.title),
           // A lens is its picture, drawn from what was frozen when it was published (or, for a draft read with a sign-in, now); otherwise a section shows its figure.
           d.lenses?.[p.section.id]
             ? h('div', { class: lensClass(p.section.id), 'data-lens': p.section.id })
@@ -186,7 +189,7 @@ function draw(d) {
   const kids = [
     d.site && siteHead(d.site),
     d.head === 'invoice' ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
-    d.parts.map(part),
+    d.parts.filter((p) => !p.section || p.section.id !== d.share).map(part),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
     // A published page is read on the web: only a link's or an invoice's has a way to print it.
@@ -210,7 +213,7 @@ if (!given) warmDrawings();
   : preview
   ? post(`${here}/data`, {})
   : own
-  ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: { of: own } })]).then(([d, { style: s }]) => ({ ...d, theme: s.theme, lengths: s.lengths, faces: s.faces, type: s.type, head: s.page?.head }))
+  ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: { of: own } })]).then(([d, { style: s }]) => ({ ...d, theme: s.theme, lengths: s.lengths, faces: s.faces, type: s.type, head: s.page?.head, share: s.page?.share }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');

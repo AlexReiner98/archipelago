@@ -27,6 +27,17 @@ test('a theme is used once the owner keeps a version of it, and every page and a
   assert.equal(((await pageLook(l)).theme as any).light.accent, OPEN_WATER.light);
 });
 
+test('a theme is tried on one read: drawn as if kept, over the one kept, and nothing is kept', async () => {
+  const l = await fresh();
+  const tried = await pageStyle(l, { try: 'themes.ice' });
+  assert.equal((tried.style.theme as any).light.accent, ICE.light);
+  assert.ok(!(await pageStyle(l, {})).used.some((u) => u.preset === 'themes.ice'), 'trying keeps nothing');
+  await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Open water', props: { preset: 'themes.open_water' } }]);
+  assert.equal(((await pageStyle(l, { try: 'themes.ice' })).style.theme as any).light.accent, ICE.light, 'the one tried lies over the one kept');
+  assert.equal(((await pageStyle(l, {})).style.theme as any).light.accent, OPEN_WATER.light);
+  assert.equal(((await pageLook(l)).theme as any).light.accent, OPEN_WATER.light, 'a page read with no login never sees it');
+});
+
 test("a person's own theme lies over the workspace's on the pages they see, and never on one read with no login", async () => {
   const l = await fresh();
   const made = await make(l, [

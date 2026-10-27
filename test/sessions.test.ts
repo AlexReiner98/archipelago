@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { hookSessionEnd, hookSessionStart, sessionEnd, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
+import { hookSessionEnd, hookSessionStart, resolveRun, sessionEnd, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
@@ -23,7 +23,7 @@ test('a session registers, takes the lane its task needs, and gives it back when
   // A second session wanting the same lane is told who has it, and waits.
   const two = await sessionStart(l, agent, { task: made.live, session_id: 's2' });
   assert.equal(two.status, 'waiting');
-  assert.match(two.blocked![0].why, /held by "Session: Capture probe"/);
+  assert.match(two.blocked![0].why, new RegExp(`held by "${one.name}"`), 'named by its name');
 
   await sessionUpdate(l, agent, { run: 's1', note: 'Probe captured; parity is off by 2 px' });
   let view = (await VIEWS.sessions.run(l, {})) as any;
@@ -122,9 +122,9 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
 
   const brief = (await ask(l, 'brief', { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Apex');
-  assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
+  assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', holder.name]]);
   assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['governed_by', 'One live lane.']]);
-  for (const part of ['# Capture probe', 'Part of: Apex', 'held by Other session', 'Only one session drives the CAD app.']) {
+  for (const part of ['# Capture probe', 'Part of: Apex', `held by ${holder.name}`, 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
   const gated = (await ask(l, 'brief', { task: made.gated })) as any;
@@ -148,7 +148,7 @@ test('the session-start hook registers the session and hands it the repo\'s work
 
   const other = await sessionStart(l, agent, { title: 'Lane holder' });
   await l.claim(agent, { resource: made.lane, holder: other.run, reason: 'busy' });
-  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), /does not know a repository[\s\S]*HELD by Lane holder: do not use it/);
+  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), new RegExp(`does not know a repository.*HELD by ${other.name}: do not use it`, 's'));
 
   // On another machine the folder is somewhere else: the repository is known by the address it was cloned from, however that is written.
   await make(l, [{ op: 'update', id: repoId!, props: { remote: 'https://github.com/Acme/Apex' } }]);
@@ -160,8 +160,8 @@ test('the session-start hook registers the session and hands it the repo\'s work
   for (const id of ['far', 'stranger']) await hookSessionEnd(l, { session_id: id });
 
   await hookSessionEnd(l, { session_id: 'abc', reason: 'logout' });
-  const open = ((await VIEWS.sessions.run(l, {})) as any).open.map((r: any) => r.title);
-  assert.ok(!open.includes('Session in Apex repo'));
+  const open = ((await VIEWS.sessions.run(l, {})) as any).open.map((r: any) => r.id);
+  assert.ok(!open.includes((await resolveRun(l, 'abc'))!.id));
   await hookSessionEnd(l, { session_id: 'never-seen' });
 });
 

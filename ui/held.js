@@ -56,7 +56,7 @@ export async function heldPiece(host, title) {
         { class: 'row-top', style: 'flex-wrap: nowrap' },
         h('span', { class: 'pill warn', style: 'flex: none', title: p.held_by?.say ?? 'Waits for you' }, 'Approve'),
         h('span', { class: 'grow', title: p.reason, style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, said(p, names)),
-        h('span', { class: 'muted small', style: 'flex: none' }, who(p.actor)),
+        h('span', { class: 'muted small', style: 'flex: none' }, who(p.actor, p.run_name)),
         h('span', { class: 'muted small nowrap', style: 'flex: none' }, `${n} change${n === 1 ? '' : 's'}`),
         h('button', { style: 'flex: none', title: 'See each part of it, and leave out or correct any before applying', onclick: look }, 'Look'),
         ...buttons,
@@ -140,7 +140,7 @@ function proposalCard(p, names, done) {
     h(
       'div',
       { class: 'meta' },
-      h('div', { class: 'row-top nowrap-row' }, h('strong', { class: 'grow gist', title: p.reason }, gist(p.reason)), who(p.actor), ago(p.ts)),
+      h('div', { class: 'row-top nowrap-row' }, h('strong', { class: 'grow gist', title: p.reason }, gist(p.reason)), who(p.actor, p.run_name), ago(p.ts)),
       p.source && h('div', { class: 'muted small gist', title: p.source.uri }, `source: ${p.source.title ?? p.source.uri}`),
       p.warnings.map((w) => h('div', { class: 'warning small' }, `Warning: ${w}`)),
     ),

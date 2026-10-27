@@ -21,13 +21,13 @@ export const sessionOf = (step) => step.run ?? step.actor;
 
 /** The sessions heard from while the page is open, by key: what to call each one, and when it last took a step. */
 export const heard = new Map();
-/** Hear a step: its session is among those a pane can follow. Two sessions of one agent are told apart by their run. */
+/** Hear a step: its session is among those a pane can follow, called by its name (the run's title), else by its agent's. */
 export function hear(step) {
   const key = sessionOf(step);
-  const name = step.actor.split(/[/:]/).at(-1);
+  const name = step.name ?? step.actor.split(/[/:]/).at(-1);
   heard.set(key, { name, at: Math.max(step.at, heard.get(key)?.at ?? 0), run: step.run });
 }
-/** A session's name as a pane's picker says it: the agent's, with its run when another session goes by the same. */
+/** A session's name as a pane's picker says it: its own, or the agent's, with its run when another session goes by the same. */
 export function nameOf(key) {
   const one = heard.get(key);
   if (!one) return key.startsWith('e_') ? key : key.split(/[/:]/).at(-1);
