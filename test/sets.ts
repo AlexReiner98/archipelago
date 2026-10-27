@@ -19,6 +19,7 @@ export const SLOW: Record<string, string> = {
   'test/find-lens.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
   'test/narrow-bar.test.ts': 'browser',
+  'test/panes.test.ts': 'browser',
   'test/published-frames.test.ts': 'browser',
   'test/saved-canvases.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',

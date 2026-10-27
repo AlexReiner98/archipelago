@@ -55,6 +55,10 @@ export const ACT_TOOLS: Record<string, Tool> = {
         .describe('How the view is drawn, for this one look. The style a view opens in is kept on the map: an item of type style, about the project or item it is for, or about nothing for the whole workspace; change it with change.'),
       note: z.string().max(200).optional().describe('One line shown beside the page.'),
       look: z.boolean().optional().describe('Ask the page that goes there for a picture of what it drew: the canvas as the owner sees it.'),
+      pane: z
+        .enum(['left', 'right', 'above', 'below', 'main', 'alone'])
+        .optional()
+        .describe('Which pane of their page it goes to: a side opens it in a pane beside their main canvas (one already drawing it moves there), main is the main canvas, alone closes the other panes first. Left out, a pane already drawing it is lit, else the main canvas goes there. Only a canvas or an item goes to a pane; with look, the picture is of that pane.'),
       wait_seconds: z.number().int().min(0).max(60).optional().describe('With look: how long to wait for the picture (20). 0 answers at once with the look, to read with query picture.'),
     },
     run: async (l, actor, input) => {
@@ -62,7 +66,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const shown = async (hash: string, note?: string) => {
         const { db } = await wholeMap(l);
         const look = input.look ? await askLook(db, l, actor.name) : undefined;
-        const at = await point(l, actor, 'show', hash, note, look);
+        const at = await point(l, actor, 'show', hash, note, look, input.pane);
         const pages = await watching(db, l, actor.name);
         if (!look) return { ...at, pages };
         if (!pages.following) return { ...at, pages, look, picture: null, why: 'No page of theirs follows you: nothing went there to draw it.' };

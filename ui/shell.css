@@ -5,7 +5,7 @@ html, body { height: 100%; }
 body { overflow: hidden; }
 
 /* The canvas: the view drawn edge to edge, its frame the whole page. */
-#canvas { position: fixed; inset: 0; background: var(--ln-sea, var(--bg)); }
+#canvas { position: fixed; inset: var(--main-top, 0%) var(--main-right, 0%) var(--main-bottom, 0%) var(--main-left, 0%); background: var(--ln-sea, var(--bg)); }
 #canvas > .lens-wrap, #canvas .lens-view { height: 100%; }
 /* The safe zone: the bar and the query bar above, the find bar below. A drawing that does not pan (a list, a grid)
    is laid out between them and scrolls there; one on the plane keeps the whole page and is fitted inside them. */
@@ -22,17 +22,17 @@ body { overflow: hidden; }
 #canvas .lens-view > .empty, #canvas .lens-view > .error, #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 
 /* The bar: where the canvas stands, what waits for you, and the menu. */
-#nav { position: fixed; z-index: 3; top: var(--space-7); left: var(--space-9); right: var(--space-9); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
+#nav { position: fixed; z-index: 3; top: calc(var(--main-top, 0%) + var(--space-7)); left: calc(var(--main-left, 0%) + var(--space-9)); right: calc(var(--main-right, 0%) + var(--space-9)); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
 #nav > * { pointer-events: auto; }
 /* With the sheet open, the bar keeps to the canvas left of it. */
-body[data-sheet="open"] #nav { right: calc(min(var(--sheet), 50%) + var(--space-9)); }
+body[data-sheet="open"] #nav { right: calc(max(var(--main-right, 0%), min(var(--sheet), 50%)) + var(--space-9)); }
 #nav > .grow { flex: 1; pointer-events: none; }
 #nav .brand { flex: none; font-family: var(--type-wordmark-family); font-weight: var(--type-wordmark-weight); font-style: var(--type-wordmark-style); text-transform: var(--type-wordmark-case); letter-spacing: var(--type-wordmark-track); font-size: var(--text-7); color: var(--text); text-decoration: none; padding: var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
 #nav .brand .workspace-name { display: none; }
 /* The query bar (ui/query-bar.js): the canvas's lens on one line under the top bar, its terms as chips; what does not fit scrolls along it. */
-#query { position: fixed; z-index: 2; top: calc(var(--box-9) + var(--space-8)); left: var(--space-9); right: var(--space-9); display: flex; align-items: stretch; gap: var(--space-6); overflow-x: auto; white-space: nowrap; scrollbar-width: none; pointer-events: none; }
+#query { position: fixed; z-index: 2; top: calc(var(--main-top, 0%) + var(--box-9) + var(--space-8)); left: calc(var(--main-left, 0%) + var(--space-9)); right: calc(var(--main-right, 0%) + var(--space-9)); display: flex; align-items: stretch; gap: var(--space-6); overflow-x: auto; white-space: nowrap; scrollbar-width: none; pointer-events: none; }
 #query[hidden] { display: none; }
-body[data-sheet="open"] #query { right: calc(min(var(--sheet), 50%) + var(--space-9)); }
+body[data-sheet="open"] #query { right: calc(max(var(--main-right, 0%), min(var(--sheet), 50%)) + var(--space-9)); }
 #query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); pointer-events: auto; }
 #query .q-filter { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 #query .q-sum { flex: 0 1 auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-4); font-size: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
@@ -82,8 +82,8 @@ body[data-sheet="open"] #query { right: calc(min(var(--sheet), 50%) + var(--spac
 #whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }
 
 /* Find: one bar at the canvas's foot; what its words would find is said in one line above it. */
-#find { position: fixed; z-index: 3; left: 50%; bottom: var(--space-9); transform: translateX(-50%); width: min(var(--find-most), calc(100% - 2 * var(--space-9))); margin: 0; }
-body[data-sheet="open"] #find { left: calc((100% - min(var(--sheet), 50%)) / 2); width: min(var(--find-most), calc(100% - min(var(--sheet), 50%) - 2 * var(--space-9))); }
+#find { position: fixed; z-index: 3; left: calc(var(--main-left, 0%) + (100% - var(--main-left, 0%) - var(--main-right, 0%)) / 2); bottom: calc(var(--main-bottom, 0%) + var(--space-9)); transform: translateX(-50%); width: min(var(--find-most), calc(100% - var(--main-left, 0%) - var(--main-right, 0%) - 2 * var(--space-9))); margin: 0; }
+body[data-sheet="open"] #find { left: calc(var(--main-left, 0%) + (100% - var(--main-left, 0%) - max(var(--main-right, 0%), min(var(--sheet), 50%))) / 2); width: min(var(--find-most), calc(100% - var(--main-left, 0%) - max(var(--main-right, 0%), min(var(--sheet), 50%)) - 2 * var(--space-9))); }
 #find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
 #find input[type=search] { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-4) var(--space-7); font-size: var(--text-6); outline: none; }
 #find .find-peek { display: flex; gap: var(--space-5); align-items: center; min-width: 0; margin: 0 0 var(--space-4); padding: var(--space-4) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; }
@@ -149,3 +149,30 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 .signup-name { flex: 1; min-width: var(--field-least); }
 .signup-email { flex: 2; min-width: var(--field-least); }
 .signup-error { padding: 0 var(--space-8) var(--space-8); }
+
+/* Panes (ui/panes.js): the canvases docked beside the main one, each with its name, a way to make it main, to pop it
+   out and to close it. Their frames are set by the layout as shares of the page; the line between two is dragged. */
+#panes > .pane { position: fixed; z-index: 1; display: flex; flex-direction: column; background: var(--ln-sea, var(--bg)); border-left: var(--border-1) solid var(--line); border-top: var(--border-1) solid var(--line); box-sizing: border-box; }
+#panes > .pane.pane-shown { animation: pane-shown 1.2s ease; }
+@keyframes pane-shown { from { box-shadow: inset 0 0 0 var(--border-2, var(--border-1)) var(--accent); } to { box-shadow: none; } }
+#panes .pane-bar { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); min-width: 0; }
+#panes .pane-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-3); font-weight: 600; cursor: grab; user-select: none; touch-action: none; padding: var(--space-2) var(--space-3); }
+#panes .pane-act { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
+#panes .pane-act:hover { color: var(--accent); }
+#panes .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+#panes .pane-canvas > .lens-wrap, #panes .pane-canvas .lens-view { height: 100%; }
+#panes .pane-canvas .lens-view { position: relative; box-sizing: border-box; overflow: auto; }
+#panes .pane-canvas .lens-view:has(.lf-stage) { overflow: hidden; }
+#panes .pane-canvas .lf-stage { height: 100%; }
+#panes .pane-canvas .lens-view > .toolbar { display: none; }
+#panes .pane-canvas > .empty, #panes .pane-canvas > .error, #panes .pane-canvas .lens-view > .empty { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
+#panes > .pane-sash { position: fixed; z-index: 2; background: transparent; }
+#panes > .pane-sash.row { top: 0; bottom: 0; width: var(--space-4); transform: translateX(-50%); cursor: col-resize; }
+#panes > .pane-sash.column { left: 0; right: 0; height: var(--space-4); transform: translateY(-50%); cursor: row-resize; }
+#panes > .pane-sash:hover, body[data-dragging="sash"] #panes > .pane-sash { background: var(--accent-soft); }
+/* While a pane or a line is dragged, a style's frame does not take the pointer from the page. */
+body[data-dragging] { user-select: none; }
+body[data-dragging] iframe { pointer-events: none; }
+body[data-dragging="pane"] { cursor: grabbing; }
+.pane-zone { position: fixed; z-index: 7; pointer-events: none; background: var(--accent-soft); border: var(--border-1) solid var(--accent); box-sizing: border-box; transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s; }
+.pane-zone[hidden] { display: none; }

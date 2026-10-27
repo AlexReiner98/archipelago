@@ -38,6 +38,8 @@ export interface Step {
   hash?: string;
   /** For a show: the look the page that goes there answers with a picture of what it drew (src/looks.ts). */
   look?: string;
+  /** For a show: the pane of the owner's page it goes to (ui/panes.js): a side of the main canvas, the main one, or the main one alone. */
+  pane?: string;
 }
 
 /** How many steps are kept for a page to catch up on between two looks. */

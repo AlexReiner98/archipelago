@@ -5,7 +5,7 @@
 // The views kept before the flat lens were translated into such canvases when the workspace opened
 // (src/lens-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
 
-import { api, ask, h, tell } from './base.js';
+import { api, ask, h, hooks, tell } from './base.js';
 import { flatQuery, flatView } from './lens.js';
 import { isA, typeTitle } from './words.js';
 
@@ -113,7 +113,7 @@ export function canvasSwitch(lens, style, isHome) {
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
       all.map((c) => h('option', { value: canvasAt(c.id), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
     );
-    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current) }, '☆'));
+    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current) }, '☆'), hooks.paneButton?.() ?? '');
   });
   return part;
 }

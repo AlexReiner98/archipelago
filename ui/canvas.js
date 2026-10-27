@@ -29,6 +29,8 @@ let at = null;
 export const lensNow = () => at?.lens ?? null;
 /** The address that brings the canvas as it is back, with no page open over it. */
 export const canvasHref = () => (!at || at.home ? '#/' : `#/v?${flatQuery(at.lens, at.asked)}`);
+/** The address of an item's page over the canvas as it is, which keeps what it draws (a click in another pane, ui/panes.js). */
+export const sheetOver = (id) => `#/e/${id}${at ? `?${flatQuery(at.lens, at.asked)}` : ''}`;
 /** Whether the canvas draws this item now. */
 export const canvasHas = (id) => Boolean(at?.view.answer?.items.some((i) => i.id === id));
 /** Draw this lens instead, through the address: under the item whose page is open, if one is. */
@@ -186,12 +188,16 @@ try {
 /** The frame the drawing moves in now, and what moves it (ui/pan-zoom.js). */
 const moves = () => at?.view.querySelector('.lens-view')?.moves;
 /** What the sheet covers on the right of the canvas; a sheet as wide as the page leaves nothing beside it. */
-const covered = () => (document.body.dataset.sheet === 'open' && sheet.offsetWidth < innerWidth * 0.8 ? sheet.offsetWidth : 0);
-/** What the bars cover of the canvas above and below: the query bar's foot, and the find bar's top. */
+const covered = () => {
+  if (document.body.dataset.sheet !== 'open' || sheet.offsetWidth >= innerWidth * 0.8) return 0;
+  return Math.max(0, host.getBoundingClientRect().right - sheet.getBoundingClientRect().left);
+};
+/** What the bars cover of the canvas above and below: the query bar's foot, and the find bar's top, in the canvas's own frame (it may be one pane of several, ui/panes.js). */
 const bars = () => {
   const edge = (id, side) => { const el = document.getElementById(id); return el && !el.hidden ? el.getBoundingClientRect()[side] : undefined; };
-  const foot = edge('query', 'bottom') ?? edge('nav', 'bottom') ?? 0, find = edge('find', 'top');
-  return [foot, find === undefined ? 0 : innerHeight - find];
+  const box = host.getBoundingClientRect();
+  const foot = edge('query', 'bottom') ?? edge('nav', 'bottom') ?? box.top, find = edge('find', 'top');
+  return [Math.max(0, foot - box.top), find === undefined ? 0 : Math.max(0, box.bottom - find)];
 };
 /** All of it in sight, beside the sheet and between the bars, when the reader asked for that. */
 const fitNow = () => settings.fit && moves()?.fit(covered(), ...bars());

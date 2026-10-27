@@ -28,6 +28,8 @@ export const following = {
   /** How many agents took a step lately: more than one, and nothing is followed unless the reader asks. */
   working: 0,
   get on() {
+    // A window popped out of the main page (ui/panes.js) draws one pane; the main page follows for it.
+    if (window.name.startsWith('pelago-pane:')) return false;
     try {
       const kept = localStorage.getItem('pelago-follow');
       if (kept) return kept !== 'off';
@@ -103,6 +105,8 @@ const thisPage = () => ({ page: pageId, on: following.on && chosen.kinds.has('sh
 export const storyOf = new Map();
 
 export function follow(steps = []) {
+  // A popped-out pane leaves what agents show to the main page, which answers for both.
+  if (window.name.startsWith('pelago-pane:')) return;
   // The first answer only says where things stand; an old step is not followed.
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
@@ -135,17 +139,19 @@ export function follow(steps = []) {
   clearTimeout(followedTimer);
   // A show offered to a page not following stays longer: it is the only way the reader hears of it.
   followedTimer = setTimeout(() => (followed.hidden = true), following.on ? 12000 : 60000);
-  if (!busy && there && location.hash !== there) location.hash = there;
-  if (asked) answerLook(asked, to.actor, !busy && there ? null : !following.on ? 'Their page does not follow agents.' : 'They were busy on the page: it did not go there.');
+  // A canvas docked beside the main one draws it, when the show asked for a pane or one draws it already (ui/panes.js); else the main canvas goes there.
+  const frame = !busy && place?.kind === 'show' && place.hash ? hooks.showIn?.(place.hash, place.pane) : null;
+  if (!busy && there && !frame && location.hash !== there) location.hash = there;
+  if (asked) answerLook(asked, to.actor, !busy && there ? null : !following.on ? 'Their page does not follow agents.' : 'They were busy on the page: it did not go there.', frame ?? undefined);
 }
 
 /** The answers owed to looks, sent with the next tail (src/looks.ts). */
 const owed = [];
-async function answerLook(look, actor, why) {
+async function answerLook(look, actor, why, frame) {
   if (why) return void owed.push({ look, why });
   try {
-    await drawnNow();
-    owed.push({ look, ...(await pictureOf()) });
+    await drawnNow(frame);
+    owed.push({ look, ...(await pictureOf(frame)) });
     // The reader is told what left the page, and for whom.
     const line = h('span', { class: 'grow' }, `An image of this canvas went to ${actor.split('/').at(-1)}`);
     followed.replaceChildren(line);

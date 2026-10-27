@@ -66,6 +66,12 @@ canvas as a flat graph", with its decisions.
 - **A new item is started on the canvas:** double-click or +. It is loose
   until it is tied; once a change ties it, the canvas goes to it.
 
+### Panes
+- **More than one canvas at once,** side by side or popped out into a window
+  of its own, docked by dragging a pane's name as in a code editor
+  (`docs/canvas.md`, Panes). The main canvas keeps the bar, find and the
+  sheet; where the panes stand is the reader's, in their browser.
+
 ### The sheet
 - **The sheet is the item's one page,** over the canvas where it stands,
   never more than half the screen (all of it on a phone); Esc or × goes back.
