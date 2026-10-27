@@ -122,7 +122,8 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .page-head { margin-bottom: var(--space-9); }
 #sheet .draft-title { font-size: var(--text-9); line-height: 1.2; margin: 0 0 var(--space-5); padding-right: var(--box-8); outline: none; overflow-wrap: anywhere; }
 #sheet .draft-title:empty::before { content: attr(data-placeholder); color: var(--muted); }
-#sheet .sheet-marks { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-4); }
+/* Right-aligned on whichever line it lands, so the ⋯ menu, which opens leftward, stays inside the sheet under a long title. */
+#sheet .sheet-marks { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-4); }
 #sheet .sheet-marks > .grow { flex: 1; }
 #sheet .mark-type { color: var(--muted); }
 #sheet .sheet-marks select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
