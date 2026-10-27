@@ -51,7 +51,11 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
 A person grows a canvas by editing its lens (a click adds an id, find sets
 the text, the query bar changes any term), and an agent reads the same lens
 (`query` name `flat`) and points the page at one (`report` action `show`
-with `lens`). The page calls no tool an agent lacks for it.
+with `lens`). The page calls no tool an agent lacks for it. The bar's
+pickers (the walk's links, the box's types) lead with what the canvas
+draws, then what lies one step around it (the same `flat` read, walked
+once), then the rest; a retired or dormant type or link type is never
+offered (`ui/picker-rank.js`, task e_css8swr9).
 - `test/structure.test.ts`: "the page calls no more tools through /api than
   it did" (the names it calls, frozen on 25 Oct 2026; the list only shrinks).
 - `test/lens-flat.test.ts`: "an agent asks it by name, and sees only what
