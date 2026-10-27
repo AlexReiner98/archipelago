@@ -29,11 +29,10 @@ option, optgroup { background: var(--panel); color: var(--text); }
 #canvas .lens-view > .empty, #canvas .lens-view > .error, #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 
 /* The bar: where the canvas stands, what waits for you, and the menu. */
-#nav { position: fixed; z-index: 3; top: calc(var(--main-top, 0%) + var(--space-7)); left: calc(var(--main-left, 0%) + var(--space-9)); right: calc(var(--main-right, 0%) + var(--space-9)); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
+#nav { position: fixed; z-index: 5; top: calc(var(--main-top, 0%) + var(--space-7)); left: calc(var(--main-left, 0%) + var(--space-9)); right: calc(var(--main-right, 0%) + var(--space-9)); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
 #nav > * { pointer-events: auto; }
-/* With the sheet open, the bar keeps to the canvas left of it. */
-body[data-sheet="open"] #nav { right: calc(max(var(--main-right, 0%), min(var(--sheet), 50%)) + var(--space-9)); }
-#nav > .grow { flex: 1; pointer-events: none; }
+/* The bar runs across the page over the sheet, one pane or several: the sheet opens under it (the owner, 27 Oct 2026). */
+body { --bar-room: calc(var(--box-9) + 2 * var(--space-7)); }#nav > .grow { flex: 1; pointer-events: none; }
 /* Tabs (ui/tab-bar.js): one for each canvas kept, a session's named in its hue; many shrink to their mark and first letters. */
 #tabs { display: flex; align-items: center; gap: var(--space-3); min-width: 0; overflow-x: auto; scrollbar-width: none; }
 #tabs > .tab { pointer-events: auto; flex: 0 1 auto; min-width: calc(var(--box-3) + 2 * var(--space-5) + 2 * var(--border-1)); box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-5); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); color: var(--muted); font-size: var(--text-3); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
@@ -46,6 +45,18 @@ body[data-sheet="open"] #nav { right: calc(max(var(--main-right, 0%), min(var(--
 #tabs .tab-name.who-session::before { margin-right: var(--space-3); }
 #tabs .tab-act { flex: none; border: 0; background: none; padding: 0 var(--space-2); color: var(--muted); font: inherit; font-weight: 400; cursor: pointer; }
 #tabs .tab-act:hover { color: var(--accent); }
+#tabs > .tab[data-follows="none"] .tab-name { font-style: italic; }
+#tabs > .tab-new { pointer-events: auto; flex: none; border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); font-size: var(--text-4); cursor: pointer; }
+#tabs > .tab-new:hover { color: var(--accent); }
+/* The tab in sight's menu: whom it follows, pop out. A popover, so the strip does not clip it. */
+.tab-menu { position: fixed; inset: auto; margin: var(--space-3) 0 0; display: grid; min-width: var(--menu-least); padding: var(--space-4); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); box-shadow: 0 var(--space-4) var(--space-10) rgb(0 0 0 / 0.22); }
+.tab-menu:not(:popover-open) { display: none; }
+.tab-menu > button { text-align: left; border: 0; background: none; padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); white-space: nowrap; cursor: pointer; }
+.tab-menu > button:hover { background: var(--accent-soft); }
+.tab-menu > button[aria-checked="true"] { font-weight: 600; }
+.tab-menu > button[aria-checked="true"]::after { content: ' ✓'; color: var(--accent); }
+.tab-menu > .tab-menu-head { padding: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-2); }
+.tab-menu > hr { width: 100%; margin: var(--space-3) 0; border: 0; border-top: var(--border-1) solid var(--line); }
 #nav .brand { flex: none; font-family: var(--type-wordmark-family); font-weight: var(--type-wordmark-weight); font-style: var(--type-wordmark-style); text-transform: var(--type-wordmark-case); letter-spacing: var(--type-wordmark-track); font-size: var(--text-7); color: var(--text); text-decoration: none; padding: var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
 #nav .brand .workspace-name { display: none; }
 /* The query bar (ui/query-bar.js): the canvas's lens on one line under the top bar, its terms as chips; what does not fit scrolls along it. */
@@ -53,7 +64,9 @@ body[data-sheet="open"] #nav { right: calc(max(var(--main-right, 0%), min(var(--
 #query[hidden] { display: none; }
 body[data-sheet="open"] #query { right: calc(max(var(--active-right, 0%), min(var(--sheet), 50%)) + var(--space-9)); }
 #query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); pointer-events: auto; }
+/* The filter is the lens: folded, its line of what it finds keeps room to be read. */
 #query .q-filter { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+#query .q-filter:has(> .q-sum) { min-width: calc(2 * var(--box-10)); }
 #query .q-sum { flex: 0 1 auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-4); font-size: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 #query .q-sum:hover, #query .q-fold:hover { color: var(--accent); }
 #query .q-fold { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
@@ -74,8 +87,9 @@ body[data-sheet="open"] #query { right: calc(max(var(--active-right, 0%), min(va
 #query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-3); font-size: var(--text-3); text-align: right; }
 #query .q-count { color: var(--muted); font-size: var(--text-3); padding-right: var(--space-3); }
 #query .q-count.cut { color: var(--accent); }
-#query .q-canvas { flex: 0 1 auto; min-width: 0; }
-#query .q-pick { min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
+/* The canvas's name never shrinks away: the filter folds first. Its edge takes the hue of the session the tab follows. */
+#query .q-canvas { flex: none; border-color: var(--tab-hue, var(--line)); }
+#query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
 #query .q-save { border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
 #query .q-save:hover { color: var(--accent); }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
@@ -112,7 +126,7 @@ body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(
 
 /* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
    (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */
-#sheet { position: fixed; z-index: 4; top: 0; right: 0; bottom: 0; width: min(var(--sheet), 50%); overflow: auto; background: var(--bg); border-left: var(--border-1) solid var(--line); box-shadow: 0 0 var(--space-13) rgb(0 0 0 / 0.14); transform: translateX(100%); visibility: hidden; transition: transform 0.18s ease, visibility 0s 0.18s; }
+#sheet { position: fixed; z-index: 4; top: var(--bar-room); right: 0; bottom: 0; width: min(var(--sheet), 50%); overflow: auto; background: var(--bg); border-left: var(--border-1) solid var(--line); box-shadow: 0 0 var(--space-13) rgb(0 0 0 / 0.14); transform: translateX(100%); visibility: hidden; transition: transform 0.18s ease, visibility 0s 0.18s; }
 body[data-sheet="open"] #sheet { transform: none; visibility: visible; transition: transform 0.18s ease; }
 @media (prefers-reduced-motion: reduce) { #sheet, body[data-sheet="open"] #sheet { transition: none; } }
 #sheet-close { position: sticky; z-index: 1; top: var(--space-6); float: right; margin: var(--space-6) var(--space-6) 0 0; width: var(--box-8); height: var(--box-8); padding: 0; border-radius: var(--radius-pill); font-size: var(--text-8); line-height: 1; }
@@ -227,7 +241,6 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #panes .pane-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-3); font-weight: 600; cursor: grab; user-select: none; touch-action: none; padding: var(--space-2) var(--space-3); }
 #panes .pane-follows, #main-name .pane-follows { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2, var(--text-3)); color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-pill, var(--radius, 0)); padding: 0 var(--space-3); margin-left: var(--space-3); }
 #panes .pane-follows[hidden] { display: none; }
-#query .q-follows { flex: none; max-width: 25%; font-size: var(--text-3); color: var(--muted); background: none; border: var(--border-1) solid var(--line); border-radius: var(--radius, 0); padding: var(--space-1, 0) var(--space-2); }
 #panes .pane-act { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
 #panes .pane-act:hover { color: var(--accent); }
 #panes .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; }
@@ -258,7 +271,7 @@ body[data-dragging="pane"] { cursor: grabbing; }
    Every pane keeps a strip of one height at its top, in or out of focus, so nothing moves when focus does: the query
    bar fills the strip of the pane it acts on, and the others show their names there (the main one in #main-name). */
 body[data-panes]:not([data-panes="1"]) { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
-body[data-panes]:not([data-panes="1"]) #nav, body[data-panes]:not([data-panes="1"])[data-sheet="open"] #nav { top: var(--space-4); left: var(--space-9); right: var(--space-9); }
+body[data-panes]:not([data-panes="1"]) #nav { top: var(--space-4); left: var(--space-9); right: var(--space-9); }
 body[data-panes]:not([data-panes="1"]) #sheet { top: var(--band); }
 body[data-panes]:not([data-panes="1"]) #canvas { --safe-top: var(--strip); --safe-bottom: 0; }
 body[data-panes]:not([data-panes="1"]) #query { top: calc(var(--active-top, 0%) + var(--space-3)); height: var(--box-9); }

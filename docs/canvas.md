@@ -199,23 +199,31 @@ the main one; its places are its canvas's. Every pane is live: the query bar
 and find act on the one last touched, and sit over it (decision e_h2pqjy2q).
 A click on a node in a docked pane adds it to that pane's filter and opens
 its page in the sheet over the main canvas. Each pane keeps its own back and
-forward (‹ › in the bar): a step for each lens it is given, none for typing
-or for a page opened over it (e_ssnyd3ex). On a page taller than wide a row
-is drawn as a column.
+forward (‹ › in the bar, once there is somewhere to go): a step for each
+lens it is given, none for typing or for a page opened over it (e_ssnyd3ex).
+What is typed in the bar's box and whether its filter is unfolded are the
+pane's: another pane or tab starts without them. On a page taller than wide
+a row is drawn as a column. The top bar runs across the page over the sheet,
+one pane or several: the sheet opens under it.
 
 A tab (`tab-bar.js`, `tabs.js`; decision e_mzer5m4t) is a whole canvas and
 the panes split beside it, which stay together in it. The tabs stand in the
-top bar, a session's named by the session in its hue; one tab alone shows no
-strip. There is no most: many shrink to their mark and first letters
-(e_q3amet26). ⊞ in the bar opens the canvas in a tab of its own; a press
-brings a tab into sight, a middle press closes it. A tab, not a pane, pops
-out into a window of its own (⧉ on the tab in sight, or the tab dragged out
-of the page) and ⇲ there docks it back whole (e_ezb7s3a7). The tabs are the
-reader's, kept in this browser for each workspace like the canvas settings:
-never on the map, meaning nothing.
+top bar, one tab included, each named as its canvas is: a session's by the
+session in its hue, else a saved canvas or an item by its name, a lens by
+what its filter finds, Home by Home. There is no most: many shrink to their
+mark and first letters (e_q3amet26). What is the tab's own is on the strip,
+never in the query bar, which shows the lens (e_j7ggggjr): ⊞ at its end
+opens the canvas in a tab of its own; a press brings a tab into sight, a
+middle press closes it, and the tab in sight has × and ⌄, its menu. A tab,
+not a pane, pops out into a window of its own (Pop out in ⌄, or the tab
+dragged out of the page) and ⇲ there docks it back whole (e_ezb7s3a7).
+Brought into sight again, a tab's bar acts on the pane last touched in it
+(e_x9b9yv5g), and the bar's canvas name takes the hue of the session it
+follows. The tabs are the reader's, kept in this browser for each workspace
+like the canvas settings: never on the map, meaning nothing.
 
-Each tab follows everyone (the default), one session, or nobody: the reader
-picks it in the bar. Where an agent's step lands is `pane-route.js`, worked
+Each tab follows everyone (the default), one session, or nobody (its name
+in italics): the reader picks it in ⌄. Where an agent's step lands is `pane-route.js`, worked
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
 - a session's show or change goes to the tab that follows it;
 - else to a tab that follows everyone and no other session at work (a step

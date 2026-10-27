@@ -561,7 +561,7 @@ details.menu > .menu-items > button { max-width: var(--menu-item-most); overflow
   .row-top:not(.nowrap-row) > .grow { flex-basis: 100%; }
   table.list td { overflow-wrap: anywhere; }
   .toolbar.facts > .grow { display: none; }
-  #sheet { width: 100%; }
+  #sheet { width: 100%; } body[data-sheet="open"] #query { visibility: hidden; }
 }
 
 /* What a thing is for: asked for, not printed. A dotted line under a heading, or a small ? beside a control. */

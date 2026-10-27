@@ -37,10 +37,12 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
   try {
     await page.evaluate(`localStorage.setItem('pelago-follow', 'on')`);
     await wait(3000);
-    // One session alone takes the canvas, and one tab shows no strip.
+    // One session alone takes the canvas, in the one tab there is.
     await show(0, 'i0');
     await until('the first session is drawn', async () => page.evaluate(`location.hash === '#/e/${made.i0}'`));
-    assert.deepEqual(await strip(), []);
+    assert.equal((await strip()).length, 1);
+    // The tab's own controls are on the strip, not in the query bar, which shows the lens.
+    assert.equal(await page.evaluate(`Boolean(document.querySelector('#tabs [aria-label="New tab"]')) && !document.querySelector('#query .q-follows, #query [aria-label="New tab"]')`), true);
     // A second and a third, just after: each a tab of its own, in the background, marked.
     await show(1, 'i1');
     await until('the second keeps a tab', async () => (await strip()).length === 2);
@@ -65,7 +67,8 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     assert.deepEqual((await strip())[3].slice(0, 3), [sessions[1].name, false, true]);
     // The tab in sight pops out into a window of its own, and docks back whole.
     await page.send('Target.setDiscoverTargets', { discover: true });
-    await press(`${tabOf(2)} [aria-label="Pop this tab out into a window of its own"]`);
+    await press(`${tabOf(2)} [aria-label="This tab: whom it follows, pop it out"]`);
+    await press('.tab-menu [role="menuitem"]');
     await until('the tab is out', async () => (await strip()).some((t) => t[3]));
     assert.equal((await strip()).filter((t) => !t[3]).length, 3);
     const targets = (await page.send('Target.getTargets')).result.targetInfos as { targetId: string; type: string; url: string }[];

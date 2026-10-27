@@ -89,7 +89,10 @@ export function drawFind() {
   });
   bar.replaceChildren(peek, h('div', { class: 'find-row' }, input));
   addEventListener('hashchange', () => setTimeout(keepUp, 0));
-  keepUp();
+  // Another pane or tab in focus: the bar says its lens's text, and what was typed for the last one goes.
+  addEventListener('pane-focus', () => setTimeout(() => ((peek.hidden = true), keepUp()), 0));
+  // The page's first lens is put up just after the bar is drawn (ui/app.js).
+  setTimeout(keepUp, 0);
 }
 
 addEventListener('keydown', (ev) => {

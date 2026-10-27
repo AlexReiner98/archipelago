@@ -16,8 +16,10 @@ import { relations, titles, typeTitle, types } from './words.js';
 const bar = document.getElementById('query');
 /** The words the box was given back by a chip, to be written again. */
 let words = '';
-/** Whether the person unfolded the filter's chips, for as long as the page is open. */
+/** Whether the person unfolded the filter's chips, while the bar acts on the same pane. */
 let unfolded = false;
+// Both are the pane's the bar acts on: another pane or tab starts with neither (ui/panes.js tells).
+addEventListener('pane-focus', () => ((words = ''), (unfolded = false)));
 /** Items the bar has asked the names of, so each is asked once. */
 const asking = new Set();
 /** What is used one step around the canvas, asked once for each lens (`key`), and the bar drawn last. */
@@ -129,8 +131,8 @@ function endWords(term, redraw) {
   return end === 'me' ? 'me' : isId(end) ? nameOf(end, redraw) : end;
 }
 
-/** What the filter finds, in a few words: each kind of term once, a second of the same counted ("is part of Server +3"). */
-function summary(f, redraw) {
+/** What the filter finds, in a few words: each kind of term once, a second of the same counted ("is part of Server +3"). A tab is named by it (ui/tab-bar.js). */
+export function filterSaid(f, redraw) {
   const some = (list, one, many) => (list?.length ? (list.length === 1 ? one(list[0]) : many(list)) : null);
   const tags = (f.links ?? []).filter((t) => t.startsWith('tagged '));
   return [
@@ -212,7 +214,7 @@ export function drawQuery(lens, view, go, lead, folded = false) {
       (f.within ?? []).map((id) => chip('q-narrow', `within ${nameOf(id, redraw)}`, 'Only what is within this item, at any depth, of what the filter finds', 'within', id, `within ${id}`)),
       exclude.map((x) => chip('q-out', `−${x === 'closed' || x === 'system' ? x : typeTitle(x)}`, 'Left out of everything', 'exclude', x, `-${x}`)),
   ];
-  const said = summary(f, redraw);
+  const said = filterSaid(f, redraw);
   bar.replaceChildren(
     lead ?? '',
     typeList,
