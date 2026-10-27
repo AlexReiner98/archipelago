@@ -13,7 +13,8 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const CODE = `export default function draw({ field, change, on }) {
   const at = { x: 20, y: 20, width: 240, height: 30, placeholder: 'Name' };
   field('name', at);
-  on('answer', () => {});
+  // What it made comes back in its answer: shown in a field of its own.
+  on('answer', (next) => next.items.some((i) => i.title === 'Typed task') && field('seen', { x: 20, y: 60, width: 240, height: 30, value: 'seen' }));
   on('field', async ({ value, done }) => {
     if (!done) return;
     const mine = await change([{ op: 'create', type: 'work.task', title: value }], 'Typed in the drawing');
@@ -58,6 +59,9 @@ test('in a browser, a drawing gets a text field and asks for changes, which the 
     let said = '';
     for (let n = 0; n < 40 && !said; n++, await wait(200)) said = await inFrame(`(() => { return document.querySelector('input.field').value.replace('Typed task', ''); })()`);
     assert.equal(said, 'applied proposed held', 'the code is told what came of each: one applied, one held for the person');
+    let seen = false;
+    for (let n = 0; n < 40 && !seen; n++, await wait(200)) seen = await inFrame(`document.querySelectorAll('input.field').length === 2`);
+    assert.ok(seen, 'what the code made is in the answer it is handed next');
     const pending = (await call('/api/query', undefined, { name: 'proposals' })).result;
     assert.match(JSON.stringify(pending), /drawing_reach/, 'held by the rule for what a drawing does not write');
     assert.equal(await inFrame(`document.querySelectorAll('canvas').length`), 1, 'the same frame: a new answer reached the code that listens for one, not a new picture');

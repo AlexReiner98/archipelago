@@ -232,6 +232,8 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   warmDrawings();
   host.ready = load();
   host.refresh = () => load(true);
+  // A drawing that made something asks for the lens again: a new item is not among those the store follows.
+  host.addEventListener('lens-read', () => load(true));
   host.mark = (id) => {
     style.here = chosen.here = id;
     body.redraw?.();
