@@ -311,9 +311,12 @@ schema, backups or the log's storage, run every file:
 npm run test:full
 ```
 
-CI runs `test:full` on every pull request. A new test that starts a
+CI runs every file on every pull request and push to main, as shards
+side by side (`shard` in `test/sets.ts`: the rest, and one per reason in
+`SLOW`), so a push deploys after its slowest shard. A new test that starts a
 browser or takes more than a few seconds of one process goes in `SLOW`,
-with why; never move the structure test there.
+with why; never move the structure test there. A new reason there is a new
+shard, to add to both matrices in `.github/workflows/tests.yml`.
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
