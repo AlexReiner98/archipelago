@@ -25,8 +25,25 @@ export const focusOn = (id) => ({ filter: { ids: [id] }, walk: { over: FOCUS, st
 /** What is up: the lens asked for, the view drawing it, the item lit in it, the style the address asks. */
 let at = null;
 
-/** The lens the canvas draws now. */
-export const lensNow = () => at?.lens ?? null;
+/**
+ * The pane the bar and find act on when it is not the main canvas (ui/panes.js): its lens, its style as asked, the view
+ * drawing it, and how to draw another lens or open another saved canvas there. The one last touched (decision e_h2pqjy2q).
+ */
+let docked = null;
+/** Make this docked pane the one the bar acts on, or the main canvas (null). */
+export function activate(pane) {
+  docked = pane;
+  barNow();
+}
+/** The bar drawn for the pane it acts on. */
+function barNow() {
+  if (docked) return drawQuery(docked.lens, docked.view, docked.go, canvasSwitch(docked.lens, docked.asked, false, docked.open));
+  if (at?.view) drawQuery(at.lens, at.view, goLens, canvasSwitch(at.lens, at.asked, at.home));
+}
+/** Whether the bar acts on the main canvas. */
+export const mainActive = () => !docked;
+/** The lens the pane the bar acts on draws now. */
+export const lensNow = () => docked?.lens ?? at?.lens ?? null;
 /** The address that brings the canvas as it is back, with no page open over it. */
 export const canvasHref = () => (!at || at.home ? '#/' : `#/v?${flatQuery(at.lens, at.asked)}`);
 /** The address of an item's page over the canvas as it is, which keeps what it draws (a click in another pane, ui/panes.js). */
@@ -35,6 +52,7 @@ export const sheetOver = (id) => `#/e/${id}${at ? `?${flatQuery(at.lens, at.aske
 export const canvasHas = (id) => Boolean(at?.view.answer?.items.some((i) => i.id === id));
 /** Draw this lens instead, through the address: under the item whose page is open, if one is. */
 export function goLens(lens) {
+  if (docked) return docked.go(lens);
   const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(location.hash)?.[1];
   location.hash = `${open ? `#/e/${open}` : '#/v'}?${flatQuery(lens, at?.asked)}`;
 }
@@ -54,6 +72,8 @@ export function showCanvas(lens, here, asked = {}) {
   // Where things were put here is read beside the lens, into `placed`: one object the picture keeps, filled in place.
   const style = { ...asked, ...(here && { here }), snap: Boolean(settings.snap), placed: {} };
   at = { key, view: null, lens, home: isHome, here, kept: null, style, asked };
+  // Another lens drawn: a step in the main pane's back and forth (ui/panes.js).
+  hooks.canvasMoved?.();
   drawAgain();
   readPlaces(canvasOf(lens, asked), style.placed);
 }
@@ -69,8 +89,8 @@ function drawAgain() {
   if (at.view?.store) unfollow(at.view.store);
   at.view = view;
   // The bar says the lens at once, and again with what its answer found (the names of the items it names, a cut).
-  view.addEventListener('lens-answer', () => at?.view === view && drawQuery(lens, view, goLens, lead));
-  drawQuery(lens, view, goLens, lead);
+  view.addEventListener('lens-answer', () => at?.view === view && !docked && drawQuery(lens, view, goLens, lead));
+  if (!docked) drawQuery(lens, view, goLens, lead);
   host.replaceChildren(view);
 }
 

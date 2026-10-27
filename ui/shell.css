@@ -30,9 +30,9 @@ body[data-sheet="open"] #nav { right: calc(max(var(--main-right, 0%), min(var(--
 #nav .brand { flex: none; font-family: var(--type-wordmark-family); font-weight: var(--type-wordmark-weight); font-style: var(--type-wordmark-style); text-transform: var(--type-wordmark-case); letter-spacing: var(--type-wordmark-track); font-size: var(--text-7); color: var(--text); text-decoration: none; padding: var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
 #nav .brand .workspace-name { display: none; }
 /* The query bar (ui/query-bar.js): the canvas's lens on one line under the top bar, its terms as chips; what does not fit scrolls along it. */
-#query { position: fixed; z-index: 2; top: calc(var(--main-top, 0%) + var(--box-9) + var(--space-8)); left: calc(var(--main-left, 0%) + var(--space-9)); right: calc(var(--main-right, 0%) + var(--space-9)); display: flex; align-items: stretch; gap: var(--space-6); overflow-x: auto; white-space: nowrap; scrollbar-width: none; pointer-events: none; }
+#query { position: fixed; z-index: 2; top: calc(var(--active-top, 0%) + var(--box-9) + var(--space-8)); left: calc(var(--active-left, 0%) + var(--space-9)); right: calc(var(--active-right, 0%) + var(--space-9)); display: flex; align-items: stretch; gap: var(--space-6); overflow-x: auto; white-space: nowrap; scrollbar-width: none; pointer-events: none; }
 #query[hidden] { display: none; }
-body[data-sheet="open"] #query { right: calc(max(var(--main-right, 0%), min(var(--sheet), 50%)) + var(--space-9)); }
+body[data-sheet="open"] #query { right: calc(max(var(--active-right, 0%), min(var(--sheet), 50%)) + var(--space-9)); }
 #query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); pointer-events: auto; }
 #query .q-filter { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 #query .q-sum { flex: 0 1 auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-4); font-size: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
@@ -82,8 +82,8 @@ body[data-sheet="open"] #query { right: calc(max(var(--main-right, 0%), min(var(
 #whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }
 
 /* Find: one bar at the canvas's foot; what its words would find is said in one line above it. */
-#find { position: fixed; z-index: 3; left: calc(var(--main-left, 0%) + (100% - var(--main-left, 0%) - var(--main-right, 0%)) / 2); bottom: calc(var(--main-bottom, 0%) + var(--space-9)); transform: translateX(-50%); width: min(var(--find-most), calc(100% - var(--main-left, 0%) - var(--main-right, 0%) - 2 * var(--space-9))); margin: 0; }
-body[data-sheet="open"] #find { left: calc(var(--main-left, 0%) + (100% - var(--main-left, 0%) - max(var(--main-right, 0%), min(var(--sheet), 50%))) / 2); width: min(var(--find-most), calc(100% - var(--main-left, 0%) - max(var(--main-right, 0%), min(var(--sheet), 50%)) - 2 * var(--space-9))); }
+#find { position: fixed; z-index: 3; left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - var(--active-right, 0%)) / 2); bottom: calc(var(--active-bottom, 0%) + var(--space-9)); transform: translateX(-50%); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - var(--active-right, 0%) - 2 * var(--space-9))); margin: 0; }
+body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%))) / 2); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%)) - 2 * var(--space-9))); }
 #find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
 #find input[type=search] { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-4) var(--space-7); font-size: var(--text-6); outline: none; }
 #find .find-peek { display: flex; gap: var(--space-5); align-items: center; min-width: 0; margin: 0 0 var(--space-4); padding: var(--space-4) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; }
@@ -176,3 +176,10 @@ body[data-dragging] iframe { pointer-events: none; }
 body[data-dragging="pane"] { cursor: grabbing; }
 .pane-zone { position: fixed; z-index: 7; pointer-events: none; background: var(--accent-soft); border: var(--border-1) solid var(--accent); box-sizing: border-box; transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s; }
 .pane-zone[hidden] { display: none; }
+
+/* The pane the bar and find act on, among several: marked by a line round it. A docked one has its own bar of names
+   at its top, which the query bar sits under. */
+#panes > .pane.pane-active, #canvas.pane-active { box-shadow: inset 0 0 0 var(--border-1) var(--accent); }
+body[data-active="pane"] #query { top: calc(var(--active-top, 0%) + var(--box-9)); }
+/* The key of the docked pane the bar acts on sits under the bar, not behind it. */
+#panes > .pane.pane-active .lf-legend { top: calc(var(--box-9) + var(--space-6)); }

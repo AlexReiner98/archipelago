@@ -126,7 +126,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `canvas.js` | the lens up, Home's lens, clicks, moves batched, Arrange |
 | `lens.js` | the address codec (`readFlatLens`, `flatQuery`); `flatView` reads, holds and draws a lens |
 | `query-bar.js` | the lens as chips, changed in place |
-| `find.js` | the filter's text, with a one-line peek |
+| `find.js` | the seeds as words, with a one-line peek: Enter replaces them, + or Shift+Enter adds (e_c3g6gwqq) |
 | `canvases.js` | saved canvases: the bar's switch, ☆ save, Home's list |
 | `drawing.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
 | `pan-zoom.js` | the infinite plane |
@@ -184,14 +184,19 @@ measure it reads at), shipped by the house style and a pack's presets.
    asks Apply or Decline, and `decide` settles it.
 
 ## Panes: more than one canvas at once
-The main canvas is the one the address draws, with the query bar, find and the
-sheet. Others can stand beside it, as a code editor's groups do: ◫ in the bar
+The main canvas is the one the address draws, and the sheet opens over it.
+Others can stand beside it, as a code editor's groups do: ◫ in the bar
 opens the canvas up in a pane beside it, a pane's name dragged onto a side of
 another docks it there (onto its middle swaps them, out of the window pops it
 out), the line between two shares the room, ⤢ makes a pane the main canvas,
 ⧉ pops it into a window of its own and ⇲ there docks it back. Each pane is a
 lens and a style of its own, held in its own store and kept current from the
-log like the main one; its places are its canvas's. The layout is the
+log like the main one; its places are its canvas's. Every pane is live: the
+query bar and find act on the one last touched, and sit over it (decision
+e_h2pqjy2q). A click on a node in a docked pane adds it to that pane's filter
+and opens its page in the sheet over the main canvas. Each pane keeps its own
+back and forward (‹ › in the bar): a step for each lens it is given, none for
+typing or for a page opened over it (e_ssnyd3ex). The layout is the
 reader's, kept in this browser for each workspace like the canvas settings:
 never on the map, meaning nothing. On a page taller than wide a row is drawn
 as a column.
@@ -203,8 +208,8 @@ there. A look is of the pane it went to. A popped-out window follows no agent:
 the main page does, for both.
 
 ## What is not yet so
-- A pane has no query bar or find of its own: what it draws is changed by
-  making it the main canvas (⤢).
+- Find excludes only what the query bar's box excludes (closed, system, a
+  type); an item named to leave out is not yet a term of the lens.
 - A kept view drawn in a document or a screen (`canvases.js` `keptView`)
   still nests what is inside what for the drawings that box it
   (architecture, grid, list). The canvas itself never does.

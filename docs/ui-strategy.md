@@ -34,8 +34,10 @@ canvas as a flat graph", with its decisions.
 ### Growing a canvas
 - **A click on a node adds it to the filter** and opens its page in the
   sheet. Hover shows its title and the start of its note.
-- **Find, at the canvas's foot, sets the filter's text.** Typing shows in
-  one line how many it would find and their first names; Enter draws them.
+- **Find, at the canvas's foot, sets the seeds.** Typing shows in one line
+  how many it would find and their first names; Enter draws them in place of
+  what was found, + or Shift+Enter adds them to it. What narrows and what is
+  left out stay.
 - **An item's address alone** (`#/e/<id>`) keeps the canvas when it draws
   the item, and otherwise draws the item with what it holds, depends on and
   waits on.
@@ -69,8 +71,9 @@ canvas as a flat graph", with its decisions.
 ### Panes
 - **More than one canvas at once,** side by side or popped out into a window
   of its own, docked by dragging a pane's name as in a code editor
-  (`docs/canvas.md`, Panes). The main canvas keeps the bar, find and the
-  sheet; where the panes stand is the reader's, in their browser.
+  (`docs/canvas.md`, Panes). The bar and find act on the pane last touched,
+  and each pane has its own back and forward; the sheet opens over the main
+  canvas. Where the panes stand is the reader's, in their browser.
 
 ### The sheet
 - **The sheet is the item's one page,** over the canvas where it stands,
