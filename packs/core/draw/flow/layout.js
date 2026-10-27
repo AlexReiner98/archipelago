@@ -10,8 +10,8 @@
 // open question is a scenario, and a choice nothing follows yet ends in a step of its own. Pure: an answer in,
 // geometry out; `measure(text, px)` gives a title's width at a size.
 
-import { drawnPaths, field, route, take, tieRoute } from './free.js';
-import { acyclic, flatten, grouped, highest, lowest, NEAR, ORDER, QUIET, reduced, wrapLeaves } from './graph.js';
+import { drawnPaths, field, outlineRoute, route, take, tieRoute } from './free.js';
+import { acyclic, flatten, grouped, highest, lowest, NEAR, ORDER, QUIET, placeOutline, reduced, wrapLeaves } from './graph.js';
 
 /** Past this many steps in a cluster the layer search and the sifting are skipped: they grow with the square of the steps. */
 export const LARGE = 60;
@@ -120,14 +120,15 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
     };
     spread([...asap.keys()]);
     for (const id of ids) if (!asap.has(id)) (asap.set(id, 0), spread([id]));
+    // Two in no order tied side by side stack, the one the link points to (holding nothing) under: the tie drops straight.
+    for (const t of ties) if (t.type !== NEAR && !flows(t.a) && !flows(t.b) && asap.get(t.a) === asap.get(t.b) && !near.get(t.b).some((n) => n.rel === 'child')) asap.set(t.b, asap.get(t.a) + 1);
     const wide = (id) => nodes.get(id).w + NODE_GAP;
-    // Many leaves of one (part of it, tied to nothing else) wrap in rows under it, to the shape asked for (./graph.js).
-    wrapLeaves({ ids, near, asap, flows, wide, tall: (id) => nodes.get(id).h + LAYER_GAP, aspect });
-    // In a large cluster, a layer wider than the picture should be wraps into rows, each a layer of its own, and pushes
-    // what is under it down: the order still reads from the top down, and a large map comes out about the shape asked
-    // for, not one band. The width is the one that makes the whole about `aspect` times as wide as tall; what is part
-    // of one thing stays together in a row. Only steps in no order wrap: a step of the order keeps its layer, so the
-    // order's wires gain no waypoints from the rows.
+    // Many leaves of one (part of it, tied to nothing else) wrap under it as an outline, to the shape asked for (./graph.js).
+    const outlines = large ? [] : wrapLeaves({ ids, near, asap, flows, wide, tall: (id) => nodes.get(id).h + LAYER_GAP / 2, bus: 2 * LEAD_OUT, aspect });
+    const outlined = new Set(outlines.flatMap((o) => o.leaves));
+    // In a large cluster, a layer wider than the picture should be wraps into rows, each a layer of its own, pushing
+    // what is under it down, so a large map comes out about `aspect` times as wide as tall, not one band; what is part
+    // of one thing stays together in a row. Only steps in no order (nor in an outline) wrap: the order keeps its layers.
     const across = Math.max(highest(ids.map(wide)), Math.sqrt(aspect * (BOX_H + LAYER_GAP) * ids.reduce((s, id) => s + wide(id), 0)));
     const byLayer = grouped(ids, (id) => asap.get(id));
     const parentOf = (id) => (near.get(id) ?? []).find((t) => t.rel === 'parent')?.id ?? '';
@@ -136,7 +137,7 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
       const list = byLayer.get(k).sort((p, q) => Number(!flows(p)) - Number(!flows(q)) || (parentOf(p) < parentOf(q) ? -1 : parentOf(p) > parentOf(q) ? 1 : 0));
       let row = 0, run = 0;
       for (const id of list) {
-        if (flows(id)) {
+        if (flows(id) || outlined.has(id)) {
           asap.set(id, k + added);
           run += wide(id);
           continue;
@@ -246,6 +247,8 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
     for (const [id, k] of chosen.layerOf) nodes.get(id).layer = k;
     for (const [id, w] of chosen.waypoints) nodes.set(id, w);
     const { chains, up, down, pullUp, pullDown, layers } = chosen;
+    // An outline's leaves take no room in their layers and pull nothing, set once the rest is (placeOutline).
+    for (const list of [...layers, ...pullUp.values(), ...pullDown.values()]) list.splice(0, list.length, ...list.filter((id) => !outlined.has(id)));
     const every = layers.flat();
 
     // ---- Places: each step pulled toward what it is wired and tied to, in order, never overlapping.
@@ -312,12 +315,13 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
             x.set(mover, Math.min(hi, Math.max(lo, x.get(mover) + Math.sign(x.get(other) - x.get(mover)) * need)));
           }
         }
+    for (const o of outlines) every.push(...placeOutline(o, { nodes, layers, x, gap: NODE_GAP, bus: 2 * LEAD_OUT }));
     const all = every.map((id) => nodes.get(id));
     const minX = lowest(all.map((n) => x.get(n.id) - n.w / 2));
     for (const id of every) x.set(id, x.get(id) - minX);
     const width = highest(all.map((n) => x.get(n.id) + n.w / 2));
     const { breaks, height } = wire({ all, chains, layers, room });
-    return { ids: every, chains, breaks, width, height };
+    return { ids: every, chains, breaks, width, height, outlines };
   };
 
   // ---- Routing, at right angles only. Between two layers a wire drops from the foot of its step, runs across on a
@@ -483,12 +487,13 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
       const others = steps.filter((n) => n.id !== e.a && n.id !== e.b).map((n) => box(n.id));
       chains.push({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b), points: route(box(e.a), box(e.b), LEAD_OUT, others) });
     }
-  // Each tie keeps off what is drawn already: the order's wires, then the ties before it (a tie that shares a step
-  // with another may run along it, as a bus out of one step).
+  // Each tie keeps off what is drawn already (the order's wires, then the ties before it), or shares a bus out of one step.
   const around = field(steps.map((n) => ({ id: n.id, ...box(n.id) })), LAYER_GAP);
   const taken = drawnPaths(LEAD_OUT / 2);
   for (const c of chains) take(taken, c.points, [c.a, c.b]);
-  for (const t of ties) t.points = tieRoute({ id: t.a, ...box(t.a) }, { id: t.b, ...box(t.b) }, LEAD_OUT, around, taken);
+  // A tie into an outline's leaf runs down its column's bus, from halfway down to the outline's first row (./free.js).
+  const outlineOf = new Map(laid.flatMap((c) => c.outlines.flatMap((o) => o.leaves.map((l) => [`${l} ${o.parent}`, lowest(o.leaves.filter((_, k) => k % o.rows === 0).map((f) => y.get(f) - nodes.get(f).h / 2))]))));
+  for (const t of ties) t.points = outlineOf.has(`${t.a} ${t.b}`) ? outlineRoute(box(t.b), box(t.a), outlineOf.get(`${t.a} ${t.b}`), LEAD_OUT) : tieRoute({ id: t.a, ...box(t.a) }, { id: t.b, ...box(t.b) }, LEAD_OUT, around, taken);
   const reachX = [...steps.map((n) => x.get(n.id) + n.w / 2), ...chains.flatMap((c) => c.points.map((p) => p[0]))];
   const reachY = [...steps.map((n) => y.get(n.id) + n.h / 2), ...chains.flatMap((c) => c.points.map((p) => p[1]))];
   return { nodes, all, chains, ties, breaks, potential, x, y, width: highest(reachX) + MARGIN, height: highest(reachY) + MARGIN };
