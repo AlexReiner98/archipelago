@@ -1,6 +1,7 @@
 import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
+import { hear } from './pane-route.js';
 import { types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
@@ -23,10 +24,9 @@ main.addEventListener('input', (e) => {
 // tool, and every change it makes). With "Follow agents" on, the page goes
 // there; a line at the bottom says who sent it and why. Anything half done on
 // the page, or a reader in the middle of reading it, is kept, and the line offers
-// the jump instead. Until the reader chooses, it is on only while one agent at most is at work.
+// the jump instead. It is on until the reader chooses: each session lands in a pane that follows it (ui/pane-route.js),
+// so several at work do not take the one canvas from each other.
 export const following = {
-  /** How many agents took a step lately: more than one, and nothing is followed unless the reader asks. */
-  working: 0,
   get on() {
     // A window popped out of the main page (ui/panes.js) draws one pane; the main page follows for it.
     if (window.name.startsWith('pelago-pane:')) return false;
@@ -36,7 +36,7 @@ export const following = {
     } catch {
       // Without storage, as if nothing was chosen.
     }
-    return this.working <= 1;
+    return true;
   },
   set on(value) {
     try {
@@ -113,9 +113,9 @@ export function follow(steps = []) {
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
   for (const s of steps) {
     heardFrom.add(s.actor);
-    if (s.kind === 'story') storyOf.set(s.actor, s.hash);
+    hear(s);
+    if (s.kind === 'story') storyOf.set(s.run ?? s.actor, s.hash);
   }
-  following.working = new Set(steps.filter((s) => Date.now() - s.at < 600_000).map((s) => s.actor)).size;
   followBox.checked = following.on;
   // A page not following still offers what an agent showed: the line, and the way there.
   const wanted = fresh.filter((s) => (following.on ? chosen.kinds.has(s.kind) : s.kind === 'show') && !chosen.muted.has(s.actor));
@@ -123,14 +123,18 @@ export function follow(steps = []) {
   const to = wanted.at(-1);
   if (!to) return;
   const place = wanted.findLast((s) => s.hash || storyOf.has(s.actor));
-  const there = place && `#/${storyOf.get(place.actor) ?? place.hash}`;
+  const there = place && `#/${storyOf.get(place.run ?? place.actor) ?? place.hash}`;
   const busy = !following.on || state.dirty || document.querySelector('dialog[open]') || reading();
+  // Which pane it lands in, by whose step it is (ui/panes.js): 'main' moves the address, a frame is a pane that drew
+  // it, null is no pane that follows this session, and it is only offered.
+  const landed = !busy && there ? (hooks.land ? hooks.land({ ...place, hash: there.slice(2) }) : 'main') : null;
+  const offered = busy || !landed;
   followed.replaceChildren(
     ...[
       // One line: who, and the first few words of why. The whole reason is on the page it brought you to.
       h('strong', {}, to.actor.split('/').at(-1)),
-      h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : busy ? 'is working somewhere else' : 'brought you here'),
-      busy && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
+      h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : offered ? 'is working somewhere else' : 'brought you here'),
+      offered && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
       following.on && h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
     ].filter(Boolean),
   );
@@ -138,9 +142,7 @@ export function follow(steps = []) {
   clearTimeout(followedTimer);
   // A show offered to a page not following stays longer: it is the only way the reader hears of it.
   followedTimer = setTimeout(() => (followed.hidden = true), following.on ? 12000 : 60000);
-  // A canvas docked beside the main one draws it, when the show asked for a pane or one draws it already (ui/panes.js); else the main canvas goes there.
-  const frame = !busy && place?.kind === 'show' && place.hash ? hooks.showIn?.(place.hash, place.pane) : null;
-  if (!busy && there && !frame && location.hash !== there) location.hash = there;
+  if (landed === 'main' && location.hash !== there) location.hash = there;
 }
 
 /** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */

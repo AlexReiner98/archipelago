@@ -16,7 +16,7 @@ test('a show names the pane it goes to, and the page is told it with the step', 
   await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, pane: 'right' } });
   const steps = (await call('/api/tail', undefined, { page })).result.steps;
   assert.ok(steps.some((s: { kind: string; pane?: string }) => s.kind === 'show' && s.pane === 'right'));
-  assert.match((await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, pane: 'nowhere' } })).error ?? '', /pane/);
+  assert.match((await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, pane: 'Not a pane!' } })).error ?? '', /pane/);
 });
 
 const browser = chrome();
