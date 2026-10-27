@@ -69,7 +69,7 @@
     {
       "id": "inquiry.assumes",
       "moved_from": ["assumes"],
-      "extends": "relates_to",
+      "extends": "bears_on",
       "title": "assumes",
       "inverse": "is assumed by",
       "from": ["*"],

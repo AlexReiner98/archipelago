@@ -319,7 +319,7 @@
     },
     {
       "id": "ships",
-      "extends": "relates_to",
+      "extends": "produced",
       "title": "ships",
       "inverse": "ships in",
       "from": ["occurrence"],
@@ -364,7 +364,7 @@
     },
     {
       "id": "works_at",
-      "extends": "relates_to",
+      "extends": "part_of",
       "title": "works at",
       "inverse": "employs",
       "from": ["person"],
@@ -400,7 +400,7 @@
     },
     {
       "id": "produced",
-      "extends": "relates_to",
+      "root": true,
       "title": "produced",
       "inverse": "was produced by",
       "from": ["*"],
@@ -435,17 +435,28 @@
       "description": "Replaces an older version."
     },
     {
-      "id": "relates_to",
+      "id": "link",
       "root": true,
-      "title": "relates to",
-      "inverse": "relates to",
+      "title": "is linked to",
+      "inverse": "is linked to",
       "from": ["*"],
       "to": ["*"],
-      "description": "A loose link. Prefer a specific relation when one fits."
+      "description": "The plain wire, drawn before its meaning is known: any link already says its two ends relate, so this one says nothing more. Nothing is a flavour of it; a link that means something is a flavour of the root it means.",
+      "moved_from": ["relates_to"]
+    },
+    {
+      "id": "uses",
+      "root": true,
+      "title": "uses",
+      "inverse": "is used by",
+      "from": ["*"],
+      "to": ["*"],
+      "description": "Relies on it to work, without waiting on it: a part that calls another, an app a team runs. Unlike depends on, it blocks nothing.",
+      "moved_from": ["software.uses"]
     },
     {
       "id": "tagged",
-      "extends": "relates_to",
+      "extends": "about",
       "title": "is tagged",
       "inverse": "tags",
       "from": ["*"],
@@ -726,7 +737,7 @@
     {
       "id": "core.brief",
       "shape": "data",
-      "lens": { "over": ["needs", "lives_in", "relates_to", "about", "bears_on", "depends_on", "waits_on"] },
+      "lens": { "over": ["needs", "lives_in", "link", "about", "bears_on", "depends_on", "waits_on"] },
       "answer": "brief",
       "description": "Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required)."
     },
@@ -863,7 +874,7 @@
         "headless": ["part_of"],
         "place_hues": ["#2f5fb3", "#a86a12", "#0f7c86", "#b5489a", "#4f8a2b", "#d0622c", "#6f43b0", "#8a8f2a"],
         "key": "shown",
-        "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#b23a48", "relates_to": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
+        "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#b23a48", "link": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
         "lit": "all",
         "open": 1,
         "show": ["status", "waits", "sessions"],

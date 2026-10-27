@@ -63,7 +63,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
   const needs = related('needs', [task.id]);
   // What the task rests on beyond structure (a rule that governs it, an issue it addresses, a question it assumes), by
   // the kind of link. From what holds it or what it needs, only questions and records: the rules and the decisions.
-  const kinds = l.registry.relationFamily('relates_to', 'about', 'bears_on').filter((t) => t !== 'produced');
+  const kinds = l.registry.relationFamily('link', 'about', 'bears_on').filter((t) => t !== 'produced');
   const tiedBy = new Map<string, { rel: string; near: boolean; e: Row }>();
   for (const r of out(kinds, [...ids, ...needs.map((n) => n.id)])) {
     const key = `${r.type} ${r.to_id}`;

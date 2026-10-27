@@ -95,7 +95,7 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
       `select ${cols('e')}, ${open ? 'r.id' : 'null'} as link from relation r join entity e on e.id = r.${far}
        where r.${near} = $1 and r.type = any($2::text[]) and r.valid_to is null and e.archived_at is null and ($3::text[] is null or e.type = any($3::text[]))
        order by ${order} limit ${READ_LIMIT}`,
-      [q.related, l.registry.relationFamily(q.relation ?? 'relates_to'), family(q.types)],
+      [q.related, l.registry.relationFamily(q.relation ?? 'link'), family(q.types)],
     );
     return rows.map(typed);
   }

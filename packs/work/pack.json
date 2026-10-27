@@ -165,7 +165,7 @@
     {
       "id": "work.based_on",
       "moved_from": ["based_on"],
-      "extends": "relates_to",
+      "extends": "about",
       "title": "is based on",
       "inverse": "informs",
       "from": ["*"],
@@ -175,7 +175,7 @@
     {
       "id": "work.governed_by",
       "moved_from": ["governed_by"],
-      "extends": "relates_to",
+      "extends": "about",
       "title": "is governed by",
       "inverse": "governs",
       "from": ["*"],

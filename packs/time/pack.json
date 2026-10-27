@@ -93,7 +93,7 @@
   "links": [
     {
       "id": "time.bills",
-      "extends": "relates_to",
+      "extends": "about",
       "title": "bills",
       "inverse": "is billed on",
       "from": ["time.invoice"],

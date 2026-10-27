@@ -26,7 +26,7 @@ async function chain() {
     { op: 'link', type: 'depends_on', from: 'c', to: 'b' },
     { op: 'link', type: 'depends_on', from: 'd', to: 'c' },
     { op: 'link', type: 'depends_on', from: 'x', to: 'a' },
-    { op: 'link', type: 'relates_to', from: 'n', to: 'a' },
+    { op: 'link', type: 'link', from: 'n', to: 'a' },
     { op: 'link', type: 'waits_on', from: 'c', to: 'bo', props: { for: 'Choose the words' } },
   ]);
   return { l, made };
@@ -83,7 +83,7 @@ test('the limit caps what is sent, seeds first, and says it cut', async () => {
 test('the answer is items and links, and nothing of the old lens', async () => {
   const { l, made } = await chain();
   await make(l, [{ op: 'define_type', type: { id: 'local.thing', title: 'Thing', description: 'A thing.', extends: 'work', fields: { colour: { type: 'string', shown: true }, secret: { type: 'string' } } } }]);
-  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'local.thing', title: 'Red thing', props: { colour: 'red', secret: 'kept' } }, { op: 'link', type: 'relates_to', from: 't', to: made.a }]);
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'local.thing', title: 'Red thing', props: { colour: 'red', secret: 'kept' } }, { op: 'link', type: 'link', from: 't', to: made.a }]);
   const answer = await flatLens(l, { filter: { ids: [t, made.a, made.c, made.bo] } });
   assert.deepEqual(Object.keys(answer).sort(), ['items', 'lens', 'links']);
   const thing = answer.items.find((i) => i.id === t)!;
@@ -92,7 +92,7 @@ test('the answer is items and links, and nothing of the old lens', async () => {
   for (const item of answer.items) for (const gone of ['inside', 'place', 'within', 'size', 'state']) assert.ok(!(gone in item), `no ${gone}`);
   const waits = answer.links.find((k) => k.type === 'waits_on')!;
   assert.deepEqual([waits.from, waits.to, waits.props], [made.c, made.bo, { for: 'Choose the words' }]);
-  assert.deepEqual(answer.links.map((k) => k.type).sort(), ['relates_to', 'waits_on'], 'every link among what is sent, and only those');
+  assert.deepEqual(answer.links.map((k) => k.type).sort(), ['link', 'waits_on'], 'every link among what is sent, and only those');
 });
 
 test('an agent asks it by name, and sees only what the viewer may', async () => {

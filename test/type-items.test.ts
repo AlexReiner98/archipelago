@@ -59,10 +59,10 @@ test('a retired link type makes no new link; one of the workspace\'s own can be 
   const made = await make(l, [
     { op: 'create', ref: 'a', type: 'work.task', title: 'A' },
     { op: 'create', ref: 'b', type: 'work.task', title: 'B' },
-    { op: 'create', type: 'link_type', title: 'Relates to', status: 'retired', props: { preset: 'relates_to' } },
+    { op: 'create', type: 'link_type', title: 'Is linked to', status: 'retired', props: { preset: 'link' } },
     { op: 'create', type: 'link_type', title: 'Feeds', props: { name: 'local.feeds', extends: 'depends_on' } },
   ]);
-  await assert.rejects(make(l, [{ op: 'link', type: 'relates_to', from: made.a, to: made.b }]), /retired here/);
+  await assert.rejects(make(l, [{ op: 'link', type: 'link', from: made.a, to: made.b }]), /retired here/);
   await make(l, [{ op: 'link', type: 'local.feeds', from: made.a, to: made.b }]);
   assert.deepEqual(l.registry.relationFamily('depends_on').includes('local.feeds'), true);
 });
@@ -74,4 +74,11 @@ test('an agent\'s type waits for the owner as any of its changes does', async ()
   assert.equal(l.registry.type('local.site_visit'), undefined);
   await l.decide(human, { proposal: (proposed as { proposal: string }).proposal, approve: true });
   assert.ok(l.registry.type('local.site_visit'));
+});
+
+test('nothing is a flavour of the plain link, and uses blocks nothing', async () => {
+  const l = await fresh();
+  await assert.rejects(make(l, [{ op: 'create', type: 'link_type', title: 'Touches', props: { name: 'local.touches', extends: 'link' } }]), /cannot be a flavour of link/);
+  assert.ok(!l.registry.relationFamily('depends_on', 'waits_on', 'needs').includes('software.calls'), 'a call is no block');
+  assert.deepEqual(l.registry.relationFamily('uses'), ['uses', 'software.calls']);
 });

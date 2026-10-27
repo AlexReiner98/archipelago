@@ -102,7 +102,7 @@ export interface ResolvedType {
 /** A relation as loaded: `root` names the root it extends (itself, for a root). */
 export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root: string; dormant?: boolean };
 
-/** The pack that approved type proposals are written to. */ export const LOCAL_PACK = 'local';
+/** The pack that approved type proposals are written to. */ export const LOCAL_PACK = 'local'; /** The plain wire: no link type is a flavour of it. */ export const BASE_LINK = 'link';
 export { SYSTEM } from './head.ts';
 
 export class Registry {
@@ -259,7 +259,7 @@ export class Registry {
       if (rel.root) return rel.id;
       if (rel.extends && rel.extends === rel.id) throw new Error(`Relation "${rel.id}" extends itself`);
       if (trail.includes(rel.id)) throw new Error(`Relation cycle: ${[...trail, rel.id].join(' -> ')}`);
-      const parent = rel.extends ? declared.get(rel.extends) : undefined;
+      const parent = rel.extends ? declared.get(rel.extends) : undefined; if (rel.extends === BASE_LINK) throw new Error(`Relation "${rel.id}" cannot be a flavour of ${BASE_LINK}, which means nothing more than that its ends relate: extend the root it means`);
       if (!parent) throw new Error(`Relation "${rel.id}" must extend one of the root relations${rel.extends ? `, not unknown "${rel.extends}"` : ''}`);
       for (const [side, ends] of [['from', rel.from], ['to', rel.to]] as const) {
         const bad = ends.find((end) => !fits(parent[side], end));

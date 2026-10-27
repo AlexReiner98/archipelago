@@ -26,7 +26,7 @@
   "links": [
     {
       "id": "funding.could_fund",
-      "extends": "relates_to",
+      "extends": "about",
       "title": "could fund",
       "inverse": "could be funded by",
       "from": ["funding.program"],
@@ -35,7 +35,7 @@
     },
     {
       "id": "funding.requires",
-      "extends": "relates_to",
+      "extends": "depends_on",
       "title": "requires first",
       "inverse": "comes before",
       "from": ["funding.program"],
@@ -44,7 +44,7 @@
     },
     {
       "id": "funding.reduces",
-      "extends": "relates_to",
+      "extends": "about",
       "title": "is figured after",
       "inverse": "reduces",
       "from": ["funding.program"],
@@ -53,21 +53,12 @@
     },
     {
       "id": "funding.earns",
-      "extends": "relates_to",
+      "extends": "produced",
       "title": "also earns",
       "inverse": "is earned by",
       "from": ["funding.program"],
       "to": ["funding.program"],
       "description": "Money spent under this program also earns the target, e.g. a payment to a college that earns a tax credit. Say how in props.says."
-    },
-    {
-      "id": "funding.leads_to",
-      "extends": "relates_to",
-      "title": "leads to",
-      "inverse": "follows from",
-      "from": ["funding.program"],
-      "to": ["funding.program"],
-      "description": "What this program produces or decides makes the target easier to get or use. Say how in props.says."
     }
   ]
 }

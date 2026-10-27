@@ -241,7 +241,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
   assert.match(await refused(alex, [{ op: 'create', ref: 'n', type: 'work.task', title: 'New shared', visibility: 'shared' }, { op: 'link', type: 'depends_on', from: 'n', to: made.priv }]), /cannot depend on "Private prep"/);
   // Private on private (same person) and private on shared are both fine: they were created above.
   // A looser relation is not a dependency, so it is allowed.
-  await api(alex, 'change', { reason: 'x', ops: [{ op: 'link', type: 'relates_to', from: made.pub, to: made.priv }] });
+  await api(alex, 'change', { reason: 'x', ops: [{ op: 'link', type: 'link', from: made.pub, to: made.priv }] });
 
   // Sharing something that waits on a private item needs that item shared too.
   assert.match(await refused(alex, [{ op: 'update', id: made.priv2, visibility: 'shared' }]), /cannot be shared while it depends on private items: "Private prep"/);

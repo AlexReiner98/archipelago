@@ -909,11 +909,11 @@
     "title": "Sign the package",
     "type": "work.task"
    },
-   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (work.decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Relates to\n- Is the cert enough? (open)\n\n## Is governed by\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, end its message with the line \"Closes: <sign>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (work.decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Is governed by\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, end its message with the line \"Closes: <sign>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
    "ties": [
     {
      "id": "<q>",
-     "relation": "relates_to",
+     "relation": "link",
      "status": "open",
      "title": "Is the cert enough?",
      "type": "work.decision"
@@ -1196,7 +1196,7 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
@@ -1542,7 +1542,7 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
@@ -1759,7 +1759,7 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
@@ -2050,7 +2050,7 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
@@ -2230,7 +2230,7 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<release>",
@@ -2827,7 +2827,7 @@
      "from": "<sign>",
      "id": "<link>",
      "to": "<q>",
-     "type": "relates_to"
+     "type": "link"
     },
     {
      "from": "<tiers>",

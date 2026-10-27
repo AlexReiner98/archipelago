@@ -15,7 +15,7 @@ import { askView } from '../src/askview.ts';
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place', 'system'];
-const ROOTS = ['part_of', 'depends_on', 'defers', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'supersedes', 'relates_to'];
+const ROOTS = ['part_of', 'depends_on', 'defers', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'supersedes', 'link', 'uses', 'produced'];
 const SYSTEM = ['lens', 'style', 'instruction', 'screen', 'type', 'link_type', 'sys.source', 'sys.run', 'sys.notification', 'sys.automation'];
 const human: Actor = { kind: 'human', name: 'test' };
 

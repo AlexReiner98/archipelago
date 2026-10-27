@@ -34,7 +34,7 @@ function ctxOver(items: Item[], links: [string, string, string][], blocked: Reco
     read: async (q: Record<string, any>) => {
       if (q.me) return me;
       // What is read around the event: here, all of the map.
-      if (q.around) return { items: [...byId.values()], links: links.map(([from, type, to], i) => ({ id: `r${i}`, type, from, to, is: type === 'software.ships' ? ['software.ships', 'ships', 'relates_to'] : [type] })) };
+      if (q.around) return { items: [...byId.values()], links: links.map(([from, type, to], i) => ({ id: `r${i}`, type, from, to, is: type === 'software.ships' ? ['software.ships', 'ships', 'produced'] : [type] })) };
       if (q.parts_of) return [...new Set(q.parts_of.flatMap((id: string) => [id, ...parts(id)]))].map((id) => byId.get(id as string)!);
       if (q.get) return byId.get(q.get) ?? null;
       if (q.items) return [...byId.values()].filter((e) => e.is.includes(q.items.type));

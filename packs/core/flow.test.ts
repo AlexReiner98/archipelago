@@ -135,12 +135,12 @@ test('the item a picture is of is a step like any other, tied to what is part of
 
 test("a flat lens's answer is drawn: every item a step, part_of a tie, depends_on the order, nothing nested", () => {
   const items = [flat('p', { type: 'work.project' }), flat('a'), flat('b'), flat('c'), flat('d'), flat('q', { kind: 'question' }), flat('t', { kind: 'aim', type: 'tag' })];
-  const links = [link('part_of', 'a', 'p'), link('part_of', 'b', 'p'), link('part_of', 'c', 'p'), link('depends_on', 'b', 'a'), link('depends_on', 'c', 'b'), link('relates_to', 'q', 'c'), link('tagged', 'd', 't')];
+  const links = [link('part_of', 'a', 'p'), link('part_of', 'b', 'p'), link('part_of', 'c', 'p'), link('depends_on', 'b', 'a'), link('depends_on', 'c', 'b'), link('link', 'q', 'c'), link('tagged', 'd', 't')];
   const g = layout({ items, links, undrawn: ['tagged'], measure, sizes: house.sizes });
   checks(g);
   assert.deepEqual([...g.nodes.keys()].sort(), ['a', 'b', 'c', 'd', 'p', 'q', 't'], 'every item a step');
   assert.deepEqual(g.chains.map((c: any) => c.key), ['a b', 'b c'], 'the order');
-  assert.deepEqual(g.ties.map((t: any) => `${t.type} ${t.a} ${t.b}`).sort(), ['part_of a p', 'part_of b p', 'part_of c p', 'relates_to q c'], 'every other link a tie, but what the style leaves undrawn');
+  assert.deepEqual(g.ties.map((t: any) => `${t.type} ${t.a} ${t.b}`).sort(), ['link q c', 'part_of a p', 'part_of b p', 'part_of c p'], 'every other link a tie, but what the style leaves undrawn');
   assert.ok(g.y.get('a') < g.y.get('b') && g.y.get('b') < g.y.get('c'), 'read from the top down');
 });
 

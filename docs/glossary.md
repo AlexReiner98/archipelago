@@ -38,8 +38,10 @@ in `src/pelago.ts`, read with `get`. Replaces *entity*.
 
 **link.** A typed tie from one item to another: `depends_on`, `part_of`,
 `waits_on`. In the code: a row of the `relation` table, projected from the
-log's facts about the link (`r_…`); link types are a pack's `links`, the
-roots in `packs/core/pack.json`. Replaces *relation* (still the name of the
+log's facts about the link (`r_…`); link types are a pack's `links`, each a
+flavour of one of core's roots (`packs/core/pack.json`), the meanings the
+kernel reads. `link` is the plain wire, drawn before a meaning is known:
+nothing is a flavour of it. Replaces *relation* (still the name of the
 table and of the `relation` field that identifies a link in `unlink`).
 
 **kind.** One of the seven broad sorts every type belongs to: actor, aim,

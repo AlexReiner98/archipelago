@@ -101,7 +101,7 @@
   "links": [
     {
       "id": "sys.works_on",
-      "extends": "relates_to",
+      "extends": "about",
       "title": "is working on",
       "inverse": "is being worked on by",
       "from": ["sys.run", "agent", "person"],

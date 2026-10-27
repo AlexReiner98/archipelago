@@ -229,15 +229,6 @@
       "description": "The repository that holds the work."
     },
     {
-      "id": "software.uses",
-      "extends": "relates_to",
-      "title": "uses",
-      "inverse": "is used by",
-      "from": ["*"],
-      "to": ["software.application"],
-      "description": "An application the work depends on or targets."
-    },
-    {
       "id": "software.answers",
       "extends": "bears_on",
       "title": "helps answer",
@@ -248,7 +239,7 @@
     },
     {
       "id": "software.calls",
-      "extends": "relates_to",
+      "extends": "uses",
       "title": "calls",
       "inverse": "is called by",
       "from": ["*"],
@@ -266,7 +257,7 @@
     },
     {
       "id": "software.settles",
-      "extends": "relates_to",
+      "extends": "about",
       "title": "settles",
       "inverse": "is settled by",
       "from": ["software.commit"],

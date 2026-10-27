@@ -272,7 +272,7 @@ function factChangeset(dayIndex: number) {
     } else if (project) link('part_of', item, project, at, actor, cs, reason, { authority, until: unlinked() });
     if (['work.document', 'work.decision', 'work.note'].includes(type) && recentTasks.length && chance(0.5)) link('about', item, pick(recentTasks), at, actor, cs, reason, { authority });
     if (type === 'software.feature') recentFeatures.push(item);
-    if (type === 'software.pull_request' && recentTasks.length) link('relates_to', item, pick(recentTasks.slice(-200)), at, actor, cs, reason, { authority });
+    if (type === 'software.pull_request' && recentTasks.length) link('link', item, pick(recentTasks.slice(-200)), at, actor, cs, reason, { authority });
   }
 }
 

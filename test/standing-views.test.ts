@@ -68,7 +68,7 @@ async function fixture() {
     { op: 'link', type: 'waits_on', from: 'hover', to: 'bo', props: { for: 'The card design' } },
     { op: 'link', type: 'needs', from: 'sign', to: 'lane' },
     { op: 'link', type: 'work.governed_by', from: 'lane', to: 'rule' },
-    { op: 'link', type: 'relates_to', from: 'sign', to: 'q' },
+    { op: 'link', type: 'link', from: 'sign', to: 'q' },
     { op: 'link', type: 'software.ships', from: 'release', to: 'addin' },
     { op: 'link', type: 'depends_on', from: 'release', to: 'installer' },
     { op: 'link', type: 'depends_on', from: 'release', to: 'pricing' },

@@ -60,8 +60,8 @@ test("the page's projector makes the server's rows from the log, row for row", a
   const edit = (await l.change(human, { reason: 'Reshape', ops: [{ op: 'update', id: made.u, title: 'Tail it' }, { op: 'archive', id: made.u }] })) as { changeset: string };
   await undo(l, human, { changeset: edit.changeset });
   await make(l, [{ op: 'update', id: made.t, props: { tokens_estimated: null } }, { op: 'archive', id: made.q }]);
-  const gone = await make(l, [{ op: 'create', ref: 'g', type: 'work.task', title: 'Forgotten', owner: me }, { op: 'link', type: 'relates_to', from: 'g', to: made.t }]);
-  const kept = await make(l, [{ op: 'create', ref: 'k', type: 'work.task', title: 'Kept one' }, { op: 'link', type: 'relates_to', from: 'k', to: made.p }]);
+  const gone = await make(l, [{ op: 'create', ref: 'g', type: 'work.task', title: 'Forgotten', owner: me }, { op: 'link', type: 'link', from: 'g', to: made.t }]);
+  const kept = await make(l, [{ op: 'create', ref: 'k', type: 'work.task', title: 'Kept one' }, { op: 'link', type: 'link', from: 'k', to: made.p }]);
   await make(l, [{ op: 'merge', keep: made.t, drop: kept.k }]);
   await make(l, [{ op: 'forget', id: gone.g }]);
   const link = ((await l.get(made.t)).outgoing as { type: string; relation: string }[]).find((o) => o.type === 'part_of')!;
