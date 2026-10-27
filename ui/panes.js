@@ -12,6 +12,7 @@ import { activate, canvasHref, focusOn, home, sheetOver, withItem } from './canv
 import { canvasLens } from './canvases.js';
 import { flatQuery, flatView, readFlatLens } from './lens.js';
 import { lookMode } from './look.js';
+import { busy, windowOf, windows } from './pane-busy.js';
 import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf, route, sessionOf } from './pane-route.js';
 import { unfollow } from './replica.js';
@@ -353,6 +354,7 @@ function popOut(id) {
   const box = el?.getBoundingClientRect();
   const win = window.open(`${location.pathname}#/${layout.panes[id].at}`, `pelago-pane:${id}`, `popup,width=${Math.round(box?.width ?? innerWidth / 2)},height=${Math.round(box?.height ?? innerHeight)}`);
   if (!win) return;
+  windows.set(id, win);
   layout.panes[id] = { ...layout.panes[id], popped: true };
   layout.groups = layout.groups.filter((g) => g !== id);
   even();
@@ -376,7 +378,8 @@ let docking = false;
 const here = () => location.hash.replace(/^#\//, '') || 'v';
 function dockBack() {
   layout = read();
-  layout.panes[popped] = { at: here() };
+  const { popped: _, ...was } = layout.panes[popped] ?? {};
+  layout.panes[popped] = { ...was, at: here() };
   layout.groups = [...layout.groups.filter((g) => g !== popped), popped];
   even();
   keep();
@@ -385,7 +388,8 @@ function dockBack() {
 }
 if (popped) {
   document.body.dataset.popped = 'true';
-  const mine = () => ((layout = read()), (layout.panes[popped] = { at: here(), popped: true }), keep());
+  // Whom it follows stays with it: the main page sends it what its session shows.
+  const mine = () => ((layout = read()), (layout.panes[popped] = { ...layout.panes[popped], at: here(), popped: true }), keep());
   addEventListener('hashchange', () => setTimeout(mine, 0));
   addEventListener('pagehide', () => {
     if (docking) return;
@@ -430,15 +434,31 @@ hooks.paneButtons = () => {
 /** When each pane last drew a session's step, by pane: a pane that follows everyone is that session's while it is at work. */
 const landed = new Map();
 /**
- * Where an agent's step lands (ui/live.js), as ui/pane-route.js works it out from whom each pane follows: answers
- * 'main' for the main canvas, which the address then moves; the frame of a pane that draws it; or null where no pane
- * takes it, and it is only offered.
+ * Open a window of its own for a session's pane, drawing this address: 'popped', or, where the browser holds back a
+ * window no press opened, the way to open it from the line (ui/live.js), where a press may.
+ */
+function popNew(at, own) {
+  const id = newId();
+  const win = window.open(`${location.pathname}#/${at}`, `pelago-pane:${id}`, `popup,width=${Math.round(innerWidth / 2)},height=${Math.round(innerHeight)}`);
+  if (!win) return { popOut: () => popNew(at, own) };
+  windows.set(id, win);
+  layout.panes[id] = { at, ...own, popped: true };
+  keep();
+  landed.set(id, { session: own.follows, at: Date.now() });
+  return 'popped';
+}
+/**
+ * Where an agent's step lands (ui/live.js), as ui/pane-route.js works it out from whom each pane follows and where the
+ * reader is busy (ui/pane-busy.js): answers 'main' for the main canvas, which the address then moves; the frame of a
+ * docked pane that draws it, or 'popped' for a window of its own; { popOut } where a window would be opened and the
+ * browser will not without a press; or null where no pane takes it, and it is only offered.
  */
 hooks.land = (step) => {
   if (popped) return null;
   const at = step.hash;
-  const pane = (id, p) => ({ id, follows: p?.follows ?? 'all', slot: p?.slot, landed: landed.get(id), draws: named(id === 'main' ? asPane(canvasHref()) : p.at) === named(at) });
-  const panes = [pane('main', layout.main), ...docked().map((g) => pane(g, layout.panes[g]))];
+  const pane = (id, p) => ({ id, follows: p?.follows ?? 'all', slot: p?.slot, landed: landed.get(id), busy: busy(id), popped: p?.popped, draws: named(id === 'main' ? asPane(canvasHref()) : p.at) === named(at) });
+  const out = Object.keys(layout.panes).filter((id) => layout.panes[id].popped && windowOf(id));
+  const panes = [pane('main', layout.main), ...docked().map((g) => pane(g, layout.panes[g])), ...out.map((g) => pane(g, layout.panes[g]))];
   const now = Date.now();
   const others = [...heard].filter(([key, o]) => key !== sessionOf(step) && now - o.at < 600_000).length;
   const to = route(step, panes, { now, recent: 600_000, most: 4, others, drawable: drawable(at) });
@@ -448,6 +468,13 @@ hooks.land = (step) => {
     if (to.side === 'alone') alone();
     landed.set('main', { session, at: Date.now() });
     return 'main';
+  }
+  if (to.open?.popped) return popNew(at, { follows: to.open.follows, named: nameOf(to.open.follows), ...(to.open.slot && { slot: to.open.slot }) });
+  const win = to.pane && layout.panes[to.pane]?.popped ? windowOf(to.pane) : null;
+  if (win) {
+    win.location.hash = `#/${at}`;
+    landed.set(to.pane, { session, at: Date.now() });
+    return 'popped';
   }
   const id = to.open ? openPane(at, to.open.side, 'main', { follows: to.open.follows, named: nameOf(to.open.follows), ...(to.open.slot && { slot: to.open.slot }) }) : to.pane;
   if (!id) return null;
