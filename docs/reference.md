@@ -68,8 +68,9 @@ The web UI has five places, and one page for each thing.
   whether new things start private; the backup), **Packs** (each pack a card with
   its on/off switch and what it touches, its manifest's keys grouped as types,
   links, views, styles, instructions, rules, actions, runs and reach, each
-  counted; a group changed here, such as its styles, screens or checks, opens
-  in the card on a click), and **Connections** (the
+  counted; a click opens a group in the card, each thing in it one line by name
+  and what it is, with its controls where it is changed here: styles, screens,
+  checks), and **Connections** (the
   GitHub App, pushes and the webhook, the other workspaces that may notify
   this one). Each setting is one row; what is done rarely is in its ⋯ menu.
 

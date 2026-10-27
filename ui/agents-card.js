@@ -70,7 +70,7 @@ export function agentsMayCard(info, then, fail) {
 /** A rule that asks an agent at its reply's end (on its pack's card): how often it asked this week, and its switch. */
 export function checkRow(r) {
   const on = h('input', { type: 'checkbox', checked: !r.off, title: 'On: it asks an agent whose reply did what it names' });
-  const name = h('span', { class: 'grow', title: `A check: once a turn, it asks an agent whose reply did what it names.\n${r.say}` }, h('strong', {}, r.rule.split('.').pop().replaceAll('_', ' ')), ' ', h('span', { class: 'muted small' }, 'a check on replies'));
+  const name = h('span', { class: 'grow', title: `A check: once a turn, it asks an agent whose reply did what it names.\n${r.say}` }, h('strong', {}, r.rule.split('.').pop().replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase())), ' ', h('span', { class: 'muted small' }, 'a check on replies'));
   on.onchange = () => api('workspace_set', { lifted: { [r.lifted]: !on.checked } }).catch((err) => ((on.checked = !on.checked), (name.title = err.message)));
   return line(name, h('span', { class: 'pill', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)), on);
 }

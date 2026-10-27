@@ -1,7 +1,8 @@
 // The Workspace screen's packs: each pack on this server a plate, kept to what matters at a glance: its name, its
 // switch, and what it touches, as the server groups its manifest's keys (packTouches in src/packstate.ts): types,
-// links, views, styles, instructions, rules, actions, runs, reach, each with how many. A group the owner controls here
-// (the styles, the screens among its views, the checks among its rules) opens its rows in the plate on a click.
+// links, views, styles, instructions, rules, actions, runs, reach, each with how many. A group opens in the plate on a
+// click, so the owner sees exactly what the pack brings: each thing one line, by name and what it is, and where the
+// owner changes it here (its styles, the screens among its views, the checks among its rules), its controls.
 
 import { api, ask, h, state, tell } from './base.js';
 import { screenRows } from './nav.js';
@@ -17,7 +18,6 @@ const KERNEL = ['core'];
 const opened = new Map();
 
 const list = (v) => (Array.isArray(v) ? v : Object.values(v ?? {}));
-const plural = (n, one) => `${n} ${n === 1 ? one.replace(/s$/, '') : one}`;
 /** What each group is, for its tooltip. */
 const MEANS = {
   types: 'what it adds to the map',
@@ -45,28 +45,35 @@ export function packsCard({ info, then, goTo }) {
     if (!sure) return void (box.checked = !on);
     api('pack_set', { pack: p.id, on }).then(then, (err) => ((box.checked = !on), tell('That was not done', err.message)));
   };
-  // The rows the owner controls in a group, where the pack has any here.
+  // The rows the owner controls in a group, where the pack has any here, and the sorts of thing they cover.
   const controls = (p, key) => {
     const of = (things) => list(things).filter((t) => t.pack === p.id);
     if (key === 'styles') {
       const styles = of(schema.styles);
       const themes = styles.filter(isTheme);
-      return [styleRows(styles.filter((s) => !isTheme(s)), then), themes.length > 0 && line(h('span', { class: 'grow' }, h('strong', {}, plural(themes.length, 'themes')), ' ', h('span', { class: 'muted small' }, 'one for the whole map')), h('button', { onclick: () => goTo('map') }, 'Choose'))].flat().filter(Boolean);
+      // Its themes are each listed by name; one is chosen for the whole map, on the Map section.
+      const choose = themes.length > 0 && line(h('span', { class: 'grow muted small' }, 'One theme is chosen for the whole map'), h('button', { onclick: () => goTo('map') }, 'Choose'));
+      return { covers: ['preset'], rows: styleRows(styles.filter((s) => !isTheme(s)), then), after: choose ? [choose] : [] };
     }
-    if (key === 'views') return screenRows(of(schema.screens), then).filter(Boolean);
-    if (key === 'rules') return (info.reply_rules ?? []).filter((r) => r.rule.startsWith(`${p.id}.`)).map(checkRow);
-    return [];
+    if (key === 'views') return { covers: ['screen'], rows: screenRows(of(schema.screens), then).filter(Boolean) };
+    if (key === 'rules') return { covers: ['check'], rows: (info.reply_rules ?? []).filter((r) => r.rule.startsWith(`${p.id}.`)).map(checkRow) };
+    return { covers: [], rows: [] };
+  };
+  // Everything in a group, one line each: the controls where the owner changes it here, the rest by name and what it is.
+  const group = (p, t) => {
+    const c = p.state !== 'off' ? controls(p, t.key) : { covers: [], rows: [] };
+    const shown = c.rows.length ? t.items.filter((x) => !c.covers.includes(x.sort)) : t.items;
+    return [...c.rows, ...shown.map((x) => line(h('span', { class: 'grow', title: [x.name, x.about].filter(Boolean).join(': ') }, h('strong', {}, x.name), ' ', h('span', { class: 'muted small' }, x.about)))), ...(c.after ?? [])];
   };
   const packPlate = (p) => {
     const on = p.state !== 'off';
-    const open = opened.get(p.id);
     const touched = (p.touches ?? []).filter((t) => t.n > 0);
-    const rows = on && open ? controls(p, open) : [];
+    const open = touched.find((t) => t.key === opened.get(p.id));
     const cell = (t) => {
-      const can = on && controls(p, t.key).length > 0;
+      const can = on && (controls(p, t.key).rows.length > 0 || (controls(p, t.key).after ?? []).length > 0);
       return h(
-        can ? 'button' : 'span',
-        { class: `touch${t.key === open ? ' on' : ''}${can ? ' can' : ''}`, title: `${t.n} ${t.key}: ${MEANS[t.key] ?? ''}${t.names.length ? `\n${t.names.slice(0, 12).join(', ')}${t.names.length > 12 ? ', …' : ''}` : ''}${can ? '\nClick to change them here' : ''}`, onclick: can ? () => (opened.set(p.id, t.key === open ? null : t.key), draw()) : null },
+        'button',
+        { class: `touch${t === open ? ' on' : ''}${can ? ' can' : ''}`, title: `${t.n} ${t.key}: ${MEANS[t.key] ?? ''}${can ? '. Some are changed here' : ''}`, 'aria-expanded': String(t === open), onclick: () => (opened.set(p.id, t === open ? null : t.key), draw()) },
         h('strong', {}, String(t.n)),
         h('span', {}, t.key),
       );
@@ -80,7 +87,7 @@ export function packsCard({ info, then, goTo }) {
       marks: p.state === 'waiting' && h('span', { class: 'pill warn', title: p.why ?? '' }, 'waiting'),
       // The switch is on the plate's face; the kernel's pack has none, since it is never off.
       action: KERNEL.includes(p.id) ? h('span', { class: 'muted small', title: 'The kernel’s own: never off' }, 'always on') : box,
-      rows: [h('li', { class: 'touches' }, touched.map(cell)), rows],
+      rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : []],
     });
   };
   let packs = [];

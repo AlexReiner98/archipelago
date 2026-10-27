@@ -83,12 +83,9 @@ export function screenRows(screens, then) {
       navable(s) && typeof s.nav !== 'number' && h('button', { title: 'Give it a place in the nav, after the others', onclick: () => add(s) }, 'Add to nav'),
       rare(s),
     );
-  // A screen on the pages of a kind has no switch here: those are one row, each named in its tooltip.
+  // A screen on the pages of a kind has no switch here: it is a row of its own, saying which pages it is on.
   const actionable = (s) => s.at === 'home' || Boolean(s.homeable) || navable(s);
   const onPages = screens.filter((s) => !actionable(s));
-  const pagesRow =
-    onPages.length > 0 &&
-    h('li', { class: 'one' }, h('span', { class: 'grow muted small', title: onPages.map((s) => `${s.title}: ${where(s)}`).join('\n') }, `${onPages.length} on item pages`));
   const sorted = [...screens].filter(actionable).sort((a, b) => Number(b.at === 'home' || Boolean(b.homeable)) - Number(a.at === 'home' || Boolean(a.homeable)) || (typeof a.nav === 'number' ? a.nav : 1e9) - (typeof b.nav === 'number' ? b.nav : 1e9) || Number(navable(b)) - Number(navable(a)));
-  return [...sorted.map(row), pagesRow];
+  return [...sorted.map(row), ...onPages.map(row)];
 }
