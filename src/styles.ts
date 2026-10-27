@@ -135,7 +135,7 @@ function typeVars(type: unknown, faces: unknown): [string, string][] {
     if (!NAME.test(role) || !t || typeof t !== 'object') continue;
     const at = `--type-${role.replaceAll('_', '-')}`;
     out.push([`${at}-family`, face(t.face)], [`${at}-weight`, [400, 600].includes(t.weight) ? String(t.weight) : '400'], [`${at}-style`, t.style === 'italic' ? 'italic' : 'normal']);
-    out.push([`${at}-case`, t.case === 'upper' ? 'uppercase' : 'none'], [`${at}-track`, typeof t.track === 'string' && /^-?\d+(\.\d+)?em$/.test(t.track) ? t.track : '0em']);
+    out.push([`${at}-case`, t.case === 'upper' ? 'uppercase' : 'none'], [`${at}-track`, typeof t.track === 'string' && /^-?\d+(\.\d+)?em$/.test(t.track) ? t.track : '0']);
   }
   return out;
 }
