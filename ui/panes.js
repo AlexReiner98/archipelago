@@ -53,8 +53,10 @@ function paneEl(id) {
   const mark = h('span', { class: 'pane-follows', hidden: true });
   const body = h('div', { class: 'pane-canvas' });
   const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
-  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, name, mark, button('Open it as the main canvas', '⤢', () => toMain(id)), button('Close this pane', '×', () => close(id))), body);
-  name.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
+  // Its controls stand in its strip in focus or not: in focus, the query bar takes the name's place between them.
+  const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
+  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Open it as the main canvas', '⤢', () => toMain(id)), button('Close this pane', '×', () => close(id))), body);
+  for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
   const entry = { el, body, name, mark, view: null, at: null, back: [], forth: [] };
   drawn.set(id, entry);
   fitOnMount(body);
@@ -313,23 +315,16 @@ addEventListener('resize', () => {
 // The sheet opening or shutting changes the room the panes share.
 new MutationObserver(() => started && front().groups.length > 1 && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 
-/** The query bar's own for the pane it acts on: move it, back and forth, split, and for a docked pane make main and close. */
+/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. A docked pane's move, make main and close stay in its strip. */
 export function paneButtons() {
   const { back, forth } = historyNow();
-  const button = (label, title, mark, onclick, off) => h('button', { type: 'button', class: 'q-save', title, 'aria-label': label, disabled: off, onclick }, mark);
-  // A docked pane in focus has its names covered by the bar: what they offered is here, and it is dragged from ⠿.
+  const button = (label, title, mark, onclick, off, cls = 'q-save') => h('button', { type: 'button', class: cls, title, 'aria-label': label, disabled: off, onclick }, mark);
   const entry = active === 'main' ? null : drawn.get(active);
-  const grip = entry ? h('button', { type: 'button', class: 'q-save q-grip', title: 'Drag to dock this pane elsewhere', 'aria-label': 'Move this pane' }, '⠿') : null;
-  grip?.addEventListener('pointerdown', (ev) => dragPane(ev, active, entry.el, { groups: groupEls, drop }));
   return [
-    grip,
-    // Back and forth come into sight once there is somewhere to go.
-    (back.length > 0 || forth.length > 0) && button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length),
-    (back.length > 0 || forth.length > 0) && button('Forward', 'Forward again', '›', () => travel(1), !forth.length),
-    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', '◫', () => openPane(asPane(active === 'main' ? canvasHref() : `#/${entry.at}`), 'right', active)),
-    entry && button('Make main', 'Open it as the main canvas', '⤢', () => toMain(active)),
-    entry && button('Close', 'Close this pane', '×', () => close(active)),
-  ].filter(Boolean);
+    button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length),
+    button('Forward', 'Forward again', '›', () => travel(1), !forth.length),
+    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', '◫ Split', () => openPane(asPane(active === 'main' ? canvasHref() : `#/${entry.at}`), 'right', active), false, 'q-save q-word'),
+  ];
 }
 /** The address the pane the bar acts on draws, for a new tab to open on. */
 export const activeAt = () => (active === 'main' ? canvasHref() : `#/${drawn.get(active)?.at ?? ''}`);

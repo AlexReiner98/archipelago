@@ -13,7 +13,7 @@ option, optgroup { background: var(--panel); color: var(--text); }
    cover it, and runs to the foot of the page, with find drawn over it: no room is kept for find. A drawing on the
    plane is fitted above find; one that scrolls (a list, a grid) keeps room for it after its end only, so its last row
    can be scrolled out from under it. */
-#canvas { --safe-top: calc(2 * var(--box-9) + var(--space-8) + var(--space-6)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
+#canvas { --safe-top: calc(var(--strip) + var(--box-9) + var(--space-4)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
 #canvas .lens-view { position: relative; box-sizing: border-box; padding: var(--safe-top) 0 var(--safe-bottom); overflow: auto; }
 #canvas .lens-view:has(.lf-stage), #canvas .lens-view:has(.code-stage) { padding: var(--safe-top) 0 0; overflow: hidden; }
 /* A style's own code fills its canvas or pane, not the height a document gives its frame. */
@@ -29,77 +29,107 @@ option, optgroup { background: var(--panel); color: var(--text); }
 #canvas .lens-view > .empty, #canvas .lens-view > .error, #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 
 /* The bar: where the canvas stands, what waits for you, and the menu. */
-#nav { position: fixed; z-index: 5; top: calc(var(--main-top, 0%) + var(--space-7)); left: calc(var(--main-left, 0%) + var(--space-9)); right: calc(var(--main-right, 0%) + var(--space-9)); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
+#nav { position: fixed; z-index: 5; top: var(--space-4); left: var(--space-9); right: var(--space-9); height: var(--box-9); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
 #nav > * { pointer-events: auto; }
 /* The bar runs across the page over the sheet, one pane or several: the sheet opens under it (the owner, 27 Oct 2026). */
-body { --bar-room: calc(var(--box-9) + 2 * var(--space-7)); }#nav > .grow { flex: 1; pointer-events: none; }
-/* Tabs (ui/tab-bar.js): one for each canvas kept, a session's named in its hue; many shrink to their mark and first letters. */
-#tabs { display: flex; align-items: center; gap: var(--space-3); min-width: 0; overflow-x: auto; scrollbar-width: none; }
-#tabs > .tab { pointer-events: auto; flex: 0 1 auto; min-width: calc(var(--box-3) + 2 * var(--space-5) + 2 * var(--border-1)); box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-5); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); color: var(--muted); font-size: var(--text-3); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
-#tabs > .tab[aria-selected="true"] { flex-shrink: 0; max-width: 40%; color: var(--text); font-weight: 600; border-color: var(--session-hue, var(--accent)); }
-#tabs > .tab.tab-out { border-style: dashed; }
-#tabs > .tab[data-unseen] { color: var(--text); box-shadow: inset 0 0 0 var(--border-1) var(--session-hue, var(--accent)); }
+/* One layout for one pane or several: the bar in a band across the top, over the sheet, and every pane under it with
+   its strip, so nothing moves or changes width when a tab is split. */
+body { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
+#nav > .grow { flex: 1; pointer-events: none; }
+/* Tabs (ui/tab-bar.js): one for each canvas kept, a session's named in its hue; many shrink to their mark and first letters.
+   They stand on one line across the bar, square below and rounded above; the one in sight is raised in the panel's
+   colour over that line, its top in the accent or its session's hue. No tab changes its size or controls when another
+   comes into sight. */
+#tabs { align-self: stretch; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: calc(-1 * var(--border-1)); padding: 0 var(--space-3); overflow-x: auto; scrollbar-width: none; }
+#tabs > .tab { pointer-events: auto; flex: 0 1 auto; max-width: 40%; min-width: calc(var(--box-8) + 2 * var(--box-7) + var(--space-6)); box-sizing: border-box; display: inline-flex; align-items: center; gap: 0; height: var(--box-8); padding: 0 var(--space-1) 0 var(--space-6); background: none; border: var(--border-1) solid transparent; border-bottom: 0; border-radius: var(--radius-3) var(--radius-3) 0 0; color: var(--muted); font-size: var(--text-5); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
+#tabs > .tab:hover { color: var(--text); background: var(--accent-soft); }
+#tabs > .tab[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
+#tabs > .tab.tab-out { border-color: var(--line); border-style: dashed; }
+#tabs > .tab[data-unseen] { color: var(--text); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
 #tabs > .tab.tab-shown { animation: tab-shown 1.2s ease 2; }
 @keyframes tab-shown { 50% { background: var(--accent-soft); } }
 #tabs .tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #tabs .tab-name.who-session::before { margin-right: var(--space-3); }
-#tabs .tab-act { flex: none; border: 0; background: none; padding: 0 var(--space-2); color: var(--muted); font: inherit; font-weight: 400; cursor: pointer; }
-#tabs .tab-act:hover { color: var(--accent); }
 #tabs > .tab[data-follows="none"] .tab-name { font-style: italic; }
-#tabs > .tab-new { pointer-events: auto; flex: none; border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); font-size: var(--text-4); cursor: pointer; }
-#tabs > .tab-new:hover { color: var(--accent); }
+/* Every control on the strip, in the bar and on a pane is a button a finger finds: a square of one size, its mark large enough to read. */
+#tabs .tab-act, #tabs > .tab-new, #query .q-save, #panes .pane-act { flex: none; display: inline-grid; place-items: center; box-sizing: border-box; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); font-size: var(--text-8); line-height: 1; cursor: pointer; }
+#tabs .tab-act:hover, #tabs > .tab-new:hover, #query .q-save:hover:not(:disabled), #panes .pane-act:hover { color: var(--text); background: var(--accent-soft); }
+#query .q-save:disabled { opacity: 0.35; cursor: default; }
+/* An action that is not read from its mark alone says its word beside it. */
+#query .q-save.q-word { width: auto; gap: var(--space-3); grid-auto-flow: column; padding: 0 var(--space-5); font-size: var(--text-4); color: var(--text); }
+#tabs > .tab-new { pointer-events: auto; align-self: center; }
 /* The tab in sight's menu: whom it follows, pop out. A popover, so the strip does not clip it. */
-.tab-menu { position: fixed; inset: auto; margin: var(--space-3) 0 0; display: grid; min-width: var(--menu-least); padding: var(--space-4); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); box-shadow: 0 var(--space-4) var(--space-10) rgb(0 0 0 / 0.22); }
-.tab-menu:not(:popover-open) { display: none; }
+.tab-menu, .term-pick { position: fixed; inset: auto; margin: var(--space-3) 0 0; display: grid; min-width: var(--menu-least); padding: var(--space-4); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); box-shadow: 0 var(--space-4) var(--space-10) rgb(0 0 0 / 0.22); }
+.tab-menu:not(:popover-open), .term-pick:not(:popover-open) { display: none; }
 .tab-menu > button { text-align: left; border: 0; background: none; padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); white-space: nowrap; cursor: pointer; }
 .tab-menu > button:hover { background: var(--accent-soft); }
 .tab-menu > button[aria-checked="true"] { font-weight: 600; }
 .tab-menu > button[aria-checked="true"]::after { content: ' ✓'; color: var(--accent); }
 .tab-menu > .tab-menu-head { padding: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-2); }
 .tab-menu > hr { width: 100%; margin: var(--space-3) 0; border: 0; border-top: var(--border-1) solid var(--line); }
-#nav .brand { flex: none; font-family: var(--type-wordmark-family); font-weight: var(--type-wordmark-weight); font-style: var(--type-wordmark-style); text-transform: var(--type-wordmark-case); letter-spacing: var(--type-wordmark-track); font-size: var(--text-7); color: var(--text); text-decoration: none; padding: var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
+/* A part's menu (ui/term-pick.js): a field to narrow or write in, then the choices by group, and what the part holds. */
+.term-pick { width: var(--menu-least); max-height: var(--scroll-most); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.term-pick-field { margin: 0 0 var(--space-3); padding: var(--space-4) var(--space-5); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--bg); color: var(--text); font: inherit; outline: none; }
+.term-pick-field:focus { border-color: var(--accent); }
+.term-pick-field.wrong { border-color: var(--bad); }
+.term-pick-list { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.term-pick-list > * { flex: none; }
+.term-pick-head { padding: var(--space-4) var(--space-5) var(--space-2); color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
+.term-pick-item { text-align: left; border: 0; background: none; padding: var(--space-4) var(--space-5); border-radius: var(--radius-2); color: var(--text); font: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.term-pick-item:hover, .term-pick-item:focus-visible { background: var(--accent-soft); outline: none; }
+.term-pick-typed { color: var(--accent); }
+.term-pick-held { display: flex; align-items: center; }
+.term-pick-held > .term-pick-item { flex: 1; min-width: 0; }
+.term-pick-x { flex: none; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); cursor: pointer; }
+.term-pick-x:hover { color: var(--text); }
+#nav .brand { flex: none; font-family: var(--type-wordmark-family); font-weight: var(--type-wordmark-weight); font-style: var(--type-wordmark-style); text-transform: var(--type-wordmark-case); letter-spacing: var(--type-wordmark-track); font-size: var(--text-7); color: var(--text); text-decoration: none; padding: 0 var(--space-3); }
 #nav .brand .workspace-name { display: none; }
 /* The query bar (ui/query-bar.js): the canvas's lens on one line under the top bar, its terms as chips; what does not fit scrolls along it. */
-#query { position: fixed; z-index: 2; top: calc(var(--active-top, 0%) + var(--box-9) + var(--space-8)); left: calc(var(--active-left, 0%) + var(--space-9)); right: calc(var(--active-right, 0%) + var(--space-9)); display: flex; align-items: stretch; gap: var(--space-6); overflow-x: auto; white-space: nowrap; scrollbar-width: none; pointer-events: none; }
+/* Under the tabs, two bands, each the width of the pane: the view, in the panel's colour and joined to the tab in sight
+   (or the strip of the pane in focus), with the canvas up and what is done with it; then the query, in the page's
+   colour. No box holds another (rule e_vgs9vt5j): the filter, the walk and the limit are parts of the query's band set
+   apart by a line, and each term is its words and its ×, with no shape of its own. */
+#query { position: fixed; z-index: 2; top: var(--active-top, 0%); left: var(--active-left, 0%); right: var(--active-right, 0%); display: flex; flex-direction: column; white-space: nowrap; pointer-events: none; }
 #query[hidden] { display: none; }
-body[data-sheet="open"] #query { right: calc(max(var(--active-right, 0%), min(var(--sheet), 50%)) + var(--space-9)); }
-#query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); pointer-events: auto; }
-/* The filter is the lens: folded, its line of what it finds keeps room to be read. */
-#query .q-filter { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-#query .q-filter:has(> .q-sum) { min-width: calc(2 * var(--box-10)); }
-#query .q-sum { flex: 0 1 auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-4); font-size: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-#query .q-sum:hover, #query .q-fold:hover { color: var(--accent); }
-#query .q-fold { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
-#query .q-group { display: inline-flex; align-items: center; gap: var(--space-2); }
-#query .q-group-word { color: var(--muted); font-size: var(--text-3); padding-left: var(--space-3); }
-#query .q-term { display: inline-flex; align-items: center; border-radius: var(--radius-pill); background: var(--accent-soft); font-size: var(--text-3); }
-#query .q-term.q-out { background: none; border: var(--border-1) dashed var(--line); color: var(--muted); }
-#query .q-term.q-narrow { background: none; border: var(--border-1) solid var(--accent); }
-#query .q-term.q-walk { background: none; border: var(--border-1) solid var(--line); }
-#query .q-term button, #query .q-term .q-said { border: 0; background: none; padding: var(--space-2) var(--space-4); font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
+body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--sheet), 50%)); }
+#query .q-view { pointer-events: auto; display: flex; align-items: center; box-sizing: border-box; height: var(--strip); padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); }
+#query .q-view > .q-canvas { padding: 0; background: none; border: 0; border-radius: 0; }
+#query .q-lens { pointer-events: auto; display: flex; align-items: stretch; box-sizing: border-box; height: var(--box-9); padding: 0 var(--space-5); background: var(--bg); border-bottom: var(--border-1) solid var(--line); overflow-x: auto; scrollbar-width: none; font-size: var(--text-4); }
+#query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-6); padding: 0 var(--space-8); }
+#query .q-label { flex: none; color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
+/* Each part's own +, and how many more it holds than are in sight: a mark that opens its menu. */
+#query .q-add, #query .q-more { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-2); font: inherit; color: var(--accent); cursor: pointer; }
+#query .q-add { font-size: var(--text-6); line-height: 1; }
+#query .q-add:hover, #query .q-more:hover { background: var(--accent-soft); }
+#query .q-lens > .q-part:first-of-type { padding-left: 0; }
+#query .q-lens > .q-part + .q-part { border-left: var(--border-1) solid var(--line); }
+#query .q-term { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text); }
+#query .q-term.q-out { color: var(--muted); }
+#query .q-term.q-narrow { color: var(--accent); }
+#query .q-term button, #query .q-term .q-said { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
+#query .q-term .q-said:hover { text-decoration: underline; text-underline-offset: var(--space-3); }
 #query .q-term.q-walk .q-said { font-family: var(--type-water-family); font-weight: var(--type-water-weight); font-style: var(--type-water-style); text-transform: var(--type-water-case); letter-spacing: var(--type-water-track); }
-#query .q-term .q-x { padding-left: 0; color: var(--muted); }
+#query .q-term .q-x { color: var(--muted); }
 #query .q-term .q-x:hover { color: var(--text); }
-#query .q-box { border: 0; background: none; padding: var(--space-2) var(--space-3); font-size: var(--text-3); min-width: var(--space-8); outline: none; }
-#query .q-box.wrong { text-decoration: underline wavy var(--accent); }
-#query .q-add { border: 0; background: none; color: var(--muted); font-size: var(--text-3); max-width: var(--space-10); }
-#query .q-steps button { padding: var(--space-2) var(--space-4); font-size: var(--text-3); }
-#query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: var(--space-2) var(--space-3); font-size: var(--text-3); text-align: right; }
-#query .q-count { color: var(--muted); font-size: var(--text-3); padding-right: var(--space-3); }
+#query .q-steps { gap: var(--space-3); }
+#query .q-steps button, #query .q-steps button.on { border: 0; background: none; padding: 0 var(--space-2); margin: 0; font: inherit; color: var(--muted); }
+#query .q-steps button.on { color: var(--text); font-weight: 600; }
+#query .q-steps button:hover:not(:disabled):not(.on) { color: var(--text); }
+#query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: 0; font: inherit; text-align: right; }
+#query .q-count { color: var(--muted); }
 #query .q-count.cut { color: var(--accent); }
-/* The canvas's name never shrinks away: the filter folds first. Its edge takes the hue of the session the tab follows. */
-#query .q-canvas { flex: none; border-color: var(--tab-hue, var(--line)); }
+/* The canvas's name never shrinks away. */
+#query .q-canvas { flex: none; }
 #query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
-#query .q-save { border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
-#query .q-save:hover { color: var(--accent); }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
 #marks .count.held { background: var(--warn); }
-#new-item { display: inline-flex; align-items: center; justify-content: center; width: var(--box-8); height: var(--box-8); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); color: var(--text); font-size: var(--text-8); line-height: 1; text-decoration: none; }
-#new-item:hover { border-color: var(--accent); }
+#new-item { display: inline-grid; place-items: center; width: var(--box-8); height: var(--box-8); border-radius: var(--radius-2); color: var(--muted); font-size: var(--text-8); line-height: 1; text-decoration: none; }
+#new-item:hover, #more > summary:hover { color: var(--text); background: var(--accent-soft); }
 #listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
 #listening::before { content: "● "; }
 #listening[hidden] { display: none; }
-#more > summary { background: var(--panel); border-radius: var(--radius-pill); }
+/* The bar's own controls are marks on it, as a tab's are: no box of their own (rule e_vgs9vt5j). */
+#more > summary { display: inline-grid; place-items: center; width: var(--box-8); height: var(--box-8); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); }
 #more > .menu-items { min-width: var(--menu-least); }
 #menu-pages { display: grid; }
 #menu-pages > a { padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; }
@@ -117,16 +147,16 @@ body[data-sheet="open"] #query { right: calc(max(var(--active-right, 0%), min(va
 /* Find: one bar at the canvas's foot; what its words would find is said in one line above it. */
 #find { position: fixed; z-index: 3; left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - var(--active-right, 0%)) / 2); bottom: calc(var(--active-bottom, 0%) + var(--space-9)); transform: translateX(-50%); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - var(--active-right, 0%) - 2 * var(--space-9))); margin: 0; }
 body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%))) / 2); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%)) - 2 * var(--space-9))); }
-#find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
+#find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
 #find input[type=search] { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-4) var(--space-7); font-size: var(--text-6); outline: none; }
-#find .find-peek { display: flex; gap: var(--space-5); align-items: center; min-width: 0; margin: 0 0 var(--space-4); padding: var(--space-4) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; }
+#find .find-peek { display: flex; gap: var(--space-5); align-items: center; min-width: 0; margin: 0 0 var(--space-4); padding: var(--space-4) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); white-space: nowrap; }
 #find .find-peek[hidden] { display: none; }
 #find .find-peek .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 #find .find-peek > .quiet-button { flex: none; }
 
 /* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
    (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */
-#sheet { position: fixed; z-index: 4; top: var(--bar-room); right: 0; bottom: 0; width: min(var(--sheet), 50%); overflow: auto; background: var(--bg); border-left: var(--border-1) solid var(--line); box-shadow: 0 0 var(--space-13) rgb(0 0 0 / 0.14); transform: translateX(100%); visibility: hidden; transition: transform 0.18s ease, visibility 0s 0.18s; }
+#sheet { position: fixed; z-index: 4; top: var(--band); right: 0; bottom: 0; width: min(var(--sheet), 50%); overflow: auto; background: var(--bg); border-left: var(--border-1) solid var(--line); box-shadow: 0 0 var(--space-13) rgb(0 0 0 / 0.14); transform: translateX(100%); visibility: hidden; transition: transform 0.18s ease, visibility 0s 0.18s; }
 body[data-sheet="open"] #sheet { transform: none; visibility: visible; transition: transform 0.18s ease; }
 @media (prefers-reduced-motion: reduce) { #sheet, body[data-sheet="open"] #sheet { transition: none; } }
 #sheet-close { position: sticky; z-index: 1; top: var(--space-6); float: right; margin: var(--space-6) var(--space-6) 0 0; width: var(--box-8); height: var(--box-8); padding: 0; border-radius: var(--radius-pill); font-size: var(--text-8); line-height: 1; }
@@ -239,10 +269,8 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 @keyframes pane-shown { from { box-shadow: inset 0 0 0 var(--border-2, var(--border-1)) var(--accent); } to { box-shadow: none; } }
 #panes .pane-bar { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); min-width: 0; }
 #panes .pane-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-3); font-weight: 600; cursor: grab; user-select: none; touch-action: none; padding: var(--space-2) var(--space-3); }
-#panes .pane-follows, #main-name .pane-follows { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2, var(--text-3)); color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-pill, var(--radius, 0)); padding: 0 var(--space-3); margin-left: var(--space-3); }
+#panes .pane-follows, #main-name .pane-follows { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2, var(--text-3)); color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-2); padding: 0 var(--space-3); margin-left: var(--space-3); }
 #panes .pane-follows[hidden] { display: none; }
-#panes .pane-act { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-3); color: var(--muted); cursor: pointer; }
-#panes .pane-act:hover { color: var(--accent); }
 #panes .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 #panes .pane-canvas > .lens-wrap, #panes .pane-canvas .lens-view { height: 100%; }
 #panes .pane-canvas .lens-view { position: relative; box-sizing: border-box; overflow: auto; }
@@ -270,13 +298,11 @@ body[data-dragging="pane"] { cursor: grabbing; }
 /* Several panes: the top bar runs in a band across the page and over the sheet, the panes and the sheet under it.
    Every pane keeps a strip of one height at its top, in or out of focus, so nothing moves when focus does: the query
    bar fills the strip of the pane it acts on, and the others show their names there (the main one in #main-name). */
-body[data-panes]:not([data-panes="1"]) { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
-body[data-panes]:not([data-panes="1"]) #nav { top: var(--space-4); left: var(--space-9); right: var(--space-9); }
-body[data-panes]:not([data-panes="1"]) #sheet { top: var(--band); }
-body[data-panes]:not([data-panes="1"]) #canvas { --safe-top: var(--strip); --safe-bottom: 0; }
-body[data-panes]:not([data-panes="1"]) #query { top: calc(var(--active-top, 0%) + var(--space-3)); height: var(--box-9); }
-body[data-panes]:not([data-panes="1"]) #panes .pane-bar { box-sizing: border-box; height: var(--strip); padding-top: 0; padding-bottom: 0; }
-#panes > .pane.pane-active > .pane-bar > * { visibility: hidden; }
+#panes .pane-bar { box-sizing: border-box; height: var(--strip); padding-top: 0; padding-bottom: 0; }
+/* In focus, the bar takes the place of the pane's name, between its ⠿ and its ⤢ ×, which stay where they are. */
+#panes > .pane.pane-active > .pane-bar > .pane-name, #panes > .pane.pane-active > .pane-bar > .pane-follows { visibility: hidden; }
+#panes .pane-grip { cursor: grab; user-select: none; touch-action: none; }
+body[data-active="pane"] #query .q-view { margin: 0 calc(var(--space-5) + 2 * var(--box-7) + 2 * var(--space-3)) 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
 #panes > .pane-sash.row { top: var(--band, 0%); }
 #main-name { position: fixed; z-index: 2; top: var(--main-top, 0%); left: var(--main-left, 0%); right: var(--main-right, 0%); height: var(--strip); box-sizing: border-box; display: flex; align-items: center; padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); color: var(--muted); font-size: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 #main-name[hidden] { display: none; }

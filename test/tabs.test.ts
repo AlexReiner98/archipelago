@@ -57,7 +57,7 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await wait(1500);
     assert.equal((await strip()).length, 3);
     // A press brings a tab into sight, where its session last showed.
-    await press(tabOf(2));
+    await press(`${tabOf(2)} .tab-name`);
     await until('the second session’s tab is in sight', async () => (await page.evaluate(`location.hash`)) === `#/e/${made.i2}` && (await strip())[1][1]);
     // While the reader is at work in it, its session's next show goes to a tab behind.
     await press('#canvas');

@@ -4,7 +4,7 @@
 // is ui/pane-route.js. There is no most: many tabs shrink to their mark and first letters (e_q3amet26). A tab, not a
 // pane, pops out into a window of its own, from its strip or dragged out of the page, and docks back whole (e_ezb7s3a7).
 // What is the tab's own lives on the strip, never in the query bar, which shows the lens (decision e_j7ggggjr, asked):
-// the tab in sight has ⌄ (whom it follows, pop out) and ×, and ⊞ ends the strip, which shows with one tab too.
+// every tab has ⋯ (whom it follows, pop out) and ×, the same in sight or not, and + ends the strip, which shows with one tab too.
 
 import { api, h, hooks } from './base.js';
 import { readFlatLens } from './lens.js';
@@ -130,8 +130,9 @@ function tabEl(t, out) {
       style: hue ? `--session-hue: ${hue}` : null,
     },
     h('span', { class: `tab-name${session ? ' who-session' : ''}` }, name),
-    inSight && act('This tab: whom it follows, pop it out', '⌄', (ev) => tabMenu(ev.currentTarget)),
-    inSight && tabs.list.length > 1 && act('Close this tab', '×', () => closeTab(t.id)),
+    // Every tab has the same controls, in sight or not, so nothing moves when another is brought into sight.
+    !out && act('This tab: whom it follows, pop it out', '⋯', (ev) => tabMenu(ev.currentTarget, t)),
+    !out && tabs.list.length > 1 && act('Close this tab', '×', () => closeTab(t.id)),
   );
   el.addEventListener('pointerdown', (ev) => pressTab(ev, t, out));
   el.addEventListener('keydown', (ev) => ev.key === 'Enter' && toFront(t.id));
@@ -143,34 +144,28 @@ export function drawStrip() {
   if (!strip || poppedTab) return;
   const out = outTabs().filter((t) => !tabOf(t.id));
   const all = [...tabs.list.map((t) => [t, false]), ...out.map((t) => [t, true])];
-  const fresh = h('button', { type: 'button', class: 'tab-new', title: 'New tab: this canvas in a tab of its own', 'aria-label': 'New tab', onclick: () => openTab(activeAt()) }, '⊞');
+  const fresh = h('button', { type: 'button', class: 'tab-new', title: 'New tab: this canvas in a tab of its own', 'aria-label': 'New tab', onclick: () => openTab(activeAt()) }, '+');
   strip.replaceChildren(...all.map(([t, o]) => tabEl(t, o)), fresh);
   document.body.dataset.tabs = String(all.length);
-  // The bar is the tab's: it takes the hue of the session the tab in sight follows.
-  const hue = nameOfTab(front()).hue;
-  if (hue) document.body.style.setProperty('--tab-hue', hue);
-  else document.body.style.removeProperty('--tab-hue');
 }
 
 // ---- Whom the tab in sight follows: everyone, nobody, or one session (its run, or the agent's name).
 
 /** The reader picks whom the tab in sight follows; a session it held lets go of it. */
-function setFollows(follows) {
-  const t = front();
+function setFollows(follows, t = front()) {
   Object.assign(t, { follows, named: heard.has(follows) ? nameOf(follows) : undefined });
   for (const key of [...landed.keys()]) if (key.startsWith(`${t.id}:`)) landed.delete(key);
   keep();
   drawStrip();
 }
-/** The menu of the tab in sight, over everything (a popover: the strip clips what hangs below it): whom it follows (everyone, nobody, the sessions heard from lately, newest first), and pop out. */
+/** A tab's menu, over everything (a popover: the strip clips what hangs below it): whom it follows (everyone, nobody, the sessions heard from lately, newest first), and pop out. */
 const menuEl = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This tab' });
 document.body.append(menuEl);
-function tabMenu(anchor) {
-  const t = front();
+function tabMenu(anchor, t) {
   const now = t.follows ?? 'all';
   const sessions = [...heard].sort(([, a], [, b]) => b.at - a.at).map(([key]) => key);
   if (!['all', 'none', ...sessions].includes(now)) sessions.unshift(now);
-  const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key)) }, said);
+  const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key, t)) }, said);
   menuEl.replaceChildren(
     h('div', { class: 'tab-menu-head', title: 'Whose shows and changes come into this tab' }, 'Follows'),
     pick('all', 'Everyone', 'Every session’s, unless another tab follows it'),

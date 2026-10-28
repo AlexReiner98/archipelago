@@ -7,6 +7,7 @@
 
 import { api, ask, h, hooks, tell } from './base.js';
 import { flatQuery, flatView } from './lens.js';
+import { filterSaid } from './query-bar.js';
 import { isA, typeTitle } from './words.js';
 
 const TYPE = 'lens';
@@ -108,12 +109,13 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const changed = current && edited(current, lens, style);
     const pick = h(
       'select',
-      { class: 'q-pick', 'aria-label': 'Saved canvases', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not a saved canvas', onchange: (ev) => ev.target.value && open(ev.target.value) },
-      !current && !isHome && h('option', { value: '', selected: true }, 'Not saved'),
+      { class: 'q-pick', 'aria-label': 'Saved canvases', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: ☆ keeps it', onchange: (ev) => ev.target.value && open(ev.target.value) },
+      // Not saved, it is named as its tab and its pane are: by what its filter finds.
+      !current && !isHome && h('option', { value: '', selected: true }, filterSaid(lens.filter, () => {}) || 'Canvas'),
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
       all.map((c) => h('option', { value: canvasAt(c.id), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
     );
-    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, '☆'), ...(hooks.paneButtons?.() ?? []));
+    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, '☆ Save'), ...(hooks.paneButtons?.() ?? []));
   });
   return part;
 }

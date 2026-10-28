@@ -35,7 +35,8 @@ test('in a browser, the query bar shows what narrows the filter as chips of thei
   const drawn = `[...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent)`;
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
   const chips = `[...document.querySelectorAll('#query .q-narrow .q-said')].map((c) => c.textContent)`;
-  const box = (q: string) => page.evaluate(`(() => { const i = document.querySelector('#query .q-box'); i.focus(); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`);
+  // Written in the filter's own menu, opened from its +.
+  const box = (q: string) => page.evaluate(`(() => { document.querySelector('#query [aria-label="Add to the filter"]').click(); const i = document.querySelector('.term-pick-field'); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`);
   const shots = process.env.PELAGO_SHOTS;
   try {
     assert.ok(await until(has('Which tiles?')), `the narrowed canvas is drawn: ${page.logs().join('\n')}`);
@@ -44,7 +45,8 @@ test('in a browser, the query bar shows what narrows the filter as chips of thei
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#query .q-type .q-said')].map((c) => c.textContent)`), ['Question'], 'what it includes stays a chip apart');
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-      const tall = await page.evaluate<{ bar: number; part: number }>(`(() => ({ bar: document.querySelector('#query').getBoundingClientRect().height, part: document.querySelector('#query .q-part').getBoundingClientRect().height }))()`);
+      // The query is one row under the view's: nothing in it wraps onto a second line.
+      const tall = await page.evaluate<{ bar: number; part: number }>(`(() => { const row = document.querySelector('#query .q-lens'); return { bar: row.scrollHeight, part: row.clientHeight }; })()`);
       assert.ok(tall.bar <= tall.part + 1, `one line at ${width} px (${tall.bar} against ${tall.part})`);
       if (shots) writeFileSync(`${shots}/narrow-bar-${width}.png`, await page.screenshot());
     }

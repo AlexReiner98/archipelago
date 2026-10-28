@@ -58,7 +58,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       const name = `Saved at ${width}`;
       await page.go(`${base}/#/v?ids=${made.p}&over=part_of&steps=1`);
       assert.ok(await until(drawn(made.a)), `drawn: ${page.logs().join('\n')}`);
-      assert.ok(await until(`${picked} === 'Not saved'`), 'the bar says what is up is not saved');
+      assert.ok(await until(`document.querySelector('#query .q-pick')?.title.startsWith('Not saved')`), 'the bar says what is up is not saved');
 
       // Saved from the bar: a name asked in the page.
       await page.evaluate(`document.querySelector('#query .q-save').click()`);
@@ -100,7 +100,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     assert.equal(await canvasUp(), other);
     assert.ok(await until(`${picked} === 'The other one'`), 'named in the bar');
     // As a chip, or in the folded line when the bar is narrow (560 px, from the loop above).
-    assert.ok(await until(`[...document.querySelectorAll('#query .q-id, #query .q-sum')].some((c) => c.textContent.includes('Another project'))`), 'its lens in the bar');
+    assert.ok(await until(`[...document.querySelectorAll('#query .q-id, #query .q-more')].some((c) => (c.textContent + c.title).includes('Another project'))`), 'its lens in the bar');
     await page.evaluate(`(() => { const s = document.querySelector('#query .q-pick'); s.value = [...s.options].find((o) => o.textContent === 'Saved at 1280').value; s.dispatchEvent(new Event('change')); })()`);
     assert.ok(await until(drawn(made.a)), 'switched from the bar');
     assert.ok(await until(`${picked} === 'Saved at 1280'`));
