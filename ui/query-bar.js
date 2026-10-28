@@ -330,5 +330,20 @@ export function fitBar() {
     if (over(line) || (sum && over(sum) && sum.clientWidth * 3 < line.clientWidth)) line.classList.add('tight');
   }
   fitRows();
+  keepClear();
+}
+
+/**
+ * The pane the bar acts on keeps what it draws below the bar, its line and Edit's rows alike: its top safe zone is
+ * where the bar ends over it (the owner, 28 Oct 2026). Other panes keep the stylesheet's.
+ */
+function keepClear() {
+  const under = document.querySelector('#canvas > .pane.pane-active > .pane-canvas');
+  for (const c of document.querySelectorAll('#canvas > .pane > .pane-canvas')) if (c !== under) c.style.removeProperty('--safe-top');
+  if (!under || bar.hidden) return under?.style.removeProperty('--safe-top');
+  const below = Math.max(0, Math.round(bar.getBoundingClientRect().bottom - under.getBoundingClientRect().top));
+  under.style.setProperty('--safe-top', `calc(${below}px + var(--space-4))`);
 }
 if (bar) new ResizeObserver(fitBar).observe(bar);
+addEventListener('pane-focus', () => setTimeout(keepClear, 0));
+addEventListener('resize', keepClear);
