@@ -212,7 +212,7 @@ export function drawQuery(lens, view, go, lead) {
     ].filter(Boolean),
   });
   // The lens's parts by their words (decision e_drt4g872): Find what adds, any of it; Only what must all hold of it; Not
-  // what is left out of everything, what the walk reaches included.
+  // what is left out of everything but an item named, what the walk reaches included.
   const findTerms = [
     ...wordsOf(f).map((w) => term('q-text', `“${w}”`, 'Words to find, set in the find bar', 'text', w, addToFilter)),
     ...(f.types ?? []).map((t) => term('q-type', typeTitle(t), 'Items of this type, the newest first', 'types', t, addToFilter)),

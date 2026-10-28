@@ -4,20 +4,46 @@
     {
       "name": "archipelago-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3100
     },
     {
       "name": "archipelago-query",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "env": { "PELAGO_PORT": "3102", "PELAGO_DATA": "runs/data-query", "PELAGO_UNSANDBOXED": "1" },
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "env": {
+        "PELAGO_PORT": "3102",
+        "PELAGO_DATA": "runs/data-query",
+        "PELAGO_UNSANDBOXED": "1"
+      },
       "port": 3102
+    },
+    {
+      "name": "archipelago-terms",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "env": {
+        "PELAGO_PORT": "3103",
+        "PELAGO_DATA": "runs/data-terms",
+        "PELAGO_UNSANDBOXED": "1"
+      },
+      "port": 3103
     },
     {
       "name": "patterns-sketch",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["sketches/serve.mjs"],
+      "runtimeArgs": [
+        "sketches/serve.mjs"
+      ],
       "port": 3210
     }
   ]

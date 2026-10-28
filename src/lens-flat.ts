@@ -1,6 +1,6 @@
 // The flat lens (the decision "The lens is a filter, a walk and a limit", 25 Oct 2026): a filter, a walk and a limit,
 // and nothing else. What the filter includes picks the seeds; what it narrows by must all hold of every seed as well
-// (only these types, within these items); what it excludes applies to everything, what the walk reaches included; the walk follows the link types named, either way, step by step; the limit is the most it sends.
+// (only these types, within these items); what it excludes applies to everything but an item named by id, what the walk reaches included; the walk follows the link types named, either way, step by step; the limit is the most it sends.
 // The answer is items and the links among them: no containment, no places, no views, no style.
 //
 // Every read is bounded by the ids in hand, an end of a link, the type index or the limit, and runs as the viewer:
@@ -112,7 +112,8 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const within = lens.narrow.within && (await l.db.query<{ id: string }>('select id from entity where id = any($1::text[]) and archived_at is null', [lens.narrow.within])).rows.map((r) => r.id);
   const hidden = within !== undefined && within.length < new Set(lens.narrow.within).size;
   const narrowing = [...(only ? [only] : []), ...(within ? [within] : [])];
-  const narrowed = (n: number) => [keep(n), only && `e.type = any($${n + 1}::text[])`, within && `(select count(*) from part_closure c where c.descendant = e.id and c.ancestor = any($${n + 1 + (only ? 1 : 0)}::text[])) = cardinality($${n + 1 + (only ? 1 : 0)}::text[])`].filter(Boolean).join(' and ');
+  const narrows = (n: number) => [only && `e.type = any($${n}::text[])`, within && `(select count(*) from part_closure c where c.descendant = e.id and c.ancestor = any($${n + (only ? 1 : 0)}::text[])) = cardinality($${n + (only ? 1 : 0)}::text[])`].filter(Boolean);
+  const narrowed = (n: number) => [keep(n), ...narrows(n + 1)].join(' and ');
   // Each read finds ids only; what is sent of them is read once, at the end. A seed is found narrowed; a step of the walk is not.
   const read = async (cond: string, sql: (keep: string) => string, own: unknown[], more: unknown[]) => (await l.db.query<{ id: string }>(sql(cond), [...own, leftOut, ...more])).rows.map((r) => r.id);
   const find = (sql: (keep: string) => string, own: unknown[]) => read(keep(own.length + 1), sql, own, []);
@@ -144,7 +145,9 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
 
   // The seeds, each narrowed: ids first, then what a link term finds, what the text finds, the newest of each type named.
   const { ids, links, text, types } = lens.include;
-  if (ids?.length) add(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k}`, [ids]), 'id');
+  // An item named by id is always drawn: Not leaves out only what other terms find and what the walk reaches
+  // (decision e_yasbwj45), and Only still narrows it.
+  if (ids?.length && !hidden) add((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${['e.archived_at is null', ...narrows(2)].join(' and ')}`, [ids, ...narrowing])).rows.map((r) => r.id), 'id');
   for (const term of links ?? []) {
     if (room() <= 0) break;
     const end = term.to ?? term.from!;

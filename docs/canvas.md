@@ -34,7 +34,8 @@ The filter has two kinds of term. Those that include add seeds, each its
 own (text, types, ids, links such as `tagged e_x`: a union); those that
 narrow must all hold of a seed (an AND: `only`, types; `within`, items it
 is part of at any depth, read from the part_of closure). What it
-excludes applies to everything the walk reaches; the
+excludes applies to everything the walk reaches, never to an item named
+by id (e_yasbwj45); the
 walk follows the link types named, either way, for some steps; the limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
 whole map. Search is the filter's text; tags are a core `tag` type and a
@@ -43,7 +44,8 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
   "what is excluded is left out of everything the walk reaches, and is not
   walked through"; "the limit caps what is sent, seeds first, and says it
   cut"; "the text is the search read"; "narrowing: only and within must all
-  hold of every seed, not of what the walk reaches".
+  hold of every seed, not of what the walk reaches"; "an item named by id is
+  drawn whatever Not says, and the walk from it still keeps Not".
 - `test/find-lens.test.ts`: "in a browser, the find bar sets the text of the
   canvas lens".
 

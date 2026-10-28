@@ -100,7 +100,7 @@ bar and an agent's answer give them (decision e_drt4g872). **Find** is what
 adds: words, a type, a tag, a link and its end, an item; any of them (the
 find bar's words are one Find term). **Only** is what must all hold of what
 Find finds: a type, or within an item. **Not** is what is left out of
-everything: closed, system, or a type. **Walk** is the links followed from
+everything but an item named: closed, system, or a type. **Walk** is the links followed from
 what Find finds, either way, ×steps. **Limit** is the most items drawn, said
 as how many of it. In the code: the filter's `text`, `types`, `ids`, `links`;
 `only`, `within`; `exclude`; `walk`; `limit` (`src/lens-flat.ts`).
