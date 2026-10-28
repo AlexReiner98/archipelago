@@ -232,7 +232,7 @@ export function drawQuery(lens, view, go, lead) {
   const { text, ...terms } = f;
   const kept = filterTerms.map((t) => t.said);
   const out = exclude.filter((x) => x !== 'system').map((x) => (x === 'closed' ? x : typeTitle(x)));
-  const walkSaid = `${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')}, ${steps} ${steps === 1 ? 'step' : 'steps'}`;
+  const walkSaid = `${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')} (${steps} ${steps === 1 ? 'step' : 'steps'})`;
   const parts = [
     text && ['Search', `“${text}”`],
     (kept.length > 0 || out.length > 0) && ['Nodes', [...kept.map((x) => h('span', { class: 'q-kept' }, x)), ...out.map((x) => h('s', { class: 'q-struck', title: `${x}: left out` }, x))]],
