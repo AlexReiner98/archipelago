@@ -20,6 +20,7 @@ export const UI_FILES: Record<string, string> = {
   '/diagram.css': 'diagram.css',
   '/list.css': 'list.css',
   '/notes.css': 'notes.css',
+  '/menus.css': 'menus.css',
   '/public.js': 'public.js',
   '/public.css': 'public.css',
   '/doc.js': 'doc.js',
