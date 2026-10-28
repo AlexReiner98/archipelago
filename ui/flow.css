@@ -7,8 +7,8 @@
 /* What the marks mean: a card in the frame's corner, one mark to a line, whatever the zoom. */
 .lf-legend { position: absolute; top: var(--ln-legend-inset); left: var(--ln-legend-inset); display: flex; flex-direction: column; gap: var(--ln-legend-gap); padding: var(--ln-legend-pad-y) var(--ln-legend-pad-x); background: var(--ln-land); border: var(--ln-rule) solid var(--ln-line); border-radius: var(--ln-radius-size); color: var(--ln-text); font-size: var(--ln-legend-text); pointer-events: none; }
 .lf-legend span { display: flex; gap: var(--ln-legend-mark-gap); align-items: center; white-space: nowrap; }
-/* A row's words are one line: what does not fit is cut, the whole in its title; a row for an item opens its page. */
-.lf-legend span > span, .lf-legend a { display: block; max-width: var(--tip-most); overflow: hidden; text-overflow: ellipsis; color: inherit; text-decoration: none; }
+/* A row's words are one line, as long as they are; a row for an item opens its page. */
+.lf-legend span > span, .lf-legend a { display: block; color: inherit; text-decoration: none; }
 .lf-legend[hidden] { display: none; }
 /* A still picture (a published page's): no frame to move it in, drawn at the width it is given and as tall as that
    makes it, on the page itself; its key a row above it, in the flow, never over a step or a wire. */
@@ -18,10 +18,15 @@
 .lf-legend.still { position: static; flex-direction: row; flex-wrap: wrap; column-gap: var(--ln-legend-pad-x); padding: 0 0 var(--ln-legend-pad-y); background: none; border: none; }
 /* A picture a drawing's code draws (ui/drawing.js): what it draws stays inside it, however its stylesheet places it. */
 [data-drawing] { contain: paint; position: relative; }
-/* Where a drawing's tip goes (ui/drawing-tip.js): beside its mark, out of the pointer's way. How it looks is the drawing's. */
-.drawing-tip { position: absolute; z-index: 1; pointer-events: none; transform: translate(-50%, calc(-100% - var(--space-4))); }
+/* Where a drawing's tip goes (ui/drawing-tip.js): beside its mark, out of the pointer's way, in the top layer above
+   every bar. How it looks is the drawing's: the browser's own look for a popover is taken off. */
+.drawing-tip { position: fixed; inset: auto; margin: 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; pointer-events: none; transform: translate(-50%, calc(-100% - var(--space-4))); }
 .drawing-tip.below { transform: translate(-50%, var(--space-4)); }
-.drawing-tip[hidden] { display: none; }
+/* The page's one tooltip (ui/tip.js): what a control or a mark says of itself, in the top layer, after a moment's
+   wait; moving on to the next, at once. The browser never shows its own. */
+.tip { --tip-gap: var(--space-4); position: fixed; inset: auto; margin: 0; max-width: var(--tip-most); padding: var(--space-4) var(--space-6); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.18); font-size: var(--text-2); line-height: 1.4; white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; opacity: 1; transition: opacity 0.12s ease 0.45s; }
+.tip.at-once { transition: none; }
+@starting-style { .tip:popover-open { opacity: 0; } }
 /* A drawing's surface (ui/surface.js): over its picture, where the page puts it, taking no pointer. */
 .lf-surface { position: absolute; display: block; pointer-events: none; }
 /* The frame drawings run in: drawn, with no size, so the browser does not slow it as a frame that is not drawn. */

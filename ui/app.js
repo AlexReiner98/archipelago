@@ -16,11 +16,13 @@ import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
 import { startTabs } from './pane-land.js';
+import { startTips } from './tip.js';
 import { workspace } from './workspace.js';
 
 /** The pages the sheet holds, by the name in their address. */
 const SHEET = { e: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
+startTips();
 const close = () => (location.hash = canvasHref());
 document.getElementById('sheet-close').addEventListener('click', close);
 addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset.sheet && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') && close());
