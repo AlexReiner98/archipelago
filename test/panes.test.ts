@@ -70,12 +70,12 @@ test('in a browser, a show opens a canvas in a pane beside the main one, both ke
     // By hand: the pane's name dragged to the left of the main canvas docks it there, and × closes it.
     await show({ entity: views.g, pane: 'right' });
     await until('the pane is back on the right', async () => (await panes())[0]?.[1] > 500);
-    // A press in the pane makes it the one the bar and find act on; find replaces its seeds, and back undoes that.
+    // A press in the pane makes it the one the bar and find act on; find with Shift held replaces its seeds, and back undoes that.
     const middle = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = document.querySelector('#panes .pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: middle[0], y: middle[1], button: 'left', clickCount: 1 });
     await until('the pane is the active one', () => page.evaluate(`document.querySelector('#panes .pane').classList.contains('pane-active') && document.getElementById('query').textContent.includes('Second step, renamed')`));
     const mainWas = await page.evaluate<string>('location.hash');
-    await page.evaluate(`(() => { const input = document.querySelector('#find input'); input.value = 'First'; document.getElementById('find').requestSubmit(); })()`);
+    await page.evaluate(`(() => { const input = document.querySelector('#find input'); input.value = 'First'; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
     await until('the pane draws what find found', () => page.evaluate(`document.querySelector('#panes svg')?.textContent.includes('First step, renamed') && !document.querySelector('#panes svg').textContent.includes('Second step') && document.getElementById('query').textContent.includes('First')`));
     assert.equal(await page.evaluate<string>('location.hash'), mainWas, 'the main canvas kept its lens');
     await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);

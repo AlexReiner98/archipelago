@@ -94,13 +94,15 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-view { pointer-events: auto; display: flex; align-items: center; box-sizing: border-box; height: var(--strip); padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); }
 #query .q-view > .q-canvas { display: inline-flex; align-items: center; gap: var(--space-6); padding: 0; background: none; border: 0; border-radius: 0; }
 #query .q-lens { pointer-events: auto; display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; height: var(--box-9); padding: 0 var(--space-5); background: var(--bg); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); }
-#query .q-sum { flex: 0 1 auto; min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: pre; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
-#query .q-sum:hover { text-decoration: underline; text-underline-offset: var(--space-3); }
+#query .q-sum { flex: 0 1 auto; min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+#query .q-sum-part + .q-sum-part { margin-left: var(--space-8); }
+#query .q-sum-part > .q-label { margin-right: var(--space-4); }
+#query .q-sum:hover { color: var(--accent); }
 #query .q-lens > .q-count { flex: none; }
 /* Edit: a row for each part under the line, the width of the view, its word in a column of its own and its terms after it, as many as fit (ui/query-bar.js fitRows). */
 #query .q-edit { pointer-events: auto; display: grid; grid-template-columns: max-content minmax(0, 1fr); box-sizing: border-box; padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); }
 #query .q-edit[hidden] { display: none; }
-#query .q-edit > .q-part { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--box-9); }
+#query .q-edit > .q-part { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--box-8); }
 #query .q-edit > .q-part + .q-part { border-top: var(--border-1) solid var(--line); }
 #query .q-edit > .q-part > .q-label { padding-right: var(--space-8); }
 #query .q-terms { display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
@@ -123,7 +125,7 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-steps button, #query .q-steps button.on { border: 0; background: none; padding: 0 var(--space-2); margin: 0; font: inherit; color: var(--muted); }
 #query .q-steps button.on { color: var(--text); font-weight: 600; }
 #query .q-steps button:hover:not(:disabled):not(.on) { color: var(--text); }
-#query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: 0; font: inherit; text-align: right; }
+#query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: 0; font: inherit; color: inherit; }
 #query .q-count { color: var(--muted); }
 #query .q-count.cut { color: var(--accent); }
 /* The canvas's name never shrinks away. */

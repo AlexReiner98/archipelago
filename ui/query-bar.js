@@ -1,8 +1,9 @@
-// The query bar: the canvas's lens, always in sight in one line under the view's (decision e_sdsaxxq4): what the
-// filter finds, the walk and what is left out, said in a few words, and how many items are drawn. Edit opens a row for
-// each part under it, each saying what it is in a word: the filter (text, types, tags, items, links; and what narrows
-// them, only a type, within an item), what is left out, the walk (the links it follows, how many steps) and the limit.
-// A row shows its first terms and how many more, all of them a click away, and has its own + that opens one menu
+// The query bar: the canvas's lens, always in sight in one line under the view's (decision e_sdsaxxq4): the search's
+// words (set in the find bar, ui/find.js), what the filter finds, the walk and what is left out, said in a few words,
+// and how many items are drawn. Edit opens a row for each part under it, each saying what it is in a word: the filter
+// (types, tags, items, links; and what narrows them, only a type, within an item), what is left out, the walk (the
+// links it follows, how many steps) and the limit. A row shows as many terms as fit and how many more, those a click
+// away, and has its own + that opens one menu
 // (ui/term-pick.js) to add to it; a term's words open it again to change that term, its × takes it away. Every change
 // is a new lens, handed to `go` (the canvas puts it in the address and draws it). The menus lead with what this canvas
 // and its neighbourhood use (ui/picker-rank.js). No term or part is a box inside a box (rule e_vgs9vt5j).
@@ -165,7 +166,7 @@ export function drawQuery(lens, view, go, lead) {
     label: 'Add to the filter',
     groups: groupsOf(ranked(typeChoices(), here.types, near.uses?.types), (t) => ({ label: t.title, title: 'Items of this type, the newest first', pick: () => go(added(but(field, value), { type: t.id })) })),
     typed: {
-      placeholder: 'Words, a type, #tag, only a type…',
+      placeholder: 'A type, #tag, only a type…',
       title: 'Words to find; a type; #tag; a link and its end (waits_on me); an item id; only a type, or within an item id, to narrow what it finds',
       pick: (written) => {
         const t = termOf(written);
@@ -194,7 +195,6 @@ export function drawQuery(lens, view, go, lead) {
     ].filter(Boolean),
   });
   const filterTerms = [
-    f.text && term('q-text', `“${f.text}”`, 'Words it finds', 'text', f.text, addToFilter),
     ...(f.types ?? []).map((t) => term('q-type', typeTitle(t), 'Items of this type, the newest first', 'types', t, addToFilter)),
     ...(f.links ?? []).filter((t) => t.startsWith('tagged ')).map((t) => term('q-tag', termWords(t, redraw), 'Items with this tag', 'links', t, addToFilter)),
     ...(f.links ?? []).filter((t) => !t.startsWith('tagged ')).map((t) => term('q-link', termWords(t, redraw), `Items with this link: ${termWords(t, redraw)}`, 'links', t, addToFilter)),
@@ -208,10 +208,10 @@ export function drawQuery(lens, view, go, lead) {
     ? [walkTerm('every link', () => walk({ over: [], steps: 0 }))]
     : walked.map((r) => walkTerm(linkTitle(r), () => walk({ over: walked.filter((o) => o !== r), steps: walked.length > 1 ? steps : 0 })));
   // A part of the query, a row of the editor: its word, its terms, as many as the row has room for and how many more
-  // (all of them a click away, each with its ×), and its own + to add one.
+  // (those a click away, each with its ×), and its own + to add one.
   const part = (cls, word, title, list, add, addLabel, ...rest) => {
     const plus = h('button', { type: 'button', class: 'q-add', title: addLabel, 'aria-label': addLabel, onclick: (ev) => add(ev.currentTarget) }, '+');
-    const all = (ev) => pickTerm(ev.currentTarget, { label: word, held: list.map((t) => ({ label: t.said, title: t.title, open: () => add(plus), drop: t.drop })) });
+    const all = (ev) => pickTerm(ev.currentTarget, { label: `${word}: the rest`, held: list.filter((t) => t.el.hidden).map((t) => ({ label: t.said, title: t.title, open: () => add(plus), drop: t.drop })) });
     for (const t of list) t.el.dataset.said = t.said;
     return h('div', { class: `q-part ${cls}`, title },
       h('span', { class: 'q-label', title }, word),
@@ -225,20 +225,25 @@ export function drawQuery(lens, view, go, lead) {
   const limit = lens.limit ?? answer?.lens?.limit ?? '';
   const drawn = answer && h('span', { class: `q-count${answer.cut ? ' cut' : ''}`, title: answer.cut ? 'The limit cut what the lens finds' : 'Items drawn' }, `${answer.items.length}${answer.cut ? '+' : ''} drawn`);
   const failed = view?.failed && h('span', { class: 'q-count cut', title: view.failed }, '!');
-  // The query in one line: what the filter finds, the walk, and what is left out beyond the system's own; the whole of it is the line's tooltip.
+  // The query in one line, each part by the word its row in the editor has: the search's words (set in the find bar, not
+  // a row of the editor), what the filter's other terms find, the walk, and what is left out beyond the system's own. The whole of it is the line's tooltip.
   const leftSaid = exclude.filter((x) => x !== 'system').map((x) => (x === 'closed' ? x : typeTitle(x)));
-  const said = [
-    filterSaid(f, redraw),
-    walking && `→ ${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')}${steps > 1 ? ` ×${steps}` : ''}`,
-    leftSaid.length > 0 && `without ${leftSaid.join(', ')}`,
-  ].filter(Boolean).join('  ');
+  const { text, ...terms } = f;
+  const parts = [
+    text && ['Search', `“${text}”`],
+    filterSaid(terms, redraw) && ['Filter', filterSaid(terms, redraw)],
+    walking && ['Walk', `${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')}, ${steps} ${steps === 1 ? 'step' : 'steps'}`],
+    leftSaid.length > 0 && ['Left out', leftSaid.join(', ')],
+  ].filter(Boolean);
+  const said = parts.map(([word, what]) => `${word}: ${what}`).join(' · ');
   const toggle = () => ((editing = !editing), redraw());
   // Three bands, one under the other: the view (the canvas up and what is done with it, joined to its tab or its pane's
   // strip), the query in one line, and, while it is being edited, a row for each part of it under that line.
   bar.replaceChildren(
     h('div', { class: 'q-view', role: 'group', 'aria-label': 'The view' }, lead ?? ''),
     h('div', { class: 'q-lens', role: 'group', 'aria-label': 'The query' },
-      h('button', { type: 'button', class: 'q-sum', title: `${said}: edit the query`, 'aria-expanded': String(editing), onclick: toggle }, said),
+      h('button', { type: 'button', class: 'q-sum', title: `${said}: edit the query`, 'aria-expanded': String(editing), onclick: toggle },
+        parts.map(([word, what]) => h('span', { class: 'q-sum-part' }, h('span', { class: 'q-label' }, word), what))),
       drawn, failed,
       h('button', { type: 'button', class: 'q-save q-word q-edit-toggle', title: editing ? 'Done editing the query' : 'Edit the query: what it finds, leaves out and walks along', 'aria-expanded': String(editing), onclick: toggle }, editing ? 'Done' : 'Edit')),
     h('div', { class: 'q-edit', role: 'group', 'aria-label': 'Edit the query', hidden: !editing, onkeydown: (ev) => ev.key === 'Escape' && toggle() },

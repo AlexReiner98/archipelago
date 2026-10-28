@@ -1,6 +1,6 @@
 // Finding through the bar, in a real browser (skipped where there is no Chrome): the find bar sets the text of the
-// canvas's lens. Typing says what the words would find in one line (how many, the first names); Shift+Enter adds it to
-// the canvas with what it is tied to, Enter draws it in place, back undoes that; clearing the bar takes the term out. No list of
+// canvas's lens. Typing says what the words would find in one line (how many, the first names); Enter adds it to
+// the canvas with what it is tied to, the rest of the query kept; Shift+Enter draws it alone, back undoes that; clearing the bar takes the term out. No list of
 // rows is drawn. At 1280 and at 560 px, the line never wraps.
 
 import assert from 'node:assert/strict';
@@ -35,7 +35,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
   const drawn = `[...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent)`;
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
   const type = (q: string) => page.evaluate(`(() => { const i = document.querySelector('#find input'); i.focus(); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
-  // Enter, or with Shift held to add to what is drawn.
+  // Enter, or with Shift held to draw only what the words find.
   const enter = (shift = false) => page.evaluate(`(() => { document.querySelector('#find input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: ${shift}, bubbles: true })); document.querySelector('#find').requestSubmit(); })()`);
   const peek = `document.querySelector('#find .find-peek')`;
   const shots = process.env.PELAGO_SHOTS;
@@ -53,10 +53,10 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       assert.ok(line.wide, `inside the page at ${width} px`);
       assert.equal(await page.evaluate(`document.querySelectorAll('#find ul, #find li').length`), 0, 'no list of rows');
       if (shots) writeFileSync(`${shots}/find-peek-${width}.png`, await page.screenshot());
-      await enter(true);
-      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Shift+Enter draws what is found, with what it is tied to: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      await enter();
+      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter draws what is found, with what it is tied to: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       assert.ok(await page.evaluate(has('Elsewhere')), 'added: what was drawn stays');
-      assert.ok(await until(`[...document.querySelectorAll('#query .q-text, #query .q-more')].some((c) => (c.textContent + c.title).includes('roof'))`), 'the query bar shows the term, in sight or among the rest of its part');
+      assert.ok(await until(`document.querySelector('#query .q-sum')?.textContent.includes('Search“roof”')`), 'the query bar says the search apart from the filter');
       assert.ok(await page.evaluate(`${peek}.hidden`), 'the line goes once it is drawn');
       if (shots) writeFileSync(`${shots}/find-drawn-${width}.png`, await page.screenshot());
       // Clearing the bar takes the term out.
@@ -64,10 +64,10 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       await enter();
       // Waited for together: between the two pictures the canvas holds none, and neither is drawn.
       assert.ok(await until(`!location.hash.includes('text=') && !${has('Roof the shed')} && ${has('Elsewhere')}`), `cleared, the term is out and what was there before is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
-      // Enter draws what is found in place of what was drawn (decision e_c3g6gwqq), and back brings that again.
+      // Shift+Enter draws only what is found, in place of what was drawn, and back brings that again.
       await type('roof');
-      await enter();
-      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && !${has('Elsewhere')}`), `Enter replaces what was drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      await enter(true);
+      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && !${has('Elsewhere')}`), `Shift+Enter replaces what was drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
       assert.ok(await until(`!location.hash.includes('text=') && ${has('Elsewhere')} && !${has('Roof the shed')}`), `back draws what was there before: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
     }

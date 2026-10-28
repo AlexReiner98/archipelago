@@ -22,7 +22,7 @@ export function pickTerm(anchor, { label, groups = [], typed, held }) {
     const q = field?.value.trim().toLowerCase() ?? '';
     const some = groups.map((g) => ({ ...g, items: g.items.filter((i) => !q || i.label.toLowerCase().includes(q)) })).filter((g) => g.items.length);
     list.replaceChildren(
-      ...(held?.length ? [h('div', { class: 'term-pick-head' }, 'Here'), ...held.map((t) => h('div', { class: 'term-pick-held' },
+      ...(held?.length ? [groups.length > 0 && h('div', { class: 'term-pick-head' }, 'Here'), ...held.map((t) => h('div', { class: 'term-pick-held' },
         h('button', { type: 'button', class: 'term-pick-item', title: t.title, onclick: () => (close(), t.open()) }, t.label),
         h('button', { type: 'button', class: 'term-pick-x', title: 'Take it out', 'aria-label': `Take out ${t.label}`, onclick: () => (close(), t.drop()) }, '×')))] : []),
       ...some.flatMap((g) => [g.label && h('div', { class: 'term-pick-head' }, g.label), ...g.items.map((i) => h('button', { type: 'button', class: 'term-pick-item', title: i.title ?? i.label, onclick: () => take(i) }, i.label))]),
