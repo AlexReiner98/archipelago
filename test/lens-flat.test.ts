@@ -183,3 +183,15 @@ test('within an item the viewer cannot see, nothing is', async () => {
   assert.deepEqual(titles(await flatLens(l.as(bo), { filter: { types: ['task'], within: [s] } })), ['Saved canvases']);
   assert.deepEqual(titles(await flatLens(l.as('e_someone'), { filter: { types: ['task'], within: [s] } })), [], 'what is in it is not told');
 });
+
+test('each item says why it is there: the terms that found it, or the step of the walk that reached it', async () => {
+  const { l, made } = await chain();
+  const answer = await flatLens(l, { filter: { ids: [made.c], text: 'query bar', types: ['note'] }, walk: { over: ['depends_on'], steps: 2 } });
+  const why = Object.fromEntries(answer.items.map((i: any) => [i.title, i.found ?? i.step]));
+  assert.deepEqual(why['Query bar'], ['id', 'text'], 'found by its id and by the words');
+  assert.deepEqual(why['A note on it'], ['type']);
+  assert.equal(why['Tags'], 1, 'one step of the walk from what was found');
+  assert.equal(why['Flat lens'], 2, 'two steps');
+  const linked = await flatLens(l, { filter: { links: [`waits_on ${made.bo}`] } });
+  assert.deepEqual((linked.items[0] as any).found, ['link']);
+});

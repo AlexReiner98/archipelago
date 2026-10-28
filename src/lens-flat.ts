@@ -17,6 +17,9 @@ export interface LinkTerm {
   from?: string;
 }
 
+/** Which term of the filter found an item: its words, a type, an id named, a link term. */
+export type Found = 'text' | 'type' | 'id' | 'link';
+
 export interface FlatLens {
   /** What picks the seeds: any item any of these finds. */
   include: { text?: string; types?: string[]; ids?: string[]; links?: LinkTerm[] };
@@ -115,7 +118,16 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
 
   const sent = new Set<string>();
   const room = () => lens.limit + 1 - sent.size;
-  const add = (ids: string[]) => { for (const id of ids) if (room() > 0) sent.add(id); };
+  // Why each item is there: the terms of the filter that found it (a seed may be found by more than one), or the step
+  // of the walk that reached it. A person and an agent read the same reason (decision e_drt4g872: Find's terms).
+  const foundBy = new Map<string, Found[]>();
+  const stepOf = new Map<string, number>();
+  const add = (ids: string[], by?: Found) => {
+    for (const id of ids) {
+      if (by && (sent.has(id) || room() > 0)) foundBy.set(id, [...new Set([...(foundBy.get(id) ?? []), by])]);
+      if (room() > 0) sent.add(id);
+    }
+  };
   const me = l.viewer || (await l.setting<string>('me')) || null;
   // A term's end is an item's id, or else its name: the items so titled (any case) of the types that end of the link
   // takes ("tagged Urgent" is the tag named Urgent), as the viewer may see them.
@@ -130,14 +142,14 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
 
   // The seeds, each narrowed: ids first, then what a link term finds, what the text finds, the newest of each type named.
   const { ids, links, text, types } = lens.include;
-  if (ids?.length) add(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k}`, [ids]));
+  if (ids?.length) add(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k}`, [ids]), 'id');
   for (const term of links ?? []) {
     if (room() <= 0) break;
     const end = term.to ?? term.from!;
     const at = end === 'me' ? (me ? [me] : []) : await ends(term, end);
     if (!at.length) continue;
     const [near, far] = term.to !== undefined ? ['from_id', 'to_id'] : ['to_id', 'from_id'];
-    add(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), room()]));
+    add(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), room()]), 'link');
   }
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
@@ -150,9 +162,9 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     let rows = await finding(false);
     if (!rows.length) rows = await finding(true);
     matched = rows[0]?.n ?? 0;
-    add(rows.map((r) => r.id));
+    add(rows.map((r) => r.id), 'text');
   }
-  if (types?.length && room() > 0) add(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), room()]));
+  if (types?.length && room() > 0) add(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), room()]), 'type');
 
   // The walk: a step at a time, either way along the links named, to what the filter does not exclude. An excluded
   // item is not walked through. Each step is bounded by the ids reached the step before and what room is left.
@@ -161,6 +173,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     const typed = over ? ' and r.type = any($4::text[])' : '';
     const way = (near: string, far: string, k: string) => `select e.id, e.updated_at from relation r join unnest($1::text[]) s(id) on s.id = r.${near} join entity e on e.id = r.${far} where r.valid_to is null${typed} and e.id <> all($2::text[]) and ${k}`;
     level = await find((k) => `select id from (${way('from_id', 'to_id', k)} union ${way('to_id', 'from_id', k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...(over ? [over] : [])]);
+    for (const id of level) if (!sent.has(id)) stepOf.set(id, n + 1);
     add(level);
   }
 
@@ -186,6 +199,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
         visibility: e.visibility, status: e.status, open: e.is_open, owner: e.owner,
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
+        ...(foundBy.has(e.id) ? { found: foundBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
       };
     }),
     links: relations.map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),

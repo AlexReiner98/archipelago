@@ -164,9 +164,12 @@ test("an agent's change reaches a store holding a flat lens's answer, with no le
   assert.deepEqual([changed.items.added, changed.items.changed.includes(made.a), changed.items.removed], [[c], true, [made.b]]);
   assert.equal(heard.length, 1, 'listeners are told once');
 
-  // What the store holds is what reading the lens again gives.
+  // What the store holds is what reading the lens again gives. Why each item is there (found, step) is the answer's,
+  // not the log's: one the log brought has none until the lens is read again, so it is not compared.
   const again = await read();
   // As the page has both: over the wire, times are strings.
-  const pick = (a: any) => JSON.parse(JSON.stringify({ items: [...a.items].sort(byId), links: [...a.links].sort(byId) }));
+  const bare = ({ found, step, ...i }: any) => i;
+  const pick = (a: any) => JSON.parse(JSON.stringify({ items: [...a.items].map(bare).sort(byId), links: [...a.links].sort(byId) }));
   assert.deepEqual(pick(store.answer()), pick(again));
+  assert.deepEqual([store.item(made.p).found, store.item(made.a).step], [['id'], 1], 'what it held keeps why it was there, through the changes');
 });

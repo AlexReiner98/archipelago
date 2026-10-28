@@ -32,8 +32,10 @@ const linkName = (type) => {
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-function lit(i, style) {
+function lit(i, style, words) {
   if (Array.isArray(style.only)) return style.only.includes(i.id);
+  // What the lens's words found among the rest it draws stays lit, the rest dimmed (Find's hits, e_d9q8b5zr).
+  if (words) return Boolean(i.found?.includes('text'));
   return style.lit === 'you' ? Boolean(i.state.needs_you) : style.lit === 'blocked' ? Boolean(i.state.blocked) : true;
 }
 
@@ -234,8 +236,11 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     (stepBadges.size > 0 || linkBadges.length > 0) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
   ].flat().filter(Boolean);
 
-  // What stays lit, as the style says: the rest dimmed.
-  const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now));
+  // What stays lit, as the style says: the rest dimmed. Where the lens's words found some of what is drawn and not all,
+  // what they found is lit.
+  const hits = answer.items.filter((i) => i.found?.includes('text')).length;
+  const words = hits > 0 && hits < answer.items.length;
+  const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now, words));
   for (const id of dimmed(style)) addClass(dims.get(id), 'dim');
   /** Light the wires and ties of a step, or of none. */
   const light = (id) => [
