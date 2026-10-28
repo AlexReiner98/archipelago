@@ -168,12 +168,14 @@ function tabMenu(anchor, t) {
   if (!['all', 'none', ...sessions].includes(now)) sessions.unshift(now);
   const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key, t)) }, said);
   menuEl.replaceChildren(
-    h('div', { class: 'tab-menu-head', title: 'Whose shows and changes come into this tab' }, 'Follows'),
-    pick('all', 'Everyone', 'Every session’s, unless another tab follows it'),
-    pick('none', 'Nobody', 'No agent moves this tab'),
-    ...sessions.map((key) => pick(key, key === now && !heard.has(key) ? (t.named ?? nameOf(key)) : nameOf(key), key)),
-    tabs.list.length > 1 && h('hr'),
-    tabs.list.length > 1 && h('button', { type: 'button', role: 'menuitem', title: 'Into a window of its own: ⇲ there docks it back', onclick: () => (menuEl.hidePopover(), popOut(t.id)) }, 'Pop out'),
+    ...[
+      h('div', { class: 'tab-menu-head', title: 'Whose shows and changes come into this tab' }, 'Follows'),
+      pick('all', 'Everyone', 'Every session’s, unless another tab follows it'),
+      pick('none', 'Nobody', 'No agent moves this tab'),
+      ...sessions.map((key) => pick(key, key === now && !heard.has(key) ? (t.named ?? nameOf(key)) : nameOf(key), key)),
+      tabs.list.length > 1 && h('hr'),
+      tabs.list.length > 1 && h('button', { type: 'button', role: 'menuitem', title: 'Into a window of its own: ⇲ there docks it back', onclick: () => (menuEl.hidePopover(), popOut(t.id)) }, 'Pop out'),
+    ].filter(Boolean),
   );
   menuEl.showPopover();
   const r = anchor.getBoundingClientRect();

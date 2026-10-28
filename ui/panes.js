@@ -263,12 +263,13 @@ export function draw() {
 /**
  * Open this address in a pane on this side of the pane `by` (the one in focus, unless named) in tab `t` (the one in
  * sight unless named); one already on it is moved there. A pane opened for a session by the name it gave (`slot`), or
- * held for it (`held`), is its own, never one already open. Answers the pane's id.
+ * held for it (`held`), is its own, never one already open; so is one opened `anew` (Split: a second of what is up).
+ * Answers the pane's id.
  */
-export function openPane(at, side = 'right', by = undefined, own = {}, t = front()) {
+export function openPane(at, side = 'right', by = undefined, { anew = false, ...own } = {}, t = front()) {
   if (!drawable(at)) return null;
   at = paneAt(at);
-  const same = !own.slot && !own.held && Object.entries(t.panes).find(([id, p]) => t.groups.includes(id) && !p.slot && !p.held && named(p.at) === named(at));
+  const same = !anew && !own.slot && !own.held && Object.entries(t.panes).find(([id, p]) => t.groups.includes(id) && !p.slot && !p.held && named(p.at) === named(at));
   const id = same?.[0] ?? newId('p');
   t.panes[id] = { ...freshPane(at), ...t.panes[id], at, ...own };
   place(id, side, by ?? focusOf(t), t);
@@ -329,7 +330,7 @@ export function paneButtons() {
   return [
     button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length, 'q-save q-travel'),
     button('Forward', 'Forward again', '›', () => travel(1), !forth.length, 'q-save q-travel'),
-    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', ['◫', h('span', { class: 'q-word-text' }, 'Split')], () => openPane(historyNow().at, 'right', active), false, 'q-save q-word q-split'),
+    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', ['◫', h('span', { class: 'q-word-text' }, 'Split')], () => openPane(historyNow().at, 'right', active, { anew: true }), false, 'q-save q-word q-split'),
   ];
 }
 /** The address the pane the bar acts on draws, for a new tab to open on. */

@@ -228,8 +228,13 @@ export function menu(label, items) {
   const box = h('details', { class: 'menu' }, h('summary', {}, label), h('div', { class: 'menu-items' }, items.filter(Boolean).map(([text, onclick, cls]) => h('button', { class: cls ?? '', onclick: (ev) => ((box.open = false), onclick(ev)) }, text))));
   return box;
 }
+// A menu shuts on a click anywhere else, and once one of its options is chosen (☰ and what it holds included); a tick
+// (a checkbox, or an item that is one) keeps it open, as more than one may be ticked.
+const isTick = (el) => el.matches('[role="menuitemcheckbox"], input[type="checkbox"]') || Boolean(el.matches('label') && el.querySelector('input[type="checkbox"]'));
 document.addEventListener('click', (ev) => {
-  for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target)) open.open = false;
+  const hit = ev.target.closest?.('.menu-items :is(button, a, label, input)');
+  const option = hit && !isTick(hit) ? hit : null;
+  for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target) || (option && open.contains(option))) open.open = false;
 });
 
 /** When an open item was last changed or confirmed, as a mark that turns as it ages. */

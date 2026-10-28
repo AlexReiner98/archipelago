@@ -1,0 +1,16 @@
+/* Every dropdown (decision e_eqsuv24q). What opens one is bare: a menu is ⋯ or a word, a value picker its value and its
+   chevron, each lit when pointed at; only a select among a form's fields is boxed as they are. What opens is one list,
+   whatever opened it: a menu's, the tab's, a part's picker, the time entry's, Follow's What. */
+details.menu { position: relative; }
+details.menu > summary { list-style: none; cursor: pointer; padding: var(--space-2) var(--space-4); border: 0; border-radius: var(--radius-2); background: none; }
+details.menu > summary::-webkit-details-marker { display: none; }
+details.menu > summary:hover, details.menu[open] > summary, select:hover:not(:disabled) { background: var(--accent-soft); }
+select { border-color: transparent; background: none; padding: var(--space-2) var(--space-4); cursor: pointer; }
+.form select, dialog select, select:has(~ input), input ~ select { border-color: var(--line); background: var(--panel); padding: var(--space-4) var(--space-6); }
+details.menu > .menu-items, .tab-menu, .term-pick, .tq-picks { display: grid; align-content: start; min-width: var(--menu-least); padding: var(--space-4); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); box-shadow: 0 var(--space-4) var(--space-10) rgb(0 0 0 / 0.22); }
+details.menu > .menu-items { position: absolute; right: 0; top: calc(100% + var(--space-3)); z-index: 5; }
+:is(details.menu > .menu-items, .tab-menu) > :is(button, a, label), .term-pick-item, .tq-picks button { text-align: left; border: 0; border-radius: var(--radius-2); background: none; padding: var(--space-4) var(--space-6); color: var(--text); font: inherit; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: var(--menu-item-most); cursor: pointer; }
+:is(details.menu > .menu-items, .tab-menu) > label, .tq-picks button { display: flex; gap: var(--space-5); align-items: center; }
+:is(:is(details.menu > .menu-items, .tab-menu) > :is(button, a, label), .term-pick-item, .tq-picks button):is(:hover, :focus-visible) { background: var(--accent-soft); outline: none; }
+.tab-menu-head, .term-pick-head { padding: var(--space-4) var(--space-6) var(--space-2); color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
+:is(details.menu > .menu-items, .tab-menu) > hr { width: 100%; margin: var(--space-3) 0; border: 0; border-top: var(--border-1) solid var(--line); }

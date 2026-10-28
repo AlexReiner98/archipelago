@@ -247,9 +247,8 @@ async function writeMoves() {
 }
 hooks.act = () => writeMoves();
 addEventListener('visibilitychange', () => document.hidden && writeMoves());
-document.getElementById('canvas-arrange')?.addEventListener('click', () => ((document.getElementById('more').open = false), current?.arrange()));
 
-// ---- What the reader chose for the canvas, in the settings menu: kept in this browser, the same for every pane.
+// ---- What the reader chose for the canvas, in the view band's menu (decision e_yxp78scv): kept in this browser, the same for every pane.
 
 /** fit: all of it brought into sight on every change; else the reader alone moves it. The key is the style's (key). */
 const settings = { fit: true, snap: false };
@@ -273,18 +272,17 @@ const bars = (host) => {
   return [Math.max(0, foot - box.top), find === undefined ? 0 : Math.max(0, box.bottom - find)];
 };
 const fitAll = () => all.forEach((c) => c.fit());
-for (const box of document.querySelectorAll('#canvas-settings input[data-setting]')) {
-  box.checked = Boolean(settings[box.dataset.setting]);
-  box.addEventListener('change', () => {
-    settings[box.dataset.setting] = box.checked;
-    try {
-      localStorage.setItem('pelago-canvas', JSON.stringify(settings));
-    } catch {
-      // Kept until the page is reloaded.
-    }
-    all.forEach((c) => (c.snap(), c.fit()));
-  });
+function toggle(name) {
+  settings[name] = !settings[name];
+  try {
+    localStorage.setItem('pelago-canvas', JSON.stringify(settings));
+  } catch {
+    // Kept until the page is reloaded.
+  }
+  all.forEach((c) => (c.snap(), c.fit()));
 }
+// What the band's menu (ui/canvas-menu.js) acts on: Arrange the pane in focus, and the reader's toggles.
+hooks.canvasNow = { arrange: () => current?.arrange(), settings, toggle };
 // The sheet opening or shutting, and the window resized, change the room each is fitted to.
 new MutationObserver(fitAll).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 addEventListener('resize', fitAll);
