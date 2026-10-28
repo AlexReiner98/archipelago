@@ -69,6 +69,13 @@ system type `lens`, and Home lists them. Where a person put a node is a
 place in the `places` stream: one per canvas and item, compacted to the
 newest, never an item or a link, read only to draw it there. Position never
 carries meaning; a grouping that matters is made as a link.
+A pack ships saved canvases as presets (a `styles` entry of `type: "lens"`,
+decision e_x8bghuce): the picker and Home list each until the owner saves
+their own version, which names it (`preset`) and stands in its place.
+A style is the pane's (decision e_tqr9cxdc): editing the lens keeps it,
+opening a saved canvas brings its own, and Save keeps both. The view band
+switches it beside the canvas (`ui/look-switch.js`); the band's ⋯ holds
+Arrange, Fit and Snap for the main canvas (decision e_yxp78scv).
 - `test/saved-canvases.test.ts`: "in a browser, a canvas is saved from the
   bar, listed on Home, opened and switched to, its places its own".
 - `test/canvas-places.test.ts`: "a move names a canvas and items the map

@@ -30,6 +30,23 @@ test('an agent makes and changes a saved canvas through change, and report show 
   assert.ok(!drawn.items.some((i) => i.id === id), 'not drawn on a canvas of the work');
 });
 
+test("a pack ships canvases as presets: the schema offers each, its lens answers, and the owner keeps their version under its id", async () => {
+  const l = await fresh();
+  const { canvases, shapes } = (await callTool(l, human, 'schema', {})) as { canvases: { id: string; pack: string; title: string; props: { filter: Record<string, unknown>; walk: unknown } }[]; shapes: { shape: string }[] };
+  const waiting = canvases.find((c) => c.id === 'core.waiting');
+  assert.ok(waiting && waiting.pack === 'core' && waiting.title, 'core ships what waits on you');
+  assert.ok(shapes.some((s) => s.shape === 'flow'), 'the shapes the drawings draw, for the style switch');
+  // What waits on the person looking: the lens answers as a saved one does.
+  const { me } = await l.init(human, { name: 'Me' });
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'T' }]);
+  await l.change(human, { reason: 'test', ops: [{ op: 'link', type: 'waits_on', from: t, to: me }] });
+  const drawn = (await callTool(l, human, 'view', { name: 'flat', params: { filter: waiting.props.filter, walk: waiting.props.walk } })) as { items: { id: string }[] };
+  assert.ok(drawn.items.some((i) => i.id === t), 'what waits on you is drawn');
+  const kept = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: waiting.title, props: { ...waiting.props, preset: waiting.id } }] })) as { created: Record<string, string> };
+  const got = (await callTool(l, human, 'query', { name: 'get', params: { id: kept.created.c } })) as { entity: { props: Record<string, unknown> } };
+  assert.equal(got.entity.props.preset, 'core.waiting', 'the owner’s version names the preset it stands for');
+});
+
 test('in a browser, a canvas is saved from the bar, listed on Home, opened and switched to, its places its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {

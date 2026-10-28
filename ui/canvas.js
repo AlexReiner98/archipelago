@@ -3,7 +3,7 @@
 // shown and edited in the query bar (ui/query-bar.js): every change of what is drawn is a change of that lens. A click
 // on an item adds it to the filter; the find bar adds text. It is drawn in the drawing its style names (the flow, by
 // the canvas pack's preset, unless a nearer style says otherwise), so the canvas has no look of its own: it keeps
-// which lens is up, lights the item whose page is open, and moves as the reader chose in the settings menu: fitted on
+// which lens is up, lights the item whose page is open, and moves as the reader chose in the view band's menu: fitted on
 // every change, or left where they put it.
 
 import { api, hooks, state } from './base.js';
@@ -194,9 +194,8 @@ function arrange() {
   drawAgain();
   writeMoves();
 }
-document.getElementById('canvas-arrange')?.addEventListener('click', () => (document.getElementById('more').open = false, arrange()));
 
-// ---- What the reader chose for the canvas, in the settings menu: kept in this browser.
+// ---- What the reader chose for the canvas, in the view band's menu (decision e_yxp78scv): kept in this browser.
 
 /** fit: all of it brought into sight on every change; else the reader alone moves it. The key is the style's (key). */
 const settings = { fit: true, snap: false };
@@ -227,18 +226,17 @@ function apply() {
   if (at?.style) at.style.snap = Boolean(settings.snap);
   fitNow();
 }
-for (const box of document.querySelectorAll('#canvas-settings input[data-setting]')) {
-  box.checked = Boolean(settings[box.dataset.setting]);
-  box.addEventListener('change', () => {
-    settings[box.dataset.setting] = box.checked;
-    try {
-      localStorage.setItem('pelago-canvas', JSON.stringify(settings));
-    } catch {
-      // Kept until the page is reloaded.
-    }
-    apply();
-  });
+function toggle(name) {
+  settings[name] = !settings[name];
+  try {
+    localStorage.setItem('pelago-canvas', JSON.stringify(settings));
+  } catch {
+    // Kept until the page is reloaded.
+  }
+  apply();
 }
+// What the band's menu (ui/canvas-menu.js) acts on: Arrange the canvas the bar acts on, and the reader's toggles.
+hooks.canvasNow = { arrange: () => !docked && arrange(), settings, toggle };
 apply();
 // Where the reader left it, each time they move it: a drawing drawn again (the map changed) is put back there.
 const keep = () => at && moves() && (at.kept = moves().state());
