@@ -9,15 +9,19 @@
 import { api, hooks, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { canvasSwitch } from './canvases.js';
+import { numberOf } from './lens-base.js';
 import { FOCUS, flatView } from './lens.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
 const sheet = document.getElementById('sheet');
-/** Home: the map's top (what stands at the altitude of the workspace or a project) and what is directly in each, open. */
+/**
+ * Home: open projects (what stands at a project's altitude) and whatever waits on the viewer, with no walk and a short
+ * limit, so the first canvas answers one question (decision e_5stjvfvb). Growing it is a step taken from an item.
+ */
 export const home = () => ({
-  filter: { types: (state.schema?.types ?? []).filter((t) => !t.dormant && (t.altitude === 'workspace' || t.altitude === 'project')).map((t) => t.id), exclude: ['closed', 'system'] },
-  walk: { over: ['part_of'], steps: 1 },
+  filter: { types: (state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => t.id), links: ['waits_on me'], exclude: ['closed', 'system'] },
+  limit: numberOf(state.style, 'home_limit'),
 });
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
 export const focusOn = (id) => ({ filter: { ids: [id] }, walk: { over: FOCUS, steps: 1 } });
