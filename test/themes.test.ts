@@ -78,7 +78,6 @@ test('each theme carries its own emblem, a PNG drawn in its place\'s colours, an
   const emblems = themes.map((t) => (t.props as { emblem?: string }).emblem ?? '');
   for (const [i, e] of emblems.entries()) assert.match(e, png, `${themes[i].title} has an emblem`);
   assert.match(styleOf('core', 'core.house').emblem, png, 'the house style has one');
-  // Open water and Bay are of no one place: they keep the emblem's own. Every place's is its own.
-  const places = emblems.filter((_, i) => !['themes.open_water', 'themes.bay'].includes(themes[i].id));
-  assert.equal(new Set(places).size, places.length, 'one for each place');
+  const all = [...emblems, styleOf('core', 'core.house').emblem];
+  assert.equal(new Set(all).size, all.length, 'every one its own');
 });

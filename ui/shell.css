@@ -87,7 +87,7 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 .term-pick-x { flex: none; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); cursor: pointer; }
 .term-pick-x:hover { color: var(--text); }
 /* The emblem, the theme's own (its style's emblem, ui/theme.js), in place of the name: the name is still what it is called. */
-#nav .brand { flex: none; width: var(--box-8); height: var(--box-8); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
+#nav .brand { flex: none; width: var(--box-9); height: var(--box-9); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
 #nav .brand > .error { font-size: var(--text-2); }
 #nav .brand .workspace-name { display: none; }
 /* Under the tabs, two bands, each the width of the pane: the view, in the panel's colour and joined to the tab in sight
