@@ -195,8 +195,7 @@ own store and kept current from the log, with its places, its wires, its
 fitting and Arrange. Panes stand side by side, as a code editor's groups do:
 ◫ in the bar opens the pane in focus's canvas in a pane beside it, a pane's
 name dragged onto a side of another docks it there (onto its middle swaps
-them), the line between two shares the room, ⤢ keeps only that pane and ×
-closes it; the last one stays. One pane alone has no strip: the bar floats
+them), the line between two shares the room, and × closes it; the last one stays. One pane alone has no strip: the bar floats
 over its top, as the page's canvas always did.
 
 The pane last touched is in focus: the query bar and find act on it and sit

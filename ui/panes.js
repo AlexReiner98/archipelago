@@ -65,7 +65,7 @@ function paneEl(id) {
   const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
   // Its controls stand in its strip in focus or not: in focus, the query bar takes the name's place between them.
   const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
-  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Keep only this pane', '⤢', () => only(id)), button('Close this pane', '×', () => close(id))), body);
+  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Close this pane', '×', () => close(id))), body);
   for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
   const canvas = canvasIn(body, {
     go: (lens) => goPane(id, lens ? `v?${flatQuery(lens, canvas.asked)}` : 'v'),
@@ -255,7 +255,7 @@ export function draw() {
   dispatchEvent(new Event('resize'));
 }
 
-// ---- What can be done with a pane, any pane: open, move, close, keep only it.
+// ---- What can be done with a pane, any pane: open, move, close; an agent's alone keeps only its own.
 
 /**
  * Open this address in a pane on this side of the pane `by` (the one in focus, unless named) in tab `t` (the one in
@@ -319,7 +319,7 @@ addEventListener('resize', () => {
 // The sheet opening or shutting changes the room the panes share.
 new MutationObserver(() => started && front().groups.length > 1 && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 
-/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move, keep only it and close stay in its strip. */
+/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move and close stay in its strip. */
 export function paneButtons() {
   const { back = [], forth = [] } = historyNow();
   const button = (label, title, mark, onclick, off, cls = 'q-save') => h('button', { type: 'button', class: cls, title, 'aria-label': label, disabled: off, onclick }, mark);

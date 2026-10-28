@@ -59,7 +59,8 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 #query .q-mark { width: var(--text-5); height: var(--text-5); fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
 /* An action that is not read from its mark alone says its word beside it. */
 #query .q-save.q-word { width: auto; gap: var(--space-3); grid-auto-flow: column; padding: 0 var(--space-5); font-size: var(--text-4); color: var(--text); }
-#tabs > .tab-new { pointer-events: auto; align-self: center; }
+/* New tab: on the line of the tabs' own buttons, as a browser's + is (its glyph sits a hairline lower than × and ⋯, so it is lifted by one), in the text's colour so it reads at a glance. */
+#tabs > .tab-new { pointer-events: auto; align-self: flex-end; margin: 0 0 calc((var(--box-8) - var(--box-7)) / 2 + var(--border-1)) var(--space-3); color: var(--text); }
 /* The tab in sight's menu: whom it follows, pop out. A popover, so the strip does not clip it. */
 .tab-menu, .term-pick { position: fixed; inset: auto; margin: var(--space-3) 0 0; display: grid; min-width: var(--menu-least); padding: var(--space-4); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); box-shadow: 0 var(--space-4) var(--space-10) rgb(0 0 0 / 0.22); }
 .tab-menu:not(:popover-open), .term-pick:not(:popover-open) { display: none; }
@@ -104,7 +105,8 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 /* The nodes: what the filter adds, each by name, then what it leaves out, muted and struck through, a word apart. */
 #query .q-sum-part > .q-kept + *, #query .q-sum-part > .q-struck + * { margin-left: var(--space-5); }
 #query .q-sum-part > .q-struck { color: var(--muted); text-decoration: line-through; }
-#query .q-sum:hover { color: var(--accent); }
+/* The query's words open its editor too: pointing at them lights Edit (or Done), not the words. */
+#query .q-lens:has(> .q-sum:hover) > .q-edit-toggle { color: var(--text); background: var(--accent-soft); }
 #query .q-lens > .q-count { flex: none; }
 /* Edit: a row for each part under the line, the width of the view, its word in a column of its own and its terms after it, as many as fit (ui/query-bar.js fitRows). */
 #query .q-edit { pointer-events: auto; display: grid; grid-template-columns: max-content minmax(0, 1fr); box-sizing: border-box; padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); }
@@ -136,8 +138,11 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-count { color: var(--muted); }
 #query .q-count.cut { color: var(--accent); }
 /* The canvas's name never shrinks away. */
-#query .q-canvas { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+#query .q-canvas { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 #query .q-canvas > * { flex: none; }
+/* Back and forward sit together at the start, as a browser's do; Split goes to the far end. */
+#query .q-canvas > .q-travel + .q-travel { margin-left: calc(-1 * var(--space-5)); }
+#query .q-canvas > .q-split { margin-left: auto; }
 /* Narrow (ui/query-bar.js fitBar): the buttons' words go, then back and forward, then Split, and the canvas's name shrinks; the
    query's line drops how many are drawn once its words have little room. */
 #query .tight .q-word-text, #query .tighter .q-travel, #query .q-lens.tight > .q-count { display: none; }
@@ -147,8 +152,7 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
 #marks .count.held { background: var(--warn); }
-#new-item { display: inline-grid; place-items: center; width: var(--box-8); height: var(--box-8); border-radius: var(--radius-2); color: var(--muted); font-size: var(--text-8); line-height: 1; text-decoration: none; }
-#new-item:hover, #more > summary:hover { color: var(--text); background: var(--accent-soft); }
+#more > summary:hover { color: var(--text); background: var(--accent-soft); }
 #listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
 #listening::before { content: "● "; }
 #listening[hidden] { display: none; }
@@ -200,7 +204,9 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .note > .fields { padding: 0; margin: 0 0 var(--space-8); }
 #sheet .draft-read { cursor: text; }
 #sheet .draft-read .body-text, #sheet .note.doc .body-text { padding-left: 0; padding-right: 0; }
-#sheet .note.doc h3.doc-head, #sheet .note > img.figure { margin-left: 0; margin-right: 0; }
+#sheet .note.doc h3.doc-head, #sheet .page-section > img.figure { margin-left: 0; margin-right: 0; }
+/* An image never runs wider than the sheet: a wide one scales down with its proportions, a small one keeps its size. */
+#sheet img { max-width: 100%; height: auto; }
 #sheet .draft-body { display: block; width: 100%; min-height: var(--box-10); padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: var(--text-6); line-height: 1.6; resize: none; outline: none; overflow: hidden; }
 #sheet .draft-body::placeholder { color: var(--muted); }
 #sheet .draft-body[hidden] { display: none; }
@@ -329,9 +335,9 @@ body[data-dragging="pane"] { cursor: grabbing; }
    Every pane keeps a strip of one height at its top, in or out of focus, so nothing moves when focus does: the query
    bar fills the strip of the pane it acts on, and the others show their names there. A pane alone has no strip. */
 #canvas .pane-bar { box-sizing: border-box; height: var(--strip); padding-top: 0; padding-bottom: 0; }
-/* In focus, the bar takes the place of the pane's name, between its ⠿ and its ⤢ ×, which stay where they are. */
+/* In focus, the bar takes the place of the pane's name, between its ⠿ and its ×, which stay where they are. */
 #canvas > .pane.pane-active > .pane-bar > .pane-name, #canvas > .pane.pane-active > .pane-bar > .pane-follows { visibility: hidden; }
 body[data-panes="1"] #canvas .pane-bar { display: none; }
 .pane-bar .pane-grip { cursor: grab; user-select: none; touch-action: none; }
-body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + 2 * var(--box-7) + 2 * var(--space-3)) 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
+body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
 #canvas > .pane-sash.row { top: var(--band, 0%); }

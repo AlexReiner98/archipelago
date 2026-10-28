@@ -124,7 +124,10 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
       all.map((c) => h('option', { value: canvasAt(c.id), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
     );
-    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, 'Save')), ...(hooks.paneButtons?.() ?? []));
+    // In a browser's order: back and forward, then the canvas up, as its address, with Save beside it, and Split at the end.
+    const own = hooks.paneButtons?.() ?? [];
+    const travel = own.filter((b) => b.classList.contains('q-travel'));
+    part.replaceChildren(...travel, pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, 'Save')), ...own.filter((b) => !travel.includes(b)));
     fitBar();
   });
   return part;

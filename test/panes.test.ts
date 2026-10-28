@@ -114,7 +114,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await page.evaluate(`document.getElementById('sheet-close').click()`);
     await until('the sheet shut', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open'`));
 
-    // A pane's name dragged to the left of the other docks it there; × closes it; ⤢ keeps only the pane it is on.
+    // A pane's name dragged to the left of the other docks it there, and × closes it; the strip has only ⠿ and ×.
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(1)}.querySelector('.pane-name').getBoundingClientRect(); return [r.left + 10, r.top + r.height / 2]; })())`));
     const mouse = (type: string, at: number[]) => page.send('Input.dispatchMouseEvent', { type, x: at[0], y: at[1], button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
     await mouse('mousePressed', [x, y]);
@@ -125,8 +125,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await until('closed by hand', async () => (await panes()).length === 1 && (await draws(0, 'First step, renamed')));
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
     await until('a pane once more', async () => (await panes()).length === 2);
-    await page.evaluate(`${nth(1)}.querySelector('[aria-label="Keep only this pane"]').click()`);
-    await until('only that pane', async () => (await panes()).length === 1 && (await draws(0, 'First step, renamed')));
+    assert.deepEqual(await page.evaluate(`[...${nth(1)}.querySelectorAll('.pane-bar [aria-label]')].map((b) => b.getAttribute('aria-label'))`), ['Move this pane', 'Close this pane'], 'every pane has the same controls');
   } finally {
     page.close();
   }
