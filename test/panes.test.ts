@@ -112,7 +112,8 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.a}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
     await until('its page is open over the first', async () => (await page.evaluate<boolean>(`location.hash.startsWith('#/e/${made.a}?') && !location.hash.includes('Second')`)) && (await panes())[0][3]);
     await page.evaluate(`document.getElementById('sheet-close').click()`);
-    await until('the sheet shut', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open'`));
+    // Shut, and slid away: until then it covers the second pane's strip.
+    await until('the sheet shut', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && getComputedStyle(document.getElementById('sheet')).visibility === 'hidden'`));
 
     // A pane's name dragged to the left of the other docks it there, and × closes it; the strip has only ⠿ and ×.
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(1)}.querySelector('.pane-name').getBoundingClientRect(); return [r.left + 10, r.top + r.height / 2]; })())`));

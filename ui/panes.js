@@ -239,8 +239,11 @@ export function draw() {
     for (const side of ['left', 'right', 'top', 'bottom']) el.style[side] = layout.groups.length > 1 ? edge(side, box[side]) : '';
     if (el.parentNode !== host) host.append(el);
   }
-  // In the order they stand, so a reader's tab order and a test's first pane are the leftmost.
-  for (const g of layout.groups) host.append(drawn.get(g).el);
+  // In the order they stand, so a reader's tab order and a test's first pane are the leftmost; moved only when out of
+  // order, since an element moved loses the pointer a drag of its name holds.
+  const order = layout.groups.map((g) => drawn.get(g).el);
+  const standing = [...host.children].filter((el) => el.classList.contains('pane'));
+  if (order.some((el, n) => standing[n] !== el)) for (const el of order) host.append(el);
   document.body.dataset.panes = String(layout.groups.length);
   if (!layout.groups.includes(active)) activeIs(focusOf(layout));
   else frameActive();
