@@ -35,12 +35,16 @@ option, optgroup { background: var(--panel); color: var(--text); }
 /* One layout for one pane or several: the bar in a band across the top, over the sheet, and every pane under it with
    its strip, so nothing moves or changes width when a tab is split. */
 body { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
+/* The lines of the frame are one system: a line under the tabs across the page, the tab in sight standing on it in the
+   panel's colour; a line under each band; one line between two panes, which is what is dragged and lights when it is
+   (ui/panes.js). Nothing draws a border of its own around a view. */
+body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) - var(--border-1)); left: 0; right: 0; height: var(--border-1); background: var(--line); pointer-events: none; }
 #nav > .grow { flex: 1; pointer-events: none; }
 /* Tabs (ui/tab-bar.js): one for each canvas kept, a session's named in its hue; many shrink to their mark and first letters.
    They stand on one line across the bar, square below and rounded above; the one in sight is raised in the panel's
    colour over that line, its top in the accent or its session's hue. No tab changes its size or controls when another
    comes into sight. */
-#tabs { align-self: stretch; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: calc(-1 * var(--border-1)); padding: 0 var(--space-3); overflow-x: auto; scrollbar-width: none; }
+#tabs { align-self: stretch; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: calc(var(--box-9) + var(--space-4) - var(--band)); padding: 0 var(--space-3); overflow-x: auto; scrollbar-width: none; }
 #tabs > .tab { pointer-events: auto; flex: 0 1 auto; max-width: 40%; min-width: calc(var(--box-8) + 2 * var(--box-7) + var(--space-6)); box-sizing: border-box; display: inline-flex; align-items: center; gap: 0; height: var(--box-8); padding: 0 var(--space-1) 0 var(--space-6); background: none; border: var(--border-1) solid transparent; border-bottom: 0; border-radius: var(--radius-3) var(--radius-3) 0 0; color: var(--muted); font-size: var(--text-5); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
 #tabs > .tab:hover { color: var(--text); background: var(--accent-soft); }
 #tabs > .tab[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
@@ -281,7 +285,7 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 
 /* Panes (ui/panes.js): the canvases docked beside the main one in a tab, each with its name, a way to make it main
    and to close it. Their frames are set by the layout as shares of the page; the line between two is dragged. */
-#panes > .pane { position: fixed; z-index: 1; display: flex; flex-direction: column; background: var(--ln-sea, var(--bg)); border-left: var(--border-1) solid var(--line); border-top: var(--border-1) solid var(--line); box-sizing: border-box; }
+#panes > .pane { position: fixed; z-index: 1; display: flex; flex-direction: column; background: var(--ln-sea, var(--bg)); box-sizing: border-box; }
 #panes > .pane.pane-shown { animation: pane-shown 1.2s ease; }
 @keyframes pane-shown { from { box-shadow: inset 0 0 0 var(--border-2, var(--border-1)) var(--accent); } to { box-shadow: none; } }
 #panes .pane-bar { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); min-width: 0; }
@@ -295,10 +299,17 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #panes .pane-canvas .lf-stage { height: 100%; }
 #panes .pane-canvas .lens-view > .toolbar { display: none; }
 #panes .pane-canvas > .empty, #panes .pane-canvas > .error, #panes .pane-canvas .lens-view > .empty { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
-#panes > .pane-sash { position: fixed; z-index: 2; background: transparent; }
+/* The line between two panes: drawn by the sash itself, over the bands it crosses, wider and in the accent while it is
+   pointed at or dragged; what takes the pointer is wider than what is drawn. */
+#panes > .pane-sash { position: fixed; z-index: 3; background: transparent; }
 #panes > .pane-sash.row { top: 0; bottom: 0; width: var(--space-4); transform: translateX(-50%); cursor: col-resize; }
 #panes > .pane-sash.column { left: 0; right: 0; height: var(--space-4); transform: translateY(-50%); cursor: row-resize; }
-#panes > .pane-sash:hover, body[data-dragging="sash"] #panes > .pane-sash { background: var(--accent-soft); }
+#panes > .pane-sash::after { content: ''; position: absolute; background: var(--line); }
+#panes > .pane-sash.row::after { top: 0; bottom: 0; left: 50%; width: var(--border-1); transform: translateX(-50%); }
+#panes > .pane-sash.column::after { left: 0; right: 0; top: 50%; height: var(--border-1); transform: translateY(-50%); }
+#panes > .pane-sash:hover::after, body[data-dragging="sash"] #panes > .pane-sash::after { background: var(--accent); }
+#panes > .pane-sash.row:hover::after, body[data-dragging="sash"] #panes > .pane-sash.row::after { width: var(--border-3); }
+#panes > .pane-sash.column:hover::after, body[data-dragging="sash"] #panes > .pane-sash.column::after { height: var(--border-3); }
 /* While a pane or a line is dragged, a style's frame does not take the pointer from the page. */
 body[data-dragging] { user-select: none; }
 body[data-dragging] iframe { pointer-events: none; }
@@ -309,7 +320,7 @@ body[data-dragging="pane"] { cursor: grabbing; }
 /* The pane the bar and find act on, among several: a line of the accent along its top; the names of the others quiet. */
 #panes > .pane.pane-active > .pane-bar { box-shadow: inset 0 var(--border-2, var(--border-1)) 0 var(--accent); }
 #panes > .pane:not(.pane-active) .pane-name { color: var(--muted); font-weight: 400; }
-#canvas.pane-active::before { content: ''; position: absolute; z-index: 4; top: 0; left: 0; right: 0; height: var(--border-2, var(--border-1)); background: var(--accent); pointer-events: none; }
+body:has(#canvas.pane-active) #query .q-view, body:has(#canvas.pane-active) #main-name { box-shadow: inset 0 var(--border-2, var(--border-1)) 0 var(--accent); }
 /* A pane not in focus takes the first press on a style's frame itself (a frame keeps its presses), and is then in focus. */
 #panes > .pane:not(.pane-active) > .pane-canvas:has(iframe)::after, body[data-active="pane"] #canvas:has(iframe)::after { content: ''; position: absolute; inset: 0; z-index: 3; cursor: pointer; }
 /* Several panes: the top bar runs in a band across the page and over the sheet, the panes and the sheet under it.
