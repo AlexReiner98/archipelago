@@ -62,7 +62,8 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 #query .q-mark { width: var(--text-5); height: var(--text-5); fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
 /* An action that is not read from its mark alone says its word beside it. */
 #query .q-save.q-word { width: auto; gap: var(--space-3); grid-auto-flow: column; padding: 0 var(--space-5); font-size: var(--text-4); color: var(--text); }
-#tabs > .tab-new { pointer-events: auto; align-self: center; }
+/* New tab: on the line of the tabs' own buttons, as a browser's + is (its glyph sits a hairline lower than × and ⋯, so it is lifted by one), in the text's colour so it reads at a glance. */
+#tabs > .tab-new { pointer-events: auto; align-self: flex-end; margin: 0 0 calc((var(--box-8) - var(--box-7)) / 2 + var(--border-1)) var(--space-3); color: var(--text); }
 /* The tab in sight's menu: whom it follows, pop out. A popover, so the strip does not clip it. */
 .tab-menu, .term-pick { position: fixed; inset: auto; margin: var(--space-3) 0 0; display: grid; min-width: var(--menu-least); padding: var(--space-4); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); box-shadow: 0 var(--space-4) var(--space-10) rgb(0 0 0 / 0.22); }
 .tab-menu:not(:popover-open), .term-pick:not(:popover-open) { display: none; }
