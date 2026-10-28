@@ -107,7 +107,8 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 /* The nodes: what the filter adds, each by name, then what it leaves out, muted and struck through, a word apart. */
 #query .q-sum-part > .q-kept + *, #query .q-sum-part > .q-struck + * { margin-left: var(--space-5); }
 #query .q-sum-part > .q-struck { color: var(--muted); text-decoration: line-through; }
-#query .q-sum:hover { color: var(--accent); }
+/* The query's words open its editor too: pointing at them lights Edit (or Done), not the words. */
+#query .q-lens:has(> .q-sum:hover) > .q-edit-toggle { color: var(--text); background: var(--accent-soft); }
 #query .q-lens > .q-count { flex: none; }
 /* Edit: a row for each part under the line, the width of the view, its word in a column of its own and its terms after it, as many as fit (ui/query-bar.js fitRows). */
 #query .q-edit { pointer-events: auto; display: grid; grid-template-columns: max-content minmax(0, 1fr); box-sizing: border-box; padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); }
