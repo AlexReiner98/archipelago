@@ -218,8 +218,10 @@ export function menu(label, items) {
   const box = h('details', { class: 'menu' }, h('summary', {}, label), h('div', { class: 'menu-items' }, items.filter(Boolean).map(([text, onclick, cls]) => h('button', { class: cls ?? '', onclick: (ev) => ((box.open = false), onclick(ev)) }, text))));
   return box;
 }
+// A menu shuts on a click anywhere else, and once one of its options is clicked (☰ and what it holds included).
 document.addEventListener('click', (ev) => {
-  for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target)) open.open = false;
+  const option = ev.target.closest?.('.menu-items :is(button, a, label, input)');
+  for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target) || (option && open.contains(option))) open.open = false;
 });
 
 /** When an open item was last changed or confirmed, as a mark that turns as it ages. */
