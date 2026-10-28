@@ -96,7 +96,10 @@ export function canvasIn(host, pane) {
       writeMoves();
       // Where things were put here is read beside the lens, into `placed`: one object the picture keeps, filled in place.
       const style = { ...asked, ...(here && { here }), snap: Boolean(settings.snap), placed: {} };
-      at = { key, view: null, lens, home: isHome, here, kept: null, style, asked };
+      // The same lens drawn again (an item's page opened over it says it anew) stays where it stands: opening an item
+      // does not move the canvas.
+      const same = at && JSON.stringify(at.lens) === JSON.stringify(lens);
+      at = { key, view: null, lens, home: isHome, here, kept: same ? (c.moves()?.state() ?? at.kept) : null, style, asked };
       c.draw();
       readPlaces(c, canvasOf(lens, asked), style.placed);
     },
@@ -167,10 +170,8 @@ export function canvasIn(host, pane) {
     batched.set(c.places, { ...was, moves: { ...was.moves, [ev.detail.id]: put } });
     at.style.placed[ev.detail.id] = put;
   });
-  // A wire drawn by hand from one step to another makes a link; a held change is decided where it is drawn.
+  // A held change is decided where it is drawn.
   wiresOn(host, () => at?.view?.store);
-  // A new item is started where the canvas is double-clicked, away from anything drawn on it.
-  host.addEventListener('dblclick', (ev) => !ev.target.closest('a, button, input, select') && (location.hash = '#/new'));
   return c;
 }
 

@@ -10,21 +10,27 @@ import { quietTip } from './tip.js';
 export function tipOf(host) {
   if (host.drawingTip) return host.drawingTip;
   // Kept inside the host, so the drawing's stylesheet reaches it; a popover, so nothing on the page covers it.
-  const box = h('div', { class: 'drawing-tip', role: 'tooltip', popover: 'manual' });
+  const box = h('div', { class: 'drawing-tip', role: 'tooltip', popover: 'manual', hidden: true });
   let at = null;
   const hide = () => {
     if (at) quietTip(null);
+    if (at?.title) at.el.prepend(at.title);
     at = null;
     if (box.matches(':popover-open')) box.hidePopover();
+    box.hidden = true;
   };
   /** Show what node says beside el, a mark of the picture. */
   const show = (el, node) => {
     hide();
     if (!el?.isConnected || !host.contains(el)) return;
-    at = el;
+    // Its own title is set aside while the tip says it (the page's tip may have taken it already).
+    const title = [...el.children].find((kid) => kid.tagName.toLowerCase() === 'title');
+    title?.remove();
+    at = { el, title };
     quietTip(el);
     if (!box.isConnected) host.append(box);
     box.replaceChildren(node);
+    box.hidden = false;
     box.showPopover();
     const mark = el.getBoundingClientRect();
     const half = box.offsetWidth / 2, middle = mark.left + mark.width / 2;
@@ -35,7 +41,7 @@ export function tipOf(host) {
   };
   // Gone when the pointer leaves the picture, or a tap lands elsewhere in it (a tap on a mark may then show its own).
   host.addEventListener('mouseleave', hide);
-  host.addEventListener('click', (ev) => at && !at.contains(ev.target) && hide(), true);
+  host.addEventListener('click', (ev) => at && !at.el.contains(ev.target) && hide(), true);
   host.drawingTip = { show, hide };
   return host.drawingTip;
 }

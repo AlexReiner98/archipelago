@@ -6,7 +6,7 @@
 // paints in its worker shown on a canvas laid over its picture (surface.js).
 
 import { frameSandbox, h } from './base.js';
-import { dragOf, wireHover } from './drag.js';
+import { dragOf } from './drag.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './drawing-tip.js';
 import { build, cssFor, patch, step } from './marks.js';
@@ -146,7 +146,6 @@ export function drawWith(host, answer, style, keep) {
     if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1] } }));
     send({ key, name });
   };
-  wireHover(host, style);
   const run = (now) => step(moving, now) && requestAnimationFrame(run);
   // What a drawing patches: its marks, and its tip (drawing-tip.js), whose marks are checked as every mark is.
   const tip = tipOf(host);

@@ -141,7 +141,8 @@ export function drawFind() {
     wait = setTimeout(look, 160);
   });
   input.addEventListener('focus', open);
-  said.addEventListener('click', open);
+  // The whole bar at rest is a field: a click anywhere on it opens it.
+  row.addEventListener('click', open);
   // A row's word puts find in that part.
   rows.addEventListener('click', (ev) => {
     const word = ev.target.closest?.('.q-part > .q-label')?.textContent;

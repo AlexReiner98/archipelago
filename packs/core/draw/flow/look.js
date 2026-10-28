@@ -9,7 +9,9 @@ export const css = `
 .lf-step.placed .lf-shape { stroke: var(--lf-place); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-step.scenario .lf-shape { stroke: var(--ln-muted); stroke-dasharray: var(--ln-flow-dash-scenario); }
 .lf-step.you .lf-shape { stroke: var(--ln-you); }
-.lf-step.here .lf-shape, .lf-step:hover .lf-shape, .lf-step:focus .lf-shape { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
+.lf-step:hover .lf-shape, .lf-step:focus .lf-shape { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
+/* The step whose page is open is lit, in the page's accent, while the page is open: not as a hover is. */
+.lf-step.here .lf-shape { stroke: var(--accent, var(--ln-text)); stroke-width: var(--ln-flow-stroke-lit); fill: color-mix(in srgb, var(--accent, var(--ln-text)) 18%, var(--ln-land)); }
 .lf-step text { fill: var(--ln-text); font-size: var(--ln-flow-text); font-family: var(--ln-font); dominant-baseline: middle; }
 .lf-step.closed text, .lf-step.stub text { fill: var(--ln-muted); }
 .lf-step.stub text { font-size: var(--ln-flow-stub-text); }

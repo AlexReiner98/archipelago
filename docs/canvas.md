@@ -113,15 +113,15 @@ compares answers.
   open canvas without a lens read".
 
 ### 7. Every gesture is a change through the one write path
-A wire drawn by hand, a status, Save in the sheet: each builds ops and sends
+A status, Save in the sheet: each builds ops and sends
 them through `change` on the person's authority, where the rules decide
 whether it applies or waits. A held change is drawn as a ghost where it
 would land and decided there. Moves are the one batch outside it, written to
 the places stream just before the person's next action.
 - `test/structure.test.ts`: "items and relations are written in one place";
   "every approval is decided by a rule".
-- `test/canvas-wires.test.ts`: "in a browser, a wire drawn by hand becomes a
-  link, and a held change is drawn and decided where it would land".
+- `test/canvas-wires.test.ts`: "in a browser, opening a step keeps the canvas
+  still and lights it, and a held change is decided where it would land".
 - `test/ghosts.test.ts`: "held changes are drawn where they would land, and
   only there".
 - `test/canvas-drag.test.ts`: "in a browser, a step dragged on the canvas is

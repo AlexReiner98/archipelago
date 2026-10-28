@@ -3,14 +3,13 @@
 // which opens from the side over it to read and act on one thing: an item read as a document, a new item, the
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
-import { SignInNeeded, api, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
+import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem } from './draft.js';
 import { drawFind } from './find.js';
 import { signupPage, welcome } from './signup.js';
 import { home } from './home.js';
 import { entity } from './item.js';
-import { flatQuery } from './lens.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
@@ -27,16 +26,6 @@ startTips();
 const close = () => (location.hash = hrefNow());
 document.getElementById('sheet-close').addEventListener('click', close);
 addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset.sheet && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') && close());
-
-/** How many things wait for you: changes held for your word, and what only you can move. A mark in the bar, opening them. */
-async function drawMarks() {
-  const [held, mine] = await Promise.all([api('proposals').catch(() => []), api('view', { name: 'attention', params: { person: 'me', reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 50 } }).catch(() => ({ items: [] }))]);
-  const n = held.length + mine.items.length;
-  // What is held is answered on the page that holds it; else the mark opens a canvas of what waits on you (the bar names
-  // it by the saved canvas that draws the same, a pack's or the owner's).
-  const href = held.length ? '#/you' : `#/v?${flatQuery({ filter: { links: ['waits_on me'] } })}`;
-  document.getElementById('marks').replaceChildren(n ? h('a', { class: `count${held.length ? ' held' : ''}`, href, title: [held.length && `${held.length} held for your word`, mine.items.length && `${mine.items.length} your move`].filter(Boolean).join(', ') }, String(n)) : '');
-}
 
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
 async function route(pulse = false) {
@@ -74,7 +63,6 @@ async function route(pulse = false) {
   document.body.dataset.sheet = page ? 'open' : '';
   state.dirty = false;
   stale.hidden = true;
-  drawMarks();
   if (!page) return showIdentity();
   if (main.firstElementChild?.dataset.part !== page) main.replaceChildren(h('div', { class: 'part', 'data-part': page }));
   const draw = {
