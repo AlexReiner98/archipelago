@@ -7,7 +7,7 @@
 
 import { api, ask, h, hooks, tell } from './base.js';
 import { flatQuery, flatView } from './lens.js';
-import { filterSaid } from './query-bar.js';
+import { filterSaid, fitBar } from './query-bar.js';
 import { isA, typeTitle } from './words.js';
 
 const TYPE = 'lens';
@@ -115,7 +115,8 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
       all.map((c) => h('option', { value: canvasAt(c.id), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
     );
-    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, '☆ Save'), ...(hooks.paneButtons?.() ?? []));
+    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, '☆', h('span', { class: 'q-word-text' }, 'Save')), ...(hooks.paneButtons?.() ?? []));
+    fitBar();
   });
   return part;
 }

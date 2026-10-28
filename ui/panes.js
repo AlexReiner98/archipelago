@@ -321,9 +321,9 @@ export function paneButtons() {
   const button = (label, title, mark, onclick, off, cls = 'q-save') => h('button', { type: 'button', class: cls, title, 'aria-label': label, disabled: off, onclick }, mark);
   const entry = active === 'main' ? null : drawn.get(active);
   return [
-    button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length),
-    button('Forward', 'Forward again', '›', () => travel(1), !forth.length),
-    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', '◫ Split', () => openPane(asPane(active === 'main' ? canvasHref() : `#/${entry.at}`), 'right', active), false, 'q-save q-word'),
+    button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length, 'q-save q-travel'),
+    button('Forward', 'Forward again', '›', () => travel(1), !forth.length, 'q-save q-travel'),
+    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', ['◫', h('span', { class: 'q-word-text' }, 'Split')], () => openPane(asPane(active === 'main' ? canvasHref() : `#/${entry.at}`), 'right', active), false, 'q-save q-word q-split'),
   ];
 }
 /** The address the pane the bar acts on draws, for a new tab to open on. */

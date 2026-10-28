@@ -263,7 +263,7 @@ export function drawQuery(lens, view, go, lead) {
     ),
   );
   bar.hidden = !filled;
-  fitRows();
+  fitBar();
 }
 
 /** Each row of the editor shows as many of its terms as it has room for, and how many more: drawn again as the bar's width changes. */
@@ -284,4 +284,27 @@ function fitRows() {
     }
   }
 }
-if (bar) new ResizeObserver(fitRows).observe(bar);
+/**
+ * Fit the bar to its width: the view's band drops its buttons' words, then back and forward, then Split as the canvas's
+ * name shrinks; the query's line drops how many are drawn once its words have little room; each row of the editor shows what it has
+ * room for. Drawn again as the width changes.
+ */
+export function fitBar() {
+  if (!bar) return;
+  const over = (el) => el && el.scrollWidth > el.clientWidth + 1;
+  const view = bar.querySelector('.q-view');
+  if (view) {
+    view.classList.remove('tight', 'tighter', 'tightest');
+    const canvas = view.querySelector('.q-canvas');
+    for (const step of ['tight', 'tighter', 'tightest']) if (over(view) || over(canvas)) view.classList.add(step);
+  }
+  const line = bar.querySelector('.q-lens');
+  if (line) {
+    line.classList.remove('tight');
+    const sum = line.querySelector('.q-sum');
+    // How many are drawn goes when the query's words have less than a third of the line.
+    if (over(line) || (sum && over(sum) && sum.clientWidth * 3 < line.clientWidth)) line.classList.add('tight');
+  }
+  fitRows();
+}
+if (bar) new ResizeObserver(fitBar).observe(bar);
