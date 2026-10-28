@@ -119,7 +119,9 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #find:not(.open) .q-edit, #find.typing .q-edit, #find.open .q-lens, #find:not(.open) input[type=search] { display: none; }
 #find .q-edit > .q-part { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--box-8); }
 #find .q-edit > .q-part + .q-part { border-top: var(--border-1) solid var(--line); }
-#find .q-edit > .q-part > .q-label { padding-right: var(--space-8); }
+#find .q-edit > .q-part > .q-label { padding-right: var(--space-8); cursor: pointer; }
+/* The part find is in, before its box: its word, as the rows say it. */
+#find .find-mode { padding-left: var(--space-6); color: var(--accent); }
 #find .q-terms { display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
 #find .q-terms > [hidden] { display: none; }
 /* Open to edit, a term is said whole: a row shows those that fit and how many more, never a term cut short. */

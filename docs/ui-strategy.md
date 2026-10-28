@@ -39,7 +39,10 @@ canvas as a flat graph", with its decisions.
 - **Find, at the canvas's foot, is the query.** A click or / opens it, and
   its rows (Find, Only, Not, Walk, Limit) rise above it. Typing lists what the
   words could be, each said by its kind: Words first and lit, then In and
-  Item for each item found by name, a Tag, a Type, a Link to me, a New item.
+  Item for each item found by name, a Tag, a Type, a Link to me. A part's
+  word and a space (only, not, walk, limit), or a click on a row's word,
+  puts find in that part and offers its choices; Backspace goes back to Find.
+  Find makes no items.
   Enter takes the lit one (the words in place of those find set before, any
   other term added); Shift+Enter adds the words as another set; Escape
   empties what was typed, then shuts find.

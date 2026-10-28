@@ -90,6 +90,13 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       await out('gutters');
       assert.ok(await until(`!location.hash.includes('text=') && ${has('Elsewhere')} && !${has('Walls')}`), 'cleared for the next width');
     }
+    // A part's word and a space put find in that part: "only " is no words to find, and Only's choices are offered.
+    await type('only ');
+    assert.ok(await until(`document.querySelector('#find .find-mode')?.textContent === 'Only' && !document.querySelector('#find .find-mode').hidden && document.querySelector('#find input[type=search]').value === ''`), 'find is in Only, its mark before the box');
+    await type('done');
+    assert.ok(await until(`${list}.querySelector('.find-choice.lit')?.textContent === 'Worddone'`), `Only's own choices, the first lit: ${await page.evaluate(`${list}.textContent`)}`);
+    await enter();
+    assert.ok(await until(`location.hash.includes('only=done') && !document.getElementById('find').classList.contains('open')`), `Enter takes it as an Only term: ${await page.evaluate('location.hash')}`);
     // At rest find says, in its line, the lens an address carries.
     await page.go(`${base}/#/v?ids=${made.other}&text=gutters`);
     assert.ok(await until(`document.querySelector('#find .q-sum')?.textContent.includes('“gutters”')`), 'find says the lens up');
