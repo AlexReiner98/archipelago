@@ -235,9 +235,14 @@ addEventListener('storage', (ev) => {
 let started = false;
 /** Draw the tabs kept and the panes of the one in sight, once the map's schema is read (ui/app.js): what they draw is read through it. */
 export function startTabs() {
-  // A look's page (the server's own, ui/look.js) draws the view it was asked for alone.
-  if (lookMode || started) return;
+  if (started) return;
   started = true;
+  // A look's page (the server's own, ui/look.js) draws the view it was asked for alone, in one pane, with no tabs.
+  if (lookMode) {
+    tabs.list = [freshTab(location.hash || '#/')];
+    tabs.front = tabs.list[0].id;
+    return startPanes();
+  }
   // The page opened on an address: the page it names is open over the tab in sight (its lens goes to the pane in focus, ui/app.js).
   front().sheet = sheetOf(location.hash);
   keep();
