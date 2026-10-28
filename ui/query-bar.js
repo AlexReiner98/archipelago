@@ -1,7 +1,7 @@
 // The query bar: the canvas's lens, always in sight in one line under the view's (decision e_sdsaxxq4): the search's
-// words (set in the find bar, ui/find.js), what the filter finds, the walk and what is left out, said in a few words,
+// words (set in the find bar, ui/find.js), what the filter adds and leaves out, and the walk, said in a few words,
 // and how many items are drawn. Edit opens a row for each part under it, each saying what it is in a word: the filter
-// (types, tags, items, links; and what narrows them, only a type, within an item), what is left out, the walk (the
+// (types, tags, items, links; what narrows them, only a type, within an item; and what it leaves out), the walk (the
 // links it follows, how many steps) and the limit. A row shows as many terms as fit and how many more, those a click
 // away, and has its own + that opens one menu
 // (ui/term-pick.js) to add to it; a term's words open it again to change that term, its × takes it away. Every change
@@ -202,7 +202,8 @@ export function drawQuery(lens, view, go, lead) {
     ...(f.only ?? []).map((t) => term('q-narrow', `only ${typeTitle(t)}`, 'Only what is of this type, of what the filter finds', 'only', t, addToFilter)),
     ...(f.within ?? []).map((id) => term('q-narrow', `within ${nameOf(id, redraw)}`, 'Only what is within this item, at any depth, of what the filter finds', 'within', id, addToFilter)),
   ].filter(Boolean);
-  const leftTerms = exclude.map((x) => term('q-out', x === 'closed' || x === 'system' ? x : typeTitle(x), 'Left out of everything', 'exclude', x, leaveOut));
+  // What is left out is in the filter's row too, each marked −: left out of everything, what the walk reaches included.
+  const leftTerms = exclude.map((x) => term('q-out', `− ${x === 'closed' || x === 'system' ? x : typeTitle(x)}`, 'Left out of everything', 'exclude', x, leaveOut));
   const walkTerm = (said, drop) => ({ said, title: 'Along this link, either way', drop, el: h('span', { class: 'q-term q-walk' }, h('span', { class: 'q-said' }, said), h('button', { type: 'button', class: 'q-x', title: 'Take it out', 'aria-label': `Take out ${said}`, onclick: drop }, '×')) });
   const walkTerms = over === 'all'
     ? [walkTerm('every link', () => walk({ over: [], steps: 0 }))]
@@ -226,14 +227,16 @@ export function drawQuery(lens, view, go, lead) {
   const drawn = answer && h('span', { class: `q-count${answer.cut ? ' cut' : ''}`, title: answer.cut ? 'The limit cut what the lens finds' : 'Items drawn' }, `${answer.items.length}${answer.cut ? '+' : ''} drawn`);
   const failed = view?.failed && h('span', { class: 'q-count cut', title: view.failed }, '!');
   // The query in one line, each part by the word its row in the editor has: the search's words (set in the find bar, not
-  // a row of the editor), what the filter's other terms find, the walk, and what is left out beyond the system's own. The whole of it is the line's tooltip.
-  const leftSaid = exclude.filter((x) => x !== 'system').map((x) => (x === 'closed' ? x : typeTitle(x)));
+  // a row of the editor), what the filter's other terms add (+) and what it leaves out beyond the system's own (−), and
+  // the walk. The whole of it is the line's tooltip.
   const { text, ...terms } = f;
+  const outTypes = exclude.filter((x) => x !== 'system' && x !== 'closed');
+  const outSaid = [exclude.includes('closed') && 'closed', outTypes.length === 1 ? typeTitle(outTypes[0]) : outTypes.length > 1 && `${outTypes.length} types`].filter(Boolean).join(', ');
+  const filterLine = [filterSaid(terms, redraw) && `+ ${filterSaid(terms, redraw)}`, outSaid && `− ${outSaid}`].filter(Boolean).join('  ');
   const parts = [
     text && ['Search', `“${text}”`],
-    filterSaid(terms, redraw) && ['Filter', filterSaid(terms, redraw)],
+    filterLine && ['Filter', filterLine],
     walking && ['Walk', `${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')}, ${steps} ${steps === 1 ? 'step' : 'steps'}`],
-    leftSaid.length > 0 && ['Left out', leftSaid.join(', ')],
   ].filter(Boolean);
   const said = parts.map(([word, what]) => `${word}: ${what}`).join(' · ');
   const toggle = () => ((editing = !editing), redraw());
@@ -247,8 +250,8 @@ export function drawQuery(lens, view, go, lead) {
       drawn, failed,
       h('button', { type: 'button', class: 'q-save q-word q-edit-toggle', title: editing ? 'Done editing the query' : 'Edit the query: what it finds, leaves out and walks along', 'aria-expanded': String(editing), onclick: toggle }, editing ? 'Done' : 'Edit')),
     h('div', { class: 'q-edit', role: 'group', 'aria-label': 'Edit the query', hidden: !editing, onkeydown: (ev) => ev.key === 'Escape' && toggle() },
-      part('q-filter', 'Filter', 'What it finds is drawn', filterTerms, (a) => addToFilter(a), 'Add to the filter'),
-      part('q-left', 'Left out', 'Left out of everything, what the walk reaches included', leftTerms, (a) => leaveOut(a), 'Leave something out'),
+      part('q-filter', 'Filter', 'What it finds is drawn, but what it leaves out (−)', [...filterTerms, ...leftTerms], (a) => addToFilter(a), 'Add to the filter',
+        h('button', { type: 'button', class: 'q-add q-less', title: 'Leave something out', 'aria-label': 'Leave something out', onclick: (ev) => leaveOut(ev.currentTarget) }, '−')),
       part('q-walk-part', 'Walk', 'From what the filter finds, along these links either way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
         walking && h('span', { class: 'q-label q-sub', title: 'How many steps the walk takes' }, 'Steps'),
         walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },
