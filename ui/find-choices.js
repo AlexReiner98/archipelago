@@ -17,7 +17,24 @@ const MEANS = { Find: 'What adds to the canvas', Only: 'What must all hold of wh
 const has = (name, q) => String(name ?? '').toLowerCase().includes(q.toLowerCase());
 const typeList = (q, most) => [...types.values()].filter((t) => !t.system && t.kind !== 'system' && has(t.title, q)).slice(0, most);
 const linkList = (q, most) => [...relations.values()].filter((r) => !r.id.startsWith('sys.') && r.id !== 'tagged' && has(r.title ?? r.id, q)).slice(0, most);
-const found = async (q, most, type) => (q ? await api('search', { q, limit: most, ...(type && { type }) }).catch(() => []) : []).map((e) => (titles.set(e.id, e.title), e));
+/**
+ * Items found by name. A name's last words that name a type (one or two, as typed or with an s: "archipelago project",
+ * "roof tasks") narrow the search to that type, the rest the name; each choice says its type, so what was read is in sight.
+ */
+const typeNamed = (q) => {
+  const words = q.split(/\s+/);
+  for (const n of [2, 1]) {
+    if (words.length <= n) continue;
+    const said = words.slice(-n).join(' ').toLowerCase();
+    const t = [...types.values()].find((x) => !x.system && x.kind !== 'system' && [x.title.toLowerCase(), `${x.title.toLowerCase()}s`].includes(said));
+    if (t) return { q: words.slice(0, -n).join(' '), type: t.id };
+  }
+  return { q };
+};
+const found = async (typed, most, given) => {
+  const { q, type } = given ? { q: typed, type: given } : typeNamed(typed);
+  return (q ? await api('search', { q, limit: most, ...(type && { type }) }).catch(() => []) : []).map((e) => (titles.set(e.id, e.title), e));
+};
 
 /** The words themselves, Find's first choice: drawn at once, before the search answers, so Enter never waits on it. */
 export function wordsChoice(q) {
@@ -28,12 +45,29 @@ export function wordsChoice(q) {
 const modeChoices = (mode, q) => (q.length < 2 ? [] : MODES.filter((m) => m !== mode && m.toLowerCase().startsWith(q.toLowerCase())))
   .map((m) => ({ kind: m, label: `${MEANS[m].toLowerCase()} ›`, note: '', title: `${m}: ${MEANS[m].toLowerCase()} (type “${m.toLowerCase()} ” to go there)`, mode: m }));
 
+/** The kinds of choice in each part: one's word first in what is typed ("within archipelago") offers that kind alone. */
+const KINDS = { Find: ['Words', 'In', 'Item', 'Tag', 'Type', 'Link'], Only: ['Word', 'Owner', 'Status', 'Type', 'Within'], Not: ['Type'], Walk: [], Limit: [] };
+
+/** The kind whose word leads what is typed in `mode`, and the rest; or nothing. */
+export function ledBy(mode, q) {
+  const [, lead, rest] = /^(\S+)\s+(.*)$/.exec(q) ?? [];
+  const kind = lead && KINDS[mode].find((k) => k.toLowerCase() === lead.toLowerCase());
+  return kind ? { kind, rest: rest.trim() } : null;
+}
+
 /**
  * The choices for `q` in `mode`, in order: { kind, label, note, title, and one of words, term (added to the filter),
- * walk (a link to follow), limit, mode (find goes into that part) }. `c` is { most, lens }: how many of each are offered,
- * and the lens up, so what it holds already is not offered again.
+ * walk (a link to follow), limit, mode (find goes into that part) }. `c` is { most, wide, lens }: how many of each are
+ * offered, how many of the one kind a kind's word asks for, and the lens up, so what it holds already is not offered
+ * again. Led by a kind's word, only that kind is offered, found by the rest; in Find the whole of what was typed is
+ * still offered as words, last.
  */
 export async function choicesFor(mode, q, c) {
+  const led = !c.narrowed && ledBy(mode, q);
+  if (led) {
+    const all = (await choicesFor(mode, led.rest, { ...c, most: c.wide, narrowed: true })).filter((x) => x.kind === led.kind);
+    return [...all, ...(mode === 'Find' && led.kind !== 'Words' ? [wordsChoice(q)] : [])];
+  }
   const f = c.lens.filter;
   if (mode === 'Find') {
     const items = (await found(q, c.most)).flatMap((e) => {
@@ -51,7 +85,7 @@ export async function choicesFor(mode, q, c) {
   if (mode === 'Only') {
     const words = offered(f.only ?? []).filter((w) => has(w.word, q)).map((w) => ({ kind: 'Word', label: w.word, note: '', title: w.title, term: { only: w.word } }));
     const mine = has('owner me', q) && !(f.only ?? []).includes('owner me') ? [{ kind: 'Owner', label: 'me', note: '', title: 'What is mine', term: { only: 'owner me' } }] : [];
-    const statuses = [...new Set([...types.values()].flatMap((t) => [...(t.statuses?.open ?? []), ...(t.statuses?.closed ?? [])]))].filter((s) => q && has(s, q)).slice(0, c.most)
+    const statuses = [...new Set([...types.values()].flatMap((t) => [...(t.statuses?.open ?? []), ...(t.statuses?.closed ?? [])]))].filter((s) => (q ? has(s, q) : c.narrowed)).slice(0, c.most)
       .map((s) => ({ kind: 'Status', label: s, note: '', title: `Only what is ${s}`, term: { only: `status ${s}` } }));
     const typed = typeList(q, c.most).map((t) => ({ kind: 'Type', label: typeChoice(t), note: '', title: `Only what is of the type ${t.title}`, term: { only: t.id } }));
     const within = (await found(q, c.most)).map((e) => ({ kind: 'Within', label: e.title, note: typeTitle(e.type), title: `Only what is within ${e.title}, at any depth`, term: { within: e.id } }));

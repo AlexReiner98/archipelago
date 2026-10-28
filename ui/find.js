@@ -10,7 +10,7 @@
 
 import { api, asWords, h, state, wordsOf } from './base.js';
 import { goLens, home, lensNow } from './canvas.js';
-import { MODES, choicesFor, wordsChoice } from './find-choices.js';
+import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
 import { numberOf } from './lens-base.js';
 import { added, fitBar } from './query-bar.js';
 
@@ -25,8 +25,9 @@ const mark = h('span', { class: 'q-label find-mode', title: 'The part find is in
 const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn' };
 const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Choose what the words are: ↑↓, then Enter; Shift+Enter adds the words as another set' });
 let asked = 0;
-/** The choices drawn for what is typed, and the lit one. */
+/** The choices drawn, what was typed when they were, and the lit one. */
 let choices = [];
+let shownFor = '';
 let lit = 0;
 
 const lensUp = () => lensNow() ?? home();
@@ -84,6 +85,8 @@ function drawChoices() {
     h('span', { class: 'find-name' }, c.label),
     c.note && h('span', { class: 'find-note' }, c.note))));
   list.hidden = !choices.length;
+  // What was typed when they were drawn: Enter takes only choices drawn for what is typed now.
+  list.dataset.for = shownFor;
 }
 
 /** What the words could be: the words at once, the rest once the search answers; how many the words find, under the canvas's Not. */
@@ -93,18 +96,23 @@ async function look() {
   const finding = mode === 'Find';
   bar.classList.toggle('typing', Boolean(q) || !finding);
   if (finding && !q) return void ((choices = []), (list.hidden = true));
-  choices = finding ? [wordsChoice(q)] : [];
+  // In Find the words are drawn at once, unless a kind's word leads them: then that kind's choices come first.
+  const seeded = finding && !ledBy(mode, q);
+  choices = seeded ? [wordsChoice(q)] : [];
+  shownFor = seeded ? q : '';
   lit = 0;
   drawChoices();
   const lens = lensUp();
   const exclude = lens.filter.exclude;
   const most = numberOf(state.style, 'find_choice_items');
   const [all, counted] = await Promise.all([
-    choicesFor(mode, q, { most, lens }),
+    choicesFor(mode, q, { most, wide: numberOf(state.style, 'term_find_most'), lens }),
     finding ? api('view', { name: 'flat', params: { filter: { text: q, ...(exclude && { exclude }) }, limit: most } }).catch(() => null) : null,
   ]);
   if (mine !== asked) return;
-  if (finding) all[0].note = counted ? `${counted.matched ?? counted.items.length} found` : '';
+  const words = all.find((x) => x.words === q);
+  if (words && counted) words.note = `${counted.matched ?? counted.items.length} found`;
+  shownFor = q;
   choices = all;
   drawChoices();
 }
@@ -148,10 +156,11 @@ export function drawFind() {
     ev.preventDefault();
     clearTimeout(wait);
     const q = input.value.trim();
-    // In Find, typed faster than the choices came, the words are what is taken: they are always the first. In another
-    // part, only a choice drawn is taken.
-    if (mode !== 'Find') take(choices[lit], add);
-    else if (q) take(choices[lit] && choices[0].words === q ? choices[lit] : wordsChoice(q), add);
+    // Only a choice drawn for what is typed now is taken. In Find, typed faster than the choices came, the words are
+    // what is taken, as they come first; led by a kind's word, or in another part, nothing is, until its choices come.
+    const ready = shownFor === q && choices[lit];
+    if (ready) take(choices[lit], add);
+    else if (q && mode === 'Find' && !ledBy(mode, q)) take(wordsChoice(q), add);
     add = false;
   });
   // Another pane or tab in focus: find shuts, and says that lens.

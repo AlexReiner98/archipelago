@@ -94,9 +94,15 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
     await type('only ');
     assert.ok(await until(`document.querySelector('#find .find-mode')?.textContent === 'Only' && !document.querySelector('#find .find-mode').hidden && document.querySelector('#find input[type=search]').value === ''`), 'find is in Only, its mark before the box');
     await type('done');
-    assert.ok(await until(`${list}.querySelector('.find-choice.lit')?.textContent === 'Worddone'`), `Only's own choices, the first lit: ${await page.evaluate(`${list}.textContent`)}`);
+    assert.ok(await until(`${list}.dataset.for === 'done' && ${list}.querySelector('.find-choice.lit')?.textContent === 'Worddone'`), `Only's own choices, the first lit: ${await page.evaluate(`${list}.textContent`)}`);
     await enter();
     assert.ok(await until(`location.hash.includes('only=done') && !document.getElementById('find').classList.contains('open')`), `Enter takes it as an Only term: ${await page.evaluate('location.hash')}`);
+    // A kind's word leading what is typed offers that kind alone, found by the rest: "within site" is Within Site works.
+    await type('only ');
+    await type('within site');
+    assert.ok(await until(`${list}.dataset.for === 'within site' && ${list}.querySelector('.find-choice.lit')?.textContent.startsWith('WithinSite works') && [...${list}.querySelectorAll('.find-choice .q-label')].every((k) => k.textContent === 'Within')`), `Within's choices alone: ${await page.evaluate(`${list}.textContent`)}`);
+    await enter();
+    assert.ok(await until(`location.hash.includes('within=${made.site}')`), `Enter takes it as within: ${await page.evaluate('location.hash')}`);
     // At rest find says, in its line, the lens an address carries.
     await page.go(`${base}/#/v?ids=${made.other}&text=gutters`);
     assert.ok(await until(`document.querySelector('#find .q-sum')?.textContent.includes('“gutters”')`), 'find says the lens up');
