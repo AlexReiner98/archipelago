@@ -102,9 +102,8 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-sum { flex: 0 1 auto; min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
 #query .q-sum-part + .q-sum-part { margin-left: var(--space-8); }
 #query .q-sum-part > .q-label { margin-right: var(--space-4); }
-/* The nodes: what the filter adds, each by name, then what it leaves out, muted and struck through, a word apart. */
-#query .q-sum-part > .q-kept + *, #query .q-sum-part > .q-struck + * { margin-left: var(--space-5); }
-#query .q-sum-part > .q-struck { color: var(--muted); text-decoration: line-through; }
+/* Find: each term by name, joined by a muted "or" (any of them adds). */
+#query .q-sum-part > .q-or { margin: 0 var(--space-4); color: var(--muted); }
 /* The query's words open its editor too: pointing at them lights Edit (or Done), not the words. */
 #query .q-lens:has(> .q-sum:hover) > .q-edit-toggle { color: var(--text); background: var(--accent-soft); }
 #query .q-lens > .q-count { flex: none; }
@@ -117,7 +116,6 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-terms { display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
 #query .q-terms > [hidden] { display: none; }
 #query .q-label { flex: none; color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
-#query .q-label.q-sub { margin-left: var(--space-6); }
 /* Each part's own +, and how many more it holds than are in sight: a mark that opens its menu. */
 #query .q-add, #query .q-more { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-2); font: inherit; color: var(--accent); cursor: pointer; }
 #query .q-add { font-size: var(--text-6); line-height: 1; }

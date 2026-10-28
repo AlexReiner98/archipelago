@@ -1,7 +1,7 @@
-// Finding through the bar, in a real browser (skipped where there is no Chrome): the find bar sets the text of the
-// canvas's lens. Typing says what the words would find in one line (how many, the first names); Enter adds it to
-// the canvas with what it is tied to, the rest of the query kept; Shift+Enter draws it alone, back undoes that; clearing the bar takes the term out. No list of
-// rows is drawn. At 1280 and at 560 px, the line never wraps.
+// Finding through the bar, in a real browser (skipped where there is no Chrome): the find bar sets the words of the
+// canvas's lens. Typing says what the words would find in one line (how many, the first names); Enter finds them in
+// place of the lens; Shift+Enter adds them to it, the rest kept, and back undoes that (e_e3k797d3); clearing the bar
+// takes the term out. No list of rows is drawn. At 1280 and at 560 px, the line never wraps.
 
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
@@ -35,7 +35,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
   const drawn = `[...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent)`;
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
   const type = (q: string) => page.evaluate(`(() => { const i = document.querySelector('#find input'); i.focus(); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
-  // Enter, or with Shift held to draw only what the words find.
+  // Enter, or with Shift held to add what the words find.
   const enter = (shift = false) => page.evaluate(`(() => { document.querySelector('#find input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: ${shift}, bubbles: true })); document.querySelector('#find').requestSubmit(); })()`);
   const peek = `document.querySelector('#find .find-peek')`;
   const shots = process.env.PELAGO_SHOTS;
@@ -53,10 +53,10 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       assert.ok(line.wide, `inside the page at ${width} px`);
       assert.equal(await page.evaluate(`document.querySelectorAll('#find ul, #find li').length`), 0, 'no list of rows');
       if (shots) writeFileSync(`${shots}/find-peek-${width}.png`, await page.screenshot());
-      await enter();
-      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter draws what is found, with what it is tied to: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      await enter(true);
+      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Shift+Enter adds what is found, the walk kept: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       assert.ok(await page.evaluate(has('Elsewhere')), 'added: what was drawn stays');
-      assert.ok(await until(`document.querySelector('#query .q-sum')?.textContent.includes('Search“roof”')`), 'the query bar says the search apart from the filter');
+      assert.ok(await until(`document.querySelector('#query .q-sum')?.textContent.startsWith('Find“roof”or')`), 'the query bar says the words as a Find term, joined by or');
       assert.ok(await page.evaluate(`${peek}.hidden`), 'the line goes once it is drawn');
       if (shots) writeFileSync(`${shots}/find-drawn-${width}.png`, await page.screenshot());
       // Clearing the bar takes the term out.
@@ -64,10 +64,10 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       await enter();
       // Waited for together: between the two pictures the canvas holds none, and neither is drawn.
       assert.ok(await until(`!location.hash.includes('text=') && !${has('Roof the shed')} && ${has('Elsewhere')}`), `cleared, the term is out and what was there before is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
-      // Shift+Enter draws only what is found, in place of what was drawn, and back brings that again.
+      // Enter finds it in place of the lens, its walk too, and back brings that again.
       await type('roof');
-      await enter(true);
-      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && !${has('Elsewhere')}`), `Shift+Enter replaces what was drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      await enter();
+      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && !${has('Elsewhere')} && !${has('Gutters')}`), `Enter replaces the lens: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
       assert.ok(await until(`!location.hash.includes('text=') && ${has('Elsewhere')} && !${has('Roof the shed')}`), `back draws what was there before: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
     }

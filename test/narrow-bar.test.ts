@@ -1,7 +1,7 @@
 // The narrowing terms in the query bar, in a real browser (skipped where there is no Chrome): an address that narrows
-// (only a type, within an item) draws only what holds, and the bar shows each as a chip of its own, apart from what
-// the filter includes. The box takes `only <type>` and `within <id>`; a chip's × takes the narrowing out. At 1280 and
-// at 560 px, the bar stays one line.
+// (only a type, within an item) draws only what holds, and the bar shows each in its Only row, apart from what Find
+// finds (decision e_drt4g872). Find's box takes `only <type>` and `within <id>`; a term's × takes the narrowing out. At
+// 1280 and at 560 px, the bar stays one line.
 
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
@@ -11,7 +11,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, the query bar shows what narrows the filter as chips of their own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, the query bar shows what narrows in its Only row', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -34,16 +34,16 @@ test('in a browser, the query bar shows what narrows the filter as chips of thei
   };
   const drawn = `[...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent)`;
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
-  // The narrowing terms in sight, then those beyond what fits, which its part's "+N more" names.
-  const chips = `[...[...document.querySelectorAll('#query .q-narrow .q-said')].map((c) => c.textContent), ...(document.querySelector('#query .q-filter .q-more')?.title.split(' · ') ?? [])].filter((t) => /^(only|within) /.test(t))`;
-  // Written in the filter's own menu, opened from its +.
-  const box = (q: string) => page.evaluate(`(() => { document.querySelector('#query [aria-label="Add to the filter"]').click(); const i = document.querySelector('.term-pick-field'); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`);
+  // The Only row's terms in sight, then those beyond what fits, which its "+N more" names.
+  const chips = `[...[...document.querySelectorAll('#query .q-only .q-narrow .q-said')].map((c) => c.textContent), ...(document.querySelector('#query .q-only .q-more:not([hidden])')?.title.split(' · ') ?? [])]`;
+  // Written in Find's own menu, opened from its +.
+  const box = (q: string) => page.evaluate(`(() => { document.querySelector('#query [aria-label="Find more"]').click(); const i = document.querySelector('.term-pick-field'); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`);
   const shots = process.env.PELAGO_SHOTS;
   try {
     assert.ok(await until(has('Which tiles?')), `the narrowed canvas is drawn: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate(has('Elsewhere?'))), 'a question outside the project is not');
-    assert.ok(await until(`${chips}.join('|') === 'within Site works'`), `within is a chip of its own, by the item's name: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
-    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#query .q-type .q-said')].map((c) => c.textContent)`), ['Question'], 'what it includes stays a chip apart');
+    assert.ok(await until(`${chips}.join('|') === 'within Site works'`), `within is in the Only row, by the item's name: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#query .q-type .q-said')].map((c) => c.textContent)`), ['Question'], 'what Find finds stays apart');
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
       // The query is one row under the view's: nothing in it wraps onto a second line.
@@ -57,9 +57,9 @@ test('in a browser, the query bar shows what narrows the filter as chips of thei
     assert.ok(await until(`${has('Gutters')} && ${has('Which tiles?')}`), `a type more is found within it: ${page.logs().join('\n')}`);
     await box('only Task');
     assert.ok(await until(`location.hash.includes('only=task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
-    assert.ok(await until(`${chips}.join('|') === 'only Task|within Site works'`), `each narrowing a chip: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
+    assert.ok(await until(`${chips}.join('|') === 'Task|within Site works'`), `each narrowing a term of Only: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
     // Its × takes it out, and what it held back is drawn again.
-    await page.evaluate(`[...document.querySelectorAll('#query .q-narrow')].find((c) => c.textContent.includes('only')).querySelector('.q-x').click()`);
+    await page.evaluate(`[...document.querySelectorAll('#query .q-narrow')].find((c) => !c.textContent.includes('within')).querySelector('.q-x').click()`);
     assert.ok(await until(`!location.hash.includes('only=') && ${has('Which tiles?')}`), 'taken out, it narrows no more');
     await page.evaluate(`[...document.querySelectorAll('#query .q-narrow')].find((c) => c.textContent.includes('within')).querySelector('.q-x').click()`);
     assert.ok(await until(`!location.hash.includes('within=') && ${has('Elsewhere?')}`), 'nor within');

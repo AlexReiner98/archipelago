@@ -1,10 +1,9 @@
-// Find: a bar at the canvas's foot that sets the text of the lens of the pane the bar acts on (decision e_sdsaxxq4:
-// search is the text term of the filter). Enter sets the words and keeps every other term of the query; Shift+Enter
-// draws only what the words find, the other seeds gone (the owner, 28 Oct 2026, over e_c3g6gwqq). What is found becomes
-// seeds, the walk carries on from them, and it is drawn with what it is tied to; what narrows and what is left out stay. Typing shows what the words would find, in one line above the bar
-// (how many, the first few names); clearing the bar takes the term out. / puts the cursor in it.
-// The search is the flat lens's text term, the search read's own (src/lens-flat.ts): types and what is left out are
-// the query bar's terms, so what it would find is read under the canvas's exclusions.
+// Find: a bar at the canvas's foot that sets the words of the lens of the pane the bar acts on (decision e_sdsaxxq4:
+// search is the text term of the filter). Enter finds what the words find in place of what the lens found; Shift+Enter
+// adds them to it (the owner, 28 Oct 2026, e_e3k797d3). What is left out stays either way. Typing shows what the words
+// would find, in one line above the bar (how many, the first few names); clearing the bar takes the term out. / puts
+// the cursor in it. The words are a Find term of the lens (src/lens-flat.ts), its parts named as the query bar names
+// them (e_drt4g872), so what they would find is read under the canvas's Not.
 
 import { api, h, state } from './base.js';
 import { goHome, goLens, home, lensNow } from './canvas.js';
@@ -13,17 +12,17 @@ import { workType } from './words.js';
 
 const bar = document.getElementById('find');
 const peek = h('div', { class: 'find-peek', hidden: true, role: 'status' });
-const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map  /', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Words to find: Enter draws what they find on the canvas, with what it is tied to' });
+const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map  /', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Words to find: Enter finds them in place of the lens, Shift+Enter adds them to it' });
 let asked = 0;
 
 const lensUp = () => lensNow() ?? home();
 const includes = (f) => Boolean(f.text || f.types?.length || f.ids?.length || f.links?.length);
-/** Draw the lens with these words as its filter's text, its other terms kept; or (`alone`) the words in place of the other seeds. */
-function drawText(q, alone = false) {
+/** Draw what these words find in place of the lens, what it leaves out kept; or (`add`) the words added to what it finds, the rest kept. */
+function drawText(q, add = false) {
   peek.hidden = true;
-  const { only, within, exclude, ...seeds } = lensUp().filter;
-  const kept = { ...(only && { only }), ...(within && { within }), ...(exclude && { exclude }) };
-  goLens({ ...lensUp(), filter: alone ? { ...kept, text: q } : { ...seeds, ...kept, text: q } });
+  const { exclude } = lensUp().filter;
+  if (add) return goLens({ ...lensUp(), filter: { ...lensUp().filter, text: q } });
+  goLens({ ...lensUp(), filter: { text: q, ...(exclude && { exclude }) }, walk: { over: [], steps: 0 } });
 }
 /** Take the text out of the canvas's lens; a lens left including nothing is Home (or the open item's own canvas). */
 function takeOut() {
@@ -50,8 +49,8 @@ async function look() {
     said = [
       h('span', { class: 'count', title: 'How many the words find' }, String(found.matched ?? names.length)),
       h('span', { class: 'gist grow', title: names.join('\n') }, names.length ? names.join(' · ') : 'Nothing matches.'),
-      names.length > 0 && h('button', { type: 'button', class: 'quiet-button', title: 'Draw what the words find, the rest of the query kept (Enter)', onclick: () => drawText(q) }, 'Draw'),
-      names.length > 0 && includes(lensUp().filter) && h('button', { type: 'button', class: 'quiet-button', title: 'Draw only what the words find, in place of what is drawn (Shift+Enter)', onclick: () => drawText(q, true) }, 'Alone'),
+      names.length > 0 && h('button', { type: 'button', class: 'quiet-button', title: 'Find what the words find, in place of the lens (Enter)', onclick: () => drawText(q) }, 'Find'),
+      names.length > 0 && includes(lensUp().filter) && h('button', { type: 'button', class: 'quiet-button', title: 'Add what the words find to the lens (Shift+Enter)', onclick: () => drawText(q, true) }, 'Add'),
       h('button', { type: 'button', class: 'quiet-button', title: `A new item named "${q}"`, onclick: () => ((peek.hidden = true), (location.hash = `#/new/${workType()}?title=${encodeURIComponent(q)}`)) }, 'New'),
     ];
   } catch (err) {
@@ -77,15 +76,15 @@ export function drawFind() {
   });
   // The bar's own × (and Esc in it) empties it: the term goes out of the lens.
   input.addEventListener('search', () => !input.value.trim() && takeOut());
-  // Enter keeps the rest of the query; Shift+Enter draws only what the words find. A form's submit does not say Shift, so the key is read here.
-  let alone = false;
-  input.addEventListener('keydown', (ev) => ev.key === 'Enter' && (alone = ev.shiftKey));
+  // Enter finds the words in place of the lens; Shift+Enter adds them. A form's submit does not say Shift, so the key is read here.
+  let add = false;
+  input.addEventListener('keydown', (ev) => ev.key === 'Enter' && (add = ev.shiftKey));
   bar.addEventListener('submit', (ev) => {
     ev.preventDefault();
     clearTimeout(wait);
     const q = input.value.trim();
-    q ? drawText(q, alone) : takeOut();
-    alone = false;
+    q ? drawText(q, add) : takeOut();
+    add = false;
   });
   bar.replaceChildren(peek, h('div', { class: 'find-row' }, input));
   addEventListener('hashchange', () => setTimeout(keepUp, 0));
