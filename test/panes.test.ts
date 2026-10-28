@@ -86,17 +86,18 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await press(1);
     await until('the second is in focus', async () => (await panes())[1][3]);
     await find('Second');
-    await until('the second draws what find found', async () => (await draws(1, 'Second step, renamed')) && !(await draws(1, 'First step')) && (await draws(0, 'First step, renamed')));
+    // Find sets the words of the second's lens and keeps the rest of it (e_e3k797d3): what it drew stays, what the words find joins it.
+    await until('the second draws what find found', async () => (await draws(1, 'Second step, renamed')) && (await draws(1, 'First step, renamed')) && (await draws(0, 'First step, renamed')) && !(await draws(0, 'Second step')));
     assert.match(await page.evaluate<string>('location.hash'), /Second/, 'the address is the pane in focus’s');
     // ‹ in the bar, and the browser's own back, act on the pane in focus.
     await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
     await until('back draws what the pane drew before', async () => (await draws(1, 'First step, renamed')) && !(await draws(1, 'Second step')));
     await find('Second');
-    await until('found again', async () => (await draws(1, 'Second step, renamed')) && !(await draws(1, 'First step')));
+    await until('found again', async () => (await draws(1, 'Second step, renamed')));
     await page.evaluate('history.back()');
     await until('the browser’s back draws what the pane drew before', async () => (await draws(1, 'First step, renamed')) && !(await draws(1, 'Second step')));
     await page.evaluate('history.forward()');
-    await until('and forward again', async () => (await draws(1, 'Second step, renamed')) && !(await draws(1, 'First step')));
+    await until('and forward again', async () => (await draws(1, 'Second step, renamed')));
     // A press in the first gives it the bar and the address, with nothing of the second's.
     await press(0);
     await until('the first is in focus', async () => (await panes())[0][3] && (await page.evaluate<boolean>(`document.getElementById('query').textContent.includes('First step, renamed')`)));
@@ -107,9 +108,9 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await press(1);
     await until('the second keeps its history', () => page.evaluate<boolean>(`!document.querySelector('#query [aria-label="Back"]').disabled`));
     // A click on a node in either pane opens its page over it, that pane's lens as it was (e_jedng69e): the second
-    // finds by its words, and the item clicked is not added to them.
+    // finds by its words, and the item clicked is not added to its ids.
     await page.evaluate(`${nth(1)}.querySelector('svg a[href="#/e/${made.b}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
-    await until('its page is open over the second', async () => (await page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.b}?') && location.hash.includes('text=Second') && !location.hash.includes('ids=')`)) && (await panes())[1][3]);
+    await until('its page is open over the second', async () => (await page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.b}?') && location.hash.includes('text=Second') && !(new URLSearchParams(location.hash.split('?')[1]).get('ids') ?? '').includes('${made.b}')`)) && (await panes())[1][3]);
     await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.a}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
     await until('its page is open over the first', async () => (await page.evaluate<boolean>(`location.hash.startsWith('#/e/${made.a}?') && !location.hash.includes('Second')`)) && (await panes())[0][3]);
     await page.evaluate(`document.getElementById('sheet-close').click()`);

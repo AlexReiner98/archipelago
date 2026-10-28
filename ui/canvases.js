@@ -5,7 +5,7 @@
 // The views kept before the flat lens were translated into such canvases when the workspace opened
 // (src/lens-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
 
-import { api, ask, h, hooks, tell } from './base.js';
+import { api, ask, h, hooks, tell, wordsOf } from './base.js';
 import { flatQuery, flatView } from './lens.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { isA, typeTitle } from './words.js';
@@ -138,7 +138,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
 /** What a lens finds, in a few words: its terms, then its walk. */
 function lensWords(lens) {
   const f = lens.filter ?? {};
-  const said = [f.text && `“${f.text}”`, ...(f.types ?? []).map(typeTitle), f.ids?.length && `${f.ids.length} item${f.ids.length === 1 ? '' : 's'}`, ...(f.links ?? []), ...(f.only ?? []).map((t) => `only ${typeTitle(t)}`), f.within?.length && `within ${f.within.length} item${f.within.length === 1 ? '' : 's'}`].filter(Boolean);
+  const said = [...wordsOf(f).map((w) => `“${w}”`), ...(f.types ?? []).map(typeTitle), f.ids?.length && `${f.ids.length} item${f.ids.length === 1 ? '' : 's'}`, ...(f.links ?? []), ...(f.only ?? []).map((t) => `only ${typeTitle(t)}`), f.within?.length && `within ${f.within.length} item${f.within.length === 1 ? '' : 's'}`].filter(Boolean);
   const over = lens.walk?.over;
   if (over === 'all' || over?.length) said.push(`${over === 'all' ? 'every link' : over.join(', ').replaceAll('_', ' ')} × ${lens.walk.steps}`);
   return said.join(' · ');

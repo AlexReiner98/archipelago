@@ -1,7 +1,7 @@
 // Finding through the bar, in a real browser (skipped where there is no Chrome): the find bar sets the words of the
-// canvas's lens. Typing says what the words would find in one line (how many, the first names); Enter finds them in
-// place of the lens; Shift+Enter adds them to it, the rest kept, and back undoes that (e_e3k797d3); clearing the bar
-// takes the term out. No list of rows is drawn. At 1280 and at 560 px, the line never wraps.
+// canvas's lens. Typing says what the words would find in one line (how many, the first names); Enter puts them in
+// place of the words the bar set before, the rest of the lens kept; Shift+Enter adds them as another set, found as
+// well (e_e3k797d3); clearing the bar takes the words out, and back brings them again. No list of rows is drawn. At 1280 and at 560 px, the line never wraps.
 
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
@@ -53,23 +53,32 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       assert.ok(line.wide, `inside the page at ${width} px`);
       assert.equal(await page.evaluate(`document.querySelectorAll('#find ul, #find li').length`), 0, 'no list of rows');
       if (shots) writeFileSync(`${shots}/find-peek-${width}.png`, await page.screenshot());
-      await enter(true);
-      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Shift+Enter adds what is found, the walk kept: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
-      assert.ok(await page.evaluate(has('Elsewhere')), 'added: what was drawn stays');
+      // Enter sets the words, every other term and the walk kept.
+      await enter();
+      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter finds the words, the walk kept: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      assert.ok(await page.evaluate(has('Elsewhere')), 'the rest of the lens stays');
       assert.ok(await until(`document.querySelector('#query .q-sum')?.textContent.startsWith('Find“roof”or')`), 'the query bar says the words as a Find term, joined by or');
       assert.ok(await page.evaluate(`${peek}.hidden`), 'the line goes once it is drawn');
       if (shots) writeFileSync(`${shots}/find-drawn-${width}.png`, await page.screenshot());
-      // Clearing the bar takes the term out.
+      // Enter again puts new words in place of those the bar set, and nothing else.
+      await type('walls');
+      await enter();
+      assert.ok(await until(`location.hash.includes('text=walls') && !location.hash.includes('text=roof') && ${has('Walls')} && ${has('Elsewhere')} && !${has('Roof the shed')}`), `Enter replaces only the words: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+      // Shift+Enter adds a set of words: both are found.
+      await type('gutters');
+      await enter(true);
+      assert.ok(await until(`location.hash.includes('text=walls') && location.hash.includes('text=gutters') && ${has('Walls')} && ${has('Gutters')} && ${has('Elsewhere')}`), `Shift+Enter keeps both sets: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+      assert.ok(await until(`document.querySelector('#query .q-sum')?.textContent.includes('“walls”or“gutters”')`), 'each set its own Find term');
+      // Clearing the bar takes the words out, and back brings them again.
       await type('');
       await enter();
-      // Waited for together: between the two pictures the canvas holds none, and neither is drawn.
-      assert.ok(await until(`!location.hash.includes('text=') && !${has('Roof the shed')} && ${has('Elsewhere')}`), `cleared, the term is out and what was there before is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
-      // Enter finds it in place of the lens, its walk too, and back brings that again.
-      await type('roof');
-      await enter();
-      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && !${has('Elsewhere')} && !${has('Gutters')}`), `Enter replaces the lens: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      assert.ok(await until(`!location.hash.includes('text=') && !${has('Walls')} && ${has('Elsewhere')}`), `cleared, the words are out and the rest is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
-      assert.ok(await until(`!location.hash.includes('text=') && ${has('Elsewhere')} && !${has('Roof the shed')}`), `back draws what was there before: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+      assert.ok(await until(`location.hash.includes('text=walls') && location.hash.includes('text=gutters') && ${has('Walls')}`), `back draws the words again: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+      // Out again for the next width.
+      await type('');
+      await enter();
+      assert.ok(await until(`!location.hash.includes('text=') && ${has('Elsewhere')} && !${has('Walls')}`), 'cleared for the next width');
     }
     // The bar shows the lens's text when an address carries one.
     await page.evaluate(`document.activeElement.blur()`);

@@ -195,3 +195,12 @@ test('each item says why it is there: the terms that found it, or the step of th
   const linked = await flatLens(l, { filter: { links: [`waits_on ${made.bo}`] } });
   assert.deepEqual((linked.items[0] as any).found, ['link']);
 });
+
+test('several sets of words are each a term: what any of them finds is a seed', async () => {
+  const { l } = await chain();
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: ['canvases', 'tags'] } })), ['Saved canvases', 'Tags']);
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: ['canvases', ' ', 'canvases'] } })), ['Saved canvases'], 'blank and repeated sets go');
+  const read = await flatLens(l, { filter: { text: ['canvases', 'tags'] } });
+  assert.deepEqual(read.lens.include.text, ['canvases', 'tags']);
+  assert.equal(read.matched, 2, 'matched counts what all the sets found');
+});

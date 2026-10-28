@@ -22,7 +22,7 @@ export type Found = 'text' | 'type' | 'id' | 'link';
 
 export interface FlatLens {
   /** What picks the seeds: any item any of these finds. */
-  include: { text?: string; types?: string[]; ids?: string[]; links?: LinkTerm[] };
+  include: { text?: string[]; types?: string[]; ids?: string[]; links?: LinkTerm[] };
   /** What must all hold of a seed as well: one of these types (flavours too), and part of each of these items, however far down. */
   narrow: { only?: string[]; within?: string[] };
   /** What is left out of everything: closed, system, or a type (its flavours too). */
@@ -63,7 +63,9 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
   const filter = (input.filter ?? {}) as Record<string, unknown>;
   if (typeof filter !== 'object' || Array.isArray(filter)) throw new Error('filter must be an object: { text, types, ids, links, only, within, exclude }');
   const include: FlatLens['include'] = {};
-  if (filter.text !== undefined && String(filter.text).trim()) include.text = String(filter.text).trim();
+  // Words: one set, or several (each its own term, as Shift+Enter in the find bar adds one, e_e3k797d3).
+  const words = [...new Set((Array.isArray(filter.text) ? filter.text : [filter.text]).filter((w) => w != null).map((w) => String(w).trim()).filter(Boolean))];
+  if (words.length) include.text = words;
   if (filter.types !== undefined) include.types = names(filter.types, 'filter.types');
   if (filter.ids !== undefined) include.ids = names(filter.ids, 'filter.ids');
   if (filter.links !== undefined) {
@@ -75,7 +77,7 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
   if (filter.only !== undefined && (filter.only as unknown[]).length !== 0) narrow.only = names(filter.only, 'filter.only');
   if (filter.within !== undefined && (filter.within as unknown[]).length !== 0) narrow.within = names(filter.within, 'filter.within');
   for (const type of narrow.only ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.only: unknown type "${type}"`);
-  if (!include.text && !include.types?.length && !include.ids?.length && !include.links?.length)
+  if (!include.text?.length && !include.types?.length && !include.ids?.length && !include.links?.length)
     throw new Error(narrow.only || narrow.within
       ? 'A lens includes something (filter: text, types, ids or links) for only and within to narrow: they narrow what the filter includes, and alone would read the whole map.'
       : 'A lens includes something (filter: text, types, ids or links): a filter that includes nothing would read the whole map.');
@@ -155,13 +157,14 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
   // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps.
   let matched: number | undefined;
-  if (text && room() > 0 && !hidden) {
+  for (const words of hidden ? [] : (text ?? [])) {
+    if (room() <= 0) break;
     const finding = async (near: boolean) => (await l.db.query<{ id: string; n: number }>(
       `select e.id, count(*) over ()::int as n from entity e where e.id in (select pelago_search_ids($1, ${near})) and ${narrowed(3)} order by ${rankSql('$1', 'e.')} desc, e.updated_at desc, e.id limit $2`,
-      [text, room(), leftOut, ...narrowing])).rows;
+      [words, room(), leftOut, ...narrowing])).rows;
     let rows = await finding(false);
     if (!rows.length) rows = await finding(true);
-    matched = rows[0]?.n ?? 0;
+    matched = (matched ?? 0) + (rows[0]?.n ?? 0);
     add(rows.map((r) => r.id), 'text');
   }
   if (types?.length && room() > 0) add(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), room()]), 'type');

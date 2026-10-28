@@ -8,7 +8,7 @@
 // is a new lens, handed to `go` (the canvas puts it in the address and draws it). The menus lead with what this canvas
 // and its neighbourhood use (ui/picker-rank.js). No term or part is a box inside a box (rule e_vgs9vt5j).
 
-import { api, h, state } from './base.js';
+import { api, asWords, h, state, wordsOf } from './base.js';
 import { numberOf } from './lens-base.js';
 import { ranked, around, uses } from './picker-rank.js';
 import { pickTerm } from './term-pick.js';
@@ -82,7 +82,7 @@ function termOf(written) {
 /** The lens with one term added to its filter. */
 function added(lens, term) {
   const f = { ...lens.filter };
-  if (term.text) f.text = term.text;
+  if (term.text) Object.assign(f, asWords([...wordsOf(f), term.text]));
   if (term.type) f.types = [...new Set([...(f.types ?? []), term.type])];
   if (term.id) f.ids = [...new Set([...(f.ids ?? []), term.id])];
   if (term.link) f.links = [...new Set([...(f.links ?? []), term.link])];
@@ -95,9 +95,11 @@ function added(lens, term) {
 /** The lens with one of its filter's terms taken out: `field` and the value it holds. */
 function without(lens, field, value) {
   const f = { ...lens.filter };
-  if (field === 'text') delete f.text;
-  else f[field] = (f[field] ?? (field === 'exclude' ? ['system'] : [])).filter((v) => v !== value);
-  if (field !== 'exclude' && !f[field]?.length) delete f[field];
+  if (field === 'text') {
+    delete f.text;
+    Object.assign(f, asWords(wordsOf(lens.filter).filter((w) => w !== value)));
+  } else f[field] = (f[field] ?? (field === 'exclude' ? ['system'] : [])).filter((v) => v !== value);
+  if (field !== 'exclude' && field !== 'text' && !f[field]?.length) delete f[field];
   return { ...lens, filter: f };
 }
 
@@ -123,7 +125,7 @@ export function filterSaid(f, redraw) {
   const some = (list, one, many) => (list?.length ? (list.length === 1 ? one(list[0]) : many(list)) : null);
   const tags = (f.links ?? []).filter((t) => t.startsWith('tagged '));
   return [
-    f.text && `“${f.text}”`,
+    ...wordsOf(f).map((w) => `“${w}”`),
     some(f.types, typeTitle, (l) => `${l.length} types`),
     some(tags, (t) => termWords(t, redraw), (l) => `${termWords(l[0], redraw)} +${l.length - 1}`),
     ...[...linkGroups(f.links ?? []).values()].map((l) => `${termWords(l[0], redraw)}${l.length > 1 ? ` +${l.length - 1}` : ''}`),
@@ -143,8 +145,8 @@ export function drawQuery(lens, view, go, lead) {
   if (answer) lookAround(lens, answer);
   const here = uses(answer?.items, answer?.links);
   const exclude = f.exclude ?? ['system'];
-  const filled = (lens.filter.text || lens.filter.types?.length || lens.filter.ids?.length || lens.filter.links?.length);
-  const includes = [f.text ? 1 : 0, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0].reduce((a, b) => a + b, 0);
+  const filled = (wordsOf(lens.filter).length || lens.filter.types?.length || lens.filter.ids?.length || lens.filter.links?.length);
+  const includes = [wordsOf(f).length, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0].reduce((a, b) => a + b, 0);
   /** The lens with term `field` `value` taken out, when one is being changed; else as it is. */
   const but = (field, value) => (field ? without(lens, field, value) : lens);
   /** A term: its words, a click to change it in its part's menu, an × to take it away. The last term the filter includes is not taken away: a lens includes something. */
@@ -212,7 +214,7 @@ export function drawQuery(lens, view, go, lead) {
   // The lens's parts by their words (decision e_drt4g872): Find what adds, any of it; Only what must all hold of it; Not
   // what is left out of everything, what the walk reaches included.
   const findTerms = [
-    f.text && term('q-text', `“${f.text}”`, 'The words to find, set in the find bar', 'text', f.text, addToFilter),
+    ...wordsOf(f).map((w) => term('q-text', `“${w}”`, 'Words to find, set in the find bar', 'text', w, addToFilter)),
     ...(f.types ?? []).map((t) => term('q-type', typeTitle(t), 'Items of this type, the newest first', 'types', t, addToFilter)),
     ...(f.links ?? []).filter((t) => t.startsWith('tagged ')).map((t) => term('q-tag', termWords(t, redraw), 'Items with this tag', 'links', t, addToFilter)),
     ...(f.links ?? []).filter((t) => !t.startsWith('tagged ')).map((t) => term('q-link', termWords(t, redraw), `Items with this link: ${termWords(t, redraw)}`, 'links', t, addToFilter)),

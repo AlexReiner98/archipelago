@@ -1,4 +1,4 @@
-import { api, h } from './base.js';
+import { api, asWords, h, wordsOf } from './base.js';
 import { replicate } from './live.js';
 import { unfollow } from './replica.js';
 import { drawWith, drawings, warmDrawings } from './drawing.js';
@@ -98,7 +98,7 @@ export function readFlatLens(query) {
   const p = new URLSearchParams(query);
   const filter = {};
   const ids = [...list(p.get('from')), ...list(p.get('ids'))];
-  if (p.get('text')?.trim()) filter.text = p.get('text').trim();
+  Object.assign(filter, asWords(p.getAll('text')));
   if (p.get('types')) filter.types = list(p.get('types'));
   if (ids.length) filter.ids = [...new Set(ids)];
   if (p.getAll('link').length) filter.links = p.getAll('link').filter(Boolean);
@@ -118,7 +118,7 @@ export function readFlatLens(query) {
 export function flatQuery(lens, style = {}) {
   const p = new URLSearchParams();
   const { text, types, ids, links, only, within, exclude } = lens.filter;
-  if (text) p.set('text', text);
+  for (const words of wordsOf({ text })) p.append('text', words);
   if (types?.length) p.set('types', types.join(','));
   if (ids?.length) p.set('ids', ids.join(','));
   for (const term of links ?? []) p.append('link', term);

@@ -46,7 +46,7 @@ export async function viewAddress(l: Archipelago, input: ViewAsked): Promise<str
     if (lens) {
       const { text, types, ids, links } = lens.include;
       const walked = lens.walk.over === 'all' || lens.walk.over.length > 0;
-      if (text) query.set('text', text);
+      for (const words of text ?? []) query.append('text', words);
       if (types?.length) query.set('types', types.join(','));
       if (ids?.length) query.set('ids', ids.join(','));
       for (const t of links ?? []) query.append('link', `${t.link} ${t.to ?? t.from}`);
