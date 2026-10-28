@@ -98,7 +98,7 @@ that names it is still `shape`.
 **Find, Only, Not, Walk, Limit.** The parts of a lens, by the words the
 query bar and an agent's answer give them (decision e_drt4g872). **Find** is
 what adds: words, a type, a tag, a link and its end, an item, in an item
-(all that is part of it, at any depth); any of them (the find bar's words
+(all that is part of it, at any depth); any of them (words typed in find
 are one Find term). **Only** is what must all hold of what Find finds: a
 type, within an item, or a plain word (done, blocked, status todo, owner me,
 no owner, over estimate, changed since 7d, made since a date, by owner, by

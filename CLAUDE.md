@@ -172,7 +172,7 @@ The canvas keeps to these (the flat canvas, 25 Oct 2026: document
   scale and how much text shows, never structure.
 - **Lens and style are the whole surface.** What a canvas shows is a flat
   lens (a filter of terms that add seeds and terms that must all hold of
-  them, a walk, a limit), always in sight in the query bar; how it
+  them, a walk, a limit), always in sight in find at the canvas's foot; how it
   looks is a style. A click adds to the filter and a search sets its text:
   growing a canvas is editing its lens. A person and an agent read the same
   lens (`query` name `flat`), and the page calls no tool an agent lacks for

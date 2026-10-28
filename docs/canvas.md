@@ -60,8 +60,11 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
   canvas lens".
 
 ### 4. Lens and style are the whole surface, for people and agents
-A person grows a canvas by editing its lens (find sets its words, the query
-bar changes any term; a click only opens an item's page, e_jedng69e), and an agent reads the same lens
+A person grows a canvas by editing its lens in find, at the canvas's foot,
+which is the query's (e_2a4mddx8): at rest it says the lens in one line;
+open, a row for each part rises above it; typed, it lists what the words
+could be, each said by its kind, Words first and lit (a click only opens an
+item's page, e_jedng69e). The top keeps the view's band. An agent reads the same lens
 (`query` name `flat`) and points the page at one (`report` action `show`
 with `lens`). The page calls no tool an agent lacks for it. A term is made
 by picking its kind, then the thing (an item by its name from a list, kept
@@ -220,8 +223,8 @@ name dragged onto a side of another docks it there (onto its middle swaps
 them), the line between two shares the room, and × closes it; the last one stays. One pane alone has no strip: the bar floats
 over its top, as the page's canvas always did.
 
-The pane last touched is in focus: the query bar and find act on it and sit
-in its strip (decision e_h2pqjy2q). The address is its address
+The pane last touched is in focus: the view's band sits in its strip and
+find acts on its lens (decision e_h2pqjy2q). The address is its address
 (`pane-address.js`): `#/v?…` says its lens, and an item's page open over it
 is `#/e/<id>?…` with that lens beside it. Moving focus rewrites the address
 without a step of the browser's; a lens given to a pane in focus is one. Each
@@ -230,9 +233,8 @@ every pane as it was, history included: a step for each lens it is given,
 none for typing or for a page opened over it (e_ssnyd3ex). ‹ › in the bar,
 dimmed with nowhere to go, and the browser's own back and forward, all act on
 the pane in focus. A click on a node in any pane puts that pane in focus,
-adds the node to its filter and opens its page in the sheet over it. What is
-typed in the bar's box and whether its filter is unfolded are the pane's:
-another pane or tab starts without them. On a page taller than wide a row is
+adds the node to its filter and opens its page in the sheet over it. Find shuts when
+another pane or tab comes into focus, and what was typed goes. On a page taller than wide a row is
 drawn as a column. The top bar runs across the page over the sheet, one pane
 or several: the sheet opens under it.
 

@@ -1,6 +1,7 @@
-// The query bar: the canvas's lens, always in sight in one line under the view's (decision e_sdsaxxq4): the search's
-// words (set in the find bar, ui/find.js), what the filter adds and leaves out, and the walk, said in a few words,
-// and how many items are drawn. Edit opens a row for each part under it, each saying what it is in a word: the filter
+// The query bar: the canvas's lens, always in sight (decision e_sdsaxxq4). The view's band stays at the top; the lens
+// is said in one line in the find bar at the canvas's foot (decision e_2a4mddx8): the search's words, what the filter
+// adds and leaves out, and the walk, in a few words, and how many items are drawn. Opening find (ui/find.js) shows a
+// row for each part above it, each saying what it is in a word: the filter
 // (types, tags, items, links; what narrows them, only a type, within an item; and what it leaves out), the walk (the
 // links it follows, how many steps) and the limit. A row shows as many terms as fit and how many more, those a click
 // away, and has its own + that opens one menu
@@ -17,13 +18,14 @@ import { pickTerm } from './term-pick.js';
 import { ARROW, NEXT_WAY, relations, titles, typeTitle, types, wayOf, withWay } from './words.js';
 
 const bar = document.getElementById('query');
+/** Where find holds the lens: its line at rest, and its rows while it is open (ui/find.js). */
+const line = document.getElementById('find-lens');
+const rows = document.getElementById('find-rows');
 /** Items the bar has asked the names of, so each is asked once. */
 const asking = new Set();
 /** What is used one step around the canvas, asked once for each lens (`key`), and the bar drawn last. */
 let near = { key: '', uses: null };
 let last = null;
-/** Whether the query is open to edit, a row for each part under its line; kept as the lens changes. */
-let editing = false;
 
 /**
  * Ask what is used one step around what the canvas draws, and draw the bar again with it: once for each lens, so what
@@ -59,7 +61,7 @@ function nameOf(id, redraw) {
 }
 
 /** The lens with one term added to its filter. */
-function added(lens, term) {
+export function added(lens, term) {
   const f = { ...lens.filter };
   if (term.text) Object.assign(f, asWords([...wordsOf(f), term.text]));
   if (term.type) f.types = [...new Set([...(f.types ?? []), term.type])];
@@ -242,31 +244,29 @@ export function drawQuery(lens, view, go, lead) {
     walking && ['Walk', walkSaid],
   ].filter(Boolean);
   const said = parts.map(([word]) => `${word} ${{ Find: found.join(' or '), Only: narrowed.join(', '), Not: out.join(', '), Walk: walkSaid }[word]}`).join(' · ');
-  const toggle = () => ((editing = !editing), redraw());
-  // Three bands, one under the other: the view (the canvas up and what is done with it, joined to its tab or its pane's
-  // strip), the lens in one line, and, while it is being edited, a row for each part of it under that line.
-  bar.replaceChildren(
-    h('div', { class: 'q-view', role: 'group', 'aria-label': 'The view' }, lead ?? ''),
-    h('div', { class: 'q-lens', role: 'group', 'aria-label': 'The lens' },
-      h('button', { type: 'button', class: 'q-sum', title: `${said}: edit the lens`, 'aria-expanded': String(editing), onclick: toggle },
-        parts.map(([word, what]) => h('span', { class: 'q-sum-part' }, h('span', { class: 'q-label' }, word), what))),
-      drawn, failed,
-      h('button', { type: 'button', class: 'q-save q-word q-edit-toggle', title: editing ? 'Done editing the lens' : 'Edit the lens: what it finds, only, not, and walks along', 'aria-expanded': String(editing), onclick: toggle }, editing ? 'Done' : 'Edit')),
-    h('div', { class: 'q-edit', role: 'group', 'aria-label': 'Edit the lens', hidden: !editing, onkeydown: (ev) => ev.key === 'Escape' && toggle() },
-      part('q-filter', 'Find', 'What any of these finds is drawn', findTerms, (a) => addToFilter(a), 'Find more'),
-      part('q-only', 'Only', 'What Find finds must all be so', onlyTerms, (a) => narrowTo(a), 'Only what is so, of a type, or within an item'),
-      part('q-not', 'Not', 'Left out of everything, what the walk reaches included', notTerms, (a) => leaveOut(a), 'Leave something out'),
-      part('q-walk-part', 'Walk', 'From what Find finds, along these links, each its own way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
-        walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },
-          h('button', { type: 'button', title: 'One step fewer', disabled: steps <= 1, onclick: () => walk({ steps: steps - 1 }) }, '−'),
-          h('button', { type: 'button', class: 'on', title: 'Steps' }, `×${steps}`),
-          h('button', { type: 'button', title: 'One step more', onclick: () => walk({ steps: steps + 1 }) }, '+'))),
-      h('div', { class: 'q-part', title: 'The limit: the most items drawn' },
-        h('span', { class: 'q-label', title: 'The most items drawn' }, 'Limit'),
-        h('span', { class: 'q-terms' },
-          h('input', { class: 'q-limit', inputmode: 'numeric', value: limit, size: String(limit).length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
-          drawn && drawn.cloneNode(true))),
-    ),
+  // The view's band at the top, joined to its tab or its pane's strip; the lens in one line in find, and a row for each
+  // part of it above find while find is open.
+  bar.replaceChildren(h('div', { class: 'q-view', role: 'group', 'aria-label': 'The view' }, lead ?? ''));
+  line?.replaceChildren(...[
+    h('button', { type: 'button', class: 'q-sum', title: filled ? `${said}: change it` : 'Find on the map' },
+      filled ? parts.map(([word, what]) => h('span', { class: 'q-sum-part' }, h('span', { class: 'q-label' }, word), what)) : h('span', { class: 'q-hint' }, 'Find on the map')),
+    drawn, failed,
+    h('span', { class: 'q-key', title: '/ opens it' }, '/'),
+  ].filter(Boolean));
+  rows?.replaceChildren(
+    part('q-filter', 'Find', 'What any of these finds is drawn', findTerms, (a) => addToFilter(a), 'Find more'),
+    part('q-only', 'Only', 'What Find finds must all be so', onlyTerms, (a) => narrowTo(a), 'Only what is so, of a type, or within an item'),
+    part('q-not', 'Not', 'Left out of everything, what the walk reaches included', notTerms, (a) => leaveOut(a), 'Leave something out'),
+    part('q-walk-part', 'Walk', 'From what Find finds, along these links, each its own way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
+      walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },
+        h('button', { type: 'button', title: 'One step fewer', disabled: steps <= 1, onclick: () => walk({ steps: steps - 1 }) }, '−'),
+        h('button', { type: 'button', class: 'on', title: 'Steps' }, `×${steps}`),
+        h('button', { type: 'button', title: 'One step more', onclick: () => walk({ steps: steps + 1 }) }, '+'))),
+    h('div', { class: 'q-part', title: 'The limit: the most items drawn' },
+      h('span', { class: 'q-label', title: 'The most items drawn' }, 'Limit'),
+      h('span', { class: 'q-terms' },
+        h('input', { class: 'q-limit', inputmode: 'numeric', value: limit, size: String(limit).length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
+        drawn && drawn.cloneNode(true))),
   );
   bar.hidden = !filled;
   fitBar();
@@ -274,7 +274,7 @@ export function drawQuery(lens, view, go, lead) {
 
 /** Each row of the editor shows as many of its terms as it has room for, and how many more: drawn again as the bar's width changes. */
 function fitRows() {
-  for (const row of bar.querySelectorAll('.q-edit > .q-part')) {
+  for (const row of rows?.querySelectorAll(':scope > .q-part') ?? []) {
     const box = row.querySelector('.q-terms');
     const more = box.querySelector(':scope > .q-more');
     if (!more) continue;
@@ -306,7 +306,6 @@ export function fitBar() {
     const canvas = view.querySelector('.q-canvas');
     for (const step of ['tight', 'tighter', 'tightest']) if (over(view) || over(canvas)) view.classList.add(step);
   }
-  const line = bar.querySelector('.q-lens');
   if (line) {
     line.classList.remove('tight');
     const sum = line.querySelector('.q-sum');
@@ -318,7 +317,7 @@ export function fitBar() {
 }
 
 /**
- * The pane the bar acts on keeps what it draws below the bar, its line and Edit's rows alike: its top safe zone is
+ * The pane the bar acts on keeps what it draws below the view's band: its top safe zone is
  * where the bar ends over it (the owner, 28 Oct 2026). Other panes keep the stylesheet's.
  */
 function keepClear() {
@@ -330,5 +329,7 @@ function keepClear() {
 }
 const fits = new ResizeObserver(() => fitBar());
 if (bar) fits.observe(bar);
+// Find's line and rows are measured once in sight: opening find sizes its rows.
+for (const el of [line, rows]) if (el) fits.observe(el);
 addEventListener('pane-focus', () => setTimeout(keepClear, 0));
 addEventListener('resize', keepClear);

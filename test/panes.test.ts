@@ -58,7 +58,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(n)}.querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
   };
-  const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
+  const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input[type=search]'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
   try {
     await page.evaluate(`localStorage.setItem('pelago-follow', 'on')`);
     await wait(3000);
@@ -100,7 +100,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await until('and forward again', async () => (await draws(1, 'Second step, renamed')));
     // A press in the first gives it the bar and the address, with nothing of the second's.
     await press(0);
-    await until('the first is in focus', async () => (await panes())[0][3] && (await page.evaluate<boolean>(`document.getElementById('query').textContent.includes('First step, renamed')`)));
+    await until('the first is in focus', async () => (await panes())[0][3] && (await page.evaluate<boolean>(`document.getElementById('find-lens').textContent.includes('First step, renamed')`)));
     assert.doesNotMatch(await page.evaluate<string>('location.hash'), /Second/, 'the address is the first pane’s');
     // A reload draws every pane as it was, each with its own history.
     await page.evaluate('location.reload()');
