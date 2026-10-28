@@ -20,7 +20,7 @@ body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-p
 #canvas .code-stage { height: 100%; }
 #canvas .code-stage > .lens-frame { height: 100%; min-height: 0; }
 /* The key, always in sight on a pane alone: in the safe zone, under the query bar, scrolled when it is longer than the room. */
-body[data-panes="1"] #canvas .lf-legend { top: var(--safe-top); bottom: auto; max-height: calc(100% - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; pointer-events: auto; }
+body[data-panes="1"] #canvas .lf-legend { top: var(--safe-top); bottom: auto; max-height: min(var(--ln-legend-most-height), calc(100% - var(--safe-top) - var(--safe-bottom))); overflow-y: auto; pointer-events: auto; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
 #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
