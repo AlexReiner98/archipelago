@@ -146,11 +146,15 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 /* The canvas's menu is a mark the size of the buttons beside it, on the band's surface. */
 #query .q-band-menu { flex: none; }
 #query .q-band-menu > summary { width: var(--box-7); padding: 0; border: 0; background: none; color: inherit; text-align: center; }
-/* Narrow (ui/query-bar.js fitBar): the buttons' words go, then the canvas's name and its style shrink, then back and
-   forward and Split go; the query's line drops how many are drawn once its words have little room. */
+/* Narrow (ui/query-bar.js fitBar): the buttons' words go, then the pickers shrink, and last back and forward, Split
+   and the pickers' marks; the query's line drops how many are drawn once its words have little room. */
 #query .tight .q-word-text, #query .tightest .q-travel, #query .q-lens.tight > .q-count { display: none; }
 #query .tight .q-save.q-word { width: var(--box-7); padding: 0; }
 #query .tighter .q-canvas > .q-pick { flex: 0 1 auto; min-width: var(--box-10); }
+/* A picker's mark sits close before it, and goes only with back and forward: its tooltip says what it is. */
+#query .q-pick-label { display: inline-flex; align-items: center; }
+#query .q-canvas > .q-pick-label + .q-pick { margin-left: calc(-1 * var(--space-5)); }
+#query .tightest .q-pick-label { display: none; }
 #query .tightest .q-split { display: none; }
 #query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
