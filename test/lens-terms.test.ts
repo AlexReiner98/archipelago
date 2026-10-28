@@ -42,3 +42,17 @@ test('Find in an item: all that is part of it at any depth, of any type, not the
   assert.equal(await viewAddress(l, { lens: { filter: { in: [made.p] } } }), `v?in=${made.p}`, 'the address carries it');
   await assert.rejects(viewAddress(l, { lens: { filter: { in: ['e_nothing0'] } } }), /No item/);
 });
+
+test('the walk follows each link out, in or either way, as it is named', async () => {
+  const { l, made } = await project();
+  const walk = async (from: string, over: string[] | 'all', steps = 1) => titles(await flatLens(l, { filter: { ids: [from] }, walk: { over, steps } }));
+  assert.deepEqual(await walk(made.a, ['depends_on>']), ['Elsewhere', 'Find in'], 'out: what it depends on');
+  assert.deepEqual(await walk(made.o, ['depends_on>']), ['Elsewhere'], 'nothing it depends on');
+  assert.deepEqual(await walk(made.o, ['depends_on<']), ['Elsewhere', 'Find in'], 'in: what depends on it');
+  assert.deepEqual(await walk(made.a, ['part_of>'], 6), ['Find in', 'Rework', 'The bar'], 'part of, upward, all the way');
+  assert.deepEqual(await walk(made.f, ['part_of<'], 6), ['Find in', 'The bar', 'Which words?'], 'what is in it, downward');
+  assert.deepEqual(await walk(made.f, ['part_of']), ['Find in', 'Rework', 'The bar', 'Which words?'], 'either way, as a lens kept before ways were said');
+  assert.deepEqual(await walk(made.a, ['part_of>', 'depends_on>'], 2), ['Elsewhere', 'Find in', 'Rework', 'The bar'], 'each link its own way');
+  await assert.rejects(flatLens(l, { filter: { ids: [made.a] }, walk: { over: ['nope>'] } }), /unknown link type "nope"/);
+  assert.equal(await viewAddress(l, { lens: { filter: { ids: [made.a] }, walk: { over: ['depends_on>', 'part_of<'], steps: 2 } } }), `v?ids=${made.a}&over=depends_on%3E%2Cpart_of%3C&steps=2`, 'the address carries the ways');
+});

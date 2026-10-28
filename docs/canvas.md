@@ -37,7 +37,9 @@ narrow must all hold of a seed (an AND: `only`, types; `within`, items it
 is part of at any depth, read from the part_of closure). What it
 excludes applies to everything the walk reaches, never to an item named
 by id (e_yasbwj45); the
-walk follows the link types named, either way, for some steps; the limit
+walk follows the link types named, each out (→, `depends_on>`), in (←,
+`depends_on<`) or either way (↔, as a lens kept before ways were said), for
+some steps, a click on its arrow in the bar turning it (e_gue6cg6q); the limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
 whole map. Search is the filter's text; tags are a core `tag` type and a
 `tagged` link, filtered by and, in the house style, not drawn.
@@ -48,7 +50,8 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
   hold of every seed, not of what the walk reaches"; "an item named by id is
   drawn whatever Not says, and the walk from it still keeps Not".
 - `test/lens-terms.test.ts`: "Find in an item: all that is part of it at any
-  depth, of any type, not the item itself".
+  depth, of any type, not the item itself"; "the walk follows each link out,
+  in or either way, as it is named".
 - `test/find-lens.test.ts`: "in a browser, the find bar sets the text of the
   canvas lens".
 

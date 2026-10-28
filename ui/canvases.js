@@ -8,7 +8,7 @@
 import { api, ask, h, hooks, tell, wordsOf } from './base.js';
 import { flatQuery, flatView } from './lens.js';
 import { filterSaid, fitBar } from './query-bar.js';
-import { isA, typeTitle } from './words.js';
+import { ARROW, isA, typeTitle, wayOf } from './words.js';
 
 const TYPE = 'lens';
 /** The saved canvases, pinned first, then by name: so a switch keeps its order as they change. */
@@ -138,9 +138,9 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
 /** What a lens finds, in a few words: its terms, then its walk. */
 function lensWords(lens) {
   const f = lens.filter ?? {};
-  const said = [...wordsOf(f).map((w) => `“${w}”`), ...(f.types ?? []).map(typeTitle), f.ids?.length && `${f.ids.length} item${f.ids.length === 1 ? '' : 's'}`, ...(f.links ?? []), ...(f.only ?? []).map((t) => `only ${typeTitle(t)}`), f.within?.length && `within ${f.within.length} item${f.within.length === 1 ? '' : 's'}`].filter(Boolean);
+  const said = [...wordsOf(f).map((w) => `“${w}”`), ...(f.types ?? []).map(typeTitle), f.ids?.length && `${f.ids.length} item${f.ids.length === 1 ? '' : 's'}`, ...(f.links ?? []), f.in?.length && `in ${f.in.length} item${f.in.length === 1 ? '' : 's'}`, ...(f.only ?? []).map((t) => `only ${typeTitle(t)}`), f.within?.length && `within ${f.within.length} item${f.within.length === 1 ? '' : 's'}`].filter(Boolean);
   const over = lens.walk?.over;
-  if (over === 'all' || over?.length) said.push(`${over === 'all' ? 'every link' : over.join(', ').replaceAll('_', ' ')} × ${lens.walk.steps}`);
+  if (over === 'all' || over?.length) said.push(`${over === 'all' ? 'every link' : over.map((t) => ((w) => `${ARROW[w.way]} ${w.link}`)(wayOf(t))).join(', ').replaceAll('_', ' ')} × ${lens.walk.steps}`);
   return said.join(' · ');
 }
 

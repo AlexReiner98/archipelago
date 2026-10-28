@@ -1,6 +1,6 @@
 // The flat lens (the decision "The lens is a filter, a walk and a limit", 25 Oct 2026): a filter, a walk and a limit,
 // and nothing else. What the filter includes picks the seeds; what it narrows by must all hold of every seed as well
-// (only these types, within these items); what it excludes applies to everything but an item named by id, what the walk reaches included; the walk follows the link types named, either way, step by step; the limit is the most it sends.
+// (only these types, within these items); what it excludes applies to everything but an item named by id, what the walk reaches included; the walk follows the link types named, each out, in or either way, step by step; the limit is the most it sends.
 // The answer is items and the links among them: no containment, no places, no views, no style.
 //
 // Every read is bounded by the ids in hand, an end of a link, the type index or the limit, and runs as the viewer:
@@ -27,7 +27,7 @@ export interface FlatLens {
   narrow: { only?: string[]; within?: string[] };
   /** What is left out of everything: closed, system, or a type (its flavours too). */
   exclude: string[];
-  /** The link types followed, either way, and how many steps. */
+  /** The link types followed, each as named (`depends_on>` out, `depends_on<` in, `depends_on` either way), and how many steps. */
   walk: { over: string[] | 'all'; steps: number };
   /** The most items sent. */
   limit: number;
@@ -43,6 +43,12 @@ const FLAT_LIMIT = 500;
 const MAX_STEPS = 6;
 /** How much of an item's note travels with it: enough to show on hover. */
 const NOTE_START = 280;
+
+/** A link the walk follows and which way (decision e_gue6cg6q): `>` along it from the item it starts at, `<` back to it, else either. */
+export const wayOf = (term: string): { link: string; way: 'out' | 'in' | 'either' } => {
+  const way = term.endsWith('>') ? 'out' : term.endsWith('<') ? 'in' : 'either';
+  return { link: way === 'either' ? term : term.slice(0, -1), way };
+};
 
 const names = (value: unknown, field: string): string[] => {
   if (!Array.isArray(value) || value.some((v) => typeof v !== 'string' || !v)) throw new Error(`${field} must be a list of names`);
@@ -86,7 +92,7 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
   for (const x of exclude) if (x !== 'closed' && x !== SYSTEM && !l.registry.types.has(l.registry.canonical(x))) throw new Error(`filter.exclude: "${x}" is not closed, system or a type`);
   const walkIn = (input.walk ?? {}) as Record<string, unknown>;
   const over = walkIn.over === undefined ? [] : walkIn.over === 'all' ? 'all' : names(walkIn.over, 'walk.over');
-  if (over !== 'all') for (const kind of over) if (!l.registry.relations.has(l.registry.canonical(kind))) throw new Error(`walk.over: unknown link type "${kind}"`);
+  if (over !== 'all') for (const { link } of over.map(wayOf)) if (!l.registry.relations.has(l.registry.canonical(link))) throw new Error(`walk.over: unknown link type "${link}" (a link type, with > to go out along it or < to come in)`);
   const steps = walkIn.steps ?? (over.length ? 1 : 0);
   if (!Number.isInteger(steps) || (steps as number) < 0 || (steps as number) > MAX_STEPS) throw new Error(`walk.steps must be a whole number from 0 to ${MAX_STEPS}`);
   const limit = input.limit ?? FLAT_LIMIT;
@@ -178,13 +184,16 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   }
   if (types?.length && room() > 0) add(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), room()]), 'type');
 
-  // The walk: a step at a time, either way along the links named, to what the filter does not exclude. An excluded
-  // item is not walked through. Each step is bounded by the ids reached the step before and what room is left.
-  const over = lens.walk.over === 'all' ? null : l.registry.relationFamily(...lens.walk.over);
-  for (let level = [...sent], n = 0; level.length && n < lens.walk.steps && room() > 0 && over?.length !== 0; n++) {
-    const typed = over ? ' and r.type = any($4::text[])' : '';
-    const way = (near: string, far: string, k: string) => `select e.id, e.updated_at from relation r join unnest($1::text[]) s(id) on s.id = r.${near} join entity e on e.id = r.${far} where r.valid_to is null${typed} and e.id <> all($2::text[]) and ${k}`;
-    level = await find((k) => `select id from (${way('from_id', 'to_id', k)} union ${way('to_id', 'from_id', k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...(over ? [over] : [])]);
+  // The walk: a step at a time along the links named, each the way it is named (out along it, in to it, or either), to
+  // what the filter does not exclude. An excluded item is not walked through. Each step is bounded by the ids reached
+  // the step before and what room is left.
+  const along = (way: 'out' | 'in') => (lens.walk.over === 'all' ? null : l.registry.relationFamily(...lens.walk.over.map(wayOf).filter((t) => t.way !== (way === 'out' ? 'in' : 'out')).map((t) => t.link)));
+  // Out from an item is along its links (it is their from); in is back along the links to it. Every link goes both.
+  const ways = ([['from_id', 'to_id', along('out')], ['to_id', 'from_id', along('in')]] as const).filter(([, , types]) => types?.length !== 0);
+  for (let level = [...sent], n = 0; level.length && n < lens.walk.steps && room() > 0 && ways.length; n++) {
+    const typed = ways.flatMap(([, , types]) => (types ? [types] : []));
+    const way = (k: string) => ways.map(([near, far, types], i) => `select e.id, e.updated_at from relation r join unnest($1::text[]) s(id) on s.id = r.${near} join entity e on e.id = r.${far} where r.valid_to is null${types ? ` and r.type = any($${4 + ways.slice(0, i).filter(([, , t]) => t).length}::text[])` : ''} and e.id <> all($2::text[]) and ${k}`).join(' union ');
+    level = await find((k) => `select id from (${way(k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...typed]);
     for (const id of level) if (!sent.has(id)) stepOf.set(id, n + 1);
     add(level);
   }

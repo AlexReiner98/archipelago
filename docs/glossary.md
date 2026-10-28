@@ -95,17 +95,18 @@ sandbox (`ui/draw.html`), answering with marks the page checks
 (`docs/drawings.md`). Replaces *shape* where a shape meant this; the field
 that names it is still `shape`.
 
-**Find, Only, Not, Walk, Limit.** The parts of a lens, by the words the query
-bar and an agent's answer give them (decision e_drt4g872). **Find** is what
-adds: words, a type, a tag, a link and its end, an item, in an item (all
-that is part of it, at any depth); any of them (the
-find bar's words are one Find term). **Only** is what must all hold of what
-Find finds: a type, or within an item. **Not** is what is left out of
-everything but an item named: closed, system, or a type. **Walk** is the links followed from
-what Find finds, either way, ×steps. **Limit** is the most items drawn, said
-as how many of it. In the code: the filter's `text`, `types`, `ids`, `links`, `in`;
-`only`, `within`; `exclude`; `walk`; `limit` (`src/lens-flat.ts`).
-Replaces *search*, *nodes* and *edges* where the bar meant these.
+**Find, Only, Not, Walk, Limit.** The parts of a lens, by the words the
+query bar and an agent's answer give them (decision e_drt4g872). **Find** is
+what adds: words, a type, a tag, a link and its end, an item, in an item
+(all that is part of it, at any depth); any of them (the find bar's words
+are one Find term). **Only** is what must all hold of what Find finds: a
+type, or within an item. **Not** is what is left out of everything but an
+item named: closed, system, or a type. **Walk** is the links followed from
+what Find finds, each out (→), in (←) or either way (↔), ×steps. **Limit**
+is the most items drawn, said as how many of it. In the code: the filter's
+`text`, `types`, `ids`, `links`, `in`; `only`, `within`; `exclude`; `walk`;
+`limit` (`src/lens-flat.ts`). Replaces *search*, *nodes* and *edges* where
+the bar meant these.
 
 **canvas.** The page's one flat plane, where every item a lens reaches is a
 node and every link a wire; depth is never drawn (`docs/canvas.md`). A

@@ -12,7 +12,7 @@ import { api, asWords, h, state, wordsOf } from './base.js';
 import { numberOf } from './lens-base.js';
 import { ranked, around, uses } from './picker-rank.js';
 import { pickTerm } from './term-pick.js';
-import { relations, titles, typeTitle, types } from './words.js';
+import { ARROW, NEXT_WAY, relations, titles, typeTitle, types, wayOf, withWay } from './words.js';
 
 const bar = document.getElementById('query');
 /** Items the bar has asked the names of, so each is asked once. */
@@ -206,12 +206,14 @@ export function drawQuery(lens, view, go, lead) {
   const { over, steps } = lens.walk ?? { over: [], steps: 0 };
   const walked = over === 'all' ? [] : over;
   const walk = (change) => go({ ...lens, walk: { over, steps, ...change } });
+  /** A walked link in words: its way's arrow, then its title. */
+  const waySaid = (t) => ((w) => `${ARROW[w.way]} ${linkTitle(w.link)}`)(wayOf(t));
   // What the walk follows: every link, or one more link type, those used here first.
   const walkAlong = (anchor) => pickTerm(anchor, {
     label: 'Walk',
     groups: [
       over !== 'all' && { label: '', items: [{ label: 'every link', title: 'Every link, either way', pick: () => walk({ over: 'all', steps: steps || 1 }) }] },
-      ...groupsOf(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.') && !walked.includes(r.id)), here.links, near.uses?.links), (r) => ({ label: r.title ?? r.id, title: 'Along this link, either way', pick: () => walk({ over: [...walked, r.id], steps: steps || 1 }) })),
+      ...groupsOf(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.') && !walked.some((t) => wayOf(t).link === r.id)), here.links, near.uses?.links), (r) => ({ label: r.title ?? r.id, title: 'Along this link, either way: its arrow turns it', pick: () => walk({ over: [...walked, r.id], steps: steps || 1 }) })),
     ].filter(Boolean),
   });
   // The lens's parts by their words (decision e_drt4g872): Find what adds, any of it; Only what must all hold of it; Not
@@ -229,10 +231,19 @@ export function drawQuery(lens, view, go, lead) {
     ...(f.within ?? []).map((id) => term('q-narrow', `within ${nameOf(id, redraw)}`, 'Only what is within this item, at any depth, of what Find finds', 'within', id, narrowTo)),
   ];
   const notTerms = exclude.map((x) => term('q-out', x === 'closed' || x === 'system' ? x : typeTitle(x), 'Left out of everything', 'exclude', x, leaveOut));
-  const walkTerm = (said, drop) => ({ said, title: 'Along this link, either way', drop, el: h('span', { class: 'q-term q-walk' }, h('span', { class: 'q-said' }, said), h('button', { type: 'button', class: 'q-x', title: 'Take it out', 'aria-label': `Take out ${said}`, onclick: drop }, '×')) });
+  // A walked link: its arrow, a click turning it out (→), in (←) or either way (↔); its title; its ×.
+  const wayTitle = { either: 'Either way along this link', out: 'Out along this link, from what it starts at', in: 'In along this link, to what it starts at' };
+  const walkTerm = (said, drop, t) => {
+    const w = t && wayOf(t);
+    const turn = w && (() => walk({ over: walked.map((o) => (o === t ? withWay(w.link, NEXT_WAY[w.way]) : o)) }));
+    return { said, title: w ? wayTitle[w.way] : 'Every link, either way', drop, el: h('span', { class: 'q-term q-walk' },
+      w && h('button', { type: 'button', class: 'q-way', title: `${wayTitle[w.way]}: turn it`, 'aria-label': `Turn the way of ${said}`, onclick: turn }, ARROW[w.way]),
+      h('span', { class: 'q-said' }, w ? linkTitle(w.link) : said),
+      h('button', { type: 'button', class: 'q-x', title: 'Take it out', 'aria-label': `Take out ${said}`, onclick: drop }, '×')) };
+  };
   const walkTerms = over === 'all'
     ? [walkTerm('every link', () => walk({ over: [], steps: 0 }))]
-    : walked.map((r) => walkTerm(linkTitle(r), () => walk({ over: walked.filter((o) => o !== r), steps: walked.length > 1 ? steps : 0 })));
+    : walked.map((r) => walkTerm(waySaid(r), () => walk({ over: walked.filter((o) => o !== r), steps: walked.length > 1 ? steps : 0 }), r));
   // A part of the query, a row of the editor: its word, its terms, as many as the row has room for and how many more
   // (those a click away, each with its ×), and its own + to add one.
   const part = (cls, word, title, list, add, addLabel, ...rest) => {
@@ -258,7 +269,7 @@ export function drawQuery(lens, view, go, lead) {
   const found = findTerms.map((t) => t.said);
   const narrowed = onlyTerms.map((t) => t.said);
   const out = exclude.filter((x) => x !== 'system').map((x) => (x === 'closed' ? x : typeTitle(x)));
-  const walkSaid = `${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')} ×${steps}`;
+  const walkSaid = `${over === 'all' ? 'every link' : walked.map(waySaid).join(', ')} ×${steps}`;
   const parts = [
     found.length > 0 && ['Find', or(found.map((x) => h('span', { class: 'q-kept' }, x)))],
     narrowed.length > 0 && ['Only', narrowed.join(', ')],
@@ -280,7 +291,7 @@ export function drawQuery(lens, view, go, lead) {
       part('q-filter', 'Find', 'What any of these finds is drawn', findTerms, (a) => addToFilter(a), 'Find more'),
       part('q-only', 'Only', 'What Find finds must all be so', onlyTerms, (a) => narrowTo(a), 'Only what is of a type, or within an item'),
       part('q-not', 'Not', 'Left out of everything, what the walk reaches included', notTerms, (a) => leaveOut(a), 'Leave something out'),
-      part('q-walk-part', 'Walk', 'From what Find finds, along these links either way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
+      part('q-walk-part', 'Walk', 'From what Find finds, along these links, each its own way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
         walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },
           h('button', { type: 'button', title: 'One step fewer', disabled: steps <= 1, onclick: () => walk({ steps: steps - 1 }) }, '−'),
           h('button', { type: 'button', class: 'on', title: 'Steps' }, `×${steps}`),

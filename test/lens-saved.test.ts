@@ -70,6 +70,7 @@ test('a translation keeps the start a view names, and a type it renames follows 
     filter: { types: ['hypothesis'], links: ['assumes me', { link: 'assumes', from: 'e_x' }] },
   });
   assert.deepEqual(renamedLens({ walk: { over: ['part_of'] } }, 'hypothesis', 'hypothesis', 'entity'), {});
+  assert.deepEqual(renamedLens({ walk: { over: ['assumes>', 'part_of<'], steps: 2 } }, 'assumes', 'presumes', 'relation'), { walk: { over: ['presumes>', 'part_of<'], steps: 2 } }, 'a way said is kept');
 });
 
 // What the old lens drew of each, read on this fixture from the old lens itself (src/lens.ts at 84433ae, the last

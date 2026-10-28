@@ -12,7 +12,7 @@ export const VIEW_INPUT = {
   lens: z
     .record(z.string(), z.unknown())
     .optional()
-    .describe('What the canvas draws: a flat lens, as query flat takes it ({ filter: { text, types, ids, links, in, only, within, exclude }, walk: { over, steps }, limit }), shown in the query bar as if written there. With entity, under that item\'s page. {} is the canvas as it opens.'),
+    .describe('What the canvas draws: a flat lens, as query flat takes it ({ filter: { text, types, ids, links, in, only, within, exclude }, walk: { over (depends_on> out, depends_on< in, depends_on either way), steps }, limit }), shown in the query bar as if written there. With entity, under that item\'s page. {} is the canvas as it opens.'),
   style: z
     .object({
       lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),

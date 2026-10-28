@@ -37,6 +37,16 @@ export const isA = (typeId, ancestor) => {
 export const fits = (allowed, typeId) => allowed.some((a) => a === '*' || isA(typeId, a));
 // Relations the system keeps itself (what a session works on, who holds a resource) are not edited by hand.
 export const kept = (relId) => relId.startsWith('sys.') || relId === 'holds';
+/** A link the walk follows and which way (decision e_gue6cg6q): `>` out along it, `<` in to it, else either way. */
+export const wayOf = (term) => {
+  const way = term.endsWith('>') ? 'out' : term.endsWith('<') ? 'in' : 'either';
+  return { link: way === 'either' ? term : term.slice(0, -1), way };
+};
+/** A walked link written with its way, as the lens keeps it. */
+export const withWay = (link, way) => `${link}${{ out: '>', in: '<' }[way] ?? ''}`;
+/** Each way's arrow, and the way a click on it turns to. */
+export const ARROW = { either: '↔', out: '→', in: '←' };
+export const NEXT_WAY = { either: 'out', out: 'in', in: 'either' };
 
 export const when = (ts) => new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 export const daysAgo = (ts) => {
