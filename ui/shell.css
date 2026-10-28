@@ -59,6 +59,7 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 #tabs .tab-act, #tabs > .tab-new, #query .q-save, #panes .pane-act { flex: none; display: inline-grid; place-items: center; box-sizing: border-box; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); font-size: var(--text-8); line-height: 1; cursor: pointer; }
 #tabs .tab-act:hover, #tabs > .tab-new:hover, #query .q-save:hover:not(:disabled), #panes .pane-act:hover { color: var(--text); background: var(--accent-soft); }
 #query .q-save:disabled { opacity: 0.35; cursor: default; }
+#query .q-mark { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
 /* An action that is not read from its mark alone says its word beside it. */
 #query .q-save.q-word { width: auto; gap: var(--space-3); grid-auto-flow: column; padding: 0 var(--space-5); font-size: var(--text-4); color: var(--text); }
 #tabs > .tab-new { pointer-events: auto; align-self: center; }

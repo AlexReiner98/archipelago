@@ -131,7 +131,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `lens.js` | the address codec (`readFlatLens`, `flatQuery`); `flatView` reads, holds and draws a lens |
 | `query-bar.js` | the lens as chips, changed in place |
 | `find.js` | the seeds as words, with a one-line peek: Enter replaces them, + or Shift+Enter adds (e_c3g6gwqq) |
-| `canvases.js` | saved canvases: the bar's switch, ☆ save, Home's list |
+| `canvases.js` | saved canvases: the bar's switch, Save, Home's list |
 | `drawing.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
 | `pan-zoom.js` | the infinite plane |
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
