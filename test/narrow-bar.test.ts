@@ -42,7 +42,8 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
   try {
     assert.ok(await until(has('Which tiles?')), `the narrowed canvas is drawn: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate(has('Elsewhere?'))), 'a question outside the project is not');
-    assert.ok(await until(`${chips}.join('|') === 'within Site works'`), `within is in the Only row, by the item's name: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
+    assert.ok(await until(`${chips}.join('|') === 'within Site works'`), `within is in the Only row, by the item's name: ${await page.evaluate(`JSON.stringify(${chips})`)} ${page.logs().join('
+')}`);
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#find .q-type .q-said')].map((c) => c.textContent)`), ['Question'], 'what Find finds stays apart');
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
