@@ -70,13 +70,16 @@ const runsOf = (points, ends) => points.slice(1).map(([x2, y2], k) => {
 /** The paths drawn so far, their runs kept by line (across or down) and where it lies, `near` apart: what route keeps off. */
 export const drawnPaths = (near) => ({ near, lines: new Map() });
 const lineOf = (taken, h, at) => `${h ? 'h' : 'v'} ${Math.round(at / taken.near)}`;
-/** How far a path runs along what is drawn already, within `near` of it: a run that shares a step with it is a bus, and costs nothing. */
+/**
+ * How far a path runs along what is drawn already, within `near` of it: two lines closer than that read as one. A run
+ * exactly on a run that shares a step with it is a bus, and costs nothing; beside it, it costs as any other.
+ */
 const overlap = (points, ends, taken) => {
   let n = 0;
   for (const r of runsOf(points, ends))
     for (const d of [-1, 0, 1])
       for (const o of taken.lines.get(lineOf(taken, r.h, r.at + d * taken.near)) ?? [])
-        if (Math.abs(o.at - r.at) < taken.near && !o.ends.some((e) => ends.includes(e))) n += Math.max(0, Math.min(r.hi, o.hi) - Math.max(r.lo, o.lo));
+        if (Math.abs(o.at - r.at) < taken.near && !(Math.abs(o.at - r.at) < 0.01 && o.ends.some((e) => ends.includes(e)))) n += Math.max(0, Math.min(r.hi, o.hi) - Math.max(r.lo, o.lo));
   return n;
 };
 /** Keep a path as drawn, so the next one routed keeps off it. */
@@ -118,10 +121,11 @@ const tidy = (points) => {
 /**
  * A path at right angles from (sx, sy) down to (tx, ty), coming into the second from above, round the steps (`others`,
  * its ends left out) a row at a time: down its line until a step is in the way, across over that step's row to a lane
- * beside it, and on down; then across over the second and down into it. Every run is first found clear, and of the
- * lanes (a half lead to a lead and a half off the step's side) and the heights across (a lead over the row, higher a
- * half lead at a time, or halfway up) each takes the one that runs along the least drawn (`taken`), on the side
- * toward the second unless that runs along more (or the side away from it first, `away`). Undefined where it finds no way.
+ * through that row, and on down; then across over the second and down into it. Every run is first found clear, and of
+ * the lanes (down the middle of the gaps between the steps of that row, the nearest few each side) and the heights
+ * across (a lead over the row, higher a little at a time, or halfway up) each takes the one that runs along the least
+ * drawn (`taken`), on the side toward the second unless that runs along more (or the side away from it first, `away`).
+ * Undefined where it finds no way.
  */
 function stairs(sx, sy, tx, ty, lead, others, ends, taken, away) {
   if (ty < sy) return undefined;
@@ -135,11 +139,11 @@ function stairs(sx, sy, tx, ty, lead, others, ends, taken, away) {
   const clear = (x1, y1, x2, y2) => !hits(x1 === x2 ? x1 - 1e-3 : x1, y1 === y2 ? y1 - 1e-3 : y1, x1 === x2 ? x2 + 1e-3 : x2, y1 === y2 ? y2 + 1e-3 : y2).length;
   const along = (points) => (taken ? overlap(points, ends, taken) : 0);
   // Where a run across from x1 to x2 may go, between y and `until`: a lead over `until`, lifted over each step it would
-  // meet there, and higher a half lead at a time, or halfway up to y.
+  // meet there, and higher two thirds of a lead at a time (the order's tracks are as far apart), or halfway up to y.
   const heights = (x1, x2, y, until) => {
     let h = until - lead;
     for (let met = hits(x1, h - 1e-3, x2, h + 1e-3); met.length && h >= y; met = hits(x1, h - 1e-3, x2, h + 1e-3)) h = Math.min(...met.map((o) => o.y - o.h / 2)) - lead;
-    return [h, h - lead / 2, h - lead, h - (3 * lead) / 2, (y + h) / 2].filter((v) => v >= y);
+    return [...Array.from({ length: 5 }, (_, k) => h - (k * 2 * lead) / 3), (y + h) / 2].filter((v) => v >= y);
   };
   const points = [[sx, sy]];
   let [x, y] = [sx, sy];
@@ -160,15 +164,24 @@ function stairs(sx, sy, tx, ty, lead, others, ends, taken, away) {
     const block = below.reduce((p, q) => (q.y - q.h / 2 < p.y - p.h / 2 ? q : p));
     const toRight = tx === x ? block.x < x : tx > x;
     const top = block.y - block.h / 2, foot = block.y + block.h / 2;
+    // The lanes through its row: down the middle of each gap between the steps there (a lead in from each side of a
+    // wide one), the nearest few on each side of it.
+    const row = hits(block.x - 40 * lead, top + 1e-3, block.x + 40 * lead, foot - 1e-3).map((o) => [o.x - o.w / 2, o.x + o.w / 2]).sort((p, q) => p[0] - q[0]);
+    const gaps = [];
+    let edge = -Infinity;
+    for (const [l, r] of row) ((l > edge && gaps.push([edge, l])), (edge = Math.max(edge, r)));
+    gaps.push([edge, Infinity]);
+    const lanesIn = ([l, r]) => (r - l < 3 * lead ? [(l + r) / 2] : [l + lead, r - lead].filter(Number.isFinite));
+    const [l0, r0] = [block.x - block.w / 2, block.x + block.w / 2];
+    const sides = { false: gaps.filter(([, r]) => r <= l0 + 1e-6).reverse().flatMap(lanesIn).slice(0, 8), true: gaps.filter(([l]) => l >= r0 - 1e-6).flatMap(lanesIn).slice(0, 8) };
     // The first that runs along nothing drawn, on the side it goes first, is taken at once.
     search: for (const right of [toRight !== away, toRight === away])
-      for (const off of [lead / 2, lead, (3 * lead) / 2]) {
-        const to = right ? block.x + block.w / 2 + off : block.x - block.w / 2 - off;
+      for (const to of sides[right]) {
         for (const h of heights(x, to, y, top)) {
           if (!clear(x, y, x, h) || !clear(x, h, to, h) || !clear(to, h, to, foot)) continue;
           // The other side only where this one runs along more: by more than a lead's worth.
           const runs = along([[x, y], [x, h], [to, h], [to, foot]]), first = right === (toRight !== away);
-          const cost = runs * ALONG + (first ? 0 : lead * ALONG) + Math.abs(to - x) / 100;
+          const cost = runs * ALONG + (first ? 0 : lead * ALONG) + Math.abs(to - x) / 10;
           if (cost < least) ((least = cost), (best = [to, h]));
           if (!runs && first) break search;
         }
@@ -234,7 +247,10 @@ function straight(a, b, lead, others, taken, ends) {
     const [downA, downB] = [along(ax), along(bx)];
     const reach = (list, y1, y2) => list.reduce((n, o) => n + (o.y + o.h / 2 > y1 && o.y - o.h / 2 < y2 ? 1 : 0), 0);
     let chosen, least = Infinity;
-    for (const my of spread(ay + lead, by - lead)) {
+    // A tie's tracks are a lead apart from just under a (or just over b), so the ties out of one step lie on one another
+    // as a bus: the nearest eight to each.
+    const grid = [...new Set([1, 2, 3, 4, 5, 6, 7, 8].flatMap((k) => [ay + k * lead, by - k * lead]))].filter((v) => v >= ay + lead && v <= by - lead);
+    for (const my of taken ? [...grid, ...spread(ay + lead, by - lead)] : spread(ay + lead, by - lead)) {
       const p = [[ax, ay], [ax, my], [bx, my], [bx, by]];
       const through = (reach(downA, ay, my) + reach(downB, my, by) + crossings([[ax, my], [bx, my]], others, ends)) * 1e6;
       if (through >= least) continue;
@@ -251,7 +267,7 @@ function straight(a, b, lead, others, taken, ends) {
   // Beside them, further out a track at a time, when the nearest is taken.
   const out = taken ? [1, 2, 3].flatMap((k) => [side + k * lead, other - k * lead]) : [];
   // Out and in a lead from each, or further when that runs along what is drawn: the heights across are a half lead apart.
-  const [outs, ins] = taken ? [[1, 1.5, 2, 2.5].map((k) => ay + k * lead), [1, 1.5, 2, 2.5].map((k) => by - k * lead)] : [[ay + lead], [by - lead]];
+  const [outs, ins] = taken ? [[1, 2, 3].map((k) => ay + k * lead), [1, 2, 3].map((k) => by - k * lead)] : [[ay + lead], [by - lead]];
   const tracks = [...columns, ...out].flatMap((cx) => outs.flatMap((y1) => ins.map((y2) => [cx, y1, y2])));
   return best(tracks, ([cx, y1, y2]) => [[ax, ay], [ax, y1], [cx, y1], [cx, y2], [bx, y2], [bx, by]]);
 }
@@ -294,7 +310,9 @@ export function outlineRoute(a, b, top, bus, lane = (a.y + a.h / 2 + top) / 2) {
  */
 export function routeTies(ties, steps, chains, outlines, { lead, cell, track }) {
   const around = field(steps, cell), at = new Map(steps.map((s) => [s.id, s]));
-  const taken = drawnPaths(lead / 2);
+  // Two lines closer than the order's tracks are apart read as one: each keeps that far off what is drawn, or lies on it
+  // as one bus.
+  const taken = drawnPaths(track);
   for (const c of chains) take(taken, c.points, [c.a, c.b]);
   const lanes = new Map();
   for (const t of ties) {

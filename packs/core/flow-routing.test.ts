@@ -99,19 +99,20 @@ test('a tie leaves the foot of the higher of its steps and comes down into the h
   }
 });
 
-test('no two paths run along each other unless they share a step: then they are one bus', () => {
+test('no two paths run along or close beside each other unless they share a step: then they are one bus, on one line', () => {
   const g = laidOut(dense());
   const all = runs(g);
   const along: string[] = [];
   for (let i = 0; i < all.length; i++)
     for (let j = i + 1; j < all.length; j++) {
       const [r, o] = [all[i], all[j]];
-      if (r.p === o.p || r.across !== o.across || Math.abs(r.at - o.at) > 0.5 || Math.min(r.hi, o.hi) - Math.max(r.lo, o.lo) <= 1) continue;
-      const shared = [r.p.a, r.p.b].some((e) => [o.p.a, o.p.b].includes(e));
+      // Two lines closer than this read as one.
+      if (r.p === o.p || r.across !== o.across || Math.abs(r.at - o.at) >= LEAD * 2 / 3 || Math.min(r.hi, o.hi) - Math.max(r.lo, o.lo) <= 1) continue;
+      const shared = Math.abs(r.at - o.at) < 0.5 && [r.p.a, r.p.b].some((e) => [o.p.a, o.p.b].includes(e));
       // Two wires of the order never share a stretch, a bus or not: each has a track of its own (layout.js).
       if (!shared || (!r.p.type && !o.p.type)) along.push(`${r.p.type ?? 'order'} ${r.p.a}>${r.p.b} and ${o.p.type ?? 'order'} ${o.p.a}>${o.p.b}`);
     }
-  assert.deepEqual(along, [], 'paths that share no step run apart');
+  assert.deepEqual(along, [], 'paths that share no step run apart, and a bus is one line');
 });
 
 test('two outlines side by side each run across at a height of their own', () => {
