@@ -324,3 +324,9 @@ shard, to add to both matrices in `.github/workflows/tests.yml`.
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
+
+## Archipelago
+
+This project's work is kept in Archipelago (https://app.archipelago.tools). How to work with it:
+
+@.claude/pelago.md

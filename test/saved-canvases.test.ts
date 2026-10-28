@@ -71,7 +71,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       assert.equal(await canvasUp(), saved.id, 'its id in the address');
 
       // Moved on it: written under its own id, not the item's canvas or the map's.
-      await page.evaluate(`document.getElementById('canvas').dispatchEvent(new CustomEvent('drawing-drop', { detail: { id: '${made.a}', x: ${width}, y: 77 } }))`);
+      await page.evaluate(`document.querySelector('#canvas .pane-canvas').dispatchEvent(new CustomEvent('drawing-drop', { detail: { id: '${made.a}', x: ${width}, y: 77 } }))`);
       await page.evaluate(`location.hash = '#/'`);
       let mine: Record<string, [number, number]> = {};
       for (const end = Date.now() + 10000; Date.now() < end && !mine[made.a]; await wait(200)) mine = (await call('/api/places', undefined, { canvas: saved.id })).result;

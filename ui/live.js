@@ -124,9 +124,9 @@ export function follow(steps = []) {
   // A pane being read or worked in is passed by, not taken (ui/pane-busy.js): only a question open over the page, or
   // following turned off, holds every pane.
   const busy = !following.on || document.querySelector('dialog[open]');
-  // Which tab and pane it lands in, by whose step it is (ui/pane-land.js): 'main' moves the address, a frame or
-  // 'popped' is a pane that drew it, { open } a tab out of sight that drew it, null no tab that takes it: it is offered.
-  const landed = !busy && there ? (hooks.land ? hooks.land({ ...place, hash: there.slice(2) }) : 'main') : null;
+  // Which tab and pane it lands in, by whose step it is (ui/pane-land.js): a frame or 'popped' is a pane that drew it,
+  // { open } a tab out of sight that drew it, null no tab that takes it: it is offered.
+  const landed = !busy && there && hooks.land ? hooks.land({ ...place, hash: there.slice(2) }) : null;
   const aside = landed?.open;
   const offered = busy || !landed;
   // Several sessions at once: each other session's last step with a place lands too, in its own tab, behind this one.
@@ -149,7 +149,6 @@ export function follow(steps = []) {
   clearTimeout(followedTimer);
   // A show offered to a page not following stays longer: it is the only way the reader hears of it.
   followedTimer = setTimeout(() => (followed.hidden = true), following.on ? 12000 : 60000);
-  if (landed === 'main' && location.hash !== there) location.hash = there;
 }
 
 /** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */
@@ -160,8 +159,8 @@ export function shownIds() {
   for (const host of main.querySelectorAll('.lens-wrap')) for (const item of host.answer?.items ?? []) ids.add(item.id);
   return ids;
 }
-/** The canvas behind the sheet (ui/canvas.js): the view it draws. */
-const canvasView = () => document.querySelector('#canvas > .lens-wrap');
+/** The canvases behind the sheet (ui/canvas.js): the view each pane draws. */
+const canvasViews = () => document.querySelectorAll('#canvas > .pane > .pane-canvas > .lens-wrap');
 
 /** What the projector asks of the types, read from the schema the page loaded; and which fields a lens sends. */
 export const kinds = {
@@ -277,10 +276,11 @@ export async function checkTail() {
   // Only the map moved, and nothing of it is on the sheet: it stays as it is, and the canvas asks again if
   // it is on it (drawn again only where its answer changed).
   if (!bears(touched, now.split('.').slice(2).join() !== was.split('.').slice(2).join())) {
-    const drawn = canvasView();
-    // A canvas whose answer is held in a store is kept current by the facts themselves (ui/replica.js).
-    if (drawn?.store) return;
-    if (!touched || touched.ids === null || touched.made || touched.ids.some((id) => drawn?.answer?.items.some((i) => i.id === id))) drawn?.refresh?.();
+    for (const drawn of canvasViews()) {
+      // A canvas whose answer is held in a store is kept current by the facts themselves (ui/replica.js).
+      if (drawn.store) continue;
+      if (!touched || touched.ids === null || touched.made || touched.ids.some((id) => drawn.answer?.items.some((i) => i.id === id))) drawn.refresh?.();
+    }
     return;
   }
   if (state.dirty || document.querySelector('dialog[open]') || /^#\/new/.test(location.hash)) {

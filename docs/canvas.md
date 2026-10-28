@@ -127,7 +127,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | Module | What it is |
 | --- | --- |
 | `app.js` | routes the address to the canvas and the sheet |
-| `canvas.js` | the lens up, Home's lens, clicks, moves batched, Arrange |
+| `canvas.js` | a pane's canvas: its lens, Home's lens, clicks, moves batched, Arrange |
 | `lens.js` | the address codec (`readFlatLens`, `flatQuery`); `flatView` reads, holds and draws a lens |
 | `query-bar.js` | the lens as chips, changed in place |
 | `find.js` | the seeds as words, with a one-line peek: Enter replaces them, + or Shift+Enter adds (e_c3g6gwqq) |
@@ -136,7 +136,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `pan-zoom.js` | the infinite plane |
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
 | `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
-| `panes.js`, `pane-drag.js` | more than one canvas at once: panes docked beside the main one in a tab, dragged |
+| `panes.js`, `pane-drag.js`, `pane-address.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's |
 | `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
 | `item.js` and the sheet's parts | the item's page (being settled) |
 | `fields.js` | a field's value by its kind, else by its shape; the choices a question settles by |
@@ -189,29 +189,34 @@ measure it reads at), shipped by the house style and a pack's presets.
    asks Apply or Decline, and `decide` settles it.
 
 ## Tabs and panes: more than one canvas at once
-The main canvas is the one the address draws, and the sheet opens over it.
-Others can stand beside it, as a code editor's groups do: ◫ in the bar
-opens the canvas up in a pane beside it, a pane's name dragged onto a side of
-another docks it there (onto its middle swaps them), the line between two
-shares the room, and × closes it. Each pane is a lens and
-a style of its own, held in its own store and kept current from the log like
-the main one; its places are its canvas's. Every pane is live: the query bar
-and find act on the one last touched, and sit over it (decision e_h2pqjy2q).
-A click on a node in a docked pane adds it to that pane's filter and opens
-its page in the sheet over the main canvas. Each pane keeps its own back and
-forward (‹ › in the bar): a step for each
-lens it is given, none for typing or for a page opened over it (e_ssnyd3ex).
-What is typed in the bar's box and whether its filter is unfolded are the
-pane's: another pane or tab starts without them. On a page taller than wide
-a row is drawn as a column. Every pane, the main one too, keeps ⠿ and × in
-its strip in focus or not, so none is special but in which canvas the address
-draws (the owner, 28 Oct 2026): the main one closed, the next takes its place; in focus the bar takes its name's place between them, and ‹ ›
-stay in the bar, dimmed with nowhere to go. The top bar runs across the page over the sheet,
-one pane or several: the sheet opens under it.
+Every pane in a tab is alike (the owner, 28 Oct 2026): none is the main one.
+Each is a canvas of its own (`canvas.js`): a lens and a style, held in its
+own store and kept current from the log, with its places, its wires, its
+fitting and Arrange. Panes stand side by side, as a code editor's groups do:
+◫ in the bar opens the pane in focus's canvas in a pane beside it, a pane's
+name dragged onto a side of another docks it there (onto its middle swaps
+them), the line between two shares the room, and × closes it; the last one stays. One pane alone has no strip: the bar floats
+over its top, as the page's canvas always did.
 
-A tab (`tab-bar.js`, `tabs.js`; decision e_mzer5m4t) is a whole canvas and
-the panes split beside it, which stay together in it. The tabs stand in the
-top bar, one tab included, each named as its canvas is: a session's by the
+The pane last touched is in focus: the query bar and find act on it and sit
+in its strip (decision e_h2pqjy2q). The address is its address
+(`pane-address.js`): `#/v?…` says its lens, and an item's page open over it
+is `#/e/<id>?…` with that lens beside it. Moving focus rewrites the address
+without a step of the browser's; a lens given to a pane in focus is one. Each
+pane keeps its own back and forward, kept with its tab, so a reload draws
+every pane as it was, history included: a step for each lens it is given,
+none for typing or for a page opened over it (e_ssnyd3ex). ‹ › in the bar,
+dimmed with nowhere to go, and the browser's own back and forward, all act on
+the pane in focus. A click on a node in any pane puts that pane in focus,
+adds the node to its filter and opens its page in the sheet over it. What is
+typed in the bar's box and whether its filter is unfolded are the pane's:
+another pane or tab starts without them. On a page taller than wide a row is
+drawn as a column. The top bar runs across the page over the sheet, one pane
+or several: the sheet opens under it.
+
+A tab (`tab-bar.js`, `tabs.js`; decision e_mzer5m4t) is a set of panes,
+which stay together in it. The tabs stand in the
+top bar, one tab included, each named as its pane in focus is: a session's by the
 session in its hue, else a saved canvas or an item by its name, a lens by
 what its filter finds, Home by Home. There is no most: many shrink to their
 mark and first letters (e_q3amet26). What is the tab's own is on the strip,
@@ -230,14 +235,19 @@ in italics): the reader picks it in ⋯. Where an agent's step lands is `pane-ro
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
 - a session's show or change goes to the tab that follows it;
 - else to a tab that follows everyone and no other session at work (a step
-  within ten minutes) holds: the one it holds, the one drawing it, else the
-  one in sight; so one session alone works on the main canvas as before;
+  within ten minutes) holds: the one where it holds a pane, the one it
+  landed in, the one drawing it, else the one in sight;
 - when those are all held by other sessions, it gets a tab of its own,
   following it;
 - within the tab, a show's `pane` may be a name of the session's own ("map",
-  "tests"): a pane by that name is split beside the tab's canvas the first
-  time and drawn in again each time it is named; else it goes to the pane it
-  last landed in, the one drawing it, or the tab's canvas;
+  "tests"): a pane by that name is split beside the others the first time and
+  drawn in again each time it is named. Else it goes to the session's own
+  pane: one held for it (a pane keeps whose it is, and says so in its strip,
+  for as long as it stands, so a long session finds it again), else one that
+  draws what it shows, else one nobody holds, else one split for it. Never
+  the pane in focus, where the reader may be at work beside it (the owner,
+  28 Oct 2026), unless it draws that already; in a tab that follows the
+  session alone every pane is its own;
 - a tab comes into sight unless the reader is at work in the one in sight or
   another session showed there in the last half minute: then it is drawn in
   the background, its mark rings, and the line at the foot offers Open tab
@@ -250,11 +260,13 @@ out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
   a show moves no tab its session has not shown into while others are at
   work, opens none and brings none into sight; otherwise it waits as the line.
 A side (`left`, `right`, `above`, `below`) puts the session's pane there in
-its tab, `main` is the tab's canvas and `alone` closes the others. A session
+its tab, and `alone` closes the others; `main`, from before every pane was
+alike, is the session's own pane. A page that is not a canvas (a screen)
+opens in the sheet over the pane in focus. A session
 is its run: a step carries the run it names (show, tell, session_update), or
 the one its agent last named (`src/presence.ts`). Following is on until the
 reader turns it off. A popped-out window follows no agent: the main page
-does, and draws a show for its tab in the window's canvas.
+does, and draws a show for its tab in the window's pane in focus.
 
 ## What is not yet so
 - Find excludes only what the query bar's box excludes (closed, system, a

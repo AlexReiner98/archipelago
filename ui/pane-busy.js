@@ -1,6 +1,6 @@
 // Whether the reader is busy in a pane of the tab in sight (ui/panes.js), so that what an agent shows passes it by
 // (ui/pane-route.js): a press, a scroll, a wheel or a key in that pane within the last while, text selected there, or,
-// for the main pane, words typed into the sheet and not yet saved. Moving the pointer is watching, not working, and a
+// for the pane in focus, words typed into the sheet over it and not yet saved. Moving the pointer is watching, not working, and a
 // dial, a tick or a pick is not unsaved work (ui/live.js). A tab popped out into a window (ui/tab-bar.js) keeps when it
 // was last worked in, for the main page to read; and the main page keeps the windows it popped out, so an agent's next
 // step can go to one.
@@ -11,11 +11,10 @@ const quietAfter = 20_000;
 const popped = window.name.startsWith('pelago-tab:') ? window.name.slice('pelago-tab:'.length) : null;
 const keyOf = (id) => `pelago-pane-busy:${id}`;
 
-/** The pane an element is in: a docked one by its id, the main canvas and the sheet over it as main. */
-export const paneOf = (el) => {
-  const pane = el?.closest?.('#panes > .pane');
-  return pane ? pane.dataset.pane : el?.closest?.('#canvas, #main-name, #sheet') ? 'main' : null;
-};
+/** The pane in focus: the sheet opens over it. */
+const inFocus = () => document.querySelector('#canvas > .pane.pane-active')?.dataset.pane ?? null;
+/** The pane an element is in, by its id: the sheet is the pane in focus's. */
+export const paneOf = (el) => el?.closest?.('#canvas > .pane')?.dataset.pane ?? (el?.closest?.('#sheet') ? inFocus() : null);
 
 const lastAt = new Map();
 let keptAt = 0;
@@ -47,7 +46,7 @@ export function busy(id) {
   if (Date.now() - last < quietAfter) return true;
   const selected = getSelection();
   if (selected?.toString() && paneOf(selected.anchorNode?.parentElement) === id) return true;
-  return id === 'main' && state.dirty;
+  return id === inFocus() && state.dirty;
 }
 
 /** The windows this page popped out, by tab: an agent's step reaches one through it. */

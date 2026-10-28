@@ -40,7 +40,7 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
     // Count the lens reads the page makes from here on.
     await page.evaluate(`(() => { window.flatReads = 0; const was = window.fetch; window.fetch = (url, init) => { if (String(init?.body ?? '').includes('"name":"flat"')) window.flatReads++; return was(url, init); }; })()`);
     await agentChange([{ op: 'update', id: made.b, title: 'Renamed step' }]);
-    const probe = `(() => { const v = document.querySelector('#canvas > .lens-wrap'); const s = v?.store; return JSON.stringify({ has: Boolean(v), store: Boolean(s), pos: s?.pos, titles: s ? [...s.items.values()].map((r) => r.title) : null, drawn: [...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent) }); })()`;
+    const probe = `(() => { const v = document.querySelector('#canvas .pane-canvas > .lens-wrap'); const s = v?.store; return JSON.stringify({ has: Boolean(v), store: Boolean(s), pos: s?.pos, titles: s ? [...s.items.values()].map((r) => r.title) : null, drawn: [...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent) }); })()`;
     assert.ok(await until(drawn('Renamed step')), `the new title is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
     assert.equal(await page.evaluate('window.flatReads'), 0, 'drawn from the facts, with no lens read');
     // An item made in the same change as its link to what is drawn comes with the facts: still no lens read.
