@@ -1,7 +1,9 @@
-// The flow's routing conventions (docs/drawings.md, e_k78mxqxt), each held on pictures dense enough to break them: the
-// order in wires at right angles from the foot of what is depended on down into the head of what depends on it; every
-// other link a tie at right angles too, round the steps, off the lines already drawn unless two share a step (a bus),
-// with a head where the link points unless the style draws its type headless. Input in, marks out: no database.
+// The flow's routing conventions (docs/drawings.md, e_k78mxqxt), each held on pictures dense enough to break them.
+// Every line is wired by one rule (./draw/flow/wires.js): the order from the foot of what is depended on down into the
+// head of what depends on it; every other link a tie the same way, from the higher of its steps down into the lower
+// (or under its row, up into each foot), at right angles, round the steps, off the lines already drawn unless two
+// share a step (a bus, one line); a head where the link points unless the style draws its type headless. Input in,
+// marks out: no database.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -26,7 +28,7 @@ const link = (type: string, from: string, to: string) => ({ id: `r_${type}${from
 /**
  * A map as the live one is where the conventions broke: one hub that many things are part of, chains of the order under
  * it in wide rows, so a tie from the hub to a part far down has whole rows of steps in its way; things that serve
- * others across the rows; and two items with many leaves each, wrapped under them as outlines side by side.
+ * others across the rows; and two items with many leaves each, wrapped under them in blocks side by side.
  */
 function dense() {
   const items = [item('hub', 'aim')];
@@ -87,15 +89,19 @@ test('the order runs from the foot of what is depended on down into the head of 
   }
 });
 
-test('a tie leaves the foot of the higher of its steps and comes down into the head of the lower, or into a leaf\'s side', () => {
+test('a tie leaves the foot of the higher of its steps and comes down into the head of the lower, or runs under its row', () => {
   const g = laidOut(dense());
   for (const t of g.ties) {
-    const [a, b] = [boxOf(g, t.a), boxOf(g, t.b)], [hi, lo] = a.y <= b.y ? [a, b] : [b, a];
-    const [first, last, before] = [t.points[0], t.points.at(-1), t.points.at(-2)];
-    assert.ok(Math.abs(first[1] - (hi.y + hi.h / 2)) < 0.5 && Math.abs(first[0] - hi.x) <= hi.w / 2, `${t.a} to ${t.b} leaves the foot of ${hi.id}`);
-    const side = Math.abs(last[0] - (lo.x - lo.w / 2)) < 0.01 && Math.abs(last[1] - lo.y) < 0.01;
-    const head = Math.abs(last[1] - (lo.y - lo.h / 2)) < 0.5 && Math.abs(before[0] - last[0]) < 0.01 && before[1] < last[1];
-    assert.ok(head || side, `${t.a} to ${t.b} comes down into the head of ${lo.id}, or into its side from its outline's bus`);
+    const [a, b] = [boxOf(g, t.a), boxOf(g, t.b)], [first, last, before] = [t.points[0], t.points.at(-1), t.points.at(-2)];
+    const foot = (p: number[], s: any) => Math.abs(p[1] - (s.y + s.h / 2)) < 0.5 && Math.abs(p[0] - s.x) <= s.w / 2;
+    if (Math.abs(a.y - b.y) < 0.5) {
+      assert.ok(foot(first, a) && foot(last, b) && before[1] > last[1], `${t.a} to ${t.b}, in one row, runs under it from one foot up into the other`);
+      continue;
+    }
+    const [hi, lo] = a.y < b.y ? [a, b] : [b, a];
+    assert.ok(foot(first, hi), `${t.a} to ${t.b} leaves the foot of ${hi.id}`);
+    assert.ok(Math.abs(last[1] - (lo.y - lo.h / 2)) < 0.5 && Math.abs(before[0] - last[0]) < 0.01 && before[1] < last[1], `${t.a} to ${t.b} comes down into the head of ${lo.id}`);
+    assert.equal(t.headAt, hi === b ? 'start' : 'end', `${t.a} to ${t.b} has its head where its link points`);
   }
 });
 
@@ -106,8 +112,9 @@ test('no two paths run along or close beside each other unless they share a step
   for (let i = 0; i < all.length; i++)
     for (let j = i + 1; j < all.length; j++) {
       const [r, o] = [all[i], all[j]];
-      // Two lines closer than this read as one.
-      if (r.p === o.p || r.across !== o.across || Math.abs(r.at - o.at) >= LEAD * 2 / 3 || Math.min(r.hi, o.hi) - Math.max(r.lo, o.lo) <= 1) continue;
+      // Two lines closer than this read as one, where they go together further than a lead (two that cross pass close
+      // for a moment).
+      if (r.p === o.p || r.across !== o.across || Math.abs(r.at - o.at) >= LEAD * 2 / 3 || Math.min(r.hi, o.hi) - Math.max(r.lo, o.lo) <= LEAD) continue;
       const shared = Math.abs(r.at - o.at) < 0.5 && [r.p.a, r.p.b].some((e) => [o.p.a, o.p.b].includes(e));
       // Two wires of the order never share a stretch, a bus or not: each has a track of its own (layout.js).
       if (!shared || (!r.p.type && !o.p.type)) along.push(`${r.p.type ?? 'order'} ${r.p.a}>${r.p.b} and ${o.p.type ?? 'order'} ${o.p.a}>${o.p.b}`);
@@ -115,7 +122,7 @@ test('no two paths run along or close beside each other unless they share a step
   assert.deepEqual(along, [], 'paths that share no step run apart, and a bus is one line');
 });
 
-test('two outlines side by side each run across at a height of their own', () => {
+test('many leaves of two, side by side: each wraps under its own in a block, its ties one bus out of it', () => {
   // Two items under one, each with more leaves than a row holds: each wraps them under it as an outline (./graph.js).
   const items = [item('hub', 'aim')], links = [];
   for (const p of ['p', 'q']) {
@@ -124,11 +131,12 @@ test('two outlines side by side each run across at a height of their own', () =>
     for (let k = 0; k < 14; k++) (items.push(item(`${p}${k}`)), links.push(link('part_of', `${p}${k}`, p)));
   }
   const g = laidOut({ items, links });
-  const across = (p: string) => g.ties.filter((t: any) => t.b === p).map((t: any) => t.points[1][1]);
-  const [p, q] = [new Set(across('p')), new Set(across('q'))];
+  const out = (p: string) => new Set(g.ties.filter((t: any) => t.b === p).map((t: any) => JSON.stringify(t.points.slice(0, 2))));
   assert.equal(g.y.get('p'), g.y.get('q'), 'the two are in one row');
-  assert.ok(p.size === 1 && q.size === 1, 'the leaves of one outline share its bus');
-  assert.notEqual([...p][0], [...q][0], 'the two outlines do not share a lane');
+  assert.ok(new Set(['p', 'q'].flatMap((p) => Array.from({ length: 14 }, (_, k) => g.y.get(`${p}${k}`)))).size > 1, 'their leaves wrap into rows');
+  assert.ok(out('p').size === 1 && out('q').size === 1, 'the ties out of one leave it at one place, down one bus');
+  const side = (p: string) => Array.from({ length: 14 }, (_, k) => g.x.get(`${p}${k}`));
+  assert.ok(Math.max(...side('p')) < Math.min(...side('q')) || Math.max(...side('q')) < Math.min(...side('p')), 'each block keeps to its own side');
   for (const t of g.ties) assert.deepEqual(through(g, t.points, [t.a, t.b]), [], `${t.a} to ${t.b} passes through no step`);
 });
 

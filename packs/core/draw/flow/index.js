@@ -119,10 +119,14 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     const back = up ? y + z('head_length') : y - z('head_length');
     return `M${x} ${y}L${x - z('head_half')} ${back}L${x + z('head_half')} ${back}Z`;
   };
-  // A tie runs from the higher of its ends down into the lower (free.js, tieRoute): its head is on the end its link
-  // points to, into that step's head from above, or into its foot from below.
+  // A tie runs from the higher of its ends down into the lower (./wires.js, ./free.js), or under its row from one to
+  // the other: its head is on the end its link points to (`headAt`, the end or the start of its line), the way the
+  // line comes into it: into a step's head from above, or into its foot from below.
   const headless = new Set(Array.isArray(style.headless) ? style.headless : []);
-  const tieHead = (t) => (g.y.get(t.a) <= g.y.get(t.b) ? head(...t.points.at(-1)) : head(...t.points[0], true));
+  const tieHead = (t) => {
+    const [tip, from] = t.headAt === 'start' ? [t.points[0], t.points[1]] : [t.points.at(-1), t.points.at(-2)];
+    return head(tip[0], tip[1], from[1] > tip[1]);
+  };
   const line = (points) => `M${points.map((p) => p.join(' ')).join('L')}`;
   // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
   let badges = 0;
@@ -295,6 +299,7 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     });
     g.ties.forEach((t, n) => {
       if (t.a !== id && t.b !== id) return;
+      t.headAt = g.y.get(t.a) <= g.y.get(t.b) ? 'end' : 'start';
       patches.push({ key: `n:${n}`, set: { d: line((t.points = tieRoute(boxOf(t.a), boxOf(t.b), z('lead_out'), steps.filter((s) => s.id !== t.a && s.id !== t.b).map((s) => boxOf(s.id))))) } });
       if (!headless.has(t.type)) patches.push({ key: `nh:${n}`, set: { d: tieHead(t) } });
     });

@@ -290,42 +290,17 @@ export function tieLine(a, b) {
   return [edge(a, dx, dy), edge(b, -dx, -dy)];
 }
 
-/**
- * A tie of an outline (./graph.js): down from the foot of what the leaf is part of (`a`) to halfway to the outline's
- * top (`top`, the highest of its first row), across to the bus of the leaf's column (`bus` across from its left), down
- * it, and into the leaf's (`b`) side. Every tie of a column runs along the same bus. Across at `lane` when given, a
- * height between the foot and the top that no other outline's run across takes (layout.js).
- */
-export function outlineRoute(a, b, top, bus, lane = (a.y + a.h / 2 + top) / 2) {
-  const [foot, line] = [a.y + a.h / 2, b.x - b.w / 2 - bus];
-  const points = [[a.x, foot], [a.x, lane], [line, lane], [line, b.y], [b.x - b.w / 2, b.y]];
-  return points.filter((p, k) => !k || p[0] !== points[k - 1][0] || p[1] !== points[k - 1][1]);
-}
 
 /**
- * Route every tie (each { a, b }, given its points) round the steps (`steps`, each { id, x, y, w, h }) and off what is
- * drawn: the order's wires (`chains`), then the outlines, then the rest, each keeping off those before it. A tie into an
- * outline's leaf (`outlines`, its leaf and parent to the top of its outline) runs across at a lane of its parent's own:
- * of the heights between the parent's foot and that top, `track` apart, the one that runs along the least drawn.
+ * Route each of `ties` (each { a, b }, given its points and where its head goes, `headAt`) round the steps (`steps`,
+ * each { id, x, y, w, h }) and off what is drawn (`drawn`, each with its points and ends a and b), each keeping off
+ * those before it: the ties to a step put by hand, which no row holds (./layers.js lays out the rest).
  */
-export function routeTies(ties, steps, chains, outlines, { lead, cell, track }) {
+export function routeTies(ties, steps, drawn, { lead, cell, track }) {
   const around = field(steps, cell), at = new Map(steps.map((s) => [s.id, s]));
   // Two lines closer than the order's tracks are apart read as one: each keeps that far off what is drawn, or lies on it
   // as one bus.
   const taken = drawnPaths(track);
-  for (const c of chains) take(taken, c.points, [c.a, c.b]);
-  const lanes = new Map();
-  for (const t of ties) {
-    const top = outlines.get(`${t.a} ${t.b}`);
-    if (top === undefined) continue;
-    const [leaf, parent] = [at.get(t.a), at.get(t.b)];
-    if (!lanes.has(t.b)) {
-      const foot = parent.y + parent.h / 2, n = Math.max(1, Math.floor((top - foot) / track) - 1);
-      const heights = Array.from({ length: n }, (_, k) => foot + ((top - foot) * (k + 1)) / (n + 1)).sort((p, q) => Math.abs(p - (foot + top) / 2) - Math.abs(q - (foot + top) / 2));
-      const along = (h) => overlap(outlineRoute(parent, leaf, top, lead, h), [t.a, t.b], taken);
-      lanes.set(t.b, heights.reduce((best, h) => (along(h) < along(best) ? h : best), heights[0]));
-    }
-    take(taken, (t.points = outlineRoute(parent, leaf, top, lead, lanes.get(t.b))), [t.a, t.b]);
-  }
-  for (const t of ties) if (!outlines.has(`${t.a} ${t.b}`)) t.points = tieRoute(at.get(t.a), at.get(t.b), lead, around, taken);
+  for (const c of drawn) take(taken, c.points, [c.a, c.b]);
+  for (const t of ties) Object.assign(t, { points: tieRoute(at.get(t.a), at.get(t.b), lead, around, taken), headAt: at.get(t.a).y <= at.get(t.b).y ? 'end' : 'start' });
 }

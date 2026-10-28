@@ -1235,6 +1235,8 @@
       "modules": {
         "index.js": "draw/flow/index.js",
         "layout.js": "draw/flow/layout.js",
+        "layers.js": "draw/flow/layers.js",
+        "wires.js": "draw/flow/wires.js",
         "graph.js": "draw/flow/graph.js",
         "free.js": "draw/flow/free.js",
         "look.js": "draw/flow/look.js",
