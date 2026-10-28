@@ -72,3 +72,13 @@ test('each theme is chosen, and holds its contrast: text, muted, accent and stat
     if (!light.mark) assert.deepEqual([t.light.accent, t.dark.accent], [light.sea, dark.sea], `${theme.title}'s accent is its sea`);
   }
 });
+
+test('each theme carries its own emblem, a PNG drawn in its place\'s colours, and the house style one too', () => {
+  const png = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
+  const emblems = themes.map((t) => (t.props as { emblem?: string }).emblem ?? '');
+  for (const [i, e] of emblems.entries()) assert.match(e, png, `${themes[i].title} has an emblem`);
+  assert.match(styleOf('core', 'core.house').emblem, png, 'the house style has one');
+  // Open water and Bay are of no one place: they keep the emblem's own. Every place's is its own.
+  const places = emblems.filter((_, i) => !['themes.open_water', 'themes.bay'].includes(themes[i].id));
+  assert.equal(new Set(places).size, places.length, 'one for each place');
+});

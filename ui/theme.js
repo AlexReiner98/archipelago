@@ -33,6 +33,8 @@ export function typeVars(type, faces) {
 }
 
 let theme;
+/** The mark at the top of the page, as the style gives it: a PNG as a data URL, or none. */
+let emblem;
 let lengths;
 let text = [];
 const paint = () => {
@@ -40,12 +42,14 @@ const paint = () => {
   for (const [name, colour] of Object.entries(theme?.[dark.matches ? 'dark' : 'light'] ?? {})) if (NAME.test(name) && /^#[0-9a-f]{3,8}$/i.test(String(colour))) root.setProperty(`--${name.replaceAll('_', '-')}`, colour);
   for (const [name, value] of Object.entries(lengths ?? {})) if (NAME.test(name) && asLength(value)) root.setProperty(`--${name.replaceAll('_', '-')}`, asLength(value));
   for (const [name, value] of text) root.setProperty(name, value);
+  root.setProperty('--emblem', /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(emblem ?? '') ? `url("${emblem}")` : 'none');
 };
 dark.addEventListener('change', paint);
 
 /** Paint the page in a style's theme, lengths, faces and text roles. */
 export function applyTheme(style) {
   theme = style?.theme;
+  emblem = style?.emblem;
   lengths = style?.lengths;
   text = typeVars(style?.type, style?.faces);
   paint();

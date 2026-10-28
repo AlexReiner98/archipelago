@@ -86,7 +86,9 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 .term-pick-held > .term-pick-item { flex: 1; min-width: 0; }
 .term-pick-x { flex: none; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); cursor: pointer; }
 .term-pick-x:hover { color: var(--text); }
-#nav .brand { flex: none; font-family: var(--type-wordmark-family); font-weight: var(--type-wordmark-weight); font-style: var(--type-wordmark-style); text-transform: var(--type-wordmark-case); letter-spacing: var(--type-wordmark-track); font-size: var(--text-7); color: var(--text); text-decoration: none; padding: 0 var(--space-3); }
+/* The emblem, the theme's own (its style's emblem, ui/theme.js), in place of the name: the name is still what it is called. */
+#nav .brand { flex: none; width: var(--box-8); height: var(--box-8); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
+#nav .brand > .error { font-size: var(--text-2); }
 #nav .brand .workspace-name { display: none; }
 /* Under the tabs, two bands, each the width of the pane: the view, in the panel's colour and joined to the tab in sight
    (or the strip of the pane in focus), with the canvas up and what is done with it; then the query, in the page's
