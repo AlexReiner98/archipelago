@@ -35,8 +35,10 @@ test('an instruction preset is checked as a style preset is: its words in body, 
   const types = new Map(['instruction', 'style'].map((id) => [id, l.registry.type(id)!]));
   const pack = (styles: unknown[]) => ({ id: 'core', version: '0', title: 'Core', styles }) as never;
   assert.deepEqual(checkDeclared(pack(presets), types, [], false), []);
-  const bad = checkDeclared(pack([{ id: 'core.x', type: 'instruction', title: 'X', props: { preset: 'core.one', shape: 'list' } }, { id: 'core.y', type: 'lens', title: 'Y', props: {} }]), types, [], false);
-  assert.ok(bad.some((p) => /words in body/.test(p)) && bad.some((p) => /"preset" is not a field/.test(p)) && bad.some((p) => /"shape" is not a field/.test(p)) && bad.some((p) => /a style or an instruction/.test(p)), bad.join('\n'));
+  const bad = checkDeclared(pack([{ id: 'core.x', type: 'instruction', title: 'X', props: { preset: 'core.one', shape: 'list' } }, { id: 'core.y', type: 'graph', title: 'Y', props: {} }, { id: 'core.z', type: 'lens', title: 'Z', props: {} }]), types, [], false);
+  assert.ok(bad.some((p) => /words in body/.test(p)) && bad.some((p) => /"preset" is not a field/.test(p)) && bad.some((p) => /"shape" is not a field/.test(p)) && bad.some((p) => /a style, an instruction or a canvas/.test(p)), bad.join('\n'));
+  // A pack's canvas is a flat lens and a style: one that finds nothing is refused.
+  assert.ok(bad.some((p) => /lens "core.z": a canvas's props are a flat lens/.test(p)), bad.join('\n'));
 });
 
 test('the session-start text is read from the instructions on the map', async () => {

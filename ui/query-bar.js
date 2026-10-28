@@ -296,6 +296,8 @@ export function fitBar() {
   if (!bar) return;
   const over = (el) => el && el.scrollWidth > el.clientWidth + 1;
   const view = bar.querySelector('.q-view');
+  // The band is narrowed by more than the bar: the strip of the pane it stands in takes room beside it.
+  if (view) fits.observe(view);
   if (view) {
     view.classList.remove('tight', 'tighter', 'tightest');
     const canvas = view.querySelector('.q-canvas');
@@ -310,4 +312,5 @@ export function fitBar() {
   }
   fitRows();
 }
-if (bar) new ResizeObserver(fitBar).observe(bar);
+const fits = new ResizeObserver(() => fitBar());
+if (bar) fits.observe(bar);

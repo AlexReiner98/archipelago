@@ -180,7 +180,7 @@ export interface PieceDef {
  */
 export interface StyleDef {
   id: string;
-  /** The system type it is a preset of: a style unless it says, or an instruction (what agents are told, in body). */
+  /** The system type it is a preset of: a style unless it says, an instruction (what agents are told, in body), or a canvas (lens). */
   type?: string;
   title: string;
   body?: string;
@@ -326,7 +326,8 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   for (const style of pack.styles ?? []) {
     const at = `${style.type ?? 'style'} "${style.id}"`;
     const styleFields = types.get(style.type ?? 'style')?.fields ?? {};
-    if (style.type !== undefined && !['style', 'instruction'].includes(style.type)) problems.push(`${at}: a preset is a style or an instruction`);
+    if (style.type !== undefined && !['style', 'instruction', 'lens'].includes(style.type)) problems.push(`${at}: a preset is a style, an instruction or a canvas (lens)`);
+    if (style.type === 'lens' && (typeof style.props?.filter !== 'object' || !style.props.filter)) problems.push(`${at}: a canvas's props are a flat lens and a style: { filter, walk, limit, style }`);
     if (style.type === 'instruction' ? typeof style.body !== 'string' || !style.body.trim() : style.body !== undefined) problems.push(`${at}: an instruction says its words in body, and only an instruction has one`);
     if (!own(style.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
     if (!style.title || !style.props || typeof style.props !== 'object') problems.push(`${at} needs a title and its props`);
