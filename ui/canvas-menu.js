@@ -11,14 +11,15 @@ document.body.append(list);
 function open(anchor) {
   const now = hooks.canvasNow;
   if (!now) return;
+  // Arrange is done and the list shuts; Fit and Snap are ticks: the list stays, drawn again with what is on.
   const item = (text, title, act, on) =>
-    h('button', { type: 'button', role: on === undefined ? 'menuitem' : 'menuitemcheckbox', ...(on !== undefined && { 'aria-checked': String(on) }), title, onclick: () => (list.hidePopover(), act()) }, text);
+    h('button', { type: 'button', role: on === undefined ? 'menuitem' : 'menuitemcheckbox', ...(on !== undefined && { 'aria-checked': String(on) }), title, onclick: () => (on === undefined ? (list.hidePopover(), act()) : (act(), open(anchor))) }, text);
   list.replaceChildren(
     item('Arrange', 'Lay this canvas out again as its drawing does, forgetting where you put things', now.arrange),
     item('Fit', 'Bring all of the drawing into sight on every change; off, the canvas moves only when you move it', () => now.toggle('fit'), Boolean(now.settings.fit)),
     item('Snap', 'Let what you move go on a soft grid', () => now.toggle('snap'), Boolean(now.settings.snap)),
   );
-  list.showPopover();
+  if (!list.matches(':popover-open')) list.showPopover();
   // Under the ⋯, its right edge on the ⋯'s, kept on the page.
   const r = anchor.getBoundingClientRect();
   list.style.left = `${Math.max(0, Math.min(r.right - list.offsetWidth, innerWidth - list.offsetWidth))}px`;
