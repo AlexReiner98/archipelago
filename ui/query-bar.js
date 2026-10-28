@@ -227,18 +227,18 @@ export function drawQuery(lens, view, go, lead) {
   const drawn = answer && h('span', { class: `q-count${answer.cut ? ' cut' : ''}`, title: answer.cut ? 'The limit cut what the lens finds' : 'Items drawn' }, `${answer.items.length}${answer.cut ? '+' : ''} drawn`);
   const failed = view?.failed && h('span', { class: 'q-count cut', title: view.failed }, '!');
   // The query in one line, each part by the word its row in the editor has: the search's words (set in the find bar, not
-  // a row of the editor), what the filter's other terms add (+) and what it leaves out beyond the system's own (−), and
-  // the walk. The whole of it is the line's tooltip.
+  // a row of the editor); the nodes: what the filter's other terms add, each by name, then struck through what it leaves
+  // out beyond the system's own; and the edges the walk follows. The whole of it, in words, is the line's tooltip.
   const { text, ...terms } = f;
-  const outTypes = exclude.filter((x) => x !== 'system' && x !== 'closed');
-  const outSaid = [exclude.includes('closed') && 'closed', outTypes.length === 1 ? typeTitle(outTypes[0]) : outTypes.length > 1 && `${outTypes.length} types`].filter(Boolean).join(', ');
-  const filterLine = [filterSaid(terms, redraw) && `+ ${filterSaid(terms, redraw)}`, outSaid && `− ${outSaid}`].filter(Boolean).join('  ');
+  const kept = filterTerms.map((t) => t.said);
+  const out = exclude.filter((x) => x !== 'system').map((x) => (x === 'closed' ? x : typeTitle(x)));
+  const walkSaid = `${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')}, ${steps} ${steps === 1 ? 'step' : 'steps'}`;
   const parts = [
     text && ['Search', `“${text}”`],
-    filterLine && ['Filter', filterLine],
-    walking && ['Walk', `${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')}, ${steps} ${steps === 1 ? 'step' : 'steps'}`],
+    (kept.length > 0 || out.length > 0) && ['Nodes', [...kept.map((x) => h('span', { class: 'q-kept' }, x)), ...out.map((x) => h('s', { class: 'q-struck', title: `${x}: left out` }, x))]],
+    walking && ['Edges', walkSaid],
   ].filter(Boolean);
-  const said = parts.map(([word, what]) => `${word}: ${what}`).join(' · ');
+  const said = [text && `Search: “${text}”`, kept.length > 0 && `Nodes: ${kept.join(', ')}`, out.length > 0 && `not ${out.join(', ')}`, walking && `Edges: ${walkSaid}`].filter(Boolean).join(' · ');
   const toggle = () => ((editing = !editing), redraw());
   // Three bands, one under the other: the view (the canvas up and what is done with it, joined to its tab or its pane's
   // strip), the query in one line, and, while it is being edited, a row for each part of it under that line.
@@ -250,9 +250,9 @@ export function drawQuery(lens, view, go, lead) {
       drawn, failed,
       h('button', { type: 'button', class: 'q-save q-word q-edit-toggle', title: editing ? 'Done editing the query' : 'Edit the query: what it finds, leaves out and walks along', 'aria-expanded': String(editing), onclick: toggle }, editing ? 'Done' : 'Edit')),
     h('div', { class: 'q-edit', role: 'group', 'aria-label': 'Edit the query', hidden: !editing, onkeydown: (ev) => ev.key === 'Escape' && toggle() },
-      part('q-filter', 'Filter', 'What it finds is drawn, but what it leaves out (−)', [...filterTerms, ...leftTerms], (a) => addToFilter(a), 'Add to the filter',
+      part('q-filter', 'Nodes', 'What it finds is drawn, but what it leaves out (−)', [...filterTerms, ...leftTerms], (a) => addToFilter(a), 'Add to the filter',
         h('button', { type: 'button', class: 'q-add q-less', title: 'Leave something out', 'aria-label': 'Leave something out', onclick: (ev) => leaveOut(ev.currentTarget) }, '−')),
-      part('q-walk-part', 'Walk', 'From what the filter finds, along these links either way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
+      part('q-walk-part', 'Edges', 'From what the filter finds, along these links either way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
         walking && h('span', { class: 'q-label q-sub', title: 'How many steps the walk takes' }, 'Steps'),
         walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },
           h('button', { type: 'button', title: 'One step fewer', disabled: steps <= 1, onclick: () => walk({ steps: steps - 1 }) }, '−'),
